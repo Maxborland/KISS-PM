@@ -63,7 +63,7 @@ export const planningRouteTestDataset: SeedTenantDataset = createTenantScenarioD
       name: "Егор Исполнитель",
       accessProfileId: "access-profile-reader",
       positionId: "position-engineer",
-      password: "local-executor-password"
+      password: "executor12345"
     },
     {
       id: "user-alpha-plan-reader-no-resources",
@@ -72,7 +72,7 @@ export const planningRouteTestDataset: SeedTenantDataset = createTenantScenarioD
       name: "Никита Без Ресурсов",
       accessProfileId: "access-profile-plan-reader-no-resources",
       positionId: "position-engineer",
-      password: "local-reader-password"
+      password: "reader12345"
     },
     {
       id: "user-alpha-plan-manager-no-read",
@@ -81,7 +81,7 @@ export const planningRouteTestDataset: SeedTenantDataset = createTenantScenarioD
       name: "Марина Без Чтения",
       accessProfileId: "access-profile-plan-manager-no-read",
       positionId: "position-manager",
-      password: "local-manager-password"
+      password: "manager12345"
     },
     {
       id: "user-alpha-plan-resource-manager-no-read",
@@ -90,7 +90,7 @@ export const planningRouteTestDataset: SeedTenantDataset = createTenantScenarioD
       name: "Марина Ресурсы Без Чтения",
       accessProfileId: "access-profile-plan-resource-manager-no-read",
       positionId: "position-manager",
-      password: "local-manager-password"
+      password: "manager12345"
     },
     {
       id: "user-alpha-plan-manager-reader-no-resource-manage",
@@ -99,7 +99,7 @@ export const planningRouteTestDataset: SeedTenantDataset = createTenantScenarioD
       name: "Павел План Без Ресурсов",
       accessProfileId: "access-profile-plan-manager-reader-no-resource-manage",
       positionId: "position-manager",
-      password: "local-manager-password"
+      password: "manager12345"
     },
     {
       id: "user-alpha-scenario-no-read",

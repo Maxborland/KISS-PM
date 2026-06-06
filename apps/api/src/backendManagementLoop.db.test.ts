@@ -15,7 +15,7 @@ import { createApp } from "./app";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const dataset: SeedTenantDataset = {
   tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],
@@ -41,7 +41,7 @@ const dataset: SeedTenantDataset = {
       name: "Анна Администратор",
       accessProfileId: "access-profile-admin",
       positionId: "position-manager",
-      password: "local-admin-password"
+      password: "admin12345"
     }
   ]
 };
@@ -164,7 +164,7 @@ describe("backend management loop DB smoke", () => {
     const response = await app.request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "admin@kiss-pm.local", password: "local-admin-password" })
+      body: JSON.stringify({ email: "admin@kiss-pm.local", password: "admin12345" })
     });
 
     expect(response.status).toBe(200);

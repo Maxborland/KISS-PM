@@ -39,8 +39,8 @@ describe("communications realtime API", () => {
   });
 
   it("creates call room, starts session, issues safe join token and records participant events", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const readerCookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
 
     const room = await createRoom(adminCookie);
     expect(room.callRoom).toMatchObject({
@@ -123,8 +123,8 @@ describe("communications realtime API", () => {
   });
 
   it("supports call rooms scoped to the workspace general communication channel", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const readerCookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
 
     const channels = await app.request("/api/workspace/communication-channels", {
       headers: { cookie: adminCookie }
@@ -189,7 +189,7 @@ describe("communications realtime API", () => {
   });
 
   it("emits distinct events for invited and joining participant states", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const room = await createRoom(adminCookie);
     const started = await startSession(adminCookie, room.callRoom.roomId);
 
@@ -223,8 +223,8 @@ describe("communications realtime API", () => {
   });
 
   it("rejects join tokens when the session ends after the route pre-check", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const readerCookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
     const room = await createRoom(adminCookie);
     const started = await startSession(adminCookie, room.callRoom.roomId);
     const race = createSessionEndedRaceApp(started.session.id);
@@ -248,8 +248,8 @@ describe("communications realtime API", () => {
   });
 
   it("rejects participant updates when the session ends after the route pre-check", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const readerCookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
     const room = await createRoom(adminCookie);
     const started = await startSession(adminCookie, room.callRoom.roomId);
     const race = createSessionEndedRaceApp(started.session.id);
@@ -276,8 +276,8 @@ describe("communications realtime API", () => {
   });
 
   it("blocks users without parent entity access", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const deniedCookie = await loginAs("denied@kiss-pm.local", "local-denied-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
     const room = await createRoom(adminCookie);
 
     const deniedList = await app.request(
@@ -294,7 +294,7 @@ describe("communications realtime API", () => {
   });
 
   it("maps concurrent active session creation to a stable conflict", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const room = await createRoom(adminCookie);
     await startSession(adminCookie, room.callRoom.roomId);
 
@@ -313,7 +313,7 @@ describe("communications realtime API", () => {
   });
 
   it("maps duplicate provider room ids to a stable conflict", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createRoom(adminCookie);
 
     const duplicate = await app.request("/api/workspace/call-rooms", {
@@ -334,7 +334,7 @@ describe("communications realtime API", () => {
   });
 
   it("returns stable conflict when ending an already-ended session", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const room = await createRoom(adminCookie);
     const started = await startSession(adminCookie, room.callRoom.roomId);
 
@@ -353,7 +353,7 @@ describe("communications realtime API", () => {
   });
 
   it("returns stable validation errors before recording and participant FK failures", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const room = await createRoom(adminCookie);
     const started = await startSession(adminCookie, room.callRoom.roomId);
     const sameEntityAttachment = await createExternalReferenceAttachment({
@@ -387,8 +387,8 @@ describe("communications realtime API", () => {
   });
 
   it("audits denied manage attempts before returning forbidden", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const readerCookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
     const room = await createRoom(adminCookie);
     const started = await startSession(adminCookie, room.callRoom.roomId);
 
@@ -441,7 +441,7 @@ describe("communications realtime API", () => {
   });
 
   it("attaches recordings only through same-entity attachments", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const room = await createRoom(adminCookie);
     const sameEntityAttachment = await createExternalReferenceAttachment({
       attachmentId: "attachment-project",

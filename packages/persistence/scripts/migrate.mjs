@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import postgres from "postgres";
 
 const defaultDatabaseUrl =
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 const databaseUrl = process.env.DATABASE_URL ?? defaultDatabaseUrl;
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(scriptDir, "..", "migrations");

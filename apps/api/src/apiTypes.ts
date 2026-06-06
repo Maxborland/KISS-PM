@@ -1,6 +1,10 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type {
   PlanningCommand,
+  CrmPipeline,
+  CrmPipelineStage,
+  CrmPipelineStageAutomationDefinition,
+  CrmPipelineTransitionRule,
   BackgroundJobEvent,
   BackgroundJobKind,
   BackgroundJobRun,
@@ -433,6 +437,16 @@ export type ApiTenantDataSource = {
   ): Promise<DealStageRecord | undefined>;
   createDealStage?(input: DealStageInput): Promise<DealStageRecord>;
   updateDealStage?(input: DealStageInput): Promise<DealStageRecord>;
+  listCrmPipelines?(tenantId: TenantId): Promise<CrmPipeline[]>;
+  listCrmPipelineStages?(tenantId: TenantId, pipelineId: string): Promise<CrmPipelineStage[]>;
+  listCrmPipelineTransitionRules?(
+    tenantId: TenantId,
+    pipelineId: string
+  ): Promise<CrmPipelineTransitionRule[]>;
+  listCrmPipelineStageAutomationDefinitions?(
+    tenantId: TenantId,
+    pipelineId: string
+  ): Promise<CrmPipelineStageAutomationDefinition[]>;
   listCustomFieldDefinitions?(
     tenantId: TenantId
   ): Promise<CustomFieldDefinitionRecord[]>;

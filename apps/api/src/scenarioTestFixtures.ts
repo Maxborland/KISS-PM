@@ -52,7 +52,7 @@ export function createTenantScenarioDataset(input: TenantScenarioInput = {}): Se
         name: input.adminName ?? "Анна Администратор",
         accessProfileId: adminAccessProfileId,
         positionId: positions[0]?.id ?? null,
-        password: input.adminPassword ?? "local-admin-password"
+        password: input.adminPassword ?? "admin12345"
       },
       ...(input.users ?? [])
     ]

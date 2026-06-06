@@ -11,7 +11,7 @@ test("CRM entity detail pages share workspace template and persisted inline edit
 
   const suffix = Date.now().toString(36);
   await page.goto("/");
-  await loginToWorkspace(page, { password: "local-admin-password" });
+  await loginToWorkspace(page, { password: "admin12345" });
 
   const clientsResponse = await page.request.get("/api/workspace/clients");
   expect(clientsResponse.status()).toBe(200);

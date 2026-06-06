@@ -14,7 +14,7 @@ import { createApp } from "./app";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const dataset: SeedTenantDataset = {
   tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],
@@ -49,7 +49,7 @@ const dataset: SeedTenantDataset = {
       name: "Анна Администратор",
       accessProfileId: "access-profile-admin",
       positionId: "position-engineer",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-alpha-resource-reader",
@@ -58,7 +58,7 @@ const dataset: SeedTenantDataset = {
       name: "Роман Ресурсный",
       accessProfileId: "access-profile-resource-reader",
       positionId: "position-engineer",
-      password: "local-resource-password"
+      password: "resource12345"
     },
     {
       id: "user-alpha-plan-reader-no-resources",
@@ -67,7 +67,7 @@ const dataset: SeedTenantDataset = {
       name: "Никита Без Ресурсов",
       accessProfileId: "access-profile-plan-reader-no-resources",
       positionId: "position-engineer",
-      password: "local-reader-password"
+      password: "reader12345"
     }
   ]
 };
@@ -299,7 +299,7 @@ describe("capacity API routes", () => {
   });
 
   it("returns 403 for tree without project_resources.read", async () => {
-    const cookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "local-reader-password");
+    const cookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "reader12345");
     const response = await app.request("/api/workspace/capacity/tree?monthIso=2026-05", {
       headers: { cookie }
     });
@@ -307,7 +307,7 @@ describe("capacity API routes", () => {
   });
 
   it("returns capacity_invalid_query for invalid month/date/resource input", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const tree = await app.request("/api/workspace/capacity/tree?monthIso=2026-13", {
       headers: { cookie }
     });
@@ -337,8 +337,8 @@ describe("capacity API routes", () => {
   });
 
   it("rejects invalid and unreadable project filters instead of returning tenant-wide data", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const limitedCookie = await loginAs("resource-reader@kiss-pm.local", "local-resource-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const limitedCookie = await loginAs("resource-reader@kiss-pm.local", "resource12345");
     await createProject({
       projectId: "project-readable",
       opportunityId: "opportunity-readable",
@@ -362,7 +362,7 @@ describe("capacity API routes", () => {
   });
 
   it("aggregates active and draft capacity containers across tenant resources", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createProject({
       projectId: "project-active",
       opportunityId: "opportunity-active",
@@ -446,7 +446,7 @@ describe("capacity API routes", () => {
   });
 
   it("counts planning reservations in tenant load and drilldown", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const org = await app.request("/api/tenant/current/org-structure", {
       method: "PUT",
       headers: {
@@ -533,8 +533,8 @@ describe("capacity API routes", () => {
   });
 
   it("does not leak admin-warmed project metadata to resource-only users", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const limitedCookie = await loginAs("resource-reader@kiss-pm.local", "local-resource-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const limitedCookie = await loginAs("resource-reader@kiss-pm.local", "resource12345");
     await createProject({
       projectId: "project-hidden",
       opportunityId: "opportunity-hidden",
@@ -566,8 +566,8 @@ describe("capacity API routes", () => {
   });
 
   it("returns readable and masked drilldown contributions for employee-day", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const limitedCookie = await loginAs("resource-reader@kiss-pm.local", "local-resource-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const limitedCookie = await loginAs("resource-reader@kiss-pm.local", "resource12345");
     await createProject({
       projectId: "project-alpha",
       opportunityId: "opportunity-alpha",
@@ -622,7 +622,7 @@ describe("capacity API routes", () => {
   });
 
   it("invalidates capacity cache after absence changes", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createProject({
       projectId: "project-absence",
       opportunityId: "opportunity-absence",
@@ -672,7 +672,7 @@ describe("capacity API routes", () => {
   });
 
   it("subtracts absence capacity even when the employee has no project load", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const absence = await app.request("/api/tenant/current/absences", {
       method: "POST",
       headers: {
@@ -706,7 +706,7 @@ describe("capacity API routes", () => {
   });
 
   it("invalidates capacity cache after task facade creates capacity load", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createProject({
       projectId: "project-task-facade",
       opportunityId: "opportunity-task-facade",
@@ -756,7 +756,7 @@ describe("capacity API routes", () => {
   });
 
   it("invalidates capacity cache after project closure removes committed load", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createProject({
       projectId: "project-closure-capacity",
       opportunityId: "opportunity-closure-capacity",
@@ -803,7 +803,7 @@ describe("capacity API routes", () => {
   });
 
   it("returns capacity summary for admin", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const response = await app.request("/api/workspace/capacity/summary?monthIso=2026-05", {
       headers: { cookie }
     });

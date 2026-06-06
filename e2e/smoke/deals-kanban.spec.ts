@@ -12,7 +12,7 @@ test("deals kanban stage move persists after reload", async ({ page }) => {
   const title = `Канбан проверка ${suffix}`;
 
   await page.goto("/");
-  await loginToWorkspace(page, { password: "local-admin-password" });
+  await loginToWorkspace(page, { password: "admin12345" });
   await deactivateStaleSmokeOpportunityFields(page);
   const customFieldValues = await getRequiredOpportunityCustomFieldValues(page);
 

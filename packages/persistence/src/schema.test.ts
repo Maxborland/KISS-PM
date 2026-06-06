@@ -1,6 +1,9 @@
+import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import {
+  crmPipelineStages,
+  crmPipelines,
   getPersistenceTableColumns,
   persistenceTableNames,
   tenantOwnedTableNames
@@ -19,6 +22,10 @@ describe("PostgreSQL persistence schema", () => {
       "products",
       "project_types",
       "deal_stages",
+      "crm_pipelines",
+      "crm_pipeline_stages",
+      "crm_pipeline_transition_rules",
+      "crm_pipeline_stage_automation_definitions",
       "opportunities",
       "opportunity_demands",
       "projects",
@@ -110,6 +117,10 @@ describe("PostgreSQL persistence schema", () => {
       "products",
       "project_types",
       "deal_stages",
+      "crm_pipelines",
+      "crm_pipeline_stages",
+      "crm_pipeline_transition_rules",
+      "crm_pipeline_stage_automation_definitions",
       "opportunities",
       "opportunity_demands",
       "projects",
@@ -192,6 +203,77 @@ describe("PostgreSQL persistence schema", () => {
     for (const tableName of tenantOwnedTableNames) {
       expect(getPersistenceTableColumns(tableName)).toContain("tenant_id");
     }
+  });
+
+  it("stores first-class CRM pipeline contract without changing flat deal stages", () => {
+    expect(getPersistenceTableColumns("crm_pipelines")).toEqual([
+      "id",
+      "tenant_id",
+      "name",
+      "status",
+      "lifecycle_graph_metadata",
+      "created_at",
+      "updated_at"
+    ]);
+    expect(getPersistenceTableColumns("crm_pipeline_stages")).toEqual([
+      "id",
+      "tenant_id",
+      "pipeline_id",
+      "name",
+      "sort_order",
+      "status",
+      "lifecycle_state",
+      "is_final",
+      "created_at",
+      "updated_at"
+    ]);
+    expect(getPersistenceTableColumns("crm_pipeline_transition_rules")).toEqual([
+      "id",
+      "tenant_id",
+      "pipeline_id",
+      "from_stage_id",
+      "to_stage_id",
+      "required_permission",
+      "required_fields",
+      "require_reason",
+      "status",
+      "created_at",
+      "updated_at"
+    ]);
+    expect(getPersistenceTableColumns("crm_pipeline_stage_automation_definitions")).toEqual([
+      "id",
+      "tenant_id",
+      "pipeline_id",
+      "stage_id",
+      "trigger",
+      "action_type",
+      "action_config",
+      "status",
+      "created_at",
+      "updated_at"
+    ]);
+    expect(getPersistenceTableColumns("deal_stages")).toEqual([
+      "id",
+      "tenant_id",
+      "name",
+      "sort_order",
+      "status",
+      "created_at",
+      "updated_at"
+    ]);
+  });
+
+  it("requires explicit structured lifecycle graph metadata for CRM pipelines", () => {
+    expect(crmPipelines.lifecycleGraphMetadata.notNull).toBe(true);
+    expect(crmPipelines.lifecycleGraphMetadata.hasDefault).toBe(false);
+  });
+
+  it("keeps CRM pipeline stage finality consistent with lifecycle state", () => {
+    const stageChecks = getTableConfig(crmPipelineStages).checks.map(
+      (constraint) => constraint.name
+    );
+
+    expect(stageChecks).toContain("crm_pipeline_stages_final_lifecycle_state_chk");
   });
 
   it("stores Phase 12 personal calendars and occupancy events", () => {

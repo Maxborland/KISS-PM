@@ -14,7 +14,7 @@ import { createApp } from "./app";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const dataset: SeedTenantDataset = {
   tenants: [{ id: "tenant-alpha", name: "Альфа" }],
@@ -41,7 +41,7 @@ const dataset: SeedTenantDataset = {
       name: "Админ",
       accessProfileId: "access-profile-admin",
       positionId: "pos-dev",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-org-reader",
@@ -50,7 +50,7 @@ const dataset: SeedTenantDataset = {
       name: "Читатель",
       accessProfileId: "access-profile-org-reader",
       positionId: "pos-dev",
-      password: "local-reader-password"
+      password: "reader12345"
     }
   ]
 };
@@ -79,8 +79,8 @@ describe("org structure routes (db)", () => {
     await seedTenantDataset(db, dataset);
     const dataSource = createPostgresTenantDataSource(db);
     const app = createApp({ dataSource });
-    adminCookie = await login(app, "admin@kiss-pm.local", "local-admin-password");
-    readerCookie = await login(app, "org-reader@kiss-pm.local", "local-reader-password");
+    adminCookie = await login(app, "admin@kiss-pm.local", "admin12345");
+    readerCookie = await login(app, "org-reader@kiss-pm.local", "reader12345");
   });
 
   afterAll(async () => {

@@ -13,7 +13,7 @@ import { createApp } from "./app";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const collaborationSeed: SeedTenantDataset = {
   tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],
@@ -70,7 +70,7 @@ const collaborationSeed: SeedTenantDataset = {
       name: "Анна Администратор",
       accessProfileId: "access-profile-admin",
       positionId: "position-manager",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-alpha-executor",
@@ -79,7 +79,7 @@ const collaborationSeed: SeedTenantDataset = {
       name: "Егор Исполнитель",
       accessProfileId: "access-profile-reader",
       positionId: "position-engineer",
-      password: "local-executor-password"
+      password: "executor12345"
     },
     {
       id: "user-alpha-denied",
@@ -87,7 +87,7 @@ const collaborationSeed: SeedTenantDataset = {
       email: "denied@kiss-pm.local",
       name: "Дина Без Прав",
       accessProfileId: "access-profile-denied",
-      password: "local-denied-password"
+      password: "denied12345"
     }
   ]
 };
@@ -119,8 +119,8 @@ describe("collaboration and communications API", () => {
   });
 
   it("creates project conversation messages, mentions and readable notifications", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
 
     const conversations = await app.request(
       "/api/workspace/conversations?entityType=project&entityId=project-alpha",
@@ -190,8 +190,8 @@ describe("collaboration and communications API", () => {
   });
 
   it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
 
     const channels = await app.request("/api/workspace/communication-channels", {
       headers: { cookie: adminCookie }
@@ -511,7 +511,7 @@ describe("collaboration and communications API", () => {
   });
 
   it("lists the latest conversation messages and pages older history by cursor", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const conversations = await app.request(
       "/api/workspace/conversations?entityType=project&entityId=project-alpha",
       { headers: { cookie: adminCookie } }
@@ -572,8 +572,8 @@ describe("collaboration and communications API", () => {
   });
 
   it("blocks users without parent entity access and rejects unsafe meeting links", async () => {
-    const deniedCookie = await loginAs("denied@kiss-pm.local", "local-denied-password");
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
 
     const denied = await app.request(
       "/api/workspace/conversations?entityType=project&entityId=project-alpha",
@@ -596,7 +596,7 @@ describe("collaboration and communications API", () => {
   });
 
   it("supports task and opportunity scoped discussions", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask();
 
     for (const entity of [
@@ -633,8 +633,8 @@ describe("collaboration and communications API", () => {
   });
 
   it("creates meetings with participants, external links, notes and action items", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
 
     const meeting = await createMeeting(adminCookie);
     expect(meeting.participants).toEqual(
@@ -711,7 +711,7 @@ describe("collaboration and communications API", () => {
   });
 
   it("requires explicit action item target for non-actionable meeting scopes", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const meeting = await app.request("/api/workspace/meetings", {
       method: "POST",
       headers: jsonHeaders(adminCookie),
@@ -757,7 +757,7 @@ describe("collaboration and communications API", () => {
   });
 
   it("persists notification preferences for digest-ready notification feeds", async () => {
-    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
 
     const update = await app.request("/api/workspace/notification-preferences", {
       method: "PUT",
@@ -800,7 +800,7 @@ describe("collaboration and communications API", () => {
   });
 
   it("rolls back message edits when success audit cannot be written", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const conversations = await app.request(
       "/api/workspace/conversations?entityType=project&entityId=project-alpha",
       { headers: { cookie: adminCookie } }
@@ -839,7 +839,7 @@ describe("collaboration and communications API", () => {
   });
 
   it("rolls back meeting external links when success audit cannot be written", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const meeting = await createMeeting(adminCookie);
     const failingApp = createAuditFailingApp();
 

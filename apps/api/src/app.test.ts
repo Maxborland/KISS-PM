@@ -543,7 +543,7 @@ describe("KISS PM API Phase 1 shell", () => {
       tenantId: "tenant-alpha",
       userId: "user-alpha-admin",
       email: "admin@kiss-pm.local",
-      ...hashPassword("local-admin-password")
+      ...hashPassword("admin12345")
     };
     const dataSource: Partial<ApiTenantDataSource> = {
       async findCredentialByEmail(email) {
@@ -593,9 +593,9 @@ describe("KISS PM API Phase 1 shell", () => {
   });
 
   it("checks login passwords through the same verifier when email is unknown", () => {
-    const credential = hashPassword("local-admin-password");
+    const credential = hashPassword("admin12345");
 
-    expect(verifyLoginPassword("local-admin-password", credential)).toBe(true);
+    expect(verifyLoginPassword("admin12345", credential)).toBe(true);
     expect(verifyLoginPassword("wrong-password", credential)).toBe(false);
     expect(verifyLoginPassword("wrong-password", undefined)).toBe(false);
   });
@@ -644,7 +644,7 @@ describe("KISS PM API Phase 1 shell", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         email: "admin@kiss-pm.local",
-        password: "local-admin-password",
+        password: "admin12345",
         padding: "x".repeat(70 * 1024)
       })
     });
@@ -684,7 +684,7 @@ describe("KISS PM API Phase 1 shell", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         email: `${"a".repeat(250)}@example.local`,
-        password: "local-admin-password"
+        password: "admin12345"
       })
     });
     expect(oversizedEmail.status).toBe(400);
@@ -709,7 +709,7 @@ describe("KISS PM API Phase 1 shell", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         email: "admin\u0000@kiss-pm.local",
-        password: "local-admin-password"
+        password: "admin12345"
       })
     });
     expect(controlEmail.status).toBe(400);
@@ -722,7 +722,7 @@ describe("KISS PM API Phase 1 shell", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         email: "not-an-email",
-        password: "local-admin-password"
+        password: "admin12345"
       })
     });
     expect(malformedEmail.status).toBe(400);

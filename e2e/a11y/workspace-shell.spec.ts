@@ -6,7 +6,7 @@ import { expectAdminDashboardReady, loginToWorkspace } from "../smoke/smokeHelpe
 test.describe("Workspace shell accessibility", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await loginToWorkspace(page, { password: "local-admin-password" });
+    await loginToWorkspace(page, { password: "admin12345" });
     await expectAdminDashboardReady(page);
   });
 

@@ -254,6 +254,200 @@ export const dealStages = pgTable(
   ]
 );
 
+export const crmPipelines = pgTable(
+  "crm_pipelines",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("active"),
+    lifecycleGraphMetadata: jsonb("lifecycle_graph_metadata")
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "crm_pipelines_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("crm_pipelines_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("crm_pipelines_tenant_id_name_uidx").on(table.tenantId, table.name),
+    check("crm_pipelines_status_chk", sql`${table.status} in ('active', 'archived')`)
+  ]
+);
+
+export const crmPipelineStages = pgTable(
+  "crm_pipeline_stages",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    pipelineId: text("pipeline_id").notNull(),
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull(),
+    status: text("status").notNull().default("active"),
+    lifecycleState: text("lifecycle_state").notNull().default("open"),
+    isFinal: boolean("is_final").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "crm_pipeline_stages_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "crm_pipeline_stages_pipeline_fk",
+      columns: [table.tenantId, table.pipelineId],
+      foreignColumns: [crmPipelines.tenantId, crmPipelines.id]
+    }).onDelete("cascade"),
+    index("crm_pipeline_stages_tenant_pipeline_idx").on(table.tenantId, table.pipelineId),
+    uniqueIndex("crm_pipeline_stages_tenant_pipeline_id_uidx").on(
+      table.tenantId,
+      table.pipelineId,
+      table.id
+    ),
+    uniqueIndex("crm_pipeline_stages_tenant_pipeline_sort_order_uidx").on(
+      table.tenantId,
+      table.pipelineId,
+      table.sortOrder
+    ),
+    uniqueIndex("crm_pipeline_stages_tenant_pipeline_name_uidx").on(
+      table.tenantId,
+      table.pipelineId,
+      table.name
+    ),
+    check("crm_pipeline_stages_status_chk", sql`${table.status} in ('active', 'archived')`),
+    check(
+      "crm_pipeline_stages_lifecycle_state_chk",
+      sql`${table.lifecycleState} in ('open', 'won_closed', 'lost_rejected')`
+    ),
+    check(
+      "crm_pipeline_stages_final_lifecycle_state_chk",
+      sql`(${table.isFinal} = false and ${table.lifecycleState} = 'open') or (${table.isFinal} = true and ${table.lifecycleState} in ('won_closed', 'lost_rejected'))`
+    )
+  ]
+);
+
+export const crmPipelineTransitionRules = pgTable(
+  "crm_pipeline_transition_rules",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    pipelineId: text("pipeline_id").notNull(),
+    fromStageId: text("from_stage_id").notNull(),
+    toStageId: text("to_stage_id").notNull(),
+    requiredPermission: text("required_permission"),
+    requiredFields: jsonb("required_fields").$type<string[]>().notNull(),
+    requireReason: boolean("require_reason").notNull().default(false),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "crm_pipeline_transition_rules_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "crm_pipeline_transition_rules_pipeline_fk",
+      columns: [table.tenantId, table.pipelineId],
+      foreignColumns: [crmPipelines.tenantId, crmPipelines.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "crm_pipeline_transition_rules_from_stage_fk",
+      columns: [table.tenantId, table.pipelineId, table.fromStageId],
+      foreignColumns: [
+        crmPipelineStages.tenantId,
+        crmPipelineStages.pipelineId,
+        crmPipelineStages.id
+      ]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "crm_pipeline_transition_rules_to_stage_fk",
+      columns: [table.tenantId, table.pipelineId, table.toStageId],
+      foreignColumns: [
+        crmPipelineStages.tenantId,
+        crmPipelineStages.pipelineId,
+        crmPipelineStages.id
+      ]
+    }).onDelete("cascade"),
+    index("crm_pipeline_transition_rules_tenant_pipeline_idx").on(
+      table.tenantId,
+      table.pipelineId
+    ),
+    uniqueIndex("crm_pipeline_transition_rules_edge_uidx").on(
+      table.tenantId,
+      table.pipelineId,
+      table.fromStageId,
+      table.toStageId
+    ),
+    check("crm_pipeline_transition_rules_status_chk", sql`${table.status} in ('active', 'archived')`),
+    check(
+      "crm_pipeline_transition_rules_not_self_chk",
+      sql`${table.fromStageId} <> ${table.toStageId}`
+    )
+  ]
+);
+
+export const crmPipelineStageAutomationDefinitions = pgTable(
+  "crm_pipeline_stage_automation_definitions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    pipelineId: text("pipeline_id").notNull(),
+    stageId: text("stage_id").notNull(),
+    trigger: text("trigger").notNull(),
+    actionType: text("action_type").notNull(),
+    actionConfig: jsonb("action_config").$type<Record<string, unknown>>().notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "crm_pipeline_stage_automation_definitions_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "crm_pipeline_stage_automation_definitions_pipeline_fk",
+      columns: [table.tenantId, table.pipelineId],
+      foreignColumns: [crmPipelines.tenantId, crmPipelines.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "crm_pipeline_stage_automation_definitions_stage_fk",
+      columns: [table.tenantId, table.pipelineId, table.stageId],
+      foreignColumns: [
+        crmPipelineStages.tenantId,
+        crmPipelineStages.pipelineId,
+        crmPipelineStages.id
+      ]
+    }).onDelete("cascade"),
+    index("crm_pipeline_stage_automation_definitions_tenant_stage_idx").on(
+      table.tenantId,
+      table.pipelineId,
+      table.stageId
+    ),
+    check(
+      "crm_pipeline_stage_automation_definitions_trigger_chk",
+      sql`${table.trigger} in ('stage_entered', 'stage_left')`
+    ),
+    check(
+      "crm_pipeline_stage_automation_definitions_status_chk",
+      sql`${table.status} in ('active', 'archived')`
+    )
+  ]
+);
+
 export const opportunities = pgTable(
   "opportunities",
   {
@@ -3527,6 +3721,10 @@ export type PersistenceTableName =
   | "products"
   | "project_types"
   | "deal_stages"
+  | "crm_pipelines"
+  | "crm_pipeline_stages"
+  | "crm_pipeline_transition_rules"
+  | "crm_pipeline_stage_automation_definitions"
   | "opportunities"
   | "opportunity_demands"
   | "projects"
@@ -3623,6 +3821,10 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "products",
   "project_types",
   "deal_stages",
+  "crm_pipelines",
+  "crm_pipeline_stages",
+  "crm_pipeline_transition_rules",
+  "crm_pipeline_stage_automation_definitions",
   "opportunities",
   "opportunity_demands",
   "projects",
@@ -3712,6 +3914,10 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "products",
   "project_types",
   "deal_stages",
+  "crm_pipelines",
+  "crm_pipeline_stages",
+  "crm_pipeline_transition_rules",
+  "crm_pipeline_stage_automation_definitions",
   "opportunities",
   "opportunity_demands",
   "projects",
@@ -3866,6 +4072,52 @@ const tableColumns = {
     "tenant_id",
     "name",
     "sort_order",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  crm_pipelines: [
+    "id",
+    "tenant_id",
+    "name",
+    "status",
+    "lifecycle_graph_metadata",
+    "created_at",
+    "updated_at"
+  ],
+  crm_pipeline_stages: [
+    "id",
+    "tenant_id",
+    "pipeline_id",
+    "name",
+    "sort_order",
+    "status",
+    "lifecycle_state",
+    "is_final",
+    "created_at",
+    "updated_at"
+  ],
+  crm_pipeline_transition_rules: [
+    "id",
+    "tenant_id",
+    "pipeline_id",
+    "from_stage_id",
+    "to_stage_id",
+    "required_permission",
+    "required_fields",
+    "require_reason",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  crm_pipeline_stage_automation_definitions: [
+    "id",
+    "tenant_id",
+    "pipeline_id",
+    "stage_id",
+    "trigger",
+    "action_type",
+    "action_config",
     "status",
     "created_at",
     "updated_at"

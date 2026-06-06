@@ -14,7 +14,7 @@ import { projects } from "./schema";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const controlSeed: SeedTenantDataset = {
   tenants: [
@@ -49,7 +49,7 @@ const controlSeed: SeedTenantDataset = {
       email: "admin@alpha.local",
       name: "Анна Администратор",
       accessProfileId: "access-profile-alpha-admin",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-beta-admin",
@@ -57,7 +57,7 @@ const controlSeed: SeedTenantDataset = {
       email: "admin@beta.local",
       name: "Борис Администратор",
       accessProfileId: "access-profile-beta-admin",
-      password: "local-admin-password"
+      password: "admin12345"
     }
   ]
 };

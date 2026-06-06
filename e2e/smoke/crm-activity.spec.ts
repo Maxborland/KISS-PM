@@ -17,7 +17,7 @@ test("deal detail shows persisted feed and tasks in one CRM activity rail", asyn
   const taskTitle = `Контрольная задача ${suffix}`;
 
   await page.goto("/");
-  await loginToWorkspace(page, { password: "local-admin-password" });
+  await loginToWorkspace(page, { password: "admin12345" });
   await deactivateStaleSmokeOpportunityFields(page);
   const customFieldValues = await getRequiredOpportunityCustomFieldValues(page);
 
@@ -130,7 +130,7 @@ test("deal activity panel is read-only for users without manage and audit permis
   const comment = `Видимый комментарий ${suffix}`;
 
   await page.goto("/");
-  await loginToWorkspace(page, { password: "local-admin-password" });
+  await loginToWorkspace(page, { password: "admin12345" });
   await deactivateStaleSmokeOpportunityFields(page);
   const customFieldValues = await getRequiredOpportunityCustomFieldValues(page);
 
@@ -302,7 +302,7 @@ test("client, contact and product detail pages use persisted CRM activity", asyn
   const productFile = `Файл услуги ${suffix}`;
 
   await page.goto("/");
-  await loginToWorkspace(page, { password: "local-admin-password" });
+  await loginToWorkspace(page, { password: "admin12345" });
 
   expect(
     (

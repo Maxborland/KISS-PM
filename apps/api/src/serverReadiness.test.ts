@@ -20,7 +20,7 @@ describe("server readiness checks", () => {
   it("allows production startup configuration when DATABASE_URL is configured", () => {
     expect(() =>
       assertServerRuntimeConfig({
-        DATABASE_URL: "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm",
+        DATABASE_URL: "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm",
         NODE_ENV: "production"
       } as NodeJS.ProcessEnv)
     ).not.toThrow();
@@ -29,7 +29,7 @@ describe("server readiness checks", () => {
   it("fails production startup configuration when dev tenant routes are enabled", () => {
     expect(() =>
       assertServerRuntimeConfig({
-        DATABASE_URL: "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm",
+        DATABASE_URL: "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm",
         KISS_PM_ENABLE_DEV_ROUTES: "true",
         NODE_ENV: "production"
       } as NodeJS.ProcessEnv)
@@ -49,7 +49,7 @@ describe("server readiness checks", () => {
     ).toThrow("planning_events_redis_url_required");
     expect(() =>
       readServerRuntimeConfig({
-        DATABASE_URL: "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm",
+        DATABASE_URL: "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm",
         NODE_ENV: "production",
         PLANNING_EVENTS_BACKEND: "redis",
         PLANNING_EVENTS_REDIS_URL: "redis://cache.internal:6379"

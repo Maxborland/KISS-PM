@@ -4,11 +4,11 @@ import { hashPassword, hashSessionToken, verifyPassword } from "./auth";
 
 describe("auth password and session primitives", () => {
   it("verifies the original password and rejects another password", () => {
-    const hash = hashPassword("local-admin-password");
+    const hash = hashPassword("admin12345");
 
     expect(
       verifyPassword({
-        password: "local-admin-password",
+        password: "admin12345",
         ...hash
       })
     ).toBe(true);

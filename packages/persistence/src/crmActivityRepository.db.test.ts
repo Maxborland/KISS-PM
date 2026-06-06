@@ -12,7 +12,7 @@ import { createProjectIntakeRepository } from "./projectIntakeRepository";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const activitySeed: SeedTenantDataset = {
   tenants: [
@@ -77,7 +77,7 @@ const activitySeed: SeedTenantDataset = {
       name: "Анна Администратор",
       accessProfileId: "access-profile-admin",
       positionId: "position-engineer",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-alpha-assignee",
@@ -95,7 +95,7 @@ const activitySeed: SeedTenantDataset = {
       name: "Борис Администратор",
       accessProfileId: "access-profile-beta-admin",
       positionId: "position-beta-engineer",
-      password: "local-admin-password"
+      password: "admin12345"
     }
   ]
 };

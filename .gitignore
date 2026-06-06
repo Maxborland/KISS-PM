@@ -19,4 +19,4 @@ Thumbs.db
 .tmp/
 tmp/
 .worktrees/
-apps/web/.storybook-verify-tmp/
+apps/web/.storybook-verify-tmp/*.png

@@ -27,7 +27,7 @@ import {
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 const demo = createDemoTenantDataset();
 const dataset: SeedTenantDataset = {
   tenants: demo.tenants,
@@ -132,7 +132,7 @@ const dataset: SeedTenantDataset = {
         : "beta@kiss-pm.local",
     positionId:
       user.id === "user-alpha-admin" ? "position-project-manager" : null,
-    password: user.id === "user-alpha-admin" ? "local-admin-password" : "local-beta-password"
+    password: user.id === "user-alpha-admin" ? "admin12345" : "beta12345"
   })).concat([
     {
       id: "user-alpha-engineer",

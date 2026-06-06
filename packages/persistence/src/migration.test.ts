@@ -207,6 +207,13 @@ const phaseG3CommunicationChannelAttachmentsMigration = readFileSync(
   ),
   "utf8"
 );
+const crmPipelineSchemaContractMigration = readFileSync(
+  new URL(
+    "../migrations/0041_crm_pipeline_schema_contract.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -757,6 +764,50 @@ describe("Phase 4 general CRM activity SQL migration", () => {
     );
     expect(phase4GeneralCrmActivityMigration).toContain(
       'DROP TABLE IF EXISTS "opportunity_activities"'
+    );
+  });
+});
+
+describe("CRM pipeline schema contract SQL migration", () => {
+  it("adds first-class pipeline, stage, transition rule and automation tables", () => {
+    expect(crmPipelineSchemaContractMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "crm_pipelines"'
+    );
+    expect(crmPipelineSchemaContractMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "crm_pipeline_stages"'
+    );
+    expect(crmPipelineSchemaContractMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "crm_pipeline_transition_rules"'
+    );
+    expect(crmPipelineSchemaContractMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "crm_pipeline_stage_automation_definitions"'
+    );
+    expect(crmPipelineSchemaContractMigration).toContain(
+      'CONSTRAINT "crm_pipeline_stages_pipeline_fk"'
+    );
+    expect(crmPipelineSchemaContractMigration).toContain(
+      'CONSTRAINT "crm_pipeline_transition_rules_from_stage_fk"'
+    );
+    expect(crmPipelineSchemaContractMigration).toContain(
+      'CONSTRAINT "crm_pipeline_stage_automation_definitions_stage_fk"'
+    );
+    expect(crmPipelineSchemaContractMigration).not.toContain(
+      'ALTER TABLE "deal_stages"'
+    );
+  });
+
+  it("requires explicit structured lifecycle graph metadata on CRM pipeline writes", () => {
+    expect(crmPipelineSchemaContractMigration).toContain(
+      '"lifecycle_graph_metadata" jsonb NOT NULL,'
+    );
+    expect(crmPipelineSchemaContractMigration).not.toMatch(
+      /"lifecycle_graph_metadata" jsonb NOT NULL DEFAULT/
+    );
+  });
+
+  it("keeps CRM pipeline stage finality consistent with lifecycle state", () => {
+    expect(crmPipelineSchemaContractMigration).toContain(
+      'CONSTRAINT "crm_pipeline_stages_final_lifecycle_state_chk"'
     );
   });
 });

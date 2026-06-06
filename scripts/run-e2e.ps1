@@ -4,7 +4,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
 if (-not $env:DATABASE_URL) {
-  $env:DATABASE_URL = "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm"
+  $env:DATABASE_URL = "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm"
 }
 
 Write-Host "Starting Postgres..."

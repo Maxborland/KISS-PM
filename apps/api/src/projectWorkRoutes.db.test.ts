@@ -13,7 +13,7 @@ import { createApp } from "./app";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const projectWorkApiSeed: SeedTenantDataset = {
   tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],
@@ -74,7 +74,7 @@ const projectWorkApiSeed: SeedTenantDataset = {
       name: "Анна Администратор",
       accessProfileId: "access-profile-admin",
       positionId: "position-manager",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-alpha-executor",
@@ -83,7 +83,7 @@ const projectWorkApiSeed: SeedTenantDataset = {
       name: "Егор Исполнитель",
       accessProfileId: "access-profile-reader",
       positionId: "position-engineer",
-      password: "local-executor-password"
+      password: "executor12345"
     },
     {
       id: "user-alpha-denied",
@@ -91,7 +91,7 @@ const projectWorkApiSeed: SeedTenantDataset = {
       email: "denied@kiss-pm.local",
       name: "Дина Без Прав",
       accessProfileId: "access-profile-denied",
-      password: "local-denied-password"
+      password: "denied12345"
     },
     {
       id: "user-alpha-manager-only",
@@ -100,7 +100,7 @@ const projectWorkApiSeed: SeedTenantDataset = {
       name: "Марк Менеджер",
       accessProfileId: "access-profile-manager-only",
       positionId: "position-manager",
-      password: "local-manager-password"
+      password: "manager12345"
     }
   ]
 };
@@ -217,7 +217,7 @@ describe("project work API routes", () => {
   });
 
   it("rejects malformed project work route identifiers before persistence lookup", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
 
     const badProjectDetail = await app.request("/api/workspace/projects/bad..project", {
       headers: { cookie: adminCookie }
@@ -270,8 +270,8 @@ describe("project work API routes", () => {
   });
 
   it("creates a project task, returns it in project detail and My Work, and writes audit", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     const createdTask = await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -391,8 +391,8 @@ describe("project work API routes", () => {
   });
 
   it("creates projectless task CRUD records inside the workspace inbox planning project", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
 
     const createdTask = await app.request("/api/workspace/tasks", {
       method: "POST",
@@ -494,8 +494,8 @@ describe("project work API routes", () => {
   });
 
   it("lets an assigned executor transition their task status and writes audit", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -571,8 +571,8 @@ describe("project work API routes", () => {
   });
 
   it("keeps acceptance-required tasks on review until requester accepts the result", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -652,8 +652,8 @@ describe("project work API routes", () => {
   });
 
   it("manages tenant task statuses and keeps system statuses required", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const readerCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("executor@kiss-pm.local", "executor12345");
 
     const initial = await app.request("/api/workspace/task-statuses", {
       headers: { cookie: adminCookie }
@@ -769,8 +769,8 @@ describe("project work API routes", () => {
   });
 
   it("lets requester accept review tasks without manage permission", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const requesterCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const requesterCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -852,8 +852,8 @@ describe("project work API routes", () => {
   });
 
   it("persists task comments for task participants and blocks unrelated readers", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -928,8 +928,8 @@ describe("project work API routes", () => {
   });
 
   it("blocks task field edits and archive for executors without edit/delete permission", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const executorCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -1022,8 +1022,8 @@ describe("project work API routes", () => {
   });
 
   it("requires resource manage permission for task PATCH participant assignment changes", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const requesterCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const requesterCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -1071,7 +1071,7 @@ describe("project work API routes", () => {
   });
 
   it("rejects stale task PATCH versions before applying planning compatibility commands", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -1124,7 +1124,7 @@ describe("project work API routes", () => {
   });
 
   it("rejects stale task PATCH after planning assignment changes", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -1196,8 +1196,8 @@ describe("project work API routes", () => {
   });
 
   it("requires explicit delete permission to archive requester-owned tasks", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const requesterCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const requesterCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -1262,8 +1262,8 @@ describe("project work API routes", () => {
   });
 
   it("lets manage-only actors transition task status without project read permission", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const managerCookie = await loginAs("manager-only@kiss-pm.local", "local-manager-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const managerCookie = await loginAs("manager-only@kiss-pm.local", "manager12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -1301,8 +1301,8 @@ describe("project work API routes", () => {
   });
 
   it("denies task status transition for non-participant readers", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const readerCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -1340,8 +1340,8 @@ describe("project work API routes", () => {
   });
 
   it("denies task status transition for observer participants", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const observerCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const observerCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -1382,7 +1382,7 @@ describe("project work API routes", () => {
   });
 
   it("rejects unsupported task statuses", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -1420,7 +1420,7 @@ describe("project work API routes", () => {
   });
 
   it("rejects status rollbacks after task completion", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -1482,7 +1482,7 @@ describe("project work API routes", () => {
   });
 
   it("requires same-origin action header for task status transitions", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
 
     const denied = await app.request(
       "/api/workspace/projects/project-alpha/tasks/task-any/status",
@@ -1503,8 +1503,8 @@ describe("project work API routes", () => {
   });
 
   it("enforces project read and manage permissions", async () => {
-    const readerCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
-    const deniedCookie = await loginAs("denied@kiss-pm.local", "local-denied-password");
+    const readerCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+    const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
     const readerCreate = await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {

@@ -1,0 +1,13 @@
+{
+  "batch": "13f",
+  "date": "2026-05-24",
+  "command": "pnpm --filter @kiss-pm/web test",
+  "exitCode": 0,
+  "testFiles": 2,
+  "testsPassed": 6,
+  "files": [
+    "apps/web/vitest.config.ts",
+    "apps/web/src/__health__/storybook-contract.health.test.ts",
+    "apps/web/.storybook/sidebarLabelsRu.test.ts"
+  ]
+}

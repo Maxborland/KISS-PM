@@ -6,7 +6,7 @@ const configDir = dirname(fileURLToPath(import.meta.url));
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 const apiPort = process.env.E2E_API_PORT ?? "4100";
 const webPort = process.env.E2E_WEB_PORT ?? "3100";
 const apiOrigin = `http://127.0.0.1:${apiPort}`;

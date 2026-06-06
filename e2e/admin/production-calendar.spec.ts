@@ -7,7 +7,7 @@ test.describe("production calendar", () => {
     await page.goto("/");
     await loginToWorkspace(page, {
       email: "admin@kiss-pm.local",
-      password: "local-admin-password"
+      password: "admin12345"
     });
 
     await page.goto("/settings/production-calendar");

@@ -32,7 +32,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await expect(
     page.getByRole("heading", { name: "Вход в рабочее пространство" })
   ).toBeVisible();
-  await loginToWorkspace(page, { password: "local-admin-password" });
+  await loginToWorkspace(page, { password: "admin12345" });
   await deactivateStaleSmokeOpportunityFields(page);
   await expectAdminDashboardReady(page);
   await verifyResponsiveNavigation(page);
@@ -989,7 +989,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await logoutThroughUserMenu(page);
   await loginToWorkspace(page, {
     email: "admin@kiss-pm.local",
-    password: "local-admin-password"
+    password: "admin12345"
   });
   await expect(page.getByRole("heading", { name: "Рабочее пространство" })).toBeVisible();
 
@@ -1070,7 +1070,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({
   await logoutThroughUserMenu(page);
   await loginToWorkspace(page, {
     email: "admin@kiss-pm.local",
-    password: "local-admin-password"
+    password: "admin12345"
   });
   await expect(page.getByRole("heading", { name: "Рабочее пространство" })).toBeVisible();
 

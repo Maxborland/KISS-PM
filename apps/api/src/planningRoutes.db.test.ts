@@ -15,7 +15,7 @@ import { createApp } from "./app";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const dataset: SeedTenantDataset = {
   tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],
@@ -87,7 +87,7 @@ const dataset: SeedTenantDataset = {
       name: "Анна Администратор",
       accessProfileId: "access-profile-admin",
       positionId: "position-manager",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-alpha-executor",
@@ -96,7 +96,7 @@ const dataset: SeedTenantDataset = {
       name: "Егор Исполнитель",
       accessProfileId: "access-profile-reader",
       positionId: "position-engineer",
-      password: "local-executor-password"
+      password: "executor12345"
     },
     {
       id: "user-alpha-plan-reader-no-resources",
@@ -105,7 +105,7 @@ const dataset: SeedTenantDataset = {
       name: "Никита Без Ресурсов",
       accessProfileId: "access-profile-plan-reader-no-resources",
       positionId: "position-engineer",
-      password: "local-reader-password"
+      password: "reader12345"
     },
     {
       id: "user-alpha-plan-manager-no-read",
@@ -114,7 +114,7 @@ const dataset: SeedTenantDataset = {
       name: "Марина Без Чтения",
       accessProfileId: "access-profile-plan-manager-no-read",
       positionId: "position-manager",
-      password: "local-manager-password"
+      password: "manager12345"
     },
     {
       id: "user-alpha-scenario-no-read",
@@ -132,7 +132,7 @@ const dataset: SeedTenantDataset = {
       name: "Павел Без Ресурсов",
       accessProfileId: "access-profile-plan-manager-no-resource-manage",
       positionId: "position-manager",
-      password: "local-plan-manager-password"
+      password: "planmanager12345"
     },
     {
       id: "user-alpha-resource-manager-no-plan",
@@ -141,7 +141,7 @@ const dataset: SeedTenantDataset = {
       name: "Роман Без Плана",
       accessProfileId: "access-profile-resource-manager-no-plan-manage",
       positionId: "position-manager",
-      password: "resourcelocal-manager-password"
+      password: "resourcemanager12345"
     }
   ]
 };
@@ -256,9 +256,9 @@ describe("planning API routes", () => {
   });
 
   it("exposes task CRUD records through planning read-model and applies dependency commands with versioned audit", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const readerCookie = await loginAs("executor@kiss-pm.local", "local-executor-password");
-    const planOnlyReaderCookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "local-reader-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+    const planOnlyReaderCookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "reader12345");
     await createTask(adminCookie, {
       id: "task-plan-a",
       title: "Подготовить план",
@@ -896,7 +896,7 @@ describe("planning API routes", () => {
   it("requires resource management permission when task creation includes assignments", async () => {
     const limitedManagerCookie = await loginAs(
       "plan-manager-no-resource-manage@kiss-pm.local",
-      "local-plan-manager-password"
+      "planmanager12345"
     );
     const readModel = await app.request(
       "/api/workspace/projects/project-alpha/planning/read-model",
@@ -960,10 +960,10 @@ describe("planning API routes", () => {
   });
 
   it("requires resource management permission to create and read auto-solver runs", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const limitedManagerCookie = await loginAs(
       "plan-manager-no-resource-manage@kiss-pm.local",
-      "local-plan-manager-password"
+      "planmanager12345"
     );
 
     const deniedCreate = await app.request(
@@ -1007,7 +1007,7 @@ describe("planning API routes", () => {
   it("requires plan management permission when assigned task creation also allocates resources", async () => {
     const resourceManagerCookie = await loginAs(
       "resource-manager-no-plan@kiss-pm.local",
-      "resourcelocal-manager-password"
+      "resourcemanager12345"
     );
     const readModel = await app.request(
       "/api/workspace/projects/project-alpha/planning/read-model",
@@ -1071,7 +1071,7 @@ describe("planning API routes", () => {
   });
 
   it("returns baseline comparison in the planning read-model", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask(adminCookie, {
       id: "task-baseline-a",
       title: "Сравнить baseline",
@@ -1171,7 +1171,7 @@ describe("planning API routes", () => {
   });
 
   it("emits distinct audit actions for archived and hard-deleted planning tasks", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask(adminCookie, {
       id: "task-archive-a",
       title: "Архивируемая задача",
@@ -1264,7 +1264,7 @@ describe("planning API routes", () => {
   it("requires plan read permission before returning command preview read models", async () => {
     const managerWithoutReadCookie = await loginAs(
       "plan-manager-no-read@kiss-pm.local",
-      "local-manager-password"
+      "manager12345"
     );
 
     const preview = await app.request(
@@ -1305,7 +1305,7 @@ describe("planning API routes", () => {
   it("requires plan read permission before returning apply and scenario planning details", async () => {
     const managerWithoutReadCookie = await loginAs(
       "plan-manager-no-read@kiss-pm.local",
-      "local-manager-password"
+      "manager12345"
     );
     const scenarioOperatorWithoutReadCookie = await loginAs(
       "scenario-no-read@kiss-pm.local",
@@ -1389,7 +1389,7 @@ describe("planning API routes", () => {
   });
 
   it("returns planning validation errors for invalid commands without mutating plan state", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask(adminCookie, {
       id: "task-plan-a",
       title: "Подготовить план",
@@ -1639,7 +1639,7 @@ describe("planning API routes", () => {
   });
 
   it("applies command batch atomically with idempotency and version conflict", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask(adminCookie, {
       id: "task-plan-a",
       title: "Подготовить план",
@@ -1742,7 +1742,7 @@ describe("planning API routes", () => {
   });
 
   it("rejects batch when a middle command has blocking validation", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask(adminCookie, {
       id: "task-plan-a",
       title: "Подготовить план",
@@ -1804,7 +1804,7 @@ describe("planning API routes", () => {
   });
 
   it("lists planning baselines for a project", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const response = await app.request("/api/workspace/projects/project-alpha/planning/baselines", {
       headers: { cookie: adminCookie }
     });
@@ -1814,7 +1814,7 @@ describe("planning API routes", () => {
   });
 
   it("opens planning events SSE stream for authorized reader", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const response = await app.request("/api/workspace/projects/project-alpha/planning/events", {
       headers: { cookie: adminCookie, Accept: "text/event-stream" }
     });
@@ -1823,7 +1823,7 @@ describe("planning API routes", () => {
   });
 
   it("lists and creates saved views with stable API keys", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const listEmpty = await app.request(
       "/api/workspace/projects/project-alpha/planning/saved-views",
       { headers: { cookie: adminCookie } }
@@ -1867,7 +1867,7 @@ describe("planning API routes", () => {
   });
 
   it("allows plan-only reader to load read-model and SSE without resource read", async () => {
-    const planOnlyCookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "local-reader-password");
+    const planOnlyCookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "reader12345");
     const readModel = await app.request(
       "/api/workspace/projects/project-alpha/planning/read-model",
       { headers: { cookie: planOnlyCookie } }
@@ -1881,7 +1881,7 @@ describe("planning API routes", () => {
   });
 
   it("applies project.settings.update with audit and plan recalc", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const response = await app.request(
       "/api/workspace/projects/project-alpha/planning/apply-command",
       {

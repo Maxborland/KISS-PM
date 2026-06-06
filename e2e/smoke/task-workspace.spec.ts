@@ -16,7 +16,7 @@ test("task workspace supports kanban creation, detail activity, drag status and 
   const editedTaskTitle = `${taskTitle} edited`;
 
   await page.goto("/");
-  await loginToWorkspace(page, { password: "local-admin-password" });
+  await loginToWorkspace(page, { password: "admin12345" });
   await page.getByRole("complementary").getByRole("button", { name: "Моя работа" }).click();
   await expect(page).toHaveURL(/\/my-work$/);
   await expect(page.getByRole("heading", { name: "Мои задачи" }).first()).toBeVisible();

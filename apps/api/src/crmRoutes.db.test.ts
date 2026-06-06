@@ -13,7 +13,7 @@ import { createApp } from "./app";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const dataset: SeedTenantDataset = {
   tenants: [
@@ -64,7 +64,7 @@ const dataset: SeedTenantDataset = {
       name: "Анна Администратор",
       accessProfileId: "access-profile-alpha-admin",
       positionId: "position-engineer",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-alpha-reader",
@@ -72,7 +72,7 @@ const dataset: SeedTenantDataset = {
       email: "reader@kiss-pm.local",
       name: "Роман Наблюдатель",
       accessProfileId: "access-profile-alpha-reader",
-      password: "local-reader-password"
+      password: "reader12345"
     }
   ]
 };
@@ -114,7 +114,7 @@ describe("Phase 3.1 CRM API", () => {
   });
 
   it("creates CRM foundation entities, creates a linked deal, opens detail and moves it across stages", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {
       "content-type": "application/json",
       "x-kiss-pm-action": "same-origin",
@@ -378,7 +378,7 @@ describe("Phase 3.1 CRM API", () => {
   });
 
   it("updates CRM foundation entities with tenant-scoped audit trail", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {
       "content-type": "application/json",
       "x-kiss-pm-action": "same-origin",
@@ -574,7 +574,7 @@ describe("Phase 3.1 CRM API", () => {
   });
 
   it("allows editing a contact on its archived current client but rejects reassignment to archived clients", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {
       "content-type": "application/json",
       "x-kiss-pm-action": "same-origin",
@@ -669,7 +669,7 @@ describe("Phase 3.1 CRM API", () => {
   });
 
   it("denies CRM foundation mutations for users without Phase 3.1 permissions", async () => {
-    const cookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+    const cookie = await loginAs("reader@kiss-pm.local", "reader12345");
     const clientResponse = await app.request("/api/workspace/clients", {
       method: "POST",
       headers: {
@@ -849,7 +849,7 @@ describe("Phase 3.1 CRM API", () => {
   });
 
   it("rejects oversized CRM/intake JSON payloads before parser validation", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const largeDescription = "x".repeat(70_000);
     const clientResponse = await app.request("/api/workspace/clients", {
       method: "POST",
@@ -899,7 +899,7 @@ describe("Phase 3.1 CRM API", () => {
   });
 
   it("rejects malformed JSON before activating a project with generated defaults", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {
       "content-type": "application/json",
       "x-kiss-pm-action": "same-origin",

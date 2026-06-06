@@ -17,7 +17,7 @@ import { createLocalStorageProvider as createApiLocalStorageProvider } from "./s
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const dataset: SeedTenantDataset = {
   tenants: [
@@ -90,7 +90,7 @@ const dataset: SeedTenantDataset = {
       name: "Анна Администратор",
       accessProfileId: "access-profile-alpha-admin",
       positionId: "position-engineer",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-alpha-reader",
@@ -98,7 +98,7 @@ const dataset: SeedTenantDataset = {
       email: "reader@kiss-pm.local",
       name: "Роман Наблюдатель",
       accessProfileId: "access-profile-alpha-reader",
-      password: "local-reader-password"
+      password: "reader12345"
     },
     {
       id: "user-alpha-denied",
@@ -106,7 +106,7 @@ const dataset: SeedTenantDataset = {
       email: "denied@kiss-pm.local",
       name: "Дина Без Доступа",
       accessProfileId: "access-profile-alpha-denied",
-      password: "local-denied-password"
+      password: "denied12345"
     },
     {
       id: "user-beta-admin",
@@ -114,7 +114,7 @@ const dataset: SeedTenantDataset = {
       email: "beta@kiss-pm.local",
       name: "Борис Бета",
       accessProfileId: "access-profile-beta-admin",
-      password: "local-beta-password"
+      password: "beta12345"
     }
   ]
 };
@@ -150,7 +150,7 @@ describe("attachment and unified search API", () => {
   });
 
   it("attaches external references and exposes them through attachments, CRM feed and search", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
 
     const attach = await app.request("/api/workspace/attachments/external-references", {
       method: "POST",
@@ -216,7 +216,7 @@ describe("attachment and unified search API", () => {
   });
 
   it("supports communication channel attachments for call recordings", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const channels = await app.request("/api/workspace/communication-channels", {
       headers: { cookie }
     });
@@ -266,7 +266,7 @@ describe("attachment and unified search API", () => {
   });
 
   it("rejects unsafe external references and records denied audit for missing manage permission", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const unsafe = await app.request("/api/workspace/attachments/external-references", {
       method: "POST",
       headers: jsonHeaders(cookie),
@@ -280,7 +280,7 @@ describe("attachment and unified search API", () => {
     expect(unsafe.status).toBe(400);
     await expect(unsafe.json()).resolves.toEqual({ error: "external_url_private_host" });
 
-    const readerCookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
     const denied = await app.request("/api/workspace/attachments/external-references", {
       method: "POST",
       headers: jsonHeaders(readerCookie),
@@ -308,7 +308,7 @@ describe("attachment and unified search API", () => {
   });
 
   it("rejects malformed attachment identifiers before persistence", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
 
     const badEntityId = await app.request("/api/workspace/attachments/external-references", {
       method: "POST",
@@ -384,7 +384,7 @@ describe("attachment and unified search API", () => {
   });
 
   it("uploads, downloads and archives local file assets without leaking provider internals", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const form = new FormData();
     form.set("entityType", "client");
     form.set("entityId", "client-alpha");
@@ -413,7 +413,7 @@ describe("attachment and unified search API", () => {
     expect(download.headers.get("content-disposition")).toContain("brief.txt");
     await expect(download.text()).resolves.toBe("hello");
 
-    const deniedCookie = await loginAs("denied@kiss-pm.local", "local-denied-password");
+    const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
     const deniedDownload = await app.request(
       `/api/workspace/attachments/${uploadPayload.attachment.id}/download`,
       { headers: { cookie: deniedCookie } }
@@ -450,7 +450,7 @@ describe("attachment and unified search API", () => {
   });
 
   it("omits unreadable attachment metadata from unified search", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await app.request("/api/workspace/attachments/external-references", {
       method: "POST",
       headers: jsonHeaders(adminCookie),
@@ -462,7 +462,7 @@ describe("attachment and unified search API", () => {
       })
     });
 
-    const deniedCookie = await loginAs("denied@kiss-pm.local", "local-denied-password");
+    const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
     const search = await app.request("/api/workspace/search?q=закрытый", {
       headers: { cookie: deniedCookie }
     });
@@ -471,7 +471,7 @@ describe("attachment and unified search API", () => {
   });
 
   it("keeps scanning attachment matches after unreadable candidates are filtered", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await app.request("/api/workspace/attachments/external-references", {
       method: "POST",
       headers: jsonHeaders(adminCookie),
@@ -495,7 +495,7 @@ describe("attachment and unified search API", () => {
       });
     }
 
-    const readerCookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
     const search = await app.request(
       "/api/workspace/search?q=общий&limit=1&types=external_reference",
       { headers: { cookie: readerCookie } }
@@ -512,7 +512,7 @@ describe("attachment and unified search API", () => {
   });
 
   it("respects file and external reference type filters in unified search", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await app.request("/api/workspace/attachments/external-references", {
       method: "POST",
       headers: jsonHeaders(adminCookie),

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KISS PM — Ресурс · Михаил К.</title>
+  <link rel="stylesheet" href="_partials.css" />
+  <style>
+    .res-detail {
+      display: grid;
+      grid-template-columns: 280px 1fr 320px;
+      gap: 16px;
+      align-items: start;
+    }
+  </style>
+</head>
+<body>
+  <div class="mockup-shell">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><span class="sidebar__brand-mark"></span> KISS PM</div>
+      <div class="sidebar__group">Работа</div>
+      <div class="sidebar__item sidebar__item--active"><span>Проекты</span><span class="sidebar__item-badge">8</span></div>
+      <div class="sidebar__footer">v0.1 dev</div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar__project">
+          <div class="topbar__icon">ПР</div>
+          <div>
+            <div class="topbar__title">Производственный портал · Релиз 2 → ресурс</div>
+            <div class="topbar__meta"><span class="chip chip--info">В работе</span><span>план v17</span></div>
+          </div>
+        </div>
+        <label class="topbar__search"><span class="muted">⌕</span><input placeholder="Найти задачу или ресурс"></label>
+        <div class="topbar__actions"><button class="icon-btn">●</button><button class="icon-btn">И</button></div>
+      </header>
+      <nav class="tabs">
+        <span class="tabs__item">Обзор</span>
+        <span class="tabs__item">График</span>
+        <span class="tabs__item tabs__item--active">Ресурсы</span>
+        <span class="tabs__item">Назначения</span>
+        <span class="tabs__item">Календари</span>
+        <span class="tabs__item">Сценарии</span>
+        <span class="tabs__item">Baseline</span>
+        <span class="tabs__item">Аудит</span>
+        <span class="tabs__item">Настройки</span>
+        <span class="tabs__status"><span class="tabs__status-dot"></span> Сохранено</span>
+      </nav>
+      <section class="content">
+        <div class="page-title">
+          <div>
+            <h1>Михаил К. · Разработчик FE</h1>
+            <div class="subtitle">Календарь ProjCal · ставка 1.0 · <a href="04-resources.html">← Все ресурсы</a></div>
+          </div>
+          <div class="row">
+            <button class="btn btn--sm">Изменить календарь</button>
+            <button class="btn btn--sm">Резервировать</button>
+            <button class="btn btn--sm btn--primary">Снять перегруз</button>
+          </div>
+        </div>
+
+        <div class="res-detail">
+          <div class="card">
+            <div class="card__head"><div class="card__title">Доступность</div></div>
+            <div class="card__body col" style="gap:8px;">
+              <div class="row"><span class="muted grow">Рабочая неделя</span><span class="mono">Пн–Пт</span></div>
+              <div class="row"><span class="muted grow">Рабочие часы</span><span class="mono">08:00–17:00 · 8 ч/день</span></div>
+              <div class="row"><span class="muted grow">Календарь</span><span class="chip chip--outline">ProjCal</span></div>
+              <div class="row"><span class="muted grow">Ставка занятости</span><span class="mono">1.0 (полная)</span></div>
+              <div class="hr"></div>
+              <div class="muted" style="font-size:11.5px;text-transform:uppercase;letter-spacing:0.04em;">Исключения</div>
+              <div class="row"><span class="chip chip--warning mono">14.06</span><span>нерабочий — отпуск</span></div>
+              <div class="row"><span class="chip chip--warning mono">15.06</span><span>нерабочий — отпуск</span></div>
+              <div class="row"><span class="chip chip--warning mono">16.06</span><span>нерабочий — отпуск</span></div>
+              <a class="muted" href="06-calendars.html">Открыть в Календарях →</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__head">
+              <div class="card__title">Назначенные задачи (7)</div>
+              <span class="muted">264 ч за 14 дней</span>
+            </div>
+            <div class="card__body" style="padding:0;">
+              <div class="list" style="--cols: 60px 1fr 90px 90px 80px; border:0; border-radius:0;">
+                <div class="list__row head"><span>WBS</span><span>Задача</span><span>Финиш</span><span>Часы</span><span>Units</span></div>
+                <div class="list__row"><span class="mono">3.2.1</span><span>WBS + Gantt <span class="chip chip--danger">критичная</span></span><span class="mono">29.05</span><span class="mono">120 ч</span><span class="mono">100%</span></div>
+                <div class="list__row"><span class="mono">3.2.2</span><span>Inspector задачи</span><span class="mono">22.05</span><span class="mono">56 ч</span><span class="mono">100%</span></div>
+                <div class="list__row"><span class="mono">3.2.3</span><span>Сценарии</span><span class="mono">05.06</span><span class="mono">36 ч</span><span class="mono">100%</span></div>
+                <div class="list__row"><span class="mono">3.2</span><span>Frontend · ревью архитектуры</span><span class="mono">28.05</span><span class="mono">12 ч</span><span class="mono">50%</span></div>
+                <div class="list__row"><span class="mono">4.1</span><span>Функциональное · поддержка</span><span class="mono">05.06</span><span class="mono">20 ч</span><span class="mono">25%</span></div>
+                <div class="list__row"><span class="mono">2.2</span><span>Контур безопасности · фронт</span><span class="mono">17.04</span><span class="mono">12 ч</span><span class="mono">25%</span></div>
+                <div class="list__row"><span class="mono">5.1</span><span>Запуск пилота ◇</span><span class="mono">14.06</span><span class="mono">8 ч</span><span class="mono">25%</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__head"><div class="card__title">Конфликты и риски</div></div>
+            <div class="card__body col" style="gap:10px;">
+              <div class="attention attention--danger">
+                <div class="icon">!</div>
+                <div class="body">
+                  <div class="title">Перегруз +14 ч/нед</div>
+                  <div class="desc">Неделя 25.05–31.05 · units 142% · 4 задачи перекрывают доступные часы</div>
+                </div>
+              </div>
+              <div class="attention attention--warning">
+                <div class="icon">К</div>
+                <div class="body">
+                  <div class="title">Нерабочие дни 14.06–16.06</div>
+                  <div class="desc">Задача 5.1 «Запуск пилота» назначена на 14.06 — конфликт календаря</div>
+                </div>
+              </div>
+              <div class="banner banner--muted">
+                Возможные действия: открыть Сценарии и применить «Балансированный»; снять units 25% с 2.2; перенести 5.1.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <footer class="bottom-bar bottom-bar--hidden"></footer>
+    </main>
+  </div>
+</body>
+</html>

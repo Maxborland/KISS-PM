@@ -14,7 +14,7 @@ import { createApp } from "./app";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const apiSeedDataset: SeedTenantDataset = {
   tenants: [
@@ -159,7 +159,7 @@ const apiSeedDataset: SeedTenantDataset = {
       name: "Анна Администратор",
       accessProfileId: "access-profile-alpha-admin",
       positionId: "position-project-manager",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-beta-admin",
@@ -167,7 +167,7 @@ const apiSeedDataset: SeedTenantDataset = {
       email: "beta@kiss-pm.local",
       name: "Борис Администратор",
       accessProfileId: "access-profile-beta-admin",
-      password: "local-beta-password"
+      password: "beta12345"
     },
     {
       id: "user-alpha-reader",
@@ -176,7 +176,7 @@ const apiSeedDataset: SeedTenantDataset = {
       name: "Роман Наблюдатель",
       accessProfileId: "access-profile-alpha-reader",
       positionId: "position-engineer",
-      password: "local-reader-password"
+      password: "reader12345"
     }
   ]
 };
@@ -279,7 +279,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("creates an access profile through a permission-checked command and writes audit", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const response = await app.request("/api/tenant/current/access-profiles", {
       method: "POST",
       headers: {
@@ -334,7 +334,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("bounds audit event reads with a validated limit", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     for (const suffix of ["one", "two"]) {
       const response = await app.request("/api/tenant/current/access-profiles", {
         method: "POST",
@@ -362,7 +362,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("denies access-profile creation when the actor lacks management permission", async () => {
-    const cookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+    const cookie = await loginAs("reader@kiss-pm.local", "reader12345");
     const response = await app.request("/api/tenant/current/access-profiles", {
       method: "POST",
       headers: {
@@ -404,7 +404,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("rejects cookie-authenticated state changes without same-origin action header", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const response = await app.request("/api/workspace/positions", {
       method: "POST",
       headers: {
@@ -424,7 +424,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("manages workspace custom fields and project templates with audit trail", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const createdField = await app.request("/api/workspace/config/custom-fields", {
       method: "POST",
       headers: {
@@ -565,7 +565,7 @@ describe("API with PostgreSQL data source", () => {
     const templates = await app.request("/api/workspace/config/project-templates", {
       headers: { cookie }
     });
-    const betaCookie = await loginAs("beta@kiss-pm.local", "local-beta-password");
+    const betaCookie = await loginAs("beta@kiss-pm.local", "beta12345");
     const betaFields = await app.request("/api/workspace/config/custom-fields", {
       headers: { cookie: betaCookie }
     });
@@ -675,7 +675,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("creates an opportunity, checks feasibility, activates a project and writes audit", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const opportunityField = await app.request("/api/workspace/config/custom-fields", {
       method: "POST",
       headers: {
@@ -972,7 +972,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("keeps project drafts out of the active projects workspace API", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const dataSource = createPostgresTenantDataSource(createDatabase(client));
     const opportunity = await dataSource.createOpportunity({
       id: "opportunity-draft-hidden",
@@ -1026,7 +1026,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("rechecks current resource capacity during project activation", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const baseOpportunity = {
       clientId: "client-romashka",
       primaryContactId: "contact-irina",
@@ -1143,7 +1143,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("serializes concurrent activations that compete for the same position capacity", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const baseOpportunity = {
       clientId: "client-romashka",
       primaryContactId: "contact-irina",
@@ -1242,7 +1242,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("denies opportunity and project reads and mutations for users without Phase 3 permissions", async () => {
-    const cookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+    const cookie = await loginAs("reader@kiss-pm.local", "reader12345");
 
     const opportunities = await app.request("/api/workspace/opportunities", {
       headers: { cookie }
@@ -1393,7 +1393,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("denies workspace config read and mutation for users without config permissions", async () => {
-    const cookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
+    const cookie = await loginAs("reader@kiss-pm.local", "reader12345");
 
     const fields = await app.request("/api/workspace/config/custom-fields", {
       headers: { cookie }
@@ -1422,8 +1422,8 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("does not leak access profiles across tenants", async () => {
-    const alphaCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const betaCookie = await loginAs("beta@kiss-pm.local", "local-beta-password");
+    const alphaCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const betaCookie = await loginAs("beta@kiss-pm.local", "beta12345");
     await app.request("/api/tenant/current/access-profiles", {
       method: "POST",
       headers: {
@@ -1451,8 +1451,8 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("keeps access role ids scoped to each tenant", async () => {
-    const alphaCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const betaCookie = await loginAs("beta@kiss-pm.local", "local-beta-password");
+    const alphaCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const betaCookie = await loginAs("beta@kiss-pm.local", "beta12345");
     const sharedRoleInput = {
       id: "access-profile-shared-local-id",
       name: "Локальная роль",
@@ -1498,7 +1498,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("allows clearing optional profile contact fields", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
 
     const filled = await app.request("/api/profile", {
       method: "PATCH",
@@ -1538,7 +1538,7 @@ describe("API with PostgreSQL data source", () => {
   });
 
   it("rejects unsafe profile theme values before persistence", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
 
     const invalidTheme = await app.request("/api/profile/theme", {
       method: "PATCH",
@@ -1598,7 +1598,7 @@ describe("API with PostgreSQL data source", () => {
       },
       body: JSON.stringify({
         email: "admin@kiss-pm.local",
-        password: "local-admin-password"
+        password: "admin12345"
       })
     });
     const cookie = login.headers.get("set-cookie") ?? "";
@@ -1649,7 +1649,7 @@ describe("API with PostgreSQL data source", () => {
       },
       body: JSON.stringify({
         email: "admin@kiss-pm.local",
-        password: "local-admin-password"
+        password: "admin12345"
       })
     });
     const cookie = login.headers.get("set-cookie") ?? "";
@@ -1713,7 +1713,7 @@ describe("API with PostgreSQL data source", () => {
       },
       body: JSON.stringify({
         email: "admin@kiss-pm.local",
-        password: "local-admin-password"
+        password: "admin12345"
       })
     });
     const cookie = login.headers.get("set-cookie") ?? "";
@@ -1790,7 +1790,7 @@ describe("API with PostgreSQL data source", () => {
       },
       body: JSON.stringify({
         email: "admin@kiss-pm.local",
-        password: "local-admin-password"
+        password: "admin12345"
       })
     });
     const cookie = login.headers.get("set-cookie") ?? "";
@@ -1825,7 +1825,7 @@ describe("API with PostgreSQL data source", () => {
       },
       body: JSON.stringify({
         email: "admin@kiss-pm.local",
-        password: "local-admin-password"
+        password: "admin12345"
       })
     });
 

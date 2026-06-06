@@ -6,7 +6,7 @@ import { loginToWorkspace } from "../smoke/smokeHelpers";
 test.describe("CRM accessibility", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await loginToWorkspace(page, { password: "local-admin-password" });
+    await loginToWorkspace(page, { password: "admin12345" });
   });
 
   test("opportunities list has no critical axe violations", async ({ page }) => {

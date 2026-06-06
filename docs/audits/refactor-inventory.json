@@ -1,0 +1,750 @@
+{
+  "generated_at": "2026-05-19",
+  "scope": "safe audit-first refactor for KISS PM SaaS/self-hosted foundation",
+  "baseline": {
+    "git_status_short": ["?? phase2-2-users-crud.png"],
+    "notes": [
+      "phase2-2-users-crud.png is untracked and was not touched.",
+      "User-requested legacy English source-of-truth paths are absent; current Russian canonical docs from docs/README.md were used."
+    ]
+  },
+  "blocks": [
+    {
+      "id": "REF-001",
+      "area": "docs/source-of-truth",
+      "files": [
+        "docs/README.md",
+        "docs/00_ВИДЕНИЕ_ПРОДУКТА.md",
+        "docs/01_ПРОДУКТОВЫЙ_КОНТУР.md",
+        "docs/02_ДОМЕННАЯ_МОДЕЛЬ.md",
+        "docs/03_АРХИТЕКТУРА_SAAS_SELF_HOSTED.md",
+        "docs/05_РОЛИ_ПРАВА_АУДИТ.md",
+        "docs/11_E2E_КОНТРАКТ.md",
+        "docs/12_ФАЗОВЫЙ_ПЛАН.md"
+      ],
+      "problem": "The task referenced old English canonical document paths that no longer exist after docs-first restart.",
+      "risk": "medium",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "Get-Content docs/README.md and current Russian canonical docs"
+      ],
+      "tests_after": [
+        "Documented as source-of-truth path drift; no runtime checks required"
+      ],
+      "status": "documented",
+      "notes": "Use current Russian canonical docs as source of truth; do not recreate old filenames unless a docs decision asks for compatibility aliases."
+    },
+    {
+      "id": "REF-002",
+      "area": "domain/api/web workspace configuration validation",
+      "files": [
+        "packages/domain/src/index.ts",
+        "packages/domain/src/workspaceConfig.ts",
+        "packages/domain/src/workspaceConfig.test.ts",
+        "apps/api/src/workspaceConfigParsers.ts",
+        "apps/api/src/workspaceConfigParsers.test.ts",
+        "apps/web/src/workspaceForms.ts",
+        "apps/web/src/workspaceForms.test.ts",
+        "apps/web/package.json"
+      ],
+      "problem": "Workspace config constraints are duplicated in API parsers and web form validation instead of living in the domain boundary.",
+      "risk": "medium",
+      "refactor_type": "extract domain logic",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run packages/domain/src/workspaceConfig.test.ts apps/web/src/workspaceForms.test.ts apps/api/src/workspaceConfigParsers.test.ts"
+      ],
+      "tests_after": [
+        "pnpm vitest run packages/domain/src/workspaceConfig.test.ts apps/web/src/workspaceForms.test.ts apps/api/src/workspaceConfigParsers.test.ts",
+        "pnpm --filter @kiss-pm/domain typecheck",
+        "pnpm --filter @kiss-pm/api typecheck",
+        "pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "status": "completed",
+      "notes": "Completed in this batch. Domain now owns normalized validators and raw-input compatibility helpers; API error codes and Russian UI messages stayed unchanged."
+    },
+    {
+      "id": "REF-003",
+      "area": "web application shell",
+      "files": ["apps/web/src/App.tsx"],
+      "problem": "App.tsx was a god file; after the completed slices it is a thin client entrypoint and shell orchestration is split into reusable layout, routing and data modules.",
+      "risk": "high",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "apps/web/src/repositoryHealth.test.ts now limits App.tsx to 100 lines and WorkspaceShell.tsx to 500 lines"
+      ],
+      "tests_after": [
+        "component or route-level characterization tests before extraction",
+        "pnpm --filter @kiss-pm/web typecheck",
+        "pnpm test:e2e:smoke for navigation-critical changes"
+      ],
+      "status": "completed",
+      "notes": "Closed after review through REF-003A..REF-003K. App.tsx is below the 500-line target; WorkspaceShell.tsx is below the 500-line follow-up budget and delegates reusable sidebar, topbar, route rendering and data orchestration."
+    },
+    {
+      "id": "REF-003C",
+      "area": "web",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/DashboardView.tsx",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "Dashboard presentation lived inside App.tsx and kept the shell god-file above the current guardrail.",
+      "risk": "low",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "status": "completed",
+      "notes": "DashboardView extracted as a presentation component; App.tsx line budget tightened from 2800 to 2600. Next slices should use Next App Router page/view boundaries where possible."
+    },
+    {
+      "id": "REF-003D",
+      "area": "web",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/UsersView.tsx",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "Users CRUD view, form state, modal state and user mutations lived inside App.tsx.",
+      "risk": "medium",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "status": "completed",
+      "notes": "UsersView extracted without changing route ids, permissions, mutation calls or modal behavior. App.tsx line budget tightened from 2600 to 2200."
+    },
+    {
+      "id": "REF-003E",
+      "area": "web",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/RolesView.tsx",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "Access roles CRUD view, permission matrix form and access role mutations lived inside App.tsx.",
+      "risk": "medium",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "status": "completed",
+      "notes": "RolesView extracted without changing route ids, permission gating, disabled-state reasons or mutation calls. App.tsx line budget tightened from 2200 to 1900."
+    },
+    {
+      "id": "REF-003F",
+      "area": "web",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/PositionsView.tsx",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "Positions CRUD view, form state and position mutations lived inside App.tsx.",
+      "risk": "medium",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "status": "completed",
+      "notes": "PositionsView extracted without changing route ids, permission gating, disabled-state reasons or mutation calls. App.tsx line budget tightened from 1900 to 1600."
+    },
+    {
+      "id": "REF-003G",
+      "area": "web",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/AuditView.tsx",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "Audit table rendering lived inside App.tsx.",
+      "risk": "low",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "status": "completed",
+      "notes": "AuditView extracted without changing audit preview formatting, route ids or permission gating. App.tsx line budget tightened from 1600 to 1450."
+    },
+    {
+      "id": "REF-003H",
+      "area": "web",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/AccountViews.tsx",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "Profile and theme forms lived inside App.tsx.",
+      "risk": "low",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "status": "completed",
+      "notes": "ProfileView and ThemeView extracted without changing mutation calls, permission gating or form markup. App.tsx line budget tightened from 1450 to 1300."
+    },
+    {
+      "id": "REF-003I",
+      "area": "web",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/WorkspaceSettingsView.tsx",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "Workspace settings custom fields/templates CRUD view lived inside App.tsx.",
+      "risk": "medium",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "status": "completed",
+      "notes": "WorkspaceSettingsView extracted without changing custom field/template mutation calls, permission gating or form markup. App.tsx line budget tightened from 1300 to 700."
+    },
+    {
+      "id": "REF-003J",
+      "area": "web",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/WorkspaceShell.tsx",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "App.tsx still owned authenticated workspace shell orchestration after route views were extracted.",
+      "risk": "low",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "status": "completed",
+      "notes": "WorkspaceShell extracted. App.tsx is now a 7-line client entrypoint; repository health guards App.tsx at 100 lines."
+    },
+    {
+      "id": "REF-003K",
+      "area": "web",
+      "files": [
+        "apps/web/src/WorkspaceShell.tsx",
+        "apps/web/src/WorkspaceSidebar.tsx",
+        "apps/web/src/WorkspaceTopbar.tsx",
+        "apps/web/src/WorkspaceRouteRenderer.tsx",
+        "apps/web/src/useWorkspaceShellData.ts",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "WorkspaceShell still owned navigation drawer, topbar, route rendering and authenticated data orchestration after App.tsx was thinned.",
+      "risk": "medium",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm typecheck",
+        "pnpm test",
+        "pnpm --filter @kiss-pm/web build",
+        "pnpm test:e2e:smoke"
+      ],
+      "status": "completed",
+      "notes": "WorkspaceSidebar, WorkspaceTopbar, WorkspaceRouteRenderer and useWorkspaceShellData extracted. WorkspaceShell is now 415 lines and guarded by a 500-line budget."
+    },
+    {
+      "id": "REF-003A",
+      "area": "web application shell state helpers",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/workspaceShellState.ts",
+        "apps/web/src/workspaceShellState.test.ts",
+        "apps/web/src/components/workspace-ui.tsx"
+      ],
+      "problem": "App.tsx owned pure permission checks, section loading/error state, metric hints and API error message mapping, making shell behavior harder to test outside the god-file.",
+      "risk": "low",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/web/src/workspaceShellState.test.ts apps/web/src/routes.test.ts apps/web/src/repositoryHealth.test.ts failed because workspaceShellState did not exist"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/workspaceShellState.test.ts apps/web/src/routes.test.ts apps/web/src/repositoryHealth.test.ts",
+        "pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "status": "completed",
+      "notes": "SectionState moved to a neutral shell-state module; workspace-ui imports only its type. API error messages and permission checks are covered by characterization tests."
+    },
+    {
+      "id": "REF-003B",
+      "area": "web application route icon registry",
+      "files": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/workspaceRouteIcons.ts",
+        "apps/web/src/workspaceRouteIcons.test.ts"
+      ],
+      "problem": "App.tsx owned route icon metadata that belongs with shell route metadata rather than the main application component.",
+      "risk": "low",
+      "refactor_type": "split large component",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/web/src/workspaceRouteIcons.test.ts apps/web/src/routes.test.ts failed because workspaceRouteIcons did not exist"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/workspaceRouteIcons.test.ts apps/web/src/routes.test.ts apps/web/src/repositoryHealth.test.ts",
+        "pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "status": "completed",
+      "notes": "Route icon registry now has coverage for every stable workspace route id. Test adjusted after verifying lucide icons can be React component objects, not only functions."
+    },
+    {
+      "id": "REF-004",
+      "area": "api application composition",
+      "files": ["apps/api/src/app.ts"],
+      "problem": "API app file is still large and combines route wiring, auth/session behavior, workspace operations and audit concerns.",
+      "risk": "high",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": ["pnpm --filter @kiss-pm/api test", "pnpm test:db"],
+      "tests_after": ["pnpm --filter @kiss-pm/api test", "pnpm test:db"],
+      "status": "completed",
+      "notes": "Closed through REF-004A app error mapping and REF-004B route-group extraction. apps/api/src/app.ts is now a composition entrypoint under the 500-line guardrail."
+    },
+    {
+      "id": "REF-004A",
+      "area": "api application error boundary",
+      "files": [
+        "apps/api/src/app.ts",
+        "apps/api/src/appErrors.ts",
+        "apps/api/src/appErrors.test.ts"
+      ],
+      "problem": "app.ts owned fail-closed application error mapping alongside route wiring.",
+      "risk": "low",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/api/src/appErrors.test.ts apps/api/src/app.test.ts failed because appErrors did not exist"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/api/src/appErrors.test.ts apps/api/src/app.test.ts",
+        "pnpm --filter @kiss-pm/api typecheck",
+        "pnpm --filter @kiss-pm/api test",
+        "pnpm test:db"
+      ],
+      "status": "completed",
+      "notes": "MissingAccessProfileError and resolveAppErrorResponse now live outside app.ts; Hono onError remains a thin adapter."
+    },
+    {
+      "id": "REF-004B",
+      "area": "api route group extraction",
+      "files": [
+        "apps/api/src/app.ts",
+        "apps/api/src/routeTypes.ts",
+        "apps/api/src/authRoutes.ts",
+        "apps/api/src/devTenantRoutes.ts",
+        "apps/api/src/accessRoleRoutes.ts",
+        "apps/api/src/auditRoutes.ts",
+        "apps/api/src/workspaceUserRoutes.ts",
+        "apps/api/src/positionRoutes.ts",
+        "apps/api/src/profileRoutes.ts",
+        "apps/api/src/inMemoryTenantDataSource.ts",
+        "apps/api/src/tenantAdminProfile.ts",
+        "apps/web/src/repositoryHealth.test.ts"
+      ],
+      "problem": "apps/api/src/app.ts still owned endpoint bodies for auth, dev tenant routes, access roles, audit, workspace users, positions and profile/theme after the first error-boundary split.",
+      "risk": "medium",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts apps/web/src/shadcnFoundation.test.ts apps/api/src/app.test.ts failed because apps/api/src/app.ts had 1302 lines and the new budget is 500"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts apps/web/src/shadcnFoundation.test.ts apps/api/src/app.test.ts",
+        "pnpm --filter @kiss-pm/api typecheck",
+        "pnpm --filter @kiss-pm/web typecheck",
+        "pnpm test",
+        "pnpm test:db"
+      ],
+      "status": "completed",
+      "notes": "Route paths, auth cookie flow, permission checks, API error codes and audit payloads stayed unchanged; app.ts is 186 lines after extraction."
+    },
+    {
+      "id": "REF-005",
+      "area": "persistence repositories",
+      "files": ["packages/persistence/src/repositories.ts"],
+      "problem": "Repository layer is a broad persistence surface; tenant, user, profile, workspace config and audit operations are coupled in one file.",
+      "risk": "medium",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": ["pnpm --filter @kiss-pm/persistence test", "pnpm test:db"],
+      "tests_after": ["pnpm --filter @kiss-pm/persistence test", "pnpm test:db"],
+      "status": "completed",
+      "notes": "Closed for this refactor plan through REF-005A repository row mappers and REF-005B workspace config repository area. Further repository splitting should wait for a concrete business feature or proven risk."
+    },
+    {
+      "id": "REF-005A",
+      "area": "persistence repository row mappers",
+      "files": [
+        "packages/persistence/src/repositories.ts",
+        "packages/persistence/src/repositoryMappers.ts",
+        "packages/persistence/src/repositoryMappers.test.ts"
+      ],
+      "problem": "repositories.ts owned pure row-to-domain mappers and permission coercion alongside SQL query methods.",
+      "risk": "low",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run packages/persistence/src/repositoryMappers.test.ts packages/persistence/src/repositories.db.test.ts failed because repositoryMappers did not exist"
+      ],
+      "tests_after": [
+        "pnpm vitest run packages/persistence/src/repositoryMappers.test.ts packages/persistence/src/repositories.db.test.ts",
+        "pnpm --filter @kiss-pm/persistence typecheck",
+        "pnpm test:db"
+      ],
+      "status": "completed",
+      "notes": "Pure mappers and toPermission moved to repositoryMappers; repository SQL and public datasource API stayed unchanged."
+    },
+    {
+      "id": "REF-005B",
+      "area": "persistence workspace config repository area",
+      "files": [
+        "packages/persistence/src/repositories.ts",
+        "packages/persistence/src/workspaceConfigRepository.ts",
+        "apps/web/src/repositoryHealth.test.ts",
+        "docs/audits/refactor-plan.md",
+        "docs/audits/refactor-inventory.json"
+      ],
+      "problem": "packages/persistence/src/repositories.ts still owned workspace config SQL for custom fields and project templates after pure row mappers were extracted.",
+      "risk": "low",
+      "refactor_type": "split large service",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts failed because packages/persistence/src/repositories.ts had 627 lines and the new budget is 560"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm vitest run --config vitest.db.config.ts packages/persistence/src/repositories.db.test.ts",
+        "pnpm --filter @kiss-pm/persistence typecheck",
+        "pnpm test",
+        "pnpm test:db",
+        "pnpm typecheck"
+      ],
+      "status": "completed",
+      "notes": "Custom field and project template persistence now live in workspaceConfigRepository. repositories.ts is 524 lines and remains the root datasource composition. Stop condition: do not split more persistence areas until a business feature or proven risk requires it."
+    },
+    {
+      "id": "REF-006",
+      "area": "test architecture",
+      "files": [
+        "apps/api/src/app.db.test.ts",
+        "e2e/smoke/single-workspace-auth-rbac.spec.ts"
+      ],
+      "problem": "Large integration and smoke specs are valuable but hard to localize when failures happen.",
+      "risk": "medium",
+      "refactor_type": "stabilize tests",
+      "expected_behavior_change": "none",
+      "tests_before": ["pnpm test:db", "pnpm test:e2e:smoke"],
+      "tests_after": ["pnpm test:db", "pnpm test:e2e:smoke"],
+      "status": "completed",
+      "notes": "REF-006A extracted Playwright smoke helpers without weakening assertions; remaining future split into multiple specs is optional once flows grow further."
+    },
+    {
+      "id": "REF-006A",
+      "area": "browser smoke helper extraction",
+      "files": [
+        "e2e/smoke/single-workspace-auth-rbac.spec.ts",
+        "e2e/smoke/smokeHelpers.ts"
+      ],
+      "problem": "The smoke spec embedded login/logout and responsive navigation assertions inline, making failures harder to localize.",
+      "risk": "low",
+      "refactor_type": "stabilize tests",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm test:e2e:smoke failed after importing the future helper because smokeHelpers did not exist"
+      ],
+      "tests_after": [
+        "pnpm test:e2e:smoke",
+        "pnpm test",
+        "pnpm typecheck"
+      ],
+      "status": "completed",
+      "notes": "Login/logout/dashboard readiness and responsive navigation assertions now have named helper functions. Assertions were moved, not removed."
+    },
+    {
+      "id": "REF-007",
+      "area": "repository hygiene",
+      "files": [
+        "apps/api/dist",
+        "apps/web/.next",
+        "apps/web/dist",
+        "apps/web/node_modules/.vite",
+        "apps/web/node_modules/.vite-temp",
+        "phase2-2-users-crud.png"
+      ],
+      "problem": "Local generated artifacts and an untracked screenshot are present in the worktree; generated output can obscure refactor diffs.",
+      "risk": "low",
+      "refactor_type": "remove dead code",
+      "expected_behavior_change": "none",
+      "tests_before": ["git status --short", "git ls-files"],
+      "tests_after": ["git status --short"],
+      "status": "documented",
+      "notes": "No deletion in this refactor closure. The only visible untracked artifact is phase2-2-users-crud.png and it may be user-owned."
+    },
+    {
+      "id": "REF-008",
+      "area": "package scripts",
+      "files": ["package.json"],
+      "problem": "Requested baseline commands npm run lint, npm run test:unit and npm run test:integration are absent.",
+      "risk": "medium",
+      "refactor_type": "stabilize tests",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "npm run lint exits 1: missing script",
+        "npm run test:unit exits 1: missing script",
+        "npm run test:integration exits 1: missing script"
+      ],
+      "tests_after": ["Decision needed before adding new script semantics"],
+      "status": "documented",
+      "notes": "No new script semantics added in this refactor closure. Current canonical checks are pnpm typecheck, pnpm test, pnpm test:db, web build and smoke."
+    },
+    {
+      "id": "REF-009",
+      "area": "core domain product leakage",
+      "files": ["apps", "packages"],
+      "problem": "Search did not find Bitrix-specific leakage in active core code, but docs intentionally preserve BR2 as reference/anti-pattern context.",
+      "risk": "low",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": ["rg -i \"bitrix|BR2|report|отчет\" apps packages docs"],
+      "tests_after": ["Repeat search when adding project-control domain modules"],
+      "status": "documented",
+      "notes": "Keep monitoring as new resource/KPI/control-surface modules appear."
+    },
+    {
+      "id": "REF-010",
+      "area": "web Tailwind/shadcn foundation",
+      "files": [
+        "apps/web/package.json",
+        "apps/web/components.json",
+        "apps/web/postcss.config.mjs",
+        "apps/web/src/shadcn.css",
+        "apps/web/src/lib/utils.ts",
+        "apps/web/src/components/ui/button.tsx",
+        "apps/web/src/components/ui/dialog.tsx",
+        "apps/web/src/components/ui/dropdown-menu.tsx",
+        "apps/web/src/components/ui/table.tsx",
+        "apps/web/src/shadcnFoundation.test.ts"
+      ],
+      "problem": "Documentation and tests needed to reflect the actual Tailwind CSS v4/shadcn scaffold instead of the older shadcn-like-only baseline.",
+      "risk": "low",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "apps/web/src/shadcnFoundation.test.ts already covered most scaffold files but did not explicitly guard the PostCSS bridge"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/web/src/shadcnFoundation.test.ts",
+        "pnpm --filter @kiss-pm/web typecheck",
+        "pnpm --filter @kiss-pm/web build"
+      ],
+      "status": "completed",
+      "notes": "No second scaffold installation was needed. The existing scaffold is now guarded by tests including @tailwindcss/postcss."
+    },
+    {
+      "id": "REF-011",
+      "area": "api project intake application service",
+      "files": [
+        "apps/api/src/projectIntakeRoutes.ts",
+        "apps/api/src/projectIntakeService.ts",
+        "apps/api/src/projectIntakeService/activateProjectCommand.ts",
+        "apps/api/src/projectIntakeService/activationErrors.ts",
+        "apps/api/src/projectIntakeService/audit.ts",
+        "apps/api/src/projectIntakeService/authorization.ts",
+        "apps/api/src/projectIntakeService/changeOpportunityStageCommand.ts",
+        "apps/api/src/projectIntakeService/checkOpportunityFeasibilityCommand.ts",
+        "apps/api/src/projectIntakeService/createOpportunityCommand.ts",
+        "apps/api/src/projectIntakeService/feasibilityAssessment.ts",
+        "apps/api/src/projectIntakeService/opportunityLinks.ts",
+        "apps/api/src/projectIntakeService/opportunityStatus.ts",
+        "apps/api/src/projectIntakeService/types.ts",
+        "apps/api/src/projectIntakeService.test.ts",
+        "apps/web/src/repositoryHealth.test.ts",
+        "docs/audits/refactor-plan.md",
+        "docs/audits/refactor-inventory.json"
+      ],
+      "problem": "State-changing CRM/intake use cases lived directly inside HTTP route handlers, mixing permissions, transactions, domain checks and audit with body parsing and response mapping.",
+      "risk": "high",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": [
+        "pnpm vitest run apps/api/src/projectIntakeService.test.ts failed because ./projectIntakeService did not exist",
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts failed after modularization guardrail because projectIntakeService.ts had 729 lines with a 120-line budget"
+      ],
+      "tests_after": [
+        "pnpm vitest run apps/api/src/projectIntakeService.test.ts",
+        "pnpm vitest run apps/api/src/projectIntakeService.test.ts apps/api/src/app.test.ts apps/api/src/projectIntakeParsers.test.ts",
+        "pnpm vitest run apps/web/src/repositoryHealth.test.ts",
+        "pnpm --filter @kiss-pm/api typecheck",
+        "pnpm test:db",
+        "pnpm test"
+      ],
+      "status": "completed for current slice",
+      "notes": "projectIntakeService.ts is now a thin facade. Create/stage/feasibility/activate commands, authorization, audit, link resolving and feasibility assessment live in focused modules under projectIntakeService/. Routes remain responsible for session, JSON body parsing and HTTP response mapping. ProjectDraft lifecycle is closed by REF-012 as Project.status=draft."
+    },
+    {
+      "id": "REF-012",
+      "area": "project lifecycle",
+      "files": [
+        "docs/02_ДОМЕННАЯ_МОДЕЛЬ.md",
+        "docs/06_CRM_ПРИЕМКА_И_ПРОЕКТЫ.md",
+        "docs/22_PHASE_3_CRM_INTAKE_ACTIVE_PROJECT.md",
+        "docs/decisions/2026-05-19-project-draft-lifecycle-status.md",
+        "docs/status/phase3-crm-intake-active-project-ledger.md",
+        "apps/api/src/apiTypes.ts",
+        "apps/api/src/app.db.test.ts",
+        "apps/api/src/projectIntakeService/activateProjectCommand.ts",
+        "apps/api/src/projectIntakeService/authorization.ts",
+        "apps/api/src/projectIntakeService/activationErrors.ts",
+        "packages/persistence/migrations/0009_phase_3_2_project_lifecycle_status.sql",
+        "packages/persistence/src/migration.test.ts",
+        "packages/persistence/src/projectIntakeRepository.ts",
+        "packages/persistence/src/repositories.db.test.ts",
+        "packages/persistence/src/schema.ts",
+        "apps/api/src/projectIntakeService.ts"
+      ],
+      "problem": "Canonical docs require ProjectDraft before active project, while current activation creates an active project directly from an opportunity.",
+      "risk": "high",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "yes, activation now passes through Project status draft before active while preserving the existing Phase 3 endpoint contract",
+      "tests_before": [
+        "Architecture review found direct active project creation in current activation flow",
+        "pnpm vitest run --config vitest.db.config.ts packages/persistence/src/repositories.db.test.ts failed because createProjectDraftFromOpportunity did not exist"
+      ],
+      "tests_after": [
+        "pnpm db:migrate",
+        "pnpm vitest run --config vitest.db.config.ts packages/persistence/src/repositories.db.test.ts apps/api/src/app.db.test.ts",
+        "pnpm vitest run packages/persistence/src/migration.test.ts",
+        "pnpm typecheck",
+        "pnpm test",
+        "pnpm test:db"
+      ],
+      "status": "completed",
+      "notes": "Decision: ProjectDraft is Project.status=draft, not a separate aggregate. Draft has activatedAt=null, is hidden from /api/workspace/projects and does not reserve capacity. Governed activation transitions draft to active, sets activatedAt, converts the source opportunity and writes audit beforeState draft -> afterState active."
+    },
+    {
+      "id": "REF-013",
+      "area": "api datasource ports",
+      "files": ["apps/api/src/apiTypes.ts"],
+      "problem": "ApiTenantDataSource is a broad kitchen-sink port spanning auth, users, CRM, project intake, workspace config, audit and transactions.",
+      "risk": "medium",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": ["Typecheck and route/db tests before each context-specific split"],
+      "tests_after": ["Typecheck and targeted route/db tests after each context-specific split"],
+      "status": "planned",
+      "notes": "Split only with concrete business slices into context-specific ports such as CrmIntakeRepository, ProjectIntakeRepository, ResourcePlanningRepository, AuditWriter and TransactionRunner."
+    },
+    {
+      "id": "REF-014",
+      "area": "crm reference label contract",
+      "files": [
+        "apps/api/src/apiTypes.ts",
+        "packages/persistence/src/schema.ts",
+        "apps/web/src/opportunityDisplay.ts",
+        "docs/23_PHASE_3_1_CRM_FOUNDATION_DEAL_UX.md"
+      ],
+      "problem": "Opportunity stores reference ids and snapshot labels, while UI resolves current labels; the API contract does not yet name historical snapshots distinctly.",
+      "risk": "medium",
+      "refactor_type": "strengthen types",
+      "expected_behavior_change": "none until contract decision",
+      "tests_before": ["apps/web/src/opportunityDisplay.test.ts covers current-label UI preference"],
+      "tests_after": ["DTO/schema tests after snapshot/current label contract is formalized"],
+      "status": "planned",
+      "notes": "Prefer explicit snapshot fields or a DTO that separates currentLabels from snapshotLabels."
+    },
+    {
+      "id": "REF-015",
+      "area": "resource planning boundary",
+      "files": [
+        "packages/domain/src/projectIntake.ts",
+        "packages/persistence/src/schema.ts",
+        "apps/api/src/projectIntakeService.ts"
+      ],
+      "problem": "Feasibility currently uses position demand and active user counts directly; this is a valid intake seed but not the final resource matrix boundary.",
+      "risk": "medium",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none until resource matrix phase",
+      "tests_before": ["packages/domain/src/projectIntake.test.ts and app.db resource feasibility tests"],
+      "tests_after": ["Provider-level resource availability and reservation tests before Phase 4 matrix work"],
+      "status": "planned",
+      "notes": "Introduce ResourceAvailabilityProvider or equivalent before building BR2-like resource matrix, reservations and load buckets."
+    },
+    {
+      "id": "REF-016",
+      "area": "web feature data boundaries",
+      "files": [
+        "apps/web/src/useWorkspaceShellData.ts",
+        "apps/web/src/workspaceData.ts",
+        "apps/web/src/WorkspaceRouteRenderer.tsx"
+      ],
+      "problem": "WorkspaceData aggregates most workspace server state and is passed through route rendering; future heavy pages should not keep expanding the central object.",
+      "risk": "medium",
+      "refactor_type": "improve boundaries",
+      "expected_behavior_change": "none",
+      "tests_before": ["Existing workspaceData, routes and smoke tests"],
+      "tests_after": ["Feature-specific query hook tests when adding Gantt/resource/KPI/control pages"],
+      "status": "planned",
+      "notes": "Keep shell data for session/navigation/audit preview. New project-control pages should own their query bundles through feature-specific hooks."
+    }
+  ]
+}

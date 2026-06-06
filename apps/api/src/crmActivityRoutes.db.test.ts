@@ -13,7 +13,7 @@ import { createApp } from "./app";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const dataset: SeedTenantDataset = {
   tenants: [
@@ -156,7 +156,7 @@ const dataset: SeedTenantDataset = {
       name: "Анна Администратор",
       accessProfileId: "access-profile-alpha-admin",
       positionId: "position-engineer",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-alpha-opportunity-reader",
@@ -164,7 +164,7 @@ const dataset: SeedTenantDataset = {
       email: "reader@kiss-pm.local",
       name: "Роман Наблюдатель",
       accessProfileId: "access-profile-alpha-opportunity-reader",
-      password: "local-reader-password"
+      password: "reader12345"
     },
     {
       id: "user-alpha-no-crm",
@@ -172,7 +172,7 @@ const dataset: SeedTenantDataset = {
       email: "no-crm@kiss-pm.local",
       name: "Нина Без CRM",
       accessProfileId: "access-profile-alpha-no-crm",
-      password: "local-no-crm-password"
+      password: "no-crm12345"
     },
     {
       id: "user-beta-admin",
@@ -181,7 +181,7 @@ const dataset: SeedTenantDataset = {
       name: "Борис Бета",
       accessProfileId: "access-profile-beta-admin",
       positionId: "position-beta-engineer",
-      password: "local-beta-password"
+      password: "beta12345"
     }
   ]
 };
@@ -213,7 +213,7 @@ describe("CRM activity API", () => {
   });
 
   it("creates comments and tasks, completes a task and exposes scoped feed", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createAlphaOpportunity(cookie, "opportunity-alpha");
 
     const comment = await app.request(
@@ -297,8 +297,8 @@ describe("CRM activity API", () => {
   });
 
   it("filters activity and audit projection by opportunity and tenant", async () => {
-    const alphaCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const betaCookie = await loginAs("beta@kiss-pm.local", "local-beta-password");
+    const alphaCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const betaCookie = await loginAs("beta@kiss-pm.local", "beta12345");
     await createAlphaOpportunity(alphaCookie, "opportunity-alpha");
     await createAlphaOpportunity(alphaCookie, "opportunity-neighbor");
     await createBetaOpportunity(betaCookie, "opportunity-beta");
@@ -360,7 +360,7 @@ describe("CRM activity API", () => {
   });
 
   it("persists real activity for client, contact and product detail workspaces", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
 
     const clientComment = await app.request(
       "/api/workspace/crm/client/client-alpha/comments",
@@ -445,9 +445,9 @@ describe("CRM activity API", () => {
   });
 
   it("hides raw audit without audit permission and denies restricted mutations", async () => {
-    const adminCookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
-    const readerCookie = await loginAs("reader@kiss-pm.local", "local-reader-password");
-    const noCrmCookie = await loginAs("no-crm@kiss-pm.local", "local-no-crm-password");
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
+    const noCrmCookie = await loginAs("no-crm@kiss-pm.local", "no-crm12345");
     await createAlphaOpportunity(adminCookie, "opportunity-alpha");
 
     const deniedComment = await app.request(
@@ -500,7 +500,7 @@ describe("CRM activity API", () => {
   });
 
   it("does not append duplicate task transition audit for no-op status updates", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createAlphaOpportunity(cookie, "opportunity-alpha");
 
     const task = await app.request(
@@ -551,7 +551,7 @@ describe("CRM activity API", () => {
   });
 
   it("blocks comments, task creation and task transitions after opportunity finalization", async () => {
-    const cookie = await loginAs("admin@kiss-pm.local", "local-admin-password");
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createAlphaOpportunity(cookie, "opportunity-final");
 
     const task = await app.request(

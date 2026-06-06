@@ -257,6 +257,105 @@ export const crmProjectSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  CrmPipelineLifecycleGraphStage: {
+    type: "object",
+    required: ["stageId", "sortOrder", "lifecycleState", "isFinal"],
+    properties: {
+      stageId: stringIdSchema,
+      sortOrder: { type: "integer", minimum: 1, maximum: 2147483647 },
+      lifecycleState: { type: "string", enum: ["open", "won_closed", "lost_rejected"] },
+      isFinal: { type: "boolean" }
+    },
+    additionalProperties: false
+  },
+  CrmPipelineLifecycleGraphTransition: {
+    type: "object",
+    required: ["ruleId", "fromStageId", "toStageId"],
+    properties: {
+      ruleId: stringIdSchema,
+      fromStageId: stringIdSchema,
+      toStageId: stringIdSchema
+    },
+    additionalProperties: false
+  },
+  CrmPipelineLifecycleGraph: {
+    type: "object",
+    required: ["pipelineId", "initialStageId", "finalStageIds", "stages", "transitions"],
+    properties: {
+      pipelineId: stringIdSchema,
+      initialStageId: nullableStringSchema,
+      finalStageIds: { type: "array", items: stringIdSchema },
+      stages: { type: "array", items: schemaRef("CrmPipelineLifecycleGraphStage") },
+      transitions: { type: "array", items: schemaRef("CrmPipelineLifecycleGraphTransition") }
+    },
+    additionalProperties: false
+  },
+  CrmPipeline: {
+    type: "object",
+    required: ["id", "tenantId", "name", "status", "lifecycleGraphMetadata", "createdAt", "updatedAt"],
+    properties: {
+      id: stringIdSchema,
+      tenantId: stringIdSchema,
+      name: { type: "string", minLength: 1, maxLength: 160 },
+      status: crmStatusSchema,
+      lifecycleGraphMetadata: schemaRef("CrmPipelineLifecycleGraph"),
+      createdAt: dateTimeSchema,
+      updatedAt: dateTimeSchema
+    },
+    additionalProperties: false
+  },
+  CrmPipelineStage: {
+    type: "object",
+    required: ["id", "tenantId", "pipelineId", "name", "sortOrder", "status", "lifecycleState", "isFinal", "createdAt", "updatedAt"],
+    properties: {
+      id: stringIdSchema,
+      tenantId: stringIdSchema,
+      pipelineId: stringIdSchema,
+      name: { type: "string", minLength: 1, maxLength: 160 },
+      sortOrder: { type: "integer", minimum: 1, maximum: 2147483647 },
+      status: crmStatusSchema,
+      lifecycleState: { type: "string", enum: ["open", "won_closed", "lost_rejected"] },
+      isFinal: { type: "boolean" },
+      createdAt: dateTimeSchema,
+      updatedAt: dateTimeSchema
+    },
+    additionalProperties: false
+  },
+  CrmPipelineTransitionRule: {
+    type: "object",
+    required: ["id", "tenantId", "pipelineId", "fromStageId", "toStageId", "requiredPermission", "requiredFields", "requireReason", "status", "createdAt", "updatedAt"],
+    properties: {
+      id: stringIdSchema,
+      tenantId: stringIdSchema,
+      pipelineId: stringIdSchema,
+      fromStageId: stringIdSchema,
+      toStageId: stringIdSchema,
+      requiredPermission: nullableStringSchema,
+      requiredFields: { type: "array", items: { type: "string" } },
+      requireReason: { type: "boolean" },
+      status: crmStatusSchema,
+      createdAt: dateTimeSchema,
+      updatedAt: dateTimeSchema
+    },
+    additionalProperties: false
+  },
+  CrmPipelineStageAutomationDefinition: {
+    type: "object",
+    required: ["id", "tenantId", "pipelineId", "stageId", "trigger", "actionType", "actionConfig", "status", "createdAt", "updatedAt"],
+    properties: {
+      id: stringIdSchema,
+      tenantId: stringIdSchema,
+      pipelineId: stringIdSchema,
+      stageId: stringIdSchema,
+      trigger: { type: "string", enum: ["stage_entered", "stage_left"] },
+      actionType: { type: "string", minLength: 1 },
+      actionConfig: schemaRef("AnyJsonObject"),
+      status: crmStatusSchema,
+      createdAt: dateTimeSchema,
+      updatedAt: dateTimeSchema
+    },
+    additionalProperties: false
+  },
   PositionDemand: {
     type: "object",
     required: ["positionId", "requiredHours"],

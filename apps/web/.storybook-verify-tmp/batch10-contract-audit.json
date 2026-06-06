@@ -1,0 +1,105 @@
+{
+  "batch": 10,
+  "date": "2026-05-24",
+  "storybookEntries": 106,
+  "designV2Entries": 0,
+  "referenceStories": [
+    {
+      "id": "foundations-colors--palette",
+      "ref": "foundations-colors",
+      "hasNoPreview": false,
+      "hasEnDev": false,
+      "hasCyrillic": true,
+      "welcomeHero": false,
+      "typeH1": true,
+      "pageIntro": false,
+      "textLen": 718,
+      "pass": true
+    },
+    {
+      "id": "foundations-typography--type-scale",
+      "ref": "foundations-typography",
+      "hasNoPreview": false,
+      "hasEnDev": false,
+      "hasCyrillic": true,
+      "welcomeHero": false,
+      "typeH1": true,
+      "pageIntro": false,
+      "textLen": 389,
+      "pass": true
+    },
+    {
+      "id": "views-screens--dashboard",
+      "ref": "views-screens-dashboard",
+      "hasNoPreview": false,
+      "hasEnDev": false,
+      "hasCyrillic": true,
+      "welcomeHero": true,
+      "typeH1": false,
+      "pageIntro": false,
+      "textLen": 1038,
+      "pass": true
+    },
+    {
+      "id": "views-screens--task-card",
+      "ref": "views-screens-task-card",
+      "hasNoPreview": false,
+      "hasEnDev": false,
+      "hasCyrillic": true,
+      "welcomeHero": false,
+      "typeH1": false,
+      "pageIntro": true,
+      "textLen": 977,
+      "pass": true
+    },
+    {
+      "id": "views-screens--project-gantt",
+      "ref": "views-screens-gantt",
+      "hasNoPreview": false,
+      "hasEnDev": false,
+      "hasCyrillic": true,
+      "welcomeHero": false,
+      "typeH1": false,
+      "pageIntro": true,
+      "textLen": 1660,
+      "pass": true
+    },
+    {
+      "id": "views-screens--project-resources",
+      "ref": "views-screens-resources",
+      "hasNoPreview": false,
+      "hasEnDev": false,
+      "hasCyrillic": true,
+      "welcomeHero": false,
+      "typeH1": false,
+      "pageIntro": true,
+      "textLen": 1720,
+      "pass": true
+    },
+    {
+      "id": "catalog-all-components--for-approval",
+      "ref": "catalog-all-components",
+      "hasNoPreview": false,
+      "hasEnDev": false,
+      "hasCyrillic": true,
+      "welcomeHero": false,
+      "typeH1": false,
+      "pageIntro": true,
+      "textLen": 915,
+      "pass": true
+    }
+  ],
+  "referencePassCount": 7,
+  "checklist": {
+    "screensFullscreenLayout": true,
+    "screensWorkspaceChromeExempt": false,
+    "noteChromeExempt": "state-* и 19-login: login без chrome OK; state-* сейчас в WorkspaceChrome (screen-view.tsx)",
+    "noDesignV2InIndex": true,
+    "catalogUsesCardPanelDataTable": false,
+    "catalogUsesShadcnCardTable": true,
+    "uiVariantStatesBeyondShowcase": false,
+    "uiVitrinaOnlyCount": 31,
+    "legacyBadgeBemInViews": true,
+    "legacyBadgePath": "apps/web/src/views/blocks/deals-block.tsx"
+  }
+}

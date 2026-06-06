@@ -13,7 +13,7 @@ type TestApp = ReturnType<typeof createApp>;
 
 export const communicationRealtimeDatabaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 export const communicationRealtimeSeed: SeedTenantDataset = {
   tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],
@@ -64,7 +64,7 @@ export const communicationRealtimeSeed: SeedTenantDataset = {
       name: "Анна Администратор",
       accessProfileId: "access-profile-admin",
       positionId: "position-manager",
-      password: "local-admin-password"
+      password: "admin12345"
     },
     {
       id: "user-alpha-reader",
@@ -73,7 +73,7 @@ export const communicationRealtimeSeed: SeedTenantDataset = {
       name: "Роман Участник",
       accessProfileId: "access-profile-reader",
       positionId: "position-engineer",
-      password: "local-reader-password"
+      password: "reader12345"
     },
     {
       id: "user-alpha-denied",
@@ -81,7 +81,7 @@ export const communicationRealtimeSeed: SeedTenantDataset = {
       email: "denied@kiss-pm.local",
       name: "Дина Без Прав",
       accessProfileId: "access-profile-denied",
-      password: "local-denied-password"
+      password: "denied12345"
     }
   ]
 };

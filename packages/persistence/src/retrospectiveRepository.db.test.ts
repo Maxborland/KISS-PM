@@ -16,7 +16,7 @@ import { projectClosureSnapshots, projects } from "./schema";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:change_me_local_dev_only@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 describe("retrospective repository", () => {
   let client: PostgresClient;
