@@ -1,3 +1,4 @@
+import { isPermission } from "@kiss-pm/access-control";
 import {
   isCrmPipelineAutomationTrigger,
   isCrmPipelineLifecycleState,
@@ -25,6 +26,11 @@ type ParseResult<T> =
       ok: false;
       error: string;
     };
+
+export type CrmOpportunityPipelineTransitionRequest = {
+  targetStageId: string;
+  reason: string | null;
+};
 
 const idPattern = /^[a-z][a-z0-9-]{2,80}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -292,7 +298,8 @@ export function parseCrmPipelineTransitionRuleBody(
   if (fromStageId === toStageId) return { ok: false, error: "invalid_transition_self_loop" };
   if (
     requiredPermission !== null &&
-    !isSafeSingleLineText(requiredPermission, maxLengths.permission)
+    (!isSafeSingleLineText(requiredPermission, maxLengths.permission) ||
+      !isPermission(requiredPermission))
   ) {
     return { ok: false, error: "invalid_required_permission" };
   }
@@ -349,6 +356,24 @@ export function parseCrmPipelineStageAutomationDefinitionBody(
     ok: true,
     value: { id, tenantId, pipelineId, stageId, trigger, actionType, actionConfig, status }
   };
+}
+
+export function parseCrmOpportunityPipelineTransitionBody(
+  body: unknown
+): ParseResult<CrmOpportunityPipelineTransitionRequest> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const targetStageId = getOptionalString(input, "targetStageId");
+  const reason = getOptionalString(input, "reason") ?? null;
+
+  if (!targetStageId || !isId(targetStageId)) {
+    return { ok: false, error: "invalid_crm_pipeline_stage_id" };
+  }
+  if (reason !== null && !isSafeMultilineText(reason, maxLengths.description)) {
+    return { ok: false, error: "invalid_transition_reason" };
+  }
+
+  return { ok: true, value: { targetStageId, reason } };
 }
 
 export function parseDealStageBody(

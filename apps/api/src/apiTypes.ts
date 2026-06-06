@@ -273,6 +273,9 @@ export type OpportunityRecord = {
   ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
+  crmPipelineId: string | null;
+  crmPipelineStageId: string | null;
+  crmPipelineStateUpdatedAt: Date | null;
   clientName: string;
   contactName: string;
   title: string;
@@ -304,8 +307,13 @@ export type OpportunityInput = Omit<
   | "feasibilityCheckedAt"
   | "ownerUserId"
   | "customFieldValues"
+  | "crmPipelineStateUpdatedAt"
+  | "crmPipelineId"
+  | "crmPipelineStageId"
 > & {
   ownerUserId?: string | null;
+  crmPipelineId?: string | null;
+  crmPipelineStageId?: string | null;
   customFieldValues?: OpportunityCustomFieldValues;
 };
 export type OpportunityUpdateInput = Omit<
@@ -528,6 +536,13 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     opportunityId: string;
     stageId: string;
+  }): Promise<OpportunityRecord | undefined>;
+  transitionOpportunityCrmPipelineStage?(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    pipelineId: string;
+    currentStageId: string;
+    targetStageId: string;
   }): Promise<OpportunityRecord | undefined>;
   finalizeOpportunity?(input: {
     tenantId: TenantId;

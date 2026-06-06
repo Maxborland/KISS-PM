@@ -37,6 +37,9 @@ export type OpportunityRecord = {
   ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
+  crmPipelineId: string | null;
+  crmPipelineStageId: string | null;
+  crmPipelineStateUpdatedAt: Date | null;
   clientName: string;
   contactName: string;
   title: string;
@@ -68,8 +71,13 @@ export type OpportunityInput = Omit<
   | "feasibilityCheckedAt"
   | "ownerUserId"
   | "customFieldValues"
+  | "crmPipelineStateUpdatedAt"
+  | "crmPipelineId"
+  | "crmPipelineStageId"
 > & {
   ownerUserId?: string | null;
+  crmPipelineId?: string | null;
+  crmPipelineStageId?: string | null;
   customFieldValues?: Record<string, string>;
 };
 
@@ -134,6 +142,13 @@ export type ProjectIntakeRepository = {
     tenantId: TenantId;
     opportunityId: string;
     stageId: string;
+  }): Promise<OpportunityRecord | undefined>;
+  transitionOpportunityCrmPipelineStage(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    pipelineId: string;
+    currentStageId: string;
+    targetStageId: string;
   }): Promise<OpportunityRecord | undefined>;
   finalizeOpportunity(input: {
     tenantId: TenantId;
@@ -243,6 +258,9 @@ export function createProjectIntakeRepository(
             ownerUserId: input.ownerUserId ?? null,
             projectTypeId: input.projectTypeId,
             stageId: input.stageId,
+            crmPipelineId: input.crmPipelineId ?? null,
+            crmPipelineStageId: input.crmPipelineStageId ?? null,
+            crmPipelineStateUpdatedAt: input.crmPipelineId && input.crmPipelineStageId ? new Date() : null,
             clientName: input.clientName,
             contactName: input.contactName,
             title: input.title,
@@ -379,6 +397,33 @@ export function createProjectIntakeRepository(
           and(
             eq(opportunities.tenantId, input.tenantId),
             eq(opportunities.id, input.opportunityId),
+            notInArray(opportunities.status, finalOpportunityStatuses)
+          )
+        )
+        .returning();
+
+      if (!row) return undefined;
+      const demandByOpportunity = await listOpportunityDemand(input.tenantId, [
+        input.opportunityId
+      ]);
+
+      return mapOpportunityRecord(row, demandByOpportunity.get(row.id) ?? []);
+    },
+    async transitionOpportunityCrmPipelineStage(input) {
+      const [row] = await db
+        .update(opportunities)
+        .set({
+          crmPipelineId: input.pipelineId,
+          crmPipelineStageId: input.targetStageId,
+          crmPipelineStateUpdatedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(opportunities.tenantId, input.tenantId),
+            eq(opportunities.id, input.opportunityId),
+            eq(opportunities.crmPipelineId, input.pipelineId),
+            eq(opportunities.crmPipelineStageId, input.currentStageId),
             notInArray(opportunities.status, finalOpportunityStatuses)
           )
         )
@@ -650,6 +695,9 @@ function mapOpportunityRecord(
     ownerUserId: row.ownerUserId,
     projectTypeId: row.projectTypeId,
     stageId: row.stageId,
+    crmPipelineId: row.crmPipelineId,
+    crmPipelineStageId: row.crmPipelineStageId,
+    crmPipelineStateUpdatedAt: row.crmPipelineStateUpdatedAt,
     clientName: row.clientName,
     contactName: row.contactName,
     title: row.title,

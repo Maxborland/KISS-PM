@@ -5,7 +5,8 @@ import { isSingleUseActivationError } from "./projectIntakeService/activationErr
 import type {
   ApiTenantDataSource,
   ManagementAuditEventInput,
-  OpportunityInput
+  OpportunityInput,
+  OpportunityRecord
 } from "./apiTypes";
 import type { TenantUser } from "@kiss-pm/domain";
 
@@ -40,6 +41,48 @@ const opportunityInput: OpportunityInput = {
   customFieldValues: {},
   demand: [{ positionId: "position-analyst", requiredHours: 160 }]
 };
+
+function createOpportunityRecord(
+  input: OpportunityInput,
+  overrides: Partial<OpportunityRecord> = {}
+): OpportunityRecord {
+  return {
+    id: input.id,
+    tenantId: input.tenantId,
+    clientId: input.clientId,
+    primaryContactId: input.primaryContactId,
+    ownerUserId: input.ownerUserId ?? null,
+    projectTypeId: input.projectTypeId,
+    stageId: input.stageId,
+    crmPipelineId: input.crmPipelineId ?? null,
+    crmPipelineStageId: input.crmPipelineStageId ?? null,
+    crmPipelineStateUpdatedAt:
+      input.crmPipelineId && input.crmPipelineStageId
+        ? new Date("2026-05-19T00:00:00.000Z")
+        : null,
+    clientName: input.clientName,
+    contactName: input.contactName,
+    title: input.title,
+    projectType: input.projectType,
+    description: input.description,
+    plannedStart: input.plannedStart,
+    plannedFinish: input.plannedFinish,
+    contractValue: input.contractValue,
+    plannedHourlyRate: input.plannedHourlyRate,
+    plannedHours: input.plannedHours,
+    probability: input.probability,
+    status: input.status,
+    templateId: input.templateId,
+    customFieldValues: input.customFieldValues ?? {},
+    demand: input.demand,
+    feasibilityStatus: null,
+    feasibilityResult: null,
+    feasibilityCheckedAt: null,
+    createdAt: new Date("2026-05-19T00:00:00.000Z"),
+    updatedAt: new Date("2026-05-19T00:00:00.000Z"),
+    ...overrides
+  };
+}
 
 describe("project intake application service", () => {
   it("treats finalized source opportunity draft race as activation conflict", () => {
@@ -119,16 +162,7 @@ describe("project intake application service", () => {
       },
       async createOpportunity(input) {
         createdInput = input;
-        return {
-          ...input,
-          ownerUserId: input.ownerUserId ?? null,
-          customFieldValues: input.customFieldValues ?? {},
-          feasibilityStatus: null,
-          feasibilityResult: null,
-          feasibilityCheckedAt: null,
-          createdAt: new Date("2026-05-19T00:00:00.000Z"),
-          updatedAt: new Date("2026-05-19T00:00:00.000Z")
-        };
+        return createOpportunityRecord(input);
       },
       async withTransaction(operation) {
         transactionUsed = true;
@@ -193,17 +227,14 @@ describe("project intake application service", () => {
     const audits: ManagementAuditEventInput[] = [];
     let updatedInput: OpportunityInput | null = null;
     let transactionUsed = false;
-    const existingOpportunity = {
-      ...opportunityInput,
-      ownerUserId: opportunityInput.ownerUserId ?? null,
-      customFieldValues: {},
+    const existingOpportunity = createOpportunityRecord(opportunityInput, {
       status: "ready_to_activate",
       feasibilityStatus: "ok",
       feasibilityResult: { rows: [] },
       feasibilityCheckedAt: new Date("2026-05-19T00:00:00.000Z"),
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
-    };
+    });
 
     const dataSource: ApiTenantDataSource = {
       async listDevUsers() {
@@ -274,16 +305,13 @@ describe("project intake application service", () => {
       },
       async updateOpportunity(input) {
         updatedInput = input;
-        return {
-          ...input,
-          ownerUserId: input.ownerUserId ?? null,
-          customFieldValues: input.customFieldValues ?? {},
+        return createOpportunityRecord(input, {
           feasibilityStatus: null,
           feasibilityResult: null,
           feasibilityCheckedAt: null,
           createdAt: existingOpportunity.createdAt,
           updatedAt: new Date("2026-05-20T00:00:00.000Z")
-        };
+        });
       },
       async withTransaction(operation) {
         transactionUsed = true;
@@ -358,16 +386,13 @@ describe("project intake application service", () => {
 
   it("returns conflict instead of throwing when opportunity update loses a finalization race", async () => {
     const audits: ManagementAuditEventInput[] = [];
-    const existingOpportunity = {
-      ...opportunityInput,
-      ownerUserId: opportunityInput.ownerUserId ?? null,
-      customFieldValues: {},
+    const existingOpportunity = createOpportunityRecord(opportunityInput, {
       feasibilityStatus: null,
       feasibilityResult: null,
       feasibilityCheckedAt: null,
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
-    };
+    });
     const dataSource: ApiTenantDataSource = {
       async listDevUsers() {
         return [];
@@ -468,16 +493,13 @@ describe("project intake application service", () => {
 
   it("returns conflict instead of throwing when stage update loses a finalization race", async () => {
     const audits: ManagementAuditEventInput[] = [];
-    const existingOpportunity = {
-      ...opportunityInput,
-      ownerUserId: opportunityInput.ownerUserId ?? null,
-      customFieldValues: {},
+    const existingOpportunity = createOpportunityRecord(opportunityInput, {
       feasibilityStatus: null,
       feasibilityResult: null,
       feasibilityCheckedAt: null,
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
-    };
+    });
     const dataSource: ApiTenantDataSource = {
       async listDevUsers() {
         return [];
@@ -541,16 +563,13 @@ describe("project intake application service", () => {
 
   it("returns conflict instead of throwing when feasibility update loses a finalization race", async () => {
     const audits: ManagementAuditEventInput[] = [];
-    const existingOpportunity = {
-      ...opportunityInput,
-      ownerUserId: opportunityInput.ownerUserId ?? null,
-      customFieldValues: {},
+    const existingOpportunity = createOpportunityRecord(opportunityInput, {
       feasibilityStatus: null,
       feasibilityResult: null,
       feasibilityCheckedAt: null,
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
-    };
+    });
     const dataSource: ApiTenantDataSource = {
       async listDevUsers() {
         return [];
@@ -613,17 +632,14 @@ describe("project intake application service", () => {
     const audits: ManagementAuditEventInput[] = [];
     let finalizedInput: { tenantId: string; opportunityId: string; status: string } | null =
       null;
-    const existingOpportunity = {
-      ...opportunityInput,
-      ownerUserId: opportunityInput.ownerUserId ?? null,
-      customFieldValues: {},
+    const existingOpportunity = createOpportunityRecord(opportunityInput, {
       status: "feasibility",
       feasibilityStatus: null,
       feasibilityResult: null,
       feasibilityCheckedAt: null,
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
-    };
+    });
 
     const dataSource: ApiTenantDataSource = {
       async listDevUsers() {

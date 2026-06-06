@@ -460,6 +460,9 @@ export const opportunities = pgTable(
     ownerUserId: text("owner_user_id"),
     projectTypeId: text("project_type_id"),
     stageId: text("stage_id"),
+    crmPipelineId: text("crm_pipeline_id"),
+    crmPipelineStageId: text("crm_pipeline_stage_id"),
+    crmPipelineStateUpdatedAt: timestamp("crm_pipeline_state_updated_at", { withTimezone: true }),
     clientName: text("client_name").notNull(),
     contactName: text("contact_name").notNull(),
     title: text("title").notNull(),
@@ -507,10 +510,33 @@ export const opportunities = pgTable(
       columns: [table.tenantId, table.stageId],
       foreignColumns: [dealStages.tenantId, dealStages.id]
     }).onDelete("restrict"),
+    foreignKey({
+      name: "opportunities_crm_pipeline_fk",
+      columns: [table.tenantId, table.crmPipelineId],
+      foreignColumns: [crmPipelines.tenantId, crmPipelines.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "opportunities_crm_pipeline_stage_fk",
+      columns: [table.tenantId, table.crmPipelineId, table.crmPipelineStageId],
+      foreignColumns: [
+        crmPipelineStages.tenantId,
+        crmPipelineStages.pipelineId,
+        crmPipelineStages.id
+      ]
+    }).onDelete("restrict"),
     index("opportunities_tenant_id_idx").on(table.tenantId),
     index("opportunities_status_idx").on(table.status),
     index("opportunities_owner_user_id_idx").on(table.tenantId, table.ownerUserId),
-    index("opportunities_stage_id_idx").on(table.tenantId, table.stageId)
+    index("opportunities_stage_id_idx").on(table.tenantId, table.stageId),
+    index("opportunities_crm_pipeline_idx").on(
+      table.tenantId,
+      table.crmPipelineId,
+      table.crmPipelineStageId
+    ),
+    check(
+      "opportunities_crm_pipeline_state_pair_chk",
+      sql`(${table.crmPipelineId} is null and ${table.crmPipelineStageId} is null and ${table.crmPipelineStateUpdatedAt} is null) or (${table.crmPipelineId} is not null and ${table.crmPipelineStageId} is not null and ${table.crmPipelineStateUpdatedAt} is not null)`
+    )
   ]
 );
 

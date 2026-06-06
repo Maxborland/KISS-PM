@@ -178,7 +178,7 @@ describe("CRM pipeline routes", () => {
       id: "pipeline-rule-retained",
       fromStageId: "pipeline-stage-open",
       toStageId: "pipeline-stage-final",
-      requiredPermission: "tenant.crm.deals.close",
+      requiredPermission: "tenant.project_activation.manage",
       requiredFields: ["contractValue"],
       requireReason: true
     });
@@ -231,7 +231,7 @@ describe("CRM pipeline routes", () => {
     await expect(transitionRulePatch.json()).resolves.toMatchObject({
       transitionRule: {
         status: "archived",
-        requiredPermission: "tenant.crm.deals.close",
+        requiredPermission: "tenant.project_activation.manage",
         requiredFields: ["contractValue"],
         requireReason: true
       }

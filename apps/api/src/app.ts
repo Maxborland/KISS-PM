@@ -32,6 +32,7 @@ import { registerCrmRoutes } from "./crmRoutes";
 import { registerCrmPipelineRoutes } from "./crmPipelineRoutes";
 import { registerCollaborationRoutes } from "./collaborationRoutes";
 import { registerCommunicationUpgradeRoutes } from "./communicationUpgradeRoutes";
+import { registerCrmOpportunityTransitionRoutes } from "./crmOpportunityTransitionRoutes";
 import { registerCommunicationRealtimeRoutes } from "./communicationRealtimeRoutes";
 import { registerControlRoutes } from "./controlRoutes";
 import { registerControlSurfaceRoutes } from "./controlSurfaceRoutes";
@@ -256,6 +257,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerKnowledgeRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
   registerCrmPipelineRoutes(app, routeDeps);
+  registerCrmOpportunityTransitionRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);
   registerAttachmentRoutes(app, routeDeps);
