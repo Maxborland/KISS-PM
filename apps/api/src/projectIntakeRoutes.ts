@@ -259,7 +259,7 @@ export function registerProjectIntakeRoutes(
 
     return context.json({
       projects: (await dataSource.listProjects(actor.tenantId)).filter(
-        (project) => project.status === "active"
+        (project) => project.status === "active" || project.status === "paused"
       )
     });
   });

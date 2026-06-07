@@ -1577,6 +1577,9 @@ describe("project work API routes", () => {
     const projectTasks = await app.request("/api/workspace/projects/project-alpha/tasks", {
       headers: { cookie: adminCookie }
     });
+    const projectListWhilePaused = await app.request("/api/workspace/projects", {
+      headers: { cookie: adminCookie }
+    });
     const createOnPaused = await app.request("/api/workspace/projects/project-alpha/tasks", {
       method: "POST",
       headers: {
@@ -1626,7 +1629,17 @@ describe("project work API routes", () => {
         cookie: adminCookie
       }
     });
-    const resumed = await app.request("/api/workspace/projects/project-alpha/status", {
+    expect(projectListWhilePaused.status).toBe(200);
+    const projectListWhilePausedBody = await projectListWhilePaused.json();
+    expect(projectListWhilePausedBody).toMatchObject({
+      projects: [expect.objectContaining({ id: "project-alpha", status: "paused" })]
+    });
+    const listedPausedProject = projectListWhilePausedBody.projects.find(
+      (project: { id: string }) => project.id === "project-alpha"
+    );
+    expect(listedPausedProject).toMatchObject({ id: "project-alpha", status: "paused" });
+
+    const resumed = await app.request(`/api/workspace/projects/${listedPausedProject.id}/status`, {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
