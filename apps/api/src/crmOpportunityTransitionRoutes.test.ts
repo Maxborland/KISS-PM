@@ -155,6 +155,53 @@ describe("CRM opportunity transition routes", () => {
     });
   });
 
+  it("accepts required ordinary opportunity fields when they are present", async () => {
+    const fixture = createFixture(adminProfile, {
+      opportunity: {
+        description: "Board-approved implementation scope",
+        templateId: "template-enterprise"
+      },
+      transitionRules: [
+        {
+          ...transitionRule,
+          requiredFields: [
+            "title",
+            "description",
+            "clientName",
+            "contactName",
+            "templateId",
+            "status"
+          ]
+        }
+      ]
+    });
+    const response = await fixture.app.request(
+      "/api/workspace/opportunities/opportunity-alpha/pipeline-transition",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: "kiss_pm_session=test" },
+        body: JSON.stringify({ targetStageId: "pipeline-stage-qualified" })
+      }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      opportunity: {
+        id: "opportunity-alpha",
+        crmPipelineStageId: "pipeline-stage-qualified"
+      },
+      transition: {
+        ok: true,
+        ruleId: "pipeline-rule-intake-qualified"
+      }
+    });
+    expect(fixture.auditEvents).toHaveLength(1);
+    expect(fixture.auditEvents[0]).toMatchObject({
+      actionType: "crm_opportunity_pipeline.transitioned",
+      executionResult: { status: "succeeded" }
+    });
+  });
+
   it("records domain-denied audit when the atomic transition loses the current-state race", async () => {
     const fixture = createFixture(adminProfile, { transitionConflict: true });
     const response = await fixture.app.request(
@@ -276,11 +323,12 @@ function createFixture(
     pipeline?: CrmPipeline;
     transitionRules?: CrmPipelineTransitionRule[];
     transitionConflict?: boolean;
+    opportunity?: Partial<OpportunityRecord>;
   } = {}
 ) {
   const app = new Hono();
   const auditEvents: AuditEventListItem[] = [];
-  let opportunity = createOpportunity();
+  let opportunity = { ...createOpportunity(), ...overrides.opportunity };
   const transitionRules = overrides.transitionRules ?? [transitionRule];
   const dataSource: ApiTenantDataSource = {
     async listDevUsers() { return []; },

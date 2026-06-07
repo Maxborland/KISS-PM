@@ -224,11 +224,35 @@ function opportunityFieldsForTransition(opportunity: Record<string, unknown>) {
 
   return {
     ...customFieldValues,
+    id: opportunity.id,
+    tenantId: opportunity.tenantId,
+    clientId: opportunity.clientId,
+    primaryContactId: opportunity.primaryContactId,
+    ownerUserId: opportunity.ownerUserId,
+    projectTypeId: opportunity.projectTypeId,
+    stageId: opportunity.stageId,
+    crmPipelineId: opportunity.crmPipelineId,
+    crmPipelineStageId: opportunity.crmPipelineStageId,
+    crmPipelineStateUpdatedAt: opportunity.crmPipelineStateUpdatedAt,
+    clientName: opportunity.clientName,
+    contactName: opportunity.contactName,
+    title: opportunity.title,
+    projectType: opportunity.projectType,
+    description: opportunity.description,
+    plannedStart: opportunity.plannedStart,
+    plannedFinish: opportunity.plannedFinish,
     contractValue: opportunity.contractValue,
+    plannedHourlyRate: opportunity.plannedHourlyRate,
     plannedHours: opportunity.plannedHours,
     probability: opportunity.probability,
-    clientId: opportunity.clientId,
-    projectTypeId: opportunity.projectTypeId,
-    ownerUserId: opportunity.ownerUserId
+    status: opportunity.status,
+    templateId: opportunity.templateId,
+    feasibilityStatus: opportunity.feasibilityStatus,
+    feasibilityResult: opportunity.feasibilityResult,
+    feasibilityCheckedAt: opportunity.feasibilityCheckedAt,
+    createdAt: opportunity.createdAt,
+    updatedAt: opportunity.updatedAt,
+    demand: opportunity.demand,
+    customFieldValues: opportunity.customFieldValues
   };
 }
