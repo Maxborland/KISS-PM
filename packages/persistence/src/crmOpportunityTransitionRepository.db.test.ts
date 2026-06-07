@@ -86,6 +86,52 @@ describe("CRM opportunity pipeline transition persistence", () => {
     expect(persisted?.crm_pipeline_state_updated_at).toBeTruthy();
   });
 
+  it("preserves CRM pipeline timestamp when same-state updates echo CRM fields", async () => {
+    const existing = await dataSource.findOpportunityById(
+      "tenant-alpha",
+      "opportunity-alpha"
+    );
+
+    const updated = await dataSource.updateOpportunity({
+      id: "opportunity-alpha",
+      tenantId: "tenant-alpha",
+      clientId: existing!.clientId,
+      primaryContactId: existing!.primaryContactId,
+      ownerUserId: existing!.ownerUserId,
+      projectTypeId: existing!.projectTypeId,
+      stageId: existing!.stageId,
+      crmPipelineId: existing!.crmPipelineId,
+      crmPipelineStageId: existing!.crmPipelineStageId,
+      crmPipelineStateUpdatedAt: existing!.crmPipelineStateUpdatedAt,
+      clientName: existing!.clientName,
+      contactName: existing!.contactName,
+      title: "Opportunity renamed without CRM transition",
+      projectType: existing!.projectType,
+      description: existing!.description,
+      plannedStart: existing!.plannedStart,
+      plannedFinish: existing!.plannedFinish,
+      contractValue: 125_000,
+      plannedHourlyRate: existing!.plannedHourlyRate,
+      plannedHours: existing!.plannedHours,
+      probability: existing!.probability,
+      status: existing!.status,
+      templateId: existing!.templateId,
+      customFieldValues: existing!.customFieldValues,
+      demand: existing!.demand
+    });
+
+    expect(updated).toMatchObject({
+      id: "opportunity-alpha",
+      title: "Opportunity renamed without CRM transition",
+      contractValue: 125_000,
+      crmPipelineId: "pipeline-sales",
+      crmPipelineStageId: "pipeline-stage-intake"
+    });
+    expect(updated?.crmPipelineStateUpdatedAt?.toISOString()).toBe(
+      existing?.crmPipelineStateUpdatedAt?.toISOString()
+    );
+  });
+
   it("preserves CRM pipeline state when an ordinary opportunity update omits it", async () => {
     const existing = await dataSource.findOpportunityById(
       "tenant-alpha",

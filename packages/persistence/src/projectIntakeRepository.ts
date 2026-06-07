@@ -78,6 +78,7 @@ export type OpportunityInput = Omit<
   ownerUserId?: string | null;
   crmPipelineId?: string | null;
   crmPipelineStageId?: string | null;
+  crmPipelineStateUpdatedAt?: Date | null;
   customFieldValues?: Record<string, string>;
 };
 
@@ -351,13 +352,19 @@ export function createProjectIntakeRepository(
           updatedAt: now
         };
 
+        const hasCrmPipelineStateUpdatedAt = Object.prototype.hasOwnProperty.call(
+          input,
+          "crmPipelineStateUpdatedAt"
+        );
         if ("crmPipelineId" in input || "crmPipelineStageId" in input) {
           Object.assign(updateValues, {
             crmPipelineId: input.crmPipelineId ?? null,
             crmPipelineStageId: input.crmPipelineStageId ?? null,
             crmPipelineStateUpdatedAt:
               input.crmPipelineId && input.crmPipelineStageId
-                ? now
+                ? hasCrmPipelineStateUpdatedAt
+                  ? input.crmPipelineStateUpdatedAt ?? null
+                  : now
                 : null
           });
         }

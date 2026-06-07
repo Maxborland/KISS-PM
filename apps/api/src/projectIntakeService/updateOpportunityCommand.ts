@@ -33,6 +33,14 @@ export async function updateOpportunity(
     ...input.input,
     ownerUserId: input.input.ownerUserId ?? opportunity.ownerUserId ?? input.actor.id
   };
+  const preservesCurrentCrmPipelineState =
+    Object.prototype.hasOwnProperty.call(inputWithOwner, "crmPipelineId") &&
+    Object.prototype.hasOwnProperty.call(inputWithOwner, "crmPipelineStageId") &&
+    inputWithOwner.crmPipelineId === opportunity.crmPipelineId &&
+    inputWithOwner.crmPipelineStageId === opportunity.crmPipelineStageId;
+  const crmPipelineTimestampPatch = preservesCurrentCrmPipelineState
+    ? { crmPipelineStateUpdatedAt: opportunity.crmPipelineStateUpdatedAt }
+    : {};
   const linked = await resolveOpportunityLinks(
     deps.dataSource,
     input.actor.tenantId,
@@ -62,6 +70,7 @@ export async function updateOpportunity(
 
       const updated = await transactionDataSource.updateOpportunity({
         ...inputWithOwner,
+        ...crmPipelineTimestampPatch,
         id: opportunity.id,
         status: opportunity.status,
         clientName: linked.client.name,

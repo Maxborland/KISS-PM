@@ -739,6 +739,184 @@ describe("project intake application service", () => {
     expect(audits).toEqual([]);
   });
 
+  it("preserves CRM pipeline timestamp when update echoes the current pipeline state", async () => {
+    const audits: ManagementAuditEventInput[] = [];
+    let updatedInput: OpportunityInput | null = null;
+    const existingPipelineStateUpdatedAt = new Date("2026-05-17T12:00:00.000Z");
+    const existingOpportunity = createOpportunityRecord(
+      {
+        ...opportunityInput,
+        crmPipelineId: "pipeline-sales",
+        crmPipelineStageId: "pipeline-stage-intake"
+      },
+      {
+        crmPipelineStateUpdatedAt: existingPipelineStateUpdatedAt,
+        createdAt: new Date("2026-05-16T00:00:00.000Z"),
+        updatedAt: new Date("2026-05-19T00:00:00.000Z")
+      }
+    );
+
+    const dataSource: ApiTenantDataSource = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === actor.id ? actor : undefined;
+      },
+      async findTenantById() {
+        return undefined;
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async listOpportunities() {
+        return [existingOpportunity];
+      },
+      async findOpportunityById() {
+        return existingOpportunity;
+      },
+      async findClientById() {
+        return {
+          id: "client-alpha",
+          tenantId: "tenant-alpha",
+          name: "Client Alpha",
+          description: null,
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async findContactById() {
+        return {
+          id: "contact-alpha",
+          tenantId: "tenant-alpha",
+          clientId: "client-alpha",
+          name: "Contact Alpha",
+          email: "contact@example.test",
+          phone: null,
+          telegram: null,
+          role: "Sponsor",
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async findProjectTypeById() {
+        return {
+          id: "project-type-alpha",
+          tenantId: "tenant-alpha",
+          name: "Implementation",
+          description: null,
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async findDealStageById() {
+        return {
+          id: "deal-stage-alpha",
+          tenantId: "tenant-alpha",
+          name: "Intake",
+          sortOrder: 10,
+          status: "active",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async findCrmPipelineById() {
+        return {
+          id: "pipeline-sales",
+          tenantId: "tenant-alpha",
+          name: "Sales",
+          status: "active",
+          lifecycleGraphMetadata: {
+            pipelineId: "pipeline-sales",
+            initialStageId: "pipeline-stage-intake",
+            finalStageIds: [],
+            stages: [],
+            transitions: []
+          },
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async findCrmPipelineStageById() {
+        return {
+          id: "pipeline-stage-intake",
+          tenantId: "tenant-alpha",
+          pipelineId: "pipeline-sales",
+          name: "Intake",
+          sortOrder: 10,
+          status: "active",
+          lifecycleState: "open",
+          isFinal: false,
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async updateOpportunity(input) {
+        updatedInput = input;
+        const persistenceInput = input as OpportunityInput & {
+          crmPipelineStateUpdatedAt?: Date | null;
+        };
+        return createOpportunityRecord(input, {
+          crmPipelineStateUpdatedAt:
+            persistenceInput.crmPipelineStateUpdatedAt ??
+            new Date("2026-06-07T00:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T00:00:00.000Z")
+        });
+      },
+      async withTransaction(operation) {
+        return operation(dataSource);
+      },
+      async appendAuditEvent() {
+        throw new Error("service test uses appendManagementAuditEvent dependency");
+      }
+    };
+
+    const service = createProjectIntakeService({
+      dataSource,
+      getActorProfile: async () => tenantAdminProfile,
+      runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
+      appendManagementAuditEvent: async (input) => {
+        audits.push(input);
+        return `audit-test-${audits.length}`;
+      }
+    });
+
+    const result = await service.updateOpportunity({
+      actor,
+      opportunityId: opportunityInput.id,
+      input: {
+        ...opportunityInput,
+        crmPipelineId: "pipeline-sales",
+        crmPipelineStageId: "pipeline-stage-intake",
+        title: "Updated title",
+        contractValue: 1_250_000
+      }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: 200,
+      opportunity: {
+        title: "Updated title",
+        contractValue: 1_250_000,
+        crmPipelineId: "pipeline-sales",
+        crmPipelineStageId: "pipeline-stage-intake",
+        crmPipelineStateUpdatedAt: existingPipelineStateUpdatedAt
+      }
+    });
+    expect(updatedInput).toMatchObject({
+      crmPipelineId: "pipeline-sales",
+      crmPipelineStageId: "pipeline-stage-intake",
+      crmPipelineStateUpdatedAt: existingPipelineStateUpdatedAt
+    });
+    expect(audits[0]?.afterState).toMatchObject({
+      crmPipelineStateUpdatedAt: existingPipelineStateUpdatedAt
+    });
+  });
+
   it("rejects direct CRM pipeline seeding to a non-initial stage", async () => {
     const audits: ManagementAuditEventInput[] = [];
     let updatedInput: OpportunityInput | null = null;

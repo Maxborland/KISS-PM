@@ -314,6 +314,7 @@ export type OpportunityInput = Omit<
   ownerUserId?: string | null;
   crmPipelineId?: string | null;
   crmPipelineStageId?: string | null;
+  crmPipelineStateUpdatedAt?: Date | null;
   customFieldValues?: OpportunityCustomFieldValues;
 };
 export type OpportunityUpdateInput = Omit<
