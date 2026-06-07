@@ -70,6 +70,9 @@ export async function createWorkspaceInboxTask(
       plannedStart: input.body.plannedStart,
       plannedFinish: input.body.plannedFinish
     });
+    if (!inboxProject) {
+      return { ok: false as const, status: 404, error: "project_not_found" };
+    }
     const planningCommand = buildCreateTaskPlanningCommand({
       taskId,
       projectId: inboxProject.id,

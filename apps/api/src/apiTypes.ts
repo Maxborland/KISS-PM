@@ -576,7 +576,7 @@ export type ApiTenantDataSource = {
   listProjects?(tenantId: TenantId): Promise<ProjectRecord[]>;
   ensureWorkspaceInboxProject?(
     input: WorkspaceInboxProjectInput
-  ): Promise<ProjectRecord>;
+  ): Promise<ProjectRecord | undefined>;
   createProjectDraftFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
   updateProjectStatus?(input: ProjectStatusUpdateInput): Promise<ProjectRecord | undefined>;

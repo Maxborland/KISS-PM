@@ -120,6 +120,10 @@ describe("project work API routes", () => {
     return response.headers.get("set-cookie") ?? "";
   }
 
+  function delay(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async function createActiveProject() {
     const dataSource = createPostgresTenantDataSource(createDatabase(client));
     const opportunity = await dataSource.createOpportunity({
@@ -1692,6 +1696,145 @@ describe("project work API routes", () => {
           executionResult: { status: "succeeded" }
         })
       ])
+    });
+  });
+
+  it("keeps a paused workspace inbox immutable until it is explicitly resumed", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const createdInboxTask = await app.request("/api/workspace/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-inbox-before-pause",
+        title: "Inbox task before pause",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    expect(createdInboxTask.status).toBe(201);
+    const createdInboxTaskBody = await createdInboxTask.json();
+    const inboxProjectId = createdInboxTaskBody.project.id;
+
+    const paused = await app.request(`/api/workspace/projects/${inboxProjectId}/status`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ status: "paused" })
+    });
+    expect(paused.status).toBe(200);
+
+    const createWhilePaused = await app.request("/api/workspace/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-inbox-while-paused",
+        title: "Inbox task while paused",
+        plannedStart: "2026-06-06",
+        plannedFinish: "2026-06-07",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const inboxRowsAfterDeniedCreate = await client`
+      SELECT status, planned_finish
+      FROM projects
+      WHERE tenant_id = 'tenant-alpha'
+        AND id = ${inboxProjectId}
+    `;
+    const deniedTaskRows = await client`
+      SELECT id
+      FROM tasks
+      WHERE tenant_id = 'tenant-alpha'
+        AND id = 'task-inbox-while-paused'
+    `;
+
+    expect(createWhilePaused.status).toBe(404);
+    await expect(createWhilePaused.json()).resolves.toEqual({ error: "project_not_found" });
+    expect(inboxRowsAfterDeniedCreate).toMatchObject([{ status: "paused" }]);
+    expect(String(inboxRowsAfterDeniedCreate[0]?.planned_finish)).toContain("2026-06-05");
+    expect(deniedTaskRows).toHaveLength(0);
+
+    const resumed = await app.request(`/api/workspace/projects/${inboxProjectId}/status`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ status: "active" })
+    });
+    expect(resumed.status).toBe(200);
+
+    const createAfterResume = await app.request("/api/workspace/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-inbox-after-resume",
+        title: "Inbox task after resume",
+        plannedStart: "2026-06-06",
+        plannedFinish: "2026-06-07",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    expect(createAfterResume.status).toBe(201);
+  });
+
+  it("serializes project pause and resume with tenant planning mutations", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    let pendingPause: Promise<Response> | undefined;
+
+    await client.begin(async (transaction) => {
+      await transaction`
+        SELECT pg_advisory_xact_lock(
+          hashtext('tenant-alpha'),
+          hashtext('kiss_pm_resource_planning')
+        )
+      `;
+
+      pendingPause = Promise.resolve(app.request("/api/workspace/projects/project-alpha/status", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ status: "paused" })
+      }));
+
+      const earlyResult = await Promise.race([
+        pendingPause.then(() => "completed"),
+        delay(100).then(() => "waiting")
+      ]);
+
+      expect(earlyResult).toBe("waiting");
+    });
+
+    if (!pendingPause) {
+      throw new Error("expected pause request to start");
+    }
+
+    const pauseResponse = await pendingPause;
+    expect(pauseResponse.status).toBe(200);
+    await expect(pauseResponse.json()).resolves.toMatchObject({
+      project: { id: "project-alpha", status: "paused" }
     });
   });
 
