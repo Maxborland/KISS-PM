@@ -1736,8 +1736,14 @@ describe("project work API routes", () => {
 
     expect(denied.status).toBe(403);
     await expect(denied.json()).resolves.toEqual({ error: "permission_missing" });
-    expect(closeAttempt.status).toBe(409);
-    expect(cancelAttempt.status).toBe(409);
+    expect(closeAttempt.status).toBe(400);
+    await expect(closeAttempt.json()).resolves.toEqual({
+      error: "invalid_project_status"
+    });
+    expect(cancelAttempt.status).toBe(400);
+    await expect(cancelAttempt.json()).resolves.toEqual({
+      error: "invalid_project_status"
+    });
     expect(draftTarget.status).toBe(400);
     await expect(draftTarget.json()).resolves.toEqual({ error: "invalid_project_status" });
     for (const response of terminalResponses) {

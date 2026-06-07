@@ -6,7 +6,7 @@ export {
   parseTaskStatusIdParam
 } from "./routeParamParsers";
 
-const projectLifecycleStatuses = ["active", "paused", "closed", "cancelled"] as const;
+const projectStatusUpdateStatuses = ["active", "paused"] as const;
 const taskPriorities = ["low", "normal", "high", "critical"] as const;
 const taskStatusCategories = [
   "new",
@@ -26,7 +26,7 @@ const taskParticipantRoles = [
 const maxTaskDescriptionLength = 4000;
 
 export type UpdateProjectStatusBody = {
-  status: (typeof projectLifecycleStatuses)[number];
+  status: (typeof projectStatusUpdateStatuses)[number];
 };
 
 export type UpdateProjectStatusParseResult =
@@ -324,7 +324,7 @@ function getBooleanField(input: unknown, key: string): boolean | null {
 function isProjectLifecycleStatus(
   value: string
 ): value is UpdateProjectStatusBody["status"] {
-  return projectLifecycleStatuses.includes(value as UpdateProjectStatusBody["status"]);
+  return projectStatusUpdateStatuses.includes(value as UpdateProjectStatusBody["status"]);
 }
 
 function isTaskPriority(value: string): value is CreateTaskBody["priority"] {

@@ -657,7 +657,7 @@ export const crmProjectSchemas = openApiSchemaFragment({
     type: "object",
     required: ["status"],
     properties: {
-      status: { type: "string", enum: ["active", "paused", "closed", "cancelled"] }
+      status: { type: "string", enum: ["active", "paused"] }
     },
     additionalProperties: false
   },

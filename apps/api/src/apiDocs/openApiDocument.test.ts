@@ -167,9 +167,7 @@ describe("OpenAPI route inventory", () => {
     expect(requestSchema.required).toEqual(["status"]);
     expect(requestSchema.properties.status.enum).toEqual([
       "active",
-      "paused",
-      "closed",
-      "cancelled"
+      "paused"
     ]);
     expect(document.components.schemas.Project.properties.status).toEqual({
       $ref: "#/components/schemas/ProjectStatus"

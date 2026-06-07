@@ -241,7 +241,7 @@ describe("project work parsers", () => {
   });
 
   it("parses project lifecycle status requests and keeps draft internal", () => {
-    for (const status of ["active", "paused", "closed", "cancelled"] as const) {
+    for (const status of ["active", "paused"] as const) {
       expect(parseUpdateProjectStatusBody({ status })).toEqual({
         ok: true,
         value: { status }
@@ -249,6 +249,14 @@ describe("project work parsers", () => {
     }
 
     expect(parseUpdateProjectStatusBody({ status: "draft" })).toEqual({
+      ok: false,
+      error: "invalid_project_status"
+    });
+    expect(parseUpdateProjectStatusBody({ status: "closed" })).toEqual({
+      ok: false,
+      error: "invalid_project_status"
+    });
+    expect(parseUpdateProjectStatusBody({ status: "cancelled" })).toEqual({
       ok: false,
       error: "invalid_project_status"
     });
