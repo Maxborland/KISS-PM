@@ -6,9 +6,11 @@ import type {
   ApiTenantDataSource,
   ManagementAuditEventInput,
   OpportunityInput,
-  OpportunityRecord
+  OpportunityRecord,
+  ProjectInput,
+  ProjectRecord
 } from "./apiTypes";
-import type { TenantUser } from "@kiss-pm/domain";
+import type { CrmPipelineStage, TenantUser } from "@kiss-pm/domain";
 
 const actor: TenantUser = {
   id: "user-admin",
@@ -81,6 +83,161 @@ function createOpportunityRecord(
     createdAt: new Date("2026-05-19T00:00:00.000Z"),
     updatedAt: new Date("2026-05-19T00:00:00.000Z"),
     ...overrides
+  };
+}
+
+function createProjectRecord(
+  input: ProjectInput,
+  overrides: Partial<ProjectRecord> = {}
+): ProjectRecord {
+  return {
+    id: input.id,
+    tenantId: input.tenantId,
+    sourceType: "opportunity",
+    sourceOpportunityId: input.sourceOpportunityId,
+    clientId: input.clientId,
+    projectTypeId: input.projectTypeId,
+    title: input.title,
+    clientName: input.clientName,
+    status: input.status,
+    plannedStart: input.plannedStart,
+    plannedFinish: input.plannedFinish,
+    contractValue: input.contractValue,
+    plannedHours: input.plannedHours,
+    templateId: input.templateId,
+    createdAt: new Date("2026-05-20T00:00:00.000Z"),
+    activatedAt: null,
+    closedAt: null,
+    demand: input.demand,
+    ...overrides
+  };
+}
+
+function createCrmPipelineStage(
+  overrides: Partial<CrmPipelineStage> = {}
+): CrmPipelineStage {
+  return {
+    id: "pipeline-stage-current",
+    tenantId: "tenant-alpha",
+    pipelineId: "pipeline-sales",
+    name: "Current stage",
+    sortOrder: 30,
+    status: "active",
+    lifecycleState: "won_closed",
+    isFinal: true,
+    createdAt: new Date("2026-05-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-05-01T00:00:00.000Z"),
+    ...overrides
+  };
+}
+
+function createActivationFixture(input: {
+  crmStage?: Partial<CrmPipelineStage> | null;
+  opportunityOverrides?: Partial<OpportunityRecord>;
+  activeProjects?: ProjectRecord[];
+} = {}) {
+  const audits: ManagementAuditEventInput[] = [];
+  const createdDrafts: ProjectInput[] = [];
+  const stageLookups: Array<{ pipelineId: string; stageId: string }> = [];
+  const crmStage = input.crmStage === null
+    ? null
+    : createCrmPipelineStage(input.crmStage);
+  const currentOpportunity = createOpportunityRecord(
+    {
+      ...opportunityInput,
+      ...(crmStage
+        ? { crmPipelineId: crmStage.pipelineId, crmPipelineStageId: crmStage.id }
+        : {})
+    },
+    {
+      status: "ready_to_activate",
+      feasibilityStatus: "ok",
+      feasibilityResult: { rows: [] },
+      feasibilityCheckedAt: new Date("2026-05-19T00:00:00.000Z"),
+      ...input.opportunityOverrides
+    }
+  );
+
+  const dataSource: ApiTenantDataSource = {
+    async listDevUsers() {
+      return [];
+    },
+    async findUserById(userId) {
+      return userId === actor.id ? actor : undefined;
+    },
+    async findTenantById() {
+      return undefined;
+    },
+    async listUsersByTenantId() {
+      return [];
+    },
+    async findOpportunityById() {
+      return currentOpportunity;
+    },
+    async listPositions() {
+      return [{ id: "position-analyst", tenantId: "tenant-alpha", name: "Analyst", description: null }];
+    },
+    async listWorkspaceUsers() {
+      return [
+        {
+          ...actor,
+          email: "admin@example.test",
+          positionId: "position-analyst",
+          positionName: "Analyst",
+          phone: null,
+          telegram: null,
+          status: "active",
+          theme: "light",
+          accentColor: "#2563eb"
+        }
+      ];
+    },
+    async listProjects() {
+      return input.activeProjects ?? [];
+    },
+    async lockTenantResourcePlanning() {},
+    async createProjectDraftFromOpportunity(projectInput) {
+      createdDrafts.push(projectInput);
+      return createProjectRecord(projectInput);
+    },
+    async activateProjectDraft({ projectId }) {
+      const draft = createdDrafts.find((item) => item.id === projectId);
+      if (!draft) throw new Error("draft_not_found");
+      return createProjectRecord(draft, {
+        status: "active",
+        activatedAt: new Date("2026-05-20T00:00:00.000Z")
+      });
+    },
+    ...(crmStage
+      ? {
+          async findCrmPipelineStageById(_tenantId: string, pipelineId: string, stageId: string) {
+            stageLookups.push({ pipelineId, stageId });
+            return crmStage;
+          }
+        }
+      : {}),
+    async withTransaction(operation) {
+      return operation(dataSource);
+    },
+    async appendAuditEvent() {
+      throw new Error("service test uses appendManagementAuditEvent dependency");
+    }
+  };
+
+  return {
+    audits,
+    createdDrafts,
+    currentOpportunity,
+    stageLookups,
+    service: createProjectIntakeService({
+      dataSource,
+      getActorProfile: async () => tenantAdminProfile,
+      runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
+      appendManagementAuditEvent: async (auditInput) => {
+        audits.push(auditInput);
+        return `audit-test-${audits.length}`;
+      }
+    })
   };
 }
 
@@ -397,6 +554,137 @@ describe("project intake application service", () => {
       })
     ).resolves.toMatchObject({ ok: true, status: 201 });
     expect(createdInputs).toHaveLength(1);
+  });
+
+  it("activates initialized CRM opportunities from an active final won stage", async () => {
+    const fixture = createActivationFixture({
+      crmStage: { lifecycleState: "won_closed", isFinal: true }
+    });
+
+    const result = await fixture.service.activateProjectFromOpportunity({
+      actor,
+      opportunityId: fixture.currentOpportunity.id,
+      activation: { id: "project-activated", acceptedRiskReason: null }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: 201,
+      project: {
+        id: "project-activated",
+        status: "active",
+        sourceOpportunityId: fixture.currentOpportunity.id
+      }
+    });
+    expect(fixture.stageLookups).toEqual([
+      { pipelineId: "pipeline-sales", stageId: "pipeline-stage-current" }
+    ]);
+    expect(fixture.createdDrafts).toHaveLength(1);
+    expect(fixture.audits).toHaveLength(1);
+  });
+
+  it("rejects initialized CRM opportunities from an open non-final stage", async () => {
+    const fixture = createActivationFixture({
+      crmStage: { lifecycleState: "open", isFinal: false }
+    });
+
+    const result = await fixture.service.activateProjectFromOpportunity({
+      actor,
+      opportunityId: fixture.currentOpportunity.id,
+      activation: { id: "project-open-stage", acceptedRiskReason: null }
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      error: "crm_pipeline_won_stage_required"
+    });
+    expect(fixture.stageLookups).toHaveLength(1);
+    expect(fixture.createdDrafts).toEqual([]);
+    expect(fixture.audits).toEqual([]);
+  });
+
+  it("rejects initialized CRM opportunities from a final lost stage", async () => {
+    const fixture = createActivationFixture({
+      crmStage: { lifecycleState: "lost_rejected", isFinal: true }
+    });
+
+    const result = await fixture.service.activateProjectFromOpportunity({
+      actor,
+      opportunityId: fixture.currentOpportunity.id,
+      activation: { id: "project-lost-stage", acceptedRiskReason: null }
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      error: "crm_pipeline_won_stage_required"
+    });
+    expect(fixture.stageLookups).toHaveLength(1);
+    expect(fixture.createdDrafts).toEqual([]);
+    expect(fixture.audits).toEqual([]);
+  });
+
+  it("preserves legacy uninitialized opportunity activation", async () => {
+    const fixture = createActivationFixture({ crmStage: null });
+
+    const result = await fixture.service.activateProjectFromOpportunity({
+      actor,
+      opportunityId: fixture.currentOpportunity.id,
+      activation: { id: "project-legacy", acceptedRiskReason: null }
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: 201,
+      project: {
+        id: "project-legacy",
+        status: "active",
+        sourceOpportunityId: fixture.currentOpportunity.id
+      }
+    });
+    expect(fixture.stageLookups).toEqual([]);
+    expect(fixture.createdDrafts).toHaveLength(1);
+  });
+
+  it("still requires accepted risk reason for conflicting activation capacity", async () => {
+    const existingReservation = createProjectRecord(
+      {
+        id: "project-existing-active",
+        tenantId: "tenant-alpha",
+        sourceOpportunityId: "opportunity-existing",
+        clientId: "client-alpha",
+        projectTypeId: "project-type-alpha",
+        title: "Existing active project",
+        clientName: "Client Alpha",
+        status: "active",
+        plannedStart: opportunityInput.plannedStart,
+        plannedFinish: opportunityInput.plannedFinish,
+        contractValue: 500_000,
+        plannedHours: 170,
+        templateId: null,
+        demand: [{ positionId: "position-analyst", requiredHours: 170 }]
+      },
+      { activatedAt: new Date("2026-05-10T00:00:00.000Z") }
+    );
+    const fixture = createActivationFixture({
+      crmStage: null,
+      activeProjects: [existingReservation]
+    });
+
+    const result = await fixture.service.activateProjectFromOpportunity({
+      actor,
+      opportunityId: fixture.currentOpportunity.id,
+      activation: { id: "project-conflict", acceptedRiskReason: null }
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      error: "risk_acceptance_required"
+    });
+    expect(fixture.createdDrafts).toEqual([]);
+    expect(fixture.audits).toEqual([]);
   });
 
   it("updates draft opportunity fields, refreshes linked labels and records management audit", async () => {

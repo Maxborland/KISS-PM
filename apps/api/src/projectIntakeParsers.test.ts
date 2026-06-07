@@ -62,6 +62,22 @@ describe("project intake parsers", () => {
     });
   });
 
+  it("parses activation request id and nullable accepted risk reason", () => {
+    const generated = parseProjectActivationBody({});
+    expect(generated).toMatchObject({
+      ok: true,
+      value: { acceptedRiskReason: null }
+    });
+    if (generated.ok) expect(generated.value.id).toMatch(/^project-[a-f0-9-]{36}$/);
+
+    expect(
+      parseProjectActivationBody({ id: "project-alpha", acceptedRiskReason: null })
+    ).toEqual({ ok: true, value: { id: "project-alpha", acceptedRiskReason: null } });
+    expect(
+      parseProjectActivationBody({ id: "project-alpha", acceptedRiskReason: " Approved " })
+    ).toEqual({ ok: true, value: { id: "project-alpha", acceptedRiskReason: "Approved" } });
+  });
+
   it("parses optional owner user id on create and update", () => {
     const parsed = parseOpportunityBody(
       {
