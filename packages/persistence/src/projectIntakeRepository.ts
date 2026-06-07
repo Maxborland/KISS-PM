@@ -333,6 +333,12 @@ export function createProjectIntakeRepository(
             ownerUserId: input.ownerUserId ?? null,
             projectTypeId: input.projectTypeId,
             stageId: input.stageId,
+            crmPipelineId: input.crmPipelineId ?? null,
+            crmPipelineStageId: input.crmPipelineStageId ?? null,
+            crmPipelineStateUpdatedAt:
+              input.crmPipelineId && input.crmPipelineStageId
+                ? now
+                : null,
             clientName: input.clientName,
             contactName: input.contactName,
             title: input.title,

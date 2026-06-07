@@ -30,6 +30,62 @@ describe("CRM opportunity pipeline transition persistence", () => {
     await client.end();
   });
 
+  it("persists CRM pipeline state when updating an existing opportunity", async () => {
+    await client`
+      UPDATE opportunities
+      SET
+        crm_pipeline_id = NULL,
+        crm_pipeline_stage_id = NULL,
+        crm_pipeline_state_updated_at = NULL
+      WHERE tenant_id = 'tenant-alpha' AND id = 'opportunity-alpha'
+    `;
+
+    const updated = await dataSource.updateOpportunity({
+      id: "opportunity-alpha",
+      tenantId: "tenant-alpha",
+      clientId: null,
+      primaryContactId: null,
+      ownerUserId: null,
+      projectTypeId: null,
+      stageId: "deal-stage-legacy",
+      crmPipelineId: "pipeline-sales",
+      crmPipelineStageId: "pipeline-stage-qualified",
+      clientName: "Client",
+      contactName: "Contact",
+      title: "Opportunity updated",
+      projectType: "Implementation",
+      description: null,
+      plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+      plannedFinish: new Date("2026-06-08T00:00:00.000Z"),
+      contractValue: 100_000,
+      plannedHourlyRate: 5_000,
+      plannedHours: 20,
+      probability: 75,
+      status: "new",
+      templateId: null,
+      customFieldValues: {},
+      demand: []
+    });
+
+    expect(updated).toMatchObject({
+      id: "opportunity-alpha",
+      crmPipelineId: "pipeline-sales",
+      crmPipelineStageId: "pipeline-stage-qualified"
+    });
+    expect(updated?.crmPipelineStateUpdatedAt).toBeInstanceOf(Date);
+
+    const [persisted] = await client`
+      SELECT crm_pipeline_id, crm_pipeline_stage_id, crm_pipeline_state_updated_at
+      FROM opportunities
+      WHERE tenant_id = 'tenant-alpha' AND id = 'opportunity-alpha'
+    `;
+    expect(persisted).toMatchObject({
+      crm_pipeline_id: "pipeline-sales",
+      crm_pipeline_stage_id: "pipeline-stage-qualified"
+    });
+    expect(persisted?.crm_pipeline_state_updated_at).toBeTruthy();
+  });
+
   it("atomically advances CRM pipeline state while preserving legacy deal stage", async () => {
     const transitioned = await dataSource.transitionOpportunityCrmPipelineStage({
       tenantId: "tenant-alpha",
