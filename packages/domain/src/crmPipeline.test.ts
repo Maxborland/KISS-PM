@@ -15,18 +15,21 @@ describe("CRM pipeline domain contract", () => {
         {
           id: "stage-won",
           sortOrder: 30,
+          status: "active",
           lifecycleState: "won_closed",
           isFinal: true
         },
         {
           id: "stage-new",
           sortOrder: 10,
+          status: "active",
           lifecycleState: "open",
           isFinal: false
         },
         {
           id: "stage-qualified",
           sortOrder: 20,
+          status: "active",
           lifecycleState: "open",
           isFinal: false
         }
@@ -124,7 +127,15 @@ describe("CRM pipeline domain contract", () => {
     expect(() =>
       buildCrmPipelineLifecycleGraph({
         pipelineId: "pipeline-sales",
-        stages: [{ id: "stage-open-final", sortOrder: 10, lifecycleState: "open", isFinal: true }],
+        stages: [
+          {
+            id: "stage-open-final",
+            sortOrder: 10,
+            status: "active",
+            lifecycleState: "open",
+            isFinal: true
+          }
+        ],
         transitionRules: []
       })
     ).toThrow("CRM pipeline stage finality must match lifecycle state");
@@ -132,7 +143,15 @@ describe("CRM pipeline domain contract", () => {
     expect(() =>
       buildCrmPipelineLifecycleGraph({
         pipelineId: "pipeline-sales",
-        stages: [{ id: "stage-won", sortOrder: 10, lifecycleState: "won_closed", isFinal: false }],
+        stages: [
+          {
+            id: "stage-won",
+            sortOrder: 10,
+            status: "active",
+            lifecycleState: "won_closed",
+            isFinal: false
+          }
+        ],
         transitionRules: []
       })
     ).toThrow("CRM pipeline stage finality must match lifecycle state");
