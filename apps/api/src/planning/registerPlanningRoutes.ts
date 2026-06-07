@@ -30,6 +30,7 @@ import {
   hashJson,
   parseProjectRouteParam,
   parseScenarioProposalRouteParam,
+  requireActivePlanningProject,
   serializeScenarioProposal,
   summarizeSnapshot,
   validateCommandDataSourcePreconditions,
@@ -238,6 +239,12 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
           return { ok: true as const, body: existingIdempotency.responsePayload };
         }
       }
+      const activeProject = await requireActivePlanningProject(
+        transactionDataSource,
+        actor.tenantId,
+        projectId
+      );
+      if (!activeProject.ok) return activeProject;
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
       if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
@@ -433,6 +440,12 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         }
       }
 
+      const activeProject = await requireActivePlanningProject(
+        transactionDataSource,
+        actor.tenantId,
+        projectId
+      );
+      if (!activeProject.ok) return activeProject;
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
       if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
@@ -752,6 +765,12 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
 
       const projectId = parsedProjectId.value;
       await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      const activeProject = await requireActivePlanningProject(
+        transactionDataSource,
+        actor.tenantId,
+        projectId
+      );
+      if (!activeProject.ok) return activeProject;
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
       if (snapshot.planVersion !== parsed.value.clientPlanVersion) {

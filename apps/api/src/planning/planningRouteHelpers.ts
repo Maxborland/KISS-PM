@@ -152,6 +152,21 @@ export function summarizeSnapshot(snapshot: {
   };
 }
 
+export async function requireActivePlanningProject(
+  dataSource: ApiTenantDataSource,
+  tenantId: string,
+  projectId: string
+): Promise<{ ok: true } | { ok: false; status: 404; error: "project_not_found" }> {
+  if (!dataSource.listProjects) return { ok: true };
+  const project = (await dataSource.listProjects(tenantId)).find(
+    (candidate) => candidate.id === projectId
+  );
+  if (!project || project.status !== "active") {
+    return { ok: false, status: 404, error: "project_not_found" };
+  }
+  return { ok: true };
+}
+
 export async function validateCommandDataSourcePreconditions(
   dataSource: ApiTenantDataSource,
   tenantId: string,
