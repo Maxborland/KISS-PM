@@ -109,6 +109,8 @@ export async function resolveOpportunityLinks(
     if (!pipelineStage || pipelineStage.status !== "active") {
       return { ok: false, status: 404, error: "crm_pipeline_stage_not_found" };
     }
+
+    const isInitialStage = pipeline.lifecycleGraphMetadata.initialStageId === input.crmPipelineStageId;
     if (existingOpportunity) {
       const isInitialized =
         existingOpportunity.crmPipelineId !== null ||
@@ -124,15 +126,21 @@ export async function resolveOpportunityLinks(
             error: "crm_pipeline_transition_required"
           };
         }
-      } else if (pipeline.lifecycleGraphMetadata.initialStageId !== input.crmPipelineStageId) {
-        return {
-          ok: false,
-          status: 409,
-          error: "crm_pipeline_initial_stage_required"
-        };
+      } else if (!isInitialStage) {
+        return initialCrmPipelineStageRequired();
       }
+    } else if (!isInitialStage) {
+      return initialCrmPipelineStageRequired();
     }
   }
 
   return { ok: true, client, contact, owner: owner ?? null, projectType, stage };
+}
+
+function initialCrmPipelineStageRequired(): {
+  ok: false;
+  status: 409;
+  error: "crm_pipeline_initial_stage_required";
+} {
+  return { ok: false, status: 409, error: "crm_pipeline_initial_stage_required" };
 }

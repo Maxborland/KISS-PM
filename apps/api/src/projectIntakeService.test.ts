@@ -223,7 +223,7 @@ describe("project intake application service", () => {
     });
   });
 
-  it("rejects inactive initial CRM pipeline state before creating an opportunity", async () => {
+  it("validates initial CRM pipeline state before creating an opportunity", async () => {
     const createdInputs: OpportunityInput[] = [];
     const makeService = (input: {
       pipelineStatus: "active" | "archived";
@@ -310,9 +310,9 @@ describe("project intake application service", () => {
             updatedAt: new Date("2026-05-01T00:00:00.000Z")
           };
         },
-        async findCrmPipelineStageById() {
+        async findCrmPipelineStageById(_tenantId, _pipelineId, stageId) {
           return {
-            id: "pipeline-stage-intake",
+            id: stageId,
             tenantId: "tenant-alpha",
             pipelineId: "pipeline-sales",
             name: "Intake",
@@ -363,6 +363,31 @@ describe("project intake application service", () => {
       })
     ).resolves.toEqual({ ok: false, status: 404, error: "crm_pipeline_stage_not_found" });
     expect(createdInputs).toEqual([]);
+
+    await expect(
+      makeService({ pipelineStatus: "active", stageStatus: "active" }).createOpportunity({
+        actor,
+        input: {
+          ...baseInput,
+          id: "opportunity-later-pipeline-stage",
+          crmPipelineStageId: "pipeline-stage-qualified"
+        }
+      })
+    ).resolves.toEqual({
+      ok: false,
+      status: 409,
+      error: "crm_pipeline_initial_stage_required"
+    });
+
+    expect(createdInputs).toHaveLength(0);
+
+    await expect(
+      makeService({ pipelineStatus: "active", stageStatus: "active" }).createOpportunity({
+        actor,
+        input: { ...baseInput, id: "opportunity-initial-pipeline-stage" }
+      })
+    ).resolves.toMatchObject({ ok: true, status: 201 });
+    expect(createdInputs).toHaveLength(1);
   });
 
   it("updates draft opportunity fields, refreshes linked labels and records management audit", async () => {
