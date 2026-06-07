@@ -223,6 +223,148 @@ describe("project intake application service", () => {
     });
   });
 
+  it("rejects inactive initial CRM pipeline state before creating an opportunity", async () => {
+    const createdInputs: OpportunityInput[] = [];
+    const makeService = (input: {
+      pipelineStatus: "active" | "archived";
+      stageStatus: "active" | "archived";
+    }) => {
+      const dataSource: ApiTenantDataSource = {
+        async listDevUsers() {
+          return [];
+        },
+        async findUserById(userId) {
+          return userId === actor.id ? actor : undefined;
+        },
+        async findTenantById() {
+          return undefined;
+        },
+        async listUsersByTenantId() {
+          return [];
+        },
+        async listOpportunities() {
+          return [];
+        },
+        async findClientById() {
+          return {
+            id: "client-alpha",
+            tenantId: "tenant-alpha",
+            name: "Client Alpha",
+            description: null,
+            status: "active",
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-05-01T00:00:00.000Z")
+          };
+        },
+        async findContactById() {
+          return {
+            id: "contact-alpha",
+            tenantId: "tenant-alpha",
+            clientId: "client-alpha",
+            name: "Contact Alpha",
+            email: "contact@example.test",
+            phone: null,
+            telegram: null,
+            role: "Sponsor",
+            status: "active",
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-05-01T00:00:00.000Z")
+          };
+        },
+        async findProjectTypeById() {
+          return {
+            id: "project-type-alpha",
+            tenantId: "tenant-alpha",
+            name: "Implementation",
+            description: null,
+            status: "active",
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-05-01T00:00:00.000Z")
+          };
+        },
+        async findDealStageById() {
+          return {
+            id: "deal-stage-alpha",
+            tenantId: "tenant-alpha",
+            name: "Intake",
+            sortOrder: 10,
+            status: "active",
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-05-01T00:00:00.000Z")
+          };
+        },
+        async findCrmPipelineById() {
+          return {
+            id: "pipeline-sales",
+            tenantId: "tenant-alpha",
+            name: "Sales",
+            status: input.pipelineStatus,
+            lifecycleGraphMetadata: {
+              pipelineId: "pipeline-sales",
+              initialStageId: "pipeline-stage-intake",
+              finalStageIds: [],
+              stages: [],
+              transitions: []
+            },
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-05-01T00:00:00.000Z")
+          };
+        },
+        async findCrmPipelineStageById() {
+          return {
+            id: "pipeline-stage-intake",
+            tenantId: "tenant-alpha",
+            pipelineId: "pipeline-sales",
+            name: "Intake",
+            sortOrder: 10,
+            status: input.stageStatus,
+            lifecycleState: "open",
+            isFinal: false,
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-05-01T00:00:00.000Z")
+          };
+        },
+        async createOpportunity(input) {
+          createdInputs.push(input);
+          return createOpportunityRecord(input);
+        },
+        async withTransaction(operation) {
+          return operation(dataSource);
+        },
+        async appendAuditEvent() {
+          throw new Error("service test uses appendManagementAuditEvent dependency");
+        }
+      };
+
+      return createProjectIntakeService({
+        dataSource,
+        getActorProfile: async () => tenantAdminProfile,
+        runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
+        appendManagementAuditEvent: async () => "audit-test"
+      });
+    };
+
+    const baseInput: OpportunityInput = {
+      ...opportunityInput,
+      crmPipelineId: "pipeline-sales",
+      crmPipelineStageId: "pipeline-stage-intake"
+    };
+
+    await expect(
+      makeService({ pipelineStatus: "archived", stageStatus: "active" }).createOpportunity({
+        actor,
+        input: { ...baseInput, id: "opportunity-archived-pipeline" }
+      })
+    ).resolves.toEqual({ ok: false, status: 404, error: "crm_pipeline_not_found" });
+    await expect(
+      makeService({ pipelineStatus: "active", stageStatus: "archived" }).createOpportunity({
+        actor,
+        input: { ...baseInput, id: "opportunity-archived-pipeline-stage" }
+      })
+    ).resolves.toEqual({ ok: false, status: 404, error: "crm_pipeline_stage_not_found" });
+    expect(createdInputs).toEqual([]);
+  });
+
   it("updates draft opportunity fields, refreshes linked labels and records management audit", async () => {
     const audits: ManagementAuditEventInput[] = [];
     let updatedInput: OpportunityInput | null = null;

@@ -279,7 +279,8 @@ export function parseCrmPipelineTransitionRuleBody(
   body: unknown,
   tenantId: string,
   pipelineId: string,
-  existingId?: string
+  existingId?: string,
+  existing?: Pick<CrmPipelineTransitionRuleInput, "requiredPermission">
 ): ParseResult<CrmPipelineTransitionRuleInput> {
   if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
   const input = body as Record<string, unknown>;
@@ -299,7 +300,7 @@ export function parseCrmPipelineTransitionRuleBody(
   if (
     requiredPermission !== null &&
     (!isSafeSingleLineText(requiredPermission, maxLengths.permission) ||
-      !isPermission(requiredPermission))
+      !isAllowedTransitionRulePermission(requiredPermission, existing?.requiredPermission))
   ) {
     return { ok: false, error: "invalid_required_permission" };
   }
@@ -323,6 +324,16 @@ export function parseCrmPipelineTransitionRuleBody(
       status
     }
   };
+}
+
+const legacyTenantPermissionPattern = /^tenant(?:\.[a-z][a-z0-9_]{0,40}){2,6}$/;
+
+function isAllowedTransitionRulePermission(
+  value: string,
+  existingPermission?: string | null
+): boolean {
+  if (isPermission(value)) return true;
+  return value === existingPermission && legacyTenantPermissionPattern.test(value);
 }
 
 export function parseCrmPipelineStageAutomationDefinitionBody(

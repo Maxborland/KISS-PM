@@ -13,6 +13,8 @@ type OpportunityLinkDataSource = Pick<
   ApiTenantDataSource,
   | "findClientById"
   | "findContactById"
+  | "findCrmPipelineById"
+  | "findCrmPipelineStageById"
   | "findDealStageById"
   | "findProjectTypeById"
   | "findUserById"
@@ -33,7 +35,7 @@ export async function resolveOpportunityLinks(
     }
   | {
       ok: false;
-      status: 404 | 501;
+      status: 400 | 404 | 501;
       error: string;
     }
 > {
@@ -68,6 +70,28 @@ export async function resolveOpportunityLinks(
   const stage = await dataSource.findDealStageById?.(tenantId, input.stageId ?? "");
   if (!stage || stage.status !== "active") {
     return { ok: false, status: 404, error: "deal_stage_not_found" };
+  }
+
+  if ((input.crmPipelineId == null) !== (input.crmPipelineStageId == null)) {
+    return { ok: false, status: 400, error: "invalid_crm_pipeline_state" };
+  }
+  if (input.crmPipelineId && input.crmPipelineStageId) {
+    const pipeline = await dataSource.findCrmPipelineById?.(
+      tenantId,
+      input.crmPipelineId
+    );
+    if (!pipeline || pipeline.status !== "active") {
+      return { ok: false, status: 404, error: "crm_pipeline_not_found" };
+    }
+
+    const pipelineStage = await dataSource.findCrmPipelineStageById?.(
+      tenantId,
+      input.crmPipelineId,
+      input.crmPipelineStageId
+    );
+    if (!pipelineStage || pipelineStage.status !== "active") {
+      return { ok: false, status: 404, error: "crm_pipeline_stage_not_found" };
+    }
   }
 
   return { ok: true, client, contact, owner: owner ?? null, projectType, stage };
