@@ -86,6 +86,8 @@ function parseOpportunityFields(
   const ownerUserId = getOptionalString(input, "ownerUserId") ?? null;
   const projectTypeId = getOptionalString(input, "projectTypeId");
   const stageId = getOptionalString(input, "stageId");
+  const crmPipelineId = getOptionalString(input, "crmPipelineId");
+  const crmPipelineStageId = getOptionalString(input, "crmPipelineStageId");
   const clientName = getOptionalString(input, "clientName") ?? "";
   const contactName = getOptionalString(input, "contactName") ?? "";
   const title = getOptionalString(input, "title");
@@ -115,6 +117,15 @@ function parseOpportunityFields(
   }
   if (!stageId || !idPattern.test(stageId)) {
     return { ok: false, error: "invalid_deal_stage_id" };
+  }
+  if ((crmPipelineId === null) !== (crmPipelineStageId === null)) {
+    return { ok: false, error: "invalid_crm_pipeline_state" };
+  }
+  if (crmPipelineId !== null && !idPattern.test(crmPipelineId)) {
+    return { ok: false, error: "invalid_crm_pipeline_id" };
+  }
+  if (crmPipelineStageId !== null && !idPattern.test(crmPipelineStageId)) {
+    return { ok: false, error: "invalid_crm_pipeline_stage_id" };
   }
   if (!isSafeSingleLineText(clientName, maxLengths.clientName)) {
     return { ok: false, error: "invalid_client_name" };
@@ -161,6 +172,8 @@ function parseOpportunityFields(
         ownerUserId,
         projectTypeId,
         stageId,
+        crmPipelineId,
+        crmPipelineStageId,
         clientName,
         contactName,
         title,

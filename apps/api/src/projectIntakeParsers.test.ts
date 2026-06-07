@@ -106,6 +106,37 @@ describe("project intake parsers", () => {
     ).toEqual({ ok: false, error: "invalid_owner_user_id" });
   });
 
+  it("parses initial CRM pipeline state on opportunity create", () => {
+    const parsed = parseOpportunityBody(
+      {
+        ...validOpportunityBody,
+        crmPipelineId: "pipeline-sales",
+        crmPipelineStageId: "pipeline-stage-intake"
+      },
+      "tenant-alpha"
+    );
+
+    expect(parsed).toMatchObject({
+      ok: true,
+      value: {
+        crmPipelineId: "pipeline-sales",
+        crmPipelineStageId: "pipeline-stage-intake"
+      }
+    });
+  });
+
+  it("rejects partial CRM pipeline state on opportunity create", () => {
+    expect(
+      parseOpportunityBody(
+        {
+          ...validOpportunityBody,
+          crmPipelineId: "pipeline-sales"
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_crm_pipeline_state" });
+  });
+
   it("parses runtime custom field values on create and update", () => {
     const parsed = parseOpportunityBody(
       {
