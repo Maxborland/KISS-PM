@@ -577,6 +577,35 @@ export const crmProjectSchemas = openApiSchemaFragment({
     properties: { opportunity: schemaRef("Opportunity") },
     additionalProperties: false
   },
+  OpportunityPipelineTransitionRequest: {
+    type: "object",
+    required: ["targetStageId"],
+    properties: {
+      targetStageId: stringIdSchema,
+      reason: nullableStringSchema
+    },
+    additionalProperties: false
+  },
+  CrmPipelineTransitionDecision: {
+    type: "object",
+    required: ["ok", "ruleId", "fromStageId", "toStageId"],
+    properties: {
+      ok: { type: "boolean", const: true },
+      ruleId: stringIdSchema,
+      fromStageId: stringIdSchema,
+      toStageId: stringIdSchema
+    },
+    additionalProperties: false
+  },
+  OpportunityPipelineTransitionResponse: {
+    type: "object",
+    required: ["opportunity", "transition"],
+    properties: {
+      opportunity: schemaRef("Opportunity"),
+      transition: schemaRef("CrmPipelineTransitionDecision")
+    },
+    additionalProperties: false
+  },
   OpportunityStagePatchRequest: {
     type: "object",
     required: ["stageId"],

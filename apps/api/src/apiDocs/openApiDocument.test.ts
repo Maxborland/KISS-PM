@@ -70,6 +70,31 @@ describe("OpenAPI route inventory", () => {
     ).toBeUndefined();
     expect(document.paths["/api/auth/login"]?.post?.requestBody).toBeDefined();
   });
+
+  it("documents opportunity pipeline transition request and success schemas", () => {
+    const document = createTestDocument();
+    const operation =
+      document.paths["/api/workspace/opportunities/{opportunityId}/pipeline-transition"]?.post;
+
+    expect(
+      operation?.requestBody?.content?.["application/json"]?.schema?.$ref
+    ).toBe("#/components/schemas/OpportunityPipelineTransitionRequest");
+    expect(
+      operation?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref
+    ).toBe("#/components/schemas/OpportunityPipelineTransitionResponse");
+
+    const requestSchema = document.components.schemas.OpportunityPipelineTransitionRequest;
+    expect(requestSchema.required).toEqual(["targetStageId"]);
+    expect(Object.keys(requestSchema.properties)).toEqual(["targetStageId", "reason"]);
+    expect(requestSchema.properties.targetStageId).toMatchObject({ type: "string", minLength: 1 });
+
+    const responseSchema = document.components.schemas.OpportunityPipelineTransitionResponse;
+    expect(responseSchema.required).toEqual(["opportunity", "transition"]);
+    expect(responseSchema.properties.opportunity).toEqual({ $ref: "#/components/schemas/Opportunity" });
+    expect(responseSchema.properties.transition).toEqual({
+      $ref: "#/components/schemas/CrmPipelineTransitionDecision"
+    });
+  });
 });
 
 type TestOpenApiDocument = ReturnType<typeof createKissPmOpenApiDocument> & {
@@ -79,11 +104,22 @@ type TestOpenApiDocument = ReturnType<typeof createKissPmOpenApiDocument> & {
       string,
       {
         operationId: string;
-        requestBody?: unknown;
+        requestBody?: {
+          content?: Record<string, { schema?: { $ref?: string } }>;
+        };
+        responses?: Record<
+          string,
+          {
+            content?: Record<string, { schema?: { $ref?: string } }>;
+          }
+        >;
         parameters?: Array<{ name: string; required?: boolean }>;
       }
     >
   >;
+  components: {
+    schemas: Record<string, any>;
+  };
 };
 
 function createTestDocument(): TestOpenApiDocument {
