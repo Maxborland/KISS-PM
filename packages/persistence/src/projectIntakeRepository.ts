@@ -325,39 +325,46 @@ export function createProjectIntakeRepository(
     async updateOpportunity(input) {
       return db.transaction(async (transaction) => {
         const now = new Date();
-        const [row] = await transaction
-          .update(opportunities)
-          .set({
-            clientId: input.clientId,
-            primaryContactId: input.primaryContactId,
-            ownerUserId: input.ownerUserId ?? null,
-            projectTypeId: input.projectTypeId,
-            stageId: input.stageId,
+        const updateValues = {
+          clientId: input.clientId,
+          primaryContactId: input.primaryContactId,
+          ownerUserId: input.ownerUserId ?? null,
+          projectTypeId: input.projectTypeId,
+          stageId: input.stageId,
+          clientName: input.clientName,
+          contactName: input.contactName,
+          title: input.title,
+          projectType: input.projectType,
+          description: input.description,
+          plannedStart: input.plannedStart,
+          plannedFinish: input.plannedFinish,
+          contractValue: input.contractValue,
+          plannedHourlyRate: input.plannedHourlyRate,
+          plannedHours: input.plannedHours,
+          probability: input.probability,
+          status: input.status,
+          templateId: input.templateId,
+          customFieldValues: input.customFieldValues ?? {},
+          feasibilityStatus: null,
+          feasibilityResult: null,
+          feasibilityCheckedAt: null,
+          updatedAt: now
+        };
+
+        if ("crmPipelineId" in input || "crmPipelineStageId" in input) {
+          Object.assign(updateValues, {
             crmPipelineId: input.crmPipelineId ?? null,
             crmPipelineStageId: input.crmPipelineStageId ?? null,
             crmPipelineStateUpdatedAt:
               input.crmPipelineId && input.crmPipelineStageId
                 ? now
-                : null,
-            clientName: input.clientName,
-            contactName: input.contactName,
-            title: input.title,
-            projectType: input.projectType,
-            description: input.description,
-            plannedStart: input.plannedStart,
-            plannedFinish: input.plannedFinish,
-            contractValue: input.contractValue,
-            plannedHourlyRate: input.plannedHourlyRate,
-            plannedHours: input.plannedHours,
-            probability: input.probability,
-            status: input.status,
-            templateId: input.templateId,
-            customFieldValues: input.customFieldValues ?? {},
-            feasibilityStatus: null,
-            feasibilityResult: null,
-            feasibilityCheckedAt: null,
-            updatedAt: now
-          })
+                : null
+          });
+        }
+
+        const [row] = await transaction
+          .update(opportunities)
+          .set(updateValues)
           .where(
             and(
               eq(opportunities.tenantId, input.tenantId),

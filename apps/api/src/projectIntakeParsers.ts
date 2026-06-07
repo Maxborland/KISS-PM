@@ -87,6 +87,11 @@ function parseOpportunityFields(
   const projectTypeId = getOptionalString(input, "projectTypeId");
   const stageId = getOptionalString(input, "stageId");
   const crmPipelineId = getOptionalString(input, "crmPipelineId");
+  const hasCrmPipelineId = Object.prototype.hasOwnProperty.call(input, "crmPipelineId");
+  const hasCrmPipelineStageId = Object.prototype.hasOwnProperty.call(
+    input,
+    "crmPipelineStageId"
+  );
   const crmPipelineStageId = getOptionalString(input, "crmPipelineStageId");
   const clientName = getOptionalString(input, "clientName") ?? "";
   const contactName = getOptionalString(input, "contactName") ?? "";
@@ -161,6 +166,10 @@ function parseOpportunityFields(
   if (!demand.ok) return demand;
   if (!customFieldValues.ok) return customFieldValues;
 
+  const crmPipelineStateFields = hasCrmPipelineId || hasCrmPipelineStageId
+    ? { crmPipelineId, crmPipelineStageId }
+    : {};
+
   return {
     ok: true,
     value: {
@@ -172,8 +181,7 @@ function parseOpportunityFields(
         ownerUserId,
         projectTypeId,
         stageId,
-        crmPipelineId,
-        crmPipelineStageId,
+        ...crmPipelineStateFields,
         clientName,
         contactName,
         title,

@@ -137,6 +137,19 @@ describe("project intake parsers", () => {
     ).toEqual({ ok: false, error: "invalid_crm_pipeline_state" });
   });
 
+  it("omits CRM pipeline state fields from opportunity updates when absent", () => {
+    const parsed = parseOpportunityUpdateBody(validOpportunityBody, "tenant-alpha");
+
+    expect(parsed).toMatchObject({
+      ok: true,
+      value: {
+        tenantId: "tenant-alpha"
+      }
+    });
+    expect(parsed.ok && "crmPipelineId" in parsed.value).toBe(false);
+    expect(parsed.ok && "crmPipelineStageId" in parsed.value).toBe(false);
+  });
+
   it("parses runtime custom field values on create and update", () => {
     const parsed = parseOpportunityBody(
       {
