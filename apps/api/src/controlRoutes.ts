@@ -29,6 +29,7 @@ import {
 } from "@kiss-pm/domain";
 import { randomUUID } from "node:crypto";
 
+import type { ApiTenantDataSource, ProjectRecord } from "./apiTypes";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import {
   persistControlSignalNotifications,
@@ -526,6 +527,7 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
       const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
         if (
           !transactionDataSource.listControlSignals ||
+          !transactionDataSource.listProjects ||
           !transactionDataSource.getPlanSnapshot ||
           !transactionDataSource.applyPlanningCommand ||
           !transactionDataSource.incrementPlanVersion ||
@@ -577,6 +579,13 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
           });
           return { ok: false as const, status: 403, error: lockedDecision.reason };
         }
+
+        const activeProject = await findActiveControlProject(
+          transactionDataSource,
+          actor.tenantId,
+          projectId
+        );
+        if (!activeProject) return { ok: false as const, status: 404, error: "project_not_found" };
 
         const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
         if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
@@ -981,6 +990,15 @@ function parseControlActionRouteParams(
   const actionId = parseManagementActionIdParam(context.req.param("actionId"));
   if (!actionId.ok) return actionId;
   return { ok: true, value: { ...signalRoute.value, actionId: actionId.value } };
+}
+
+async function findActiveControlProject(
+  dataSource: ApiTenantDataSource,
+  tenantId: string,
+  projectId: string
+): Promise<ProjectRecord | undefined> {
+  const projects = await dataSource.listProjects?.(tenantId);
+  return projects?.find((project) => project.id === projectId && project.status === "active");
 }
 
 async function listDefinitionsOrDefaults(deps: ApiRouteDeps, tenantId: string): Promise<KpiDefinition[]> {

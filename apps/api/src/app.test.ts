@@ -982,6 +982,30 @@ describe("KISS PM API Phase 1 shell", () => {
       async listWorkspaceUsers() {
         return users;
       },
+      async listProjects() {
+        return [
+          {
+            id: "project-alpha",
+            tenantId: "tenant-db",
+            sourceType: "manual",
+            sourceOpportunityId: null,
+            clientId: null,
+            projectTypeId: null,
+            title: "Project Alpha",
+            clientName: "Client Alpha",
+            status: "active",
+            plannedStart: now,
+            plannedFinish: now,
+            contractValue: 0,
+            plannedHours: 0,
+            templateId: null,
+            createdAt: now,
+            activatedAt: now,
+            closedAt: null,
+            demand: []
+          }
+        ];
+      },
       async findSessionByTokenHash() {
         return {
           id: "session-stale",
@@ -3301,6 +3325,9 @@ describe("KISS PM API Phase 1 shell", () => {
       async listControlSignals() {
         return [signal];
       },
+      async listProjects() {
+        return [createControlProject("active")];
+      },
       async getPlanSnapshot() {
         return snapshot;
       },
@@ -3360,6 +3387,160 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(body.newPlanVersion).toBe(6);
     expect(body.applied.changedTaskIds).toEqual(["task-control-1"]);
     expect(body.readModel.planVersion).toBe(6);
+  });
+
+  it("blocks control action apply when the project is paused under the planning lock", async () => {
+    const snapshot = createControlActionSnapshot();
+    let appliedCommand: PlanningCommand | null = null;
+    let incrementPlanVersionCalled = false;
+    let getPlanSnapshotCalled = false;
+    let projectStatusCheckedAfterLock = false;
+    let planningLockHeld = false;
+    const actionCommand: PlanningCommand = {
+      type: "task.update_work_model",
+      payload: {
+        taskId: "task-control-1",
+        taskType: "fixed_units",
+        effortDriven: false,
+        durationMinutes: 420,
+        workMinutes: 420
+      }
+    };
+    const signal: ControlSignal = {
+      id: "signal-control-1",
+      tenantId: "tenant-control",
+      projectId: "project-control",
+      sourceEntity: { type: "Project", id: "project-control" },
+      sourceMetric: "deadline_delta_days",
+      evaluationId: "eval-control-1",
+      severity: "critical",
+      explanation: "Project finish is after deadline",
+      ownerUserId: null,
+      allowedActions: ["apply_planning_delta"],
+      scenarioProposals: [
+        {
+          id: "action-control-1",
+          type: "apply_planning_delta",
+          label: "Compress critical task",
+          targetEntity: { type: "ControlSignal", id: "signal-control-1" },
+          requiredPermissions: ["tenant.project_plan.manage"],
+          planDelta: {
+            commands: [actionCommand],
+            changedTaskIds: ["task-control-1"],
+            changedAssignmentIds: [],
+            changedDependencyIds: [],
+            acceptedRiskIds: []
+          },
+          input: { taskId: "task-control-1" },
+          explainability: {
+            reason: "Deadline-first correction",
+            deadlineDeltaDays: 0,
+            overloadMinutes: 0,
+            changedTaskIds: ["task-control-1"],
+            changedAssignmentIds: [],
+            riskScore: 20,
+            cost: 120
+          }
+        }
+      ],
+      status: "open",
+      createdAt: "2026-05-24T00:00:00.000Z",
+      updatedAt: "2026-05-24T00:00:00.000Z"
+    };
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === "user-control"
+          ? {
+              id: "user-control",
+              tenantId: "tenant-control",
+              name: "Control User",
+              accessProfileId: "control-profile"
+            }
+          : undefined;
+      },
+      async findTenantById(tenantId) {
+        return tenantId === "tenant-control" ? { id: tenantId, name: "Control Tenant" } : undefined;
+      },
+      async findAccessProfileById() {
+        return {
+          id: "control-profile",
+          permissions: [
+            "tenant.control_signals.read",
+            "tenant.management_actions.execute",
+            "tenant.project_plan.manage"
+          ]
+        };
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findSessionByTokenHash() {
+        return {
+          id: "session-control",
+          tenantId: "tenant-control",
+          userId: "user-control",
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      },
+      async lockTenantResourcePlanning() {
+        planningLockHeld = true;
+      },
+      async listControlSignals() {
+        return [signal];
+      },
+      async listProjects() {
+        projectStatusCheckedAfterLock = planningLockHeld;
+        return [createControlProject("paused")];
+      },
+      async getPlanSnapshot() {
+        getPlanSnapshotCalled = true;
+        return snapshot;
+      },
+      async applyPlanningCommand(input) {
+        appliedCommand = input.command;
+      },
+      async incrementPlanVersion() {
+        incrementPlanVersionCalled = true;
+        return 6;
+      },
+      async createActionExecution(input) {
+        return {
+          ...input,
+          createdAt: new Date("2026-05-24T00:00:00.000Z")
+        };
+      },
+      async appendAuditEvent() {
+        return;
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const response = await app.request(
+      "/api/workspace/projects/project-control/control/signals/signal-control-1/actions/action-control-1/apply",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        body: JSON.stringify({ clientPlanVersion: 5 })
+      }
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "project_not_found" });
+    expect(projectStatusCheckedAfterLock).toBe(true);
+    expect(getPlanSnapshotCalled).toBe(false);
+    expect(appliedCommand).toBeNull();
+    expect(incrementPlanVersionCalled).toBe(false);
   });
 
   it("rechecks control action permissions after acquiring the planning lock", async () => {
@@ -3475,6 +3656,9 @@ describe("KISS PM API Phase 1 shell", () => {
       async listControlSignals() {
         listControlSignalsCalls += 1;
         return listControlSignalsCalls === 1 ? [baseSignal] : [lockedSignal];
+      },
+      async listProjects() {
+        return [createControlProject("active")];
       },
       async getPlanSnapshot() {
         return snapshot;
@@ -3635,6 +3819,9 @@ describe("KISS PM API Phase 1 shell", () => {
         listControlSignalsCalls += 1;
         return listControlSignalsCalls === 1 ? [baseSignal] : [lockedSignal];
       },
+      async listProjects() {
+        return [createControlProject("active")];
+      },
       async getPlanSnapshot() {
         return snapshot;
       },
@@ -3777,6 +3964,9 @@ describe("KISS PM API Phase 1 shell", () => {
       async listControlSignals() {
         return [signal];
       },
+      async listProjects() {
+        return [createControlProject("active")];
+      },
       async getPlanSnapshot() {
         return snapshot;
       },
@@ -3816,6 +4006,29 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(appliedCommand).toBeNull();
   });
 });
+
+function createControlProject(status: ProjectRecord["status"]): ProjectRecord {
+  return {
+    id: "project-control",
+    tenantId: "tenant-control",
+    sourceType: "manual",
+    sourceOpportunityId: null,
+    clientId: null,
+    projectTypeId: null,
+    title: "Control project",
+    clientName: "Control client",
+    status,
+    plannedStart: new Date("2026-05-24T00:00:00.000Z"),
+    plannedFinish: new Date("2026-05-26T00:00:00.000Z"),
+    contractValue: 0,
+    plannedHours: 0,
+    templateId: null,
+    createdAt: new Date("2026-05-24T00:00:00.000Z"),
+    activatedAt: new Date("2026-05-24T00:00:00.000Z"),
+    closedAt: null,
+    demand: []
+  };
+}
 
 function createControlActionSnapshot(): PlanSnapshot {
   return {
