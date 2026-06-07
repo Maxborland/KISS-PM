@@ -161,10 +161,7 @@ export function buildCrmPipelineLifecycleGraph(input: {
   return {
     pipelineId: input.pipelineId,
     initialStageId:
-      sortedStages.find((stage) => stage.status === "active" && !stage.isFinal)?.id ??
-      sortedStages.find((stage) => !stage.isFinal)?.id ??
-      sortedStages[0]?.id ??
-      null,
+      sortedStages.find((stage) => stage.status === "active" && !stage.isFinal)?.id ?? null,
     finalStageIds: stages.filter((stage) => stage.isFinal).map((stage) => stage.stageId),
     stages,
     transitions
