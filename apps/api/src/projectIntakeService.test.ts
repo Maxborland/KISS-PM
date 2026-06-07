@@ -551,7 +551,7 @@ describe("project intake application service", () => {
     });
   });
 
-  it("rejects partial CRM pipeline clears and direct stage changes for initialized opportunities", async () => {
+  it("rejects CRM pipeline clears and direct stage changes for initialized opportunities", async () => {
     const audits: ManagementAuditEventInput[] = [];
     let updatedInput: OpportunityInput | null = null;
     const existingOpportunity = createOpportunityRecord(
@@ -700,6 +700,23 @@ describe("project intake application service", () => {
       ok: false,
       status: 400,
       error: "invalid_crm_pipeline_state"
+    });
+    expect(updatedInput).toBeNull();
+
+    const pairedClear = await service.updateOpportunity({
+      actor,
+      opportunityId: opportunityInput.id,
+      input: {
+        ...opportunityInput,
+        crmPipelineId: null,
+        crmPipelineStageId: null
+      }
+    });
+
+    expect(pairedClear).toEqual({
+      ok: false,
+      status: 409,
+      error: "crm_pipeline_transition_required"
     });
     expect(updatedInput).toBeNull();
 

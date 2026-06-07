@@ -92,6 +92,21 @@ export async function resolveOpportunityLinks(
   if ((input.crmPipelineId == null) !== (input.crmPipelineStageId == null)) {
     return { ok: false, status: 400, error: "invalid_crm_pipeline_state" };
   }
+  if (
+    hasCrmPipelineId &&
+    hasCrmPipelineStageId &&
+    input.crmPipelineId === null &&
+    input.crmPipelineStageId === null &&
+    existingOpportunity &&
+    (existingOpportunity.crmPipelineId !== null ||
+      existingOpportunity.crmPipelineStageId !== null)
+  ) {
+    return {
+      ok: false,
+      status: 409,
+      error: "crm_pipeline_transition_required"
+    };
+  }
   if (input.crmPipelineId && input.crmPipelineStageId) {
     const pipeline = await dataSource.findCrmPipelineById?.(
       tenantId,
