@@ -29,6 +29,7 @@ export function registerCrmOpportunityTransitionRoutes(app: Hono, deps: ApiRoute
     if (!actor) return context.json({ error: "session_required" }, 401);
     if (
       !dataSource.findOpportunityById ||
+      !dataSource.findCrmPipelineById ||
       !dataSource.findCrmPipelineStageById ||
       !dataSource.listCrmPipelineTransitionRules ||
       !dataSource.transitionOpportunityCrmPipelineStage ||
@@ -78,7 +79,8 @@ export function registerCrmOpportunityTransitionRoutes(app: Hono, deps: ApiRoute
       });
     }
 
-    const [currentStage, targetStage, transitionRules] = await Promise.all([
+    const [currentPipeline, currentStage, targetStage, transitionRules] = await Promise.all([
+      dataSource.findCrmPipelineById(actor.tenantId, opportunity.crmPipelineId),
       dataSource.findCrmPipelineStageById(
         actor.tenantId,
         opportunity.crmPipelineId,
@@ -92,6 +94,15 @@ export function registerCrmOpportunityTransitionRoutes(app: Hono, deps: ApiRoute
       dataSource.listCrmPipelineTransitionRules(actor.tenantId, opportunity.crmPipelineId)
     ]);
 
+    if (!currentPipeline || currentPipeline.status !== "active") {
+      return denyDomain(context, {
+        actor,
+        opportunity,
+        policyDecision,
+        commandInput: parsedBody.value,
+        reason: "crm_pipeline_not_active"
+      });
+    }
     if (!currentStage) return context.json({ error: "crm_pipeline_current_stage_not_found" }, 409);
     if (!targetStage) return context.json({ error: "crm_pipeline_target_stage_not_found" }, 404);
 

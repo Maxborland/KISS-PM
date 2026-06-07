@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { createAccessProfile, type AccessProfile } from "@kiss-pm/access-control";
-import { createTenantUser, type CrmPipelineStage, type CrmPipelineTransitionRule } from "@kiss-pm/domain";
+import {
+  createTenantUser,
+  type CrmPipeline,
+  type CrmPipelineStage,
+  type CrmPipelineTransitionRule
+} from "@kiss-pm/domain";
 import { Hono } from "hono";
 
 import type {
@@ -72,6 +77,34 @@ describe("CRM opportunity transition routes", () => {
       actionType: "crm_opportunity_pipeline.transition_denied",
       sourceEntity: { type: "Opportunity", id: "opportunity-alpha" },
       executionResult: { status: "denied", reason: "transition_reason_required" }
+    });
+    expect(fixture.opportunity.crmPipelineStageId).toBe("pipeline-stage-intake");
+  });
+
+  it("records domain-denied audit when the current CRM pipeline has been archived", async () => {
+    const fixture = createFixture(adminProfile, {
+      pipeline: { ...pipeline, status: "archived" }
+    });
+    const response = await fixture.app.request(
+      "/api/workspace/opportunities/opportunity-alpha/pipeline-transition",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: "kiss_pm_session=test" },
+        body: JSON.stringify({ targetStageId: "pipeline-stage-qualified" })
+      }
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "crm_pipeline_not_active" });
+    expect(fixture.auditEvents).toHaveLength(1);
+    expect(fixture.auditEvents[0]).toMatchObject({
+      actionType: "crm_opportunity_pipeline.transition_denied",
+      sourceEntity: { type: "Opportunity", id: "opportunity-alpha" },
+      beforeState: {
+        crmPipelineId: "pipeline-sales",
+        crmPipelineStageId: "pipeline-stage-intake"
+      },
+      executionResult: { status: "denied", reason: "crm_pipeline_not_active" }
     });
     expect(fixture.opportunity.crmPipelineStageId).toBe("pipeline-stage-intake");
   });
@@ -152,6 +185,22 @@ describe("CRM opportunity transition routes", () => {
 
 const now = new Date("2026-06-06T00:00:00.000Z");
 
+const pipeline: CrmPipeline = {
+  id: "pipeline-sales",
+  tenantId: "tenant-alpha",
+  name: "Sales",
+  status: "active",
+  lifecycleGraphMetadata: {
+    pipelineId: "pipeline-sales",
+    initialStageId: "pipeline-stage-intake",
+    finalStageIds: [],
+    stages: [],
+    transitions: []
+  },
+  createdAt: now,
+  updatedAt: now
+};
+
 const currentStage: CrmPipelineStage = {
   id: "pipeline-stage-intake",
   tenantId: "tenant-alpha",
@@ -223,7 +272,11 @@ function createOpportunity(): OpportunityRecord {
 
 function createFixture(
   profile: AccessProfile,
-  overrides: { transitionRules?: CrmPipelineTransitionRule[]; transitionConflict?: boolean } = {}
+  overrides: {
+    pipeline?: CrmPipeline;
+    transitionRules?: CrmPipelineTransitionRule[];
+    transitionConflict?: boolean;
+  } = {}
 ) {
   const app = new Hono();
   const auditEvents: AuditEventListItem[] = [];
@@ -234,6 +287,10 @@ function createFixture(
     async findUserById() { return actor; },
     async findTenantById() { return { id: "tenant-alpha", name: "Alpha" }; },
     async listUsersByTenantId() { return [actor]; },
+    async findCrmPipelineById(_tenantId, pipelineId) {
+      const currentPipeline = overrides.pipeline ?? pipeline;
+      return pipelineId === currentPipeline.id ? currentPipeline : undefined;
+    },
     async findOpportunityById() { return opportunity; },
     async findCrmPipelineStageById(_tenantId, _pipelineId, stageId) {
       if (stageId === currentStage.id) return currentStage;
