@@ -145,6 +145,36 @@ describe("OpenAPI route inventory", () => {
       format: "date-time"
     });
   });
+
+  it("documents project lifecycle status contract", () => {
+    const document = createTestDocument();
+    const operation = document.paths["/api/workspace/projects/{projectId}/status"]?.patch;
+
+    expect(
+      operation?.requestBody?.content?.["application/json"]?.schema?.$ref
+    ).toBe("#/components/schemas/ProjectStatusUpdateRequest");
+    expect(
+      operation?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref
+    ).toBe("#/components/schemas/ProjectResponse");
+
+    const projectStatusSchema = document.components.schemas.ProjectStatus;
+    expect(projectStatusSchema).toEqual({
+      type: "string",
+      enum: ["draft", "active", "paused", "closed", "cancelled"]
+    });
+
+    const requestSchema = document.components.schemas.ProjectStatusUpdateRequest;
+    expect(requestSchema.required).toEqual(["status"]);
+    expect(requestSchema.properties.status.enum).toEqual([
+      "active",
+      "paused",
+      "closed",
+      "cancelled"
+    ]);
+    expect(document.components.schemas.Project.properties.status).toEqual({
+      $ref: "#/components/schemas/ProjectStatus"
+    });
+  });
 });
 
 type TestOpenApiDocument = ReturnType<typeof createKissPmOpenApiDocument> & {

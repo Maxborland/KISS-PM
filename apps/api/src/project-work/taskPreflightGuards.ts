@@ -52,6 +52,7 @@ export async function preflightUpdateTask(
 ): Promise<PreflightResult> {
   if (
     !deps.dataSource.findTaskById ||
+    !deps.dataSource.listProjects ||
     !deps.dataSource.getPlanSnapshot ||
     !deps.dataSource.applyPlanningCommand ||
     !deps.dataSource.updateTaskMetadata ||
@@ -69,6 +70,8 @@ export async function preflightUpdateTask(
 
   const editDecision = canEditTaskFields(input.actor, input.profile, task);
   if (!editDecision.allowed) return { ok: false, status: 403, error: editDecision.reason };
+  const project = await findActiveProject(deps.dataSource, input.actor.tenantId, task.projectId);
+  if (!project) return { ok: false, status: 404, error: "project_not_found" };
   return { ok: true };
 }
 

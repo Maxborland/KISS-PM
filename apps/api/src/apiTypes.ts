@@ -322,6 +322,9 @@ export type OpportunityUpdateInput = Omit<
   "id" | "clientName" | "contactName" | "projectType" | "status"
 >;
 
+export type ProjectStatus = "draft" | "active" | "paused" | "closed" | "cancelled";
+export type MutableProjectStatus = "active" | "paused";
+
 export type ProjectRecord = {
   id: string;
   tenantId: TenantId;
@@ -331,7 +334,7 @@ export type ProjectRecord = {
   projectTypeId: string | null;
   title: string;
   clientName: string;
-  status: string;
+  status: ProjectStatus;
   plannedStart: Date;
   plannedFinish: Date;
   contractValue: number;
@@ -357,6 +360,12 @@ export type WorkspaceInboxProjectInput = {
   tenantId: TenantId;
   plannedStart: Date;
   plannedFinish: Date;
+};
+export type ProjectStatusUpdateInput = {
+  tenantId: TenantId;
+  projectId: string;
+  expectedStatus: MutableProjectStatus;
+  status: MutableProjectStatus;
 };
 
 export type UserCredentialRecord = {
@@ -570,6 +579,7 @@ export type ApiTenantDataSource = {
   ): Promise<ProjectRecord>;
   createProjectDraftFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
+  updateProjectStatus?(input: ProjectStatusUpdateInput): Promise<ProjectRecord | undefined>;
   listProjectTasks?(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks?(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
   listScheduledTasks?(input: {

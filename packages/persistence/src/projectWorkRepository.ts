@@ -3,7 +3,9 @@ import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-
 import type { TenantId, UserId } from "@kiss-pm/domain";
 
 import type { KissPmDatabase } from "./connection";
+import type { PositionDemandRecord, ProjectRecord, ProjectStatus } from "./projectIntakeRepository";
 import {
+  projectPositionDemands,
   projects,
   taskActivities,
   taskAssignments,
@@ -21,6 +23,7 @@ export type TaskStatusCategory =
 export type TaskStatus = TaskStatusCategory;
 export type TaskPriority = "low" | "normal" | "high" | "critical";
 export type TaskSource = "manual";
+export type ProjectMutableStatus = Extract<ProjectStatus, "active" | "paused">;
 export type TaskParticipantRole =
   | "executor"
   | "co_executor"
@@ -94,6 +97,13 @@ export type TaskMetadataInput = {
   participants: TaskParticipantRecord[];
 };
 
+export type ProjectStatusUpdateInput = {
+  tenantId: TenantId;
+  projectId: string;
+  expectedStatus: ProjectMutableStatus;
+  status: ProjectMutableStatus;
+};
+
 export type TaskStatusUpdateInput = {
   tenantId: TenantId;
   projectId: string;
@@ -159,6 +169,7 @@ export type ProjectWorkRepository = {
   updateTaskMetadata(input: TaskMetadataInput): Promise<TaskRecord | undefined>;
   archiveTask(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
   updateTaskStatus(input: TaskStatusUpdateInput): Promise<TaskRecord | undefined>;
+  updateProjectStatus(input: ProjectStatusUpdateInput): Promise<ProjectRecord | undefined>;
   listTaskActivities(tenantId: TenantId, taskId: string): Promise<TaskActivityRecord[]>;
   createTaskActivity(input: TaskActivityInput): Promise<TaskActivityRecord>;
 };
@@ -191,6 +202,35 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
     }
 
     return participantsByTask;
+  }
+
+  async function listProjectDemand(
+    tenantId: TenantId,
+    projectIds: readonly string[]
+  ): Promise<Map<string, PositionDemandRecord[]>> {
+    const demandByProject = new Map<string, PositionDemandRecord[]>();
+    if (projectIds.length === 0) return demandByProject;
+
+    const rows = await db
+      .select()
+      .from(projectPositionDemands)
+      .where(
+        and(
+          eq(projectPositionDemands.tenantId, tenantId),
+          inArray(projectPositionDemands.projectId, [...projectIds])
+        )
+      );
+
+    for (const row of rows) {
+      const demand = demandByProject.get(row.projectId) ?? [];
+      demand.push({
+        positionId: row.positionId,
+        requiredHours: row.requiredHours
+      });
+      demandByProject.set(row.projectId, demand);
+    }
+
+    return demandByProject;
   }
 
   async function hydrateTasks(
@@ -598,6 +638,23 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
       const participantsByTask = await listTaskParticipants(input.tenantId, [input.taskId]);
       return mapTaskRecord(row, null, participantsByTask.get(input.taskId) ?? []);
     },
+    async updateProjectStatus(input) {
+      const [row] = await db
+        .update(projects)
+        .set({ status: input.status })
+        .where(
+          and(
+            eq(projects.tenantId, input.tenantId),
+            eq(projects.id, input.projectId),
+            eq(projects.status, input.expectedStatus)
+          )
+        )
+        .returning();
+
+      if (!row) return undefined;
+      const demandByProject = await listProjectDemand(input.tenantId, [input.projectId]);
+      return mapProjectRecord(row, demandByProject.get(row.id) ?? []);
+    },
     async listTaskActivities(tenantId, taskId) {
       const rows = await db
         .select()
@@ -702,5 +759,31 @@ function mapTaskActivityRecord(
     authorUserId: row.authorUserId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
+  };
+}
+
+function mapProjectRecord(
+  row: typeof projects.$inferSelect,
+  demand: PositionDemandRecord[]
+): ProjectRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    sourceType: row.sourceType as ProjectRecord["sourceType"],
+    sourceOpportunityId: row.sourceOpportunityId,
+    clientId: row.clientId,
+    projectTypeId: row.projectTypeId,
+    title: row.title,
+    clientName: row.clientName,
+    status: row.status as ProjectStatus,
+    plannedStart: row.plannedStart,
+    plannedFinish: row.plannedFinish,
+    contractValue: row.contractValue,
+    plannedHours: row.plannedHours,
+    templateId: row.templateId,
+    createdAt: row.createdAt,
+    activatedAt: row.activatedAt,
+    closedAt: row.closedAt,
+    demand
   };
 }

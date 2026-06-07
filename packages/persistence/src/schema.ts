@@ -624,6 +624,10 @@ export const projects = pgTable(
     index("projects_tenant_id_idx").on(table.tenantId),
     index("projects_status_idx").on(table.status),
     check(
+      "projects_status_chk",
+      sql`${table.status} in ('draft', 'active', 'paused', 'closed', 'cancelled')`
+    ),
+    check(
       "projects_source_type_chk",
       sql`${table.sourceType} in ('opportunity', 'workspace_inbox', 'manual')`
     ),

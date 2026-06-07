@@ -318,4 +318,75 @@ describe("project work repository", () => {
       })
     ).resolves.toBeUndefined();
   });
+
+  it("updates project status between active and paused only", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const opportunity = await intakeRepository.createOpportunity({
+      id: "opportunity-alpha",
+      tenantId: "tenant-alpha",
+      clientId: "client-romashka",
+      primaryContactId: null,
+      projectTypeId: "project-type-implementation",
+      stageId: null,
+      clientName: "Client Alpha",
+      contactName: "Contact Alpha",
+      title: "KISS PM implementation",
+      projectType: "Implementation",
+      description: null,
+      plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+      plannedFinish: new Date("2026-06-30T00:00:00.000Z"),
+      contractValue: 1000000,
+      plannedHourlyRate: 5000,
+      plannedHours: 200,
+      probability: 80,
+      status: "ready_to_activate",
+      templateId: null,
+      demand: [{ positionId: "position-engineer", requiredHours: 80 }]
+    });
+    const draft = await intakeRepository.createProjectDraftFromOpportunity({
+      id: "project-alpha",
+      tenantId: "tenant-alpha",
+      sourceOpportunityId: opportunity.id,
+      clientId: opportunity.clientId,
+      projectTypeId: opportunity.projectTypeId,
+      title: opportunity.title,
+      clientName: opportunity.clientName,
+      status: "draft",
+      plannedStart: opportunity.plannedStart,
+      plannedFinish: opportunity.plannedFinish,
+      contractValue: opportunity.contractValue,
+      plannedHours: opportunity.plannedHours,
+      templateId: null,
+      demand: opportunity.demand
+    });
+    await intakeRepository.activateProjectDraft({
+      tenantId: "tenant-alpha",
+      projectId: draft.id
+    });
+
+    const paused = await workRepository.updateProjectStatus({
+      tenantId: "tenant-alpha",
+      projectId: "project-alpha",
+      expectedStatus: "active",
+      status: "paused"
+    });
+    const staleActive = await workRepository.updateProjectStatus({
+      tenantId: "tenant-alpha",
+      projectId: "project-alpha",
+      expectedStatus: "active",
+      status: "paused"
+    });
+    const resumed = await workRepository.updateProjectStatus({
+      tenantId: "tenant-alpha",
+      projectId: "project-alpha",
+      expectedStatus: "paused",
+      status: "active"
+    });
+
+    expect(paused).toMatchObject({ id: "project-alpha", status: "paused" });
+    expect(staleActive).toBeUndefined();
+    expect(resumed).toMatchObject({ id: "project-alpha", status: "active" });
+  });
 });
