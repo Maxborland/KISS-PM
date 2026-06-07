@@ -33,14 +33,19 @@ export async function updateOpportunity(
     ...input.input,
     ownerUserId: input.input.ownerUserId ?? opportunity.ownerUserId ?? input.actor.id
   };
-  const linked = await resolveOpportunityLinks(deps.dataSource, input.actor.tenantId, {
-    ...inputWithOwner,
-    id: opportunity.id,
-    status: opportunity.status,
-    clientName: opportunity.clientName,
-    contactName: opportunity.contactName,
-    projectType: opportunity.projectType
-  });
+  const linked = await resolveOpportunityLinks(
+    deps.dataSource,
+    input.actor.tenantId,
+    {
+      ...inputWithOwner,
+      id: opportunity.id,
+      status: opportunity.status,
+      clientName: opportunity.clientName,
+      contactName: opportunity.contactName,
+      projectType: opportunity.projectType
+    },
+    opportunity
+  );
   if (!linked.ok) return linked;
   const customFieldValidation = await validateOpportunityCustomFieldValues(
     deps.dataSource,

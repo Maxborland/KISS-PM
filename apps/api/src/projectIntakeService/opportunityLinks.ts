@@ -6,6 +6,7 @@ import type {
   ContactRecord,
   DealStageRecord,
   OpportunityInput,
+  OpportunityRecord,
   ProjectTypeRecord
 } from "../apiTypes";
 
@@ -23,7 +24,11 @@ type OpportunityLinkDataSource = Pick<
 export async function resolveOpportunityLinks(
   dataSource: OpportunityLinkDataSource,
   tenantId: string,
-  input: OpportunityInput
+  input: OpportunityInput,
+  existingOpportunity?: Pick<
+    OpportunityRecord,
+    "crmPipelineId" | "crmPipelineStageId"
+  >
 ): Promise<
   | {
       ok: true;
@@ -35,7 +40,7 @@ export async function resolveOpportunityLinks(
     }
   | {
       ok: false;
-      status: 400 | 404 | 501;
+      status: 400 | 404 | 409 | 501;
       error: string;
     }
 > {
@@ -91,6 +96,29 @@ export async function resolveOpportunityLinks(
     );
     if (!pipelineStage || pipelineStage.status !== "active") {
       return { ok: false, status: 404, error: "crm_pipeline_stage_not_found" };
+    }
+    if (existingOpportunity) {
+      const isInitialized =
+        existingOpportunity.crmPipelineId !== null ||
+        existingOpportunity.crmPipelineStageId !== null;
+      if (isInitialized) {
+        const isSamePipelineState =
+          existingOpportunity.crmPipelineId === input.crmPipelineId &&
+          existingOpportunity.crmPipelineStageId === input.crmPipelineStageId;
+        if (!isSamePipelineState) {
+          return {
+            ok: false,
+            status: 409,
+            error: "crm_pipeline_transition_required"
+          };
+        }
+      } else if (pipeline.lifecycleGraphMetadata.initialStageId !== input.crmPipelineStageId) {
+        return {
+          ok: false,
+          status: 409,
+          error: "crm_pipeline_initial_stage_required"
+        };
+      }
     }
   }
 
