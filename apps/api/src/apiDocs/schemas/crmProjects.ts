@@ -557,6 +557,8 @@ export const crmProjectSchemas = openApiSchemaFragment({
       productId: nullableStringSchema,
       projectTypeId: nullableStringSchema,
       stageId: stringIdSchema,
+      crmPipelineId: { type: ["string", "null"], minLength: 1 },
+      crmPipelineStageId: { type: ["string", "null"], minLength: 1 },
       expectedStart: { type: ["string", "null"], format: "date-time" },
       expectedFinish: { type: ["string", "null"], format: "date-time" },
       budget: { type: ["number", "null"], minimum: 0 },

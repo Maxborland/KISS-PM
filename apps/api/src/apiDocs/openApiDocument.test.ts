@@ -95,6 +95,18 @@ describe("OpenAPI route inventory", () => {
       $ref: "#/components/schemas/CrmPipelineTransitionDecision"
     });
   });
+
+  it("documents writable opportunity CRM pipeline state fields", () => {
+    const document = createTestDocument();
+    const schema = document.components.schemas.OpportunityWriteRequest;
+
+    expect(schema.additionalProperties).toBe(false);
+    expect(schema.properties.crmPipelineId).toEqual({ type: ["string", "null"], minLength: 1 });
+    expect(schema.properties.crmPipelineStageId).toEqual({
+      type: ["string", "null"],
+      minLength: 1
+    });
+  });
 });
 
 type TestOpenApiDocument = ReturnType<typeof createKissPmOpenApiDocument> & {
