@@ -27,6 +27,8 @@ export type ProjectIntakeServiceDataSource = Pick<
   | "finalizeOpportunity"
   | "findClientById"
   | "findContactById"
+  | "findCrmPipelineById"
+  | "findCrmPipelineStageById"
   | "findDealStageById"
   | "findOpportunityById"
   | "findProjectTypeById"

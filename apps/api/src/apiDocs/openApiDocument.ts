@@ -87,6 +87,7 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/opportunities/:opportunityId", tag: "Project intake", summary: "Read opportunity", successSchema: "OpportunityResponse" },
   { method: "post", path: "/api/workspace/opportunities", tag: "Project intake", summary: "Create opportunity", requestSchema: "OpportunityWriteRequest", successSchema: "OpportunityResponse", successStatus: 201 },
   { method: "patch", path: "/api/workspace/opportunities/:opportunityId", tag: "Project intake", summary: "Update opportunity", requestSchema: "OpportunityWriteRequest", successSchema: "OpportunityResponse" },
+  { method: "post", path: "/api/workspace/opportunities/:opportunityId/pipeline-transition", tag: "Project intake", summary: "Transition opportunity CRM pipeline stage", requestSchema: "OpportunityPipelineTransitionRequest", successSchema: "OpportunityPipelineTransitionResponse" },
   { method: "patch", path: "/api/workspace/opportunities/:opportunityId/stage", tag: "Project intake", summary: "Move opportunity stage", requestSchema: "OpportunityStagePatchRequest", successSchema: "OpportunityResponse" },
   { method: "patch", path: "/api/workspace/opportunities/:opportunityId/finalize", tag: "Project intake", summary: "Finalize opportunity", requestSchema: "OpportunityFinalizeRequest", successSchema: "OpportunityResponse" },
   { method: "post", path: "/api/workspace/opportunities/:opportunityId/feasibility", tag: "Project intake", summary: "Preview resource feasibility", successSchema: "OpportunityFeasibilityResponse" },

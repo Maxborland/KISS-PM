@@ -80,6 +80,46 @@ describe("CRM pipeline domain contract", () => {
     });
   });
 
+  it("uses the first active non-final stage as the lifecycle graph initial stage", () => {
+    const stages: Array<{
+      id: string;
+      sortOrder: number;
+      status: "active" | "archived";
+      lifecycleState: "open" | "won_closed";
+      isFinal: boolean;
+    }> = [
+      {
+        id: "stage-intake",
+        sortOrder: 10,
+        status: "archived",
+        lifecycleState: "open",
+        isFinal: false
+      },
+      {
+        id: "stage-qualified",
+        sortOrder: 20,
+        status: "active",
+        lifecycleState: "open",
+        isFinal: false
+      },
+      {
+        id: "stage-won",
+        sortOrder: 30,
+        status: "active",
+        lifecycleState: "won_closed",
+        isFinal: true
+      }
+    ];
+
+    const graph = buildCrmPipelineLifecycleGraph({
+      pipelineId: "pipeline-sales",
+      stages,
+      transitionRules: []
+    });
+
+    expect(graph.initialStageId).toBe("stage-qualified");
+  });
+
   it("rejects CRM pipeline stages with inconsistent finality and lifecycle state", () => {
     expect(() =>
       buildCrmPipelineLifecycleGraph({

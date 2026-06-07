@@ -407,7 +407,13 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     if (!beforeState) return context.json({ error: "crm_pipeline_transition_rule_not_found" }, 404);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseCrmPipelineTransitionRuleBody(patchBodyWithExisting(beforeState, body.value), actor.tenantId, pipelineId, ruleId);
+    const parsed = parseCrmPipelineTransitionRuleBody(
+      patchBodyWithExisting(beforeState, body.value),
+      actor.tenantId,
+      pipelineId,
+      ruleId,
+      beforeState
+    );
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
     if (
       !(await dataSource.findCrmPipelineStageById(actor.tenantId, pipelineId, parsed.value.fromStageId)) ||

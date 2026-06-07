@@ -178,7 +178,7 @@ describe("CRM pipeline routes", () => {
       id: "pipeline-rule-retained",
       fromStageId: "pipeline-stage-open",
       toStageId: "pipeline-stage-final",
-      requiredPermission: "tenant.crm.deals.close",
+      requiredPermission: "tenant.project_activation.manage",
       requiredFields: ["contractValue"],
       requireReason: true
     });
@@ -231,7 +231,7 @@ describe("CRM pipeline routes", () => {
     await expect(transitionRulePatch.json()).resolves.toMatchObject({
       transitionRule: {
         status: "archived",
-        requiredPermission: "tenant.crm.deals.close",
+        requiredPermission: "tenant.project_activation.manage",
         requiredFields: ["contractValue"],
         requireReason: true
       }
@@ -249,6 +249,57 @@ describe("CRM pipeline routes", () => {
         actionType: "create_task_v2",
         actionConfig: { title: "Prepare handoff" },
         status: "archived"
+      }
+    });
+  });
+
+  it("preserves existing safe custom transition rule permissions on PATCH", async () => {
+    const fixture = createRouteFixture(adminProfile);
+    const headers = {
+      "content-type": "application/json",
+      cookie: "kiss_pm_session=test"
+    };
+    const requestJson = (path: string, method: "POST" | "PATCH", body: Record<string, unknown>) =>
+      fixture.app.request(path, { method, headers, body: JSON.stringify(body) });
+    await requestJson("/api/workspace/crm/pipelines", "POST", {
+      id: "pipeline-custom-permission",
+      name: "Custom permission"
+    });
+    await requestJson("/api/workspace/crm/pipelines/pipeline-custom-permission/stages", "POST", {
+      id: "pipeline-stage-custom-open",
+      name: "Open",
+      sortOrder: 10
+    });
+    await requestJson("/api/workspace/crm/pipelines/pipeline-custom-permission/stages", "POST", {
+      id: "pipeline-stage-custom-won",
+      name: "Won",
+      sortOrder: 90,
+      lifecycleState: "won_closed",
+      isFinal: true
+    });
+    fixture.transitionRules.push({
+      id: "pipeline-rule-custom-permission",
+      tenantId: actor.tenantId,
+      pipelineId: "pipeline-custom-permission",
+      fromStageId: "pipeline-stage-custom-open",
+      toStageId: "pipeline-stage-custom-won",
+      requiredPermission: "tenant.crm.deals.close",
+      requiredFields: [],
+      requireReason: false,
+      status: "active",
+      createdAt: new Date("2026-06-06T00:00:00.000Z"),
+      updatedAt: new Date("2026-06-06T00:00:00.000Z")
+    });
+    const response = await requestJson(
+      "/api/workspace/crm/pipelines/pipeline-custom-permission/transition-rules/pipeline-rule-custom-permission",
+      "PATCH",
+      { status: "archived" }
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      transitionRule: {
+        status: "archived",
+        requiredPermission: "tenant.crm.deals.close"
       }
     });
   });
@@ -426,5 +477,5 @@ function createRouteFixture(profile = adminProfile) {
   } as unknown as ApiRouteDeps;
 
   registerCrmPipelineRoutes(app, deps);
-  return { app, auditEvents };
+  return { app, auditEvents, transitionRules };
 }

@@ -86,6 +86,13 @@ function parseOpportunityFields(
   const ownerUserId = getOptionalString(input, "ownerUserId") ?? null;
   const projectTypeId = getOptionalString(input, "projectTypeId");
   const stageId = getOptionalString(input, "stageId");
+  const crmPipelineId = getOptionalString(input, "crmPipelineId");
+  const hasCrmPipelineId = Object.prototype.hasOwnProperty.call(input, "crmPipelineId");
+  const hasCrmPipelineStageId = Object.prototype.hasOwnProperty.call(
+    input,
+    "crmPipelineStageId"
+  );
+  const crmPipelineStageId = getOptionalString(input, "crmPipelineStageId");
   const clientName = getOptionalString(input, "clientName") ?? "";
   const contactName = getOptionalString(input, "contactName") ?? "";
   const title = getOptionalString(input, "title");
@@ -115,6 +122,18 @@ function parseOpportunityFields(
   }
   if (!stageId || !idPattern.test(stageId)) {
     return { ok: false, error: "invalid_deal_stage_id" };
+  }
+  if (hasCrmPipelineId !== hasCrmPipelineStageId) {
+    return { ok: false, error: "invalid_crm_pipeline_state" };
+  }
+  if ((crmPipelineId === null) !== (crmPipelineStageId === null)) {
+    return { ok: false, error: "invalid_crm_pipeline_state" };
+  }
+  if (crmPipelineId !== null && !idPattern.test(crmPipelineId)) {
+    return { ok: false, error: "invalid_crm_pipeline_id" };
+  }
+  if (crmPipelineStageId !== null && !idPattern.test(crmPipelineStageId)) {
+    return { ok: false, error: "invalid_crm_pipeline_stage_id" };
   }
   if (!isSafeSingleLineText(clientName, maxLengths.clientName)) {
     return { ok: false, error: "invalid_client_name" };
@@ -150,6 +169,10 @@ function parseOpportunityFields(
   if (!demand.ok) return demand;
   if (!customFieldValues.ok) return customFieldValues;
 
+  const crmPipelineStateFields = hasCrmPipelineId || hasCrmPipelineStageId
+    ? { crmPipelineId, crmPipelineStageId }
+    : {};
+
   return {
     ok: true,
     value: {
@@ -161,6 +184,7 @@ function parseOpportunityFields(
         ownerUserId,
         projectTypeId,
         stageId,
+        ...crmPipelineStateFields,
         clientName,
         contactName,
         title,

@@ -153,6 +153,14 @@ describe("CRM pipeline API", () => {
         body: JSON.stringify({ id: "pipeline-stage-intake", name: "Intake", sortOrder: 10 })
       }
     );
+    const qualifiedStageResponse = await app.request(
+      "/api/workspace/crm/pipelines/pipeline-architecture-sales/stages",
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ id: "pipeline-stage-qualified", name: "Qualified", sortOrder: 20 })
+      }
+    );
     const wonStageResponse = await app.request(
       "/api/workspace/crm/pipelines/pipeline-architecture-sales/stages",
       {
@@ -168,6 +176,7 @@ describe("CRM pipeline API", () => {
       }
     );
     expect(intakeStageResponse.status).toBe(201);
+    expect(qualifiedStageResponse.status).toBe(201);
     expect(wonStageResponse.status).toBe(201);
 
     const ruleResponse = await app.request(
@@ -225,7 +234,7 @@ describe("CRM pipeline API", () => {
         {
           id: "pipeline-architecture-sales",
           lifecycleGraphMetadata: {
-            initialStageId: "pipeline-stage-intake",
+            initialStageId: "pipeline-stage-qualified",
             finalStageIds: ["pipeline-stage-won"],
             transitions: [
               {
