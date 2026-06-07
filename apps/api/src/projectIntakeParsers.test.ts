@@ -150,6 +150,28 @@ describe("project intake parsers", () => {
     expect(parsed.ok && "crmPipelineStageId" in parsed.value).toBe(false);
   });
 
+  it("rejects partial CRM pipeline clears on opportunity update", () => {
+    expect(
+      parseOpportunityUpdateBody(
+        {
+          ...validOpportunityBody,
+          crmPipelineId: null
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_crm_pipeline_state" });
+
+    expect(
+      parseOpportunityUpdateBody(
+        {
+          ...validOpportunityBody,
+          crmPipelineId: ""
+        },
+        "tenant-alpha"
+      )
+    ).toEqual({ ok: false, error: "invalid_crm_pipeline_state" });
+  });
+
   it("parses runtime custom field values on create and update", () => {
     const parsed = parseOpportunityBody(
       {

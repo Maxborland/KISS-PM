@@ -77,6 +77,18 @@ export async function resolveOpportunityLinks(
     return { ok: false, status: 404, error: "deal_stage_not_found" };
   }
 
+  const hasCrmPipelineId = Object.prototype.hasOwnProperty.call(
+    input,
+    "crmPipelineId"
+  );
+  const hasCrmPipelineStageId = Object.prototype.hasOwnProperty.call(
+    input,
+    "crmPipelineStageId"
+  );
+  if (hasCrmPipelineId !== hasCrmPipelineStageId) {
+    return { ok: false, status: 400, error: "invalid_crm_pipeline_state" };
+  }
+
   if ((input.crmPipelineId == null) !== (input.crmPipelineStageId == null)) {
     return { ok: false, status: 400, error: "invalid_crm_pipeline_state" };
   }

@@ -123,6 +123,9 @@ function parseOpportunityFields(
   if (!stageId || !idPattern.test(stageId)) {
     return { ok: false, error: "invalid_deal_stage_id" };
   }
+  if (hasCrmPipelineId !== hasCrmPipelineStageId) {
+    return { ok: false, error: "invalid_crm_pipeline_state" };
+  }
   if ((crmPipelineId === null) !== (crmPipelineStageId === null)) {
     return { ok: false, error: "invalid_crm_pipeline_state" };
   }
