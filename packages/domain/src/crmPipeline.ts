@@ -109,6 +109,7 @@ export function buildCrmPipelineLifecycleGraph(input: {
   stages: Array<{
     id: string;
     sortOrder: number;
+    status?: CrmPipelineStatus;
     lifecycleState: CrmPipelineLifecycleState;
     isFinal: boolean;
   }>;
@@ -128,14 +129,15 @@ export function buildCrmPipelineLifecycleGraph(input: {
     throw new Error("CRM pipeline stage finality must match lifecycle state");
   }
 
-  const stages = [...input.stages]
-    .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id))
-    .map((stage) => ({
-      stageId: stage.id,
-      sortOrder: stage.sortOrder,
-      lifecycleState: stage.lifecycleState,
-      isFinal: stage.isFinal
-    }));
+  const sortedStages = [...input.stages].sort(
+    (left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id)
+  );
+  const stages = sortedStages.map((stage) => ({
+    stageId: stage.id,
+    sortOrder: stage.sortOrder,
+    lifecycleState: stage.lifecycleState,
+    isFinal: stage.isFinal
+  }));
   const stageIds = new Set(stages.map((stage) => stage.stageId));
   const transitions = input.transitionRules
     .filter(
@@ -158,7 +160,9 @@ export function buildCrmPipelineLifecycleGraph(input: {
 
   return {
     pipelineId: input.pipelineId,
-    initialStageId: stages.find((stage) => !stage.isFinal)?.stageId ?? stages[0]?.stageId ?? null,
+    initialStageId:
+      sortedStages.find((stage) => stage.status !== "archived" && !stage.isFinal)?.id ??
+      null,
     finalStageIds: stages.filter((stage) => stage.isFinal).map((stage) => stage.stageId),
     stages,
     transitions

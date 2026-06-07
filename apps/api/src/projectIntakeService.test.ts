@@ -228,6 +228,7 @@ describe("project intake application service", () => {
     const makeService = (input: {
       pipelineStatus: "active" | "archived";
       stageStatus: "active" | "archived";
+      initialStageId?: string;
     }) => {
       const dataSource: ApiTenantDataSource = {
         async listDevUsers() {
@@ -301,7 +302,7 @@ describe("project intake application service", () => {
             status: input.pipelineStatus,
             lifecycleGraphMetadata: {
               pipelineId: "pipeline-sales",
-              initialStageId: "pipeline-stage-intake",
+              initialStageId: input.initialStageId ?? "pipeline-stage-intake",
               finalStageIds: [],
               stages: [],
               transitions: []
@@ -382,9 +383,17 @@ describe("project intake application service", () => {
     expect(createdInputs).toHaveLength(0);
 
     await expect(
-      makeService({ pipelineStatus: "active", stageStatus: "active" }).createOpportunity({
+      makeService({
+        pipelineStatus: "active",
+        stageStatus: "active",
+        initialStageId: "pipeline-stage-qualified"
+      }).createOpportunity({
         actor,
-        input: { ...baseInput, id: "opportunity-initial-pipeline-stage" }
+        input: {
+          ...baseInput,
+          id: "opportunity-initial-pipeline-stage",
+          crmPipelineStageId: "pipeline-stage-qualified"
+        }
       })
     ).resolves.toMatchObject({ ok: true, status: 201 });
     expect(createdInputs).toHaveLength(1);
@@ -1147,7 +1156,7 @@ describe("project intake application service", () => {
           status: "active",
           lifecycleGraphMetadata: {
             pipelineId: "pipeline-sales",
-            initialStageId: "pipeline-stage-intake",
+            initialStageId: "pipeline-stage-qualified",
             finalStageIds: [],
             stages: [],
             transitions: []
@@ -1156,14 +1165,14 @@ describe("project intake application service", () => {
           updatedAt: new Date("2026-05-01T00:00:00.000Z")
         };
       },
-      async findCrmPipelineStageById() {
+      async findCrmPipelineStageById(_tenantId, _pipelineId, stageId) {
         return {
-          id: "pipeline-stage-intake",
+          id: stageId,
           tenantId: "tenant-alpha",
           pipelineId: "pipeline-sales",
-          name: "Intake",
-          sortOrder: 10,
-          status: "active",
+          name: stageId === "pipeline-stage-qualified" ? "Qualified" : "Intake",
+          sortOrder: stageId === "pipeline-stage-qualified" ? 20 : 10,
+          status: stageId === "pipeline-stage-qualified" ? "active" : "archived",
           lifecycleState: "open",
           isFinal: false,
           createdAt: new Date("2026-05-01T00:00:00.000Z"),
@@ -1195,13 +1204,31 @@ describe("project intake application service", () => {
       }
     });
 
+    await expect(
+      service.updateOpportunity({
+        actor,
+        opportunityId: opportunityInput.id,
+        input: {
+          ...opportunityInput,
+          crmPipelineId: "pipeline-sales",
+          crmPipelineStageId: "pipeline-stage-intake"
+        }
+      })
+    ).resolves.toEqual({
+      ok: false,
+      status: 404,
+      error: "crm_pipeline_stage_not_found"
+    });
+    expect(updatedInput).toBeNull();
+    expect(audits).toHaveLength(0);
+
     const result = await service.updateOpportunity({
       actor,
       opportunityId: opportunityInput.id,
       input: {
         ...opportunityInput,
         crmPipelineId: "pipeline-sales",
-        crmPipelineStageId: "pipeline-stage-intake"
+        crmPipelineStageId: "pipeline-stage-qualified"
       }
     });
 
@@ -1210,12 +1237,12 @@ describe("project intake application service", () => {
       status: 200,
       opportunity: {
         crmPipelineId: "pipeline-sales",
-        crmPipelineStageId: "pipeline-stage-intake"
+        crmPipelineStageId: "pipeline-stage-qualified"
       }
     });
     expect(updatedInput).toMatchObject({
       crmPipelineId: "pipeline-sales",
-      crmPipelineStageId: "pipeline-stage-intake"
+      crmPipelineStageId: "pipeline-stage-qualified"
     });
     expect(audits).toHaveLength(1);
     expect(audits[0]).toMatchObject({
@@ -1226,7 +1253,7 @@ describe("project intake application service", () => {
       }),
       afterState: expect.objectContaining({
         crmPipelineId: "pipeline-sales",
-        crmPipelineStageId: "pipeline-stage-intake"
+        crmPipelineStageId: "pipeline-stage-qualified"
       })
     });
   });
