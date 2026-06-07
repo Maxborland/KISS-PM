@@ -33,7 +33,7 @@ export async function buildFeasibilityAssessment(
       ).length
     })),
     activeProjectReservations: projects
-      .filter((project) => project.status === "active")
+      .filter((project) => project.status === "active" || project.status === "paused")
       .flatMap((project: ProjectRecord) =>
         project.demand.map((line) => ({
           projectId: project.id,
