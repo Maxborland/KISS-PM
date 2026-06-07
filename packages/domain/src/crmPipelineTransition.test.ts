@@ -104,6 +104,26 @@ describe("CRM pipeline transition decisions", () => {
     ).toMatchObject({ ok: true });
   });
 
+  it("treats empty array required fields as missing", () => {
+    expect(
+      decide({
+        transitionRules: [{ ...rule, requiredFields: ["demand"] }],
+        providedFields: { demand: [] }
+      })
+    ).toEqual({
+      ok: false,
+      reason: "required_fields_missing",
+      missingFields: ["demand"]
+    });
+
+    expect(
+      decide({
+        transitionRules: [{ ...rule, requiredFields: ["demand"] }],
+        providedFields: { demand: [{ positionId: "position-engineer", requiredHours: 80 }] }
+      })
+    ).toMatchObject({ ok: true });
+  });
+
   it("requires the permission named by the transition rule", () => {
     expect(
       decide({
