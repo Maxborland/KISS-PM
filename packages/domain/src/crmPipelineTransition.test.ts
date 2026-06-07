@@ -104,6 +104,26 @@ describe("CRM pipeline transition decisions", () => {
     ).toMatchObject({ ok: true });
   });
 
+  it("requires configured fields to be own properties", () => {
+    expect(
+      decide({
+        transitionRules: [{ ...rule, requiredFields: ["constructor"] }],
+        providedFields: {}
+      })
+    ).toEqual({
+      ok: false,
+      reason: "required_fields_missing",
+      missingFields: ["constructor"]
+    });
+
+    expect(
+      decide({
+        transitionRules: [{ ...rule, requiredFields: ["constructor"] }],
+        providedFields: { constructor: "provided" }
+      })
+    ).toMatchObject({ ok: true });
+  });
+
   it("treats empty array required fields as missing", () => {
     expect(
       decide({

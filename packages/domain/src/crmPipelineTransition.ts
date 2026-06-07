@@ -89,7 +89,7 @@ export function decideCrmPipelineTransition(
   }
 
   const missingFields = activeRule.requiredFields.filter(
-    (fieldKey) => !hasRequiredValue(input.providedFields[fieldKey])
+    (fieldKey) => !hasRequiredField(input.providedFields, fieldKey)
   );
   if (missingFields.length > 0) {
     return { ok: false, reason: "required_fields_missing", missingFields };
@@ -116,6 +116,13 @@ export function decideCrmPipelineTransition(
 
 function hasText(value: string | null): boolean {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function hasRequiredField(fields: Record<string, unknown>, fieldKey: string): boolean {
+  return (
+    Object.prototype.hasOwnProperty.call(fields, fieldKey) &&
+    hasRequiredValue(fields[fieldKey])
+  );
 }
 
 function hasRequiredValue(value: unknown): boolean {
