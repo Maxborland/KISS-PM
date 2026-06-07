@@ -1799,17 +1799,37 @@ describe("project work API routes", () => {
 
   it("serializes project pause and resume with tenant planning mutations", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
-    let pendingPause: Promise<Response> | undefined;
+    const lockClient = createPostgresClient(databaseUrl);
+    let releaseLock: (() => void) | undefined;
+    let resolveLockReady: (() => void) | undefined;
+    let rejectLockReady: ((error: unknown) => void) | undefined;
+    const lockReleased = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    const lockReady = new Promise<void>((resolve, reject) => {
+      resolveLockReady = resolve;
+      rejectLockReady = reject;
+    });
 
-    await client.begin(async (transaction) => {
-      await transaction`
-        SELECT pg_advisory_xact_lock(
-          hashtext('tenant-alpha'),
-          hashtext('kiss_pm_resource_planning')
-        )
-      `;
+    const lockTransaction = lockClient
+      .begin(async (transaction) => {
+        await transaction`
+          SELECT pg_advisory_xact_lock(
+            hashtext('tenant-alpha'),
+            hashtext('kiss_pm_resource_planning')
+          )
+        `;
+        resolveLockReady?.();
+        await lockReleased;
+      })
+      .catch((error: unknown) => {
+        rejectLockReady?.(error);
+        throw error;
+      });
 
-      pendingPause = Promise.resolve(app.request("/api/workspace/projects/project-alpha/status", {
+    try {
+      await lockReady;
+      const pendingPause = Promise.resolve(app.request("/api/workspace/projects/project-alpha/status", {
         method: "PATCH",
         headers: {
           "content-type": "application/json",
@@ -1825,17 +1845,19 @@ describe("project work API routes", () => {
       ]);
 
       expect(earlyResult).toBe("waiting");
-    });
+      releaseLock?.();
+      await lockTransaction;
 
-    if (!pendingPause) {
-      throw new Error("expected pause request to start");
+      const pauseResponse = await pendingPause;
+      expect(pauseResponse.status).toBe(200);
+      await expect(pauseResponse.json()).resolves.toMatchObject({
+        project: { id: "project-alpha", status: "paused" }
+      });
+    } finally {
+      releaseLock?.();
+      await lockTransaction.catch(() => undefined);
+      await lockClient.end();
     }
-
-    const pauseResponse = await pendingPause;
-    expect(pauseResponse.status).toBe(200);
-    await expect(pauseResponse.json()).resolves.toMatchObject({
-      project: { id: "project-alpha", status: "paused" }
-    });
   });
 
   it("requires project manage permission and rejects non active-paused lifecycle transitions", async () => {
