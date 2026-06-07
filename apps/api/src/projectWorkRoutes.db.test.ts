@@ -1615,6 +1615,13 @@ describe("project work API routes", () => {
         body: JSON.stringify({ statusId: "task-status-in-progress" })
       }
     );
+    const archiveOnPaused = await app.request("/api/workspace/tasks/task-paused-project", {
+      method: "DELETE",
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      }
+    });
     const resumed = await app.request("/api/workspace/projects/project-alpha/status", {
       method: "PATCH",
       headers: {
@@ -1623,6 +1630,13 @@ describe("project work API routes", () => {
         cookie: adminCookie
       },
       body: JSON.stringify({ status: "active" })
+    });
+    const archiveOnActive = await app.request("/api/workspace/tasks/task-paused-project", {
+      method: "DELETE",
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      }
     });
     const audit = await app.request("/api/tenant/current/audit-events", {
       headers: { cookie: adminCookie }
@@ -1647,9 +1661,15 @@ describe("project work API routes", () => {
     await expect(updateOnPaused.json()).resolves.toEqual({ error: "project_not_found" });
     expect(transitionOnPaused.status).toBe(404);
     await expect(transitionOnPaused.json()).resolves.toEqual({ error: "project_not_found" });
+    expect(archiveOnPaused.status).toBe(404);
+    await expect(archiveOnPaused.json()).resolves.toEqual({ error: "project_not_found" });
     expect(resumed.status).toBe(200);
     await expect(resumed.json()).resolves.toMatchObject({
       project: { id: "project-alpha", status: "active" }
+    });
+    expect(archiveOnActive.status).toBe(200);
+    await expect(archiveOnActive.json()).resolves.toMatchObject({
+      task: { id: "task-paused-project", projectId: "project-alpha" }
     });
     await expect(audit.json()).resolves.toMatchObject({
       auditEvents: expect.arrayContaining([
