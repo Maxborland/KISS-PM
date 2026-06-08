@@ -1,0 +1,359 @@
+import { describe, expect, it } from "vitest";
+
+import type { Permission } from "@kiss-pm/access-control";
+import type { ControlSignal, CorrectiveAction } from "@kiss-pm/domain";
+import type { TaskRecord } from "@kiss-pm/persistence";
+
+import { createApp } from "./app";
+import type { ApiTenantDataSource, AuditEventListItem, ProjectRecord } from "./apiTypes";
+
+const sessionCookie =
+  "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+const operationalQueuePermissions: Permission[] = [
+  "tenant.projects.read",
+  "tenant.control_signals.read",
+  "tenant.audit_events.read"
+];
+
+describe("operational control queue API", () => {
+  it("returns an empty operational control queue for a tenant with no active signals", async () => {
+    const fixture = createOperationalQueueFixture({ projects: [] });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      asOf: "2026-06-10T00:00:00.000Z",
+      limit: 10,
+      items: []
+    });
+  });
+
+  it("fails closed before loading the queue without audit permission", async () => {
+    const fixture = createOperationalQueueFixture({
+      permissions: ["tenant.projects.read", "tenant.control_signals.read"],
+      projects: [createProject("project-alpha")]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(fixture.loadedQueueData).toBe(false);
+  });
+
+  it("keeps queue items isolated to the actor tenant", async () => {
+    const fixture = createOperationalQueueFixture({
+      projects: [
+        createProject("project-alpha"),
+        createProject("project-beta", { tenantId: "tenant-other" })
+      ],
+      signalsByProject: {
+        "project-alpha": [createSignal("signal-alpha", "project-alpha")],
+        "project-beta": [createSignal("signal-beta", "project-beta", { tenantId: "tenant-other" })]
+      }
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<Record<string, unknown>> };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({
+      id: "control-signal:project-alpha:signal-alpha",
+      tenantId: "tenant-control",
+      project: { id: "project-alpha" },
+      source: { entityType: "ControlSignal", entityId: "signal-alpha" }
+    });
+  });
+
+  it("returns sorted and limited signals from control, corrective, status, overdue, and audit inputs", async () => {
+    const project = createProject("project-alpha", {
+      plannedFinish: new Date("2026-06-08T00:00:00.000Z")
+    });
+    const criticalSignal = createSignal("signal-critical", project.id, {
+      severity: "critical",
+      sourceMetric: "resource_overload_minutes",
+      updatedAt: "2026-06-07T12:00:00.000Z"
+    });
+    const fixture = createOperationalQueueFixture({
+      projects: [project],
+      tasksByProject: {
+        [project.id]: [
+          createTask("task-overdue", project.id, {
+            priority: "critical",
+            plannedFinish: new Date("2026-06-04T00:00:00.000Z"),
+            updatedAt: new Date("2026-06-06T00:00:00.000Z")
+          }),
+          createTask("task-waiting", project.id, {
+            status: "waiting",
+            statusCategory: "waiting",
+            statusName: "Waiting on client",
+            priority: "high",
+            plannedFinish: new Date("2026-06-12T00:00:00.000Z")
+          })
+        ]
+      },
+      signalsByProject: { [project.id]: [criticalSignal] },
+      correctiveActionsByProject: {
+        [project.id]: [
+          createCorrectiveAction("corrective-overdue", project.id, criticalSignal.id, {
+            dueDate: "2026-06-03"
+          })
+        ]
+      },
+      auditEvents: [
+        createAuditEvent("audit-failed", {
+          sourceEntity: { type: "Project", id: project.id },
+          actionType: "planning.apply_failed",
+          executionResult: { status: "failed" },
+          createdAt: new Date("2026-06-09T00:00:00.000Z")
+        })
+      ]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=3",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { limit: number; items: Array<{ id: string }> };
+    expect(body.limit).toBe(3);
+    expect(body.items.map((item) => item.id)).toEqual([
+      "corrective-action:project-alpha:corrective-overdue",
+      "task-overdue:project-alpha:task-overdue",
+      "project-overdue:project-alpha"
+    ]);
+    expect(body.items[0]).toMatchObject({
+      signalKind: "corrective_action",
+      severity: "critical",
+      priority: "critical",
+      dueDate: "2026-06-03",
+      overdue: true,
+      reason: "Corrective action is overdue: corrective-overdue",
+      sourceTimestamps: { dueAt: "2026-06-03" }
+    });
+  });
+
+  it("documents the operational control queue route in OpenAPI", async () => {
+    const app = createApp();
+
+    const response = await app.request("/api/openapi.json");
+
+    expect(response.status).toBe(200);
+    const document = await response.json() as {
+      paths: Record<string, Record<string, unknown>>;
+    };
+    const route = document.paths["/api/tenant/current/operational-control-queue"];
+
+    expect(route).toBeDefined();
+    expect(route?.get).toMatchObject({
+      summary: "Read operational control queue"
+    });
+  });
+});
+
+function authHeaders() {
+  return { cookie: sessionCookie };
+}
+
+type OperationalQueueFixtureInput = {
+  permissions?: Permission[];
+  projects?: ProjectRecord[];
+  tasksByProject?: Record<string, TaskRecord[]>;
+  signalsByProject?: Record<string, ControlSignal[]>;
+  correctiveActionsByProject?: Record<string, CorrectiveAction[]>;
+  auditEvents?: AuditEventListItem[];
+};
+
+function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
+  let loadedQueueData = false;
+  const dataSource: Partial<ApiTenantDataSource> = {
+    async listDevUsers() {
+      return [];
+    },
+    async findUserById(userId) {
+      return userId === "user-control"
+        ? {
+            id: "user-control",
+            tenantId: "tenant-control",
+            name: "Control User",
+            accessProfileId: "control-profile"
+          }
+        : undefined;
+    },
+    async findAccessProfileById() {
+      return {
+        id: "control-profile",
+        permissions: input.permissions ?? operationalQueuePermissions
+      };
+    },
+    async findSessionByTokenHash() {
+      return {
+        id: "session-control",
+        tenantId: "tenant-control",
+        userId: "user-control",
+        tokenHash: "ignored",
+        expiresAt: new Date("2026-07-01T00:00:00.000Z")
+      };
+    },
+    async listProjects() {
+      loadedQueueData = true;
+      return input.projects ?? [];
+    },
+    async listProjectTasks(_tenantId, projectId) {
+      loadedQueueData = true;
+      return input.tasksByProject?.[projectId] ?? [];
+    },
+    async listControlSignals(_tenantId, projectId) {
+      loadedQueueData = true;
+      return input.signalsByProject?.[projectId] ?? [];
+    },
+    async listCorrectiveActions(_tenantId, projectId) {
+      loadedQueueData = true;
+      return input.correctiveActionsByProject?.[projectId] ?? [];
+    },
+    async listAuditEventsByTenantId() {
+      loadedQueueData = true;
+      return input.auditEvents ?? [];
+    }
+  };
+
+  return {
+    dataSource: dataSource as ApiTenantDataSource,
+    get loadedQueueData() {
+      return loadedQueueData;
+    }
+  };
+}
+
+function createProject(id: string, overrides: Partial<ProjectRecord> = {}): ProjectRecord {
+  return {
+    id,
+    tenantId: "tenant-control",
+    sourceType: "manual",
+    sourceOpportunityId: null,
+    clientId: null,
+    projectTypeId: null,
+    title: `Project ${id}`,
+    clientName: "Control client",
+    status: "active",
+    plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+    plannedFinish: new Date("2026-06-30T00:00:00.000Z"),
+    contractValue: 0,
+    plannedHours: 0,
+    templateId: null,
+    createdAt: new Date("2026-06-01T00:00:00.000Z"),
+    activatedAt: new Date("2026-06-01T00:00:00.000Z"),
+    closedAt: null,
+    demand: [],
+    ...overrides
+  };
+}
+
+function createTask(id: string, projectId: string, overrides: Partial<TaskRecord> = {}): TaskRecord {
+  return {
+    id,
+    tenantId: "tenant-control",
+    projectId,
+    stageId: null,
+    title: `Task ${id}`,
+    description: null,
+    status: "in_progress",
+    statusId: "task-status-in-progress",
+    statusName: "In progress",
+    statusCategory: "in_progress",
+    priority: "normal",
+    requesterUserId: "user-control",
+    ownerUserId: "user-control",
+    plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+    plannedFinish: new Date("2026-06-30T00:00:00.000Z"),
+    durationWorkingDays: 1,
+    plannedWork: 1,
+    actualWork: 0,
+    progress: 0,
+    requiresAcceptance: false,
+    source: "manual",
+    createdAt: new Date("2026-06-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-06-01T00:00:00.000Z"),
+    archivedAt: null,
+    participants: [],
+    ...overrides
+  };
+}
+
+function createSignal(id: string, projectId: string, overrides: Partial<ControlSignal> = {}): ControlSignal {
+  return {
+    id,
+    tenantId: "tenant-control",
+    projectId,
+    sourceEntity: { type: "Project", id: projectId },
+    sourceMetric: "deadline_delta_days",
+    evaluationId: null,
+    severity: "warning",
+    explanation: `Signal ${id}`,
+    ownerUserId: null,
+    allowedActions: ["create_corrective_action"],
+    scenarioProposals: [],
+    status: "open",
+    createdAt: "2026-06-05T00:00:00.000Z",
+    updatedAt: "2026-06-05T00:00:00.000Z",
+    ...overrides
+  };
+}
+
+function createCorrectiveAction(
+  id: string,
+  projectId: string,
+  controlSignalId: string,
+  overrides: Partial<CorrectiveAction> = {}
+): CorrectiveAction {
+  return {
+    id,
+    tenantId: "tenant-control",
+    projectId,
+    controlSignalId,
+    title: id,
+    description: null,
+    responsibleUserId: null,
+    dueDate: null,
+    status: "open",
+    result: null,
+    ...overrides
+  };
+}
+
+function createAuditEvent(id: string, overrides: Partial<AuditEventListItem> = {}): AuditEventListItem {
+  return {
+    id,
+    tenantId: "tenant-control",
+    actorUserId: "user-control",
+    actionType: "control.action_denied",
+    sourceSurfaceId: null,
+    sourceWorkflow: "control",
+    sourceEntity: { type: "Project", id: "project-alpha" },
+    input: {},
+    beforeState: null,
+    afterState: null,
+    permissionResult: { allowed: false, reason: "permission_missing" },
+    executionResult: { status: "denied" },
+    correlationId: `correlation-${id}`,
+    createdAt: new Date("2026-06-05T00:00:00.000Z"),
+    ...overrides
+  };
+}
