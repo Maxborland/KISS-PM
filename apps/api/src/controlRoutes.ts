@@ -1295,7 +1295,7 @@ function queueItemsForControlSignals(
   signals: ControlSignal[]
 ): OperationalControlQueueSortItem[] {
   return signals
-    .filter((signal) => signal.status !== "resolved")
+    .filter((signal) => signal.status !== "resolved" && signal.status !== "accepted_risk")
     .map((signal) => withQueueSort({
       id: `control-signal:${project.id}:${signal.id}`,
       tenantId: signal.tenantId,

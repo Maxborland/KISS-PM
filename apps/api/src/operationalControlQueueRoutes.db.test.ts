@@ -135,6 +135,42 @@ describe("operational control queue API DB", () => {
     expect(body.items.some((item) => item.id.includes("signal-resolved"))).toBe(false);
   });
 
+  it("excludes persisted accepted-risk control signals from the attention queue", async () => {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    await dataSource.upsertControlSignal({
+      id: "signal-accepted-risk",
+      tenantId: "tenant-alpha",
+      projectId: "project-alpha",
+      sourceEntity: { type: "Project", id: "project-alpha" },
+      sourceMetric: "baseline_finish_slip_days",
+      evaluationId: null,
+      severity: "critical",
+      explanation: "Accepted persisted risk",
+      ownerUserId: null,
+      allowedActions: [],
+      scenarioProposals: [],
+      status: "accepted_risk",
+      createdAt: "2026-06-04T00:00:00.000Z",
+      updatedAt: "2026-06-04T00:00:00.000Z"
+    });
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: { cookie } }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string }> };
+    expect(body.items.map((item) => item.id)).toEqual([
+      "corrective-action:project-alpha:action-overdue",
+      "project-overdue:project-alpha",
+      "control-signal:project-alpha:signal-critical",
+      "audit-event:project-alpha:audit-denied"
+    ]);
+    expect(body.items.some((item) => item.id.includes("signal-accepted-risk"))).toBe(false);
+  });
+
   it("does not lose older actionable audit events behind newer successes", async () => {
     const dataSource = createPostgresTenantDataSource(createDatabase(client));
     for (let index = 0; index < 100; index += 1) {

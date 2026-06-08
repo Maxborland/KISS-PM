@@ -80,6 +80,41 @@ describe("operational control queue API", () => {
     });
   });
 
+  it("excludes accepted-risk control signals from the attention queue", async () => {
+    const project = createProject("project-alpha");
+    const openSignal = createSignal("signal-open", project.id, {
+      status: "open",
+      severity: "critical"
+    });
+    const acceptedRiskSignal = createSignal("signal-accepted-risk", project.id, {
+      status: "accepted_risk",
+      severity: "critical",
+      explanation: "Accepted risk should not require operational attention"
+    });
+    const fixture = createOperationalQueueFixture({
+      projects: [project],
+      signalsByProject: { [project.id]: [openSignal, acceptedRiskSignal] }
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string; status: { value: string } }> };
+    expect(body.items.map((item) => item.id)).toEqual([
+      "control-signal:project-alpha:signal-open"
+    ]);
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        id: "control-signal:project-alpha:signal-open",
+        status: { value: "open" }
+      })
+    ]);
+  });
+
   it("resolves audit events sourced from control signals and corrective actions", async () => {
     const project = createProject("project-alpha");
     const signal = createSignal("signal-review", project.id, {
