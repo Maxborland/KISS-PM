@@ -1,0 +1,126 @@
+import { describe, expect, it } from "vitest";
+
+import type { PlanSnapshot } from "@kiss-pm/domain";
+
+import { createPlanningReadModel } from "./planningReadModel";
+
+describe("planning read model", () => {
+  it("compares resource drift with effective work for implicit assignments", () => {
+    const readModel = createPlanningReadModel({
+      ...createSnapshot(),
+      tasks: [
+        {
+          ...createTask(),
+          workMinutes: 960,
+          durationMinutes: 960
+        }
+      ],
+      assignments: [
+        {
+          id: "assignment-alpha",
+          taskId: "task-alpha",
+          resourceId: "resource-alpha",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: null,
+          calendarId: null
+        }
+      ],
+      baselines: [
+        {
+          id: "baseline-alpha",
+          capturedAt: "2026-05-21T00:00:00.000Z",
+          tasks: [
+            {
+              taskId: "task-alpha",
+              plannedStart: "2026-06-01",
+              plannedFinish: "2026-06-01",
+              workMinutes: 480
+            }
+          ],
+          assignments: [
+            {
+              assignmentId: "assignment-alpha",
+              taskId: "task-alpha",
+              resourceId: "resource-alpha",
+              workMinutes: null
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(readModel.baselineComparison.resources).toEqual([
+      {
+        resourceId: "resource-alpha",
+        status: "changed",
+        baselineWorkMinutes: 480,
+        currentWorkMinutes: 960,
+        workDeltaMinutes: 480
+      }
+    ]);
+  });
+});
+
+function createSnapshot(): PlanSnapshot {
+  return {
+    tenantId: "tenant-alpha",
+    projectId: "project-alpha",
+    planVersion: 1,
+    project: {
+      id: "project-alpha",
+      sourceType: "opportunity",
+      sourceOpportunityId: "opportunity-alpha",
+      plannedStart: "2026-06-01",
+      plannedFinish: "2026-06-30",
+      deadline: "2026-06-30",
+      calendarId: "calendar-default"
+    },
+    tasks: [createTask()],
+    assignments: [],
+    assignmentAllocations: [],
+    dependencies: [],
+    baselines: [],
+    calendars: [
+      {
+        id: "calendar-default",
+        workingWeekdays: [1, 2, 3, 4, 5],
+        workingMinutesPerDay: 480
+      }
+    ],
+    calendarExceptions: [],
+    resources: [
+      {
+        id: "resource-alpha",
+        userId: "user-alpha",
+        positionId: "engineer",
+        teamId: null,
+        name: "Alpha",
+        calendarId: "calendar-default"
+      }
+    ],
+    reservations: [],
+    constraints: [],
+    capturedAt: "2026-05-21T00:00:00.000Z"
+  };
+}
+
+function createTask() {
+  return {
+    id: "task-alpha",
+    parentTaskId: null,
+    wbsCode: "1",
+    title: "Task alpha",
+    statusId: "todo",
+    schedulingMode: "auto" as const,
+    taskType: "fixed_work" as const,
+    effortDriven: false,
+    plannedStart: "2026-06-01",
+    plannedFinish: "2026-06-01",
+    durationMinutes: 480,
+    workMinutes: 480,
+    percentComplete: 0,
+    calendarId: "calendar-default",
+    constraint: null
+  };
+}

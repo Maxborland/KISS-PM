@@ -2,6 +2,7 @@ import {
   buildResourceLoadMatrix,
   calculatePlan,
   comparePlanDates,
+  resolveEffectiveAssignmentWork,
   diffCalendarDays,
   type PlanSnapshot
 } from "@kiss-pm/domain";
@@ -66,6 +67,7 @@ export function createBaselineComparison(
   }
 
   const calculatedTasksById = new Map(calculatedPlan.tasks.map((task) => [task.id, task]));
+  const baselineTasksById = new Map(baseline.tasks.map((task) => [task.taskId, task]));
   return {
     baselineId: baseline.id,
     capturedAt: baseline.capturedAt,
@@ -89,7 +91,12 @@ export function createBaselineComparison(
       };
     }),
     assignments: createBaselineAssignmentComparison(baseline.assignments, snapshot.assignments),
-    resources: createBaselineResourceComparison(baseline.assignments, snapshot.assignments)
+    resources: createBaselineResourceComparison(
+      baseline.assignments,
+      snapshot.assignments,
+      baselineTasksById,
+      calculatedTasksById
+    )
   };
 }
 
@@ -140,13 +147,28 @@ function createBaselineAssignmentComparison(
 
 function createBaselineResourceComparison(
   baselineAssignments: BaselineAssignmentSnapshot[],
-  currentAssignments: CurrentAssignmentSnapshot[]
+  currentAssignments: CurrentAssignmentSnapshot[],
+  baselineTasksById: Map<string, PlanSnapshot["baselines"][number]["tasks"][number]>,
+  calculatedTasksById: Map<string, ReturnType<typeof calculatePlan>["tasks"][number]>
 ) {
-  const baselineWorkByResource = aggregateWorkByResource(baselineAssignments);
+  const baselineWorkByResource = aggregateWorkByResource(
+    baselineAssignments.map((assignment) => ({
+      resourceId: assignment.resourceId,
+      workMinutes: resolveBaselineAssignmentWork(
+        assignment,
+        currentAssignments,
+        baselineTasksById.get(assignment.taskId)?.workMinutes ?? 0
+      )
+    }))
+  );
   const currentWorkByResource = aggregateWorkByResource(
     currentAssignments.map((assignment) => ({
       resourceId: assignment.resourceId,
-      workMinutes: assignment.workMinutes
+      workMinutes: resolveEffectiveAssignmentWork(
+        currentAssignments,
+        assignment,
+        calculatedTasksById.get(assignment.taskId)?.workMinutes ?? 0
+      )
     }))
   );
   return [...new Set([...baselineWorkByResource.keys(), ...currentWorkByResource.keys()])]
@@ -189,15 +211,30 @@ function workComparisonStatus(
   return baselineWorkMinutes === currentWorkMinutes ? "unchanged" : "changed";
 }
 
-function aggregateWorkByResource(assignments: Array<{ resourceId: string; workMinutes: number | null }>) {
-  const workByResource = new Map<string, number | null>();
+function resolveBaselineAssignmentWork(
+  assignment: BaselineAssignmentSnapshot,
+  currentAssignments: CurrentAssignmentSnapshot[],
+  baselineTaskWorkMinutes: number
+): number {
+  if (assignment.workMinutes !== null) return assignment.workMinutes;
+
+  const currentAssignment = currentAssignments.find((candidate) => candidate.id === assignment.assignmentId);
+  if (!currentAssignment) return baselineTaskWorkMinutes;
+
+  return resolveEffectiveAssignmentWork(
+    currentAssignments,
+    currentAssignment,
+    baselineTaskWorkMinutes
+  );
+}
+
+function aggregateWorkByResource(assignments: Array<{ resourceId: string; workMinutes: number }>) {
+  const workByResource = new Map<string, number>();
   for (const assignment of assignments) {
     const existing = workByResource.has(assignment.resourceId) ? workByResource.get(assignment.resourceId)! : 0;
     workByResource.set(
       assignment.resourceId,
-      existing === null || assignment.workMinutes === null
-        ? null
-        : existing + assignment.workMinutes
+      existing + assignment.workMinutes
     );
   }
   return workByResource;

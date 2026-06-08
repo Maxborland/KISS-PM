@@ -242,7 +242,7 @@ function calculateTaskLoadForDate(
       capacityMinutes: taskWorkingOverlapForDate(task, taskDate, calendar, calendarExceptions)
     }));
     const totalCapacity = capacities.reduce((total, item) => total + item.capacityMinutes, 0);
-    const assignmentWork = resolveAssignmentWork(input.assignments, assignment, task.workMinutes);
+    const assignmentWork = resolveEffectiveAssignmentWork(input.assignments, assignment, task.workMinutes);
     if (totalCapacity <= 0) {
       if (date === task.calculatedStart && assignmentWork > 0) {
         assignedMinutes += assignmentWork;
@@ -322,7 +322,7 @@ function taskWorkingOverlapForDate(
   return diffWorkingMinutes(overlapStart, overlapFinish, calendar, calendarExceptions);
 }
 
-function resolveAssignmentWork(
+export function resolveEffectiveAssignmentWork(
   assignments: PlanAssignment[],
   assignment: PlanAssignment,
   taskWorkMinutes: number
