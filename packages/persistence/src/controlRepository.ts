@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 
 import type {
   ControlSignal,
@@ -44,9 +44,11 @@ export type ControlRepository = {
   createKpiEvaluation(input: KpiEvaluation): Promise<KpiEvaluation>;
   listKpiEvaluations(tenantId: string, projectId: string): Promise<KpiEvaluation[]>;
   upsertControlSignal(input: ControlSignal): Promise<ControlSignal>;
+  listControlSignalsForProjects(tenantId: string, projectIds: string[]): Promise<ControlSignal[]>;
   listControlSignals(tenantId: string, projectId: string): Promise<ControlSignal[]>;
   createCorrectiveAction(input: CorrectiveAction): Promise<CorrectiveAction>;
   updateCorrectiveAction(input: CorrectiveAction): Promise<CorrectiveAction>;
+  listCorrectiveActionsForProjects(tenantId: string, projectIds: string[]): Promise<CorrectiveAction[]>;
   listCorrectiveActions(tenantId: string, projectId: string): Promise<CorrectiveAction[]>;
   createActionExecution(input: ActionExecutionInput): Promise<ActionExecutionRecord>;
   listActionExecutions(tenantId: string, projectId: string): Promise<ActionExecutionRecord[]>;
@@ -172,6 +174,15 @@ export function createControlRepository(db: KissPmDatabase): ControlRepository {
       if (!row) throw new Error("Control signal upsert returned no row");
       return mapControlSignal(row);
     },
+    async listControlSignalsForProjects(tenantId, projectIds) {
+      if (projectIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(controlSignals)
+        .where(and(eq(controlSignals.tenantId, tenantId), inArray(controlSignals.projectId, projectIds)))
+        .orderBy(desc(controlSignals.createdAt), asc(controlSignals.id));
+      return rows.map(mapControlSignal);
+    },
     async listControlSignals(tenantId, projectId) {
       const rows = await db
         .select()
@@ -211,6 +222,15 @@ export function createControlRepository(db: KissPmDatabase): ControlRepository {
         .returning();
       if (!row) throw new Error("Corrective action update returned no row");
       return mapCorrectiveAction(row);
+    },
+    async listCorrectiveActionsForProjects(tenantId, projectIds) {
+      if (projectIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(correctiveActions)
+        .where(and(eq(correctiveActions.tenantId, tenantId), inArray(correctiveActions.projectId, projectIds)))
+        .orderBy(desc(correctiveActions.createdAt), asc(correctiveActions.id));
+      return rows.map(mapCorrectiveAction);
     },
     async listCorrectiveActions(tenantId, projectId) {
       const rows = await db

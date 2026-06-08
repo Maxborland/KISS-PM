@@ -161,6 +161,7 @@ export type ProjectWorkRepository = {
     tenantId: TenantId,
     statusId: string
   ): Promise<TaskStatusRecord | undefined>;
+  listProjectTasksForProjects(tenantId: TenantId, projectIds: string[]): Promise<TaskRecord[]>;
   listProjectTasks(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
   findTaskById(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
@@ -390,6 +391,23 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
         .returning();
 
       return row ? mapTaskStatusRecord(row) : undefined;
+    },
+    async listProjectTasksForProjects(tenantId, projectIds) {
+      if (projectIds.length === 0) return [];
+      const rows = await db
+        .select({ task: tasks, status: taskStatuses })
+        .from(tasks)
+        .leftJoin(
+          taskStatuses,
+          and(
+            eq(taskStatuses.tenantId, tasks.tenantId),
+            eq(taskStatuses.id, tasks.statusId)
+          )
+        )
+        .where(and(eq(tasks.tenantId, tenantId), inArray(tasks.projectId, projectIds), isNull(tasks.archivedAt)))
+        .orderBy(desc(tasks.createdAt), desc(tasks.id));
+
+      return hydrateTasks(tenantId, rows);
     },
     async listProjectTasks(tenantId, projectId) {
       const rows = await db

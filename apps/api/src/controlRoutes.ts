@@ -93,9 +93,9 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     if (
       !deps.dataSource.listProjects ||
-      !deps.dataSource.listProjectTasks ||
-      !deps.dataSource.listControlSignals ||
-      !deps.dataSource.listCorrectiveActions ||
+      !deps.dataSource.listProjectTasksForProjects ||
+      !deps.dataSource.listControlSignalsForProjects ||
+      !deps.dataSource.listCorrectiveActionsForProjects ||
       !deps.dataSource.listAuditEventsByTenantId
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
@@ -1136,33 +1136,47 @@ async function buildOperationalControlQueue(input: {
   const signalById = new Map<string, ControlSignal>();
   const signalProjectById = new Map<string, string>();
   const correctiveActionProjectById = new Map<string, string>();
+  const projectIds = projects.map((project) => project.id);
+
+  const [tasks, signals, correctiveActions] = await Promise.all([
+    input.dataSource.listProjectTasksForProjects?.(input.tenantId, projectIds) ?? Promise.resolve([]),
+    input.dataSource.listControlSignalsForProjects?.(input.tenantId, projectIds) ?? Promise.resolve([]),
+    input.dataSource.listCorrectiveActionsForProjects?.(input.tenantId, projectIds) ?? Promise.resolve([])
+  ]);
+  const activeProjectIds = new Set(projectIds);
+  const tasksByProject = new Map<string, TaskRecord[]>();
+  for (const task of tasks) {
+    if (task.tenantId !== input.tenantId || !activeProjectIds.has(task.projectId)) continue;
+    allTasks.push(task);
+    const projectTasks = tasksByProject.get(task.projectId) ?? [];
+    projectTasks.push(task);
+    tasksByProject.set(task.projectId, projectTasks);
+  }
+  const signalsByProject = new Map<string, ControlSignal[]>();
+  for (const signal of signals) {
+    if (signal.tenantId !== input.tenantId || !activeProjectIds.has(signal.projectId)) continue;
+    signalById.set(signal.id, signal);
+    signalProjectById.set(signal.id, signal.projectId);
+    const projectSignals = signalsByProject.get(signal.projectId) ?? [];
+    projectSignals.push(signal);
+    signalsByProject.set(signal.projectId, projectSignals);
+  }
+  const correctiveActionsByProject = new Map<string, CorrectiveAction[]>();
+  for (const action of correctiveActions) {
+    if (action.tenantId !== input.tenantId || !activeProjectIds.has(action.projectId)) continue;
+    correctiveActionProjectById.set(action.id, action.projectId);
+    const projectActions = correctiveActionsByProject.get(action.projectId) ?? [];
+    projectActions.push(action);
+    correctiveActionsByProject.set(action.projectId, projectActions);
+  }
 
   for (const project of projects) {
-    const [tasks, signals, correctiveActions] = await Promise.all([
-      input.dataSource.listProjectTasks?.(input.tenantId, project.id) ?? Promise.resolve([]),
-      input.dataSource.listControlSignals?.(input.tenantId, project.id) ?? Promise.resolve([]),
-      input.dataSource.listCorrectiveActions?.(input.tenantId, project.id) ?? Promise.resolve([])
-    ]);
-    const tenantTasks = tasks.filter((task) => task.tenantId === input.tenantId && task.projectId === project.id);
-    allTasks.push(...tenantTasks);
-    const tenantSignals = signals.filter(
-      (signal) => signal.tenantId === input.tenantId && signal.projectId === project.id
-    );
-    for (const signal of tenantSignals) {
-      signalById.set(signal.id, signal);
-      signalProjectById.set(signal.id, signal.projectId);
-    }
-    const tenantCorrectiveActions = correctiveActions.filter(
-      (action) => action.tenantId === input.tenantId && action.projectId === project.id
-    );
-    for (const action of tenantCorrectiveActions) correctiveActionProjectById.set(action.id, action.projectId);
-
     items.push(...queueItemsForProject(project, input.asOf));
-    items.push(...queueItemsForTasks(project, tenantTasks, input.asOf));
-    items.push(...queueItemsForControlSignals(project, tenantSignals));
+    items.push(...queueItemsForTasks(project, tasksByProject.get(project.id) ?? [], input.asOf));
+    items.push(...queueItemsForControlSignals(project, signalsByProject.get(project.id) ?? []));
     items.push(...queueItemsForCorrectiveActions(
       project,
-      tenantCorrectiveActions,
+      correctiveActionsByProject.get(project.id) ?? [],
       signalById,
       input.asOf
     ));

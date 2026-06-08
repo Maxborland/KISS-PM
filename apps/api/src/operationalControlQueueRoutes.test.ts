@@ -407,6 +407,37 @@ describe("operational control queue API", () => {
     });
   });
 
+  it("uses batched project queue reads instead of per-project fan-out", async () => {
+    const projects = Array.from({ length: 25 }, (_, index) => createProject(`project-${index}`));
+    const firstProject = projects[0]!;
+    const fixture = createOperationalQueueFixture({
+      projects,
+      signalsByProject: {
+        [firstProject.id]: [createSignal("signal-critical", firstProject.id, { severity: "critical" })]
+      }
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=1",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string }> };
+    expect(body.items).toEqual([
+      expect.objectContaining({ id: "control-signal:project-0:signal-critical" })
+    ]);
+    expect(fixture.dataReadCalls).toMatchObject({
+      projectTaskBatches: 1,
+      controlSignalBatches: 1,
+      correctiveActionBatches: 1,
+      projectTasksByProject: 0,
+      controlSignalsByProject: 0,
+      correctiveActionsByProject: 0
+    });
+  });
+
   it("documents the operational control queue route in OpenAPI", async () => {
     const app = createApp();
 
@@ -438,9 +469,32 @@ type OperationalQueueFixtureInput = {
   auditEvents?: AuditEventListItem[];
 };
 
+type OperationalQueueDataReadCalls = {
+  projectTasksByProject: number;
+  controlSignalsByProject: number;
+  correctiveActionsByProject: number;
+  projectTaskBatches: number;
+  controlSignalBatches: number;
+  correctiveActionBatches: number;
+};
+
+type OperationalQueueBatchDataSource = Partial<ApiTenantDataSource> & {
+  listProjectTasksForProjects(tenantId: string, projectIds: string[]): Promise<TaskRecord[]>;
+  listControlSignalsForProjects(tenantId: string, projectIds: string[]): Promise<ControlSignal[]>;
+  listCorrectiveActionsForProjects(tenantId: string, projectIds: string[]): Promise<CorrectiveAction[]>;
+};
+
 function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
   let loadedQueueData = false;
-  const dataSource: Partial<ApiTenantDataSource> = {
+  const dataReadCalls: OperationalQueueDataReadCalls = {
+    projectTasksByProject: 0,
+    controlSignalsByProject: 0,
+    correctiveActionsByProject: 0,
+    projectTaskBatches: 0,
+    controlSignalBatches: 0,
+    correctiveActionBatches: 0
+  };
+  const dataSource: OperationalQueueBatchDataSource = {
     async listDevUsers() {
       return [];
     },
@@ -474,16 +528,34 @@ function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
       return input.projects ?? [];
     },
     async listProjectTasks(_tenantId, projectId) {
+      dataReadCalls.projectTasksByProject += 1;
       loadedQueueData = true;
       return input.tasksByProject?.[projectId] ?? [];
     },
     async listControlSignals(_tenantId, projectId) {
+      dataReadCalls.controlSignalsByProject += 1;
       loadedQueueData = true;
       return input.signalsByProject?.[projectId] ?? [];
     },
     async listCorrectiveActions(_tenantId, projectId) {
+      dataReadCalls.correctiveActionsByProject += 1;
       loadedQueueData = true;
       return input.correctiveActionsByProject?.[projectId] ?? [];
+    },
+    async listProjectTasksForProjects(_tenantId, projectIds) {
+      dataReadCalls.projectTaskBatches += 1;
+      loadedQueueData = true;
+      return projectIds.flatMap((projectId) => input.tasksByProject?.[projectId] ?? []);
+    },
+    async listControlSignalsForProjects(_tenantId, projectIds) {
+      dataReadCalls.controlSignalBatches += 1;
+      loadedQueueData = true;
+      return projectIds.flatMap((projectId) => input.signalsByProject?.[projectId] ?? []);
+    },
+    async listCorrectiveActionsForProjects(_tenantId, projectIds) {
+      dataReadCalls.correctiveActionBatches += 1;
+      loadedQueueData = true;
+      return projectIds.flatMap((projectId) => input.correctiveActionsByProject?.[projectId] ?? []);
     },
     async listAuditEventsByTenantId(_tenantId, options) {
       loadedQueueData = true;
@@ -508,6 +580,9 @@ function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
     dataSource: dataSource as ApiTenantDataSource,
     get loadedQueueData() {
       return loadedQueueData;
+    },
+    get dataReadCalls() {
+      return { ...dataReadCalls };
     }
   };
 }

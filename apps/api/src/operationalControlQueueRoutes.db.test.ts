@@ -153,6 +153,48 @@ describe("operational control queue API DB", () => {
     expect(body.items.some((item) => item.id.includes("signal-resolved"))).toBe(false);
   });
 
+  it("returns persisted tasks, control signals, and corrective actions through the batched queue path", async () => {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    await dataSource.createTask({
+      id: "task-overdue",
+      tenantId: "tenant-alpha",
+      projectId: "project-alpha",
+      stageId: null,
+      title: "Persisted overdue task",
+      description: null,
+      status: "in_progress",
+      statusId: "task-status-in-progress",
+      statusName: "In Progress",
+      statusCategory: "in_progress",
+      priority: "critical",
+      requesterUserId: "user-admin",
+      ownerUserId: "user-admin",
+      plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+      plannedFinish: new Date("2026-06-04T00:00:00.000Z"),
+      durationWorkingDays: 1,
+      plannedWork: 1,
+      actualWork: 0,
+      progress: 0,
+      requiresAcceptance: false,
+      source: "manual",
+      participants: [{ userId: "user-admin", role: "executor" }]
+    });
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: { cookie } }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string }> };
+    expect(body.items.map((item) => item.id)).toEqual(expect.arrayContaining([
+      "task-overdue:project-alpha:task-overdue",
+      "control-signal:project-alpha:signal-critical",
+      "corrective-action:project-alpha:action-overdue"
+    ]));
+  });
+
   it("filters persisted allowedActions by actor permissions", async () => {
     const cookie = await loginAs("queue-reader@kiss-pm.local", "reader12345");
 
