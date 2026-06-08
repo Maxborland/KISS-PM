@@ -289,7 +289,7 @@ describe("project resource pool API routes", () => {
     }
   });
 
-  it("enforces resource pool permissions", async () => {
+  it("enforces resource pool permissions and audits denied replacements", async () => {
     const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
 
     const read = await app.request("/api/workspace/projects/project-alpha/resource-pool", {
@@ -307,6 +307,27 @@ describe("project resource pool API routes", () => {
 
     expect(read.status).toBe(403);
     expect(replace.status).toBe(403);
+
+    const [auditEvent] = await client`
+      SELECT action_type, source_entity, input, permission_result, execution_result
+      FROM audit_events
+      WHERE tenant_id = 'tenant-alpha' AND action_type = 'project.resource_pool_replaced'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    expect(auditEvent).toBeDefined();
+    if (!auditEvent) throw new Error("resource_pool_denied_audit_event_missing");
+    expect(auditEvent.source_entity).toEqual({ type: "Project", id: "project-alpha" });
+    expect(auditEvent.input).toEqual({ members: [] });
+    expect(auditEvent.permission_result).toMatchObject({
+      allowed: false,
+      reason: "permission_missing",
+      requiredPermission: "tenant.project_resources.manage"
+    });
+    expect(auditEvent.execution_result).toEqual({
+      status: "denied",
+      error: "permission_missing"
+    });
   });
 
   async function replacePool(cookie: string, members: Array<{ userId: string; role: string }>) {

@@ -91,6 +91,21 @@ export function registerProjectResourcePoolRoutes(
       targetTenantId: actor.tenantId
     });
     if (!permissionResult.allowed) {
+      await deps.appendManagementAuditEvent({
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: "project.resource_pool_replaced",
+        sourceWorkflow: "project_resources",
+        sourceEntity: { type: "Project", id: projectId.value },
+        commandInput: { members: parsed.value.members },
+        beforeState: null,
+        afterState: null,
+        permissionResult: {
+          ...permissionResult,
+          requiredPermission: "tenant.project_resources.manage"
+        },
+        executionResult: { status: "denied", error: permissionResult.reason }
+      });
       return context.json({ error: permissionResult.reason }, 403);
     }
 
