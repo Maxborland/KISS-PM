@@ -135,6 +135,54 @@ describe("operational control queue API DB", () => {
     expect(body.items.some((item) => item.id.includes("signal-resolved"))).toBe(false);
   });
 
+  it("does not lose older actionable audit events behind newer successes", async () => {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    for (let index = 0; index < 100; index += 1) {
+      await dataSource.appendAuditEvent({
+        id: `audit-success-${index}`,
+        tenantId: "tenant-alpha",
+        actorUserId: "user-admin",
+        actionType: "management_action.succeeded",
+        sourceSurfaceId: null,
+        sourceWorkflow: "control",
+        sourceEntity: { type: "Project", id: "project-alpha" },
+        input: { projectId: "project-alpha" },
+        beforeState: null,
+        afterState: null,
+        permissionResult: { allowed: true },
+        executionResult: { status: "succeeded" },
+        correlationId: `correlation-success-${index}`,
+        createdAt: new Date(Date.parse("2026-06-08T12:00:00.000Z") + index * 1000)
+      });
+    }
+    await dataSource.appendAuditEvent({
+      id: "audit-older-conflict",
+      tenantId: "tenant-alpha",
+      actorUserId: "user-admin",
+      actionType: "management_action.conflict",
+      sourceSurfaceId: null,
+      sourceWorkflow: "control",
+      sourceEntity: { type: "Project", id: "project-alpha" },
+      input: { projectId: "project-alpha" },
+      beforeState: null,
+      afterState: null,
+      permissionResult: { allowed: true },
+      executionResult: { status: "conflict" },
+      correlationId: "correlation-conflict",
+      createdAt: new Date("2026-06-08T09:00:00.000Z")
+    });
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=20",
+      { headers: { cookie } }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string }> };
+    expect(body.items.map((item) => item.id)).toContain("audit-event:project-alpha:audit-older-conflict");
+  });
+
   async function loginAs(email: string, password: string) {
     const response = await app.request("/api/auth/login", {
       method: "POST",

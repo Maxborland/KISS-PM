@@ -1160,7 +1160,10 @@ async function buildOperationalControlQueue(input: {
   }
 
   const taskProjectById = new Map(allTasks.map((task) => [task.id, task.projectId]));
-  const auditEvents = await input.dataSource.listAuditEventsByTenantId?.(input.tenantId, { limit: 100 }) ?? [];
+  const auditEvents = await input.dataSource.listAuditEventsByTenantId?.(input.tenantId, {
+    limit: 100,
+    requiresAttention: true
+  }) ?? [];
   items.push(...queueItemsForAuditEvents(
     auditEvents,
     projectById,
@@ -1339,9 +1342,10 @@ function queueItemsForAuditEvents(
   return auditEvents.flatMap((event) => {
     if (event.tenantId && !projectById.size) return [];
     const status = stringStatus(event.executionResult?.status);
-    const failed = status === "failed" || event.actionType.endsWith("_failed");
-    const denied = status === "denied" || event.actionType.endsWith("_denied") || event.actionType.endsWith("_conflict");
-    if (!failed && !denied) return [];
+    const failed = status === "failed" || hasAuditActionSuffix(event.actionType, "failed");
+    const denied = status === "denied" || hasAuditActionSuffix(event.actionType, "denied");
+    const conflict = status === "conflict" || hasAuditActionSuffix(event.actionType, "conflict");
+    if (!failed && !denied && !conflict) return [];
     const project = resolveAuditProject(
       event,
       projectById,
@@ -1501,6 +1505,10 @@ function compactTimestamps(input: {
 
 function stringStatus(value: unknown): string | null {
   return typeof value === "string" ? value : null;
+}
+
+function hasAuditActionSuffix(actionType: string, suffix: "failed" | "denied" | "conflict") {
+  return actionType.endsWith(`_${suffix}`) || actionType.endsWith(`.${suffix}`);
 }
 type RouteParamContext = {
   req: {

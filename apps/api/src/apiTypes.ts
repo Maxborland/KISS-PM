@@ -923,6 +923,7 @@ export type ApiTenantDataSource = {
     options?: {
       limit?: number;
       projectId?: string | null;
+      requiresAttention?: boolean;
     }
   ): Promise<AuditEventListItem[]>;
   ensureWorkspaceGeneralChannel?(input: {

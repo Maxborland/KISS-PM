@@ -54,9 +54,25 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
             event.tenantId === tenantId &&
             (!options?.projectId ||
               (event.sourceEntity.type === "Project" &&
-                event.sourceEntity.id === options.projectId))
+                event.sourceEntity.id === options.projectId)) &&
+            (!options?.requiresAttention || auditEventRequiresAttention(event))
         )
         .slice(0, options?.limit);
     }
   };
+}
+
+
+function auditEventRequiresAttention(event: { actionType: string; executionResult: Record<string, unknown> }) {
+  const status = typeof event.executionResult.status === "string" ? event.executionResult.status : null;
+  return status === "failed" ||
+    status === "denied" ||
+    status === "conflict" ||
+    hasAuditActionSuffix(event.actionType, "failed") ||
+    hasAuditActionSuffix(event.actionType, "denied") ||
+    hasAuditActionSuffix(event.actionType, "conflict");
+}
+
+function hasAuditActionSuffix(actionType: string, suffix: "failed" | "denied" | "conflict") {
+  return actionType.endsWith(`_${suffix}`) || actionType.endsWith(`.${suffix}`);
 }

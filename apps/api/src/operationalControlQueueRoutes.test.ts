@@ -133,6 +133,76 @@ describe("operational control queue API", () => {
     ]);
   });
 
+  it("includes conflict audit events in the queue", async () => {
+    const project = createProject("project-alpha");
+    const fixture = createOperationalQueueFixture({
+      projects: [project],
+      auditEvents: [
+        createAuditEvent("audit-conflict-status", {
+          sourceEntity: { type: "Project", id: project.id },
+          actionType: "management_action.apply",
+          executionResult: { status: "conflict" },
+          createdAt: new Date("2026-06-08T10:00:00.000Z")
+        }),
+        createAuditEvent("audit-conflict-action", {
+          sourceEntity: { type: "Project", id: project.id },
+          actionType: "management_action.conflict",
+          executionResult: { status: "succeeded" },
+          createdAt: new Date("2026-06-08T11:00:00.000Z")
+        })
+      ]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string; severity: string }> };
+    expect(body.items.map((item) => item.id)).toEqual([
+      "audit-event:project-alpha:audit-conflict-action",
+      "audit-event:project-alpha:audit-conflict-status"
+    ]);
+    expect(body.items).toEqual([
+      expect.objectContaining({ severity: "warning" }),
+      expect.objectContaining({ severity: "warning" })
+    ]);
+  });
+
+  it("queries actionable audit events before applying the audit source cap", async () => {
+    const project = createProject("project-alpha");
+    const newerSuccesses = Array.from({ length: 100 }, (_, index) => createAuditEvent(`audit-success-${index}`, {
+      sourceEntity: { type: "Project", id: project.id },
+      actionType: "management_action.succeeded",
+      executionResult: { status: "succeeded" },
+      createdAt: new Date(`2026-06-08T12:${String(index).padStart(2, "0")}:00.000Z`)
+    }));
+    const fixture = createOperationalQueueFixture({
+      projects: [project],
+      auditEvents: [
+        ...newerSuccesses,
+        createAuditEvent("audit-older-conflict", {
+          sourceEntity: { type: "Project", id: project.id },
+          actionType: "management_action.conflict",
+          executionResult: { status: "conflict" },
+          createdAt: new Date("2026-06-08T09:00:00.000Z")
+        })
+      ]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string }> };
+    expect(body.items.map((item) => item.id)).toEqual(["audit-event:project-alpha:audit-older-conflict"]);
+  });
+
   it("returns sorted and limited signals from control, corrective, status, overdue, and audit inputs", async () => {
     const project = createProject("project-alpha", {
       plannedFinish: new Date("2026-06-08T00:00:00.000Z")
@@ -281,9 +351,18 @@ function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
       loadedQueueData = true;
       return input.correctiveActionsByProject?.[projectId] ?? [];
     },
-    async listAuditEventsByTenantId() {
+    async listAuditEventsByTenantId(_tenantId, options) {
       loadedQueueData = true;
-      return input.auditEvents ?? [];
+      const filtered = options?.requiresAttention
+        ? (input.auditEvents ?? []).filter((event) => {
+          const status = typeof event.executionResult.status === "string" ? event.executionResult.status : null;
+          return status === "failed" ||
+            status === "denied" ||
+            status === "conflict" ||
+            /(?:_|\.)(?:failed|denied|conflict)$/.test(event.actionType);
+        })
+        : input.auditEvents ?? [];
+      return filtered.slice(0, options?.limit);
     }
   };
 

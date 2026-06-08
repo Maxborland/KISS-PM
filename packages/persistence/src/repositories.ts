@@ -189,6 +189,7 @@ export type PostgresTenantDataSource = CrmRepository &
     options?: {
       limit?: number;
       projectId?: string | null;
+      requiresAttention?: boolean;
     }
   ): Promise<AuditEventListItem[]>;
 };
@@ -585,6 +586,12 @@ export function createPostgresTenantDataSource(
           sql`${auditEvents.sourceEntity} ->> 'type' = 'Project'`,
           sql`${auditEvents.sourceEntity} ->> 'id' = ${options.projectId}`
         );
+      }
+      if (options?.requiresAttention) {
+        filters.push(sql`(
+          ${auditEvents.executionResult} ->> 'status' in ('failed', 'denied', 'conflict') or
+          ${auditEvents.actionType} ~ ${String.raw`[._](failed|denied|conflict)$`}
+        )`);
       }
       const buildQuery = () =>
         db
