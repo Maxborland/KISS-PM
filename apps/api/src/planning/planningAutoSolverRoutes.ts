@@ -101,61 +101,71 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
       return context.json({ error: resourceManageDecision.reason }, 403);
     }
 
-    const activeProject = await requireActivePlanningProject(
-      deps.dataSource,
-      actor.tenantId,
-      projectId
-    );
-    if (!activeProject.ok) return context.json({ error: activeProject.error }, activeProject.status);
-    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
-    if (!snapshot) return context.json({ error: "project_not_found" }, 404);
-    if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
-      return context.json({ error: "plan_version_conflict", currentPlanVersion: snapshot.planVersion }, 409);
-    }
-
-    const solverHorizonFinish = parsed.value.targetDeadline
-      ? maxPlanDate(
-          maxPlanDate(snapshot.project.plannedFinish, snapshot.project.deadline ?? snapshot.project.plannedFinish),
-          parsed.value.targetDeadline
-        )
-      : maxPlanDate(snapshot.project.plannedFinish, snapshot.project.deadline ?? snapshot.project.plannedFinish);
-    const solverOccupancyWindows = deps.dataSource.listOccupancyWindows
-      ? await deps.dataSource.listOccupancyWindows({
-          tenantId: actor.tenantId,
-          from: new Date(`${snapshot.project.plannedStart}T00:00:00.000Z`),
-          to: new Date(`${solverHorizonFinish}T23:59:59.999Z`)
-        })
-      : snapshot.occupancyWindows;
-    const solverSnapshot = parsed.value.targetDeadline
-      ? {
-          ...snapshot,
-          occupancyWindows: solverOccupancyWindows,
-          project: {
-            ...snapshot.project,
-            deadline: parsed.value.targetDeadline
-          }
-        }
-      : { ...snapshot, occupancyWindows: solverOccupancyWindows };
-    const runResult = proposeAutoPlanningSolutions({
-      mode: parsed.value.mode,
-      snapshot: solverSnapshot,
-      targetDeadline: parsed.value.targetDeadline ?? null,
-      calculatedAt: solverSnapshot.capturedAt,
-      engineVersion: PLANNING_ENGINE_VERSION
-    });
-    const runId = `planning-auto-solver-${randomUUID()}`;
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-    const proposals = runResult.proposals.map((proposal, index): Record<string, unknown> => ({
-      ...proposal,
-      id: `proposal-${index + 1}`,
-      conflictEffect: proposal.kind === "accepted_overload" ? "accepted_overload" : "removed",
-      label: proposal.kind === "accepted_overload" ? "Accept controlled overload" : "Resolve without overlap"
-    }));
-    const proposalPayloadHash = hashJson(proposals);
-    const run = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createPlanningSolverRun || !transactionDataSource.appendAuditEvent) {
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.getPlanSnapshot ||
+        !transactionDataSource.createPlanningSolverRun ||
+        !transactionDataSource.appendAuditEvent
+      ) {
         throw new Error("persistence_not_configured");
       }
+      await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      const activeProject = await requireActivePlanningProject(
+        transactionDataSource,
+        actor.tenantId,
+        projectId
+      );
+      if (!activeProject.ok) return activeProject;
+      const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
+      if (!snapshot) return { ok: false as const, status: 404 as const, error: "project_not_found" };
+      if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
+        return {
+          ok: false as const,
+          status: 409 as const,
+          error: "plan_version_conflict",
+          currentPlanVersion: snapshot.planVersion
+        };
+      }
+
+      const solverHorizonFinish = parsed.value.targetDeadline
+        ? maxPlanDate(
+            maxPlanDate(snapshot.project.plannedFinish, snapshot.project.deadline ?? snapshot.project.plannedFinish),
+            parsed.value.targetDeadline
+          )
+        : maxPlanDate(snapshot.project.plannedFinish, snapshot.project.deadline ?? snapshot.project.plannedFinish);
+      const solverOccupancyWindows = transactionDataSource.listOccupancyWindows
+        ? await transactionDataSource.listOccupancyWindows({
+            tenantId: actor.tenantId,
+            from: new Date(`${snapshot.project.plannedStart}T00:00:00.000Z`),
+            to: new Date(`${solverHorizonFinish}T23:59:59.999Z`)
+          })
+        : snapshot.occupancyWindows;
+      const solverSnapshot = parsed.value.targetDeadline
+        ? {
+            ...snapshot,
+            occupancyWindows: solverOccupancyWindows,
+            project: {
+              ...snapshot.project,
+              deadline: parsed.value.targetDeadline
+            }
+          }
+        : { ...snapshot, occupancyWindows: solverOccupancyWindows };
+      const runResult = proposeAutoPlanningSolutions({
+        mode: parsed.value.mode,
+        snapshot: solverSnapshot,
+        targetDeadline: parsed.value.targetDeadline ?? null,
+        calculatedAt: solverSnapshot.capturedAt,
+        engineVersion: PLANNING_ENGINE_VERSION
+      });
+      const runId = `planning-auto-solver-${randomUUID()}`;
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+      const proposals = runResult.proposals.map((proposal, index): Record<string, unknown> => ({
+        ...proposal,
+        id: `proposal-${index + 1}`,
+        conflictEffect: proposal.kind === "accepted_overload" ? "accepted_overload" : "removed",
+        label: proposal.kind === "accepted_overload" ? "Accept controlled overload" : "Resolve without overlap"
+      }));
+      const proposalPayloadHash = hashJson(proposals);
       const persistedRun = await transactionDataSource.createPlanningSolverRun({
         id: runId,
         tenantId: actor.tenantId,
@@ -194,8 +204,12 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
         },
         transactionDataSource
       );
-      return persistedRun;
+      return { ok: true as const, run: persistedRun };
     });
+    if (!result.ok) {
+      return context.json(errorResponseBody(result), result.status as 404 | 409);
+    }
+    const run = result.run;
 
     return context.json({
       runId: run.id,

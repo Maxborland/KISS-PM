@@ -94,6 +94,34 @@ describe("planning auto-solver API", () => {
     expect(harness.auditActionTypes).toEqual([]);
   });
 
+  it("rechecks active project state after acquiring the planning lock before creating solver runs", async () => {
+    const harness = createApiHarness({
+      onPlanningLock: (harnessState) => {
+        harnessState.setProjectStatus("paused");
+      }
+    });
+
+    const createResponse = await harness.app.request(
+      "/api/workspace/projects/project-solver/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        body: JSON.stringify({ mode: "schedule", clientPlanVersion: 3 })
+      }
+    );
+    const body = await createResponse.json();
+
+    expect(createResponse.status).toBe(404);
+    expect(body.error).toBe("project_not_found");
+    expect(harness.planningLockCount).toBe(1);
+    expect(harness.storedRunBox.value).toBeNull();
+    expect(harness.auditActionTypes).toEqual([]);
+  });
+
   it("builds solver runs with resource capacity through the requested deadline", async () => {
     const snapshot = createSnapshot();
     const harness = createApiHarness({
@@ -380,6 +408,7 @@ type ApiHarness = {
   storedRunBox: { value: PlanningSolverRunRecord | null };
   appliedCommandTypes: string[];
   auditActionTypes: string[];
+  planningLockCount: number;
   setProjectStatus(status: "active" | "paused"): void;
 };
 
@@ -397,9 +426,11 @@ function createApiHarness(input: {
   snapshot?: PlanSnapshot;
   listOccupancyWindows?: ApiTenantDataSource["listOccupancyWindows"];
   projectStatus?: "active" | "paused";
+  onPlanningLock?: (harnessState: Pick<ApiHarness, "setProjectStatus">) => void;
 } = {}): ApiHarness {
   let snapshot = input.snapshot ?? createSnapshot();
   let projectStatus = input.projectStatus ?? "active";
+  let planningLockCount = 0;
   const storedRunBox: { value: PlanningSolverRunRecord | null } = { value: null };
   const appliedCommandTypes: string[] = [];
   const auditActionTypes: string[] = [];
@@ -489,7 +520,12 @@ function createApiHarness(input: {
       return operation(dataSource as ApiTenantDataSource);
     },
     async lockTenantResourcePlanning() {
-      return;
+      planningLockCount += 1;
+      input.onPlanningLock?.({
+        setProjectStatus(status) {
+          projectStatus = status;
+        }
+      });
     },
     async getPlanSnapshot() {
       return snapshot;
@@ -536,6 +572,9 @@ function createApiHarness(input: {
     storedRunBox,
     appliedCommandTypes,
     auditActionTypes,
+    get planningLockCount() {
+      return planningLockCount;
+    },
     setProjectStatus(status) {
       projectStatus = status;
     }
