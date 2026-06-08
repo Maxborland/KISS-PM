@@ -461,11 +461,11 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       }
 
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
-      if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      if (!snapshot) return { ok: false as const, status: 404 as const, error: "project_not_found" };
       if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
         return {
           ok: false as const,
-          status: 409,
+          status: 409 as const,
           error: "plan_version_conflict",
           currentPlanVersion: snapshot.planVersion
         };
@@ -646,30 +646,40 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     }
 
     const projectId = parsedProjectId.value;
-    const activeProject = await requireActivePlanningProject(
-      deps.dataSource,
-      actor.tenantId,
-      projectId
-    );
-    if (!activeProject.ok) return context.json({ error: activeProject.error }, activeProject.status);
-    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
-    if (!snapshot) return context.json({ error: "project_not_found" }, 404);
-    if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
-      return context.json({ error: "plan_version_conflict", currentPlanVersion: snapshot.planVersion }, 409);
-    }
-
-    const readModel = createPlanningReadModel(snapshot);
-    const proposals = proposePlanningScenarios({
-      snapshot,
-      calculatedPlan: readModel.calculatedPlan,
-      resourceLoad: readModel.resourceLoad,
-      target: parsed.value.target
-    });
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const persistedProposals = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createPlanningScenarioRun || !transactionDataSource.appendAuditEvent) {
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.getPlanSnapshot ||
+        !transactionDataSource.createPlanningScenarioRun ||
+        !transactionDataSource.appendAuditEvent
+      ) {
         throw new Error("persistence_not_configured");
       }
+      await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      const activeProject = await requireActivePlanningProject(
+        transactionDataSource,
+        actor.tenantId,
+        projectId
+      );
+      if (!activeProject.ok) return activeProject;
+      const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
+      if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
+        return {
+          ok: false as const,
+          status: 409,
+          error: "plan_version_conflict",
+          currentPlanVersion: snapshot.planVersion
+        };
+      }
+
+      const readModel = createPlanningReadModel(snapshot);
+      const proposals = proposePlanningScenarios({
+        snapshot,
+        calculatedPlan: readModel.calculatedPlan,
+        resourceLoad: readModel.resourceLoad,
+        target: parsed.value.target
+      });
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
       const transactionProposals = [];
       for (const proposal of proposals) {
         const runId = `planning-scenario-${randomUUID()}`;
@@ -708,14 +718,22 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         },
         transactionDataSource
       );
-      return transactionProposals;
+      return {
+        ok: true as const,
+        persistedProposals: transactionProposals,
+        planVersion: snapshot.planVersion,
+        expiresAt
+      };
     });
+    if (!result.ok) {
+      return context.json(errorResponseBody(result), result.status as 404 | 409);
+    }
 
     return context.json({
-      proposals: persistedProposals,
-      planVersion: snapshot.planVersion,
+      proposals: result.persistedProposals,
+      planVersion: result.planVersion,
       engineVersion: PLANNING_ENGINE_VERSION,
-      expiresAt: expiresAt.toISOString()
+      expiresAt: result.expiresAt.toISOString()
     });
   };
 
