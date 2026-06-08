@@ -213,7 +213,8 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
         resourceRows,
         reservationRows,
         baselineRows,
-        baselineTaskRows
+        baselineTaskRows,
+        baselineAssignmentRows
       ] = await Promise.all([
         this.ensurePlanVersion(tenantId, projectId),
         db
@@ -275,7 +276,12 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
         db
           .select()
           .from(projectBaselineTasks)
-          .where(and(eq(projectBaselineTasks.tenantId, tenantId), eq(projectBaselineTasks.projectId, projectId)))
+          .where(and(eq(projectBaselineTasks.tenantId, tenantId), eq(projectBaselineTasks.projectId, projectId))),
+        db
+          .select()
+          .from(projectBaselineAssignments)
+          .where(and(eq(projectBaselineAssignments.tenantId, tenantId), eq(projectBaselineAssignments.projectId, projectId)))
+          .orderBy(asc(projectBaselineAssignments.baselineId), asc(projectBaselineAssignments.assignmentId))
       ]);
 
       const orderedTaskRows = [...taskRows].sort(compareTaskRowsByWbs);
@@ -403,7 +409,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             type: dependency.type as DependencyType,
             lagMinutes: dependency.lagMinutes
           })),
-        baselines: mapBaselines(baselineRows, baselineTaskRows),
+        baselines: mapBaselines(baselineRows, baselineTaskRows, baselineAssignmentRows),
         calendars,
         calendarExceptions: calendarExceptionsMerged,
         resources: resourceRows.map<PlanResource>((resource) => ({
@@ -1694,7 +1700,8 @@ function selectProjectCalendarId(
 
 function mapBaselines(
   baselineRows: Array<typeof projectBaselines.$inferSelect>,
-  baselineTaskRows: Array<typeof projectBaselineTasks.$inferSelect>
+  baselineTaskRows: Array<typeof projectBaselineTasks.$inferSelect>,
+  baselineAssignmentRows: Array<typeof projectBaselineAssignments.$inferSelect>
 ): PlanBaseline[] {
   return baselineRows.map((baseline) => ({
     id: baseline.id,
@@ -1706,6 +1713,14 @@ function mapBaselines(
         plannedStart: task.plannedStart,
         plannedFinish: task.plannedFinish,
         workMinutes: task.workMinutes
+      })),
+    assignments: baselineAssignmentRows
+      .filter((assignment) => assignment.baselineId === baseline.id)
+      .map((assignment) => ({
+        assignmentId: assignment.assignmentId,
+        taskId: assignment.taskId,
+        resourceId: assignment.resourceId,
+        workMinutes: assignment.workMinutes
       }))
   }));
 }

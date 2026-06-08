@@ -135,6 +135,12 @@ export type PlanBaseline = {
     plannedFinish: PlanDate | null;
     workMinutes: number;
   }>;
+  assignments: Array<{
+    assignmentId: string;
+    taskId: string;
+    resourceId: string;
+    workMinutes: number | null;
+  }>;
 };
 
 export type PlanSnapshot = {

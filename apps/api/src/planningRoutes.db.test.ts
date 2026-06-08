@@ -1240,7 +1240,9 @@ describe("planning API routes", () => {
     expect(initialBody.baselineComparison).toEqual({
       baselineId: null,
       capturedAt: null,
-      tasks: []
+      tasks: [],
+      assignments: [],
+      resources: []
     });
 
     const baselineCapture = await app.request(
@@ -1319,6 +1321,142 @@ describe("planning API routes", () => {
         })
       ]
     });
+  });
+
+  it("exposes baseline assignment and resource workload drift in the planning read-model", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-baseline-resource-a",
+      title: "Baseline resource A",
+      start: "2026-06-02",
+      finish: "2026-06-02",
+      plannedWork: 8
+    });
+
+    const initialReadModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const initialBody = await initialReadModel.json();
+    expect(initialReadModel.status).toBe(200);
+
+    const firstAssignment = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command: {
+            type: "assignment.upsert",
+            payload: {
+              id: "assignment-baseline-resource-a",
+              taskId: "task-baseline-resource-a",
+              resourceId: "user-alpha-admin",
+              role: "executor",
+              unitsPermille: 1000,
+              workMinutes: 480
+            }
+          },
+          clientPlanVersion: initialBody.planVersion
+        })
+      }
+    );
+    const firstAssignmentBody = await firstAssignment.json();
+    expect(firstAssignment.status).toBe(200);
+
+    const baselineCapture = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command: {
+            type: "baseline.capture",
+            payload: { baselineId: "baseline-resource-a", label: "Resource baseline" }
+          },
+          clientPlanVersion: firstAssignmentBody.newPlanVersion
+        })
+      }
+    );
+    const baselineCaptureBody = await baselineCapture.json();
+    expect(baselineCapture.status).toBe(200);
+
+    const changedAssignment = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command: {
+            type: "assignment.upsert",
+            payload: {
+              id: "assignment-baseline-resource-a",
+              taskId: "task-baseline-resource-a",
+              resourceId: "user-alpha-admin",
+              role: "executor",
+              unitsPermille: 1000,
+              workMinutes: 960
+            }
+          },
+          clientPlanVersion: baselineCaptureBody.newPlanVersion
+        })
+      }
+    );
+    const changedAssignmentBody = await changedAssignment.json();
+    expect(changedAssignment.status).toBe(200);
+
+    const finalReadModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const finalBody = await finalReadModel.json();
+
+    expect(finalReadModel.status).toBe(200);
+    expect(finalBody.planVersion).toBe(changedAssignmentBody.newPlanVersion);
+    expect(finalBody.baselineComparison).toMatchObject({
+      baselineId: "baseline-resource-a",
+      assignments: expect.arrayContaining([
+        expect.objectContaining({
+          assignmentId: "assignment-baseline-resource-a",
+          status: "changed",
+          baselineTaskId: "task-baseline-resource-a",
+          currentTaskId: "task-baseline-resource-a",
+          baselineResourceId: "user-alpha-admin",
+          currentResourceId: "user-alpha-admin",
+          baselineWorkMinutes: 480,
+          currentWorkMinutes: 960,
+          workDeltaMinutes: 480
+        })
+      ]),
+      resources: expect.arrayContaining([
+        expect.objectContaining({
+          resourceId: "user-alpha-admin",
+          baselineWorkMinutes: 480,
+          currentWorkMinutes: 960,
+          workDeltaMinutes: 480
+        })
+      ])
+    });
+    expect(finalBody.authored.baselines[0].assignments).toEqual(expect.arrayContaining([
+      {
+        assignmentId: "assignment-baseline-resource-a",
+        taskId: "task-baseline-resource-a",
+        resourceId: "user-alpha-admin",
+        workMinutes: 480
+      }
+    ]));
   });
 
   it("emits distinct audit actions for archived and hard-deleted planning tasks", async () => {

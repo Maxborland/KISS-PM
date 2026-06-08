@@ -15,6 +15,7 @@ import {
   calendarExceptions,
   resourceCalendarEvents,
   projectBaselineTasks,
+  projectBaselineAssignments,
   projectBaselines,
   projectCalendars,
   resourcePersonalCalendars,
@@ -176,6 +177,15 @@ describe("planning repository", () => {
       plannedFinish: "2026-06-05",
       workMinutes: 960
     });
+    await db.insert(projectBaselineAssignments).values({
+      tenantId: "tenant-alpha",
+      projectId,
+      baselineId: "baseline-alpha",
+      assignmentId: "assignment-alpha",
+      taskId: "task-alpha",
+      resourceId: "user-alpha-executor",
+      workMinutes: 960
+    });
     await db.insert(resourcePersonalCalendars).values({
       id: "personal-calendar-user-alpha-executor",
       tenantId: "tenant-alpha",
@@ -237,7 +247,19 @@ describe("planning repository", () => {
         expect.objectContaining({ id: "task-beta-user-alpha-executor-executor" })
       ]),
       dependencies: [expect.objectContaining({ id: "dep-alpha-beta", type: "FS" })],
-      baselines: [expect.objectContaining({ id: "baseline-alpha" })],
+      baselines: [
+        expect.objectContaining({
+          id: "baseline-alpha",
+          assignments: [
+            {
+              assignmentId: "assignment-alpha",
+              taskId: "task-alpha",
+              resourceId: "user-alpha-executor",
+              workMinutes: 960
+            }
+          ]
+        })
+      ],
       calendars: expect.arrayContaining([
         expect.objectContaining({ id: "tenant-default" }),
         expect.objectContaining({ id: "calendar-project-alpha" })

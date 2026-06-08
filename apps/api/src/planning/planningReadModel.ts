@@ -59,7 +59,9 @@ export function createBaselineComparison(
     return {
       baselineId: null,
       capturedAt: null,
-      tasks: []
+      tasks: [],
+      assignments: [],
+      resources: []
     };
   }
 
@@ -85,7 +87,9 @@ export function createBaselineComparison(
         workDeltaMinutes:
           currentWorkMinutes === null ? null : currentWorkMinutes - baselineTask.workMinutes
       };
-    })
+    }),
+    assignments: createBaselineAssignmentComparison(baseline.assignments, snapshot.assignments),
+    resources: createBaselineResourceComparison(baseline.assignments, snapshot.assignments)
   };
 }
 
@@ -102,4 +106,107 @@ function latestDate(dates: Array<string | null>): string {
   }, null);
   if (!latest) throw new Error("planning_read_model_missing_range_finish");
   return latest;
+}
+
+
+type BaselineAssignmentSnapshot = PlanSnapshot["baselines"][number]["assignments"][number];
+type CurrentAssignmentSnapshot = PlanSnapshot["assignments"][number];
+type BaselineComparisonStatus = "added" | "removed" | "changed" | "unchanged";
+
+function createBaselineAssignmentComparison(
+  baselineAssignments: BaselineAssignmentSnapshot[],
+  currentAssignments: CurrentAssignmentSnapshot[]
+) {
+  const baselineById = new Map(baselineAssignments.map((assignment) => [assignment.assignmentId, assignment]));
+  const currentById = new Map(currentAssignments.map((assignment) => [assignment.id, assignment]));
+  return [...new Set([...baselineById.keys(), ...currentById.keys()])]
+    .sort()
+    .map((assignmentId) => {
+      const baseline = baselineById.get(assignmentId) ?? null;
+      const current = currentById.get(assignmentId) ?? null;
+      return {
+        assignmentId,
+        status: assignmentComparisonStatus(baseline, current),
+        baselineTaskId: baseline?.taskId ?? null,
+        currentTaskId: current?.taskId ?? null,
+        baselineResourceId: baseline?.resourceId ?? null,
+        currentResourceId: current?.resourceId ?? null,
+        baselineWorkMinutes: baseline?.workMinutes ?? null,
+        currentWorkMinutes: current?.workMinutes ?? null,
+        workDeltaMinutes: workDeltaMinutes(baseline?.workMinutes ?? null, current?.workMinutes ?? null)
+      };
+    });
+}
+
+function createBaselineResourceComparison(
+  baselineAssignments: BaselineAssignmentSnapshot[],
+  currentAssignments: CurrentAssignmentSnapshot[]
+) {
+  const baselineWorkByResource = aggregateWorkByResource(baselineAssignments);
+  const currentWorkByResource = aggregateWorkByResource(
+    currentAssignments.map((assignment) => ({
+      resourceId: assignment.resourceId,
+      workMinutes: assignment.workMinutes
+    }))
+  );
+  return [...new Set([...baselineWorkByResource.keys(), ...currentWorkByResource.keys()])]
+    .sort()
+    .map((resourceId) => {
+      const baselineWorkMinutes = baselineWorkByResource.has(resourceId) ? baselineWorkByResource.get(resourceId)! : 0;
+      const currentWorkMinutes = currentWorkByResource.has(resourceId) ? currentWorkByResource.get(resourceId)! : 0;
+      return {
+        resourceId,
+        status: workComparisonStatus(baselineWorkMinutes, currentWorkMinutes),
+        baselineWorkMinutes,
+        currentWorkMinutes,
+        workDeltaMinutes: workDeltaMinutes(baselineWorkMinutes, currentWorkMinutes)
+      };
+    });
+}
+
+function assignmentComparisonStatus(
+  baseline: BaselineAssignmentSnapshot | null,
+  current: CurrentAssignmentSnapshot | null
+): BaselineComparisonStatus {
+  if (!baseline) return "added";
+  if (!current) return "removed";
+  if (
+    baseline.taskId !== current.taskId ||
+    baseline.resourceId !== current.resourceId ||
+    baseline.workMinutes !== current.workMinutes
+  ) {
+    return "changed";
+  }
+  return "unchanged";
+}
+
+function workComparisonStatus(
+  baselineWorkMinutes: number | null,
+  currentWorkMinutes: number | null
+): BaselineComparisonStatus {
+  if (baselineWorkMinutes === 0 && currentWorkMinutes !== 0) return "added";
+  if (baselineWorkMinutes !== 0 && currentWorkMinutes === 0) return "removed";
+  return baselineWorkMinutes === currentWorkMinutes ? "unchanged" : "changed";
+}
+
+function aggregateWorkByResource(assignments: Array<{ resourceId: string; workMinutes: number | null }>) {
+  const workByResource = new Map<string, number | null>();
+  for (const assignment of assignments) {
+    const existing = workByResource.has(assignment.resourceId) ? workByResource.get(assignment.resourceId)! : 0;
+    workByResource.set(
+      assignment.resourceId,
+      existing === null || assignment.workMinutes === null
+        ? null
+        : existing + assignment.workMinutes
+    );
+  }
+  return workByResource;
+}
+
+function workDeltaMinutes(
+  baselineWorkMinutes: number | null,
+  currentWorkMinutes: number | null
+): number | null {
+  if (baselineWorkMinutes === null || currentWorkMinutes === null) return null;
+  return currentWorkMinutes - baselineWorkMinutes;
 }

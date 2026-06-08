@@ -196,6 +196,29 @@ describe("OpenAPI route inventory", () => {
     expect(replaceSchema.required).toEqual(["members"]);
     expect(replaceSchema.properties.members.items).toEqual({ $ref: "#/components/schemas/ProjectResourcePoolMemberWrite" });
   });
+
+  it("documents explicit planning baseline comparison schemas", () => {
+    const document = createTestDocument();
+    const comparisonSchema = document.components.schemas.PlanningBaselineComparison;
+
+    expect(comparisonSchema.required).toEqual(["baselineId", "capturedAt", "tasks", "assignments", "resources"]);
+    expect(comparisonSchema.properties.tasks.items).toEqual({
+      $ref: "#/components/schemas/PlanningBaselineTaskComparison"
+    });
+    expect(comparisonSchema.properties.assignments.items).toEqual({
+      $ref: "#/components/schemas/PlanningBaselineAssignmentComparison"
+    });
+    expect(comparisonSchema.properties.resources.items).toEqual({
+      $ref: "#/components/schemas/PlanningBaselineResourceComparison"
+    });
+
+    expect(document.components.schemas.PlanningBaselineAssignmentSnapshot.required).toEqual([
+      "assignmentId",
+      "taskId",
+      "resourceId",
+      "workMinutes"
+    ]);
+  });
 });
 
 type TestOpenApiDocument = ReturnType<typeof createKissPmOpenApiDocument> & {

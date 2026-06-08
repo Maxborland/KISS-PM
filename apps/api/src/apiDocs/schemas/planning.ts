@@ -167,26 +167,36 @@ export const planningSchemas = openApiSchemaFragment({
       issueCodes: { type: "array", items: { type: "string" } }
     }
   },
+  PlanningBaselineTaskSnapshot: {
+    type: "object",
+    required: ["taskId", "plannedStart", "plannedFinish", "workMinutes"],
+    properties: {
+      taskId: stringIdSchema,
+      plannedStart: planDateOrNullSchema,
+      plannedFinish: planDateOrNullSchema,
+      workMinutes: { type: "integer", minimum: 0 }
+    },
+    additionalProperties: false
+  },
+  PlanningBaselineAssignmentSnapshot: {
+    type: "object",
+    required: ["assignmentId", "taskId", "resourceId", "workMinutes"],
+    properties: {
+      assignmentId: stringIdSchema,
+      taskId: stringIdSchema,
+      resourceId: stringIdSchema,
+      workMinutes: { type: ["integer", "null"], minimum: 0 }
+    },
+    additionalProperties: false
+  },
   PlanningBaseline: {
     type: "object",
-    required: ["id", "capturedAt", "tasks"],
+    required: ["id", "capturedAt", "tasks", "assignments"],
     properties: {
       id: stringIdSchema,
       capturedAt: dateTimeSchema,
-      tasks: {
-        type: "array",
-        items: {
-          type: "object",
-          required: ["taskId", "plannedStart", "plannedFinish", "workMinutes"],
-          properties: {
-            taskId: stringIdSchema,
-            plannedStart: planDateOrNullSchema,
-            plannedFinish: planDateOrNullSchema,
-            workMinutes: { type: "integer", minimum: 0 }
-          },
-          additionalProperties: false
-        }
-      }
+      tasks: { type: "array", items: schemaRef("PlanningBaselineTaskSnapshot") },
+      assignments: { type: "array", items: schemaRef("PlanningBaselineAssignmentSnapshot") }
     },
     additionalProperties: false
   },
@@ -766,13 +776,85 @@ export const planningSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  PlanningBaselineTaskComparison: {
+    type: "object",
+    required: [
+      "taskId",
+      "baselineStart",
+      "baselineFinish",
+      "baselineWorkMinutes",
+      "currentStart",
+      "currentFinish",
+      "currentWorkMinutes",
+      "startDeltaDays",
+      "finishDeltaDays",
+      "workDeltaMinutes"
+    ],
+    properties: {
+      taskId: stringIdSchema,
+      baselineStart: planDateOrNullSchema,
+      baselineFinish: planDateOrNullSchema,
+      baselineWorkMinutes: { type: "integer", minimum: 0 },
+      currentStart: planDateOrNullSchema,
+      currentFinish: planDateOrNullSchema,
+      currentWorkMinutes: { type: ["integer", "null"], minimum: 0 },
+      startDeltaDays: { type: ["integer", "null"] },
+      finishDeltaDays: { type: ["integer", "null"] },
+      workDeltaMinutes: { type: ["integer", "null"] }
+    },
+    additionalProperties: false
+  },
+  PlanningBaselineComparisonStatus: {
+    type: "string",
+    enum: ["added", "removed", "changed", "unchanged"]
+  },
+  PlanningBaselineAssignmentComparison: {
+    type: "object",
+    required: [
+      "assignmentId",
+      "status",
+      "baselineTaskId",
+      "currentTaskId",
+      "baselineResourceId",
+      "currentResourceId",
+      "baselineWorkMinutes",
+      "currentWorkMinutes",
+      "workDeltaMinutes"
+    ],
+    properties: {
+      assignmentId: stringIdSchema,
+      status: schemaRef("PlanningBaselineComparisonStatus"),
+      baselineTaskId: nullableStringSchema,
+      currentTaskId: nullableStringSchema,
+      baselineResourceId: nullableStringSchema,
+      currentResourceId: nullableStringSchema,
+      baselineWorkMinutes: { type: ["integer", "null"], minimum: 0 },
+      currentWorkMinutes: { type: ["integer", "null"], minimum: 0 },
+      workDeltaMinutes: { type: ["integer", "null"] }
+    },
+    additionalProperties: false
+  },
+  PlanningBaselineResourceComparison: {
+    type: "object",
+    required: ["resourceId", "status", "baselineWorkMinutes", "currentWorkMinutes", "workDeltaMinutes"],
+    properties: {
+      resourceId: stringIdSchema,
+      status: schemaRef("PlanningBaselineComparisonStatus"),
+      baselineWorkMinutes: { type: ["integer", "null"], minimum: 0 },
+      currentWorkMinutes: { type: ["integer", "null"], minimum: 0 },
+      workDeltaMinutes: { type: ["integer", "null"] }
+    },
+    additionalProperties: false
+  },
   PlanningBaselineComparison: {
     type: "object",
-    required: ["baselineId", "capturedAt", "tasks"],
+    required: ["baselineId", "capturedAt", "tasks", "assignments", "resources"],
     properties: {
       baselineId: nullableStringSchema,
       capturedAt: { type: ["string", "null"], format: "date-time" },
-      tasks: { type: "array", items: schemaRef("AnyJsonObject") }
+      tasks: { type: "array", items: schemaRef("PlanningBaselineTaskComparison") },
+      assignments: { type: "array", items: schemaRef("PlanningBaselineAssignmentComparison") },
+      resources: { type: "array", items: schemaRef("PlanningBaselineResourceComparison") }
     },
     additionalProperties: false
   },

@@ -334,6 +334,12 @@ function reduceBaselineCapture(
       plannedStart: task.plannedStart,
       plannedFinish: task.plannedFinish,
       workMinutes: task.workMinutes
+    })),
+    assignments: snapshot.assignments.map((assignment) => ({
+      assignmentId: assignment.id,
+      taskId: assignment.taskId,
+      resourceId: assignment.resourceId,
+      workMinutes: assignment.workMinutes
     }))
   };
 
