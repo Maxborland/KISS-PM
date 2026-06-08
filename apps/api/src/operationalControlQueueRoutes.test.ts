@@ -203,6 +203,42 @@ describe("operational control queue API", () => {
     expect(body.items.map((item) => item.id)).toEqual(["audit-event:project-alpha:audit-older-conflict"]);
   });
 
+  it("applies the audit source cap after active project resolution", async () => {
+    const project = createProject("project-alpha");
+    const closedProject = createProject("project-closed", { status: "closed" });
+    const newerClosedProjectFailures = Array.from({ length: 100 }, (_, index) => createAuditEvent(
+      `audit-closed-failed-${index}`,
+      {
+        sourceEntity: { type: "Project", id: closedProject.id },
+        actionType: "management_action.failed",
+        executionResult: { status: "failed" },
+        createdAt: new Date(`2026-06-08T12:${String(index).padStart(2, "0")}:00.000Z`)
+      }
+    ));
+    const fixture = createOperationalQueueFixture({
+      projects: [project, closedProject],
+      auditEvents: [
+        ...newerClosedProjectFailures,
+        createAuditEvent("audit-active-older-conflict", {
+          sourceEntity: { type: "Project", id: project.id },
+          actionType: "management_action.conflict",
+          executionResult: { status: "conflict" },
+          createdAt: new Date("2026-06-08T09:00:00.000Z")
+        })
+      ]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string }> };
+    expect(body.items.map((item) => item.id)).toEqual(["audit-event:project-alpha:audit-active-older-conflict"]);
+  });
+
   it("returns sorted and limited signals from control, corrective, status, overdue, and audit inputs", async () => {
     const project = createProject("project-alpha", {
       plannedFinish: new Date("2026-06-08T00:00:00.000Z")
@@ -355,6 +391,7 @@ function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
       loadedQueueData = true;
       const filtered = options?.requiresAttention
         ? (input.auditEvents ?? []).filter((event) => {
+          if (!auditEventMatchesSourceEntities(event, options.sourceEntities)) return false;
           const status = typeof event.executionResult.status === "string" ? event.executionResult.status : null;
           return status === "failed" ||
             status === "denied" ||
@@ -488,4 +525,17 @@ function createAuditEvent(id: string, overrides: Partial<AuditEventListItem> = {
     createdAt: new Date("2026-06-05T00:00:00.000Z"),
     ...overrides
   };
+}
+
+function auditEventMatchesSourceEntities(
+  event: { sourceEntity: Record<string, unknown> },
+  sourceEntities: Array<{ type: string; ids: string[] }> | undefined
+) {
+  if (!sourceEntities?.length) return true;
+  const type = typeof event.sourceEntity.type === "string" ? event.sourceEntity.type : undefined;
+  const id = typeof event.sourceEntity.id === "string" ? event.sourceEntity.id : undefined;
+  if (!type || !id) return false;
+  return sourceEntities.some((sourceEntity) =>
+    sourceEntity.type === type && sourceEntity.ids.includes(id)
+  );
 }

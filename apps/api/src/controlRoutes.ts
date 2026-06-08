@@ -1160,10 +1160,19 @@ async function buildOperationalControlQueue(input: {
   }
 
   const taskProjectById = new Map(allTasks.map((task) => [task.id, task.projectId]));
-  const auditEvents = await input.dataSource.listAuditEventsByTenantId?.(input.tenantId, {
-    limit: 100,
-    requiresAttention: true
-  }) ?? [];
+  const auditSourceEntities = auditSourceEntitiesForQueue(
+    projectById,
+    taskProjectById,
+    signalProjectById,
+    correctiveActionProjectById
+  );
+  const auditEvents = auditSourceEntities.length === 0
+    ? []
+    : await input.dataSource.listAuditEventsByTenantId?.(input.tenantId, {
+      limit: 100,
+      requiresAttention: true,
+      sourceEntities: auditSourceEntities
+    }) ?? [];
   items.push(...queueItemsForAuditEvents(
     auditEvents,
     projectById,
@@ -1175,6 +1184,20 @@ async function buildOperationalControlQueue(input: {
   return sortOperationalControlQueue(items)
     .slice(0, input.limit)
     .map(({ sort: _sort, ...item }) => item);
+}
+
+function auditSourceEntitiesForQueue(
+  projectById: Map<string, ProjectRecord>,
+  taskProjectById: Map<string, string>,
+  signalProjectById: Map<string, string>,
+  correctiveActionProjectById: Map<string, string>
+) {
+  return [
+    { type: "Project", ids: [...projectById.keys()] },
+    { type: "Task", ids: [...taskProjectById.keys()] },
+    { type: "ControlSignal", ids: [...signalProjectById.keys()] },
+    { type: "CorrectiveAction", ids: [...correctiveActionProjectById.keys()] }
+  ].filter((sourceEntity) => sourceEntity.ids.length > 0);
 }
 
 function queueItemsForProject(

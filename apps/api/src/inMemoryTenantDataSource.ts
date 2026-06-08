@@ -55,6 +55,7 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
             (!options?.projectId ||
               (event.sourceEntity.type === "Project" &&
                 event.sourceEntity.id === options.projectId)) &&
+            auditEventMatchesSourceEntities(event, options?.sourceEntities) &&
             (!options?.requiresAttention || auditEventRequiresAttention(event))
         )
         .slice(0, options?.limit);
@@ -62,6 +63,18 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
   };
 }
 
+function auditEventMatchesSourceEntities(
+  event: { sourceEntity: Record<string, unknown> },
+  sourceEntities: Array<{ type: string; ids: string[] }> | undefined
+) {
+  if (!sourceEntities?.length) return true;
+  const type = typeof event.sourceEntity.type === "string" ? event.sourceEntity.type : undefined;
+  const id = typeof event.sourceEntity.id === "string" ? event.sourceEntity.id : undefined;
+  if (!type || !id) return false;
+  return sourceEntities.some((sourceEntity) =>
+    sourceEntity.type === type && sourceEntity.ids.includes(id)
+  );
+}
 
 function auditEventRequiresAttention(event: { actionType: string; executionResult: Record<string, unknown> }) {
   const status = typeof event.executionResult.status === "string" ? event.executionResult.status : null;
