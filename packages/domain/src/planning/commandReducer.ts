@@ -339,6 +339,8 @@ function reduceBaselineCapture(
       assignmentId: assignment.id,
       taskId: assignment.taskId,
       resourceId: assignment.resourceId,
+      role: assignment.role,
+      unitsPermille: assignment.unitsPermille,
       workMinutes: assignment.workMinutes
     }))
   };

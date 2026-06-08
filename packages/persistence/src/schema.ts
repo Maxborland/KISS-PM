@@ -1537,6 +1537,8 @@ export const projectBaselineAssignments = pgTable(
     assignmentId: text("assignment_id").notNull(),
     taskId: text("task_id").notNull(),
     resourceId: text("resource_id").notNull(),
+    role: text("role").notNull().default("executor"),
+    unitsPermille: integer("units_permille").notNull().default(1000),
     workMinutes: integer("work_minutes")
   },
   (table) => [
@@ -1552,7 +1554,12 @@ export const projectBaselineAssignments = pgTable(
         projectBaselines.projectId,
         projectBaselines.id
       ]
-    }).onDelete("cascade")
+    }).onDelete("cascade"),
+    check(
+      "project_baseline_assignments_role_chk",
+      sql`${table.role} in ('executor', 'co_executor', 'controller', 'approver', 'observer')`
+    ),
+    check("project_baseline_assignments_units_permille_chk", sql`${table.unitsPermille} > 0`)
   ]
 );
 
@@ -4387,6 +4394,8 @@ const tableColumns = {
     "assignment_id",
     "task_id",
     "resource_id",
+    "role",
+    "units_permille",
     "work_minutes"
   ],
   resource_reservations: [

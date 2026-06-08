@@ -216,6 +216,8 @@ describe("OpenAPI route inventory", () => {
       "assignmentId",
       "taskId",
       "resourceId",
+      "role",
+      "unitsPermille",
       "workMinutes"
     ]);
   });

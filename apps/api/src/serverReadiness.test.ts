@@ -151,7 +151,7 @@ describe("server readiness checks", () => {
 
   it("checks that the expected database migration was applied", async () => {
     expect(expectedDatabaseMigrationTag).toBe(
-      "0043_project_resource_pool_members.sql"
+      "0044_baseline_assignment_role_units.sql"
     );
     const migrationTags: unknown[] = [];
     const checks = createServerReadinessChecks({

@@ -420,6 +420,8 @@ describe("planning command reducer", () => {
             assignmentId: "assignment-a",
             taskId: "task-a",
             resourceId: "resource-alpha",
+            role: "executor",
+            unitsPermille: 1000,
             workMinutes: 480
           }
         ]

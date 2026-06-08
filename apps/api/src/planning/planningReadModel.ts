@@ -146,7 +146,7 @@ function createBaselineAssignmentComparison(
           )
         : null;
       const currentWorkMinutes = current
-        ? resolveEffectiveAssignmentWork(
+        ? resolveComparisonAssignmentWork(
             currentAssignments,
             current,
             calculatedTasksById.get(current.taskId)?.workMinutes ?? 0
@@ -185,7 +185,7 @@ function createBaselineResourceComparison(
   const currentWorkByResource = aggregateWorkByResource(
     currentAssignments.map((assignment) => ({
       resourceId: assignment.resourceId,
-      workMinutes: resolveEffectiveAssignmentWork(
+      workMinutes: resolveComparisonAssignmentWork(
         currentAssignments,
         assignment,
         calculatedTasksById.get(assignment.taskId)?.workMinutes ?? 0
@@ -239,6 +239,7 @@ function resolveBaselineAssignmentWork(
   baselineAssignments: BaselineAssignmentSnapshot[],
   baselineTaskWorkMinutes: number
 ): number {
+  if (!isWorkAssignmentRole(assignment.role)) return 0;
   if (assignment.workMinutes !== null) return assignment.workMinutes;
 
   const baselineTaskAssignments = baselineAssignments
@@ -247,19 +248,32 @@ function resolveBaselineAssignmentWork(
       id: candidate.assignmentId,
       taskId: candidate.taskId,
       resourceId: candidate.resourceId,
-      role: "executor" as const,
-      unitsPermille: 1000,
+      role: candidate.role,
+      unitsPermille: candidate.unitsPermille,
       workMinutes: candidate.workMinutes,
       calendarId: null
     }));
   const baselineAssignment = baselineTaskAssignments.find((candidate) => candidate.id === assignment.assignmentId);
   if (!baselineAssignment) return baselineTaskWorkMinutes;
 
-  return resolveEffectiveAssignmentWork(
+  return resolveComparisonAssignmentWork(
     baselineTaskAssignments,
     baselineAssignment,
     baselineTaskWorkMinutes
   );
+}
+
+function resolveComparisonAssignmentWork(
+  assignments: CurrentAssignmentSnapshot[],
+  assignment: CurrentAssignmentSnapshot,
+  taskWorkMinutes: number
+): number {
+  if (!isWorkAssignmentRole(assignment.role)) return 0;
+  return resolveEffectiveAssignmentWork(assignments, assignment, taskWorkMinutes);
+}
+
+function isWorkAssignmentRole(role: CurrentAssignmentSnapshot["role"]): boolean {
+  return role === "executor" || role === "co_executor";
 }
 
 function aggregateWorkByResource(assignments: Array<{ resourceId: string; workMinutes: number }>) {

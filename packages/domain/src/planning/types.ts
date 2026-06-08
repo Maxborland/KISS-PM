@@ -139,6 +139,8 @@ export type PlanBaseline = {
     assignmentId: string;
     taskId: string;
     resourceId: string;
+    role: PlanAssignmentRole;
+    unitsPermille: number;
     workMinutes: number | null;
   }>;
 };

@@ -43,6 +43,8 @@ describe("planning read model", () => {
               assignmentId: "assignment-alpha",
               taskId: "task-alpha",
               resourceId: "resource-alpha",
+              role: "executor",
+              unitsPermille: 1000,
               workMinutes: null
             }
           ]
@@ -116,6 +118,8 @@ describe("planning read model", () => {
               assignmentId: "assignment-alpha",
               taskId: "task-alpha",
               resourceId: "resource-alpha",
+              role: "executor",
+              unitsPermille: 1000,
               workMinutes: null
             }
           ]
@@ -138,6 +142,188 @@ describe("planning read model", () => {
         currentWorkMinutes: 240,
         workDeltaMinutes: 240
       }
+    ]);
+  });
+
+  it("preserves baseline roles when resolving implicit assignment work", () => {
+    const readModel = createPlanningReadModel({
+      ...createSnapshot(),
+      resources: [createResource("resource-alpha"), createResource("resource-beta")],
+      assignments: [
+        {
+          id: "assignment-alpha",
+          taskId: "task-alpha",
+          resourceId: "resource-alpha",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: null,
+          calendarId: null
+        },
+        {
+          id: "assignment-beta",
+          taskId: "task-alpha",
+          resourceId: "resource-beta",
+          role: "controller",
+          unitsPermille: 1000,
+          workMinutes: null,
+          calendarId: null
+        }
+      ],
+      baselines: [
+        {
+          id: "baseline-alpha",
+          capturedAt: "2026-05-21T00:00:00.000Z",
+          tasks: [
+            {
+              taskId: "task-alpha",
+              plannedStart: "2026-06-01",
+              plannedFinish: "2026-06-01",
+              workMinutes: 480
+            }
+          ],
+          assignments: [
+            {
+              assignmentId: "assignment-alpha",
+              taskId: "task-alpha",
+              resourceId: "resource-alpha",
+              role: "executor",
+              unitsPermille: 1000,
+              workMinutes: null
+            },
+            {
+              assignmentId: "assignment-beta",
+              taskId: "task-alpha",
+              resourceId: "resource-beta",
+              role: "controller",
+              unitsPermille: 1000,
+              workMinutes: null
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(readModel.baselineComparison.assignments).toEqual([
+      expect.objectContaining({
+        assignmentId: "assignment-alpha",
+        status: "unchanged",
+        baselineWorkMinutes: 480,
+        currentWorkMinutes: 480,
+        workDeltaMinutes: 0
+      }),
+      expect.objectContaining({
+        assignmentId: "assignment-beta",
+        status: "unchanged",
+        baselineWorkMinutes: 0,
+        currentWorkMinutes: 0,
+        workDeltaMinutes: 0
+      })
+    ]);
+
+    expect(readModel.baselineComparison.resources).toEqual([
+      expect.objectContaining({
+        resourceId: "resource-alpha",
+        baselineWorkMinutes: 480,
+        currentWorkMinutes: 480,
+        workDeltaMinutes: 0
+      }),
+      expect.objectContaining({
+        resourceId: "resource-beta",
+        baselineWorkMinutes: 0,
+        currentWorkMinutes: 0,
+        workDeltaMinutes: 0
+      })
+    ]);
+  });
+
+  it("ignores explicit non-work assignment minutes in resource drift", () => {
+    const readModel = createPlanningReadModel({
+      ...createSnapshot(),
+      resources: [createResource("resource-alpha"), createResource("resource-beta")],
+      assignments: [
+        {
+          id: "assignment-alpha",
+          taskId: "task-alpha",
+          resourceId: "resource-alpha",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: 480,
+          calendarId: null
+        },
+        {
+          id: "assignment-beta",
+          taskId: "task-alpha",
+          resourceId: "resource-beta",
+          role: "approver",
+          unitsPermille: 1000,
+          workMinutes: 300,
+          calendarId: null
+        }
+      ],
+      baselines: [
+        {
+          id: "baseline-alpha",
+          capturedAt: "2026-05-21T00:00:00.000Z",
+          tasks: [
+            {
+              taskId: "task-alpha",
+              plannedStart: "2026-06-01",
+              plannedFinish: "2026-06-01",
+              workMinutes: 480
+            }
+          ],
+          assignments: [
+            {
+              assignmentId: "assignment-alpha",
+              taskId: "task-alpha",
+              resourceId: "resource-alpha",
+              role: "executor",
+              unitsPermille: 1000,
+              workMinutes: 480
+            },
+            {
+              assignmentId: "assignment-beta",
+              taskId: "task-alpha",
+              resourceId: "resource-beta",
+              role: "approver",
+              unitsPermille: 1000,
+              workMinutes: 240
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(readModel.baselineComparison.assignments).toEqual([
+      expect.objectContaining({
+        assignmentId: "assignment-alpha",
+        status: "unchanged",
+        baselineWorkMinutes: 480,
+        currentWorkMinutes: 480,
+        workDeltaMinutes: 0
+      }),
+      expect.objectContaining({
+        assignmentId: "assignment-beta",
+        status: "unchanged",
+        baselineWorkMinutes: 0,
+        currentWorkMinutes: 0,
+        workDeltaMinutes: 0
+      })
+    ]);
+
+    expect(readModel.baselineComparison.resources).toEqual([
+      expect.objectContaining({
+        resourceId: "resource-alpha",
+        baselineWorkMinutes: 480,
+        currentWorkMinutes: 480,
+        workDeltaMinutes: 0
+      }),
+      expect.objectContaining({
+        resourceId: "resource-beta",
+        baselineWorkMinutes: 0,
+        currentWorkMinutes: 0,
+        workDeltaMinutes: 0
+      })
     ]);
   });
 });

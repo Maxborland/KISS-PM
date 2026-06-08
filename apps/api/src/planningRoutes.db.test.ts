@@ -1454,6 +1454,8 @@ describe("planning API routes", () => {
         assignmentId: "assignment-baseline-resource-a",
         taskId: "task-baseline-resource-a",
         resourceId: "user-alpha-admin",
+        role: "executor",
+        unitsPermille: 1000,
         workMinutes: 480
       }
     ]));
@@ -1537,6 +1539,8 @@ describe("planning API routes", () => {
         assignmentId: "task-baseline-participant-derived-user-alpha-executor-executor",
         taskId: "task-baseline-participant-derived",
         resourceId: "user-alpha-executor",
+        role: "executor",
+        unitsPermille: 1000,
         workMinutes: null
       }
     ]);

@@ -255,6 +255,8 @@ describe("planning repository", () => {
               assignmentId: "assignment-alpha",
               taskId: "task-alpha",
               resourceId: "user-alpha-executor",
+              role: "executor",
+              unitsPermille: 1000,
               workMinutes: 960
             }
           ]

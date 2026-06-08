@@ -180,11 +180,13 @@ export const planningSchemas = openApiSchemaFragment({
   },
   PlanningBaselineAssignmentSnapshot: {
     type: "object",
-    required: ["assignmentId", "taskId", "resourceId", "workMinutes"],
+    required: ["assignmentId", "taskId", "resourceId", "role", "unitsPermille", "workMinutes"],
     properties: {
       assignmentId: stringIdSchema,
       taskId: stringIdSchema,
       resourceId: stringIdSchema,
+      role: planningAssignmentRoleSchema,
+      unitsPermille: { type: "integer", minimum: 1 },
       workMinutes: { type: ["integer", "null"], minimum: 0 }
     },
     additionalProperties: false

@@ -228,6 +228,13 @@ const projectResourcePoolMembersMigration = readFileSync(
   ),
   "utf8"
 );
+const baselineAssignmentRoleUnitsMigration = readFileSync(
+  new URL(
+    "../migrations/0044_baseline_assignment_role_units.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -948,6 +955,29 @@ describe("Project resource pool SQL migration", () => {
     );
     expect(projectResourcePoolMembersMigration).toContain(
       "CONSTRAINT \"project_resource_pool_members_role_chk\" CHECK(\"role\" in ('project_manager', 'resource', 'observer'))"
+    );
+  });
+});
+
+describe("Planning baseline assignment role SQL migration", () => {
+  it("preserves assignment role and units for baseline workload drift", () => {
+    expect(baselineAssignmentRoleUnitsMigration).toContain(
+      'ALTER TABLE "project_baseline_assignments"'
+    );
+    expect(baselineAssignmentRoleUnitsMigration).toContain(
+      'ADD COLUMN IF NOT EXISTS "role" text NOT NULL DEFAULT \'executor\''
+    );
+    expect(baselineAssignmentRoleUnitsMigration).toContain(
+      'ADD COLUMN IF NOT EXISTS "units_permille" integer NOT NULL DEFAULT 1000'
+    );
+    expect(baselineAssignmentRoleUnitsMigration).toContain(
+      'CONSTRAINT "project_baseline_assignments_role_chk"'
+    );
+    expect(baselineAssignmentRoleUnitsMigration).toContain(
+      '"role" in (\'executor\', \'co_executor\', \'controller\', \'approver\', \'observer\')'
+    );
+    expect(baselineAssignmentRoleUnitsMigration).toContain(
+      'CONSTRAINT "project_baseline_assignments_units_permille_chk"'
     );
   });
 });

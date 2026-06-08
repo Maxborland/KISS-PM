@@ -1456,6 +1456,8 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           assignmentId: assignment.id,
           taskId: assignment.taskId,
           resourceId: assignment.resourceId,
+          role: assignment.role,
+          unitsPermille: assignment.unitsPermille,
           workMinutes: assignment.workMinutes
         }))
       );
@@ -1743,6 +1745,8 @@ function mapBaselines(
         assignmentId: assignment.assignmentId,
         taskId: assignment.taskId,
         resourceId: assignment.resourceId,
+        role: assignment.role as PlanAssignmentRole,
+        unitsPermille: assignment.unitsPermille,
         workMinutes: assignment.workMinutes
       }))
   }));
