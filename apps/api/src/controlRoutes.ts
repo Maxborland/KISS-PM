@@ -13,12 +13,12 @@ import {
   canReadProjectPlan,
   canPreviewPlanningScenarios,
   type AccessProfile,
-  type Permission,
   type PolicyDecision
 } from "@kiss-pm/access-control";
 import {
   buildResourceLoadMatrix,
   calculatePlan,
+  controlSurfaceActionRegistry,
   createControlSignalsFromEvaluations,
   createDefaultProjectKpiDefinitions,
   evaluateProjectKpis,
@@ -108,7 +108,7 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     const filteredItems = items.map((item) => ({
       ...item,
-      allowedActions: filterAllowedActionsForProfile(item.allowedActions, profile)
+      allowedActions: filterAllowedActionsForProfile(item.allowedActions, actor, profile)
     }));
 
     return context.json({
@@ -1447,20 +1447,17 @@ function sortOperationalControlQueue(items: OperationalControlQueueSortItem[]) {
   );
 }
 
-const actionRequiredPermissions: Record<string, Permission[]> = {
-  open_gantt: ["tenant.project_plan.read"],
-  generate_planning_solution: ["tenant.planning_scenarios.preview"],
-  create_corrective_action: ["tenant.corrective_actions.manage"]
-};
-
 function filterAllowedActionsForProfile(
   actions: string[],
+  actor: TenantUser,
   profile: AccessProfile
 ): string[] {
   return actions.filter((action) => {
-    const required = actionRequiredPermissions[action];
-    if (!required) return true;
-    return required.every((permission) => profile.permissions.includes(permission));
+    const registry = controlSurfaceActionRegistry[action as keyof typeof controlSurfaceActionRegistry];
+    if (!registry) return true;
+    return registry.requiredPermissions.every(
+      (permission) => decisionForPermission(permission, actor, profile).allowed
+    );
   });
 }
 
@@ -1841,9 +1838,12 @@ function decisionForPermission(
   profile: AccessProfile
 ): PolicyDecision {
   const input = { actor, profile, targetTenantId: actor.tenantId };
+  if (permission === "tenant.project_plan.read") return canReadProjectPlan(input);
   if (permission === "tenant.project_plan.manage") return canManageProjectPlan(input);
   if (permission === "tenant.project_resources.manage") return canManageProjectResources(input);
+  if (permission === "tenant.planning_scenarios.preview") return canPreviewPlanningScenarios(input);
   if (permission === "tenant.planning_scenarios.apply") return canApplyPlanningScenarios(input);
+  if (permission === "tenant.corrective_actions.manage") return canManageCorrectiveActions(input);
   return {
     allowed: false,
     reason: "permission_missing"

@@ -19,7 +19,17 @@ const databaseUrl =
 const dataset: SeedTenantDataset = {
   tenants: [{ id: "tenant-alpha", name: "Alpha" }],
   accessProfiles: [
-    createTenantAdminSeedProfile({ id: "access-profile-admin", tenantId: "tenant-alpha" })
+    createTenantAdminSeedProfile({ id: "access-profile-admin", tenantId: "tenant-alpha" }),
+    {
+      id: "access-profile-queue-reader",
+      tenantId: "tenant-alpha",
+      name: "Queue Reader",
+      permissions: [
+        "tenant.projects.read",
+        "tenant.control_signals.read",
+        "tenant.audit_events.read"
+      ]
+    }
   ],
   clients: [{ id: "client-alpha", tenantId: "tenant-alpha", name: "Alpha Client" }],
   projectTypes: [{ id: "project-type-alpha", tenantId: "tenant-alpha", name: "Implementation" }],
@@ -31,6 +41,14 @@ const dataset: SeedTenantDataset = {
       name: "Admin",
       accessProfileId: "access-profile-admin",
       password: "admin12345"
+    },
+    {
+      id: "user-queue-reader",
+      tenantId: "tenant-alpha",
+      email: "queue-reader@kiss-pm.local",
+      name: "Queue Reader",
+      accessProfileId: "access-profile-queue-reader",
+      password: "reader12345"
     }
   ]
 };
@@ -133,6 +151,26 @@ describe("operational control queue API DB", () => {
       "audit-event:project-alpha:audit-denied"
     ]);
     expect(body.items.some((item) => item.id.includes("signal-resolved"))).toBe(false);
+  });
+
+  it("filters persisted allowedActions by actor permissions", async () => {
+    const cookie = await loginAs("queue-reader@kiss-pm.local", "reader12345");
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: { cookie } }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string; allowedActions: string[] }> };
+    const overdueProject = body.items.find((item) => item.id === "project-overdue:project-alpha");
+    expect(overdueProject).toBeDefined();
+    expect(overdueProject!.allowedActions).not.toContain("open_gantt");
+    expect(overdueProject!.allowedActions).not.toContain("generate_planning_solution");
+
+    const criticalSignal = body.items.find((item) => item.id === "control-signal:project-alpha:signal-critical");
+    expect(criticalSignal).toBeDefined();
+    expect(criticalSignal!.allowedActions).not.toContain("create_corrective_action");
   });
 
   it("excludes persisted accepted-risk control signals from the attention queue", async () => {
