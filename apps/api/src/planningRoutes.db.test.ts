@@ -1459,6 +1459,81 @@ describe("planning API routes", () => {
     ]));
   });
 
+  it("keeps previewed baseline assignment snapshots aligned with persisted capture for participant-derived assignments", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-baseline-participant-derived",
+      title: "Baseline participant-derived assignment",
+      start: "2026-06-02",
+      finish: "2026-06-02",
+      plannedWork: 8
+    });
+
+    await client`
+      DELETE FROM task_assignments
+      WHERE tenant_id = 'tenant-alpha'
+        AND project_id = 'project-alpha'
+        AND task_id = 'task-baseline-participant-derived'
+    `;
+
+    const readModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const readModelBody = await readModel.json();
+    expect(readModel.status).toBe(200);
+    expect(readModelBody.authored.assignments).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "task-baseline-participant-derived-user-alpha-executor-executor",
+        taskId: "task-baseline-participant-derived",
+        resourceId: "user-alpha-executor",
+        workMinutes: null
+      })
+    ]));
+
+    const command = {
+      type: "baseline.capture",
+      payload: { baselineId: "baseline-participant-derived", label: "Participant-derived baseline" }
+    };
+    const preview = await app.request(
+      "/api/workspace/projects/project-alpha/planning/preview-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ command, clientPlanVersion: readModelBody.planVersion })
+      }
+    );
+    const previewBody = await preview.json();
+    expect(preview.status).toBe(200);
+
+    const applied = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ command, clientPlanVersion: readModelBody.planVersion })
+      }
+    );
+    const appliedBody = await applied.json();
+    expect(applied.status).toBe(200);
+
+    const previewBaseline = previewBody.after.authored.baselines.find(
+      (baseline: { id: string }) => baseline.id === "baseline-participant-derived"
+    );
+    const persistedBaseline = appliedBody.readModel.authored.baselines.find(
+      (baseline: { id: string }) => baseline.id === "baseline-participant-derived"
+    );
+    expect(previewBaseline.assignments).toEqual(persistedBaseline.assignments);
+    expect(previewBaseline.assignments).toEqual([]);
+  });
   it("emits distinct audit actions for archived and hard-deleted planning tasks", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask(adminCookie, {
