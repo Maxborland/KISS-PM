@@ -5,7 +5,10 @@ import {
   readServerRuntimeConfig
 } from "./serverConfig";
 import { setPlanningRealtimeStatusProvider } from "./planningRealtimeHealth";
-import { createServerReadinessChecks } from "./serverReadiness";
+import {
+  createServerReadinessChecks,
+  expectedDatabaseMigrationTag
+} from "./serverReadiness";
 import type { StorageProvider } from "./storageProvider";
 
 describe("server readiness checks", () => {
@@ -147,13 +150,21 @@ describe("server readiness checks", () => {
   });
 
   it("checks that the expected database migration was applied", async () => {
+    expect(expectedDatabaseMigrationTag).toBe(
+      "0043_project_resource_pool_members.sql"
+    );
+    const migrationTags: unknown[] = [];
     const checks = createServerReadinessChecks({
-      postgresClient: fakePostgresClient([[{ ready: 1 }], [{ ready: 1 }]]),
+      postgresClient: fakePostgresClient(
+        [[{ ready: 1 }], [{ ready: 1 }]],
+        migrationTags
+      ),
       production: true,
       storageProvider: fakeStorageProvider()
     });
 
     await expect(checks.database?.()).resolves.toBeUndefined();
+    expect(migrationTags).toEqual([expectedDatabaseMigrationTag]);
   });
 
   it("fails database readiness when schema migrations are missing", async () => {
@@ -222,7 +233,10 @@ function fakeStorageProvider(): StorageProvider {
   };
 }
 
-function fakePostgresClient(results: unknown[][]) {
+function fakePostgresClient(results: unknown[][], capturedValues?: unknown[]) {
   let index = 0;
-  return async () => results[index++] ?? [];
+  return async (_strings: TemplateStringsArray, ...values: unknown[]) => {
+    capturedValues?.push(...values);
+    return results[index++] ?? [];
+  };
 }
