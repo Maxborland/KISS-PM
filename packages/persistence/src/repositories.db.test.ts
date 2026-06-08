@@ -445,11 +445,19 @@ describe("PostgreSQL tenant data source", () => {
       plannedStart: new Date("2026-07-02T00:00:00.000Z"),
       plannedFinish: new Date("2026-07-03T00:00:00.000Z")
     });
+    if (!firstInbox) {
+      throw new Error("expected initial workspace inbox project");
+    }
+
     const widenedInbox = await dataSource.ensureWorkspaceInboxProject({
       tenantId: "tenant-alpha",
       plannedStart: new Date("2026-06-15T00:00:00.000Z"),
       plannedFinish: new Date("2026-08-11T00:00:00.000Z")
     });
+
+    if (!widenedInbox) {
+      throw new Error("expected existing workspace inbox project");
+    }
 
     expect(widenedInbox).toMatchObject({
       id: firstInbox.id,
@@ -471,6 +479,10 @@ describe("PostgreSQL tenant data source", () => {
       plannedStart: new Date("2026-09-01T00:00:00.000Z"),
       plannedFinish: new Date("2026-09-02T00:00:00.000Z")
     });
+    if (!reopenedInbox) {
+      throw new Error("expected reopened workspace inbox project");
+    }
+
     await client`
       UPDATE projects
       SET status = 'cancelled'
@@ -489,6 +501,10 @@ describe("PostgreSQL tenant data source", () => {
         AND source_type = 'workspace_inbox'
       ORDER BY created_at, id
     `;
+
+    if (!recreatedAfterCancelledInbox) {
+      throw new Error("expected recreated workspace inbox project");
+    }
 
     expect(reopenedInbox.id).not.toBe(firstInbox.id);
     expect(recreatedAfterCancelledInbox.id).not.toBe(reopenedInbox.id);

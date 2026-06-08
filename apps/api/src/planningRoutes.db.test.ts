@@ -233,6 +233,19 @@ describe("planning API routes", () => {
     expect(response.status).toBe(201);
   }
 
+  async function pauseProject(cookie: string) {
+    const response = await app.request("/api/workspace/projects/project-alpha/status", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({ status: "paused" })
+    });
+    expect(response.status).toBe(200);
+  }
+
   beforeAll(() => {
     client = createPostgresClient(databaseUrl);
     app = createApp({
@@ -1636,6 +1649,194 @@ describe("planning API routes", () => {
           event.sourceWorkflow === "planning"
       )
     ).toBe(false);
+  });
+
+  it("keeps paused project planning reads available while blocking command mutations", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-paused-a",
+      title: "Paused task A",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
+    await createTask(adminCookie, {
+      id: "task-paused-b",
+      title: "Paused task B",
+      start: "2026-06-04",
+      finish: "2026-06-05"
+    });
+
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    expect(initial.status).toBe(200);
+
+    await pauseProject(adminCookie);
+
+    const pausedRead = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const pausedReadBody = await pausedRead.json();
+    expect(pausedRead.status).toBe(200);
+    expect(pausedReadBody.planVersion).toBe(initialBody.planVersion);
+
+    const command = {
+      type: "task.update_identity",
+      payload: { taskId: "task-paused-a", title: "Should not mutate while paused" }
+    };
+    const applyCommand = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ command, clientPlanVersion: initialBody.planVersion })
+      }
+    );
+    expect(applyCommand.status).toBe(404);
+    await expect(applyCommand.json()).resolves.toEqual({ error: "project_not_found" });
+
+    const batch = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ commands: [command], clientPlanVersion: initialBody.planVersion })
+      }
+    );
+    expect(batch.status).toBe(404);
+    await expect(batch.json()).resolves.toEqual({ error: "project_not_found" });
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    expect(after.status).toBe(200);
+    expect(afterBody).toMatchObject({
+      planVersion: initialBody.planVersion,
+      authored: {
+        tasks: expect.arrayContaining([
+          expect.objectContaining({ id: "task-paused-a", title: "Paused task A" })
+        ])
+      }
+    });
+  });
+
+  it("blocks applying stored scenario proposals while a project is paused", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-paused-overload",
+      title: "Paused overload task",
+      start: "2026-06-08",
+      finish: "2026-06-08",
+      plannedWork: 40
+    });
+
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    const assignmentApplied = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command: {
+            type: "assignment.upsert",
+            payload: {
+              id: "assignment-paused-overload",
+              taskId: "task-paused-overload",
+              resourceId: "user-alpha-executor",
+              role: "executor",
+              unitsPermille: 1000,
+              workMinutes: 4_800
+            }
+          },
+          clientPlanVersion: initialBody.planVersion
+        })
+      }
+    );
+    expect(assignmentApplied.status).toBe(200);
+    const assignmentAppliedBody = await assignmentApplied.json();
+    const overload = assignmentAppliedBody.readModel.resourceLoad.overloads.find(
+      (candidate: { resourceId: string; taskIds: string[] }) =>
+        candidate.resourceId === "user-alpha-executor" &&
+        candidate.taskIds.includes("task-paused-overload")
+    );
+    expect(overload).toBeTruthy();
+
+    const scenarioPreview = await app.request(
+      "/api/workspace/projects/project-alpha/planning/scenario-proposals",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          clientPlanVersion: assignmentAppliedBody.newPlanVersion,
+          target: {
+            type: "resource_overload",
+            resourceId: overload.resourceId,
+            date: overload.date,
+            overloadMinutes: overload.overloadMinutes,
+            taskIds: overload.taskIds
+          }
+        })
+      }
+    );
+    expect(scenarioPreview.status).toBe(200);
+    const scenarioPreviewBody = await scenarioPreview.json();
+
+    await pauseProject(adminCookie);
+
+    const scenarioApply = await app.request(
+      `/api/workspace/projects/project-alpha/planning/scenario-proposals/${scenarioPreviewBody.proposals[0].id}/apply`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          clientPlanVersion: assignmentAppliedBody.newPlanVersion,
+          acceptedRiskReason: "Paused projects cannot apply stored scenario proposals"
+        })
+      }
+    );
+    expect(scenarioApply.status).toBe(404);
+    await expect(scenarioApply.json()).resolves.toEqual({ error: "project_not_found" });
+
+    const scenarioRows = await client`
+      SELECT applied_at
+      FROM planning_scenario_runs
+      WHERE tenant_id = 'tenant-alpha'
+        AND project_id = 'project-alpha'
+        AND id = ${scenarioPreviewBody.proposals[0].id}
+    `;
+    expect(scenarioRows[0]?.applied_at).toBeNull();
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    expect(after.status).toBe(200);
+    expect(afterBody.planVersion).toBe(assignmentAppliedBody.newPlanVersion);
   });
 
   it("applies command batch atomically with idempotency and version conflict", async () => {

@@ -94,6 +94,7 @@ const routeDocs: RouteDoc[] = [
   { method: "post", path: "/api/workspace/opportunities/:opportunityId/activate", tag: "Project intake", summary: "Activate project from opportunity", requestSchema: "ProjectActivationRequest", successSchema: "ProjectActivationResponse", successStatus: 201 },
   { method: "get", path: "/api/workspace/projects", tag: "Projects and tasks", summary: "List projects", successSchema: "ProjectsResponse" },
   { method: "get", path: "/api/workspace/projects/:projectId", tag: "Projects and tasks", summary: "Read project detail", successSchema: "ProjectDetailResponse" },
+  { method: "patch", path: "/api/workspace/projects/:projectId/status", tag: "Projects and tasks", summary: "Pause or resume project", requestSchema: "ProjectStatusUpdateRequest", successSchema: "ProjectResponse" },
   { method: "get", path: "/api/workspace/projects/:projectId/tasks", tag: "Projects and tasks", summary: "List project tasks", successSchema: "TasksResponse" },
   { method: "get", path: "/api/workspace/my-work", tag: "Projects and tasks", summary: "List current user's work", successSchema: "TasksResponse" },
   { method: "get", path: "/api/workspace/tasks/:taskId", tag: "Projects and tasks", summary: "Read task", successSchema: "TaskDetailResponse" },

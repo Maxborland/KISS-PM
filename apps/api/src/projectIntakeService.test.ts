@@ -687,6 +687,46 @@ describe("project intake application service", () => {
     expect(fixture.audits).toEqual([]);
   });
 
+  it("requires accepted risk reason when paused project reservation conflicts", async () => {
+    const existingReservation = createProjectRecord(
+      {
+        id: "project-existing-paused",
+        tenantId: "tenant-alpha",
+        sourceOpportunityId: "opportunity-existing",
+        clientId: "client-alpha",
+        projectTypeId: "project-type-alpha",
+        title: "Existing paused project",
+        clientName: "Client Alpha",
+        status: "paused",
+        plannedStart: opportunityInput.plannedStart,
+        plannedFinish: opportunityInput.plannedFinish,
+        contractValue: 500_000,
+        plannedHours: 170,
+        templateId: null,
+        demand: [{ positionId: "position-analyst", requiredHours: 170 }]
+      },
+      { activatedAt: new Date("2026-05-10T00:00:00.000Z") }
+    );
+    const fixture = createActivationFixture({
+      crmStage: null,
+      activeProjects: [existingReservation]
+    });
+
+    const result = await fixture.service.activateProjectFromOpportunity({
+      actor,
+      opportunityId: fixture.currentOpportunity.id,
+      activation: { id: "project-paused-conflict", acceptedRiskReason: null }
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      error: "risk_acceptance_required"
+    });
+    expect(fixture.createdDrafts).toEqual([]);
+    expect(fixture.audits).toEqual([]);
+  });
+
   it("updates draft opportunity fields, refreshes linked labels and records management audit", async () => {
     const audits: ManagementAuditEventInput[] = [];
     let updatedInput: OpportunityInput | null = null;

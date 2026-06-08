@@ -3,6 +3,7 @@ import { createTaskSystemActivity, summarizeTask } from "./taskCommandActivities
 import {
   canApplyTaskCompatibilityPlanningCommands,
   canEditTaskFields,
+  findActiveProject,
   getParticipantUserId,
   normalizeTaskParticipants
 } from "./taskCommandGuards";
@@ -14,6 +15,7 @@ export async function updateTask(
 ): Promise<TaskResult> {
   if (
     !deps.dataSource.findTaskById ||
+    !deps.dataSource.listProjects ||
     !deps.dataSource.getPlanSnapshot ||
     !deps.dataSource.applyPlanningCommand ||
     !deps.dataSource.updateTaskMetadata ||
@@ -44,6 +46,7 @@ export async function updateTask(
       !transactionDataSource.applyPlanningCommand ||
       !transactionDataSource.updateTaskMetadata ||
       !transactionDataSource.findTaskById ||
+      !transactionDataSource.listProjects ||
       !transactionDataSource.incrementPlanVersion ||
       !transactionDataSource.listTaskStatuses ||
       !transactionDataSource.listWorkspaceUsers ||
@@ -63,6 +66,14 @@ export async function updateTask(
     const currentEditDecision = canEditTaskFields(input.actor, input.profile, currentTask);
     if (!currentEditDecision.allowed) {
       return { ok: false as const, status: 403, error: currentEditDecision.reason };
+    }
+    const currentProject = await findActiveProject(
+      transactionDataSource,
+      input.actor.tenantId,
+      currentTask.projectId
+    );
+    if (!currentProject) {
+      return { ok: false as const, status: 404, error: "project_not_found" };
     }
 
     const currentActiveUserIds = new Set(

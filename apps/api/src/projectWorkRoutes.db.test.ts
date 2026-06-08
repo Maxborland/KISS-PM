@@ -120,6 +120,10 @@ describe("project work API routes", () => {
     return response.headers.get("set-cookie") ?? "";
   }
 
+  function delay(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async function createActiveProject() {
     const dataSource = createPostgresTenantDataSource(createDatabase(client));
     const opportunity = await dataSource.createOpportunity({
@@ -1533,5 +1537,429 @@ describe("project work API routes", () => {
     await expect(deniedProject.json()).resolves.toEqual({ error: "permission_missing" });
     expect(deniedMyWork.status).toBe(403);
     await expect(deniedMyWork.json()).resolves.toEqual({ error: "permission_missing" });
+  });
+
+  it("pauses and resumes an active project, keeps paused reads open, and blocks task mutations", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-paused-project",
+        title: "Paused project task",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 16,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const taskDetailBeforePause = await app.request("/api/workspace/tasks/task-paused-project", {
+      headers: { cookie: adminCookie }
+    });
+    const taskBeforePause = (await taskDetailBeforePause.json()).task;
+
+    const paused = await app.request("/api/workspace/projects/project-alpha/status", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ status: "paused" })
+    });
+    const projectDetail = await app.request("/api/workspace/projects/project-alpha", {
+      headers: { cookie: adminCookie }
+    });
+    const projectTasks = await app.request("/api/workspace/projects/project-alpha/tasks", {
+      headers: { cookie: adminCookie }
+    });
+    const projectListWhilePaused = await app.request("/api/workspace/projects", {
+      headers: { cookie: adminCookie }
+    });
+    const createOnPaused = await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-paused-denied",
+        title: "Paused create denied",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const updateOnPaused = await app.request("/api/workspace/tasks/task-paused-project", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify(
+        buildTaskPatchBody({
+          clientUpdatedAt: taskBeforePause.updatedAt,
+          title: "Paused update denied"
+        })
+      )
+    });
+    const transitionOnPaused = await app.request(
+      "/api/workspace/projects/project-alpha/tasks/task-paused-project/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ statusId: "task-status-in-progress" })
+      }
+    );
+    const archiveOnPaused = await app.request("/api/workspace/tasks/task-paused-project", {
+      method: "DELETE",
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      }
+    });
+    expect(projectListWhilePaused.status).toBe(200);
+    const projectListWhilePausedBody = await projectListWhilePaused.json();
+    expect(projectListWhilePausedBody).toMatchObject({
+      projects: [expect.objectContaining({ id: "project-alpha", status: "paused" })]
+    });
+    const listedPausedProject = projectListWhilePausedBody.projects.find(
+      (project: { id: string }) => project.id === "project-alpha"
+    );
+    expect(listedPausedProject).toMatchObject({ id: "project-alpha", status: "paused" });
+
+    const resumed = await app.request(`/api/workspace/projects/${listedPausedProject.id}/status`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ status: "active" })
+    });
+    const archiveOnActive = await app.request("/api/workspace/tasks/task-paused-project", {
+      method: "DELETE",
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      }
+    });
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+
+    expect(paused.status).toBe(200);
+    await expect(paused.json()).resolves.toMatchObject({
+      project: { id: "project-alpha", status: "paused" }
+    });
+    expect(projectDetail.status).toBe(200);
+    await expect(projectDetail.json()).resolves.toMatchObject({
+      project: { id: "project-alpha", status: "paused" },
+      tasks: [expect.objectContaining({ id: "task-paused-project" })]
+    });
+    expect(projectTasks.status).toBe(200);
+    await expect(projectTasks.json()).resolves.toMatchObject({
+      tasks: [expect.objectContaining({ id: "task-paused-project" })]
+    });
+    expect(createOnPaused.status).toBe(404);
+    await expect(createOnPaused.json()).resolves.toEqual({ error: "project_not_found" });
+    expect(updateOnPaused.status).toBe(404);
+    await expect(updateOnPaused.json()).resolves.toEqual({ error: "project_not_found" });
+    expect(transitionOnPaused.status).toBe(404);
+    await expect(transitionOnPaused.json()).resolves.toEqual({ error: "project_not_found" });
+    expect(archiveOnPaused.status).toBe(404);
+    await expect(archiveOnPaused.json()).resolves.toEqual({ error: "project_not_found" });
+    expect(resumed.status).toBe(200);
+    await expect(resumed.json()).resolves.toMatchObject({
+      project: { id: "project-alpha", status: "active" }
+    });
+    expect(archiveOnActive.status).toBe(200);
+    await expect(archiveOnActive.json()).resolves.toMatchObject({
+      task: { id: "task-paused-project", projectId: "project-alpha" }
+    });
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "project.status_changed",
+          sourceWorkflow: "project_core",
+          sourceEntity: { type: "Project", id: "project-alpha" },
+          beforeState: { status: "active" },
+          afterState: { status: "paused" },
+          input: { status: "paused" },
+          executionResult: { status: "succeeded" }
+        }),
+        expect.objectContaining({
+          actionType: "project.status_changed",
+          sourceWorkflow: "project_core",
+          sourceEntity: { type: "Project", id: "project-alpha" },
+          beforeState: { status: "paused" },
+          afterState: { status: "active" },
+          input: { status: "active" },
+          executionResult: { status: "succeeded" }
+        })
+      ])
+    });
+  });
+
+  it("keeps a paused workspace inbox immutable until it is explicitly resumed", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const createdInboxTask = await app.request("/api/workspace/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-inbox-before-pause",
+        title: "Inbox task before pause",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    expect(createdInboxTask.status).toBe(201);
+    const createdInboxTaskBody = await createdInboxTask.json();
+    const inboxProjectId = createdInboxTaskBody.project.id;
+
+    const paused = await app.request(`/api/workspace/projects/${inboxProjectId}/status`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ status: "paused" })
+    });
+    expect(paused.status).toBe(200);
+
+    const createWhilePaused = await app.request("/api/workspace/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-inbox-while-paused",
+        title: "Inbox task while paused",
+        plannedStart: "2026-06-06",
+        plannedFinish: "2026-06-07",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const inboxRowsAfterDeniedCreate = await client`
+      SELECT status, planned_finish
+      FROM projects
+      WHERE tenant_id = 'tenant-alpha'
+        AND id = ${inboxProjectId}
+    `;
+    const deniedTaskRows = await client`
+      SELECT id
+      FROM tasks
+      WHERE tenant_id = 'tenant-alpha'
+        AND id = 'task-inbox-while-paused'
+    `;
+
+    expect(createWhilePaused.status).toBe(404);
+    await expect(createWhilePaused.json()).resolves.toEqual({ error: "project_not_found" });
+    expect(inboxRowsAfterDeniedCreate).toMatchObject([{ status: "paused" }]);
+    expect(String(inboxRowsAfterDeniedCreate[0]?.planned_finish)).toContain("2026-06-05");
+    expect(deniedTaskRows).toHaveLength(0);
+
+    const resumed = await app.request(`/api/workspace/projects/${inboxProjectId}/status`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ status: "active" })
+    });
+    expect(resumed.status).toBe(200);
+
+    const createAfterResume = await app.request("/api/workspace/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-inbox-after-resume",
+        title: "Inbox task after resume",
+        plannedStart: "2026-06-06",
+        plannedFinish: "2026-06-07",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    expect(createAfterResume.status).toBe(201);
+  });
+
+  it("serializes project pause and resume with tenant planning mutations", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const lockClient = createPostgresClient(databaseUrl);
+    let releaseLock: (() => void) | undefined;
+    let resolveLockReady: (() => void) | undefined;
+    let rejectLockReady: ((error: unknown) => void) | undefined;
+    const lockReleased = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    const lockReady = new Promise<void>((resolve, reject) => {
+      resolveLockReady = resolve;
+      rejectLockReady = reject;
+    });
+
+    const lockTransaction = lockClient
+      .begin(async (transaction) => {
+        await transaction`
+          SELECT pg_advisory_xact_lock(
+            hashtext('tenant-alpha'),
+            hashtext('kiss_pm_resource_planning')
+          )
+        `;
+        resolveLockReady?.();
+        await lockReleased;
+      })
+      .catch((error: unknown) => {
+        rejectLockReady?.(error);
+        throw error;
+      });
+
+    try {
+      await lockReady;
+      const pendingPause = Promise.resolve(app.request("/api/workspace/projects/project-alpha/status", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ status: "paused" })
+      }));
+
+      const earlyResult = await Promise.race([
+        pendingPause.then(() => "completed"),
+        delay(100).then(() => "waiting")
+      ]);
+
+      expect(earlyResult).toBe("waiting");
+      releaseLock?.();
+      await lockTransaction;
+
+      const pauseResponse = await pendingPause;
+      expect(pauseResponse.status).toBe(200);
+      await expect(pauseResponse.json()).resolves.toMatchObject({
+        project: { id: "project-alpha", status: "paused" }
+      });
+    } finally {
+      releaseLock?.();
+      await lockTransaction.catch(() => undefined);
+      await lockClient.end();
+    }
+  });
+
+  it("requires project manage permission and rejects non active-paused lifecycle transitions", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+
+    const denied = await app.request("/api/workspace/projects/project-alpha/status", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: readerCookie
+      },
+      body: JSON.stringify({ status: "paused" })
+    });
+    const closeAttempt = await app.request("/api/workspace/projects/project-alpha/status", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ status: "closed" })
+    });
+    const cancelAttempt = await app.request("/api/workspace/projects/project-alpha/status", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ status: "cancelled" })
+    });
+    const draftTarget = await app.request("/api/workspace/projects/project-alpha/status", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ status: "draft" })
+    });
+
+    const terminalStatuses = ["draft", "closed", "cancelled"] as const;
+    const terminalResponses = [];
+    for (const status of terminalStatuses) {
+      await client`UPDATE projects SET status = ${status} WHERE tenant_id = 'tenant-alpha' AND id = 'project-alpha'`;
+      terminalResponses.push(await app.request("/api/workspace/projects/project-alpha/status", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ status: "active" })
+      }));
+    }
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+
+    expect(denied.status).toBe(403);
+    await expect(denied.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(closeAttempt.status).toBe(400);
+    await expect(closeAttempt.json()).resolves.toEqual({
+      error: "invalid_project_status"
+    });
+    expect(cancelAttempt.status).toBe(400);
+    await expect(cancelAttempt.json()).resolves.toEqual({
+      error: "invalid_project_status"
+    });
+    expect(draftTarget.status).toBe(400);
+    await expect(draftTarget.json()).resolves.toEqual({ error: "invalid_project_status" });
+    for (const response of terminalResponses) {
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({
+        error: "project_status_transition_not_allowed"
+      });
+    }
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "project.status_change_denied",
+          sourceWorkflow: "project_core",
+          sourceEntity: { type: "Project", id: "project-alpha" },
+          input: { status: "paused" },
+          executionResult: { status: "denied" }
+        })
+      ])
+    });
   });
 });

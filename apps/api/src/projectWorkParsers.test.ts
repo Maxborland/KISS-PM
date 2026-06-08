@@ -7,6 +7,7 @@ import {
   parseTaskIdParam,
   parseTaskStatusIdParam,
   parseTaskCommentBody,
+  parseUpdateProjectStatusBody,
   parseUpdateTaskBody,
   parseUpdateTaskStatusBody
 } from "./projectWorkParsers";
@@ -236,6 +237,32 @@ describe("project work parsers", () => {
     expect(parseUpdateTaskStatusBody({ status: "cancelled" })).toEqual({
       ok: false,
       error: "invalid_task_status"
+    });
+  });
+
+  it("parses project lifecycle status requests and keeps draft internal", () => {
+    for (const status of ["active", "paused"] as const) {
+      expect(parseUpdateProjectStatusBody({ status })).toEqual({
+        ok: true,
+        value: { status }
+      });
+    }
+
+    expect(parseUpdateProjectStatusBody({ status: "draft" })).toEqual({
+      ok: false,
+      error: "invalid_project_status"
+    });
+    expect(parseUpdateProjectStatusBody({ status: "closed" })).toEqual({
+      ok: false,
+      error: "invalid_project_status"
+    });
+    expect(parseUpdateProjectStatusBody({ status: "cancelled" })).toEqual({
+      ok: false,
+      error: "invalid_project_status"
+    });
+    expect(parseUpdateProjectStatusBody({ status: "active\nspoof" })).toEqual({
+      ok: false,
+      error: "invalid_project_status"
     });
   });
 

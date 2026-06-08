@@ -26,6 +26,7 @@ import {
   parseProjectRouteParam,
   parseSolverProposalRouteParam,
   parseSolverRunRouteParam,
+  requireActivePlanningProject,
   summarizeSnapshot,
   type PlanningRouteDeps
 } from "./planningRouteHelpers";
@@ -316,6 +317,12 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
         }
 
         await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+        const activeProject = await requireActivePlanningProject(
+          transactionDataSource,
+          actor.tenantId,
+          projectId
+        );
+        if (!activeProject.ok) return activeProject;
         const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
         if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
         const run = await transactionDataSource.findPlanningSolverRun(actor.tenantId, projectId, runId);

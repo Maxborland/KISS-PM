@@ -214,6 +214,13 @@ const crmPipelineSchemaContractMigration = readFileSync(
   ),
   "utf8"
 );
+const projectLifecycleStatusMigration = readFileSync(
+  new URL(
+    "../migrations/0042_project_lifecycle_status_constraint.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -594,6 +601,14 @@ describe("Phase 3.2 project lifecycle SQL migration", () => {
   it("allows project drafts before governed activation", () => {
     expect(phase32ProjectLifecycleMigration).toContain(
       'ALTER TABLE "projects" ALTER COLUMN "activated_at" DROP NOT NULL'
+    );
+  });
+});
+
+describe("Project lifecycle status SQL migration", () => {
+  it("constrains project lifecycle statuses", () => {
+    expect(projectLifecycleStatusMigration).toContain(
+      "CONSTRAINT \"projects_status_chk\" CHECK (\"status\" in ('draft', 'active', 'paused', 'closed', 'cancelled'))"
     );
   });
 });

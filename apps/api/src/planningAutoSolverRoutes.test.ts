@@ -56,6 +56,20 @@ describe("planning auto-solver API", () => {
     ]);
   });
 
+  it("rejects applying persisted proposals when the project is paused", async () => {
+    const harness = createApiHarness({ projectStatus: "paused" });
+    const createBody = await createSolverRun(harness);
+
+    const response = await applyProposal(harness, createBody);
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("project_not_found");
+    expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.storedRunBox.value?.appliedProposalId).toBeNull();
+    expect(harness.auditActionTypes).toEqual(["planning.auto_solver.run_created"]);
+  });
+
   it("builds solver runs with resource capacity through the requested deadline", async () => {
     const snapshot = createSnapshot();
     const harness = createApiHarness({
@@ -357,6 +371,7 @@ function createApiHarness(input: {
   permissions?: AccessProfile["permissions"];
   snapshot?: PlanSnapshot;
   listOccupancyWindows?: ApiTenantDataSource["listOccupancyWindows"];
+  projectStatus?: "active" | "paused";
 } = {}): ApiHarness {
   let snapshot = input.snapshot ?? createSnapshot();
   const storedRunBox: { value: PlanningSolverRunRecord | null } = { value: null };
@@ -392,6 +407,30 @@ function createApiHarness(input: {
     },
     async listUsersByTenantId() {
       return [];
+    },
+    async listProjects() {
+      return [
+        {
+          id: "project-solver",
+          tenantId: "tenant-solver",
+          sourceType: "manual",
+          sourceOpportunityId: null,
+          clientId: null,
+          projectTypeId: null,
+          title: "Solver Project",
+          clientName: "Solver Client",
+          status: input.projectStatus ?? "active",
+          plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+          plannedFinish: new Date("2026-06-05T00:00:00.000Z"),
+          contractValue: 0,
+          plannedHours: 0,
+          templateId: null,
+          createdAt: new Date("2026-05-24T00:00:00.000Z"),
+          activatedAt: new Date("2026-05-24T00:00:00.000Z"),
+          closedAt: null,
+          demand: []
+        }
+      ];
     },
     async listWorkspaceUsers() {
       return [

@@ -649,6 +649,18 @@ export const crmProjectSchemas = openApiSchemaFragment({
     properties: { project: schemaRef("Project") },
     additionalProperties: false
   },
+  ProjectStatus: {
+    type: "string",
+    enum: ["draft", "active", "paused", "closed", "cancelled"]
+  },
+  ProjectStatusUpdateRequest: {
+    type: "object",
+    required: ["status"],
+    properties: {
+      status: { type: "string", enum: ["active", "paused"] }
+    },
+    additionalProperties: false
+  },
   Project: {
     type: "object",
     required: [
@@ -680,7 +692,7 @@ export const crmProjectSchemas = openApiSchemaFragment({
       projectTypeId: nullableStringSchema,
       title: { type: "string", minLength: 1 },
       clientName: { type: "string" },
-      status: { type: "string", minLength: 1 },
+      status: schemaRef("ProjectStatus"),
       plannedStart: dateTimeSchema,
       plannedFinish: dateTimeSchema,
       contractValue: { type: "number", minimum: 0 },
@@ -698,6 +710,14 @@ export const crmProjectSchemas = openApiSchemaFragment({
     required: ["projects"],
     properties: {
       projects: { type: "array", items: schemaRef("Project") }
+    },
+    additionalProperties: false
+  },
+  ProjectResponse: {
+    type: "object",
+    required: ["project"],
+    properties: {
+      project: schemaRef("Project")
     },
     additionalProperties: false
   },

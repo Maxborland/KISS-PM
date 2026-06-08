@@ -157,7 +157,7 @@ export type ProjectIntakeRepository = {
     status: OpportunityFinalStatus;
   }): Promise<OpportunityRecord | undefined>;
   listProjects(tenantId: TenantId): Promise<ProjectRecord[]>;
-  ensureWorkspaceInboxProject(input: WorkspaceInboxProjectInput): Promise<ProjectRecord>;
+  ensureWorkspaceInboxProject(input: WorkspaceInboxProjectInput): Promise<ProjectRecord | undefined>;
   createProjectDraftFromOpportunity(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
 };
@@ -503,10 +503,23 @@ export function createProjectIntakeRepository(
           and(
             eq(projects.tenantId, input.tenantId),
             eq(projects.sourceType, "workspace_inbox"),
-            inArray(projects.status, ["draft", "active", "paused"])
+            inArray(projects.status, ["draft", "active"])
           )
         )
         .limit(1);
+
+      const [pausedInbox] = await db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(
+          and(
+            eq(projects.tenantId, input.tenantId),
+            eq(projects.sourceType, "workspace_inbox"),
+            eq(projects.status, "paused")
+          )
+        )
+        .limit(1);
+      if (pausedInbox) return undefined;
 
       if (existing) {
         const plannedStart =

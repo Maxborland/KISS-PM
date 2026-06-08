@@ -6,6 +6,7 @@ export {
   parseTaskStatusIdParam
 } from "./routeParamParsers";
 
+const projectStatusUpdateStatuses = ["active", "paused"] as const;
 const taskPriorities = ["low", "normal", "high", "critical"] as const;
 const taskStatusCategories = [
   "new",
@@ -23,6 +24,14 @@ const taskParticipantRoles = [
   "observer"
 ] as const;
 const maxTaskDescriptionLength = 4000;
+
+export type UpdateProjectStatusBody = {
+  status: (typeof projectStatusUpdateStatuses)[number];
+};
+
+export type UpdateProjectStatusParseResult =
+  | { ok: true; value: UpdateProjectStatusBody }
+  | { ok: false; error: string };
 
 export type CreateTaskBody = {
   id: string | undefined;
@@ -81,6 +90,17 @@ export type TaskCommentBody = {
 export type TaskCommentParseResult =
   | { ok: true; value: TaskCommentBody }
   | { ok: false; error: string };
+
+export function parseUpdateProjectStatusBody(
+  input: unknown
+): UpdateProjectStatusParseResult {
+  const status = getStringField(input, "status") ?? "";
+  if (!isProjectLifecycleStatus(status)) {
+    return { ok: false, error: "invalid_project_status" };
+  }
+
+  return { ok: true, value: { status } };
+}
 
 export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
   const id = getOptionalString(input, "id") ?? undefined;
@@ -299,6 +319,12 @@ function getBooleanField(input: unknown, key: string): boolean | null {
   const value = (input as Record<string, unknown>)[key];
   if (typeof value !== "boolean") return null;
   return value;
+}
+
+function isProjectLifecycleStatus(
+  value: string
+): value is UpdateProjectStatusBody["status"] {
+  return projectStatusUpdateStatuses.includes(value as UpdateProjectStatusBody["status"]);
 }
 
 function isTaskPriority(value: string): value is CreateTaskBody["priority"] {

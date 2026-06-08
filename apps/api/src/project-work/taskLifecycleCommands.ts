@@ -27,6 +27,7 @@ export async function archiveTask(
 ): Promise<TaskResult> {
   if (
     !deps.dataSource.findTaskById ||
+    !deps.dataSource.listProjects ||
     !deps.dataSource.applyPlanningCommand ||
     !deps.dataSource.incrementPlanVersion ||
     !deps.dataSource.withTransaction
@@ -38,10 +39,13 @@ export async function archiveTask(
   if (!task) return { ok: false, status: 404, error: "task_not_found" };
   const deleteDecision = canDeleteTask(input.actor, input.profile, task);
   if (!deleteDecision.allowed) return { ok: false, status: 403, error: deleteDecision.reason };
+  const project = await findActiveProject(deps.dataSource, input.actor.tenantId, task.projectId);
+  if (!project) return { ok: false, status: 404, error: "project_not_found" };
 
   return deps.runDataSourceTransaction(async (transactionDataSource) => {
     if (
       !transactionDataSource.findTaskById ||
+      !transactionDataSource.listProjects ||
       !transactionDataSource.applyPlanningCommand ||
       !transactionDataSource.incrementPlanVersion
     ) {
@@ -55,6 +59,12 @@ export async function archiveTask(
     if (!currentTask) {
       return { ok: false as const, status: 404, error: "task_not_found" };
     }
+    const currentProject = await findActiveProject(
+      transactionDataSource,
+      input.actor.tenantId,
+      currentTask.projectId
+    );
+    if (!currentProject) return { ok: false as const, status: 404, error: "project_not_found" };
 
     const currentDeleteDecision = canDeleteTask(input.actor, input.profile, currentTask);
     if (!currentDeleteDecision.allowed) {
@@ -64,14 +74,14 @@ export async function archiveTask(
     const currentPlanningCommand = buildArchiveTaskPlanningCommand(currentTask.id);
     await transactionDataSource.applyPlanningCommand({
       tenantId: input.actor.tenantId,
-      projectId: currentTask.projectId,
+      projectId: currentProject.id,
       actorUserId: input.actor.id,
       command: currentPlanningCommand
     });
     const archived = { ...currentTask, archivedAt: new Date() };
     const planVersion = await transactionDataSource.incrementPlanVersion(
       input.actor.tenantId,
-      currentTask.projectId
+      currentProject.id
     );
     await deps.appendManagementAuditEvent({
       tenantId: input.actor.tenantId,

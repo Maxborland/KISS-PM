@@ -80,7 +80,7 @@ async function getProjectDetail(
   });
   if (!decision.allowed) return { ok: false, status: 403, error: decision.reason };
 
-  const project = await findActiveProject(
+  const project = await findReadableProject(
     deps.dataSource,
     input.actor.tenantId,
     input.projectId
@@ -109,7 +109,7 @@ async function listProjectTasks(
   });
   if (!decision.allowed) return { ok: false, status: 403, error: decision.reason };
 
-  const project = await findActiveProject(
+  const project = await findReadableProject(
     deps.dataSource,
     input.actor.tenantId,
     input.projectId
@@ -206,11 +206,15 @@ async function listSerializedTaskAttachmentItems(
   return attachmentItems.map((attachment: AttachmentReadModel) => serializeAttachment(attachment));
 }
 
-async function findActiveProject(
+async function findReadableProject(
   dataSource: ApiTenantDataSource,
   tenantId: string,
   projectId: string
 ): Promise<ProjectRecord | undefined> {
   const projects = await dataSource.listProjects?.(tenantId);
-  return projects?.find((project) => project.id === projectId && project.status === "active");
+  return projects?.find(
+    (project) =>
+      project.id === projectId &&
+      (project.status === "active" || project.status === "paused")
+  );
 }
