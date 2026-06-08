@@ -11,7 +11,9 @@ import {
   canReadControlSignals,
   canReadKpiDefinitions,
   canReadProjectPlan,
+  canPreviewPlanningScenarios,
   type AccessProfile,
+  type Permission,
   type PolicyDecision
 } from "@kiss-pm/access-control";
 import {
@@ -104,10 +106,15 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
       limit: query.value.limit
     });
 
+    const filteredItems = items.map((item) => ({
+      ...item,
+      allowedActions: filterAllowedActionsForProfile(item.allowedActions, profile)
+    }));
+
     return context.json({
       asOf: query.value.asOf.toISOString(),
       limit: query.value.limit,
-      items
+      items: filteredItems
     });
   });
   app.post("/api/tenant/current/kpi-definitions", async (context) => {
@@ -1438,6 +1445,23 @@ function sortOperationalControlQueue(items: OperationalControlQueueSortItem[]) {
     right.sort.timestamp.localeCompare(left.sort.timestamp) ||
     left.id.localeCompare(right.id)
   );
+}
+
+const actionRequiredPermissions: Record<string, Permission[]> = {
+  open_gantt: ["tenant.project_plan.read"],
+  generate_planning_solution: ["tenant.planning_scenarios.preview"],
+  create_corrective_action: ["tenant.corrective_actions.manage"]
+};
+
+function filterAllowedActionsForProfile(
+  actions: string[],
+  profile: AccessProfile
+): string[] {
+  return actions.filter((action) => {
+    const required = actionRequiredPermissions[action];
+    if (!required) return true;
+    return required.every((permission) => profile.permissions.includes(permission));
+  });
 }
 
 function withQueueSort(item: OperationalControlQueueItem): OperationalControlQueueSortItem {

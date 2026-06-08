@@ -628,6 +628,64 @@ function createAuditEvent(id: string, overrides: Partial<AuditEventListItem> = {
   };
 }
 
+
+  it("filters allowedActions by actor permissions", async () => {
+    const project = createProject("project-alpha", {
+      plannedFinish: new Date("2026-06-08T00:00:00.000Z")
+    });
+    const fixture = createOperationalQueueFixture({
+      permissions: [
+        "tenant.projects.read",
+        "tenant.control_signals.read",
+        "tenant.audit_events.read"
+      ],
+      projects: [project]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string; allowedActions: string[] }> };
+    for (const item of body.items) {
+      expect(item.allowedActions).not.toContain("open_gantt");
+      expect(item.allowedActions).not.toContain("generate_planning_solution");
+      expect(item.allowedActions).not.toContain("create_corrective_action");
+    }
+  });
+
+  it("includes allowedActions when actor has the required permissions", async () => {
+    const project = createProject("project-alpha", {
+      plannedFinish: new Date("2026-06-08T00:00:00.000Z")
+    });
+    const fixture = createOperationalQueueFixture({
+      permissions: [
+        "tenant.projects.read",
+        "tenant.control_signals.read",
+        "tenant.audit_events.read",
+        "tenant.project_plan.read",
+        "tenant.planning_scenarios.preview",
+        "tenant.corrective_actions.manage"
+      ],
+      projects: [project]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string; allowedActions: string[] }> };
+    const overdueProject = body.items.find((item) => item.id === "project-overdue:project-alpha");
+    expect(overdueProject).toBeDefined();
+    expect(overdueProject!.allowedActions).toContain("open_gantt");
+    expect(overdueProject!.allowedActions).toContain("generate_planning_solution");
+  });
 function compareAttentionAuditEvents(left: AuditEventListItem, right: AuditEventListItem) {
   return auditEventSeverityRank(left) - auditEventSeverityRank(right) ||
     right.createdAt.getTime() - left.createdAt.getTime() ||
