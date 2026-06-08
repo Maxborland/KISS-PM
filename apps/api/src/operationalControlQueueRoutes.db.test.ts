@@ -316,6 +316,47 @@ describe("operational control queue API DB", () => {
       expect.objectContaining({ id: "audit-event:project-alpha:audit-older-failed", severity: "critical" })
     ]));
   });
+
+  it("keeps the lowest final audit queue id when same-severity audit events tie at the source cap", async () => {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    for (let index = 0; index < 101; index += 1) {
+      await dataSource.appendAuditEvent({
+        id: `audit-same-${String(index).padStart(3, "0")}`,
+        tenantId: "tenant-alpha",
+        actorUserId: "user-admin",
+        actionType: "management_action.denied",
+        sourceSurfaceId: null,
+        sourceWorkflow: "control",
+        sourceEntity: { type: "Project", id: "project-alpha" },
+        input: { projectId: "project-alpha" },
+        beforeState: null,
+        afterState: null,
+        permissionResult: { allowed: false, reason: "permission_missing" },
+        executionResult: { status: "denied" },
+        correlationId: `correlation-same-${index}`,
+        createdAt: new Date("2026-06-08T12:00:00.000Z")
+      });
+    }
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=100",
+      { headers: { cookie } }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string }> };
+    const auditIds = body.items
+      .map((item) => item.id)
+      .filter((id) => id.startsWith("audit-event:project-alpha:audit-same-"));
+    expect(auditIds.slice(0, 3)).toEqual([
+      "audit-event:project-alpha:audit-same-000",
+      "audit-event:project-alpha:audit-same-001",
+      "audit-event:project-alpha:audit-same-002"
+    ]);
+    expect(auditIds).not.toContain("audit-event:project-alpha:audit-same-100");
+  });
+
   async function loginAs(email: string, password: string) {
     const response = await app.request("/api/auth/login", {
       method: "POST",

@@ -307,6 +307,36 @@ describe("operational control queue API", () => {
       expect.objectContaining({ id: "audit-event:project-alpha:audit-older-failed", severity: "critical" })
     ]);
   });
+
+  it("preserves audit queue item id tie-break before applying the audit source cap", async () => {
+    const project = createProject("project-alpha");
+    const tiedWarnings = Array.from({ length: 101 }, (_, index) => createAuditEvent(
+      `audit-same-${String(index).padStart(3, "0")}`,
+      {
+        sourceEntity: { type: "Project", id: project.id },
+        actionType: "management_action.denied",
+        executionResult: { status: "denied" },
+        createdAt: new Date("2026-06-08T12:00:00.000Z")
+      }
+    ));
+    const fixture = createOperationalQueueFixture({
+      projects: [project],
+      auditEvents: tiedWarnings
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=1",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string; severity: string }> };
+    expect(body.items).toEqual([
+      expect.objectContaining({ id: "audit-event:project-alpha:audit-same-000", severity: "warning" })
+    ]);
+  });
+
   it("returns sorted and limited signals from control, corrective, status, overdue, and audit inputs", async () => {
     const project = createProject("project-alpha", {
       plannedFinish: new Date("2026-06-08T00:00:00.000Z")
@@ -601,7 +631,7 @@ function createAuditEvent(id: string, overrides: Partial<AuditEventListItem> = {
 function compareAttentionAuditEvents(left: AuditEventListItem, right: AuditEventListItem) {
   return auditEventSeverityRank(left) - auditEventSeverityRank(right) ||
     right.createdAt.getTime() - left.createdAt.getTime() ||
-    right.id.localeCompare(left.id);
+    left.id.localeCompare(right.id);
 }
 
 function auditEventSeverityRank(event: AuditEventListItem) {

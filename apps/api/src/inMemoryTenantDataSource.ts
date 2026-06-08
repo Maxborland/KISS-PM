@@ -94,7 +94,7 @@ function compareAttentionAuditEvents(
 ) {
   return auditEventSeverityRank(left) - auditEventSeverityRank(right) ||
     right.createdAt.getTime() - left.createdAt.getTime() ||
-    right.id.localeCompare(left.id);
+    left.id.localeCompare(right.id);
 }
 
 function auditEventSeverityRank(event: { actionType: string; executionResult: Record<string, unknown> }) {

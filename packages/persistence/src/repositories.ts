@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
@@ -610,7 +610,7 @@ export function createPostgresTenantDataSource(
             ${auditEvents.actionType} ~ ${String.raw`[._]failed$`}
           ) then 0 else 1 end`,
           desc(auditEvents.createdAt),
-          desc(auditEvents.id)
+          asc(auditEvents.id)
         ]
         : [desc(auditEvents.createdAt), desc(auditEvents.id)];
       const buildQuery = () =>
