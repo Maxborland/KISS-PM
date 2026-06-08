@@ -915,6 +915,135 @@ describe("planning API routes", () => {
     });
   });
 
+  it("blocks idempotent command replay after the project is paused", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-idempotency-paused-single",
+      title: "Idempotency paused single",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    expect(initial.status).toBe(200);
+
+    const command = {
+      type: "task.update_identity",
+      payload: { taskId: "task-idempotency-paused-single", title: "Applied before pause" }
+    };
+
+    const applied = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-paused-replay-single"
+        })
+      }
+    );
+    expect(applied.status).toBe(200);
+
+    await pauseProject(adminCookie);
+
+    const replayed = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-paused-replay-single"
+        })
+      }
+    );
+    expect(replayed.status).toBe(404);
+    await expect(replayed.json()).resolves.toEqual({ error: "project_not_found" });
+  });
+
+  it("blocks idempotent command batch replay after the project is paused", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-idempotency-paused-batch-a",
+      title: "Idempotency paused batch A",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
+    await createTask(adminCookie, {
+      id: "task-idempotency-paused-batch-b",
+      title: "Idempotency paused batch B",
+      start: "2026-06-04",
+      finish: "2026-06-05"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    expect(initial.status).toBe(200);
+
+    const commands = [
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-idempotency-paused-batch-a", title: "Applied before pause A" }
+      },
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-idempotency-paused-batch-b", title: "Applied before pause B" }
+      }
+    ];
+
+    const applied = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-paused-replay-batch"
+        })
+      }
+    );
+    expect(applied.status).toBe(200);
+
+    await pauseProject(adminCookie);
+
+    const replayed = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-paused-replay-batch"
+        })
+      }
+    );
+    expect(replayed.status).toBe(404);
+    await expect(replayed.json()).resolves.toEqual({ error: "project_not_found" });
+  });
   it("requires resource management permission when task creation includes assignments", async () => {
     const limitedManagerCookie = await loginAs(
       "plan-manager-no-resource-manage@kiss-pm.local",
