@@ -1532,7 +1532,14 @@ describe("planning API routes", () => {
       (baseline: { id: string }) => baseline.id === "baseline-participant-derived"
     );
     expect(previewBaseline.assignments).toEqual(persistedBaseline.assignments);
-    expect(previewBaseline.assignments).toEqual([]);
+    expect(previewBaseline.assignments).toEqual([
+      {
+        assignmentId: "task-baseline-participant-derived-user-alpha-executor-executor",
+        taskId: "task-baseline-participant-derived",
+        resourceId: "user-alpha-executor",
+        workMinutes: null
+      }
+    ]);
   });
   it("emits distinct audit actions for archived and hard-deleted planning tasks", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");

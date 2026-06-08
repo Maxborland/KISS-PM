@@ -1387,7 +1387,28 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
       .from(taskAssignments)
       .where(and(eq(taskAssignments.tenantId, tenantId), eq(taskAssignments.projectId, projectId)));
     const activeTaskIds = new Set(taskRows.map((task) => task.id));
-    const activeAssignmentRows = assignmentRows.filter((assignment) => activeTaskIds.has(assignment.taskId));
+    const participantRows =
+      activeTaskIds.size > 0
+        ? await db
+            .select()
+            .from(taskParticipants)
+            .where(
+              and(
+                eq(taskParticipants.tenantId, tenantId),
+                inArray(taskParticipants.taskId, [...activeTaskIds])
+              )
+            )
+        : [];
+    const activeResourceRows = await db
+      .select({ id: tenantUsers.id })
+      .from(tenantUsers)
+      .where(and(eq(tenantUsers.tenantId, tenantId), ne(tenantUsers.status, "inactive")));
+    const baselineAssignments = mapAssignments(
+      taskRows.map((task) => task.id),
+      new Set(activeResourceRows.map((resource) => resource.id)),
+      participantRows,
+      assignmentRows
+    );
     await db
       .insert(projectBaselines)
       .values({ id: baselineId, tenantId, projectId, label, capturedAt: now })
@@ -1426,9 +1447,9 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
         }))
       );
     }
-    if (activeAssignmentRows.length > 0) {
+    if (baselineAssignments.length > 0) {
       await db.insert(projectBaselineAssignments).values(
-        activeAssignmentRows.map((assignment) => ({
+        baselineAssignments.map((assignment) => ({
           tenantId,
           projectId,
           baselineId,

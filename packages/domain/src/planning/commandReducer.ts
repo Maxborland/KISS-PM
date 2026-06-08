@@ -335,14 +335,12 @@ function reduceBaselineCapture(
       plannedFinish: task.plannedFinish,
       workMinutes: task.workMinutes
     })),
-    assignments: snapshot.assignments
-      .filter((assignment) => !isParticipantFallbackAssignment(assignment))
-      .map((assignment) => ({
-        assignmentId: assignment.id,
-        taskId: assignment.taskId,
-        resourceId: assignment.resourceId,
-        workMinutes: assignment.workMinutes
-      }))
+    assignments: snapshot.assignments.map((assignment) => ({
+      assignmentId: assignment.id,
+      taskId: assignment.taskId,
+      resourceId: assignment.resourceId,
+      workMinutes: assignment.workMinutes
+    }))
   };
 
   return withSnapshot(snapshot, command, {
@@ -350,14 +348,6 @@ function reduceBaselineCapture(
   });
 }
 
-function isParticipantFallbackAssignment(assignment: PlanAssignment): boolean {
-  return (
-    assignment.id === [assignment.taskId, assignment.resourceId, assignment.role].join("-") &&
-    assignment.unitsPermille === 1000 &&
-    assignment.workMinutes === null &&
-    assignment.calendarId === null
-  );
-}
 
 function reduceConstraintUpdate(
   snapshot: PlanSnapshot,
