@@ -614,6 +614,55 @@ describe("planning repository", () => {
     expect(participantRows).toHaveLength(1);
   });
 
+  it("omits participant fallback assignments whose generated id collides with explicit assignments", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "assignment.upsert",
+        payload: {
+          id: "task-beta-user-alpha-executor-executor",
+          taskId: "task-alpha",
+          resourceId: "user-alpha-admin",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: null
+        }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    const collidingAssignments = snapshot?.assignments.filter(
+      (assignment) => assignment.id === "task-beta-user-alpha-executor-executor"
+    );
+    expect(collidingAssignments).toHaveLength(1);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "baseline.capture",
+        payload: { baselineId: "baseline-collision", label: "Collision baseline" }
+      }
+    });
+
+    const rows = await db
+      .select()
+      .from(projectBaselineAssignments)
+      .where(eq(projectBaselineAssignments.baselineId, "baseline-collision"));
+    expect(
+      rows.filter((assignment) => assignment.assignmentId === "task-beta-user-alpha-executor-executor")
+    ).toHaveLength(1);
+  });
+
   it("excludes inactive users and their assignments from active planning resources", async () => {
     const db = createDatabase(client);
     const intakeRepository = createProjectIntakeRepository(db);

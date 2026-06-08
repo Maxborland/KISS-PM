@@ -1604,6 +1604,7 @@ function mapAssignments(
       assignmentFallbackKey(assignment.taskId, assignment.resourceId, assignment.role)
     )
   );
+  const explicitAssignmentIds = new Set(activeAssignmentRows.map((assignment) => assignment.id));
   const explicitAssignments = activeAssignmentRows.map<PlanAssignment>((assignment) => ({
     id: assignment.id,
     taskId: assignment.taskId,
@@ -1621,7 +1622,8 @@ function mapAssignments(
         isPlanningParticipantRole(participant.role) &&
         !explicitAssignmentKeys.has(
           assignmentFallbackKey(participant.taskId, participant.userId, participant.role)
-        )
+        ) &&
+        !explicitAssignmentIds.has(`${participant.taskId}-${participant.userId}-${participant.role}`)
     )
     .map<PlanAssignment>((participant) => ({
       id: `${participant.taskId}-${participant.userId}-${participant.role}`,
