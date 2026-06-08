@@ -36,8 +36,12 @@ export type ProjectResourcePoolRepository = {
 export function createProjectResourcePoolRepository(
   db: KissPmDatabase
 ): ProjectResourcePoolRepository {
-  async function listProjectResourcePoolMembers(tenantId: TenantId, projectId: string) {
-    const rows = await db
+  async function listProjectResourcePoolMembers(
+    tenantId: TenantId,
+    projectId: string,
+    queryDb: KissPmDatabase = db
+  ) {
+    const rows = await queryDb
       .select()
       .from(projectResourcePoolMembers)
       .where(
@@ -56,29 +60,32 @@ export function createProjectResourcePoolRepository(
     async replaceProjectResourcePoolMembers(input) {
       const now = new Date();
 
-      await db
-        .delete(projectResourcePoolMembers)
-        .where(
-          and(
-            eq(projectResourcePoolMembers.tenantId, input.tenantId),
-            eq(projectResourcePoolMembers.projectId, input.projectId)
-          )
-        );
+      return db.transaction(async (transaction) => {
+        const transactionDb = transaction as unknown as KissPmDatabase;
+        await transactionDb
+          .delete(projectResourcePoolMembers)
+          .where(
+            and(
+              eq(projectResourcePoolMembers.tenantId, input.tenantId),
+              eq(projectResourcePoolMembers.projectId, input.projectId)
+            )
+          );
 
-      if (input.members.length > 0) {
-        await db.insert(projectResourcePoolMembers).values(
-          input.members.map((member) => ({
-            tenantId: input.tenantId,
-            projectId: input.projectId,
-            userId: member.userId,
-            role: member.role,
-            createdAt: now,
-            updatedAt: now
-          }))
-        );
-      }
+        if (input.members.length > 0) {
+          await transactionDb.insert(projectResourcePoolMembers).values(
+            input.members.map((member) => ({
+              tenantId: input.tenantId,
+              projectId: input.projectId,
+              userId: member.userId,
+              role: member.role,
+              createdAt: now,
+              updatedAt: now
+            }))
+          );
+        }
 
-      return listProjectResourcePoolMembers(input.tenantId, input.projectId);
+        return listProjectResourcePoolMembers(input.tenantId, input.projectId, transactionDb);
+      });
     }
   };
 }

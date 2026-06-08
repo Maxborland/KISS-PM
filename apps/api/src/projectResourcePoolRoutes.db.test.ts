@@ -10,6 +10,7 @@ import {
 } from "@kiss-pm/persistence";
 
 import { createApp } from "./app";
+import type { ApiTenantDataSource } from "./apiTypes";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
@@ -238,6 +239,38 @@ describe("project resource pool API routes", () => {
     expect(replace).toEqual({ status: 409, body: { error: "project_not_active" } });
   });
 
+  it("re-checks active project status under the resource planning lifecycle lock before replacing", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await replacePool(adminCookie, [{ userId: "user-alpha-admin", role: "project_manager" }]);
+
+    const lifecycleInterleaving = createResourcePoolLifecycleInterleavingApp();
+    const replace = await lifecycleInterleaving.app.request(
+      "/api/workspace/projects/project-alpha/resource-pool",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          members: [{ userId: "user-alpha-resource", role: "resource" }]
+        })
+      }
+    );
+
+    expect(lifecycleInterleaving.didApplyLifecycleMutation()).toBe(true);
+    expect(replace.status).toBe(409);
+    await expect(replace.json()).resolves.toEqual({ error: "project_not_active" });
+
+    const read = await app.request("/api/workspace/projects/project-alpha/resource-pool", {
+      headers: { cookie: adminCookie }
+    });
+    expect(read.status).toBe(200);
+    await expect(read.json()).resolves.toMatchObject({
+      resourcePool: { members: [{ userId: "user-alpha-admin", role: "project_manager" }] }
+    });
+  });
   it("hides draft, closed, and cancelled projects from resource pool reads and writes", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
 
@@ -300,7 +333,36 @@ describe("project resource pool API routes", () => {
     expect(response.status).toBe(200);
     return response.headers.get("set-cookie") ?? "";
   }
-});
+
+  function createResourcePoolLifecycleInterleavingApp() {
+    const baseDataSource = createPostgresTenantDataSource(createDatabase(client));
+    let lifecycleMutationApplied = false;
+    const dataSource: ApiTenantDataSource = {
+      ...baseDataSource,
+      async withTransaction(operation) {
+        if (!baseDataSource.withTransaction) throw new Error("transaction_not_configured");
+
+        return baseDataSource.withTransaction(async (transactionDataSource) =>
+          operation({
+            ...transactionDataSource,
+            async lockTenantResourcePlanning(tenantId) {
+              if (!lifecycleMutationApplied) {
+                lifecycleMutationApplied = true;
+                await client`
+                  UPDATE projects
+                  SET status = 'paused'
+                  WHERE tenant_id = ${tenantId} AND id = 'project-alpha'
+                `;
+              }
+              await transactionDataSource.lockTenantResourcePlanning?.(tenantId);
+            }
+          })
+        );
+      }
+    };
+
+    return { app: createApp({ dataSource }), didApplyLifecycleMutation: () => lifecycleMutationApplied };
+  }});
 
 async function createActiveProject(client: PostgresClient) {
   const dataSource = createPostgresTenantDataSource(createDatabase(client));

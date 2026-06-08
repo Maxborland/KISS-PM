@@ -113,6 +113,7 @@ export function registerProjectResourcePoolRoutes(
         throw new Error("persistence_not_configured");
       }
 
+      await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
       const project = (await transactionDataSource.listProjects(actor.tenantId)).find(
         (candidate) => candidate.id === projectId.value
       );

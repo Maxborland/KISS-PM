@@ -101,7 +101,37 @@ describe("project resource pool repository", () => {
       repository.listProjectResourcePoolMembers("tenant-alpha", "project-alpha")
     ).resolves.toEqual(replaced);
   });
-});
+
+  it("preserves existing resource pool members when replace insert fails", async () => {
+    const repository = createProjectResourcePoolRepository(createDatabase(client));
+
+    const existing = await repository.replaceProjectResourcePoolMembers({
+      tenantId: "tenant-alpha",
+      projectId: "project-alpha",
+      members: [{ userId: "user-alpha-manager", role: "project_manager" }]
+    });
+
+    await expect(
+      repository.replaceProjectResourcePoolMembers({
+        tenantId: "tenant-alpha",
+        projectId: "project-alpha",
+        members: [
+          {
+            userId: "user-alpha-resource",
+            role: "invalid_resource_pool_role" as "resource"
+          }
+        ]
+      })
+    ).rejects.toThrow();
+
+    const afterFailedReplace = await repository.listProjectResourcePoolMembers(
+      "tenant-alpha",
+      "project-alpha"
+    );
+    expect(afterFailedReplace.map((member) => [member.userId, member.role])).toEqual(
+      existing.map((member) => [member.userId, member.role])
+    );
+  });});
 
 async function createActiveProject(client: PostgresClient) {
   const intakeRepository = createProjectIntakeRepository(createDatabase(client));
