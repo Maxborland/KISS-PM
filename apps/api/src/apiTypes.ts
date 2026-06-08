@@ -623,6 +623,7 @@ export type ApiTenantDataSource = {
   // Task planning fields are intentionally mutated only through applyPlanningCommand.
   // Compatibility task endpoints may update non-planning metadata after the command.
   updateTaskMetadata?(input: TaskMetadataInput): Promise<TaskRecord | undefined>;
+  listProjectTasksForProjects?(tenantId: TenantId, projectIds: string[]): Promise<TaskRecord[]>;
   listTaskActivities?(tenantId: TenantId, taskId: string): Promise<TaskActivityRecord[]>;
   createTaskActivity?(input: TaskActivityInput): Promise<TaskActivityRecord>;
   createPendingFileAsset?(input: FileAssetInput): Promise<FileAssetRecord>;
@@ -794,9 +795,11 @@ export type ApiTenantDataSource = {
   createKpiEvaluation?(input: KpiEvaluation): Promise<KpiEvaluation>;
   listKpiEvaluations?(tenantId: TenantId, projectId: string): Promise<KpiEvaluation[]>;
   upsertControlSignal?(input: ControlSignal): Promise<ControlSignal>;
+  listControlSignalsForProjects?(tenantId: TenantId, projectIds: string[]): Promise<ControlSignal[]>;
   listControlSignals?(tenantId: TenantId, projectId: string): Promise<ControlSignal[]>;
   createCorrectiveAction?(input: CorrectiveAction): Promise<CorrectiveAction>;
   updateCorrectiveAction?(input: CorrectiveAction): Promise<CorrectiveAction>;
+  listCorrectiveActionsForProjects?(tenantId: TenantId, projectIds: string[]): Promise<CorrectiveAction[]>;
   listCorrectiveActions?(tenantId: TenantId, projectId: string): Promise<CorrectiveAction[]>;
   createActionExecution?(input: ActionExecutionInput): Promise<ActionExecutionRecord>;
   listActionExecutions?(tenantId: TenantId, projectId: string): Promise<ActionExecutionRecord[]>;
@@ -923,6 +926,8 @@ export type ApiTenantDataSource = {
     options?: {
       limit?: number;
       projectId?: string | null;
+      requiresAttention?: boolean;
+      sourceEntities?: Array<{ type: string; ids: string[] }>;
     }
   ): Promise<AuditEventListItem[]>;
   ensureWorkspaceGeneralChannel?(input: {

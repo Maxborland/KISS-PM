@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
@@ -189,6 +189,8 @@ export type PostgresTenantDataSource = CrmRepository &
     options?: {
       limit?: number;
       projectId?: string | null;
+      requiresAttention?: boolean;
+      sourceEntities?: Array<{ type: string; ids: string[] }>;
     }
   ): Promise<AuditEventListItem[]>;
 };
@@ -586,12 +588,37 @@ export function createPostgresTenantDataSource(
           sql`${auditEvents.sourceEntity} ->> 'id' = ${options.projectId}`
         );
       }
+      if (options?.requiresAttention) {
+        filters.push(sql`(
+          ${auditEvents.executionResult} ->> 'status' in ('failed', 'denied', 'conflict') or
+          ${auditEvents.actionType} ~ ${String.raw`[._](failed|denied|conflict)$`}
+        )`);
+      }
+      const sourceEntityPredicates = options?.sourceEntities?.flatMap((sourceEntity) =>
+        sourceEntity.ids.map((id) => sql`(
+          ${auditEvents.sourceEntity} ->> 'type' = ${sourceEntity.type} and
+          ${auditEvents.sourceEntity} ->> 'id' = ${id}
+        )`)
+      ) ?? [];
+      if (sourceEntityPredicates.length > 0) {
+        filters.push(sql`(${sql.join(sourceEntityPredicates, sql` or `)})`);
+      }
+      const auditEventOrder = options?.requiresAttention
+        ? [
+          sql`case when (
+            ${auditEvents.executionResult} ->> 'status' = 'failed' or
+            ${auditEvents.actionType} ~ ${String.raw`[._]failed$`}
+          ) then 0 else 1 end`,
+          desc(auditEvents.createdAt),
+          asc(auditEvents.id)
+        ]
+        : [desc(auditEvents.createdAt), desc(auditEvents.id)];
       const buildQuery = () =>
         db
           .select()
           .from(auditEvents)
           .where(and(...filters))
-          .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id));
+          .orderBy(...auditEventOrder);
       const rows =
         options?.limit === undefined
           ? await buildQuery()

@@ -125,7 +125,99 @@ export const controlClosureSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
-  ControlEvaluateResponse: {
+  OperationalControlQueueItem: {
+    type: "object",
+    required: ["id", "tenantId", "signalKind", "severity", "priority", "project", "entity", "status", "dueDate", "overdue", "reason", "allowedActions", "source", "sourceTimestamps"],
+    properties: {
+      id: { type: "string", minLength: 1 },
+      tenantId: stringIdSchema,
+      signalKind: { type: "string", enum: ["control_signal", "corrective_action", "task_overdue", "task_status", "project_overdue", "audit_event"] },
+      severity: { type: "string", enum: ["critical", "warning", "info"] },
+      priority: { type: "string", enum: ["critical", "high", "normal", "low"] },
+      project: {
+        type: "object",
+        required: ["id", "title", "status", "plannedFinish"],
+        properties: {
+          id: stringIdSchema,
+          title: { type: "string", minLength: 1 },
+          status: { type: "string" },
+          plannedFinish: { type: "string", format: "date" }
+        },
+        additionalProperties: false
+      },
+      task: {
+        type: "object",
+        required: ["id", "title", "status", "statusId", "statusName", "statusCategory", "priority", "plannedFinish", "ownerUserId"],
+        properties: {
+          id: stringIdSchema,
+          title: { type: "string", minLength: 1 },
+          status: { type: "string" },
+          statusId: stringIdSchema,
+          statusName: { type: "string" },
+          statusCategory: { type: "string" },
+          priority: { type: "string" },
+          plannedFinish: { type: "string", format: "date" },
+          ownerUserId: stringIdSchema
+        },
+        additionalProperties: false
+      },
+      entity: {
+        type: "object",
+        required: ["type", "id", "label"],
+        properties: {
+          type: { type: "string", minLength: 1 },
+          id: stringIdSchema,
+          label: { type: "string" }
+        },
+        additionalProperties: false
+      },
+      status: {
+        type: "object",
+        required: ["value"],
+        properties: {
+          value: { type: "string" },
+          category: { type: "string" }
+        },
+        additionalProperties: false
+      },
+      dueDate: planDateOrNullSchema,
+      overdue: { type: "boolean" },
+      reason: { type: "string", minLength: 1 },
+      allowedActions: { type: "array", items: { type: "string" } },
+      source: {
+        type: "object",
+        required: ["workflow", "entityType", "entityId"],
+        properties: {
+          workflow: { type: "string", minLength: 1 },
+          entityType: { type: "string", minLength: 1 },
+          entityId: stringIdSchema,
+          metric: { type: "string" },
+          auditEventId: stringIdSchema
+        },
+        additionalProperties: false
+      },
+      sourceTimestamps: {
+        type: "object",
+        properties: {
+          createdAt: dateTimeSchema,
+          updatedAt: dateTimeSchema,
+          dueAt: { type: "string", format: "date" }
+        },
+        additionalProperties: false
+      }
+    },
+    additionalProperties: false
+  },
+  OperationalControlQueueResponse: {
+    type: "object",
+    required: ["asOf", "limit", "items"],
+    properties: {
+      asOf: dateTimeSchema,
+      limit: { type: "integer", minimum: 1, maximum: 100 },
+      items: { type: "array", items: schemaRef("OperationalControlQueueItem") }
+    },
+    additionalProperties: false
+  },  ControlEvaluateResponse: {
     type: "object",
     required: ["evaluations", "signals", "actionCandidates", "auditEventId"],
     properties: {
