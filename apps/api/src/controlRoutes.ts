@@ -1,11 +1,13 @@
 import {
   canApplyPlanningScenarios,
+  canCreateTasks,
   canReadAuditEvents,
   canReadProjects,
   canExecuteManagementActions,
   canManageCorrectiveActions,
   canManageControlSignals,
   canManageProjectPlan,
+  canManageProjects,
   canManageProjectResources,
   canManageKpiDefinitions,
   canReadControlSignals,
@@ -1844,6 +1846,11 @@ function decisionForPermission(
   if (permission === "tenant.planning_scenarios.preview") return canPreviewPlanningScenarios(input);
   if (permission === "tenant.planning_scenarios.apply") return canApplyPlanningScenarios(input);
   if (permission === "tenant.corrective_actions.manage") return canManageCorrectiveActions(input);
+  if (permission === "tenant.management_actions.execute") return canExecuteManagementActions(input);
+  if (permission === "tenant.control_signals.manage") return canManageControlSignals(input);
+  if (permission === "tenant.tasks.create") return canCreateTasks(input);
+  if (permission === "tenant.projects.manage") return canManageProjects(input);
+  if (permission === "tenant.kpi_definitions.manage") return canManageKpiDefinitions(input);
   return {
     allowed: false,
     reason: "permission_missing"

@@ -77,7 +77,7 @@ describe("operational control queue API DB", () => {
       severity: "critical",
       explanation: "Persisted critical signal",
       ownerUserId: "user-admin",
-      allowedActions: ["create_corrective_action"],
+      allowedActions: ["create_corrective_action", "accept_risk", "apply_planning_delta", "move_deadline"],
       scenarioProposals: [],
       status: "open",
       createdAt: "2026-06-03T00:00:00.000Z",
@@ -171,6 +171,29 @@ describe("operational control queue API DB", () => {
     const criticalSignal = body.items.find((item) => item.id === "control-signal:project-alpha:signal-critical");
     expect(criticalSignal).toBeDefined();
     expect(criticalSignal!.allowedActions).not.toContain("create_corrective_action");
+    expect(criticalSignal!.allowedActions).not.toContain("accept_risk");
+    expect(criticalSignal!.allowedActions).not.toContain("apply_planning_delta");
+    expect(criticalSignal!.allowedActions).not.toContain("move_deadline");
+  });
+
+  it("includes persisted management allowedActions when admin has registry permissions", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: { cookie } }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string; allowedActions: string[] }> };
+    const criticalSignal = body.items.find((item) => item.id === "control-signal:project-alpha:signal-critical");
+    expect(criticalSignal).toBeDefined();
+    expect(criticalSignal!.allowedActions).toEqual([
+      "create_corrective_action",
+      "accept_risk",
+      "apply_planning_delta",
+      "move_deadline"
+    ]);
   });
 
   it("excludes persisted accepted-risk control signals from the attention queue", async () => {

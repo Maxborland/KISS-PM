@@ -633,13 +633,17 @@ function createAuditEvent(id: string, overrides: Partial<AuditEventListItem> = {
     const project = createProject("project-alpha", {
       plannedFinish: new Date("2026-06-08T00:00:00.000Z")
     });
+    const signal = createSignal("signal-actions", project.id, {
+      allowedActions: ["accept_risk", "apply_planning_delta", "move_deadline"]
+    });
     const fixture = createOperationalQueueFixture({
       permissions: [
         "tenant.projects.read",
         "tenant.control_signals.read",
         "tenant.audit_events.read"
       ],
-      projects: [project]
+      projects: [project],
+      signalsByProject: { [project.id]: [signal] }
     });
     const app = createApp({ dataSource: fixture.dataSource });
 
@@ -654,6 +658,9 @@ function createAuditEvent(id: string, overrides: Partial<AuditEventListItem> = {
       expect(item.allowedActions).not.toContain("open_gantt");
       expect(item.allowedActions).not.toContain("generate_planning_solution");
       expect(item.allowedActions).not.toContain("create_corrective_action");
+      expect(item.allowedActions).not.toContain("accept_risk");
+      expect(item.allowedActions).not.toContain("apply_planning_delta");
+      expect(item.allowedActions).not.toContain("move_deadline");
     }
   });
 
@@ -661,16 +668,23 @@ function createAuditEvent(id: string, overrides: Partial<AuditEventListItem> = {
     const project = createProject("project-alpha", {
       plannedFinish: new Date("2026-06-08T00:00:00.000Z")
     });
+    const signal = createSignal("signal-actions", project.id, {
+      allowedActions: ["accept_risk", "apply_planning_delta", "move_deadline"]
+    });
     const fixture = createOperationalQueueFixture({
       permissions: [
         "tenant.projects.read",
         "tenant.control_signals.read",
         "tenant.audit_events.read",
         "tenant.project_plan.read",
+        "tenant.project_plan.manage",
         "tenant.planning_scenarios.preview",
-        "tenant.corrective_actions.manage"
+        "tenant.corrective_actions.manage",
+        "tenant.management_actions.execute",
+        "tenant.control_signals.manage"
       ],
-      projects: [project]
+      projects: [project],
+      signalsByProject: { [project.id]: [signal] }
     });
     const app = createApp({ dataSource: fixture.dataSource });
 
@@ -685,6 +699,14 @@ function createAuditEvent(id: string, overrides: Partial<AuditEventListItem> = {
     expect(overdueProject).toBeDefined();
     expect(overdueProject!.allowedActions).toContain("open_gantt");
     expect(overdueProject!.allowedActions).toContain("generate_planning_solution");
+
+    const actionsSignal = body.items.find((item) => item.id === "control-signal:project-alpha:signal-actions");
+    expect(actionsSignal).toBeDefined();
+    expect(actionsSignal!.allowedActions).toEqual([
+      "accept_risk",
+      "apply_planning_delta",
+      "move_deadline"
+    ]);
   });
 function compareAttentionAuditEvents(left: AuditEventListItem, right: AuditEventListItem) {
   return auditEventSeverityRank(left) - auditEventSeverityRank(right) ||
