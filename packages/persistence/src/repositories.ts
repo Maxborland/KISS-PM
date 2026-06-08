@@ -28,6 +28,7 @@ import { createKnowledgeRepository, type KnowledgeRepository } from "./knowledge
 import { createPlanningRepository, type PlanningRepository } from "./planningRepository";
 import { createPlanningSavedViewsRepository, type PlanningSavedViewsRepository } from "./planningSavedViewsRepository";
 import { createProjectIntakeRepository, type ProjectIntakeRepository } from "./projectIntakeRepository";
+import { createProjectResourcePoolRepository, type ProjectResourcePoolRepository } from "./projectResourcePoolRepository";
 import { createProjectWorkRepository, type ProjectWorkRepository } from "./projectWorkRepository";
 import { createOccupancyRepository, type OccupancyRepository } from "./occupancyRepository";
 import { createResourceAbsencesRepository, type ResourceAbsencesRepository } from "./resourceAbsencesRepository";
@@ -126,6 +127,7 @@ export type PostgresTenantDataSource = CrmRepository &
   PlanningRepository &
   PlanningSavedViewsRepository &
   ProjectWorkRepository &
+  ProjectResourcePoolRepository &
   TenantProductionCalendarRepository &
   ResourceAbsencesRepository &
   OccupancyRepository &
@@ -203,6 +205,7 @@ export function createPostgresTenantDataSource(
     ...createRetrospectiveRepository(db),
     ...createProjectIntakeRepository(db),
     ...createPlanningRepository(db),
+    ...createProjectResourcePoolRepository(db),
     ...createPlanningSavedViewsRepository(db),
     ...createProjectWorkRepository(db),
     ...createTenantProductionCalendarRepository(db),

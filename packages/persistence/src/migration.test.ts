@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+﻿import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -217,6 +217,13 @@ const crmPipelineSchemaContractMigration = readFileSync(
 const projectLifecycleStatusMigration = readFileSync(
   new URL(
     "../migrations/0042_project_lifecycle_status_constraint.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const projectResourcePoolMembersMigration = readFileSync(
+  new URL(
+    "../migrations/0043_project_resource_pool_members.sql",
     import.meta.url
   ),
   "utf8"
@@ -917,6 +924,30 @@ describe("Phase 5/6 planning core SQL migration", () => {
     );
     expect(phase56PlanningCommandIdempotencyMigration).toContain(
       'CONSTRAINT "planning_command_idempotency_keys_actor_fk"'
+    );
+  });
+});
+describe("Project resource pool SQL migration", () => {
+  it("adds explicit tenant-scoped project resource pool membership", () => {
+    expect(projectResourcePoolMembersMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "project_resource_pool_members"'
+    );
+    expect(projectResourcePoolMembersMigration).toContain(
+      'CONSTRAINT "project_resource_pool_members_pkey" PRIMARY KEY("tenant_id","project_id","user_id")'
+    );
+    expect(projectResourcePoolMembersMigration).toContain(
+      'CONSTRAINT "project_resource_pool_members_project_fk" FOREIGN KEY("tenant_id","project_id")'
+    );
+    expect(projectResourcePoolMembersMigration).toContain("ON DELETE CASCADE");
+    expect(projectResourcePoolMembersMigration).toContain(
+      'CONSTRAINT "project_resource_pool_members_user_fk" FOREIGN KEY("tenant_id","user_id")'
+    );
+    expect(projectResourcePoolMembersMigration).toContain("ON DELETE RESTRICT");
+    expect(projectResourcePoolMembersMigration).toContain(
+      'CREATE INDEX IF NOT EXISTS "project_resource_pool_members_tenant_user_idx"'
+    );
+    expect(projectResourcePoolMembersMigration).toContain(
+      "CONSTRAINT \"project_resource_pool_members_role_chk\" CHECK(\"role\" in ('project_manager', 'resource', 'observer'))"
     );
   });
 });

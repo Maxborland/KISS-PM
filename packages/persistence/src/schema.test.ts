@@ -30,6 +30,7 @@ describe("PostgreSQL persistence schema", () => {
       "opportunity_demands",
       "projects",
       "project_position_demands",
+      "project_resource_pool_members",
       "task_statuses",
       "tasks",
       "plan_versions",
@@ -125,6 +126,7 @@ describe("PostgreSQL persistence schema", () => {
       "opportunity_demands",
       "projects",
       "project_position_demands",
+      "project_resource_pool_members",
       "task_statuses",
       "tasks",
       "plan_versions",
@@ -203,6 +205,17 @@ describe("PostgreSQL persistence schema", () => {
     for (const tableName of tenantOwnedTableNames) {
       expect(getPersistenceTableColumns(tableName)).toContain("tenant_id");
     }
+  });
+
+  it("stores explicit project resource pool membership columns", () => {
+    expect(getPersistenceTableColumns("project_resource_pool_members")).toEqual([
+      "tenant_id",
+      "project_id",
+      "user_id",
+      "role",
+      "created_at",
+      "updated_at"
+    ]);
   });
 
   it("stores first-class CRM pipeline contract without changing flat deal stages", () => {

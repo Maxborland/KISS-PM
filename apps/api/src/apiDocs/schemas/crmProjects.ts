@@ -721,6 +721,61 @@ export const crmProjectSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  ProjectResourcePoolRole: {
+    type: "string",
+    enum: ["project_manager", "resource", "observer"]
+  },
+  ProjectResourcePoolMember: {
+    type: "object",
+    required: ["userId", "role", "createdAt", "updatedAt"],
+    properties: {
+      userId: stringIdSchema,
+      role: schemaRef("ProjectResourcePoolRole"),
+      createdAt: dateTimeSchema,
+      updatedAt: dateTimeSchema
+    },
+    additionalProperties: false
+  },
+  ProjectResourcePoolMemberWrite: {
+    type: "object",
+    required: ["userId", "role"],
+    properties: {
+      userId: stringIdSchema,
+      role: schemaRef("ProjectResourcePoolRole")
+    },
+    additionalProperties: false
+  },
+  ProjectResourcePool: {
+    type: "object",
+    required: ["projectId", "members"],
+    properties: {
+      projectId: stringIdSchema,
+      members: {
+        type: "array",
+        items: schemaRef("ProjectResourcePoolMember")
+      }
+    },
+    additionalProperties: false
+  },
+  ProjectResourcePoolReplaceRequest: {
+    type: "object",
+    required: ["members"],
+    properties: {
+      members: {
+        type: "array",
+        items: schemaRef("ProjectResourcePoolMemberWrite")
+      }
+    },
+    additionalProperties: false
+  },
+  ProjectResourcePoolResponse: {
+    type: "object",
+    required: ["resourcePool"],
+    properties: {
+      resourcePool: schemaRef("ProjectResourcePool")
+    },
+    additionalProperties: false
+  },
   TaskParticipant: {
     type: "object",
     required: ["userId", "role"],

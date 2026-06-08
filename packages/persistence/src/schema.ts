@@ -704,6 +704,42 @@ export const tenantUsers = pgTable(
   ]
 );
 
+export const projectResourcePoolMembers = pgTable(
+  "project_resource_pool_members",
+  {
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    userId: text("user_id").notNull(),
+    role: text("role").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "project_resource_pool_members_pkey",
+      columns: [table.tenantId, table.projectId, table.userId]
+    }),
+    foreignKey({
+      name: "project_resource_pool_members_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "project_resource_pool_members_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("project_resource_pool_members_tenant_user_idx").on(
+      table.tenantId,
+      table.userId
+    ),
+    check(
+      "project_resource_pool_members_role_chk",
+      sql`${table.role} in ('project_manager', 'resource', 'observer')`
+    )
+  ]
+);
+
 export const userCredentials = pgTable(
   "user_credentials",
   {
@@ -3759,6 +3795,7 @@ export type PersistenceTableName =
   | "opportunity_demands"
   | "projects"
   | "project_position_demands"
+  | "project_resource_pool_members"
   | "task_statuses"
   | "tasks"
   | "plan_versions"
@@ -3859,6 +3896,7 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "opportunity_demands",
   "projects",
   "project_position_demands",
+  "project_resource_pool_members",
   "task_statuses",
   "tasks",
   "plan_versions",
@@ -3952,6 +3990,7 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "opportunity_demands",
   "projects",
   "project_position_demands",
+  "project_resource_pool_members",
   "task_statuses",
   "tasks",
   "plan_versions",
@@ -4212,6 +4251,14 @@ const tableColumns = {
     "project_id",
     "position_id",
     "required_hours"
+  ],
+  project_resource_pool_members: [
+    "tenant_id",
+    "project_id",
+    "user_id",
+    "role",
+    "created_at",
+    "updated_at"
   ],
   task_statuses: [
     "id",
