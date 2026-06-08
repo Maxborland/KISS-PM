@@ -1125,6 +1125,8 @@ async function buildOperationalControlQueue(input: {
   const allTasks: TaskRecord[] = [];
   const items: OperationalControlQueueSortItem[] = [];
   const signalById = new Map<string, ControlSignal>();
+  const signalProjectById = new Map<string, string>();
+  const correctiveActionProjectById = new Map<string, string>();
 
   for (const project of projects) {
     const [tasks, signals, correctiveActions] = await Promise.all([
@@ -1137,14 +1139,21 @@ async function buildOperationalControlQueue(input: {
     const tenantSignals = signals.filter(
       (signal) => signal.tenantId === input.tenantId && signal.projectId === project.id
     );
-    for (const signal of tenantSignals) signalById.set(signal.id, signal);
+    for (const signal of tenantSignals) {
+      signalById.set(signal.id, signal);
+      signalProjectById.set(signal.id, signal.projectId);
+    }
+    const tenantCorrectiveActions = correctiveActions.filter(
+      (action) => action.tenantId === input.tenantId && action.projectId === project.id
+    );
+    for (const action of tenantCorrectiveActions) correctiveActionProjectById.set(action.id, action.projectId);
 
     items.push(...queueItemsForProject(project, input.asOf));
     items.push(...queueItemsForTasks(project, tenantTasks, input.asOf));
     items.push(...queueItemsForControlSignals(project, tenantSignals));
     items.push(...queueItemsForCorrectiveActions(
       project,
-      correctiveActions.filter((action) => action.tenantId === input.tenantId && action.projectId === project.id),
+      tenantCorrectiveActions,
       signalById,
       input.asOf
     ));
@@ -1152,7 +1161,13 @@ async function buildOperationalControlQueue(input: {
 
   const taskProjectById = new Map(allTasks.map((task) => [task.id, task.projectId]));
   const auditEvents = await input.dataSource.listAuditEventsByTenantId?.(input.tenantId, { limit: 100 }) ?? [];
-  items.push(...queueItemsForAuditEvents(auditEvents, projectById, taskProjectById));
+  items.push(...queueItemsForAuditEvents(
+    auditEvents,
+    projectById,
+    taskProjectById,
+    signalProjectById,
+    correctiveActionProjectById
+  ));
 
   return sortOperationalControlQueue(items)
     .slice(0, input.limit)
@@ -1317,7 +1332,9 @@ function queueItemsForCorrectiveActions(
 function queueItemsForAuditEvents(
   auditEvents: AuditEventListItem[],
   projectById: Map<string, ProjectRecord>,
-  taskProjectById: Map<string, string>
+  taskProjectById: Map<string, string>,
+  signalProjectById: Map<string, string>,
+  correctiveActionProjectById: Map<string, string>
 ): OperationalControlQueueSortItem[] {
   return auditEvents.flatMap((event) => {
     if (event.tenantId && !projectById.size) return [];
@@ -1325,7 +1342,13 @@ function queueItemsForAuditEvents(
     const failed = status === "failed" || event.actionType.endsWith("_failed");
     const denied = status === "denied" || event.actionType.endsWith("_denied") || event.actionType.endsWith("_conflict");
     if (!failed && !denied) return [];
-    const project = resolveAuditProject(event, projectById, taskProjectById);
+    const project = resolveAuditProject(
+      event,
+      projectById,
+      taskProjectById,
+      signalProjectById,
+      correctiveActionProjectById
+    );
     if (!project) return [];
     const severity: OperationalControlQueueSeverity = failed ? "critical" : "warning";
     return [withQueueSort({
@@ -1355,7 +1378,9 @@ function queueItemsForAuditEvents(
 function resolveAuditProject(
   event: AuditEventListItem,
   projectById: Map<string, ProjectRecord>,
-  taskProjectById: Map<string, string>
+  taskProjectById: Map<string, string>,
+  signalProjectById: Map<string, string>,
+  correctiveActionProjectById: Map<string, string>
 ): ProjectRecord | undefined {
   const sourceEntity = event.sourceEntity;
   const type = typeof sourceEntity.type === "string" ? sourceEntity.type : undefined;
@@ -1364,6 +1389,14 @@ function resolveAuditProject(
   if (type === "Project") return projectById.get(id);
   if (type === "Task") {
     const projectId = taskProjectById.get(id);
+    return projectId ? projectById.get(projectId) : undefined;
+  }
+  if (type === "ControlSignal") {
+    const projectId = signalProjectById.get(id);
+    return projectId ? projectById.get(projectId) : undefined;
+  }
+  if (type === "CorrectiveAction") {
+    const projectId = correctiveActionProjectById.get(id);
     return projectId ? projectById.get(projectId) : undefined;
   }
   return undefined;

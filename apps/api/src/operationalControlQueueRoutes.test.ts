@@ -80,6 +80,59 @@ describe("operational control queue API", () => {
     });
   });
 
+  it("resolves audit events sourced from control signals and corrective actions", async () => {
+    const project = createProject("project-alpha");
+    const signal = createSignal("signal-review", project.id, {
+      status: "resolved",
+      explanation: "Resolved signal with denied action"
+    });
+    const action = createCorrectiveAction("action-review", project.id, signal.id, {
+      status: "done"
+    });
+    const fixture = createOperationalQueueFixture({
+      projects: [project],
+      signalsByProject: { [project.id]: [signal] },
+      correctiveActionsByProject: { [project.id]: [action] },
+      auditEvents: [
+        createAuditEvent("audit-signal-denied", {
+          sourceEntity: { type: "ControlSignal", id: signal.id },
+          actionType: "management_action.denied",
+          executionResult: { status: "denied" },
+          createdAt: new Date("2026-06-08T10:00:00.000Z")
+        }),
+        createAuditEvent("audit-action-failed", {
+          sourceEntity: { type: "CorrectiveAction", id: action.id },
+          actionType: "corrective_action.apply_failed",
+          executionResult: { status: "failed" },
+          createdAt: new Date("2026-06-08T11:00:00.000Z")
+        })
+      ]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=10",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string; project: { id: string } }> };
+    expect(body.items.map((item) => item.id)).toEqual([
+      "audit-event:project-alpha:audit-action-failed",
+      "audit-event:project-alpha:audit-signal-denied"
+    ]);
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        project: { id: project.id, title: project.title, status: project.status, plannedFinish: "2026-06-30" },
+        source: expect.objectContaining({ auditEventId: "audit-action-failed" })
+      }),
+      expect.objectContaining({
+        project: { id: project.id, title: project.title, status: project.status, plannedFinish: "2026-06-30" },
+        source: expect.objectContaining({ auditEventId: "audit-signal-denied" })
+      })
+    ]);
+  });
+
   it("returns sorted and limited signals from control, corrective, status, overdue, and audit inputs", async () => {
     const project = createProject("project-alpha", {
       plannedFinish: new Date("2026-06-08T00:00:00.000Z")
