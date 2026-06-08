@@ -15,6 +15,7 @@ import {
   calendarExceptions,
   resourceCalendarEvents,
   projectBaselineTasks,
+  projectBaselineAssignments,
   projectBaselines,
   projectCalendars,
   resourcePersonalCalendars,
@@ -176,6 +177,15 @@ describe("planning repository", () => {
       plannedFinish: "2026-06-05",
       workMinutes: 960
     });
+    await db.insert(projectBaselineAssignments).values({
+      tenantId: "tenant-alpha",
+      projectId,
+      baselineId: "baseline-alpha",
+      assignmentId: "assignment-alpha",
+      taskId: "task-alpha",
+      resourceId: "user-alpha-executor",
+      workMinutes: 960
+    });
     await db.insert(resourcePersonalCalendars).values({
       id: "personal-calendar-user-alpha-executor",
       tenantId: "tenant-alpha",
@@ -237,7 +247,21 @@ describe("planning repository", () => {
         expect.objectContaining({ id: "task-beta-user-alpha-executor-executor" })
       ]),
       dependencies: [expect.objectContaining({ id: "dep-alpha-beta", type: "FS" })],
-      baselines: [expect.objectContaining({ id: "baseline-alpha" })],
+      baselines: [
+        expect.objectContaining({
+          id: "baseline-alpha",
+          assignments: [
+            {
+              assignmentId: "assignment-alpha",
+              taskId: "task-alpha",
+              resourceId: "user-alpha-executor",
+              role: "executor",
+              unitsPermille: 1000,
+              workMinutes: 960
+            }
+          ]
+        })
+      ],
       calendars: expect.arrayContaining([
         expect.objectContaining({ id: "tenant-default" }),
         expect.objectContaining({ id: "calendar-project-alpha" })
@@ -590,6 +614,55 @@ describe("planning repository", () => {
       );
 
     expect(participantRows).toHaveLength(1);
+  });
+
+  it("omits participant fallback assignments whose generated id collides with explicit assignments", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "assignment.upsert",
+        payload: {
+          id: "task-beta-user-alpha-executor-executor",
+          taskId: "task-alpha",
+          resourceId: "user-alpha-admin",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: null
+        }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    const collidingAssignments = snapshot?.assignments.filter(
+      (assignment) => assignment.id === "task-beta-user-alpha-executor-executor"
+    );
+    expect(collidingAssignments).toHaveLength(1);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "baseline.capture",
+        payload: { baselineId: "baseline-collision", label: "Collision baseline" }
+      }
+    });
+
+    const rows = await db
+      .select()
+      .from(projectBaselineAssignments)
+      .where(eq(projectBaselineAssignments.baselineId, "baseline-collision"));
+    expect(
+      rows.filter((assignment) => assignment.assignmentId === "task-beta-user-alpha-executor-executor")
+    ).toHaveLength(1);
   });
 
   it("excludes inactive users and their assignments from active planning resources", async () => {

@@ -334,6 +334,14 @@ function reduceBaselineCapture(
       plannedStart: task.plannedStart,
       plannedFinish: task.plannedFinish,
       workMinutes: task.workMinutes
+    })),
+    assignments: snapshot.assignments.map((assignment) => ({
+      assignmentId: assignment.id,
+      taskId: assignment.taskId,
+      resourceId: assignment.resourceId,
+      role: assignment.role,
+      unitsPermille: assignment.unitsPermille,
+      workMinutes: assignment.workMinutes
     }))
   };
 
@@ -341,6 +349,7 @@ function reduceBaselineCapture(
     baselines: upsertById(snapshot.baselines, baseline)
   });
 }
+
 
 function reduceConstraintUpdate(
   snapshot: PlanSnapshot,

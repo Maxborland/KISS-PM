@@ -405,6 +405,30 @@ describe("planning command reducer", () => {
     ]);
   });
 
+  it("captures current assignments in baseline preview snapshots", () => {
+    const result = reducePlanningCommand(createSnapshot(), {
+      type: "baseline.capture",
+      payload: { baselineId: "baseline-with-assignments", label: "Assignment baseline" }
+    });
+
+    expect(result.validationIssues).toEqual([]);
+    expect(result.nextSnapshot.baselines).toEqual([
+      expect.objectContaining({
+        id: "baseline-with-assignments",
+        assignments: [
+          {
+            assignmentId: "assignment-a",
+            taskId: "task-a",
+            resourceId: "resource-alpha",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: 480
+          }
+        ]
+      })
+    ]);
+  });
+
   it("rejects invalid task, dependency, assignment and reservation command references", () => {
     const invalidCommands: PlanningCommand[] = [
       {
