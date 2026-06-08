@@ -57,8 +57,9 @@ describe("planning auto-solver API", () => {
   });
 
   it("rejects applying persisted proposals when the project is paused", async () => {
-    const harness = createApiHarness({ projectStatus: "paused" });
+    const harness = createApiHarness();
     const createBody = await createSolverRun(harness);
+    harness.setProjectStatus("paused");
 
     const response = await applyProposal(harness, createBody);
     const body = await response.json();
@@ -68,6 +69,29 @@ describe("planning auto-solver API", () => {
     expect(harness.appliedCommandTypes).toEqual([]);
     expect(harness.storedRunBox.value?.appliedProposalId).toBeNull();
     expect(harness.auditActionTypes).toEqual(["planning.auto_solver.run_created"]);
+  });
+
+  it("rejects creating solver runs when the project is paused", async () => {
+    const harness = createApiHarness({ projectStatus: "paused" });
+
+    const createResponse = await harness.app.request(
+      "/api/workspace/projects/project-solver/planning/auto-solver-runs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        body: JSON.stringify({ mode: "schedule", clientPlanVersion: 3 })
+      }
+    );
+    const body = await createResponse.json();
+
+    expect(createResponse.status).toBe(404);
+    expect(body.error).toBe("project_not_found");
+    expect(harness.storedRunBox.value).toBeNull();
+    expect(harness.auditActionTypes).toEqual([]);
   });
 
   it("builds solver runs with resource capacity through the requested deadline", async () => {
@@ -356,6 +380,7 @@ type ApiHarness = {
   storedRunBox: { value: PlanningSolverRunRecord | null };
   appliedCommandTypes: string[];
   auditActionTypes: string[];
+  setProjectStatus(status: "active" | "paused"): void;
 };
 
 type SolverRunResponse = {
@@ -374,6 +399,7 @@ function createApiHarness(input: {
   projectStatus?: "active" | "paused";
 } = {}): ApiHarness {
   let snapshot = input.snapshot ?? createSnapshot();
+  let projectStatus = input.projectStatus ?? "active";
   const storedRunBox: { value: PlanningSolverRunRecord | null } = { value: null };
   const appliedCommandTypes: string[] = [];
   const auditActionTypes: string[] = [];
@@ -419,7 +445,7 @@ function createApiHarness(input: {
           projectTypeId: null,
           title: "Solver Project",
           clientName: "Solver Client",
-          status: input.projectStatus ?? "active",
+          status: projectStatus,
           plannedStart: new Date("2026-06-01T00:00:00.000Z"),
           plannedFinish: new Date("2026-06-05T00:00:00.000Z"),
           contractValue: 0,
@@ -509,7 +535,10 @@ function createApiHarness(input: {
     app: createApp({ dataSource: dataSource as ApiTenantDataSource }),
     storedRunBox,
     appliedCommandTypes,
-    auditActionTypes
+    auditActionTypes,
+    setProjectStatus(status) {
+      projectStatus = status;
+    }
   };
 }
 

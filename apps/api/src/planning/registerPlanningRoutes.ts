@@ -31,6 +31,7 @@ import {
   parseProjectRouteParam,
   parseScenarioProposalRouteParam,
   requireActivePlanningProject,
+  requireReadablePlanningProject,
   serializeScenarioProposal,
   summarizeSnapshot,
   validateCommandDataSourcePreconditions,
@@ -58,6 +59,7 @@ function emitPlanVersionFromBody(
 
 export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
   registerPlanningEventsRoute(app, {
+    dataSource: deps.dataSource,
     getSessionActorFromHeaders: deps.getSessionActorFromHeaders,
     getActorProfile: deps.getActorProfile
   });
@@ -78,6 +80,12 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     const decision = canReadPlanningReadModel({ actor, profile });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
+    const readableProject = await requireReadablePlanningProject(
+      deps.dataSource,
+      actor.tenantId,
+      parsedProjectId.value
+    );
+    if (!readableProject.ok) return context.json({ error: readableProject.error }, readableProject.status);
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, parsedProjectId.value);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
 
@@ -116,6 +124,12 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       }, 403);
     }
 
+    const activeProject = await requireActivePlanningProject(
+      deps.dataSource,
+      actor.tenantId,
+      parsedProjectId.value
+    );
+    if (!activeProject.ok) return context.json({ error: activeProject.error }, activeProject.status);
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, parsedProjectId.value);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
     if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
@@ -554,6 +568,12 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       const profile = await deps.getActorProfile(actor);
       const readDecision = canReadPlanningReadModel({ actor, profile });
       if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
+      const activeProject = await requireActivePlanningProject(
+        deps.dataSource,
+        actor.tenantId,
+        parsedProjectId.value
+      );
+      if (!activeProject.ok) return context.json({ error: activeProject.error }, activeProject.status);
       const projectId = parsedProjectId.value;
       const newPlanVersion = await deps.dataSource.incrementPlanVersion(actor.tenantId, projectId);
       notifyPlanVersionChanged(projectId, newPlanVersion);
@@ -573,6 +593,12 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
+    const readableProject = await requireReadablePlanningProject(
+      deps.dataSource,
+      actor.tenantId,
+      parsedProjectId.value
+    );
+    if (!readableProject.ok) return context.json({ error: readableProject.error }, readableProject.status);
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, parsedProjectId.value);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
     return context.json({
@@ -620,6 +646,12 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     }
 
     const projectId = parsedProjectId.value;
+    const activeProject = await requireActivePlanningProject(
+      deps.dataSource,
+      actor.tenantId,
+      projectId
+    );
+    if (!activeProject.ok) return context.json({ error: activeProject.error }, activeProject.status);
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
     if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
