@@ -96,6 +96,29 @@ describe("OpenAPI route inventory", () => {
     });
   });
 
+  it("documents project activation request parser shape", () => {
+    const document = createTestDocument();
+    const operation =
+      document.paths["/api/workspace/opportunities/{opportunityId}/activate"]?.post;
+
+    expect(
+      operation?.requestBody?.content?.["application/json"]?.schema?.$ref
+    ).toBe("#/components/schemas/ProjectActivationRequest");
+
+    const requestSchema = document.components.schemas.ProjectActivationRequest as any;
+    expect(requestSchema.required).toBeUndefined();
+    expect(Object.keys(requestSchema.properties)).toEqual(["id", "acceptedRiskReason"]);
+    expect(requestSchema.properties.id).toMatchObject({ type: "string", minLength: 1 });
+    expect(requestSchema.properties.acceptedRiskReason).toEqual({
+      type: ["string", "null"],
+      maxLength: 500
+    });
+    expect(requestSchema.properties.projectId).toBeUndefined();
+    expect(requestSchema.properties.templateId).toBeUndefined();
+    expect(requestSchema.properties.plannedStart).toBeUndefined();
+    expect(requestSchema.properties.plannedFinish).toBeUndefined();
+  });
+
   it("documents writable opportunity CRM pipeline state fields", () => {
     const document = createTestDocument();
     const schema = document.components.schemas.OpportunityWriteRequest;

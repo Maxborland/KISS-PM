@@ -6,7 +6,8 @@ import { isFinalOpportunityStatus } from "./opportunityStatus";
 import type {
   ActivateProjectFromOpportunityResult,
   ProjectActivationInput,
-  ProjectIntakeServiceDeps
+  ProjectIntakeServiceDeps,
+  ProjectIntakeMutationDataSource
 } from "./types";
 
 export async function activateProjectFromOpportunity(
@@ -50,6 +51,13 @@ export async function activateProjectFromOpportunity(
         status: 409 as const
       };
     }
+    const crmFinalStageError = await validateCrmFinalStageForActivation(
+      transactionDataSource,
+      input.actor.tenantId,
+      currentOpportunity
+    );
+    if (crmFinalStageError) return crmFinalStageError;
+
     if (!currentOpportunity.feasibilityStatus) {
       return { ok: false as const, error: "feasibility_required", status: 400 as const };
     }
@@ -135,4 +143,43 @@ export async function activateProjectFromOpportunity(
   if (!activation.ok) return activation;
 
   return { ok: true, status: 201, project: activation.project };
+}
+
+async function validateCrmFinalStageForActivation(
+  dataSource: ProjectIntakeMutationDataSource,
+  tenantId: string,
+  opportunity: { crmPipelineId: string | null; crmPipelineStageId: string | null }
+) {
+  if (!opportunity.crmPipelineId && !opportunity.crmPipelineStageId) return null;
+
+  const conflict = {
+    ok: false as const,
+    error: "crm_pipeline_won_stage_required",
+    status: 409 as const
+  };
+
+  if (
+    !opportunity.crmPipelineId ||
+    !opportunity.crmPipelineStageId ||
+    !dataSource.findCrmPipelineStageById
+  ) {
+    return conflict;
+  }
+
+  const currentStage = await dataSource.findCrmPipelineStageById(
+    tenantId,
+    opportunity.crmPipelineId,
+    opportunity.crmPipelineStageId
+  );
+
+  if (
+    !currentStage ||
+    currentStage.status !== "active" ||
+    !currentStage.isFinal ||
+    currentStage.lifecycleState !== "won_closed"
+  ) {
+    return conflict;
+  }
+
+  return null;
 }

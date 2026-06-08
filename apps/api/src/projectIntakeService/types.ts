@@ -53,6 +53,7 @@ export type ProjectIntakeMutationDataSource = Pick<
   | "createProjectDraftFromOpportunity"
   | "finalizeOpportunity"
   | "findOpportunityById"
+  | "findCrmPipelineStageById"
   | "listPositions"
   | "listProjects"
   | "listWorkspaceUsers"

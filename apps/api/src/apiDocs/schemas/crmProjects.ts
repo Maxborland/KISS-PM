@@ -638,10 +638,8 @@ export const crmProjectSchemas = openApiSchemaFragment({
   ProjectActivationRequest: {
     type: "object",
     properties: {
-      projectId: stringIdSchema,
-      templateId: nullableStringSchema,
-      plannedStart: { type: ["string", "null"], format: "date-time" },
-      plannedFinish: { type: ["string", "null"], format: "date-time" }
+      id: stringIdSchema,
+      acceptedRiskReason: { type: ["string", "null"], maxLength: 500 }
     },
     additionalProperties: false
   },
