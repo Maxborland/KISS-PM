@@ -239,6 +239,39 @@ describe("operational control queue API", () => {
     expect(body.items.map((item) => item.id)).toEqual(["audit-event:project-alpha:audit-active-older-conflict"]);
   });
 
+  it("ranks failed audit events before capping actionable audit events by recency", async () => {
+    const project = createProject("project-alpha");
+    const newerWarnings = Array.from({ length: 100 }, (_, index) => createAuditEvent(`audit-denied-${index}`, {
+      sourceEntity: { type: "Project", id: project.id },
+      actionType: "management_action.denied",
+      executionResult: { status: "denied" },
+      createdAt: new Date(Date.parse("2026-06-08T12:00:00.000Z") + index * 1000)
+    }));
+    const fixture = createOperationalQueueFixture({
+      projects: [project],
+      auditEvents: [
+        ...newerWarnings,
+        createAuditEvent("audit-older-failed", {
+          sourceEntity: { type: "Project", id: project.id },
+          actionType: "management_action.failed",
+          executionResult: { status: "failed" },
+          createdAt: new Date("2026-06-08T09:00:00.000Z")
+        })
+      ]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=1",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string; severity: string }> };
+    expect(body.items).toEqual([
+      expect.objectContaining({ id: "audit-event:project-alpha:audit-older-failed", severity: "critical" })
+    ]);
+  });
   it("returns sorted and limited signals from control, corrective, status, overdue, and audit inputs", async () => {
     const project = createProject("project-alpha", {
       plannedFinish: new Date("2026-06-08T00:00:00.000Z")
@@ -399,7 +432,10 @@ function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
             /(?:_|\.)(?:failed|denied|conflict)$/.test(event.actionType);
         })
         : input.auditEvents ?? [];
-      return filtered.slice(0, options?.limit);
+      const ordered = options?.requiresAttention
+        ? [...filtered].sort(compareAttentionAuditEvents)
+        : filtered;
+      return ordered.slice(0, options?.limit);
     }
   };
 
@@ -527,6 +563,16 @@ function createAuditEvent(id: string, overrides: Partial<AuditEventListItem> = {
   };
 }
 
+function compareAttentionAuditEvents(left: AuditEventListItem, right: AuditEventListItem) {
+  return auditEventSeverityRank(left) - auditEventSeverityRank(right) ||
+    right.createdAt.getTime() - left.createdAt.getTime() ||
+    right.id.localeCompare(left.id);
+}
+
+function auditEventSeverityRank(event: AuditEventListItem) {
+  const status = typeof event.executionResult.status === "string" ? event.executionResult.status : null;
+  return status === "failed" || /(?:_|\.)failed$/.test(event.actionType) ? 0 : 1;
+}
 function auditEventMatchesSourceEntities(
   event: { sourceEntity: Record<string, unknown> },
   sourceEntities: Array<{ type: string; ids: string[] }> | undefined

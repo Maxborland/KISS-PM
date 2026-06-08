@@ -603,12 +603,22 @@ export function createPostgresTenantDataSource(
       if (sourceEntityPredicates.length > 0) {
         filters.push(sql`(${sql.join(sourceEntityPredicates, sql` or `)})`);
       }
+      const auditEventOrder = options?.requiresAttention
+        ? [
+          sql`case when (
+            ${auditEvents.executionResult} ->> 'status' = 'failed' or
+            ${auditEvents.actionType} ~ ${String.raw`[._]failed$`}
+          ) then 0 else 1 end`,
+          desc(auditEvents.createdAt),
+          desc(auditEvents.id)
+        ]
+        : [desc(auditEvents.createdAt), desc(auditEvents.id)];
       const buildQuery = () =>
         db
           .select()
           .from(auditEvents)
           .where(and(...filters))
-          .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id));
+          .orderBy(...auditEventOrder);
       const rows =
         options?.limit === undefined
           ? await buildQuery()

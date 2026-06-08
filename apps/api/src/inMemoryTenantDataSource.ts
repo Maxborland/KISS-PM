@@ -48,17 +48,19 @@ export function createInMemoryTenantDataSource(): ApiTenantDataSource {
       });
     },
     async listAuditEventsByTenantId(tenantId, options) {
-      return auditEvents
-        .filter(
-          (event) =>
-            event.tenantId === tenantId &&
-            (!options?.projectId ||
-              (event.sourceEntity.type === "Project" &&
-                event.sourceEntity.id === options.projectId)) &&
-            auditEventMatchesSourceEntities(event, options?.sourceEntities) &&
-            (!options?.requiresAttention || auditEventRequiresAttention(event))
-        )
-        .slice(0, options?.limit);
+      const filtered = auditEvents.filter(
+        (event) =>
+          event.tenantId === tenantId &&
+          (!options?.projectId ||
+            (event.sourceEntity.type === "Project" &&
+              event.sourceEntity.id === options.projectId)) &&
+          auditEventMatchesSourceEntities(event, options?.sourceEntities) &&
+          (!options?.requiresAttention || auditEventRequiresAttention(event))
+      );
+      const ordered = options?.requiresAttention
+        ? [...filtered].sort(compareAttentionAuditEvents)
+        : filtered;
+      return ordered.slice(0, options?.limit);
     }
   };
 }
@@ -86,6 +88,19 @@ function auditEventRequiresAttention(event: { actionType: string; executionResul
     hasAuditActionSuffix(event.actionType, "conflict");
 }
 
+function compareAttentionAuditEvents(
+  left: { id: string; actionType: string; executionResult: Record<string, unknown>; createdAt: Date },
+  right: { id: string; actionType: string; executionResult: Record<string, unknown>; createdAt: Date }
+) {
+  return auditEventSeverityRank(left) - auditEventSeverityRank(right) ||
+    right.createdAt.getTime() - left.createdAt.getTime() ||
+    right.id.localeCompare(left.id);
+}
+
+function auditEventSeverityRank(event: { actionType: string; executionResult: Record<string, unknown> }) {
+  const status = typeof event.executionResult.status === "string" ? event.executionResult.status : null;
+  return status === "failed" || hasAuditActionSuffix(event.actionType, "failed") ? 0 : 1;
+}
 function hasAuditActionSuffix(actionType: string, suffix: "failed" | "denied" | "conflict") {
   return actionType.endsWith(`_${suffix}`) || actionType.endsWith(`.${suffix}`);
 }
