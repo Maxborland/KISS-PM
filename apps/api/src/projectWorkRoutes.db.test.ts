@@ -926,6 +926,13 @@ describe("project work API routes", () => {
         expect.objectContaining({
           actionType: "task.comment_created",
           sourceEntity: { type: "Task", id: "task-commented" }
+        }),
+        expect.objectContaining({
+          actionType: "task.comment_create_denied",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Task", id: "task-commented" },
+          executionResult: { status: "denied" },
+          beforeState: expect.objectContaining({ id: "task-commented" })
         })
       ])
     });
@@ -1020,6 +1027,19 @@ describe("project work API routes", () => {
         expect.objectContaining({
           actionType: "task.updated",
           sourceEntity: { type: "Task", id: "task-field-guard" }
+        }),
+        expect.objectContaining({
+          actionType: "task.update_denied",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Task", id: "task-field-guard" },
+          executionResult: { status: "denied" },
+          beforeState: expect.objectContaining({ id: "task-field-guard" })
+        }),
+        expect.objectContaining({
+          actionType: "task.archive_denied",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Task", id: "task-field-guard" },
+          executionResult: { status: "denied" }
         })
       ])
     });
@@ -1069,9 +1089,22 @@ describe("project work API routes", () => {
         ]
       }))
     });
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
 
     expect(denied.status).toBe(403);
     await expect(denied.json()).resolves.toEqual({ error: "permission_missing" });
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "task.update_denied",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Task", id: "task-resource-permission-guard" },
+          executionResult: { status: "denied" }
+        })
+      ])
+    });
   });
 
   it("rejects stale task PATCH versions before applying planning compatibility commands", async () => {
@@ -1336,10 +1369,23 @@ describe("project work API routes", () => {
         body: JSON.stringify({ statusId: "task-status-done" })
       }
     );
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
 
     expect(denied.status).toBe(403);
     await expect(denied.json()).resolves.toEqual({
       error: "task_participant_role_required"
+    });
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "task.status_change_denied",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Task", id: "task-admin-only" },
+          executionResult: { status: "denied" }
+        })
+      ])
     });
   });
 
@@ -1507,6 +1553,7 @@ describe("project work API routes", () => {
   });
 
   it("enforces project read and manage permissions", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const readerCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
     const readerCreate = await app.request("/api/workspace/projects/project-alpha/tasks", {
@@ -1527,6 +1574,9 @@ describe("project work API routes", () => {
     const deniedProject = await app.request("/api/workspace/projects/project-alpha", {
       headers: { cookie: deniedCookie }
     });
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
     const deniedMyWork = await app.request("/api/workspace/my-work", {
       headers: { cookie: deniedCookie }
     });
@@ -1537,6 +1587,16 @@ describe("project work API routes", () => {
     await expect(deniedProject.json()).resolves.toEqual({ error: "permission_missing" });
     expect(deniedMyWork.status).toBe(403);
     await expect(deniedMyWork.json()).resolves.toEqual({ error: "permission_missing" });
+    await expect(audit.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "task.create_denied",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Project", id: "project-alpha" },
+          executionResult: { status: "denied" }
+        })
+      ])
+    });
   });
 
   it("pauses and resumes an active project, keeps paused reads open, and blocks task mutations", async () => {
@@ -1707,6 +1767,34 @@ describe("project work API routes", () => {
           afterState: { status: "active" },
           input: { status: "active" },
           executionResult: { status: "succeeded" }
+        }),
+        expect.objectContaining({
+          actionType: "task.create_denied",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Project", id: "project-alpha" },
+          beforeState: expect.objectContaining({ status: "paused" }),
+          executionResult: { status: "denied" }
+        }),
+        expect.objectContaining({
+          actionType: "task.update_denied",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Task", id: "task-paused-project" },
+          beforeState: expect.objectContaining({ id: "task-paused-project" }),
+          executionResult: { status: "denied" }
+        }),
+        expect.objectContaining({
+          actionType: "task.status_change_denied",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Task", id: "task-paused-project" },
+          beforeState: expect.objectContaining({ id: "task-paused-project" }),
+          executionResult: { status: "denied" }
+        }),
+        expect.objectContaining({
+          actionType: "task.archive_denied",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Task", id: "task-paused-project" },
+          beforeState: expect.objectContaining({ id: "task-paused-project" }),
+          executionResult: { status: "denied" }
         })
       ])
     });

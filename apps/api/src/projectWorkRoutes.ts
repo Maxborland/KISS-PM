@@ -4,9 +4,11 @@ import type { Hono } from "hono";
 
 import type {
   ApiTenantDataSource,
-  ManagementAuditEventInput
+  ManagementAuditEventInput,
+  ProjectRecord
 } from "./apiTypes";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
+import { summarizeTask } from "./project-work/taskCommandActivities";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
   parseCreateTaskBody,
@@ -217,7 +219,16 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       actor,
       profile
     });
-    if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
+    if (!preflight.ok) {
+      await appendProjectWorkDeniedAudit(deps, {
+        actor,
+        actionType: "task.create_denied",
+        status: preflight.status,
+        error: preflight.error,
+        commandInput: { scope: "workspace_inbox" }
+      });
+      return context.json({ error: preflight.error }, preflight.status);
+    }
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -230,6 +241,13 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       body: parsed.value
     });
     if (!createResult.ok) {
+      await appendProjectWorkDeniedAudit(deps, {
+        actor,
+        actionType: "task.create_denied",
+        status: createResult.status,
+        error: createResult.error,
+        commandInput: { scope: "workspace_inbox", taskId: parsed.value.id ?? null }
+      });
       return context.json({ error: createResult.error }, createResult.status);
     }
 
@@ -253,7 +271,17 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       profile,
       projectId: projectId.value
     });
-    if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
+    if (!preflight.ok) {
+      await appendProjectWorkDeniedAudit(deps, {
+        actor,
+        actionType: "task.create_denied",
+        status: preflight.status,
+        error: preflight.error,
+        projectId: projectId.value,
+        commandInput: { projectId: projectId.value }
+      });
+      return context.json({ error: preflight.error }, preflight.status);
+    }
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -267,6 +295,14 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       body: parsed.value
     });
     if (!createResult.ok) {
+      await appendProjectWorkDeniedAudit(deps, {
+        actor,
+        actionType: "task.create_denied",
+        status: createResult.status,
+        error: createResult.error,
+        projectId: projectId.value,
+        commandInput: { projectId: projectId.value, taskId: parsed.value.id ?? null }
+      });
       return context.json({ error: createResult.error }, createResult.status);
     }
 
@@ -286,7 +322,17 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       profile,
       taskId: taskId.value
     });
-    if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
+    if (!preflight.ok) {
+      await appendProjectWorkDeniedAudit(deps, {
+        actor,
+        actionType: "task.update_denied",
+        status: preflight.status,
+        error: preflight.error,
+        taskId: taskId.value,
+        commandInput: { taskId: taskId.value }
+      });
+      return context.json({ error: preflight.error }, preflight.status);
+    }
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -300,6 +346,14 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       body: parsed.value
     });
     if (!updateResult.ok) {
+      await appendProjectWorkDeniedAudit(deps, {
+        actor,
+        actionType: "task.update_denied",
+        status: updateResult.status,
+        error: updateResult.error,
+        taskId: taskId.value,
+        commandInput: { taskId: taskId.value }
+      });
       return context.json({ error: updateResult.error }, updateResult.status);
     }
 
@@ -320,6 +374,14 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       taskId: taskId.value
     });
     if (!archiveResult.ok) {
+      await appendProjectWorkDeniedAudit(deps, {
+        actor,
+        actionType: "task.archive_denied",
+        status: archiveResult.status,
+        error: archiveResult.error,
+        taskId: taskId.value,
+        commandInput: { taskId: taskId.value }
+      });
       return context.json({ error: archiveResult.error }, archiveResult.status);
     }
 
@@ -343,7 +405,18 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
         profile,
         projectId: projectId.value
       });
-      if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
+      if (!preflight.ok) {
+        await appendProjectWorkDeniedAudit(deps, {
+          actor,
+          actionType: "task.status_change_denied",
+          status: preflight.status,
+          error: preflight.error,
+          projectId: projectId.value,
+          taskId: taskId.value,
+          commandInput: { projectId: projectId.value, taskId: taskId.value }
+        });
+        return context.json({ error: preflight.error }, preflight.status);
+      }
 
       const body = await readLimitedJsonBody(context);
       if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -359,6 +432,15 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       });
 
       if (!transition.ok) {
+        await appendProjectWorkDeniedAudit(deps, {
+          actor,
+          actionType: "task.status_change_denied",
+          status: transition.status,
+          error: transition.error,
+          projectId: projectId.value,
+          taskId: taskId.value,
+          commandInput: { projectId: projectId.value, taskId: taskId.value, statusId: parsed.value.statusId }
+        });
         return context.json({ error: transition.error }, transition.status);
       }
       invalidateCapacityCacheForTenant(actor.tenantId);
@@ -399,7 +481,17 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       profile,
       taskId: taskId.value
     });
-    if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
+    if (!preflight.ok) {
+      await appendProjectWorkDeniedAudit(deps, {
+        actor,
+        actionType: "task.comment_create_denied",
+        status: preflight.status,
+        error: preflight.error,
+        taskId: taskId.value,
+        commandInput: { taskId: taskId.value }
+      });
+      return context.json({ error: preflight.error }, preflight.status);
+    }
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -412,7 +504,17 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       taskId: taskId.value,
       body: parsed.value
     });
-    if (!result.ok) return context.json({ error: result.error }, result.status);
+    if (!result.ok) {
+      await appendProjectWorkDeniedAudit(deps, {
+        actor,
+        actionType: "task.comment_create_denied",
+        status: result.status,
+        error: result.error,
+        taskId: taskId.value,
+        commandInput: { taskId: taskId.value }
+      });
+      return context.json({ error: result.error }, result.status);
+    }
 
     return context.json({ activity: result.activity }, 201);
   });
@@ -451,4 +553,117 @@ async function appendProjectStatusDeniedAudit(
     permissionResult,
     executionResult: { status: "denied" }
   });
+}
+
+
+type ProjectWorkDeniedAuditInput = {
+  actor: TenantUser;
+  actionType: string;
+  status: number;
+  error: string;
+  projectId?: string;
+  taskId?: string;
+  commandInput: Record<string, unknown>;
+};
+
+async function appendProjectWorkDeniedAudit(
+  deps: ProjectWorkRouteDeps,
+  input: ProjectWorkDeniedAuditInput
+): Promise<void> {
+  const context = await resolveProjectWorkDeniedAuditContext(deps.dataSource, input);
+  if (!context.shouldAudit) return;
+
+  await deps.appendManagementAuditEvent({
+    tenantId: input.actor.tenantId,
+    actorUserId: input.actor.id,
+    actionType: input.actionType,
+    sourceWorkflow: "project_work",
+    sourceEntity: context.sourceEntity,
+    commandInput: input.commandInput,
+    beforeState: context.beforeState,
+    afterState: null,
+    permissionResult: permissionResultForProjectWorkDenial(input),
+    executionResult: { status: "denied" }
+  });
+}
+
+async function resolveProjectWorkDeniedAuditContext(
+  dataSource: ApiTenantDataSource,
+  input: ProjectWorkDeniedAuditInput
+): Promise<{
+  shouldAudit: boolean;
+  sourceEntity: { type: string; id: string };
+  beforeState: Record<string, unknown> | null;
+}> {
+  const task = input.taskId
+    ? await dataSource.findTaskById?.(input.actor.tenantId, input.taskId)
+    : undefined;
+  const projects = await dataSource.listProjects?.(input.actor.tenantId);
+  const project = resolveAuditProject(projects, input.projectId, task?.projectId, input.actionType);
+
+  if (input.status === 403) {
+    return {
+      shouldAudit: true,
+      sourceEntity: task
+        ? { type: "Task", id: task.id }
+        : project
+          ? { type: "Project", id: project.id }
+          : { type: "Tenant", id: input.actor.tenantId },
+      beforeState: task ? summarizeTask(task) : project ? summarizeProject(project) : null
+    };
+  }
+
+  if (
+    input.status !== 404 ||
+    input.error !== "project_not_found" ||
+    !project ||
+    project.status === "active"
+  ) {
+    return {
+      shouldAudit: false,
+      sourceEntity: { type: "Tenant", id: input.actor.tenantId },
+      beforeState: null
+    };
+  }
+
+  return {
+    shouldAudit: true,
+    sourceEntity: task ? { type: "Task", id: task.id } : { type: "Project", id: project.id },
+    beforeState: task ? summarizeTask(task) : summarizeProject(project)
+  };
+}
+
+function resolveAuditProject(
+  projects: ProjectRecord[] | undefined,
+  projectId: string | undefined,
+  taskProjectId: string | undefined,
+  actionType: string
+): ProjectRecord | undefined {
+  if (!projects) return undefined;
+  const knownProjectId = taskProjectId ?? projectId;
+  if (knownProjectId) return projects.find((project) => project.id === knownProjectId);
+  if (actionType === "task.create_denied") {
+    return projects.find(
+      (project) =>
+        project.sourceType === "workspace_inbox" &&
+        project.status !== "closed" &&
+        project.status !== "cancelled"
+    );
+  }
+  return undefined;
+}
+
+function summarizeProject(project: ProjectRecord): Record<string, unknown> {
+  return {
+    id: project.id,
+    status: project.status,
+    sourceType: project.sourceType
+  };
+}
+
+function permissionResultForProjectWorkDenial(
+  input: ProjectWorkDeniedAuditInput
+): Record<string, unknown> {
+  if (input.status === 403) return { allowed: false, reason: input.error };
+  return { allowed: true, reason: "project_lifecycle_blocked" };
 }
