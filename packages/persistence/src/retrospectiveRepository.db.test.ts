@@ -73,6 +73,82 @@ describe("retrospective repository", () => {
     });
   });
 
+  it("cancels a paused project with paused status in the immutable snapshot", async () => {
+    const repository = createRetrospectiveRepository(createDatabase(client));
+    await client`UPDATE projects SET status = 'paused' WHERE id = 'project-alpha'`;
+    const closedAt = new Date("2026-05-25T09:00:00.000Z");
+
+    const readModel = await repository.cancelProject({
+      snapshot: createSnapshot({
+        id: "closure-cancel-paused",
+        closedAt,
+        closeReason: "Client paused then cancelled the contract",
+        projectStatusBefore: "paused"
+      }),
+      lessons: []
+    });
+
+    expect(readModel.snapshot).toMatchObject({
+      id: "closure-cancel-paused",
+      projectId: "project-alpha",
+      projectStatusBefore: "paused",
+      closeReason: "Client paused then cancelled the contract"
+    });
+    expect(readModel.templateImprovementActions).toEqual([]);
+
+    const db = createDatabase(client);
+    const [project] = await db.select().from(projects);
+    expect(project?.status).toBe("cancelled");
+    expect(project?.closedAt?.toISOString()).toBe(closedAt.toISOString());
+  });
+
+  it("cancels a project once with immutable snapshot and lessons", async () => {
+    const repository = createRetrospectiveRepository(createDatabase(client));
+    const closedAt = new Date("2026-05-25T09:00:00.000Z");
+    const readModel = await repository.cancelProject({
+      snapshot: createSnapshot({
+        id: "closure-cancel-alpha",
+        closedAt,
+        closeReason: "Client cancelled the contract"
+      }),
+      lessons: [
+        {
+          ...createLesson({ createdAt: closedAt }),
+          id: "lesson-cancel-alpha",
+          snapshotId: "closure-cancel-alpha"
+        }
+      ]
+    });
+
+    expect(readModel.snapshot).toMatchObject({
+      id: "closure-cancel-alpha",
+      projectId: "project-alpha",
+      projectStatusBefore: "active",
+      closeReason: "Client cancelled the contract"
+    });
+    expect(readModel.lessons).toHaveLength(1);
+    expect(readModel.templateImprovementActions).toEqual([]);
+
+    const db = createDatabase(client);
+    const [project] = await db.select().from(projects);
+    expect(project?.status).toBe("cancelled");
+    expect(project?.closedAt?.toISOString()).toBe(closedAt.toISOString());
+
+    await expect(
+      repository.cancelProject({
+        snapshot: createSnapshot({
+          id: "closure-cancel-alpha-2",
+          closedAt,
+          closeReason: "Second cancellation attempt"
+        }),
+        lessons: []
+      })
+    ).rejects.toThrow("project_not_cancellable");
+
+    const snapshots = await db.select().from(projectClosureSnapshots);
+    expect(snapshots).toHaveLength(1);
+  });
+
   it("applies template improvement as a governed one-way action", async () => {
     const repository = createRetrospectiveRepository(createDatabase(client));
     const closedAt = new Date("2026-05-25T09:00:00.000Z");
@@ -190,13 +266,15 @@ async function seedBaseRows(client: PostgresClient) {
 
 function createSnapshot(input: {
   id?: string;
+  closeReason?: string;
+  projectStatusBefore?: ProjectClosureSnapshot["projectStatusBefore"];
   closedAt: Date;
 }): Omit<ProjectClosureSnapshot, "closedAt"> & { closedAt: Date } {
   return {
     id: input.id ?? "closure-alpha",
     tenantId: "tenant-alpha",
     projectId: "project-alpha",
-    projectStatusBefore: "active",
+    projectStatusBefore: input.projectStatusBefore ?? "active",
     planVersion: 4,
     snapshotPayload: {
       project: { id: "project-alpha" },
@@ -219,7 +297,7 @@ function createSnapshot(input: {
     },
     closedByUserId: "user-alpha-admin",
     closedAt: input.closedAt,
-    closeReason: "Работы приняты заказчиком",
+    closeReason: input.closeReason ?? "Работы приняты заказчиком",
     auditEventId: "audit-close-alpha"
   };
 }

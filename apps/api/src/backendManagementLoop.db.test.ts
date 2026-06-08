@@ -417,6 +417,65 @@ describe("backend management loop DB smoke", () => {
     });
   });
 
+  it("cancels an active project through the closure route and writes audit", async () => {
+    const cookie = await loginAsAdmin();
+
+    const cancelResponse = await app.request(
+      "/api/workspace/projects/project-loop/closure/cancel",
+      {
+        method: "POST",
+        headers: mutationHeaders(cookie),
+        body: JSON.stringify({
+          cancelReason: "Client cancelled before delivery",
+          lessons: [
+            {
+              category: "commercial",
+              title: "Capture cancellation triggers",
+              body: "Cancellation risks need explicit tracking before kickoff.",
+              impact: "negative"
+            }
+          ]
+        })
+      }
+    );
+    expect(cancelResponse.status).toBe(200);
+    await expect(cancelResponse.json()).resolves.toMatchObject({
+      projectId: "project-loop",
+      auditEventId: expect.stringMatching(/^audit-/),
+      snapshot: {
+        projectId: "project-loop",
+        projectStatusBefore: "active",
+        closeReason: "Client cancelled before delivery"
+      },
+      lessons: [expect.objectContaining({ title: "Capture cancellation triggers" })],
+      templateImprovementActions: []
+    });
+
+    const closureReadResponse = await app.request(
+      "/api/workspace/projects/project-loop/closure",
+      { headers: { cookie } }
+    );
+    expect(closureReadResponse.status).toBe(200);
+    await expect(closureReadResponse.json()).resolves.toMatchObject({
+      project: { id: "project-loop", status: "cancelled" },
+      snapshot: { projectId: "project-loop" }
+    });
+
+    const auditResponse = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie }
+    });
+    expect(auditResponse.status).toBe(200);
+    await expect(auditResponse.json()).resolves.toMatchObject({
+      auditEvents: expect.arrayContaining([
+        expect.objectContaining({
+          actionType: "project.cancelled",
+          sourceWorkflow: "closure",
+          sourceEntity: { type: "Project", id: "project-loop" }
+        })
+      ])
+    });
+  });
+
   it("keeps key backend read models inside production-readiness smoke thresholds", async () => {
     const cookie = await loginAsAdmin();
     await createPlanningTasksBatch(cookie, 25);

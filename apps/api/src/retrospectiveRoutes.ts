@@ -45,7 +45,7 @@ type TemplateImprovementActionPersistenceInput = Omit<
 type ClosureFailureResult = {
   ok: false;
   status: 404 | 409;
-  error: "project_not_found" | "project_not_closable";
+  error: "project_not_found" | "project_not_closable" | "project_not_cancellable";
 };
 
 export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
@@ -168,7 +168,8 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
           projectId,
           project,
           planVersion: null,
-          closeReason: parsed.value.closeReason,
+          reason: parsed.value.closeReason,
+          commandInput: { closeReason: parsed.value.closeReason },
           permissionResult: decision,
           error: "project_not_closable"
         });
@@ -238,7 +239,8 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
             projectId,
             project,
             planVersion: snapshot.planVersion,
-            closeReason: parsed.value.closeReason,
+            reason: parsed.value.closeReason,
+            commandInput: { closeReason: parsed.value.closeReason },
             permissionResult: decision,
             error: mappedError.error
           });
@@ -263,6 +265,157 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
             templateImprovementActionIds: readModel.templateImprovementActions.map(
               (action) => action.id
             )
+          },
+          permissionResult: decision,
+          executionResult: { status: "succeeded" }
+        },
+        transactionDataSource
+      );
+      return { ok: true as const, body: { projectId, ...readModel, auditEventId } };
+    });
+
+    if (!result.ok) {
+      if (result.status === 501) return context.json({ error: result.error }, 501);
+      if (result.status === 404) return context.json({ error: result.error }, 404);
+      if (result.status === 409) return context.json({ error: result.error }, 409);
+      return context.json({ error: result.error }, 400);
+    }
+    invalidateCapacityCacheForTenant(actor.tenantId);
+    return context.json(result.body);
+  });
+
+  app.post("/api/workspace/projects/:projectId/closure/cancel", async (context) => {
+    const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !deps.dataSource.getPlanSnapshot ||
+      !deps.dataSource.listProjectTasks ||
+      !deps.dataSource.listProjects ||
+      !deps.dataSource.cancelProject ||
+      !deps.dataSource.withTransaction ||
+      !deps.dataSource.appendAuditEvent
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseCancelBody(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const profile = await deps.getActorProfile(actor);
+    const decision = closeDecision(actor, profile);
+    if (!decision.allowed) {
+      await appendDeniedAudit(deps, actor, "project.cancel_denied", {
+        projectId: parsedProjectId.value
+      }, decision);
+      return context.json({ error: decision.reason }, 403);
+    }
+    const projectId = parsedProjectId.value;
+
+    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.getPlanSnapshot ||
+        !transactionDataSource.listProjectTasks ||
+        !transactionDataSource.listProjects ||
+        !transactionDataSource.cancelProject ||
+        !transactionDataSource.appendAuditEvent
+      ) {
+        return { ok: false as const, status: 501, error: "persistence_not_configured" };
+      }
+      const project = await findProject(transactionDataSource, actor.tenantId, projectId);
+      if (!project) return { ok: false as const, status: 404, error: "project_not_found" };
+      if (project.status !== "active" && project.status !== "paused") {
+        await appendClosureFailureAudit(deps, transactionDataSource, {
+          actor,
+          projectId,
+          project,
+          planVersion: null,
+          reason: parsed.value.cancelReason,
+          commandInput: { cancelReason: parsed.value.cancelReason },
+          permissionResult: decision,
+          error: "project_not_cancellable"
+        });
+        return { ok: false as const, status: 409, error: "project_not_cancellable" };
+      }
+      const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
+      if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      const tasks = await transactionDataSource.listProjectTasks(actor.tenantId, projectId);
+      const closedAt = new Date();
+      const planFactSummary = buildClosurePlanFactSummary({
+        snapshot,
+        factTasks: tasks.map((task) => ({
+          id: task.id,
+          actualWorkMinutes: task.actualWork * 60,
+          progress: task.progress,
+          statusCategory: task.statusCategory
+        }))
+      });
+      const snapshotId = `closure-${randomUUID()}`;
+      const auditEventId = `audit-${randomUUID()}`;
+      const closureSnapshot: Omit<ProjectClosureSnapshot, "closedAt"> & { closedAt: Date } = {
+        id: snapshotId,
+        tenantId: actor.tenantId,
+        projectId,
+        projectStatusBefore: project.status,
+        planVersion: snapshot.planVersion,
+        snapshotPayload: buildClosureSnapshotPayload(snapshot),
+        planFactSummary,
+        closedByUserId: actor.id,
+        closedAt,
+        closeReason: parsed.value.cancelReason,
+        auditEventId
+      };
+      const lessons = parsed.value.lessons.map((lesson) => ({
+        ...lesson,
+        id: `lesson-${randomUUID()}`,
+        tenantId: actor.tenantId,
+        projectId,
+        snapshotId,
+        createdByUserId: actor.id,
+        createdAt: closedAt
+      }));
+
+      let readModel: RetrospectiveReadModel;
+      try {
+        readModel = await transactionDataSource.cancelProject({
+          snapshot: closureSnapshot,
+          lessons
+        });
+      } catch (error) {
+        const mappedError = closurePersistenceErrorResult(error);
+        if (mappedError) {
+          await appendClosureFailureAudit(deps, transactionDataSource, {
+            actor,
+            projectId,
+            project,
+            planVersion: snapshot.planVersion,
+            reason: parsed.value.cancelReason,
+            commandInput: { cancelReason: parsed.value.cancelReason },
+            permissionResult: decision,
+            error: mappedError.error
+          });
+          return mappedError;
+        }
+        throw error;
+      }
+      await deps.appendManagementAuditEvent(
+        {
+          auditEventId,
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "project.cancelled",
+          sourceWorkflow: "closure",
+          sourceEntity: { type: "Project", id: projectId },
+          commandInput: { cancelReason: parsed.value.cancelReason },
+          beforeState: { project, planVersion: snapshot.planVersion },
+          afterState: {
+            snapshotId,
+            planFactSummary,
+            lessonIds: readModel.lessons.map((lesson) => lesson.id),
+            templateImprovementActionIds: []
           },
           permissionResult: decision,
           executionResult: { status: "succeeded" }
@@ -599,6 +752,26 @@ function parseClosureBody(input: unknown):
   };
 }
 
+function parseCancelBody(input: unknown):
+  | { ok: true; value: { cancelReason: string; lessons: Array<Omit<RetrospectiveLesson, "id" | "tenantId" | "projectId" | "snapshotId" | "createdByUserId" | "createdAt">> } }
+  | { ok: false; error: string } {
+  if (!isObject(input)) return { ok: false, error: "closure_input_invalid" };
+  const cancelReason = stringField(input, "cancelReason");
+  if (!cancelReason) return { ok: false, error: "cancel_reason_required" };
+  const lessons = Array.isArray(input.lessons) ? input.lessons : [];
+  const parsedLessons = lessons.map(parseLessonValue);
+  if (parsedLessons.some((lesson) => !lesson)) {
+    return { ok: false, error: "retrospective_lesson_invalid" };
+  }
+  return {
+    ok: true,
+    value: {
+      cancelReason,
+      lessons: parsedLessons.filter((lesson): lesson is NonNullable<typeof lesson> => Boolean(lesson))
+    }
+  };
+}
+
 function parseLessonBody(input: unknown):
   | { ok: true; value: Omit<RetrospectiveLesson, "id" | "tenantId" | "projectId" | "snapshotId" | "createdByUserId" | "createdAt"> }
   | { ok: false; error: string } {
@@ -717,21 +890,29 @@ async function appendClosureFailureAudit(
     projectId: string;
     project: ProjectRecord;
     planVersion: number | null;
-    closeReason: string;
+    reason: string;
+    commandInput: Record<string, unknown>;
     permissionResult: PolicyDecision;
-    error: "project_not_found" | "project_not_closable";
+    error: "project_not_found" | "project_not_closable" | "project_not_cancellable";
   }
 ) {
   if (!auditDataSource.appendAuditEvent) return;
+  const isCancel = "cancelReason" in input.commandInput;
   await deps.appendManagementAuditEvent(
     {
       tenantId: input.actor.tenantId,
       actorUserId: input.actor.id,
       actionType:
-        input.error === "project_not_closable" ? "project.close_conflict" : "project.close_failed",
+        input.error === "project_not_closable"
+          ? "project.close_conflict"
+          : isCancel
+            ? input.error === "project_not_cancellable"
+              ? "project.cancel_conflict"
+              : "project.cancel_failed"
+            : "project.close_failed",
       sourceWorkflow: "closure",
       sourceEntity: { type: "Project", id: input.projectId },
-      commandInput: { closeReason: input.closeReason },
+      commandInput: input.commandInput,
       beforeState: {
         project: input.project,
         planVersion: input.planVersion
@@ -791,6 +972,9 @@ function closurePersistenceErrorResult(error: unknown): ClosureFailureResult | n
   }
   if (error.message === "project_not_closable") {
     return { ok: false as const, status: 409, error: "project_not_closable" };
+  }
+  if (error.message === "project_not_cancellable") {
+    return { ok: false as const, status: 409, error: "project_not_cancellable" };
   }
   return null;
 }

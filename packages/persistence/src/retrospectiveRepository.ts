@@ -44,6 +44,10 @@ export type RetrospectiveRepository = {
     lessons: RetrospectiveLessonInput[];
     templateImprovementActions: TemplateImprovementActionInput[];
   }): Promise<RetrospectiveReadModel>;
+  cancelProject(input: {
+    snapshot: ProjectClosureSnapshotInput;
+    lessons: RetrospectiveLessonInput[];
+  }): Promise<RetrospectiveReadModel>;
   addRetrospectiveLesson(input: RetrospectiveLessonInput): Promise<RetrospectiveLesson>;
   applyTemplateImprovementAction(input: {
     tenantId: string;
@@ -192,6 +196,79 @@ export function createRetrospectiveRepository(
           snapshot: mapClosureSnapshot(snapshotRow),
           lessons: lessonRows.map(mapRetrospectiveLesson),
           templateImprovementActions: actionRows.map(mapTemplateImprovementAction)
+        };
+      });
+    },
+
+    async cancelProject(input) {
+      return db.transaction(async (transaction) => {
+        const { snapshot } = input;
+        const [project] = await transaction
+          .select()
+          .from(projects)
+          .where(
+            and(eq(projects.tenantId, snapshot.tenantId), eq(projects.id, snapshot.projectId))
+          )
+          .limit(1);
+        if (!project) throw new Error("project_not_found");
+        if (project.status !== "active" && project.status !== "paused") {
+          throw new Error("project_not_cancellable");
+        }
+
+        const [updatedProject] = await transaction
+          .update(projects)
+          .set({ status: "cancelled", closedAt: snapshot.closedAt })
+          .where(
+            and(
+              eq(projects.tenantId, snapshot.tenantId),
+              eq(projects.id, snapshot.projectId),
+              or(eq(projects.status, "active"), eq(projects.status, "paused"))
+            )
+          )
+          .returning();
+        if (!updatedProject) throw new Error("project_not_cancellable");
+
+        const [snapshotRow] = await transaction
+          .insert(projectClosureSnapshots)
+          .values({
+            id: snapshot.id,
+            tenantId: snapshot.tenantId,
+            projectId: snapshot.projectId,
+            projectStatusBefore: snapshot.projectStatusBefore,
+            planVersion: snapshot.planVersion,
+            snapshotPayload: snapshot.snapshotPayload,
+            planFactSummary: snapshot.planFactSummary,
+            closedByUserId: snapshot.closedByUserId,
+            closedAt: snapshot.closedAt,
+            closeReason: snapshot.closeReason,
+            auditEventId: snapshot.auditEventId
+          })
+          .returning();
+        if (!snapshotRow) throw new Error("Project closure snapshot insert returned no row");
+
+        if (input.lessons.length > 0) {
+          await transaction.insert(retrospectiveLessons).values(
+            input.lessons.map((lesson) => ({
+              ...lesson,
+              createdAt: lesson.createdAt ?? snapshot.closedAt
+            }))
+          );
+        }
+
+        const lessonRows = await transaction
+          .select()
+          .from(retrospectiveLessons)
+          .where(
+            and(
+              eq(retrospectiveLessons.tenantId, snapshot.tenantId),
+              eq(retrospectiveLessons.projectId, snapshot.projectId)
+            )
+          )
+          .orderBy(asc(retrospectiveLessons.createdAt), asc(retrospectiveLessons.id));
+        return {
+          snapshot: mapClosureSnapshot(snapshotRow),
+          lessons: lessonRows.map(mapRetrospectiveLesson),
+          templateImprovementActions: []
         };
       });
     },
