@@ -156,7 +156,7 @@ function createBaselineResourceComparison(
       resourceId: assignment.resourceId,
       workMinutes: resolveBaselineAssignmentWork(
         assignment,
-        currentAssignments,
+        baselineAssignments,
         baselineTasksById.get(assignment.taskId)?.workMinutes ?? 0
       )
     }))
@@ -213,17 +213,28 @@ function workComparisonStatus(
 
 function resolveBaselineAssignmentWork(
   assignment: BaselineAssignmentSnapshot,
-  currentAssignments: CurrentAssignmentSnapshot[],
+  baselineAssignments: BaselineAssignmentSnapshot[],
   baselineTaskWorkMinutes: number
 ): number {
   if (assignment.workMinutes !== null) return assignment.workMinutes;
 
-  const currentAssignment = currentAssignments.find((candidate) => candidate.id === assignment.assignmentId);
-  if (!currentAssignment) return baselineTaskWorkMinutes;
+  const baselineTaskAssignments = baselineAssignments
+    .filter((candidate) => candidate.taskId === assignment.taskId)
+    .map((candidate) => ({
+      id: candidate.assignmentId,
+      taskId: candidate.taskId,
+      resourceId: candidate.resourceId,
+      role: "executor" as const,
+      unitsPermille: 1000,
+      workMinutes: candidate.workMinutes,
+      calendarId: null
+    }));
+  const baselineAssignment = baselineTaskAssignments.find((candidate) => candidate.id === assignment.assignmentId);
+  if (!baselineAssignment) return baselineTaskWorkMinutes;
 
   return resolveEffectiveAssignmentWork(
-    currentAssignments,
-    currentAssignment,
+    baselineTaskAssignments,
+    baselineAssignment,
     baselineTaskWorkMinutes
   );
 }

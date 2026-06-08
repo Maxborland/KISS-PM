@@ -60,6 +60,72 @@ describe("planning read model", () => {
       }
     ]);
   });
+
+  it("keeps baseline implicit assignment work independent of current assignment splits", () => {
+    const readModel = createPlanningReadModel({
+      ...createSnapshot(),
+      resources: [createResource("resource-alpha"), createResource("resource-beta")],
+      assignments: [
+        {
+          id: "assignment-alpha",
+          taskId: "task-alpha",
+          resourceId: "resource-alpha",
+          role: "executor",
+          unitsPermille: 500,
+          workMinutes: null,
+          calendarId: null
+        },
+        {
+          id: "assignment-beta",
+          taskId: "task-alpha",
+          resourceId: "resource-beta",
+          role: "co_executor",
+          unitsPermille: 500,
+          workMinutes: null,
+          calendarId: null
+        }
+      ],
+      baselines: [
+        {
+          id: "baseline-alpha",
+          capturedAt: "2026-05-21T00:00:00.000Z",
+          tasks: [
+            {
+              taskId: "task-alpha",
+              plannedStart: "2026-06-01",
+              plannedFinish: "2026-06-01",
+              workMinutes: 480
+            }
+          ],
+          assignments: [
+            {
+              assignmentId: "assignment-alpha",
+              taskId: "task-alpha",
+              resourceId: "resource-alpha",
+              workMinutes: null
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(readModel.baselineComparison.resources).toEqual([
+      {
+        resourceId: "resource-alpha",
+        status: "changed",
+        baselineWorkMinutes: 480,
+        currentWorkMinutes: 240,
+        workDeltaMinutes: -240
+      },
+      {
+        resourceId: "resource-beta",
+        status: "added",
+        baselineWorkMinutes: 0,
+        currentWorkMinutes: 240,
+        workDeltaMinutes: 240
+      }
+    ]);
+  });
 });
 
 function createSnapshot(): PlanSnapshot {
@@ -89,16 +155,7 @@ function createSnapshot(): PlanSnapshot {
       }
     ],
     calendarExceptions: [],
-    resources: [
-      {
-        id: "resource-alpha",
-        userId: "user-alpha",
-        positionId: "engineer",
-        teamId: null,
-        name: "Alpha",
-        calendarId: "calendar-default"
-      }
-    ],
+    resources: [createResource("resource-alpha")],
     reservations: [],
     constraints: [],
     capturedAt: "2026-05-21T00:00:00.000Z"
@@ -122,5 +179,16 @@ function createTask() {
     percentComplete: 0,
     calendarId: "calendar-default",
     constraint: null
+  };
+}
+
+function createResource(id: string) {
+  return {
+    id,
+    userId: id,
+    positionId: "engineer",
+    teamId: null,
+    name: id,
+    calendarId: "calendar-default"
   };
 }
