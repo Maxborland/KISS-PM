@@ -21,7 +21,7 @@ describe("Phase 3 project intake domain", () => {
     ).toBe(5);
   });
 
-  it("checks demand by position against available hours and existing reservations", () => {
+  it("blocks demand that exceeds planned contract hours", () => {
     const assessment = assessOpportunityFeasibility({
       opportunity: {
         id: "opportunity-alpha",
@@ -51,7 +51,7 @@ describe("Phase 3 project intake domain", () => {
 
     expect(assessment.plannedHours).toBe(160);
     expect(assessment.totalRequiredHours).toBe(200);
-    expect(assessment.status).toBe("conflict");
+    expect(assessment.status).toBe("blocked");
     expect(assessment.blockers).toContain("demand_exceeds_planned_hours");
     expect(assessment.rows).toEqual([
       {
@@ -75,6 +75,43 @@ describe("Phase 3 project intake domain", () => {
     ]);
   });
 
+  it("keeps reservation shortages as risk-acceptable conflicts", () => {
+    const assessment = assessOpportunityFeasibility({
+      opportunity: {
+        id: "opportunity-alpha",
+        plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+        plannedFinish: new Date("2026-06-05T00:00:00.000Z"),
+        contractValue: 320_000,
+        plannedHourlyRate: 4_000
+      },
+      demand: [{ positionId: "position-analyst", requiredHours: 32 }],
+      positions: [{ id: "position-analyst", name: "Analyst", activeUsers: 1 }],
+      activeProjectReservations: [
+        {
+          projectId: "project-existing",
+          positionId: "position-analyst",
+          requiredHours: 24,
+          plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+          plannedFinish: new Date("2026-06-05T00:00:00.000Z")
+        }
+      ]
+    });
+
+    expect(assessment.status).toBe("conflict");
+    expect(assessment.blockers).toEqual([]);
+    expect(assessment.rows).toEqual([
+      {
+        positionId: "position-analyst",
+        positionName: "Analyst",
+        requiredHours: 32,
+        availableHours: 16,
+        reservedHours: 24,
+        shortageHours: 16,
+        status: "conflict"
+      }
+    ]);
+  });
+
   it("reports missing position capacity as a blocker", () => {
     const assessment = assessOpportunityFeasibility({
       opportunity: {
@@ -89,7 +126,7 @@ describe("Phase 3 project intake domain", () => {
       activeProjectReservations: []
     });
 
-    expect(assessment.status).toBe("conflict");
+    expect(assessment.status).toBe("blocked");
     expect(assessment.blockers).toContain("missing_position_capacity");
     expect(assessment.rows[0]).toMatchObject({
       positionId: "position-designer",

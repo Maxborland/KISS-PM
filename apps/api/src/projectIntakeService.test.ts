@@ -727,6 +727,29 @@ describe("project intake application service", () => {
     expect(fixture.audits).toEqual([]);
   });
 
+  it("does not accept risk for blocked feasibility activation", async () => {
+    const fixture = createActivationFixture({
+      crmStage: null,
+      opportunityOverrides: {
+        demand: [{ positionId: "position-unstaffed", requiredHours: 40 }]
+      }
+    });
+
+    const result = await fixture.service.activateProjectFromOpportunity({
+      actor,
+      opportunityId: fixture.currentOpportunity.id,
+      activation: { id: "project-blocked", acceptedRiskReason: "Proceed anyway" }
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      error: "opportunity_not_activatable"
+    });
+    expect(fixture.createdDrafts).toEqual([]);
+    expect(fixture.audits).toEqual([]);
+  });
+
   it("updates draft opportunity fields, refreshes linked labels and records management audit", async () => {
     const audits: ManagementAuditEventInput[] = [];
     let updatedInput: OpportunityInput | null = null;
