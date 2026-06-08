@@ -814,6 +814,10 @@ export type ApiTenantDataSource = {
       }
     >;
   }): Promise<RetrospectiveReadModel>;
+  cancelProject?(input: {
+    snapshot: Omit<ProjectClosureSnapshot, "closedAt"> & { closedAt: Date };
+    lessons: Array<Omit<RetrospectiveLesson, "createdAt"> & { createdAt?: Date }>;
+  }): Promise<RetrospectiveReadModel>;
   addRetrospectiveLesson?(
     input: Omit<RetrospectiveLesson, "createdAt"> & { createdAt?: Date }
   ): Promise<RetrospectiveLesson>;

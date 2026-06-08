@@ -225,6 +225,7 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/projects/:projectId/closure", tag: "Closure", summary: "Read project closure state", successSchema: "ClosureReadModelResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/closure/preview", tag: "Closure", summary: "Preview project closure", successSchema: "ClosurePreviewResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/closure/close", tag: "Closure", summary: "Close project", requestSchema: "ClosureCloseRequest", successSchema: "ClosureCloseResponse" },
+  { method: "post", path: "/api/workspace/projects/:projectId/closure/cancel", tag: "Closure", summary: "Cancel project", requestSchema: "ClosureCancelRequest", successSchema: "ClosureCancelResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/closure/lessons", tag: "Closure", summary: "Create retrospective lesson", requestSchema: "RetrospectiveLessonCreateRequest", successSchema: "RetrospectiveLessonResponse", successStatus: 201 },
   { method: "post", path: "/api/workspace/projects/:projectId/closure/template-improvement-actions/:actionId/apply", tag: "Closure", summary: "Apply template improvement action", successSchema: "TemplateImprovementActionResponse" },
   { method: "get", path: "/api/tenant/current/project-templates/:templateId/retrospective-insights", tag: "Closure", summary: "Read template retrospective insights", successSchema: "RetrospectiveInsightsResponse" },

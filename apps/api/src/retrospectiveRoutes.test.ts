@@ -28,6 +28,10 @@ describe("retrospective routes", () => {
       method: "POST",
       headers: actionHeaders
     });
+    const cancel = await app.request("/api/workspace/projects/bad..project/closure/cancel", {
+      method: "POST",
+      headers: actionHeaders
+    });
     const lessons = await app.request(
       "/api/workspace/projects/bad..project/closure/lessons",
       { method: "POST", headers: actionHeaders }
@@ -44,7 +48,7 @@ describe("retrospective routes", () => {
       "/api/tenant/current/project-templates/bad..template/retrospective-insights"
     );
 
-    for (const response of [read, preview, close, lessons, badProjectApply]) {
+    for (const response of [read, preview, close, cancel, lessons, badProjectApply]) {
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toEqual({ error: "invalid_project_id" });
     }
@@ -126,6 +130,107 @@ describe("retrospective routes", () => {
     ]);
     expect(state.auditEvents.map((event) => event.actionType)).toContain("project.closed");
   });
+
+  it.each(["active", "paused"] as const)(
+    "cancels a %s project with snapshot, lessons and audit",
+    async (status) => {
+      const state = createRetrospectiveDataSource({ projectStatus: status });
+      const app = createApp({ dataSource: state.dataSource });
+
+      const response = await app.request(
+        "/api/workspace/projects/project-alpha/closure/cancel",
+        {
+          method: "POST",
+          headers: mutationHeaders(),
+          body: JSON.stringify({
+            cancelReason: "Client cancelled the contract",
+            lessons: [
+              {
+                category: "commercial",
+                title: "Qualify cancellation risk earlier",
+                body: "The team should capture cancellation triggers before kickoff.",
+                impact: "negative"
+              }
+            ]
+          })
+        }
+      );
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as RetrospectiveReadModel & { auditEventId: string };
+
+      expect(state.projects[0]?.status).toBe("cancelled");
+      expect(state.projects[0]?.closedAt).toBeInstanceOf(Date);
+      expect(body.snapshot).toMatchObject({
+        projectId: "project-alpha",
+        projectStatusBefore: status,
+        planVersion: 7,
+        closeReason: "Client cancelled the contract"
+      });
+      expect(body.lessons).toEqual([
+        expect.objectContaining({ category: "commercial", title: "Qualify cancellation risk earlier" })
+      ]);
+      expect(body.templateImprovementActions).toEqual([]);
+      expect(state.auditEvents.map((event) => event.actionType)).toContain("project.cancelled");
+    }
+  );
+
+  it("denies cancellation without manage permissions and writes denied audit", async () => {
+    const state = createRetrospectiveDataSource({
+      permissions: [
+        "tenant.projects.read",
+        "tenant.project_plan.read",
+        "tenant.retrospectives.read"
+      ]
+    });
+    const app = createApp({ dataSource: state.dataSource });
+
+    const response = await app.request(
+      "/api/workspace/projects/project-alpha/closure/cancel",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({ cancelReason: "Client cancelled the contract" })
+      }
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(state.projects[0]?.status).toBe("active");
+    expect(state.auditEvents).toEqual([
+      expect.objectContaining({
+        actionType: "project.cancel_denied",
+        executionResult: { status: "denied" }
+      })
+    ]);
+  });
+
+  it.each(["draft", "closed", "cancelled"] as const)(
+    "rejects cancellation for %s projects with conflict audit",
+    async (status) => {
+      const state = createRetrospectiveDataSource({ projectStatus: status });
+      const app = createApp({ dataSource: state.dataSource });
+
+      const response = await app.request(
+        "/api/workspace/projects/project-alpha/closure/cancel",
+        {
+          method: "POST",
+          headers: mutationHeaders(),
+          body: JSON.stringify({ cancelReason: "Client cancelled the contract" })
+        }
+      );
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({ error: "project_not_cancellable" });
+      expect(state.projects[0]?.status).toBe(status);
+      expect(state.auditEvents).toEqual([
+        expect.objectContaining({
+          actionType: "project.cancel_conflict",
+          executionResult: { status: "failed", reason: "project_not_cancellable" }
+        })
+      ]);
+    }
+  );
 
   it("denies closure without manage permissions and writes denied audit", async () => {
     const state = createRetrospectiveDataSource({
@@ -272,6 +377,17 @@ describe("retrospective routes", () => {
     );
     expect(closeResponse.status).toBe(501);
     await expect(closeResponse.json()).resolves.toEqual({ error: "persistence_not_configured" });
+
+    const cancelResponse = await app.request(
+      "/api/workspace/projects/project-alpha/closure/cancel",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({ cancelReason: "Client cancelled the contract" })
+      }
+    );
+    expect(cancelResponse.status).toBe(501);
+    await expect(cancelResponse.json()).resolves.toEqual({ error: "persistence_not_configured" });
   });
 
   it("maps closeProject project_not_closable throws to a stable conflict response", async () => {
@@ -310,6 +426,44 @@ describe("retrospective routes", () => {
     await expect(response.json()).resolves.toEqual({ error: "project_not_found" });
     expect(state.auditEvents.map((event) => event.actionType)).not.toContain("project.closed");
     expect(state.auditEvents.map((event) => event.actionType)).toEqual(["project.close_failed"]);
+  });
+
+  it("maps cancelProject project_not_cancellable throws to a stable conflict response", async () => {
+    const state = createRetrospectiveDataSource({ cancelProjectError: "project_not_cancellable" });
+    const app = createApp({ dataSource: state.dataSource });
+
+    const response = await app.request(
+      "/api/workspace/projects/project-alpha/closure/cancel",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({ cancelReason: "Client cancelled the contract" })
+      }
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "project_not_cancellable" });
+    expect(state.auditEvents.map((event) => event.actionType)).not.toContain("project.cancelled");
+    expect(state.auditEvents.map((event) => event.actionType)).toEqual(["project.cancel_conflict"]);
+  });
+
+  it("maps cancelProject project_not_found throws to a stable not found response", async () => {
+    const state = createRetrospectiveDataSource({ cancelProjectError: "project_not_found" });
+    const app = createApp({ dataSource: state.dataSource });
+
+    const response = await app.request(
+      "/api/workspace/projects/project-alpha/closure/cancel",
+      {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: JSON.stringify({ cancelReason: "Client cancelled the contract" })
+      }
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "project_not_found" });
+    expect(state.auditEvents.map((event) => event.actionType)).not.toContain("project.cancelled");
+    expect(state.auditEvents.map((event) => event.actionType)).toEqual(["project.cancel_failed"]);
   });
 
   it("applies template improvement through governed action and exposes template insights", async () => {
@@ -489,7 +643,9 @@ describe("retrospective routes", () => {
 function createRetrospectiveDataSource(
   input: {
     permissions?: AccessProfile["permissions"];
+    projectStatus?: ProjectRecord["status"];
     closeProjectError?: "project_not_closable" | "project_not_found";
+    cancelProjectError?: "project_not_cancellable" | "project_not_found";
   } = {}
 ) {
   const actor: TenantUser = {
@@ -511,7 +667,7 @@ function createRetrospectiveDataSource(
         "tenant.template_improvements.apply"
       ]
   };
-  const projects = [createProject()];
+  const projects = [createProject({ status: input.projectStatus })];
   let readModel: RetrospectiveReadModel = {
     snapshot: null,
     lessons: [],
@@ -600,6 +756,28 @@ function createRetrospectiveDataSource(
       };
       return readModel;
     },
+    async cancelProject({ snapshot, lessons }) {
+      const project = projects.find((candidate) => candidate.id === snapshot.projectId);
+      if (!project) throw new Error("project_not_found");
+      if (project.status !== "active" && project.status !== "paused") {
+        throw new Error("project_not_cancellable");
+      }
+      if (input.cancelProjectError) throw new Error(input.cancelProjectError);
+      project.status = "cancelled";
+      project.closedAt = snapshot.closedAt;
+      readModel = {
+        snapshot: {
+          ...snapshot,
+          closedAt: snapshot.closedAt.toISOString()
+        },
+        lessons: lessons.map((lesson) => ({
+          ...lesson,
+          createdAt: (lesson.createdAt ?? snapshot.closedAt).toISOString()
+        })),
+        templateImprovementActions: []
+      };
+      return readModel;
+    },
     async addRetrospectiveLesson(input) {
       if (!readModel.snapshot) throw new Error("closure_snapshot_not_found");
       const lesson: RetrospectiveLesson = {
@@ -660,7 +838,7 @@ function mutationHeaders() {
   };
 }
 
-function createProject(): ProjectRecord {
+function createProject(input: { status: ProjectRecord["status"] | undefined } = { status: undefined }): ProjectRecord {
   return {
     id: "project-alpha",
     tenantId: "tenant-alpha",
@@ -670,7 +848,7 @@ function createProject(): ProjectRecord {
     projectTypeId: null,
     title: "Проект Альфа",
     clientName: "Internal",
-    status: "active",
+    status: input.status ?? "active",
     plannedStart: new Date("2026-05-01T00:00:00.000Z"),
     plannedFinish: new Date("2026-05-10T00:00:00.000Z"),
     contractValue: 0,

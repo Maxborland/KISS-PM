@@ -451,7 +451,28 @@ export const controlClosureSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  ClosureCancelRequest: {
+    type: "object",
+    required: ["cancelReason"],
+    properties: {
+      cancelReason: { type: "string", minLength: 1 },
+      lessons: { type: "array", items: schemaRef("RetrospectiveLessonCreateRequest"), default: [] }
+    },
+    additionalProperties: false
+  },
   ClosureCloseResponse: {
+    type: "object",
+    required: ["projectId", "snapshot", "lessons", "templateImprovementActions", "auditEventId"],
+    properties: {
+      projectId: stringIdSchema,
+      snapshot: schemaRef("AnyJsonObject"),
+      lessons: { type: "array", items: schemaRef("RetrospectiveLesson") },
+      templateImprovementActions: { type: "array", items: schemaRef("TemplateImprovementAction") },
+      auditEventId: nullableStringSchema
+    },
+    additionalProperties: true
+  },
+  ClosureCancelResponse: {
     type: "object",
     required: ["projectId", "snapshot", "lessons", "templateImprovementActions", "auditEventId"],
     properties: {
