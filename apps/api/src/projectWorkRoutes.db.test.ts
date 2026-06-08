@@ -1800,6 +1800,171 @@ describe("project work API routes", () => {
     });
   });
 
+  it("does not audit a route project miss against a mismatched paused task project", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-from-paused-project",
+        title: "Task from paused project",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 16,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    await app.request("/api/workspace/projects/project-alpha/status", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ status: "paused" })
+    });
+
+    const denied = await app.request(
+      "/api/workspace/projects/no-such-project/tasks/task-from-paused-project/status",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ statusId: "task-status-in-progress" })
+      }
+    );
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    const auditBody = (await audit.json()) as {
+      auditEvents: Array<{ actionType: string; sourceWorkflow?: string | null }>;
+    };
+
+    expect(denied.status).toBe(404);
+    await expect(denied.json()).resolves.toEqual({ error: "project_not_found" });
+    expect(
+      auditBody.auditEvents.filter(
+        (event) =>
+          event.actionType === "task.status_change_denied" &&
+          event.sourceWorkflow === "project_work"
+      )
+    ).toHaveLength(0);
+  });
+
+  it.each(["paused", "closed"] as const)(
+    "audits a %s route project status denial without using a mismatched task",
+    async (routeProjectStatus) => {
+      const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+      await app.request("/api/workspace/projects/project-alpha/tasks", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          id: "task-from-active-project",
+          title: "Task from active project",
+          plannedStart: "2026-06-02",
+          plannedFinish: "2026-06-05",
+          plannedWork: 16,
+          participants: [{ userId: "user-alpha-executor", role: "executor" }]
+        })
+      });
+      await client`
+        INSERT INTO projects (
+          id,
+          tenant_id,
+          source_type,
+          source_opportunity_id,
+          client_id,
+          project_type_id,
+          title,
+          client_name,
+          status,
+          planned_start,
+          planned_finish,
+          contract_value,
+          planned_hours,
+          template_id,
+          created_at,
+          activated_at,
+          closed_at
+        )
+        VALUES (
+          ${`project-route-${routeProjectStatus}`},
+          'tenant-alpha',
+          'manual',
+          NULL,
+          NULL,
+          NULL,
+          ${`Route ${routeProjectStatus} project`},
+          'Route client',
+          ${routeProjectStatus},
+          '2026-06-01T00:00:00.000Z',
+          '2026-06-30T00:00:00.000Z',
+          1000000,
+          200,
+          NULL,
+          now(),
+          now(),
+          ${routeProjectStatus === "closed" ? "2026-06-15T00:00:00.000Z" : null}
+        )
+      `;
+
+      const denied = await app.request(
+        `/api/workspace/projects/project-route-${routeProjectStatus}/tasks/task-from-active-project/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            "x-kiss-pm-action": "same-origin",
+            cookie: adminCookie
+          },
+          body: JSON.stringify({ statusId: "task-status-in-progress" })
+        }
+      );
+      const audit = await app.request("/api/tenant/current/audit-events", {
+        headers: { cookie: adminCookie }
+      });
+      const auditBody = (await audit.json()) as {
+        auditEvents: Array<{
+          actionType: string;
+          sourceWorkflow?: string | null;
+          sourceEntity: { type: string; id: string };
+          beforeState: Record<string, unknown> | null;
+        }>;
+      };
+      const deniedAudits = auditBody.auditEvents.filter(
+        (event) =>
+          event.actionType === "task.status_change_denied" &&
+          event.sourceWorkflow === "project_work"
+      );
+
+      expect(denied.status).toBe(404);
+      await expect(denied.json()).resolves.toEqual({ error: "project_not_found" });
+      expect(deniedAudits).toHaveLength(1);
+      expect(deniedAudits[0]).toMatchObject({
+        sourceEntity: { type: "Project", id: `project-route-${routeProjectStatus}` },
+        beforeState: expect.objectContaining({
+          id: `project-route-${routeProjectStatus}`,
+          status: routeProjectStatus
+        })
+      });
+      expect(deniedAudits[0]?.sourceEntity).not.toEqual({
+        type: "Task",
+        id: "task-from-active-project"
+      });
+    }
+  );
+
   it("keeps a paused workspace inbox immutable until it is explicitly resumed", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const createdInboxTask = await app.request("/api/workspace/tasks", {

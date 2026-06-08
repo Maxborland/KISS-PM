@@ -595,9 +595,13 @@ async function resolveProjectWorkDeniedAuditContext(
   sourceEntity: { type: string; id: string };
   beforeState: Record<string, unknown> | null;
 }> {
-  const task = input.taskId
+  const foundTask = input.taskId
     ? await dataSource.findTaskById?.(input.actor.tenantId, input.taskId)
     : undefined;
+  const task =
+    foundTask && (!input.projectId || foundTask.projectId === input.projectId)
+      ? foundTask
+      : undefined;
   const projects = await dataSource.listProjects?.(input.actor.tenantId);
   const project = resolveAuditProject(projects, input.projectId, task?.projectId, input.actionType);
 
