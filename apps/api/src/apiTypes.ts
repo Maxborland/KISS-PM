@@ -92,6 +92,8 @@ import type {
   TaskActivityRecord,
   TaskMetadataInput,
   TaskRecord,
+  ProjectResourcePoolMemberInput,
+  ProjectResourcePoolMemberRecord,
   TaskStatusInput,
   TaskStatusRecord
 } from "@kiss-pm/persistence";
@@ -580,6 +582,15 @@ export type ApiTenantDataSource = {
   createProjectDraftFromOpportunity?(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft?(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
   updateProjectStatus?(input: ProjectStatusUpdateInput): Promise<ProjectRecord | undefined>;
+  listProjectResourcePoolMembers?(
+    tenantId: TenantId,
+    projectId: string
+  ): Promise<ProjectResourcePoolMemberRecord[]>;
+  replaceProjectResourcePoolMembers?(input: {
+    tenantId: TenantId;
+    projectId: string;
+    members: ProjectResourcePoolMemberInput[];
+  }): Promise<ProjectResourcePoolMemberRecord[]>;
   listProjectTasks?(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks?(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
   listScheduledTasks?(input: {

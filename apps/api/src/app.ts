@@ -50,6 +50,7 @@ import { registerOccupancyRoutes } from "./occupancyRoutes";
 import { registerProductionCalendarRoutes } from "./productionCalendarRoutes";
 import { registerProjectIntakeRoutes } from "./projectIntakeRoutes";
 import { registerProjectWorkRoutes } from "./projectWorkRoutes";
+import { registerProjectResourcePoolRoutes } from "./projectResourcePoolRoutes";
 import { registerRetrospectiveRoutes } from "./retrospectiveRoutes";
 import { registerScheduledTasksRoutes } from "./scheduledTasksRoutes";
 import { registerSearchRoutes } from "./searchRoutes";
@@ -269,6 +270,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerOccupancyRoutes(app, routeDeps);
   registerOrgStructureRoutes(app, routeDeps);
   registerProjectWorkRoutes(app, routeDeps);
+  registerProjectResourcePoolRoutes(app, routeDeps);
   registerRetrospectiveRoutes(app, routeDeps);
   registerScheduledTasksRoutes(app, routeDeps);
   registerWorkspaceConfigRoutes(app, routeDeps);

@@ -95,6 +95,8 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/projects", tag: "Projects and tasks", summary: "List projects", successSchema: "ProjectsResponse" },
   { method: "get", path: "/api/workspace/projects/:projectId", tag: "Projects and tasks", summary: "Read project detail", successSchema: "ProjectDetailResponse" },
   { method: "patch", path: "/api/workspace/projects/:projectId/status", tag: "Projects and tasks", summary: "Pause or resume project", requestSchema: "ProjectStatusUpdateRequest", successSchema: "ProjectResponse" },
+  { method: "get", path: "/api/workspace/projects/:projectId/resource-pool", tag: "Project resources", summary: "Read project resource pool", successSchema: "ProjectResourcePoolResponse" },
+  { method: "put", path: "/api/workspace/projects/:projectId/resource-pool", tag: "Project resources", summary: "Replace project resource pool", requestSchema: "ProjectResourcePoolReplaceRequest", successSchema: "ProjectResourcePoolResponse" },
   { method: "get", path: "/api/workspace/projects/:projectId/tasks", tag: "Projects and tasks", summary: "List project tasks", successSchema: "TasksResponse" },
   { method: "get", path: "/api/workspace/my-work", tag: "Projects and tasks", summary: "List current user's work", successSchema: "TasksResponse" },
   { method: "get", path: "/api/workspace/tasks/:taskId", tag: "Projects and tasks", summary: "Read task", successSchema: "TaskDetailResponse" },

@@ -173,6 +173,29 @@ describe("OpenAPI route inventory", () => {
       $ref: "#/components/schemas/ProjectStatus"
     });
   });
+
+  it("documents project resource pool contract", () => {
+    const document = createTestDocument();
+    const readOperation = document.paths["/api/workspace/projects/{projectId}/resource-pool"]?.get;
+    const replaceOperation = document.paths["/api/workspace/projects/{projectId}/resource-pool"]?.put;
+
+    expect(
+      readOperation?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref
+    ).toBe("#/components/schemas/ProjectResourcePoolResponse");
+    expect(
+      replaceOperation?.requestBody?.content?.["application/json"]?.schema?.$ref
+    ).toBe("#/components/schemas/ProjectResourcePoolReplaceRequest");
+    expect(
+      replaceOperation?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref
+    ).toBe("#/components/schemas/ProjectResourcePoolResponse");
+
+    const roleSchema = document.components.schemas.ProjectResourcePoolRole;
+    expect(roleSchema.enum).toEqual(["project_manager", "resource", "observer"]);
+
+    const replaceSchema = document.components.schemas.ProjectResourcePoolReplaceRequest;
+    expect(replaceSchema.required).toEqual(["members"]);
+    expect(replaceSchema.properties.members.items).toEqual({ $ref: "#/components/schemas/ProjectResourcePoolMemberWrite" });
+  });
 });
 
 type TestOpenApiDocument = ReturnType<typeof createKissPmOpenApiDocument> & {
