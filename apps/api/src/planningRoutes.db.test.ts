@@ -246,6 +246,15 @@ describe("planning API routes", () => {
     expect(response.status).toBe(200);
   }
 
+  async function setProjectStatus(status: "draft" | "active" | "paused" | "closed" | "cancelled") {
+    await client`
+      UPDATE projects
+      SET status = ${status}
+      WHERE tenant_id = 'tenant-alpha'
+        AND id = 'project-alpha'
+    `;
+  }
+
   beforeAll(() => {
     client = createPostgresClient(databaseUrl);
     app = createApp({
@@ -906,6 +915,135 @@ describe("planning API routes", () => {
     });
   });
 
+  it("blocks idempotent command replay after the project is paused", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-idempotency-paused-single",
+      title: "Idempotency paused single",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    expect(initial.status).toBe(200);
+
+    const command = {
+      type: "task.update_identity",
+      payload: { taskId: "task-idempotency-paused-single", title: "Applied before pause" }
+    };
+
+    const applied = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-paused-replay-single"
+        })
+      }
+    );
+    expect(applied.status).toBe(200);
+
+    await pauseProject(adminCookie);
+
+    const replayed = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-paused-replay-single"
+        })
+      }
+    );
+    expect(replayed.status).toBe(404);
+    await expect(replayed.json()).resolves.toEqual({ error: "project_not_found" });
+  });
+
+  it("blocks idempotent command batch replay after the project is paused", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-idempotency-paused-batch-a",
+      title: "Idempotency paused batch A",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
+    await createTask(adminCookie, {
+      id: "task-idempotency-paused-batch-b",
+      title: "Idempotency paused batch B",
+      start: "2026-06-04",
+      finish: "2026-06-05"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    expect(initial.status).toBe(200);
+
+    const commands = [
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-idempotency-paused-batch-a", title: "Applied before pause A" }
+      },
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-idempotency-paused-batch-b", title: "Applied before pause B" }
+      }
+    ];
+
+    const applied = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-paused-replay-batch"
+        })
+      }
+    );
+    expect(applied.status).toBe(200);
+
+    await pauseProject(adminCookie);
+
+    const replayed = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command-batch",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-paused-replay-batch"
+        })
+      }
+    );
+    expect(replayed.status).toBe(404);
+    await expect(replayed.json()).resolves.toEqual({ error: "project_not_found" });
+  });
   it("requires resource management permission when task creation includes assignments", async () => {
     const limitedManagerCookie = await loginAs(
       "plan-manager-no-resource-manage@kiss-pm.local",
@@ -1681,10 +1819,35 @@ describe("planning API routes", () => {
     expect(pausedRead.status).toBe(200);
     expect(pausedReadBody.planVersion).toBe(initialBody.planVersion);
 
+    const pausedBaselines = await app.request("/api/workspace/projects/project-alpha/planning/baselines", {
+      headers: { cookie: adminCookie }
+    });
+    expect(pausedBaselines.status).toBe(200);
+
+    const pausedSavedViews = await app.request("/api/workspace/projects/project-alpha/planning/saved-views", {
+      headers: { cookie: adminCookie }
+    });
+    expect(pausedSavedViews.status).toBe(200);
+
     const command = {
       type: "task.update_identity",
       payload: { taskId: "task-paused-a", title: "Should not mutate while paused" }
     };
+    const previewCommand = await app.request(
+      "/api/workspace/projects/project-alpha/planning/preview-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ command, clientPlanVersion: initialBody.planVersion })
+      }
+    );
+    expect(previewCommand.status).toBe(404);
+    await expect(previewCommand.json()).resolves.toEqual({ error: "project_not_found" });
+
     const applyCommand = await app.request(
       "/api/workspace/projects/project-alpha/planning/apply-command",
       {
@@ -1715,6 +1878,25 @@ describe("planning API routes", () => {
     expect(batch.status).toBe(404);
     await expect(batch.json()).resolves.toEqual({ error: "project_not_found" });
 
+    const createSavedView = await app.request(
+      "/api/workspace/projects/project-alpha/planning/saved-views",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          name: "Paused view",
+          scope: "user",
+          payload: { columns: ["title"] }
+        })
+      }
+    );
+    expect(createSavedView.status).toBe(404);
+    await expect(createSavedView.json()).resolves.toEqual({ error: "project_not_found" });
+
     const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
       headers: { cookie: adminCookie }
     });
@@ -1728,6 +1910,44 @@ describe("planning API routes", () => {
         ])
       }
     });
+  });
+
+  it("blocks planning read surfaces for draft, closed, and cancelled projects", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-hidden-lifecycle",
+      title: "Hidden lifecycle task",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
+
+    for (const status of ["draft", "closed", "cancelled"] as const) {
+      await setProjectStatus(status);
+
+      const readModel = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+        headers: { cookie: adminCookie }
+      });
+      expect(readModel.status).toBe(404);
+      await expect(readModel.json()).resolves.toEqual({ error: "project_not_found" });
+
+      const baselines = await app.request("/api/workspace/projects/project-alpha/planning/baselines", {
+        headers: { cookie: adminCookie }
+      });
+      expect(baselines.status).toBe(404);
+      await expect(baselines.json()).resolves.toEqual({ error: "project_not_found" });
+
+      const savedViews = await app.request("/api/workspace/projects/project-alpha/planning/saved-views", {
+        headers: { cookie: adminCookie }
+      });
+      expect(savedViews.status).toBe(404);
+      await expect(savedViews.json()).resolves.toEqual({ error: "project_not_found" });
+
+      const events = await app.request("/api/workspace/projects/project-alpha/planning/events", {
+        headers: { cookie: adminCookie, Accept: "text/event-stream" }
+      });
+      expect(events.status).toBe(404);
+      await expect(events.json()).resolves.toEqual({ error: "project_not_found" });
+    }
   });
 
   it("blocks applying stored scenario proposals while a project is paused", async () => {

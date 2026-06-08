@@ -27,6 +27,7 @@ import {
   parseSolverProposalRouteParam,
   parseSolverRunRouteParam,
   requireActivePlanningProject,
+  requireReadablePlanningProject,
   summarizeSnapshot,
   type PlanningRouteDeps
 } from "./planningRouteHelpers";
@@ -100,6 +101,12 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
       return context.json({ error: resourceManageDecision.reason }, 403);
     }
 
+    const activeProject = await requireActivePlanningProject(
+      deps.dataSource,
+      actor.tenantId,
+      projectId
+    );
+    if (!activeProject.ok) return context.json({ error: activeProject.error }, activeProject.status);
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
     if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
@@ -245,6 +252,12 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
       return context.json({ error: resourceManageDecision.reason }, 403);
     }
 
+    const readableProject = await requireReadablePlanningProject(
+      deps.dataSource,
+      actor.tenantId,
+      projectId
+    );
+    if (!readableProject.ok) return context.json({ error: readableProject.error }, readableProject.status);
     const run = await deps.dataSource.findPlanningSolverRun(
       actor.tenantId,
       projectId,

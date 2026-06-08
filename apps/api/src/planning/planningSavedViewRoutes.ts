@@ -9,6 +9,8 @@ import { readLimitedJsonBody } from "../jsonBody";
 import {
   parseProjectRouteParam,
   parseSavedViewRouteParam,
+  requireActivePlanningProject,
+  requireReadablePlanningProject,
   type PlanningRouteDeps
 } from "./planningRouteHelpers";
 
@@ -34,6 +36,12 @@ export function registerPlanningSavedViewRoutes(
     if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
 
     const projectId = parsedProjectId.value;
+    const readableProject = await requireReadablePlanningProject(
+      deps.dataSource,
+      actor.tenantId,
+      projectId
+    );
+    if (!readableProject.ok) return context.json({ error: readableProject.error }, readableProject.status);
     const views = await deps.dataSource.listSavedViews(actor.tenantId, projectId, actor.id);
     return context.json({ savedViews: views });
   });
@@ -55,6 +63,13 @@ export function registerPlanningSavedViewRoutes(
     });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
+    const projectId = parsedProjectId.value;
+    const activeProject = await requireActivePlanningProject(
+      deps.dataSource,
+      actor.tenantId,
+      projectId
+    );
+    if (!activeProject.ok) return context.json({ error: activeProject.error }, activeProject.status);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const record = body.value as Record<string, unknown>;
@@ -66,7 +81,6 @@ export function registerPlanningSavedViewRoutes(
         : null;
     if (!name || !payload) return context.json({ error: "saved_view_invalid" }, 400);
 
-    const projectId = parsedProjectId.value;
     const view = await deps.dataSource.createSavedView({
       id: `saved-view-${randomUUID()}`,
       tenantId: actor.tenantId,
@@ -100,6 +114,12 @@ export function registerPlanningSavedViewRoutes(
       });
       if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
+      const activeProject = await requireActivePlanningProject(
+        deps.dataSource,
+        actor.tenantId,
+        parsedProjectId.value
+      );
+      if (!activeProject.ok) return context.json({ error: activeProject.error }, activeProject.status);
       const deleted = await deps.dataSource.deleteSavedView(
         actor.tenantId,
         parsedProjectId.value,

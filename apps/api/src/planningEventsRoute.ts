@@ -4,10 +4,13 @@ import type { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
+import type { ApiTenantDataSource } from "./apiTypes";
+import { requireReadablePlanningProject } from "./planning/planningRouteHelpers";
 import { subscribePlanningEvents, type PlanRealtimeEvent } from "./planningEventBus";
 import { parseProjectIdParam } from "./routeParamParsers";
 
 type PlanningEventsRouteDeps = {
+  dataSource: ApiTenantDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
 };
@@ -31,6 +34,12 @@ export function registerPlanningEventsRoute(app: Hono, deps: PlanningEventsRoute
     }
 
     const projectId = parsedProjectId.value;
+    const readableProject = await requireReadablePlanningProject(
+      deps.dataSource,
+      actor.tenantId,
+      projectId
+    );
+    if (!readableProject.ok) return context.json({ error: readableProject.error }, readableProject.status);
 
     return streamSSE(context, async (stream) => {
       const send = async (event: PlanRealtimeEvent) => {
