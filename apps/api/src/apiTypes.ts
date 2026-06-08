@@ -576,6 +576,13 @@ export type ApiTenantDataSource = {
     input: CrmActivityUpdateInput
   ): Promise<CrmActivityTransitionResult>;
   listProjects?(tenantId: TenantId): Promise<ProjectRecord[]>;
+  listOperationalQueueProjects?(
+    tenantId: TenantId,
+    options: {
+      statuses: Array<"active" | "paused">;
+      limit: number;
+    }
+  ): Promise<ProjectRecord[]>;
   ensureWorkspaceInboxProject?(
     input: WorkspaceInboxProjectInput
   ): Promise<ProjectRecord | undefined>;

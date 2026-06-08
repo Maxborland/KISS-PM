@@ -438,6 +438,41 @@ describe("operational control queue API", () => {
     });
   });
 
+  it("loads capped active and paused project candidates instead of all tenant projects", async () => {
+    const activeProject = createProject("project-active");
+    const pausedProject = createProject("project-paused", { status: "paused" });
+    const closedProject = createProject("project-closed", { status: "closed" });
+    const fixture = createOperationalQueueFixture({
+      failFullProjectList: true,
+      operationalQueueProjects: [activeProject, pausedProject],
+      projects: [activeProject, pausedProject, closedProject],
+      signalsByProject: {
+        [activeProject.id]: [createSignal("signal-active", activeProject.id, { severity: "critical" })],
+        [closedProject.id]: [createSignal("signal-closed", closedProject.id, { severity: "critical" })]
+      }
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=1",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string }> };
+    expect(body.items).toEqual([
+      expect.objectContaining({ id: "control-signal:project-active:signal-active" })
+    ]);
+    expect(fixture.projectCandidateReads).toEqual([
+      { tenantId: "tenant-control", limit: 100, statuses: ["active", "paused"] }
+    ]);
+    expect(fixture.dataReadCalls).toMatchObject({
+      projectTaskBatches: 1,
+      controlSignalBatches: 1,
+      correctiveActionBatches: 1
+    });
+  });
+
   it("documents the operational control queue route in OpenAPI", async () => {
     const app = createApp();
 
@@ -467,6 +502,8 @@ type OperationalQueueFixtureInput = {
   signalsByProject?: Record<string, ControlSignal[]>;
   correctiveActionsByProject?: Record<string, CorrectiveAction[]>;
   auditEvents?: AuditEventListItem[];
+  operationalQueueProjects?: ProjectRecord[];
+  failFullProjectList?: boolean;
 };
 
 type OperationalQueueDataReadCalls = {
@@ -479,6 +516,10 @@ type OperationalQueueDataReadCalls = {
 };
 
 type OperationalQueueBatchDataSource = Partial<ApiTenantDataSource> & {
+  listOperationalQueueProjects(
+    tenantId: string,
+    options: { statuses: Array<"active" | "paused">; limit: number }
+  ): Promise<ProjectRecord[]>;
   listProjectTasksForProjects(tenantId: string, projectIds: string[]): Promise<TaskRecord[]>;
   listControlSignalsForProjects(tenantId: string, projectIds: string[]): Promise<ControlSignal[]>;
   listCorrectiveActionsForProjects(tenantId: string, projectIds: string[]): Promise<CorrectiveAction[]>;
@@ -486,6 +527,11 @@ type OperationalQueueBatchDataSource = Partial<ApiTenantDataSource> & {
 
 function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
   let loadedQueueData = false;
+  const projectCandidateReads: Array<{
+    tenantId: string;
+    limit: number;
+    statuses: Array<"active" | "paused">;
+  }> = [];
   const dataReadCalls: OperationalQueueDataReadCalls = {
     projectTasksByProject: 0,
     controlSignalsByProject: 0,
@@ -523,7 +569,18 @@ function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
         expiresAt: new Date("2026-07-01T00:00:00.000Z")
       };
     },
+    async listOperationalQueueProjects(tenantId, options) {
+      loadedQueueData = true;
+      projectCandidateReads.push({ tenantId, limit: options.limit, statuses: [...options.statuses] });
+      return (input.operationalQueueProjects ?? input.projects ?? [])
+        .filter((project) => project.tenantId === tenantId)
+        .filter((project) => options.statuses.includes(project.status as "active" | "paused"))
+        .slice(0, options.limit);
+    },
     async listProjects() {
+      if (input.failFullProjectList) {
+        throw new Error("listProjects should not be called for operational queue candidates");
+      }
       loadedQueueData = true;
       return input.projects ?? [];
     },
@@ -583,6 +640,9 @@ function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
     },
     get dataReadCalls() {
       return { ...dataReadCalls };
+    },
+    get projectCandidateReads() {
+      return [...projectCandidateReads];
     }
   };
 }

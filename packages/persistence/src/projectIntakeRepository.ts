@@ -157,6 +157,13 @@ export type ProjectIntakeRepository = {
     status: OpportunityFinalStatus;
   }): Promise<OpportunityRecord | undefined>;
   listProjects(tenantId: TenantId): Promise<ProjectRecord[]>;
+  listOperationalQueueProjects(
+    tenantId: TenantId,
+    options: {
+      statuses: Array<"active" | "paused">;
+      limit: number;
+    }
+  ): Promise<ProjectRecord[]>;
   ensureWorkspaceInboxProject(input: WorkspaceInboxProjectInput): Promise<ProjectRecord | undefined>;
   createProjectDraftFromOpportunity(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
@@ -493,6 +500,23 @@ export function createProjectIntakeRepository(
       return rows.map((row) =>
         mapProjectRecord(row, demandByProject.get(row.id) ?? [])
       );
+    },
+    async listOperationalQueueProjects(tenantId, options) {
+      if (options.statuses.length === 0 || options.limit < 1) return [];
+      const rows = await db
+        .select()
+        .from(projects)
+        .where(
+          and(
+            eq(projects.tenantId, tenantId),
+            inArray(projects.status, options.statuses)
+          )
+        )
+        .orderBy(desc(projects.activatedAt), desc(projects.createdAt), desc(projects.id))
+        .limit(options.limit);
+      const demandByProject = await listProjectDemand(tenantId, rows.map((row) => row.id));
+
+      return rows.map((row) => mapProjectRecord(row, demandByProject.get(row.id) ?? []));
     },
     async ensureWorkspaceInboxProject(input) {
       const now = new Date();

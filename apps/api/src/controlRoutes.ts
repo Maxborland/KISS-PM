@@ -92,7 +92,7 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!auditDecision.allowed) return context.json({ error: auditDecision.reason }, 403);
 
     if (
-      !deps.dataSource.listProjects ||
+      (!deps.dataSource.listOperationalQueueProjects && !deps.dataSource.listProjects) ||
       !deps.dataSource.listProjectTasksForProjects ||
       !deps.dataSource.listControlSignalsForProjects ||
       !deps.dataSource.listCorrectiveActionsForProjects ||
@@ -1126,10 +1126,17 @@ async function buildOperationalControlQueue(input: {
   asOf: Date;
   limit: number;
 }): Promise<OperationalControlQueueItem[]> {
-  const rawProjects = await input.dataSource.listProjects?.(input.tenantId) ?? [];
+  const candidateStatuses: Array<"active" | "paused"> = ["active", "paused"];
+  const rawProjects = input.dataSource.listOperationalQueueProjects
+    ? await input.dataSource.listOperationalQueueProjects(input.tenantId, {
+      statuses: candidateStatuses,
+      limit: maxOperationalControlQueueLimit
+    })
+    : await input.dataSource.listProjects?.(input.tenantId) ?? [];
   const projects = rawProjects
     .filter((project) => project.tenantId === input.tenantId)
-    .filter((project) => project.status === "active" || project.status === "paused");
+    .filter((project) => candidateStatuses.includes(project.status as "active" | "paused"))
+    .slice(0, maxOperationalControlQueueLimit);
   const projectById = new Map(projects.map((project) => [project.id, project]));
   const allTasks: TaskRecord[] = [];
   const items: OperationalControlQueueSortItem[] = [];

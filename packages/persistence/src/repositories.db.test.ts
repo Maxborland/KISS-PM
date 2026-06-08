@@ -434,6 +434,59 @@ describe("PostgreSQL tenant data source", () => {
     await expect(dataSource.listProjects("tenant-beta")).resolves.toEqual([]);
   });
 
+  it("lists capped active and paused operational queue project candidates", async () => {
+    await client`
+      INSERT INTO tenants (id, name, created_at)
+      VALUES ('tenant-alpha', 'Alpha', now())
+    `;
+    await client`
+      INSERT INTO positions (id, tenant_id, name, created_at)
+      VALUES ('position-alpha', 'tenant-alpha', 'Engineer', now())
+    `;
+    await client`
+      INSERT INTO projects (
+        id, tenant_id, source_type, title, client_name, status,
+        planned_start, planned_finish, contract_value, planned_hours,
+        created_at, activated_at, closed_at
+      )
+      VALUES
+        (
+          'project-closed', 'tenant-alpha', 'manual', 'Closed project', 'Alpha', 'closed',
+          '2026-05-01T00:00:00.000Z', '2026-05-10T00:00:00.000Z', 0, 0,
+          '2026-05-01T00:00:00.000Z', '2026-05-01T00:00:00.000Z', '2026-05-10T00:00:00.000Z'
+        ),
+        (
+          'project-active', 'tenant-alpha', 'manual', 'Active project', 'Alpha', 'active',
+          '2026-06-01T00:00:00.000Z', '2026-06-10T00:00:00.000Z', 0, 0,
+          '2026-06-01T00:00:00.000Z', '2026-06-01T00:00:00.000Z', null
+        ),
+        (
+          'project-paused', 'tenant-alpha', 'manual', 'Paused project', 'Alpha', 'paused',
+          '2026-06-02T00:00:00.000Z', '2026-06-11T00:00:00.000Z', 0, 0,
+          '2026-06-02T00:00:00.000Z', '2026-06-02T00:00:00.000Z', null
+        )
+    `;
+    await client`
+      INSERT INTO project_position_demands (tenant_id, project_id, position_id, required_hours)
+      VALUES
+        ('tenant-alpha', 'project-active', 'position-alpha', 8),
+        ('tenant-alpha', 'project-closed', 'position-alpha', 99)
+    `;
+
+    await expect(
+      dataSource.listOperationalQueueProjects("tenant-alpha", {
+        statuses: ["active", "paused"],
+        limit: 1
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: "project-paused",
+        status: "paused",
+        demand: []
+      })
+    ]);
+  });
+
   it("ensures one active workspace inbox project and keeps closed inbox history", async () => {
     await client`
       INSERT INTO tenants (id, name, created_at)
