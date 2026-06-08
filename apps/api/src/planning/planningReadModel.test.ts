@@ -50,6 +50,20 @@ describe("planning read model", () => {
       ]
     });
 
+    expect(readModel.baselineComparison.assignments).toEqual([
+      {
+        assignmentId: "assignment-alpha",
+        status: "changed",
+        baselineTaskId: "task-alpha",
+        currentTaskId: "task-alpha",
+        baselineResourceId: "resource-alpha",
+        currentResourceId: "resource-alpha",
+        baselineWorkMinutes: 480,
+        currentWorkMinutes: 960,
+        workDeltaMinutes: 480
+      }
+    ]);
+
     expect(readModel.baselineComparison.resources).toEqual([
       {
         resourceId: "resource-alpha",

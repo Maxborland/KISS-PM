@@ -90,7 +90,12 @@ export function createBaselineComparison(
           currentWorkMinutes === null ? null : currentWorkMinutes - baselineTask.workMinutes
       };
     }),
-    assignments: createBaselineAssignmentComparison(baseline.assignments, snapshot.assignments),
+    assignments: createBaselineAssignmentComparison(
+      baseline.assignments,
+      snapshot.assignments,
+      baselineTasksById,
+      calculatedTasksById
+    ),
     resources: createBaselineResourceComparison(
       baseline.assignments,
       snapshot.assignments,
@@ -122,7 +127,9 @@ type BaselineComparisonStatus = "added" | "removed" | "changed" | "unchanged";
 
 function createBaselineAssignmentComparison(
   baselineAssignments: BaselineAssignmentSnapshot[],
-  currentAssignments: CurrentAssignmentSnapshot[]
+  currentAssignments: CurrentAssignmentSnapshot[],
+  baselineTasksById: Map<string, PlanSnapshot["baselines"][number]["tasks"][number]>,
+  calculatedTasksById: Map<string, ReturnType<typeof calculatePlan>["tasks"][number]>
 ) {
   const baselineById = new Map(baselineAssignments.map((assignment) => [assignment.assignmentId, assignment]));
   const currentById = new Map(currentAssignments.map((assignment) => [assignment.id, assignment]));
@@ -131,16 +138,30 @@ function createBaselineAssignmentComparison(
     .map((assignmentId) => {
       const baseline = baselineById.get(assignmentId) ?? null;
       const current = currentById.get(assignmentId) ?? null;
+      const baselineWorkMinutes = baseline
+        ? resolveBaselineAssignmentWork(
+            baseline,
+            baselineAssignments,
+            baselineTasksById.get(baseline.taskId)?.workMinutes ?? 0
+          )
+        : null;
+      const currentWorkMinutes = current
+        ? resolveEffectiveAssignmentWork(
+            currentAssignments,
+            current,
+            calculatedTasksById.get(current.taskId)?.workMinutes ?? 0
+          )
+        : null;
       return {
         assignmentId,
-        status: assignmentComparisonStatus(baseline, current),
+        status: assignmentComparisonStatus(baseline, current, baselineWorkMinutes, currentWorkMinutes),
         baselineTaskId: baseline?.taskId ?? null,
         currentTaskId: current?.taskId ?? null,
         baselineResourceId: baseline?.resourceId ?? null,
         currentResourceId: current?.resourceId ?? null,
-        baselineWorkMinutes: baseline?.workMinutes ?? null,
-        currentWorkMinutes: current?.workMinutes ?? null,
-        workDeltaMinutes: workDeltaMinutes(baseline?.workMinutes ?? null, current?.workMinutes ?? null)
+        baselineWorkMinutes,
+        currentWorkMinutes,
+        workDeltaMinutes: workDeltaMinutes(baselineWorkMinutes, currentWorkMinutes)
       };
     });
 }
@@ -188,14 +209,16 @@ function createBaselineResourceComparison(
 
 function assignmentComparisonStatus(
   baseline: BaselineAssignmentSnapshot | null,
-  current: CurrentAssignmentSnapshot | null
+  current: CurrentAssignmentSnapshot | null,
+  baselineWorkMinutes: number | null,
+  currentWorkMinutes: number | null
 ): BaselineComparisonStatus {
   if (!baseline) return "added";
   if (!current) return "removed";
   if (
     baseline.taskId !== current.taskId ||
     baseline.resourceId !== current.resourceId ||
-    baseline.workMinutes !== current.workMinutes
+    baselineWorkMinutes !== currentWorkMinutes
   ) {
     return "changed";
   }
