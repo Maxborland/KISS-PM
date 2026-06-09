@@ -1035,6 +1035,60 @@ export const planningSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  PlanningSavedViewPayload: {
+    oneOf: [schemaRef("GanttSavedViewPayload")]
+  },
+  GanttSavedViewScrollPosition: {
+    type: "object",
+    required: ["rowIndex", "timelineOffset"],
+    properties: {
+      rowIndex: { type: "integer", minimum: 0 },
+      timelineOffset: { type: "integer", minimum: 0 }
+    },
+    additionalProperties: false
+  },
+  GanttSavedViewFilters: {
+    type: "object",
+    properties: {
+      resourceIds: { type: "array", items: stringIdSchema },
+      criticalOnly: { type: "boolean" },
+      milestonesOnly: { type: "boolean" },
+      hasValidationIssues: { type: "boolean" }
+    },
+    additionalProperties: false
+  },
+  GanttSavedViewPayload: {
+    type: "object",
+    required: [
+      "viewKind",
+      "zoom",
+      "visibleColumns",
+      "columnWidths",
+      "collapsedTaskIds",
+      "selectedTaskIds",
+      "scrollPosition",
+      "filters",
+      "baselineOverlayEnabled"
+    ],
+    properties: {
+      viewKind: { type: "string", const: "gantt" },
+      zoom: { type: "string", enum: ["hour", "day", "week", "month"] },
+      visibleColumns: { type: "array", minItems: 1, items: { type: "string", minLength: 1 } },
+      columnWidths: {
+        type: "object",
+        minProperties: 1,
+        additionalProperties: { type: "integer", minimum: 0 }
+      },
+      collapsedTaskIds: { type: "array", items: stringIdSchema },
+      selectedTaskIds: { type: "array", items: stringIdSchema },
+      scrollPosition: schemaRef("GanttSavedViewScrollPosition"),
+      filters: schemaRef("GanttSavedViewFilters"),
+      baselineOverlayEnabled: { type: "boolean" },
+      baselineId: stringIdSchema,
+      scenarioRunId: stringIdSchema
+    },
+    additionalProperties: false
+  },
   PlanningSavedView: {
     type: "object",
     required: ["id", "tenantId", "projectId", "ownerUserId", "scope", "name", "payload", "createdAt"],
@@ -1045,7 +1099,7 @@ export const planningSchemas = openApiSchemaFragment({
       ownerUserId: stringIdSchema,
       scope: { type: "string", enum: ["user", "project"] },
       name: { type: "string", minLength: 1 },
-      payload: schemaRef("AnyJsonObject"),
+      payload: schemaRef("PlanningSavedViewPayload"),
       createdAt: dateTimeSchema
     },
     additionalProperties: false
@@ -1056,7 +1110,7 @@ export const planningSchemas = openApiSchemaFragment({
     properties: {
       name: { type: "string", minLength: 1 },
       scope: { type: "string", enum: ["user", "project"], default: "user" },
-      payload: schemaRef("AnyJsonObject")
+      payload: schemaRef("PlanningSavedViewPayload")
     },
     additionalProperties: false
   },

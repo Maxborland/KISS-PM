@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 
-import type { TenantId, UserId } from "@kiss-pm/domain";
+import type { PlanningSavedViewPayload, TenantId, UserId } from "@kiss-pm/domain";
 
 import type { KissPmDatabase } from "./connection";
 import { planningSavedViews } from "./schema";
@@ -14,7 +14,7 @@ export type PlanningSavedViewRecord = {
   ownerUserId: UserId;
   scope: PlanningSavedViewScope;
   name: string;
-  payload: Record<string, unknown>;
+  payload: PlanningSavedViewPayload;
   createdAt: Date;
 };
 
@@ -116,7 +116,7 @@ function mapSavedView(row: typeof planningSavedViews.$inferSelect): PlanningSave
     ownerUserId: row.ownerUserId as UserId,
     scope: row.scope as PlanningSavedViewScope,
     name: row.name,
-    payload: row.payload,
+    payload: row.payload as PlanningSavedViewPayload,
     createdAt: row.createdAt
   };
 }

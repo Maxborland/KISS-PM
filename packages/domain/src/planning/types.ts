@@ -14,6 +14,30 @@ export type ScenarioProfile = "aggressive" | "balanced" | "resilient";
 export type ValidationSeverity = "info" | "warning" | "error";
 export type ProjectSourceType = "opportunity" | "workspace_inbox" | "manual";
 
+export type GanttSavedViewPayload = {
+  viewKind: "gantt";
+  zoom: "hour" | "day" | "week" | "month";
+  visibleColumns: string[];
+  columnWidths: Record<string, number>;
+  collapsedTaskIds: string[];
+  selectedTaskIds: string[];
+  scrollPosition: {
+    rowIndex: number;
+    timelineOffset: number;
+  };
+  filters: {
+    resourceIds?: string[];
+    criticalOnly?: boolean;
+    milestonesOnly?: boolean;
+    hasValidationIssues?: boolean;
+  };
+  baselineOverlayEnabled: boolean;
+  baselineId?: string;
+  scenarioRunId?: string;
+};
+
+export type PlanningSavedViewPayload = GanttSavedViewPayload;
+
 export type PlanProject = {
   id: string;
   sourceType: ProjectSourceType;

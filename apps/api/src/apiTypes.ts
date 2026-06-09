@@ -46,6 +46,7 @@ import type {
   NotificationPreference,
   OccupancyWindow,
   PlanSnapshot,
+  PlanningSavedViewPayload,
   ProjectClosureSnapshot,
   ResourceCalendarEvent,
   ResourcePersonalCalendar,
@@ -773,7 +774,7 @@ export type ApiTenantDataSource = {
       ownerUserId: UserId;
       scope: "user" | "project";
       name: string;
-      payload: Record<string, unknown>;
+      payload: PlanningSavedViewPayload;
       createdAt: Date;
     }>
   >;
@@ -784,12 +785,12 @@ export type ApiTenantDataSource = {
     ownerUserId: UserId;
     scope: "user" | "project";
     name: string;
-    payload: Record<string, unknown>;
+    payload: PlanningSavedViewPayload;
   }): Promise<{
     id: string;
     name: string;
     scope: "user" | "project";
-    payload: Record<string, unknown>;
+    payload: PlanningSavedViewPayload;
   }>;
   deleteSavedView?(
     tenantId: TenantId,

@@ -2476,6 +2476,53 @@ describe("planning API routes", () => {
     expect(listEmpty.status).toBe(200);
     await expect(listEmpty.json()).resolves.toEqual({ savedViews: [] });
 
+    const invalidGanttView = await app.request(
+      "/api/workspace/projects/project-alpha/planning/saved-views",
+      {
+        method: "POST",
+        headers: {
+          cookie: adminCookie,
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin"
+        },
+        body: JSON.stringify({
+          name: "Invalid Gantt view",
+          payload: {
+            viewKind: "gantt",
+            zoom: "quarter",
+            visibleColumns: ["title", "plannedStart"],
+            columnWidths: { title: 280, plannedStart: 120 },
+            collapsedTaskIds: [],
+            selectedTaskIds: [],
+            scrollPosition: { rowIndex: 0, timelineOffset: 0 },
+            filters: {},
+            baselineOverlayEnabled: false
+          }
+        })
+      }
+    );
+    expect(invalidGanttView.status).toBe(400);
+    await expect(invalidGanttView.json()).resolves.toEqual({ error: "saved_view_invalid" });
+
+    const ganttPayload = {
+      viewKind: "gantt",
+      zoom: "week",
+      visibleColumns: ["wbsCode", "title", "plannedStart", "plannedFinish"],
+      columnWidths: { wbsCode: 80, title: 280, plannedStart: 120, plannedFinish: 120 },
+      collapsedTaskIds: ["task-plan-summary"],
+      selectedTaskIds: ["task-plan-a", "task-plan-b"],
+      scrollPosition: { rowIndex: 3, timelineOffset: 640 },
+      filters: {
+        resourceIds: ["user-alpha-executor"],
+        criticalOnly: true,
+        milestonesOnly: false,
+        hasValidationIssues: true
+      },
+      baselineOverlayEnabled: true,
+      baselineId: "baseline-alpha",
+      scenarioRunId: "scenario-alpha"
+    };
+
     const create = await app.request(
       "/api/workspace/projects/project-alpha/planning/saved-views",
       {
@@ -2488,7 +2535,7 @@ describe("planning API routes", () => {
         body: JSON.stringify({
           name: "Мой вид",
           scope: "user",
-          payload: { visibleColumnIds: ["title", "start"] }
+          payload: ganttPayload
         })
       }
     );
@@ -2497,7 +2544,7 @@ describe("planning API routes", () => {
     expect(createdBody.savedView).toMatchObject({
       name: "Мой вид",
       scope: "user",
-      payload: { visibleColumnIds: ["title", "start"] }
+      payload: ganttPayload
     });
 
     const listAfter = await app.request(
