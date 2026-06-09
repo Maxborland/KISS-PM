@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { ControlSignal, CorrectiveAction } from "@kiss-pm/domain";
@@ -287,6 +287,80 @@ describe("audit learning inputs API", () => {
     const body = await response.json() as { items: AuditLearningInput[] };
     expect(body.items).toHaveLength(1);
     expect(body.items[0]!.projectId).toBe(project.id);
+  });
+
+  it("uses date-only overdue checks for operational project learning inputs", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T15:00:00.000Z"));
+    try {
+      const project = createProject("project-alpha", {
+        plannedFinish: new Date("2026-06-09T00:00:00.000Z")
+      });
+      const fixture = createAuditLearningFixture({ projects: [project] });
+      const app = createApp({ dataSource: fixture.dataSource });
+
+      const response = await app.request(
+        "/api/tenant/current/audit-learning-inputs?limit=10",
+        { headers: authHeaders() }
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json() as { items: AuditLearningInput[] };
+      expect(body.items.map((item) => item.id)).not.toContain(
+        "operational-queue:project-overdue:project-alpha"
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("resolves audit attention projectId from known related entities", async () => {
+    const project = createProject("project-alpha");
+    const task = createTask("task-alpha", project.id);
+    const signal = createSignal("signal-alpha", project.id);
+    const action = createCorrectiveAction("action-alpha", project.id, signal.id);
+    const fixture = createAuditLearningFixture({
+      projects: [project],
+      tasksByProject: { [project.id]: [task] },
+      signalsByProject: { [project.id]: [signal] },
+      correctiveActionsByProject: { [project.id]: [action] },
+      auditEvents: [
+        createAuditEvent("audit-task-denied", {
+          sourceEntity: { type: "Task", id: task.id },
+          actionType: "project_work.update_denied",
+          executionResult: { status: "denied" }
+        }),
+        createAuditEvent("audit-signal-denied", {
+          sourceEntity: { type: "ControlSignal", id: signal.id },
+          actionType: "control.signal_denied",
+          executionResult: { status: "denied" }
+        }),
+        createAuditEvent("audit-action-denied", {
+          sourceEntity: { type: "CorrectiveAction", id: action.id },
+          actionType: "corrective_action.update_denied",
+          executionResult: { status: "denied" }
+        })
+      ]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/audit-learning-inputs?limit=10",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: AuditLearningInput[] };
+    const projectIdByInputId = new Map(
+      body.items
+        .filter((item) => item.inputKind === "audit_attention")
+        .map((item) => [item.id, item.projectId])
+    );
+    expect(projectIdByInputId).toEqual(new Map([
+      ["audit-attention:audit-task-denied", project.id],
+      ["audit-attention:audit-signal-denied", project.id],
+      ["audit-attention:audit-action-denied", project.id]
+    ]));
   });
 
   it("includes operational queue items from overdue projects, waiting tasks, open signals, and corrective actions", async () => {

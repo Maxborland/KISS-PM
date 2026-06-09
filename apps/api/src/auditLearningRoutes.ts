@@ -136,12 +136,32 @@ async function buildAuditLearningInputs(input: {
     dataSource.listControlSignalsForProjects!(tenantId, projects.map((project) => project.id)),
     dataSource.listCorrectiveActionsForProjects?.(tenantId, operationalProjectIds) ?? Promise.resolve([])
   ]);
+  const taskProjectById = new Map(
+    tasks
+      .filter((task) => task.tenantId === tenantId && projectMap.has(task.projectId))
+      .map((task) => [task.id, task.projectId])
+  );
+  const signalProjectById = new Map(
+    signals
+      .filter((signal) => signal.tenantId === tenantId && projectMap.has(signal.projectId))
+      .map((signal) => [signal.id, signal.projectId])
+  );
+  const correctiveActionProjectById = new Map(
+    correctiveActions
+      .filter((action) => action.tenantId === tenantId && projectMap.has(action.projectId))
+      .map((action) => [action.id, action.projectId])
+  );
 
   for (const event of auditEvents) {
     const status = auditEventStatus(event);
     if (!status) continue;
 
-    const projectId = resolveProjectIdFromAuditEvent(event, projectMap);
+    const projectId = resolveProjectIdFromAuditEvent(event, {
+      projectMap,
+      taskProjectById,
+      signalProjectById,
+      correctiveActionProjectById
+    });
     const severity: AuditLearningInputSeverity =
       status === "failed" ? "critical" : "warning";
 
@@ -251,7 +271,7 @@ function buildOperationalQueueLearningInputs(input: {
 
   for (const project of input.projects) {
     if (project.tenantId !== input.tenantId) continue;
-    if (project.plannedFinish.getTime() < input.asOf.getTime()) {
+    if (isDateBefore(project.plannedFinish, input.asOf)) {
       items.push({
         id: `operational-queue:project-overdue:${project.id}`,
         tenantId: project.tenantId,
@@ -276,7 +296,7 @@ function buildOperationalQueueLearningInputs(input: {
   for (const task of input.tasks) {
     if (task.tenantId !== input.tenantId || task.archivedAt || task.statusCategory === "done") continue;
     if (!projectById.has(task.projectId)) continue;
-    if (task.plannedFinish.getTime() < input.asOf.getTime()) {
+    if (isDateBefore(task.plannedFinish, input.asOf)) {
       const severity: AuditLearningInputSeverity =
         task.priority === "critical" || task.priority === "high" ? "critical" : "warning";
       items.push({
@@ -349,7 +369,7 @@ function buildOperationalQueueLearningInputs(input: {
     if (action.tenantId !== input.tenantId || !projectById.has(action.projectId)) continue;
     if (action.status !== "open" && action.status !== "in_progress") continue;
     const signal = signalById.get(action.controlSignalId);
-    const overdue = action.dueDate ? new Date(action.dueDate).getTime() < input.asOf.getTime() : false;
+    const overdue = action.dueDate ? isDateStringBefore(action.dueDate, input.asOf) : false;
     items.push({
       id: `operational-queue:corrective-action:${action.projectId}:${action.id}`,
       tenantId: action.tenantId,
@@ -395,7 +415,12 @@ function auditEventStatus(event: AuditEventListItem): string | null {
 
 function resolveProjectIdFromAuditEvent(
   event: AuditEventListItem,
-  projectMap: Map<string, ProjectRecord>
+  context: {
+    projectMap: Map<string, ProjectRecord>;
+    taskProjectById: Map<string, string>;
+    signalProjectById: Map<string, string>;
+    correctiveActionProjectById: Map<string, string>;
+  }
 ): string | null {
   const entityType = typeof event.sourceEntity?.type === "string"
     ? event.sourceEntity.type
@@ -403,9 +428,25 @@ function resolveProjectIdFromAuditEvent(
   const entityId = typeof event.sourceEntity?.id === "string"
     ? event.sourceEntity.id
     : null;
-  if (entityType === "Project" && entityId && projectMap.has(entityId)) {
+
+  if (!entityType || !entityId) return null;
+
+  if (entityType === "Project" && context.projectMap.has(entityId)) {
     return entityId;
   }
+
+  const relatedProjectId = entityType === "Task"
+    ? context.taskProjectById.get(entityId)
+    : entityType === "ControlSignal"
+      ? context.signalProjectById.get(entityId)
+      : entityType === "CorrectiveAction"
+        ? context.correctiveActionProjectById.get(entityId)
+        : null;
+
+  if (relatedProjectId && context.projectMap.has(relatedProjectId)) {
+    return relatedProjectId;
+  }
+
   return null;
 }
 
@@ -500,4 +541,12 @@ function parseLearningInputsLimit(value: string | undefined): number | null {
 
 function dateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+function isDateBefore(value: Date, asOf: Date): boolean {
+  return dateOnly(value) < dateOnly(asOf);
+}
+
+function isDateStringBefore(value: string, asOf: Date): boolean {
+  return value < dateOnly(asOf);
 }
