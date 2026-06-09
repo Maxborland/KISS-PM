@@ -37,6 +37,7 @@ import { randomUUID } from "node:crypto";
 import type { TaskRecord } from "@kiss-pm/persistence";
 
 import type { ApiTenantDataSource, AuditEventListItem, ProjectRecord } from "./apiTypes";
+import { listOperationalProjectCandidates } from "./operationalProjectCandidates";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import {
   persistControlSignalNotifications,
@@ -1091,9 +1092,6 @@ type OperationalControlQueueSortItem = OperationalControlQueueItem & {
 
 const defaultOperationalControlQueueLimit = 50;
 const maxOperationalControlQueueLimit = 100;
-// Keep tenant hydration bounded while leaving room to find overdue projects outside the response cap.
-const operationalControlQueueProjectCandidateLimit = maxOperationalControlQueueLimit * 5;
-
 function parseOperationalControlQueueQuery(input: {
   asOf: string | undefined;
   limit: string | undefined;
@@ -1128,20 +1126,11 @@ async function buildOperationalControlQueue(input: {
   asOf: Date;
   limit: number;
 }): Promise<OperationalControlQueueItem[]> {
-  const candidateStatuses: Array<"active" | "paused"> = ["active", "paused"];
-  const rawProjects = input.dataSource.listOperationalQueueProjects
-    ? await input.dataSource.listOperationalQueueProjects(input.tenantId, {
-        statuses: candidateStatuses,
-        asOf: input.asOf,
-        limit: operationalControlQueueProjectCandidateLimit
-      })
-    : await input.dataSource.listProjects?.(input.tenantId) ?? [];
-  const projects = rankOperationalQueueProjectCandidates(
-    rawProjects
-      .filter((project) => project.tenantId === input.tenantId)
-      .filter((project) => candidateStatuses.includes(project.status as "active" | "paused")),
-    input.asOf
-  ).slice(0, operationalControlQueueProjectCandidateLimit);
+  const projects = await listOperationalProjectCandidates({
+    dataSource: input.dataSource,
+    tenantId: input.tenantId,
+    asOf: input.asOf
+  });
   const projectById = new Map(projects.map((project) => [project.id, project]));
   const allTasks: TaskRecord[] = [];
   const items: OperationalControlQueueSortItem[] = [];
@@ -1462,25 +1451,6 @@ function resolveAuditProject(
     return projectId ? projectById.get(projectId) : undefined;
   }
   return undefined;
-}
-
-function rankOperationalQueueProjectCandidates(projects: ProjectRecord[], asOf: Date): ProjectRecord[] {
-  return [...projects].sort((left, right) => {
-    const leftOverdue = isDateBefore(left.plannedFinish, asOf);
-    const rightOverdue = isDateBefore(right.plannedFinish, asOf);
-    if (leftOverdue !== rightOverdue) return leftOverdue ? -1 : 1;
-
-    if (leftOverdue && rightOverdue) {
-      const dueDateComparison = compareNullableDate(dateOnly(left.plannedFinish), dateOnly(right.plannedFinish));
-      if (dueDateComparison !== 0) return dueDateComparison;
-    }
-
-    return (
-      isoDateTime(right.activatedAt ?? right.createdAt)!.localeCompare(
-        isoDateTime(left.activatedAt ?? left.createdAt)!
-      ) || left.id.localeCompare(right.id)
-    );
-  });
 }
 
 function sortOperationalControlQueue(items: OperationalControlQueueSortItem[]) {

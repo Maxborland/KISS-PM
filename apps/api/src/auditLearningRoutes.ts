@@ -8,12 +8,13 @@ import type { TaskRecord } from "@kiss-pm/persistence";
 
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import type { AuditEventListItem, ProjectRecord } from "./apiTypes";
+import {
+  listOperationalProjectCandidates,
+  operationalProjectCandidateHydrationLimit
+} from "./operationalProjectCandidates";
 
 const defaultLearningInputsLimit = 100;
 const maxLearningInputsLimit = 100;
-// Bound operational candidate hydration while preserving risk-ranked inputs beyond the response cap.
-const auditLearningProjectCandidateLimit = maxLearningInputsLimit * 5;
-
 type AuditLearningInputKind =
   | "audit_attention"
   | "operational_queue_item"
@@ -130,22 +131,14 @@ async function buildAuditLearningInputs(input: {
 
   const projects = await listLearningInputProjects(dataSource, tenantId);
   const projectMap = new Map(projects.map((project) => [project.id, project]));
-  const operationalProjects = rankLearningInputProjectCandidates(
-    dataSource.listOperationalQueueProjects
-      ? await dataSource.listOperationalQueueProjects(tenantId, {
-          statuses: ["active", "paused"],
-          asOf,
-          limit: auditLearningProjectCandidateLimit
-        })
-      : projects,
+  const operationalProjects = await listOperationalProjectCandidates({
+    dataSource,
+    tenantId,
     asOf
-  )
-    .filter((project) => project.tenantId === tenantId)
-    .filter((project) => project.status === "active" || project.status === "paused")
-    .slice(0, auditLearningProjectCandidateLimit);
+  });
   const learningProjectIds = uniqueIds([
     ...operationalProjects.map((project) => project.id),
-    ...projects.slice(0, auditLearningProjectCandidateLimit).map((project) => project.id)
+    ...projects.slice(0, operationalProjectCandidateHydrationLimit).map((project) => project.id)
   ]);
   const operationalProjectIds = operationalProjects.map((project) => project.id);
   const [tasks, signals, correctiveActions] = await Promise.all([
@@ -263,25 +256,6 @@ async function listLearningInputProjects(
   tenantId: string
 ): Promise<ProjectRecord[]> {
   return dataSource.listProjects?.(tenantId) ?? [];
-}
-
-function rankLearningInputProjectCandidates(projects: ProjectRecord[], asOf: Date): ProjectRecord[] {
-  return [...projects].sort((left, right) => {
-    const leftOverdue = isDateBefore(left.plannedFinish, asOf);
-    const rightOverdue = isDateBefore(right.plannedFinish, asOf);
-    if (leftOverdue !== rightOverdue) return leftOverdue ? -1 : 1;
-
-    if (leftOverdue && rightOverdue) {
-      const dueDateComparison = dateOnly(left.plannedFinish).localeCompare(dateOnly(right.plannedFinish));
-      if (dueDateComparison !== 0) return dueDateComparison;
-    }
-
-    return (
-      (right.activatedAt ?? right.createdAt).toISOString().localeCompare(
-        (left.activatedAt ?? left.createdAt).toISOString()
-      ) || left.id.localeCompare(right.id)
-    );
-  });
 }
 
 function uniqueIds(ids: string[]): string[] {
