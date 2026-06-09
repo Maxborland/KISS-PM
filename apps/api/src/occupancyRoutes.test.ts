@@ -50,7 +50,7 @@ function createTestDataSource() {
         userId: admin.id,
         tokenHash,
         createdAt: new Date("2026-05-26T00:00:00.000Z"),
-        expiresAt: new Date("2026-06-01T00:00:00.000Z")
+        expiresAt: new Date("2027-06-01T00:00:00.000Z")
       };
     },
     async findUserById(userId) {
