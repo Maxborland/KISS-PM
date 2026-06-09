@@ -218,6 +218,8 @@ export const crmProjectSchemas = openApiSchemaFragment({
   },
   DealStage: {
     type: "object",
+    description:
+      "Legacy flat deal-stage dictionary entry retained for compatibility. Use CRM pipeline stages for current opportunity pipeline movement.",
     required: ["id", "tenantId", "name", "sortOrder", "status", "createdAt", "updatedAt"],
     properties: {
       id: stringIdSchema,
@@ -613,6 +615,8 @@ export const crmProjectSchemas = openApiSchemaFragment({
   },
   OpportunityStagePatchRequest: {
     type: "object",
+    description:
+      "Compatibility request for the legacy flat opportunity stage mutation. New clients should use OpportunityPipelineTransitionRequest.",
     required: ["stageId"],
     properties: { stageId: stringIdSchema },
     additionalProperties: false

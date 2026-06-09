@@ -22,9 +22,12 @@
 Экран списка/канбана сделок:
 
 1. `GET /api/workspace/opportunities`
-2. `GET /api/workspace/deal-stages`
-3. `GET /api/workspace/clients`
-4. `GET /api/workspace/project-types`
+2. `GET /api/workspace/crm/pipelines`
+3. `GET /api/workspace/crm/pipelines/:pipelineId/stages`
+4. `GET /api/workspace/clients`
+5. `GET /api/workspace/project-types`
+
+`GET /api/workspace/deal-stages` остается compatibility-справочником для старых клиентов. Для текущего движения opportunity по intake pipeline использовать CRM pipeline stages и `POST /api/workspace/opportunities/:opportunityId/pipeline-transition`.
 
 Карточка сделки:
 
