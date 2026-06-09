@@ -206,6 +206,43 @@ describe("audit learning inputs API", () => {
     ]);
   });
 
+  it("prioritizes newer equal-severity learning inputs before input kind", async () => {
+    const project = createProject("project-alpha");
+    const fixture = createAuditLearningFixture({
+      projects: [project],
+      tasksByProject: {
+        [project.id]: [
+          createTask("task-critical-overdue", project.id, {
+            priority: "critical",
+            plannedFinish: new Date("2026-06-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-06-08T09:00:00.000Z")
+          })
+        ]
+      },
+      auditEvents: [
+        createAuditEvent("audit-failed", {
+          sourceEntity: { type: "Project", id: project.id },
+          actionType: "management_action.failed",
+          executionResult: { status: "failed" },
+          createdAt: new Date("2026-06-08T08:00:00.000Z")
+        })
+      ]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/audit-learning-inputs?limit=2",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { items: AuditLearningInput[] };
+    expect(body.items.map((item) => item.id)).toEqual([
+      "operational-queue:task-overdue:project-alpha:task-critical-overdue",
+      "audit-attention:audit-failed"
+    ]);
+  });
+
   it("includes control signal outcomes as learning inputs", async () => {
     const project = createProject("project-alpha");
     const openSignal = createSignal("signal-open", project.id, {

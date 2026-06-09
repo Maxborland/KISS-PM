@@ -228,11 +228,11 @@ async function buildAuditLearningInputs(input: {
   }
 
   items.sort((a, b) => {
-    const kindRankDiff = kindRank(a.inputKind) - kindRank(b.inputKind);
-    if (kindRankDiff !== 0) return kindRankDiff;
     const sevRankDiff = computeSeverityRank(a.severity) - computeSeverityRank(b.severity);
     if (sevRankDiff !== 0) return sevRankDiff;
-    return b.occurredAt.localeCompare(a.occurredAt);
+    const occurredAtDiff = b.occurredAt.localeCompare(a.occurredAt);
+    if (occurredAtDiff !== 0) return occurredAtDiff;
+    return kindRank(a.inputKind) - kindRank(b.inputKind);
   });
 
   return items.slice(0, limit);
