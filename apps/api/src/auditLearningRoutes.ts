@@ -214,7 +214,7 @@ async function buildAuditLearningInputs(input: {
       projectId: signal.projectId ?? null,
       severity,
       status: signal.status,
-      occurredAt: signal.createdAt,
+      occurredAt: signal.updatedAt,
       deterministicReason,
       evidence: {
         controlSignalId: signal.id,

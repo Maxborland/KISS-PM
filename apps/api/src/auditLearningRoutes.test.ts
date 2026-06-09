@@ -251,7 +251,9 @@ describe("audit learning inputs API", () => {
     });
     const acceptedRiskSignal = createSignal("signal-accepted", project.id, {
       status: "accepted_risk",
-      severity: "critical"
+      severity: "critical",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      updatedAt: "2026-06-08T12:00:00.000Z"
     });
     const resolvedSignal = createSignal("signal-resolved", project.id, {
       status: "resolved",
@@ -281,6 +283,7 @@ describe("audit learning inputs API", () => {
     expect(acceptedRiskInput).toBeDefined();
     expect(acceptedRiskInput!.status).toBe("accepted_risk");
     expect(acceptedRiskInput!.severity).toBe("critical");
+    expect(acceptedRiskInput!.occurredAt).toBe("2026-06-08T12:00:00.000Z");
     expect(acceptedRiskInput!.deterministicReason).toBe("control_signal_accepted_risk");
     expect(acceptedRiskInput!.sourceWorkflow).toBe("control");
     expect(acceptedRiskInput!.eligibleRuleFamilies).toContain("planning_control");
