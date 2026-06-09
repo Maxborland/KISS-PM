@@ -38,6 +38,7 @@ const routeDocs: RouteDoc[] = [
   { method: "patch", path: "/api/workspace/access-roles/:roleId", tag: "Access control", summary: "Update workspace access role", requestSchema: "AccessProfileWriteRequest", successSchema: "AccessProfileResponse" },
   { method: "delete", path: "/api/workspace/access-roles/:roleId", tag: "Access control", summary: "Archive workspace access role", body: "none", successSchema: "OkResponse" },
   { method: "get", path: "/api/tenant/current/audit-events", tag: "Audit", summary: "List tenant audit events", successSchema: "AuditEventsResponse", queryParameters: [{ name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } }] },
+  { method: "get", path: "/api/tenant/current/audit-learning-inputs", tag: "Audit", summary: "List audit learning inputs", successSchema: "AuditLearningInputsResponse", queryParameters: [{ name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100, default: 100 } }] },
   { method: "get", path: "/api/workspace/users", tag: "Workspace users", summary: "List workspace users", successSchema: "WorkspaceUsersResponse" },
   { method: "post", path: "/api/workspace/users", tag: "Workspace users", summary: "Create workspace user", requestSchema: "WorkspaceUserCreateRequest", successSchema: "WorkspaceUserResponse", successStatus: 201 },
   { method: "patch", path: "/api/workspace/users/:userId", tag: "Workspace users", summary: "Update workspace user", requestSchema: "WorkspaceUserPatchRequest", successSchema: "WorkspaceUserResponse" },

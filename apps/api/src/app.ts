@@ -26,6 +26,7 @@ import { createInMemoryTenantDataSource } from "./inMemoryTenantDataSource";
 import { registerAccessRoleRoutes } from "./accessRoleRoutes";
 import { registerAttachmentRoutes } from "./attachmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
+import { registerAuditLearningRoutes } from "./auditLearningRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerBackgroundJobRoutes } from "./backgroundJobRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
@@ -250,6 +251,7 @@ export function createApp(options: CreateAppOptions = {}) {
   }
   registerAccessRoleRoutes(app, routeDeps);
   registerAuditRoutes(app, routeDeps);
+  registerAuditLearningRoutes(app, routeDeps);
   registerControlRoutes(app, routeDeps);
   registerControlSurfaceRoutes(app, routeDeps);
   registerCollaborationRoutes(app, routeDeps);
