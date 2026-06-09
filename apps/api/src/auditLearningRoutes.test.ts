@@ -556,6 +556,34 @@ describe("audit learning inputs API", () => {
     ]));
   });
 
+  it("uses overdue severity fallback for corrective action queue inputs without linked signals", async () => {
+    const project = createProject("project-alpha");
+    const action = createCorrectiveAction("action-overdue-no-signal", project.id, "signal-missing", {
+      status: "open",
+      dueDate: "2026-06-01"
+    });
+    const fixture = createAuditLearningFixture({
+      projects: [project],
+      correctiveActionsByProject: { [project.id]: [action] }
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/audit-learning-inputs?limit=10",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: AuditLearningInput[] };
+    expect(body.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        deterministicReason: "operational_queue_corrective_action_overdue",
+        sourceEntity: { type: "CorrectiveAction", id: action.id },
+        severity: "critical"
+      })
+    ]));
+  });
+
   it("limits results by the limit query parameter", async () => {
     const project = createProject("project-alpha");
     const auditEvents = Array.from({ length: 10 }, (_, i) =>
