@@ -378,7 +378,7 @@ function buildOperationalQueueLearningInputs(input: {
       sourceWorkflow: "control",
       sourceEntity: { type: "CorrectiveAction", id: action.id },
       projectId: action.projectId,
-      severity: signal?.severity === "critical" || overdue ? "critical" : "warning",
+      severity: signal?.severity ?? (overdue ? "critical" : "warning"),
       status: action.status,
       occurredAt: (projectById.get(action.projectId)?.activatedAt ?? projectById.get(action.projectId)?.createdAt ?? input.asOf).toISOString(),
       deterministicReason: overdue
