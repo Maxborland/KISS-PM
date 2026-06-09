@@ -60,6 +60,14 @@ export type UpdateParticipantStateCommand = {
   userId: string;
 };
 
+export type UpdateScreenShareStateCommand = {
+  label: string | null;
+  permissionResult: PolicyDecision;
+  source: "screen" | "window" | "browser_tab" | "unknown";
+  state: "started" | "stopped";
+  userId: string;
+};
+
 export type AttachRecordingCommand = {
   attachmentId: string;
   sessionId: string | null;
@@ -357,6 +365,92 @@ export function createCommunicationCallWorkspace(deps: CommunicationCallWorkspac
       });
       if (result instanceof CallWorkspaceError) return result.toResult();
       return { ok: true, ...result };
+    },
+
+    async updateScreenShareState(input: {
+      access: CommunicationCallAccess;
+      actor: TenantUser;
+      command: UpdateScreenShareStateCommand;
+      room: CallRoom;
+      session: CallSession;
+    }): Promise<WorkspaceResult<{ event: CallEvent }>> {
+      if (input.session.status !== "active") {
+        return { ok: false, status: 409, error: "call_session_not_active" };
+      }
+
+      if (
+        !deps.dataSource.withTransaction ||
+        !deps.dataSource.findActiveCallSessionForUpdate ||
+        !deps.dataSource.createCallEvent
+      ) {
+        return notConfigured();
+      }
+
+      if (input.command.userId !== input.actor.id) {
+        const participantExists = await tenantUserExists(
+          deps.dataSource,
+          input.actor.tenantId,
+          input.command.userId
+        );
+        if (!participantExists) return { ok: false, status: 404, error: "participant_user_not_found" };
+      }
+
+      const eventType: CallEventType =
+        input.command.state === "started" ? "screen_share_started" : "screen_share_stopped";
+      const payload = {
+        userId: input.command.userId,
+        state: input.command.state,
+        source: input.command.source,
+        ...(input.command.label ? { label: input.command.label } : {})
+      };
+
+      const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+        const activeSession = await requireMethod(transactionDataSource.findActiveCallSessionForUpdate).call(
+          transactionDataSource,
+          {
+            tenantId: input.actor.tenantId,
+            roomId: input.room.id,
+            sessionId: input.session.id
+          }
+        );
+        if (!activeSession) return new CallWorkspaceError(409, "call_session_not_active");
+
+        const event = await requireMethod(transactionDataSource.createCallEvent).call(transactionDataSource, {
+          id: `call-event-${randomUUID()}`,
+          tenantId: input.actor.tenantId,
+          roomId: input.room.id,
+          sessionId: activeSession.id,
+          actorUserId: input.actor.id,
+          eventType,
+          payload
+        });
+
+        await deps.appendManagementAuditEvent(
+          communicationAudit({
+            actionType: "communications.screen_share_state_updated",
+            actor: input.actor,
+            afterState: {
+              eventType,
+              roomId: input.room.id,
+              sessionId: activeSession.id,
+              ...payload
+            },
+            commandInput: {
+              roomId: input.room.id,
+              sessionId: activeSession.id,
+              ...payload
+            },
+            permissionResult: input.command.permissionResult,
+            sourceEntity: input.access.sourceEntity
+          }),
+          transactionDataSource
+        );
+
+        return event;
+      });
+
+      if (result instanceof CallWorkspaceError) return result.toResult();
+      return { ok: true, event: result };
     },
 
     async endSession(input: {
