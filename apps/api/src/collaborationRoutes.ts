@@ -159,6 +159,14 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!deps.dataSource.createDiscussionMessage || !deps.dataSource.replaceMessageMentions) {
       return context.json({ error: "collaboration_not_configured" }, 501);
     }
+    const metadata = parseMessageMetadata(record.metadata);
+    const attachments = await validateMessageAttachmentIds({
+      dataSource: deps.dataSource,
+      entity: conversation.value.access,
+      metadata,
+      tenantId: actor.tenantId
+    });
+    if (!attachments.ok) return context.json({ error: attachments.error }, attachments.status);
 
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       const message = await requireMethod(transactionDataSource.createDiscussionMessage).call(transactionDataSource, {
@@ -167,7 +175,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         conversationId: conversation.value.conversation.id,
         authorUserId: actor.id,
         body: parsedBody.value,
-        metadata: parseMessageMetadata(record.metadata)
+        metadata
       });
       const sticker = stickerAsset
         ? await requireMethod(transactionDataSource.createMessageSticker).call(transactionDataSource, {
@@ -327,12 +335,21 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!deps.dataSource.updateDiscussionMessage) {
       return context.json({ error: "collaboration_not_configured" }, 501);
     }
+    const metadata = parseMessageMetadata(readRecord(body.value).metadata);
+    const attachments = await validateMessageAttachmentIds({
+      dataSource: deps.dataSource,
+      entity: conversation.value.access,
+      metadata,
+      tenantId: actor.tenantId
+    });
+    if (!attachments.ok) return context.json({ error: attachments.error }, attachments.status);
+
     const updated = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       const updatedMessage = await requireMethod(transactionDataSource.updateDiscussionMessage).call(transactionDataSource, {
         tenantId: actor.tenantId,
         messageId: message.id,
         body: parsedBody.value,
-        metadata: parseMessageMetadata(readRecord(body.value).metadata)
+        metadata
       });
       if (!updatedMessage) return undefined;
       await deps.appendManagementAuditEvent(collaborationAudit({
@@ -1166,6 +1183,45 @@ function parseMessageMetadata(value: unknown): Record<string, unknown> {
     ...(links.length ? { links } : {}),
     ...(attachmentIds.length ? { attachmentIds } : {})
   };
+}
+
+async function validateMessageAttachmentIds(input: {
+  dataSource: ApiTenantDataSource;
+  entity: CollaborationEntityAccessContext;
+  metadata: Record<string, unknown>;
+  tenantId: string;
+}): Promise<
+  | { ok: true }
+  | { ok: false; status: 400 | 404 | 409 | 501; error: string }
+> {
+  const attachmentIds = Array.isArray(input.metadata.attachmentIds)
+    ? input.metadata.attachmentIds.filter((attachmentId): attachmentId is string => typeof attachmentId === "string")
+    : [];
+  if (attachmentIds.length === 0) return { ok: true };
+  if (!input.dataSource.findAttachmentById) {
+    return { ok: false, status: 501, error: "collaboration_not_configured" };
+  }
+
+  for (const attachmentId of new Set(attachmentIds)) {
+    const attachment = await input.dataSource.findAttachmentById(input.tenantId, attachmentId);
+    if (!attachment || attachment.archivedAt) {
+      return { ok: false, status: 404, error: "message_attachment_not_found" };
+    }
+    if (
+      attachment.entityType !== input.entity.entityType ||
+      attachment.entityId !== input.entity.entityId
+    ) {
+      return { ok: false, status: 400, error: "message_attachment_scope_invalid" };
+    }
+    if (
+      attachment.fileAsset &&
+      (attachment.fileAsset.status !== "ready" || attachment.fileAsset.archivedAt)
+    ) {
+      return { ok: false, status: 409, error: "message_attachment_not_ready" };
+    }
+  }
+
+  return { ok: true };
 }
 
 function parseMessageLinkEntityType(value: unknown) {

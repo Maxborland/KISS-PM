@@ -131,9 +131,17 @@ describe("collaboration and communications API", () => {
       conversations: Array<{ id: string; readState: { unreadCount: number } }>;
     };
     expect(conversationsPayload.conversations).toHaveLength(1);
-    expect(conversationsPayload.conversations[0]?.readState.unreadCount).toBe(0);
-    const conversationId = conversationsPayload.conversations[0]?.id;
-    expect(conversationId).toBeTruthy();
+  expect(conversationsPayload.conversations[0]?.readState.unreadCount).toBe(0);
+  const conversationId = conversationsPayload.conversations[0]?.id;
+  expect(conversationId).toBeTruthy();
+  const riskAttachment = await uploadFileAttachment(app, adminCookie, {
+    entityType: "project",
+    entityId: "project-alpha",
+    relationType: "discussion_document",
+    originalName: "risk-note.pdf",
+    mimeType: "application/pdf",
+    bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46])
+  });
 
     const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
       method: "POST",
@@ -145,7 +153,7 @@ describe("collaboration and communications API", () => {
             { entityType: "project", entityId: "project-alpha" },
             { entityType: "kpi_signal", entityId: "signal-schedule-risk" }
           ],
-          attachmentIds: ["attachment-risk-note"]
+          attachmentIds: [riskAttachment.id]
         }
       })
     });
@@ -158,7 +166,7 @@ describe("collaboration and communications API", () => {
             { entityType: "project", entityId: "project-alpha" },
             { entityType: "kpi_signal", entityId: "signal-schedule-risk" }
           ],
-          attachmentIds: ["attachment-risk-note"]
+          attachmentIds: [riskAttachment.id]
         }
       },
       mentions: [{ mentionedUserId: "user-alpha-executor" }]
@@ -186,10 +194,220 @@ describe("collaboration and communications API", () => {
     const executorPayload = await executorConversations.json() as {
       conversations: Array<{ readState: { unreadCount: number } }>;
     };
-    expect(executorPayload.conversations[0]?.readState.unreadCount).toBe(1);
+  expect(executorPayload.conversations[0]?.readState.unreadCount).toBe(1);
+});
+
+it("supports task conversations with document and voice attachments, mentions, read state and notification visibility", async () => {
+  const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+  const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+  const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
+  await createTask();
+
+  const conversations = await app.request(
+    "/api/workspace/conversations?entityType=task&entityId=task-alpha",
+    { headers: { cookie: adminCookie } }
+  );
+  expect(conversations.status).toBe(200);
+  const conversationsPayload = await conversations.json() as {
+    conversations: Array<{ id: string; readState: { unreadCount: number } }>;
+  };
+  const conversationId = conversationsPayload.conversations[0]?.id;
+  expect(conversationId).toBeTruthy();
+  expect(conversationsPayload.conversations[0]?.readState.unreadCount).toBe(0);
+
+  const executorBefore = await app.request(
+    "/api/workspace/conversations?entityType=task&entityId=task-alpha",
+    { headers: { cookie: executorCookie } }
+  );
+  expect(executorBefore.status).toBe(200);
+  const executorBeforePayload = await executorBefore.json() as {
+    conversations: Array<{ readState: { unreadCount: number } }>;
+  };
+  expect(executorBeforePayload.conversations[0]?.readState.unreadCount).toBe(0);
+
+  const documentAttachment = await uploadFileAttachment(app, adminCookie, {
+    entityType: "task",
+    entityId: "task-alpha",
+    relationType: "discussion_document",
+    originalName: "task-brief.pdf",
+    mimeType: "application/pdf",
+    bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46])
+  });
+  const voiceAttachment = await uploadFileAttachment(app, adminCookie, {
+    entityType: "task",
+    entityId: "task-alpha",
+    relationType: "discussion_voice",
+    originalName: "voice-note.webm",
+    mimeType: "audio/webm",
+    bytes: new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x01])
+  });
+  expect(voiceAttachment.fileAsset).toMatchObject({
+    originalName: "voice-note.webm",
+    mimeType: "audio/webm",
+    sizeBytes: 5
   });
 
-  it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {
+  const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+    method: "POST",
+    headers: jsonHeaders(adminCookie),
+    body: JSON.stringify({
+      body: "Егор, проверь вложения по задаче @user-alpha-executor @user-alpha-denied",
+      metadata: {
+        attachmentIds: [documentAttachment.id, voiceAttachment.id],
+        links: [{ entityType: "task", entityId: "task-alpha" }]
+      }
+    })
+  });
+  expect(message.status).toBe(201);
+  const messagePayload = await message.json() as {
+    message: {
+      metadata: {
+        attachmentIds?: string[];
+        links?: Array<{ entityType: string; entityId: string }>;
+      };
+    };
+    mentions: Array<{ mentionedUserId: string }>;
+  };
+  expect(messagePayload.message.metadata.attachmentIds).toEqual([
+    documentAttachment.id,
+    voiceAttachment.id
+  ]);
+  expect(messagePayload.message.metadata.links).toEqual([{ entityType: "task", entityId: "task-alpha" }]);
+  expect(messagePayload.mentions.map((mention) => mention.mentionedUserId)).toEqual([
+    "user-alpha-executor"
+  ]);
+
+  const executorAfter = await app.request(
+    "/api/workspace/conversations?entityType=task&entityId=task-alpha",
+    { headers: { cookie: executorCookie } }
+  );
+  expect(executorAfter.status).toBe(200);
+  const executorAfterPayload = await executorAfter.json() as {
+    conversations: Array<{ readState: { unreadCount: number } }>;
+  };
+  expect(executorAfterPayload.conversations[0]?.readState.unreadCount).toBe(1);
+
+  const readState = await app.request(`/api/workspace/conversations/${conversationId}/read-state`, {
+    method: "POST",
+    headers: jsonHeaders(executorCookie)
+  });
+  expect(readState.status).toBe(200);
+  await expect(readState.json()).resolves.toMatchObject({
+    readState: { conversationId, unreadCount: 0 }
+  });
+
+  const executorReload = await app.request(
+    "/api/workspace/conversations?entityType=task&entityId=task-alpha",
+    { headers: { cookie: executorCookie } }
+  );
+  const executorReloadPayload = await executorReload.json() as {
+    conversations: Array<{ readState: { unreadCount: number } }>;
+  };
+  expect(executorReloadPayload.conversations[0]?.readState.unreadCount).toBe(0);
+
+  const executorNotifications = await app.request("/api/workspace/notifications?status=unread", {
+    headers: { cookie: executorCookie }
+  });
+  expect(executorNotifications.status).toBe(200);
+  await expect(executorNotifications.json()).resolves.toMatchObject({
+    notifications: [
+      expect.objectContaining({
+        notificationType: "mention",
+        sourceEntityType: "task",
+        sourceEntityId: "task-alpha",
+        route: "/tasks/task-alpha"
+      })
+    ]
+  });
+
+  const dataSource = createPostgresTenantDataSource(createDatabase(client));
+  await dataSource.createUserNotification?.({
+    id: "notification-denied-task-mention",
+    tenantId: "tenant-alpha",
+    userId: "user-alpha-denied",
+    notificationType: "mention",
+    sourceEntityType: "task",
+    sourceEntityId: "task-alpha",
+    title: "Вас упомянули",
+    body: "Недоступная задача",
+    route: "/tasks/task-alpha"
+  });
+
+  const deniedConversations = await app.request(
+    "/api/workspace/conversations?entityType=task&entityId=task-alpha",
+    { headers: { cookie: deniedCookie } }
+  );
+  expect(deniedConversations.status).toBe(403);
+  const deniedMessages = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+    headers: { cookie: deniedCookie }
+  });
+  expect(deniedMessages.status).toBe(403);
+  const deniedCreate = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+    method: "POST",
+    headers: jsonHeaders(deniedCookie),
+    body: JSON.stringify({ body: "Нет доступа" })
+  });
+  expect(deniedCreate.status).toBe(403);
+  const deniedReadState = await app.request(`/api/workspace/conversations/${conversationId}/read-state`, {
+    method: "POST",
+    headers: jsonHeaders(deniedCookie)
+  });
+  expect(deniedReadState.status).toBe(403);
+
+  const deniedNotifications = await app.request("/api/workspace/notifications?status=unread", {
+    headers: { cookie: deniedCookie }
+  });
+  expect(deniedNotifications.status).toBe(200);
+  await expect(deniedNotifications.json()).resolves.toEqual({ notifications: [] });
+
+  const deniedAttachmentList = await app.request(
+    "/api/workspace/attachments?entityType=task&entityId=task-alpha",
+    { headers: { cookie: deniedCookie } }
+  );
+  expect(deniedAttachmentList.status).toBe(403);
+  const deniedDownload = await app.request(
+    `/api/workspace/attachments/${documentAttachment.id}/download`,
+    { headers: { cookie: deniedCookie } }
+  );
+  expect(deniedDownload.status).toBe(403);
+});
+
+it("rejects task messages with attachment IDs outside the conversation entity", async () => {
+  const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+  await createTask();
+  const projectAttachment = await uploadFileAttachment(app, adminCookie, {
+    entityType: "project",
+    entityId: "project-alpha",
+    relationType: "discussion_document",
+    originalName: "project-only.pdf",
+    mimeType: "application/pdf",
+    bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46])
+  });
+  const conversations = await app.request(
+    "/api/workspace/conversations?entityType=task&entityId=task-alpha",
+    { headers: { cookie: adminCookie } }
+  );
+  expect(conversations.status).toBe(200);
+  const conversationsPayload = await conversations.json() as {
+    conversations: Array<{ id: string }>;
+  };
+  const conversationId = conversationsPayload.conversations[0]?.id;
+  expect(conversationId).toBeTruthy();
+
+  const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+    method: "POST",
+    headers: jsonHeaders(adminCookie),
+    body: JSON.stringify({
+      body: "Нельзя прикрепить файл из другого контекста",
+      metadata: { attachmentIds: [projectAttachment.id] }
+    })
+  });
+
+  expect(message.status).toBe(400);
+  await expect(message.json()).resolves.toEqual({ error: "message_attachment_scope_invalid" });
+});
+
+it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
 
@@ -1003,6 +1221,52 @@ function jsonHeaders(cookie: string) {
     "x-kiss-pm-action": "same-origin",
     cookie
   };
+}
+
+function actionHeaders(cookie: string) {
+  return {
+    "x-kiss-pm-action": "same-origin",
+    cookie
+  };
+}
+
+async function uploadFileAttachment(
+  app: ReturnType<typeof createApp>,
+  cookie: string,
+  input: {
+    entityType: "project" | "task";
+    entityId: string;
+    relationType: string;
+    originalName: string;
+    mimeType: string;
+    bytes: Uint8Array;
+  }
+) {
+  const form = new FormData();
+  form.set("entityType", input.entityType);
+  form.set("entityId", input.entityId);
+  form.set("relationType", input.relationType);
+  const bytes = new ArrayBuffer(input.bytes.byteLength);
+  new Uint8Array(bytes).set(input.bytes);
+  form.set("file", new Blob([bytes], { type: input.mimeType }), input.originalName);
+
+  const response = await app.request("/api/workspace/attachments/files", {
+    method: "POST",
+    headers: actionHeaders(cookie),
+    body: form
+  });
+  expect(response.status).toBe(201);
+  const payload = await response.json() as {
+    attachment: {
+      id: string;
+      fileAsset: {
+        originalName: string;
+        mimeType: string;
+        sizeBytes: number;
+      } | null;
+    };
+  };
+  return payload.attachment;
 }
 
 function createWebpStickerBytes(width: number, height: number) {
