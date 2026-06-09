@@ -161,7 +161,7 @@ export type ProjectIntakeRepository = {
     tenantId: TenantId,
     options: {
       statuses: Array<"active" | "paused">;
-      limit: number;
+      limit?: number;
     }
   ): Promise<ProjectRecord[]>;
   ensureWorkspaceInboxProject(input: WorkspaceInboxProjectInput): Promise<ProjectRecord | undefined>;
@@ -502,8 +502,8 @@ export function createProjectIntakeRepository(
       );
     },
     async listOperationalQueueProjects(tenantId, options) {
-      if (options.statuses.length === 0 || options.limit < 1) return [];
-      const rows = await db
+      if (options.statuses.length === 0 || (options.limit !== undefined && options.limit < 1)) return [];
+      let query = db
         .select()
         .from(projects)
         .where(
@@ -513,7 +513,9 @@ export function createProjectIntakeRepository(
           )
         )
         .orderBy(desc(projects.activatedAt), desc(projects.createdAt), desc(projects.id))
-        .limit(options.limit);
+        .$dynamic();
+      if (options.limit !== undefined) query = query.limit(options.limit);
+      const rows = await query;
       const demandByProject = await listProjectDemand(tenantId, rows.map((row) => row.id));
 
       return rows.map((row) => mapProjectRecord(row, demandByProject.get(row.id) ?? []));

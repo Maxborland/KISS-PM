@@ -1129,14 +1129,12 @@ async function buildOperationalControlQueue(input: {
   const candidateStatuses: Array<"active" | "paused"> = ["active", "paused"];
   const rawProjects = input.dataSource.listOperationalQueueProjects
     ? await input.dataSource.listOperationalQueueProjects(input.tenantId, {
-      statuses: candidateStatuses,
-      limit: maxOperationalControlQueueLimit
-    })
+        statuses: candidateStatuses
+      })
     : await input.dataSource.listProjects?.(input.tenantId) ?? [];
   const projects = rawProjects
     .filter((project) => project.tenantId === input.tenantId)
-    .filter((project) => candidateStatuses.includes(project.status as "active" | "paused"))
-    .slice(0, maxOperationalControlQueueLimit);
+    .filter((project) => candidateStatuses.includes(project.status as "active" | "paused"));
   const projectById = new Map(projects.map((project) => [project.id, project]));
   const allTasks: TaskRecord[] = [];
   const items: OperationalControlQueueSortItem[] = [];

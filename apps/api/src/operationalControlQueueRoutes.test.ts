@@ -464,13 +464,46 @@ describe("operational control queue API", () => {
       expect.objectContaining({ id: "control-signal:project-active:signal-active" })
     ]);
     expect(fixture.projectCandidateReads).toEqual([
-      { tenantId: "tenant-control", limit: 100, statuses: ["active", "paused"] }
+      { tenantId: "tenant-control", limit: undefined, statuses: ["active", "paused"] }
     ]);
     expect(fixture.dataReadCalls).toMatchObject({
       projectTaskBatches: 1,
       controlSignalBatches: 1,
       correctiveActionBatches: 1
     });
+  });
+
+  it("ranks overdue project severity before capping project candidates", async () => {
+    const newerHealthyProjects = Array.from({ length: 100 }, (_, index) =>
+      createProject(`project-newer-${index}`, {
+        plannedFinish: new Date("2026-06-30T00:00:00.000Z"),
+        createdAt: new Date("2026-06-02T00:00:00.000Z"),
+        activatedAt: new Date("2026-06-02T00:00:00.000Z")
+      })
+    );
+    const oldestCriticalProject = createProject("project-oldest-critical", {
+      plannedFinish: new Date("2026-05-01T00:00:00.000Z"),
+      createdAt: new Date("2026-05-01T00:00:00.000Z"),
+      activatedAt: new Date("2026-05-01T00:00:00.000Z")
+    });
+    const projects = [...newerHealthyProjects, oldestCriticalProject];
+    const fixture = createOperationalQueueFixture({
+      failFullProjectList: true,
+      operationalQueueProjects: projects,
+      projects
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/operational-control-queue?asOf=2026-06-10T00:00:00.000Z&limit=1",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: Array<{ id: string }> };
+    expect(body.items).toEqual([
+      expect.objectContaining({ id: "project-overdue:project-oldest-critical" })
+    ]);
   });
 
   it("documents the operational control queue route in OpenAPI", async () => {
@@ -518,7 +551,7 @@ type OperationalQueueDataReadCalls = {
 type OperationalQueueBatchDataSource = Partial<ApiTenantDataSource> & {
   listOperationalQueueProjects(
     tenantId: string,
-    options: { statuses: Array<"active" | "paused">; limit: number }
+    options: { statuses: Array<"active" | "paused">; limit?: number }
   ): Promise<ProjectRecord[]>;
   listProjectTasksForProjects(tenantId: string, projectIds: string[]): Promise<TaskRecord[]>;
   listControlSignalsForProjects(tenantId: string, projectIds: string[]): Promise<ControlSignal[]>;
@@ -529,7 +562,7 @@ function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
   let loadedQueueData = false;
   const projectCandidateReads: Array<{
     tenantId: string;
-    limit: number;
+    limit: number | undefined;
     statuses: Array<"active" | "paused">;
   }> = [];
   const dataReadCalls: OperationalQueueDataReadCalls = {
@@ -572,10 +605,10 @@ function createOperationalQueueFixture(input: OperationalQueueFixtureInput) {
     async listOperationalQueueProjects(tenantId, options) {
       loadedQueueData = true;
       projectCandidateReads.push({ tenantId, limit: options.limit, statuses: [...options.statuses] });
-      return (input.operationalQueueProjects ?? input.projects ?? [])
+      const candidates = (input.operationalQueueProjects ?? input.projects ?? [])
         .filter((project) => project.tenantId === tenantId)
-        .filter((project) => options.statuses.includes(project.status as "active" | "paused"))
-        .slice(0, options.limit);
+        .filter((project) => options.statuses.includes(project.status as "active" | "paused"));
+      return options.limit === undefined ? candidates : candidates.slice(0, options.limit);
     },
     async listProjects() {
       if (input.failFullProjectList) {

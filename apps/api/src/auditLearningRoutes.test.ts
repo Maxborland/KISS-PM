@@ -547,6 +547,39 @@ describe("audit learning inputs API", () => {
     ]));
   });
 
+  it("ranks overdue project learning inputs before capping operational project candidates", async () => {
+    const newerHealthyProjects = Array.from({ length: 100 }, (_, index) =>
+      createProject(`project-newer-${index}`, {
+        plannedFinish: new Date("2026-06-30T00:00:00.000Z"),
+        createdAt: new Date("2026-06-02T00:00:00.000Z"),
+        activatedAt: new Date("2026-06-02T00:00:00.000Z")
+      })
+    );
+    const oldestCriticalProject = createProject("project-oldest-critical", {
+      plannedFinish: new Date("2026-05-01T00:00:00.000Z"),
+      createdAt: new Date("2026-05-01T00:00:00.000Z"),
+      activatedAt: new Date("2026-05-01T00:00:00.000Z")
+    });
+    const fixture = createAuditLearningFixture({
+      projects: [...newerHealthyProjects, oldestCriticalProject]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/audit-learning-inputs?limit=1",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: AuditLearningInput[] };
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        id: "operational-queue:project-overdue:project-oldest-critical",
+        severity: "critical"
+      })
+    ]);
+  });
+
   it("preserves linked control signal severity for overdue corrective action queue inputs", async () => {
     const project = createProject("project-alpha");
     const signal = createSignal("signal-warning", project.id, {
@@ -847,11 +880,11 @@ function createAuditLearningFixture(input: AuditLearningFixtureInput) {
         expiresAt: new Date("2026-07-01T00:00:00.000Z")
       };
     },
-    async listOperationalQueueProjects(tenantId: string, options: { statuses: Array<"active" | "paused">; limit: number }) {
-      return (input.projects ?? [])
+    async listOperationalQueueProjects(tenantId: string, options: { statuses: Array<"active" | "paused">; limit?: number }) {
+      const candidates = (input.projects ?? [])
         .filter((project) => project.tenantId === tenantId)
-        .filter((project) => options.statuses.includes(project.status as "active" | "paused"))
-        .slice(0, options.limit);
+        .filter((project) => options.statuses.includes(project.status as "active" | "paused"));
+      return options.limit === undefined ? candidates : candidates.slice(0, options.limit);
     },
     async listProjectTasksForProjects(_tenantId: string, projectIds: string[]) {
       return projectIds.flatMap((projectId) => input.tasksByProject?.[projectId] ?? []);

@@ -129,8 +129,7 @@ async function buildAuditLearningInputs(input: {
   const projectMap = new Map(projects.map((project) => [project.id, project]));
   const operationalProjects = projects
     .filter((project) => project.tenantId === tenantId)
-    .filter((project) => project.status === "active" || project.status === "paused")
-    .slice(0, maxLearningInputsLimit);
+    .filter((project) => project.status === "active" || project.status === "paused");
   const learningProjectIds = projects.map((project) => project.id);
   const operationalProjectIds = operationalProjects.map((project) => project.id);
   const [tasks, signals, correctiveActions] = await Promise.all([
