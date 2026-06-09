@@ -13,6 +13,7 @@ import {
   requireReadablePlanningProject,
   type PlanningRouteDeps
 } from "./planningRouteHelpers";
+import { parsePlanningSavedViewPayload } from "./planningSavedViewPayload";
 
 export function registerPlanningSavedViewRoutes(
   app: Hono,
@@ -75,10 +76,11 @@ export function registerPlanningSavedViewRoutes(
     const record = body.value as Record<string, unknown>;
     const name = typeof record.name === "string" ? record.name.trim() : "";
     const scope = record.scope === "project" ? "project" : "user";
-    const payload =
+    const rawPayload =
       record.payload && typeof record.payload === "object" && !Array.isArray(record.payload)
         ? (record.payload as Record<string, unknown>)
         : null;
+    const payload = parsePlanningSavedViewPayload(rawPayload);
     if (!name || !payload) return context.json({ error: "saved_view_invalid" }, 400);
 
     const view = await deps.dataSource.createSavedView({

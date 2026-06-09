@@ -197,6 +197,33 @@ describe("OpenAPI route inventory", () => {
     expect(replaceSchema.properties.members.items).toEqual({ $ref: "#/components/schemas/ProjectResourcePoolMemberWrite" });
   });
 
+
+
+  it("documents typed Gantt planning saved view payloads", () => {
+    const document = createTestDocument();
+
+    expect(document.components.schemas.PlanningSavedView.properties.payload).toEqual({
+      $ref: "#/components/schemas/PlanningSavedViewPayload"
+    });
+    expect(document.components.schemas.PlanningSavedViewCreateRequest.properties.payload).toEqual({
+      $ref: "#/components/schemas/PlanningSavedViewPayload"
+    });
+    expect(document.components.schemas.PlanningSavedViewPayload.oneOf).toEqual([
+      { $ref: "#/components/schemas/GanttSavedViewPayload" }
+    ]);
+    expect(document.components.schemas.GanttSavedViewPayload.required).toEqual([
+      "viewKind",
+      "zoom",
+      "visibleColumns",
+      "columnWidths",
+      "collapsedTaskIds",
+      "selectedTaskIds",
+      "scrollPosition",
+      "filters",
+      "baselineOverlayEnabled"
+    ]);
+  });
+
   it("documents explicit planning baseline comparison schemas", () => {
     const document = createTestDocument();
     const comparisonSchema = document.components.schemas.PlanningBaselineComparison;
