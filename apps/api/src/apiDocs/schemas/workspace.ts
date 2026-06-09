@@ -32,6 +32,34 @@ export const workspaceSchemas = openApiSchemaFragment({
     properties: { events: { type: "array", items: schemaRef("AuditEvent") } },
     additionalProperties: false
   },
+  AuditLearningInput: {
+    type: "object",
+    required: ["id", "tenantId", "inputKind", "sourceWorkflow", "sourceEntity", "projectId", "severity", "status", "occurredAt", "deterministicReason", "evidence", "eligibleRuleFamilies"],
+    properties: {
+      id: stringIdSchema,
+      tenantId: stringIdSchema,
+      inputKind: { type: "string", enum: ["audit_attention", "operational_queue_item", "control_signal_outcome"] },
+      sourceWorkflow: { type: "string", minLength: 1 },
+      sourceEntity: schemaRef("AnyJsonObject"),
+      projectId: { oneOf: [stringIdSchema, { type: "null" }] },
+      severity: { type: "string", enum: ["critical", "warning", "info"] },
+      status: { type: "string", minLength: 1 },
+      occurredAt: dateTimeSchema,
+      deterministicReason: { type: "string", minLength: 1 },
+      evidence: schemaRef("AnyJsonObject"),
+      eligibleRuleFamilies: {
+        type: "array",
+        items: { type: "string", enum: ["permission_policy", "planning_control", "resource_planning", "template_improvement", "project_lifecycle"] }
+      }
+    },
+    additionalProperties: false
+  },
+  AuditLearningInputsResponse: {
+    type: "object",
+    required: ["items"],
+    properties: { items: { type: "array", items: schemaRef("AuditLearningInput") } },
+    additionalProperties: false
+  },
   TenantOrgNode: {
     type: "object",
     required: ["id", "parentId", "track", "kind", "name", "order"],
