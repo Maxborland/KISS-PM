@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 
 import type { TenantId } from "@kiss-pm/domain";
 
@@ -161,6 +161,7 @@ export type ProjectIntakeRepository = {
     tenantId: TenantId,
     options: {
       statuses: Array<"active" | "paused">;
+      asOf?: Date;
       limit?: number;
     }
   ): Promise<ProjectRecord[]>;
@@ -503,6 +504,9 @@ export function createProjectIntakeRepository(
     },
     async listOperationalQueueProjects(tenantId, options) {
       if (options.statuses.length === 0 || (options.limit !== undefined && options.limit < 1)) return [];
+      const overdueRank = options.asOf
+        ? sql<number>`case when ${projects.plannedFinish} < ${options.asOf} then 1 else 0 end`
+        : sql<number>`0`;
       let query = db
         .select()
         .from(projects)
@@ -512,7 +516,13 @@ export function createProjectIntakeRepository(
             inArray(projects.status, options.statuses)
           )
         )
-        .orderBy(desc(projects.activatedAt), desc(projects.createdAt), desc(projects.id))
+        .orderBy(
+          desc(overdueRank),
+          asc(projects.plannedFinish),
+          desc(projects.activatedAt),
+          desc(projects.createdAt),
+          desc(projects.id)
+        )
         .$dynamic();
       if (options.limit !== undefined) query = query.limit(options.limit);
       const rows = await query;
