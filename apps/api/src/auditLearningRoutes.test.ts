@@ -547,6 +547,67 @@ describe("audit learning inputs API", () => {
     ]));
   });
 
+  it("ranks overdue project learning inputs before capping operational project candidates", async () => {
+    const newerHealthyProjects = Array.from({ length: 100 }, (_, index) =>
+      createProject(`project-newer-${index}`, {
+        plannedFinish: new Date("2026-06-30T00:00:00.000Z"),
+        createdAt: new Date("2026-06-02T00:00:00.000Z"),
+        activatedAt: new Date("2026-06-02T00:00:00.000Z")
+      })
+    );
+    const oldestCriticalProject = createProject("project-oldest-critical", {
+      plannedFinish: new Date("2026-05-01T00:00:00.000Z"),
+      createdAt: new Date("2026-05-01T00:00:00.000Z"),
+      activatedAt: new Date("2026-05-01T00:00:00.000Z")
+    });
+    const fixture = createAuditLearningFixture({
+      projects: [...newerHealthyProjects, oldestCriticalProject]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/audit-learning-inputs?limit=1",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: AuditLearningInput[] };
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        id: "operational-queue:project-overdue:project-oldest-critical",
+        severity: "critical"
+      })
+    ]);
+    expect(fixture.projectCandidateReads).toEqual([
+      { tenantId: "tenant-control", limit: 500, statuses: ["active", "paused"] }
+    ]);
+    expect(fixture.batchedProjectIds.tasks[0]).toHaveLength(101);
+  });
+
+  it("bounds audit learning operational candidate hydration", async () => {
+    const projects = Array.from({ length: 501 }, (_value, index) =>
+      createProject(`project-${index}`, {
+        plannedFinish: new Date("2026-06-30T00:00:00.000Z"),
+        createdAt: new Date(`2026-06-${String((index % 20) + 1).padStart(2, "0")}T00:00:00.000Z`),
+        activatedAt: new Date(`2026-06-${String((index % 20) + 1).padStart(2, "0")}T00:00:00.000Z`)
+      })
+    );
+    const fixture = createAuditLearningFixture({ projects });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/audit-learning-inputs?limit=1",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    expect(fixture.projectCandidateReads).toEqual([
+      { tenantId: "tenant-control", limit: 500, statuses: ["active", "paused"] }
+    ]);
+    expect(fixture.batchedProjectIds.tasks[0]).toHaveLength(500);
+    expect(fixture.batchedProjectIds.tasks[0]).not.toContain("project-500");
+  });
+
   it("preserves linked control signal severity for overdue corrective action queue inputs", async () => {
     const project = createProject("project-alpha");
     const signal = createSignal("signal-warning", project.id, {
@@ -818,6 +879,16 @@ function authHeaders() {
 }
 
 function createAuditLearningFixture(input: AuditLearningFixtureInput) {
+  const projectCandidateReads: Array<{
+    tenantId: string;
+    limit: number | undefined;
+    statuses: Array<"active" | "paused">;
+  }> = [];
+  const batchedProjectIds = {
+    tasks: [] as string[][],
+    signals: [] as string[][],
+    correctiveActions: [] as string[][]
+  };
   const dataSource: Partial<ApiTenantDataSource> = {
     async listDevUsers() {
       return [];
@@ -847,19 +918,26 @@ function createAuditLearningFixture(input: AuditLearningFixtureInput) {
         expiresAt: new Date("2026-07-01T00:00:00.000Z")
       };
     },
-    async listOperationalQueueProjects(tenantId: string, options: { statuses: Array<"active" | "paused">; limit: number }) {
-      return (input.projects ?? [])
+    async listOperationalQueueProjects(
+      tenantId: string,
+      options: { statuses: Array<"active" | "paused">; asOf?: Date; limit?: number }
+    ) {
+      projectCandidateReads.push({ tenantId, limit: options.limit, statuses: [...options.statuses] });
+      const candidates = (input.projects ?? [])
         .filter((project) => project.tenantId === tenantId)
-        .filter((project) => options.statuses.includes(project.status as "active" | "paused"))
-        .slice(0, options.limit);
+        .filter((project) => options.statuses.includes(project.status as "active" | "paused"));
+      return options.limit === undefined ? candidates : candidates.slice(0, options.limit);
     },
     async listProjectTasksForProjects(_tenantId: string, projectIds: string[]) {
+      batchedProjectIds.tasks.push([...projectIds]);
       return projectIds.flatMap((projectId) => input.tasksByProject?.[projectId] ?? []);
     },
     async listControlSignalsForProjects(_tenantId: string, projectIds: string[]) {
+      batchedProjectIds.signals.push([...projectIds]);
       return projectIds.flatMap((projectId) => input.signalsByProject?.[projectId] ?? []);
     },
     async listCorrectiveActionsForProjects(_tenantId: string, projectIds: string[]) {
+      batchedProjectIds.correctiveActions.push([...projectIds]);
       return projectIds.flatMap((projectId) => input.correctiveActionsByProject?.[projectId] ?? []);
     },
     async listAuditEventsByTenantId(tenantId: string, options?: { limit?: number; requiresAttention?: boolean; sourceEntities?: Array<{ type: string; ids: string[] }> }) {
@@ -886,7 +964,19 @@ function createAuditLearningFixture(input: AuditLearningFixtureInput) {
     delete dataSource.listProjects;
   }
 
-  return { dataSource: dataSource as ApiTenantDataSource };
+  return {
+    dataSource: dataSource as ApiTenantDataSource,
+    get projectCandidateReads() {
+      return [...projectCandidateReads];
+    },
+    get batchedProjectIds() {
+      return {
+        tasks: batchedProjectIds.tasks.map((projectIds) => [...projectIds]),
+        signals: batchedProjectIds.signals.map((projectIds) => [...projectIds]),
+        correctiveActions: batchedProjectIds.correctiveActions.map((projectIds) => [...projectIds])
+      };
+    }
+  };
 }
 
 function createProject(id: string, overrides: Partial<ProjectRecord> = {}): ProjectRecord {

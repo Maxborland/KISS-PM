@@ -581,7 +581,8 @@ export type ApiTenantDataSource = {
     tenantId: TenantId,
     options: {
       statuses: Array<"active" | "paused">;
-      limit: number;
+      asOf?: Date;
+      limit?: number;
     }
   ): Promise<ProjectRecord[]>;
   ensureWorkspaceInboxProject?(
