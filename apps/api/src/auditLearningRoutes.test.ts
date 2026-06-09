@@ -403,6 +403,55 @@ describe("audit learning inputs API", () => {
     ]));
   });
 
+  it("resolves tenant-wide audit attention projectId from related entities outside operational projects", async () => {
+    const closedProject = createProject("project-closed", { status: "closed" });
+    const task = createTask("task-closed", closedProject.id);
+    const signal = createSignal("signal-closed", closedProject.id);
+    const action = createCorrectiveAction("action-closed", closedProject.id, signal.id);
+    const fixture = createAuditLearningFixture({
+      projects: [closedProject],
+      tasksByProject: { [closedProject.id]: [task] },
+      signalsByProject: { [closedProject.id]: [signal] },
+      correctiveActionsByProject: { [closedProject.id]: [action] },
+      auditEvents: [
+        createAuditEvent("audit-closed-task-denied", {
+          sourceEntity: { type: "Task", id: task.id },
+          actionType: "project_work.update_denied",
+          executionResult: { status: "denied" }
+        }),
+        createAuditEvent("audit-closed-signal-denied", {
+          sourceEntity: { type: "ControlSignal", id: signal.id },
+          actionType: "control.signal_denied",
+          executionResult: { status: "denied" }
+        }),
+        createAuditEvent("audit-closed-action-denied", {
+          sourceEntity: { type: "CorrectiveAction", id: action.id },
+          actionType: "corrective_action.update_denied",
+          executionResult: { status: "denied" }
+        })
+      ]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/audit-learning-inputs?limit=10",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: AuditLearningInput[] };
+    const projectIdByInputId = new Map(
+      body.items
+        .filter((item) => item.inputKind === "audit_attention")
+        .map((item) => [item.id, item.projectId])
+    );
+    expect(projectIdByInputId).toEqual(new Map([
+      ["audit-attention:audit-closed-task-denied", closedProject.id],
+      ["audit-attention:audit-closed-signal-denied", closedProject.id],
+      ["audit-attention:audit-closed-action-denied", closedProject.id]
+    ]));
+  });
+
   it("includes operational queue items from overdue projects, waiting tasks, open signals, and corrective actions", async () => {
     const project = createProject("project-alpha", {
       plannedFinish: new Date("2026-06-01T00:00:00.000Z")
