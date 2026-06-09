@@ -79,6 +79,30 @@ describe("audit learning inputs API", () => {
     expect(body.error).toBe("permission_missing");
   });
 
+  it("returns 501 when full project scope is not configured", async () => {
+    const fixture = createAuditLearningFixture({
+      omitListProjects: true,
+      projects: [createProject("project-closed", { status: "closed" })],
+      auditEvents: [
+        createAuditEvent("audit-closed-denied", {
+          sourceEntity: { type: "Project", id: "project-closed" },
+          actionType: "management_action.denied",
+          executionResult: { status: "denied" }
+        })
+      ]
+    });
+    const app = createApp({ dataSource: fixture.dataSource });
+
+    const response = await app.request(
+      "/api/tenant/current/audit-learning-inputs",
+      { headers: authHeaders() }
+    );
+
+    expect(response.status).toBe(501);
+    const body = await response.json() as { error: string };
+    expect(body.error).toBe("persistence_not_configured");
+  });
+
   it("includes audit attention inputs for failed and denied events", async () => {
     const project = createProject("project-alpha");
     const fixture = createAuditLearningFixture({
@@ -786,6 +810,7 @@ type AuditLearningFixtureInput = {
   signalsByProject?: Record<string, ControlSignal[]>;
   correctiveActionsByProject?: Record<string, CorrectiveAction[]>;
   auditEvents?: AuditEventListItem[];
+  omitListProjects?: boolean;
 };
 
 function authHeaders() {
@@ -856,6 +881,10 @@ function createAuditLearningFixture(input: AuditLearningFixtureInput) {
       return (input.projects ?? []).filter((project) => project.tenantId === tenantId);
     }
   };
+
+  if (input.omitListProjects) {
+    delete dataSource.listProjects;
+  }
 
   return { dataSource: dataSource as ApiTenantDataSource };
 }

@@ -87,7 +87,8 @@ export function registerAuditLearningRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     if (
       !deps.dataSource.listAuditEventsByTenantId ||
-      !deps.dataSource.listControlSignalsForProjects
+      !deps.dataSource.listControlSignalsForProjects ||
+      !deps.dataSource.listProjects
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
@@ -242,20 +243,11 @@ async function buildAuditLearningInputs(input: {
 async function listLearningInputProjects(
   dataSource: Pick<
     import("./apiTypes").ApiTenantDataSource,
-    "listProjects" | "listOperationalQueueProjects"
+    "listProjects"
   >,
   tenantId: string
 ): Promise<ProjectRecord[]> {
-  if (dataSource.listProjects) {
-    return dataSource.listProjects(tenantId);
-  }
-  if (dataSource.listOperationalQueueProjects) {
-    return dataSource.listOperationalQueueProjects(tenantId, {
-      statuses: ["active", "paused"],
-      limit: maxLearningInputsLimit
-    });
-  }
-  return [];
+  return dataSource.listProjects?.(tenantId) ?? [];
 }
 
 function buildOperationalQueueLearningInputs(input: {
