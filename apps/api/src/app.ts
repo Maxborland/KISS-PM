@@ -28,6 +28,7 @@ import { registerAttachmentRoutes } from "./attachmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuditLearningRoutes } from "./auditLearningRoutes";
 import { registerAuthRoutes } from "./authRoutes";
+import { registerAgentContextRoutes } from "./agentContextRoutes";
 import { registerBackgroundJobRoutes } from "./backgroundJobRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
 import { registerCrmPipelineRoutes } from "./crmPipelineRoutes";
@@ -245,6 +246,7 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   registerAuthRoutes(app, routeDeps);
+  registerAgentContextRoutes(app, routeDeps);
   registerBackgroundJobRoutes(app, routeDeps);
   if (enableDevTenantRoutes) {
     registerDevTenantRoutes(app, routeDeps);
