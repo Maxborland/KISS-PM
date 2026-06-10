@@ -434,6 +434,72 @@ it("rejects task messages with malformed attachment IDs", async () => {
   await expect(message.json()).resolves.toEqual({ error: "attachment_id_invalid" });
 });
 
+it("rejects task message attachment IDs malformed after the persistence limit", async () => {
+  const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+  await createTask();
+  const conversations = await app.request(
+    "/api/workspace/conversations?entityType=task&entityId=task-alpha",
+    { headers: { cookie: adminCookie } }
+  );
+  expect(conversations.status).toBe(200);
+  const conversationsPayload = await conversations.json() as {
+    conversations: Array<{ id: string }>;
+  };
+  const conversationId = conversationsPayload.conversations[0]?.id;
+  expect(conversationId).toBeTruthy();
+
+  const scopedAttachmentIds: string[] = [];
+  for (let index = 0; index < 20; index += 1) {
+    const attachment = await uploadFileAttachment(app, adminCookie, {
+      entityType: "task",
+      entityId: "task-alpha",
+      relationType: "discussion_document",
+      originalName: `limit-${index}.txt`,
+      mimeType: "text/plain",
+      bytes: new Uint8Array([index])
+    });
+    scopedAttachmentIds.push(attachment.id);
+  }
+  const attachmentIds = [...scopedAttachmentIds, "../project-alpha"];
+
+  const createMessage = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+    method: "POST",
+    headers: jsonHeaders(adminCookie),
+    body: JSON.stringify({
+      body: "Нельзя скрывать некорректное вложение лимитом",
+      metadata: { attachmentIds }
+    })
+  });
+
+  expect(createMessage.status).toBe(400);
+  await expect(createMessage.json()).resolves.toEqual({ error: "attachment_id_invalid" });
+
+  const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+    method: "POST",
+    headers: jsonHeaders(adminCookie),
+    body: JSON.stringify({ body: "Черновик для проверки редактирования" })
+  });
+  expect(message.status).toBe(201);
+  const messagePayload = await message.json() as {
+    message: { id: string };
+  };
+
+  const updateMessage = await app.request(
+    `/api/workspace/conversations/${conversationId}/messages/${messagePayload.message.id}`,
+    {
+      method: "PATCH",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        body: "Нельзя скрывать некорректное вложение лимитом",
+        metadata: { attachmentIds }
+      })
+    }
+  );
+
+  expect(updateMessage.status).toBe(400);
+  await expect(updateMessage.json()).resolves.toEqual({ error: "attachment_id_invalid" });
+});
+
 it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");

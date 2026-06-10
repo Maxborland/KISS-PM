@@ -1179,10 +1179,10 @@ function parseMessageMetadata(value: unknown):
     : [];
   const attachmentIds: string[] = [];
   if (Array.isArray(record.attachmentIds)) {
-    for (const attachmentId of record.attachmentIds.slice(0, 20)) {
+    for (const attachmentId of record.attachmentIds) {
       const parsed = parseCollaborationId(attachmentId, "attachment_id_invalid");
       if (!parsed.ok) return { ok: false, error: parsed.error };
-      attachmentIds.push(parsed.value);
+      if (attachmentIds.length < 20) attachmentIds.push(parsed.value);
     }
   }
   return {
