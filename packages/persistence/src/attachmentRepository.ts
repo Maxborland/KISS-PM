@@ -420,8 +420,7 @@ export function createAttachmentRepository(db: KissPmDatabase): AttachmentReposi
               sql`${fileAssets.safeDisplayName} ilike ${pattern} escape '\\'`,
               sql`${fileAssets.mimeType} ilike ${pattern} escape '\\'`,
               sql`${externalReferences.title} ilike ${pattern} escape '\\'`,
-              sql`${externalReferences.url} ilike ${pattern} escape '\\'`,
-              sql`${externalReferences.metadata}::text ilike ${pattern} escape '\\'`
+              sql`${externalReferences.url} ilike ${pattern} escape '\\'`
             )
           )
         )
