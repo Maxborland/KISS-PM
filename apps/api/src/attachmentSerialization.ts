@@ -1,6 +1,6 @@
 import type { AttachmentReadModel } from "@kiss-pm/persistence";
 
-const sensitiveMetadataKeys = new Set(["provider", "storagekey", "storageprovider"]);
+const sensitiveMetadataKeyTokens = ["provider", "storage", "path", "bucket"];
 
 export function serializeAttachment(attachment: AttachmentReadModel) {
   return {
@@ -46,11 +46,12 @@ function sanitizeMetadata(value: unknown): unknown {
 
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
-      .filter(([key]) => !sensitiveMetadataKeys.has(normalizeMetadataKey(key)))
+      .filter(([key]) => !isSensitiveMetadataKey(key))
       .map(([key, entry]) => [key, sanitizeMetadata(entry)])
   );
 }
 
-function normalizeMetadataKey(key: string): string {
-  return key.toLowerCase().replace(/[^a-z0-9]/g, "");
+function isSensitiveMetadataKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return sensitiveMetadataKeyTokens.some((token) => normalized.includes(token));
 }

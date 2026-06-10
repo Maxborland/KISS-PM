@@ -31,9 +31,14 @@ describe("attachment serialization", () => {
         metadata: {
           "storage.key": "internal/client/secret-dot.pdf",
           "storage key": "internal/client/secret-space.pdf",
+          storagePath: "/var/lib/kiss-pm/private.pdf",
+          localPath: "/srv/uploads/private.pdf",
+          bucket: "tenant-alpha-private",
           visible: "customer-facing",
           nested: {
             "storage.provider": "minio",
+            objectBucket: "tenant-alpha-private",
+            providerStoragePath: "internal/client/nested-secret.pdf",
             visible: "nested customer-facing"
           }
         },
