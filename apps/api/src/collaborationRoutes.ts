@@ -160,10 +160,11 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       return context.json({ error: "collaboration_not_configured" }, 501);
     }
     const metadata = parseMessageMetadata(record.metadata);
+    if (!metadata.ok) return context.json({ error: metadata.error }, 400);
     const attachments = await validateMessageAttachmentIds({
       dataSource: deps.dataSource,
       entity: conversation.value.access,
-      metadata,
+      metadata: metadata.value,
       tenantId: actor.tenantId
     });
     if (!attachments.ok) return context.json({ error: attachments.error }, attachments.status);
@@ -175,7 +176,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         conversationId: conversation.value.conversation.id,
         authorUserId: actor.id,
         body: parsedBody.value,
-        metadata
+        metadata: metadata.value
       });
       const sticker = stickerAsset
         ? await requireMethod(transactionDataSource.createMessageSticker).call(transactionDataSource, {
@@ -336,10 +337,11 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       return context.json({ error: "collaboration_not_configured" }, 501);
     }
     const metadata = parseMessageMetadata(readRecord(body.value).metadata);
+    if (!metadata.ok) return context.json({ error: metadata.error }, 400);
     const attachments = await validateMessageAttachmentIds({
       dataSource: deps.dataSource,
       entity: conversation.value.access,
-      metadata,
+      metadata: metadata.value,
       tenantId: actor.tenantId
     });
     if (!attachments.ok) return context.json({ error: attachments.error }, attachments.status);
@@ -349,7 +351,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         tenantId: actor.tenantId,
         messageId: message.id,
         body: parsedBody.value,
-        metadata
+        metadata: metadata.value
       });
       if (!updatedMessage) return undefined;
       await deps.appendManagementAuditEvent(collaborationAudit({
@@ -1162,7 +1164,9 @@ function parseOptionalDate(value: unknown) {
   return { ok: true as const, value };
 }
 
-function parseMessageMetadata(value: unknown): Record<string, unknown> {
+function parseMessageMetadata(value: unknown):
+  | { ok: true; value: Record<string, unknown> }
+  | { ok: false; error: string } {
   const record = readRecord(value);
   const links = Array.isArray(record.links)
     ? record.links.slice(0, 20).flatMap((link) => {
@@ -1173,15 +1177,20 @@ function parseMessageMetadata(value: unknown): Record<string, unknown> {
         return [{ entityType: type.value, entityId: id.value }];
       })
     : [];
-  const attachmentIds = Array.isArray(record.attachmentIds)
-    ? record.attachmentIds.slice(0, 20).flatMap((attachmentId) => {
-        const parsed = parseCollaborationId(attachmentId, "attachment_id_invalid");
-        return parsed.ok ? [parsed.value] : [];
-      })
-    : [];
+  const attachmentIds: string[] = [];
+  if (Array.isArray(record.attachmentIds)) {
+    for (const attachmentId of record.attachmentIds.slice(0, 20)) {
+      const parsed = parseCollaborationId(attachmentId, "attachment_id_invalid");
+      if (!parsed.ok) return { ok: false, error: parsed.error };
+      attachmentIds.push(parsed.value);
+    }
+  }
   return {
-    ...(links.length ? { links } : {}),
-    ...(attachmentIds.length ? { attachmentIds } : {})
+    ok: true,
+    value: {
+      ...(links.length ? { links } : {}),
+      ...(attachmentIds.length ? { attachmentIds } : {})
+    }
   };
 }
 

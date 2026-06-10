@@ -407,6 +407,33 @@ it("rejects task messages with attachment IDs outside the conversation entity", 
   await expect(message.json()).resolves.toEqual({ error: "message_attachment_scope_invalid" });
 });
 
+it("rejects task messages with malformed attachment IDs", async () => {
+  const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+  await createTask();
+  const conversations = await app.request(
+    "/api/workspace/conversations?entityType=task&entityId=task-alpha",
+    { headers: { cookie: adminCookie } }
+  );
+  expect(conversations.status).toBe(200);
+  const conversationsPayload = await conversations.json() as {
+    conversations: Array<{ id: string }>;
+  };
+  const conversationId = conversationsPayload.conversations[0]?.id;
+  expect(conversationId).toBeTruthy();
+
+  const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+    method: "POST",
+    headers: jsonHeaders(adminCookie),
+    body: JSON.stringify({
+      body: "Нельзя принимать некорректный идентификатор вложения",
+      metadata: { attachmentIds: ["../project-alpha"] }
+    })
+  });
+
+  expect(message.status).toBe(400);
+  await expect(message.json()).resolves.toEqual({ error: "attachment_id_invalid" });
+});
+
 it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
