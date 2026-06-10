@@ -67,9 +67,18 @@ describe("attachment repository search", () => {
       url: "https://files.example.test/customer-visible-brief.pdf",
       title: "Customer Visible Brief",
       metadata: {
+        source: "contract",
+        evidence: {
+          label: "signed approval",
+          storage: {
+            label: "hidden-nested-storage-label"
+          }
+        },
+        tags: ["client-confirmed"],
         provider: "s3",
         storageKey: "internal/client/secret.pdf",
-        storageProvider: "minio"
+        storageProvider: "minio",
+        object_key: "hidden-object-key"
       },
       createdByUserId: "user-alpha-admin"
     });
@@ -97,10 +106,38 @@ describe("attachment repository search", () => {
       query: "internal/client/secret.pdf",
       limit: 10
     });
+    const safeMetadataMatches = await repository.searchAttachments({
+      tenantId: "tenant-alpha",
+      query: "signed approval",
+      limit: 10
+    });
+    const safeArrayMetadataMatches = await repository.searchAttachments({
+      tenantId: "tenant-alpha",
+      query: "client-confirmed",
+      limit: 10
+    });
+    const unsafeNestedMetadataMatches = await repository.searchAttachments({
+      tenantId: "tenant-alpha",
+      query: "hidden-nested-storage-label",
+      limit: 10
+    });
+    const unsafeKeyMetadataMatches = await repository.searchAttachments({
+      tenantId: "tenant-alpha",
+      query: "hidden-object-key",
+      limit: 10
+    });
 
     expect(visibleMatches.map((attachment) => attachment.id)).toEqual([
       "attachment-alpha"
     ]);
+    expect(safeMetadataMatches.map((attachment) => attachment.id)).toEqual([
+      "attachment-alpha"
+    ]);
+    expect(safeArrayMetadataMatches.map((attachment) => attachment.id)).toEqual([
+      "attachment-alpha"
+    ]);
     expect(redactedMatches).toEqual([]);
+    expect(unsafeNestedMetadataMatches).toEqual([]);
+    expect(unsafeKeyMetadataMatches).toEqual([]);
   });
 });
