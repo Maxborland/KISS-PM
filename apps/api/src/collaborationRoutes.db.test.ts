@@ -486,7 +486,7 @@ it("rejects task message metadata with non-array attachment IDs", async () => {
   await expect(updateMessage.json()).resolves.toEqual({ error: "attachment_id_invalid" });
 });
 
-it("rejects task message attachment IDs malformed after the persistence limit", async () => {
+it("rejects task message attachment IDs over the persistence limit", async () => {
   const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
   await createTask();
   const conversations = await app.request(
@@ -501,7 +501,7 @@ it("rejects task message attachment IDs malformed after the persistence limit", 
   expect(conversationId).toBeTruthy();
 
   const scopedAttachmentIds: string[] = [];
-  for (let index = 0; index < 20; index += 1) {
+  for (let index = 0; index < 21; index += 1) {
     const attachment = await uploadFileAttachment(app, adminCookie, {
       entityType: "task",
       entityId: "task-alpha",
@@ -512,7 +512,7 @@ it("rejects task message attachment IDs malformed after the persistence limit", 
     });
     scopedAttachmentIds.push(attachment.id);
   }
-  const attachmentIds = [...scopedAttachmentIds, "../project-alpha"];
+  const attachmentIds = scopedAttachmentIds;
 
   const createMessage = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
     method: "POST",
@@ -524,7 +524,7 @@ it("rejects task message attachment IDs malformed after the persistence limit", 
   });
 
   expect(createMessage.status).toBe(400);
-  await expect(createMessage.json()).resolves.toEqual({ error: "attachment_id_invalid" });
+  await expect(createMessage.json()).resolves.toEqual({ error: "attachment_id_limit_exceeded" });
 
   const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
     method: "POST",
@@ -549,10 +549,10 @@ it("rejects task message attachment IDs malformed after the persistence limit", 
   );
 
   expect(updateMessage.status).toBe(400);
-  await expect(updateMessage.json()).resolves.toEqual({ error: "attachment_id_invalid" });
+  await expect(updateMessage.json()).resolves.toEqual({ error: "attachment_id_limit_exceeded" });
 });
 
-  it("rejects task messages with missing attachment IDs after the persistence limit", async () => {
+it("rejects task messages with over-limit attachment IDs before lookup", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask();
 
@@ -591,8 +591,8 @@ it("rejects task message attachment IDs malformed after the persistence limit", 
       })
     });
 
-    expect(message.status).toBe(404);
-    await expect(message.json()).resolves.toEqual({ error: "message_attachment_not_found" });
+    expect(message.status).toBe(400);
+    await expect(message.json()).resolves.toEqual({ error: "attachment_id_limit_exceeded" });
   });
 
   it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {

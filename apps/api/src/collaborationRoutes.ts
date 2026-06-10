@@ -1183,6 +1183,10 @@ function parseMessageMetadata(value: unknown):
     return { ok: false, error: "attachment_id_invalid" };
   }
   if (Array.isArray(record.attachmentIds)) {
+    if (record.attachmentIds.length > 20) {
+      return { ok: false, error: "attachment_id_limit_exceeded" };
+    }
+
     for (const attachmentId of record.attachmentIds) {
       const parsed = parseCollaborationId(attachmentId, "attachment_id_invalid");
       if (!parsed.ok) return { ok: false, error: parsed.error };
