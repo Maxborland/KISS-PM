@@ -504,8 +504,9 @@ export function createProjectIntakeRepository(
     },
     async listOperationalQueueProjects(tenantId, options) {
       if (options.statuses.length === 0 || (options.limit !== undefined && options.limit < 1)) return [];
-      const overdueRank = options.asOf
-        ? sql<number>`case when ${projects.plannedFinish} < ${options.asOf} then 1 else 0 end`
+      const asOfDate = options.asOf?.toISOString().slice(0, 10);
+      const overdueRank = asOfDate
+        ? sql<number>`case when ${projects.plannedFinish} < ${asOfDate} then 1 else 0 end`
         : sql<number>`0`;
       let query = db
         .select()
