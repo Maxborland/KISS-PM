@@ -434,6 +434,58 @@ it("rejects task messages with malformed attachment IDs", async () => {
   await expect(message.json()).resolves.toEqual({ error: "attachment_id_invalid" });
 });
 
+it("rejects task message metadata with non-array attachment IDs", async () => {
+  const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+  await createTask();
+  const conversations = await app.request(
+    "/api/workspace/conversations?entityType=task&entityId=task-alpha",
+    { headers: { cookie: adminCookie } }
+  );
+  expect(conversations.status).toBe(200);
+  const conversationsPayload = await conversations.json() as {
+    conversations: Array<{ id: string }>;
+  };
+  const conversationId = conversationsPayload.conversations[0]?.id;
+  expect(conversationId).toBeTruthy();
+
+  const createMessage = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+    method: "POST",
+    headers: jsonHeaders(adminCookie),
+    body: JSON.stringify({
+      body: "Нельзя принимать некорректный список вложений",
+      metadata: { attachmentIds: "attachment-id-string" }
+    })
+  });
+
+  expect(createMessage.status).toBe(400);
+  await expect(createMessage.json()).resolves.toEqual({ error: "attachment_id_invalid" });
+
+  const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+    method: "POST",
+    headers: jsonHeaders(adminCookie),
+    body: JSON.stringify({ body: "Черновик для проверки редактирования" })
+  });
+  expect(message.status).toBe(201);
+  const messagePayload = await message.json() as {
+    message: { id: string };
+  };
+
+  const updateMessage = await app.request(
+    `/api/workspace/conversations/${conversationId}/messages/${messagePayload.message.id}`,
+    {
+      method: "PATCH",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        body: "Нельзя принимать некорректный список вложений",
+        metadata: { attachmentIds: { id: "attachment-id-string" } }
+      })
+    }
+  );
+
+  expect(updateMessage.status).toBe(400);
+  await expect(updateMessage.json()).resolves.toEqual({ error: "attachment_id_invalid" });
+});
+
 it("rejects task message attachment IDs malformed after the persistence limit", async () => {
   const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
   await createTask();

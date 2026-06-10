@@ -1179,6 +1179,9 @@ function parseMessageMetadata(value: unknown):
     : [];
   const attachmentIds: string[] = [];
   const persistedAttachmentIds: string[] = [];
+  if ("attachmentIds" in record && !Array.isArray(record.attachmentIds)) {
+    return { ok: false, error: "attachment_id_invalid" };
+  }
   if (Array.isArray(record.attachmentIds)) {
     for (const attachmentId of record.attachmentIds) {
       const parsed = parseCollaborationId(attachmentId, "attachment_id_invalid");
