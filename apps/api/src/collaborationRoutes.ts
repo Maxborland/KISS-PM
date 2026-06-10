@@ -164,7 +164,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const attachments = await validateMessageAttachmentIds({
       dataSource: deps.dataSource,
       entity: conversation.value.access,
-      metadata: metadata.value,
+      attachmentIds: metadata.attachmentIds,
       tenantId: actor.tenantId
     });
     if (!attachments.ok) return context.json({ error: attachments.error }, attachments.status);
@@ -341,7 +341,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const attachments = await validateMessageAttachmentIds({
       dataSource: deps.dataSource,
       entity: conversation.value.access,
-      metadata: metadata.value,
+      attachmentIds: metadata.attachmentIds,
       tenantId: actor.tenantId
     });
     if (!attachments.ok) return context.json({ error: attachments.error }, attachments.status);
@@ -1165,7 +1165,7 @@ function parseOptionalDate(value: unknown) {
 }
 
 function parseMessageMetadata(value: unknown):
-  | { ok: true; value: Record<string, unknown> }
+  | { ok: true; value: Record<string, unknown>; attachmentIds: string[] }
   | { ok: false; error: string } {
   const record = readRecord(value);
   const links = Array.isArray(record.links)
@@ -1178,34 +1178,35 @@ function parseMessageMetadata(value: unknown):
       })
     : [];
   const attachmentIds: string[] = [];
+  const persistedAttachmentIds: string[] = [];
   if (Array.isArray(record.attachmentIds)) {
     for (const attachmentId of record.attachmentIds) {
       const parsed = parseCollaborationId(attachmentId, "attachment_id_invalid");
       if (!parsed.ok) return { ok: false, error: parsed.error };
-      if (attachmentIds.length < 20) attachmentIds.push(parsed.value);
+      attachmentIds.push(parsed.value);
+      if (persistedAttachmentIds.length < 20) persistedAttachmentIds.push(parsed.value);
     }
   }
   return {
     ok: true,
     value: {
       ...(links.length ? { links } : {}),
-      ...(attachmentIds.length ? { attachmentIds } : {})
-    }
+      ...(persistedAttachmentIds.length ? { attachmentIds: persistedAttachmentIds } : {})
+    },
+    attachmentIds
   };
 }
 
 async function validateMessageAttachmentIds(input: {
   dataSource: ApiTenantDataSource;
   entity: CollaborationEntityAccessContext;
-  metadata: Record<string, unknown>;
+  attachmentIds: string[];
   tenantId: string;
 }): Promise<
   | { ok: true }
   | { ok: false; status: 400 | 404 | 409 | 501; error: string }
 > {
-  const attachmentIds = Array.isArray(input.metadata.attachmentIds)
-    ? input.metadata.attachmentIds.filter((attachmentId): attachmentId is string => typeof attachmentId === "string")
-    : [];
+  const attachmentIds = input.attachmentIds;
   if (attachmentIds.length === 0) return { ok: true };
   if (!input.dataSource.findAttachmentById) {
     return { ok: false, status: 501, error: "collaboration_not_configured" };

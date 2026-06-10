@@ -500,7 +500,50 @@ it("rejects task message attachment IDs malformed after the persistence limit", 
   await expect(updateMessage.json()).resolves.toEqual({ error: "attachment_id_invalid" });
 });
 
-it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {
+  it("rejects task messages with missing attachment IDs after the persistence limit", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask();
+
+    const conversations = await app.request(
+      "/api/workspace/conversations?entityType=task&entityId=task-alpha",
+      { headers: { cookie: adminCookie } }
+    );
+    expect(conversations.status).toBe(200);
+    const conversationsPayload = (await conversations.json()) as {
+      conversations: Array<{ id: string }>;
+    };
+    const conversationId = conversationsPayload.conversations[0]?.id;
+    expect(conversationId).toBeTruthy();
+
+    const scopedAttachmentIds: string[] = [];
+    for (let index = 0; index < 20; index += 1) {
+      const attachment = await uploadFileAttachment(app, adminCookie, {
+        entityType: "task",
+        entityId: "task-alpha",
+        relationType: "discussion_document",
+        originalName: `limit-found-${index}.txt`,
+        mimeType: "text/plain",
+        bytes: new Uint8Array([index])
+      });
+      scopedAttachmentIds.push(attachment.id);
+    }
+
+    const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        body: "Нельзя скрывать отсутствующее вложение лимитом",
+        metadata: {
+          attachmentIds: [...scopedAttachmentIds, "missing-attachment-after-limit"]
+        }
+      })
+    });
+
+    expect(message.status).toBe(404);
+    await expect(message.json()).resolves.toEqual({ error: "message_attachment_not_found" });
+  });
+
+  it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
 
