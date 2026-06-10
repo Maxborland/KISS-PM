@@ -52,5 +52,5 @@ function sanitizeMetadata(value: unknown): unknown {
 }
 
 function normalizeMetadataKey(key: string): string {
-  return key.toLowerCase().replace(/[-_]/g, "");
+  return key.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
