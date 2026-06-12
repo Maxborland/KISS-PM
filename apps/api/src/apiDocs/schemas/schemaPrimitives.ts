@@ -1,3 +1,5 @@
+import { callEventTypes } from "@kiss-pm/domain";
+
 export const stringIdSchema = { type: "string", minLength: 1 };
 export const nullableStringSchema = { type: ["string", "null"] };
 export const crmStatusSchema = { type: "string", enum: ["active", "archived"], default: "active" };
@@ -105,14 +107,7 @@ export const callParticipantStateSchema = {
 };
 export const callEventTypeSchema = {
   type: "string",
-  enum: [
-    "room_created",
-    "session_started",
-    "join_token_issued",
-    "participant_state_updated",
-    "session_ended",
-    "recording_attached"
-  ]
+  enum: [...callEventTypes]
 };
 export const backgroundJobKindSchema = {
   type: "string",

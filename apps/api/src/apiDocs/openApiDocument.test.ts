@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { callEventTypes } from "@kiss-pm/domain";
 import { describe, expect, it } from "vitest";
 import {
   createKissPmOpenApiDocument,
@@ -171,6 +172,15 @@ describe("OpenAPI route inventory", () => {
     ]);
     expect(document.components.schemas.Project.properties.status).toEqual({
       $ref: "#/components/schemas/ProjectStatus"
+    });
+  });
+
+  it("documents the shared call event type enum from the domain contract", () => {
+    const document = createTestDocument();
+
+    expect(document.components.schemas.CallEvent.properties.eventType).toEqual({
+      type: "string",
+      enum: [...callEventTypes]
     });
   });
 

@@ -421,7 +421,7 @@ export function createAttachmentRepository(db: KissPmDatabase): AttachmentReposi
               sql`${fileAssets.mimeType} ilike ${pattern} escape '\\'`,
               sql`${externalReferences.title} ilike ${pattern} escape '\\'`,
               sql`${externalReferences.url} ilike ${pattern} escape '\\'`,
-              sql`${externalReferences.metadata}::text ilike ${pattern} escape '\\'`
+              safeExternalReferenceMetadataMatches(pattern)
             )
           )
         )
@@ -455,6 +455,58 @@ function mapFileAsset(row: typeof fileAssets.$inferSelect): FileAssetRecord {
 
 function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
+function safeExternalReferenceMetadataMatches(pattern: string) {
+  return sql`exists (
+    with recursive metadata_tree(key, value, blocked) as (
+      select
+        root.key,
+        root.value,
+        (
+          regexp_replace(lower(root.key), '[^a-z0-9]', '', 'g') in ('key', 'objectkey')
+          or regexp_replace(lower(root.key), '[^a-z0-9]', '', 'g') like '%provider%'
+          or regexp_replace(lower(root.key), '[^a-z0-9]', '', 'g') like '%storage%'
+          or regexp_replace(lower(root.key), '[^a-z0-9]', '', 'g') like '%path%'
+          or regexp_replace(lower(root.key), '[^a-z0-9]', '', 'g') like '%bucket%'
+        )
+      from jsonb_each(coalesce(${externalReferences.metadata}, '{}'::jsonb)) as root(key, value)
+      union all
+      select
+        child_entries.key,
+        child_entries.value,
+        child_entries.blocked
+      from metadata_tree
+      cross join lateral (
+        select
+          object_child.key,
+          object_child.value,
+          metadata_tree.blocked or (
+            regexp_replace(lower(object_child.key), '[^a-z0-9]', '', 'g') in ('key', 'objectkey')
+            or regexp_replace(lower(object_child.key), '[^a-z0-9]', '', 'g') like '%provider%'
+            or regexp_replace(lower(object_child.key), '[^a-z0-9]', '', 'g') like '%storage%'
+            or regexp_replace(lower(object_child.key), '[^a-z0-9]', '', 'g') like '%path%'
+            or regexp_replace(lower(object_child.key), '[^a-z0-9]', '', 'g') like '%bucket%'
+          ) as blocked
+        from jsonb_each(
+          case when jsonb_typeof(metadata_tree.value) = 'object' then metadata_tree.value else '{}'::jsonb end
+        ) as object_child(key, value)
+        union all
+        select
+          metadata_tree.key,
+          array_child.value,
+          metadata_tree.blocked
+        from jsonb_array_elements(
+          case when jsonb_typeof(metadata_tree.value) = 'array' then metadata_tree.value else '[]'::jsonb end
+        ) as array_child(value)
+      ) as child_entries(key, value, blocked)
+    )
+    select 1
+    from metadata_tree
+    where metadata_tree.blocked = false
+      and jsonb_typeof(metadata_tree.value) in ('string', 'number', 'boolean')
+      and metadata_tree.value #>> '{}' ilike ${pattern} escape '\\'
+  )`;
 }
 
 function mapExternalReference(

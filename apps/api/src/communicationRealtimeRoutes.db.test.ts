@@ -507,6 +507,148 @@ describe("communications realtime API", () => {
     });
   });
 
+  it("stores screen-share state as safe call metadata without leaking provider details", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+
+    const startedShare = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/screen-share`,
+      {
+        method: "POST",
+        headers: jsonHeaders(readerCookie),
+        body: JSON.stringify({
+          state: "started",
+          source: "browser_tab",
+          label: "Project review"
+        })
+      }
+    );
+    expect(startedShare.status).toBe(200);
+    const startedPayload = await startedShare.json() as { event: { eventType: string; payload: Record<string, unknown> } };
+    expect(startedPayload.event).toMatchObject({
+      eventType: "screen_share_started",
+      payload: {
+        userId: "user-alpha-reader",
+        state: "started",
+        source: "browser_tab",
+        label: "Project review"
+      }
+    });
+
+    const stoppedShare = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/screen-share`,
+      {
+        method: "POST",
+        headers: jsonHeaders(readerCookie),
+        body: JSON.stringify({
+          state: "stopped"
+        })
+      }
+    );
+    expect(stoppedShare.status).toBe(200);
+
+    const events = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/events`, {
+      headers: { cookie: adminCookie }
+    });
+    expect(events.status).toBe(200);
+    const eventsPayload = await events.json() as { events: Array<{ eventType: string; payload: Record<string, unknown> }> };
+    expect(eventsPayload.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "screen_share_started",
+          payload: expect.objectContaining({ userId: "user-alpha-reader", source: "browser_tab" })
+        }),
+        expect.objectContaining({
+          eventType: "screen_share_stopped",
+          payload: expect.objectContaining({ userId: "user-alpha-reader" })
+        })
+      ])
+    );
+    expect(JSON.stringify(eventsPayload.events)).not.toContain("provider-room-secret");
+
+    const auditRows = await client`
+      SELECT action_type, input, after_state
+      FROM audit_events
+      WHERE action_type = 'communications.screen_share_state_updated'
+      ORDER BY created_at ASC
+    `;
+    expect(auditRows).toHaveLength(2);
+    expect(JSON.stringify(auditRows)).toContain("screen_share_started");
+    expect(JSON.stringify(auditRows)).not.toContain("provider-room-secret");
+    expect(JSON.stringify(auditRows)).not.toContain("storageKey");
+  });
+
+  it("rejects unsafe screen-share metadata and inactive sessions", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
+    const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+
+    const unsafe = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/screen-share`,
+      {
+        method: "POST",
+        headers: jsonHeaders(readerCookie),
+        body: JSON.stringify({
+          state: "started",
+          source: "screen",
+          token: "must-not-persist",
+          providerRoomId: "provider-room-secret",
+          storageKey: "tenant/raw/capture.webm",
+          localPath: "/tmp/capture.webm",
+          streamId: "stream-123",
+          sdp: "v=0",
+          url: "https://user:pass@example.test/capture"
+        })
+      }
+    );
+    expect(unsafe.status).toBe(400);
+    await expect(unsafe.json()).resolves.toEqual({ error: "screen_share_payload_unsafe" });
+
+    const denied = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/screen-share`,
+      {
+        method: "POST",
+        headers: jsonHeaders(deniedCookie),
+        body: JSON.stringify({ state: "started" })
+      }
+    );
+    expect(denied.status).toBe(403);
+
+    const ended = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/end`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie)
+      }
+    );
+    expect(ended.status).toBe(200);
+
+    const inactive = await app.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/screen-share`,
+      {
+        method: "POST",
+        headers: jsonHeaders(readerCookie),
+        body: JSON.stringify({ state: "stopped" })
+      }
+    );
+    expect(inactive.status).toBe(409);
+    await expect(inactive.json()).resolves.toEqual({ error: "call_session_not_active" });
+
+    const events = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/events`, {
+      headers: { cookie: adminCookie }
+    });
+    const eventsPayload = await events.json() as { events: Array<{ eventType: string }> };
+    expect(eventsPayload.events).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventType: "screen_share_started" })
+      ])
+    );
+  });
+
   async function createRoom(cookie: string) {
     const response = await app.request("/api/workspace/call-rooms", {
       method: "POST",

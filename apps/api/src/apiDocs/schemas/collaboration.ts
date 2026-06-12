@@ -765,6 +765,17 @@ export const collaborationSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  CallScreenShareStateRequest: {
+    type: "object",
+    required: ["state"],
+    properties: {
+      state: { type: "string", enum: ["started", "stopped"] },
+      source: { type: "string", enum: ["screen", "window", "browser_tab", "unknown"] },
+      label: { type: "string", maxLength: 80 },
+      userId: stringIdSchema
+    },
+    additionalProperties: false
+  },
   CallRecordingCreateRequest: {
     type: "object",
     required: ["attachmentId"],
@@ -834,6 +845,14 @@ export const collaborationSchemas = openApiSchemaFragment({
     required: ["participantState", "event"],
     properties: {
       participantState: schemaRef("CallParticipantState"),
+      event: schemaRef("CallEvent")
+    },
+    additionalProperties: false
+  },
+  CallScreenShareStateResponse: {
+    type: "object",
+    required: ["event"],
+    properties: {
       event: schemaRef("CallEvent")
     },
     additionalProperties: false

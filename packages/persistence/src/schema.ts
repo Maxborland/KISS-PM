@@ -3339,7 +3339,7 @@ export const callEvents = pgTable(
     ),
     check(
       "call_events_type_chk",
-      sql`${table.eventType} in ('room_created', 'session_started', 'join_token_issued', 'participant_invited', 'participant_joining', 'participant_joined', 'participant_left', 'session_ended', 'recording_attached')`
+      sql`${table.eventType} in ('room_created', 'session_started', 'join_token_issued', 'participant_invited', 'participant_joining', 'participant_joined', 'participant_left', 'screen_share_started', 'screen_share_stopped', 'session_ended', 'recording_attached')`
     )
   ]
 );
