@@ -1,4 +1,4 @@
-import { createAccessProfile } from "@kiss-pm/access-control";
+import { createAccessProfile, permissions } from "@kiss-pm/access-control";
 import type { TenantUser, UserId } from "@kiss-pm/domain";
 import { describe, expect, it } from "vitest";
 
@@ -23,6 +23,65 @@ const mutationHeaders = {
 };
 
 describe("access role routes", () => {
+  it("returns access roles with the permission catalogue for the workspace RBAC read model", async () => {
+    const adminRole: AccessProfileRecord = {
+      ...createAccessProfile({
+        id: "tenant-admin",
+        permissions: ["tenant.access_profiles.read"]
+      }),
+      tenantId: "tenant-alpha",
+      name: "Администратор"
+    };
+    const readerRole: AccessProfileRecord = {
+      ...createAccessProfile({
+        id: "sales-reader",
+        permissions: ["tenant.opportunities.read"]
+      }),
+      tenantId: "tenant-alpha",
+      name: "CRM читатель"
+    };
+    const adminUser: TenantUser = {
+      id: "user-admin" as UserId,
+      tenantId: "tenant-alpha",
+      name: "Администратор",
+      accessProfileId: "tenant-admin"
+    };
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async findSessionByTokenHash() {
+        return {
+          id: "session-admin",
+          tenantId: "tenant-alpha",
+          userId: "user-admin" as UserId,
+          tokenHash: "ignored",
+          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+        };
+      },
+      async findUserById(userId) {
+        return userId === adminUser.id ? adminUser : undefined;
+      },
+      async findAccessProfileById(_tenantId, accessProfileId) {
+        return [adminRole, readerRole].find(
+          (role) => role.id === accessProfileId
+        );
+      },
+      async listAccessProfilesByTenantId(tenantId) {
+        return tenantId === "tenant-alpha" ? [adminRole, readerRole] : [];
+      }
+    };
+
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const response = await app.request("/api/workspace/access-roles", {
+      headers: { cookie }
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      accessRoles: [adminRole, readerRole],
+      permissionCatalogue: permissions
+    });
+  });
+
   it("updates CRM write permission audibly and revokes sessions for users on the changed role", async () => {
     const auditEvents: CapturedAuditEvent[] = [];
     const revokedSessions: Array<{ tenantId: string; userId: UserId }> = [];

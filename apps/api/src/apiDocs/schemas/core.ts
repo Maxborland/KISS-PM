@@ -194,6 +194,19 @@ export const coreSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  AccessRolesResponse: {
+    type: "object",
+    required: ["accessRoles", "permissionCatalogue"],
+    properties: {
+      accessRoles: { type: "array", items: schemaRef("AccessProfile") },
+      permissionCatalogue: {
+        type: "array",
+        items: { type: "string", minLength: 1 },
+        uniqueItems: true
+      }
+    },
+    additionalProperties: false
+  },
   AccessProfileResponse: {
     type: "object",
     required: ["accessProfile"],

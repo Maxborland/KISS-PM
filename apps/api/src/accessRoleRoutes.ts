@@ -1,6 +1,7 @@
 import {
   canManageAccessProfiles,
   canReadAccessProfiles,
+  permissions,
   type PolicyDecision
 } from "@kiss-pm/access-control";
 import type { TenantUser, UserId } from "@kiss-pm/domain";
@@ -165,7 +166,8 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
 
     return context.json({
-      accessRoles: await dataSource.listAccessProfilesByTenantId(actor.tenantId)
+      accessRoles: await dataSource.listAccessProfilesByTenantId(actor.tenantId),
+      permissionCatalogue: permissions
     });
   });
 
