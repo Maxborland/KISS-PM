@@ -23,6 +23,7 @@ import type {
 } from "./apiTypes";
 import { createApiCapabilities } from "./apiDataPorts";
 import { createInMemoryTenantDataSource } from "./inMemoryTenantDataSource";
+import { registerAdminReadModelRoutes } from "./adminReadModelRoutes";
 import { registerAccessRoleRoutes } from "./accessRoleRoutes";
 import { registerAttachmentRoutes } from "./attachmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
@@ -251,6 +252,7 @@ export function createApp(options: CreateAppOptions = {}) {
   if (enableDevTenantRoutes) {
     registerDevTenantRoutes(app, routeDeps);
   }
+  registerAdminReadModelRoutes(app, routeDeps);
   registerAccessRoleRoutes(app, routeDeps);
   registerAuditRoutes(app, routeDeps);
   registerAuditLearningRoutes(app, routeDeps);

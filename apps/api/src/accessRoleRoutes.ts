@@ -1,9 +1,10 @@
 import {
   canManageAccessProfiles,
   canReadAccessProfiles,
+  permissions,
   type PolicyDecision
 } from "@kiss-pm/access-control";
-import type { TenantUser } from "@kiss-pm/domain";
+import type { TenantUser, UserId } from "@kiss-pm/domain";
 import { readLimitedJsonBody } from "./jsonBody";
 import { parseAccessRoleIdParam } from "./routeParamParsers";
 import { parseAccessProfileCreateBody } from "./workspaceParsers";
@@ -165,7 +166,8 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
 
     return context.json({
-      accessRoles: await dataSource.listAccessProfilesByTenantId(actor.tenantId)
+      accessRoles: await dataSource.listAccessProfilesByTenantId(actor.tenantId),
+      permissionCatalogue: permissions
     });
   });
 
@@ -239,8 +241,28 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "access_role_name_taken" }, 409);
     }
 
+    const privilegeChanged = havePermissionsChanged(
+      beforeState.permissions,
+      parsed.value.permissions
+    );
+    if (
+      privilegeChanged &&
+      (!dataSource.listWorkspaceUsers || !dataSource.deleteSessionsByUserId)
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const affectedSessionUserIds: UserId[] = privilegeChanged
+      ? (await dataSource.listWorkspaceUsers!(actor.tenantId))
+          .filter((user) => user.accessProfileId === roleId)
+          .map((user) => user.id)
+      : [];
+
     const accessRole = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateAccessProfile) {
+      if (
+        !transactionDataSource.updateAccessProfile ||
+        (privilegeChanged && !transactionDataSource.deleteSessionsByUserId)
+      ) {
         throw new Error("transactional_access_profile_update_not_configured");
       }
 
@@ -248,6 +270,13 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
         ...parsed.value,
         tenantId: actor.tenantId
       });
+      for (const userId of affectedSessionUserIds) {
+        await transactionDataSource.deleteSessionsByUserId!(
+          actor.tenantId,
+          userId
+        );
+      }
+
       await appendManagementAuditEvent(
         {
           tenantId: actor.tenantId,
@@ -261,7 +290,12 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
           commandInput: parsed.value,
           beforeState,
           afterState: updatedRole,
-          permissionResult: decision
+          permissionResult: decision,
+          executionResult: {
+            affectedSessionUserIds,
+            privilegeChanged,
+            status: "updated"
+          }
         },
         transactionDataSource
       );
@@ -358,6 +392,16 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     return context.json({ status: "deleted" });
   });
+}
+
+function havePermissionsChanged(
+  beforePermissions: readonly string[],
+  afterPermissions: readonly string[]
+): boolean {
+  const beforeSet = new Set(beforePermissions);
+  const afterSet = new Set(afterPermissions);
+  if (beforeSet.size !== afterSet.size) return true;
+  return [...afterSet].some((permission) => !beforeSet.has(permission));
 }
 
 async function appendAccessRoleDeniedAudit(

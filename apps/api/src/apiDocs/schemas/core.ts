@@ -194,6 +194,33 @@ export const coreSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  AccessRolesResponse: {
+    type: "object",
+    required: ["accessRoles", "permissionCatalogue"],
+    properties: {
+      accessRoles: { type: "array", items: schemaRef("AccessProfile") },
+      permissionCatalogue: {
+        type: "array",
+        items: { type: "string", minLength: 1 },
+        uniqueItems: true
+      }
+    },
+    additionalProperties: false
+  },
+  WorkspaceAdminReadModelResponse: {
+    type: "object",
+    required: ["users", "positions", "accessRoles", "permissionCatalogue", "customFields"],
+    properties: {
+      users: { type: "array", items: schemaRef("WorkspaceUser") },
+      positions: { type: "array", items: schemaRef("Position") },
+      accessRoles: { type: "array", items: schemaRef("AccessProfile") },
+      permissionCatalogue: {
+        type: "array",
+        items: { type: "string", minLength: 1 }
+      },
+      customFields: { type: "array", items: schemaRef("CustomField") }
+    }
+  },
   AccessProfileResponse: {
     type: "object",
     required: ["accessProfile"],
