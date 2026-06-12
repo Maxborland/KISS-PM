@@ -43,6 +43,7 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/tenant/:tenantId/users", tag: "Tenant", summary: "Tenant users for dev route", auth: "dev", successSchema: "TenantUsersResponse" },
   { method: "get", path: "/api/tenant/current/access-profiles", tag: "Access control", summary: "List access profiles", successSchema: "AccessProfilesResponse" },
   { method: "post", path: "/api/tenant/current/access-profiles", tag: "Access control", summary: "Create access profile", requestSchema: "AccessProfileWriteRequest", successSchema: "AccessProfileResponse", successStatus: 201 },
+  { method: "get", path: "/api/workspace/admin/read-model", tag: "Access control", summary: "Read workspace admin setup model", successSchema: "WorkspaceAdminReadModelResponse" },
   { method: "get", path: "/api/workspace/access-roles", tag: "Access control", summary: "List workspace access roles", successSchema: "AccessRolesResponse" },
   { method: "patch", path: "/api/workspace/access-roles/:roleId", tag: "Access control", summary: "Update workspace access role", requestSchema: "AccessProfileWriteRequest", successSchema: "AccessProfileResponse" },
   { method: "delete", path: "/api/workspace/access-roles/:roleId", tag: "Access control", summary: "Archive workspace access role", body: "none", successSchema: "OkResponse" },

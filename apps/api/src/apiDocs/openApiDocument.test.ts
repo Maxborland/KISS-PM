@@ -147,6 +147,30 @@ describe("OpenAPI route inventory", () => {
     });
   });
 
+  it("documents the workspace admin read model contract", () => {
+    const document = createTestDocument();
+
+    expect(
+      document.paths["/api/workspace/admin/read-model"]?.get?.responses?.["200"]?.content?.[
+        "application/json"
+      ]?.schema
+    ).toEqual({ $ref: "#/components/schemas/WorkspaceAdminReadModelResponse" });
+    expect(document.components.schemas.WorkspaceAdminReadModelResponse).toEqual({
+      type: "object",
+      required: ["users", "positions", "accessRoles", "permissionCatalogue", "customFields"],
+      properties: {
+        users: { type: "array", items: { $ref: "#/components/schemas/WorkspaceUser" } },
+        positions: { type: "array", items: { $ref: "#/components/schemas/Position" } },
+        accessRoles: { type: "array", items: { $ref: "#/components/schemas/AccessProfile" } },
+        permissionCatalogue: {
+          type: "array",
+          items: { type: "string", minLength: 1 }
+        },
+        customFields: { type: "array", items: { $ref: "#/components/schemas/CustomField" } }
+      }
+    });
+  });
+
   it("documents project lifecycle status contract", () => {
     const document = createTestDocument();
     const operation = document.paths["/api/workspace/projects/{projectId}/status"]?.patch;
