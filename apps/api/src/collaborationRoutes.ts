@@ -159,6 +159,15 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!deps.dataSource.createDiscussionMessage || !deps.dataSource.replaceMessageMentions) {
       return context.json({ error: "collaboration_not_configured" }, 501);
     }
+    const metadata = parseMessageMetadata(record.metadata);
+    if (!metadata.ok) return context.json({ error: metadata.error }, 400);
+    const attachments = await validateMessageAttachmentIds({
+      dataSource: deps.dataSource,
+      entity: conversation.value.access,
+      attachmentIds: metadata.attachmentIds,
+      tenantId: actor.tenantId
+    });
+    if (!attachments.ok) return context.json({ error: attachments.error }, attachments.status);
 
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       const message = await requireMethod(transactionDataSource.createDiscussionMessage).call(transactionDataSource, {
@@ -167,7 +176,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         conversationId: conversation.value.conversation.id,
         authorUserId: actor.id,
         body: parsedBody.value,
-        metadata: parseMessageMetadata(record.metadata)
+        metadata: metadata.value
       });
       const sticker = stickerAsset
         ? await requireMethod(transactionDataSource.createMessageSticker).call(transactionDataSource, {
@@ -327,12 +336,22 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!deps.dataSource.updateDiscussionMessage) {
       return context.json({ error: "collaboration_not_configured" }, 501);
     }
+    const metadata = parseMessageMetadata(readRecord(body.value).metadata);
+    if (!metadata.ok) return context.json({ error: metadata.error }, 400);
+    const attachments = await validateMessageAttachmentIds({
+      dataSource: deps.dataSource,
+      entity: conversation.value.access,
+      attachmentIds: metadata.attachmentIds,
+      tenantId: actor.tenantId
+    });
+    if (!attachments.ok) return context.json({ error: attachments.error }, attachments.status);
+
     const updated = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       const updatedMessage = await requireMethod(transactionDataSource.updateDiscussionMessage).call(transactionDataSource, {
         tenantId: actor.tenantId,
         messageId: message.id,
         body: parsedBody.value,
-        metadata: parseMessageMetadata(readRecord(body.value).metadata)
+        metadata: metadata.value
       });
       if (!updatedMessage) return undefined;
       await deps.appendManagementAuditEvent(collaborationAudit({
@@ -1145,7 +1164,9 @@ function parseOptionalDate(value: unknown) {
   return { ok: true as const, value };
 }
 
-function parseMessageMetadata(value: unknown): Record<string, unknown> {
+function parseMessageMetadata(value: unknown):
+  | { ok: true; value: Record<string, unknown>; attachmentIds: string[] }
+  | { ok: false; error: string } {
   const record = readRecord(value);
   const links = Array.isArray(record.links)
     ? record.links.slice(0, 20).flatMap((link) => {
@@ -1156,16 +1177,68 @@ function parseMessageMetadata(value: unknown): Record<string, unknown> {
         return [{ entityType: type.value, entityId: id.value }];
       })
     : [];
-  const attachmentIds = Array.isArray(record.attachmentIds)
-    ? record.attachmentIds.slice(0, 20).flatMap((attachmentId) => {
-        const parsed = parseCollaborationId(attachmentId, "attachment_id_invalid");
-        return parsed.ok ? [parsed.value] : [];
-      })
-    : [];
+  const attachmentIds: string[] = [];
+  const persistedAttachmentIds: string[] = [];
+  if ("attachmentIds" in record && !Array.isArray(record.attachmentIds)) {
+    return { ok: false, error: "attachment_id_invalid" };
+  }
+  if (Array.isArray(record.attachmentIds)) {
+    if (record.attachmentIds.length > 20) {
+      return { ok: false, error: "attachment_id_limit_exceeded" };
+    }
+
+    for (const attachmentId of record.attachmentIds) {
+      const parsed = parseCollaborationId(attachmentId, "attachment_id_invalid");
+      if (!parsed.ok) return { ok: false, error: parsed.error };
+      attachmentIds.push(parsed.value);
+      if (persistedAttachmentIds.length < 20) persistedAttachmentIds.push(parsed.value);
+    }
+  }
   return {
-    ...(links.length ? { links } : {}),
-    ...(attachmentIds.length ? { attachmentIds } : {})
+    ok: true,
+    value: {
+      ...(links.length ? { links } : {}),
+      ...(persistedAttachmentIds.length ? { attachmentIds: persistedAttachmentIds } : {})
+    },
+    attachmentIds
   };
+}
+
+async function validateMessageAttachmentIds(input: {
+  dataSource: ApiTenantDataSource;
+  entity: CollaborationEntityAccessContext;
+  attachmentIds: string[];
+  tenantId: string;
+}): Promise<
+  | { ok: true }
+  | { ok: false; status: 400 | 404 | 409 | 501; error: string }
+> {
+  const attachmentIds = input.attachmentIds;
+  if (attachmentIds.length === 0) return { ok: true };
+  if (!input.dataSource.findAttachmentById) {
+    return { ok: false, status: 501, error: "collaboration_not_configured" };
+  }
+
+  for (const attachmentId of new Set(attachmentIds)) {
+    const attachment = await input.dataSource.findAttachmentById(input.tenantId, attachmentId);
+    if (!attachment || attachment.archivedAt) {
+      return { ok: false, status: 404, error: "message_attachment_not_found" };
+    }
+    if (
+      attachment.entityType !== input.entity.entityType ||
+      attachment.entityId !== input.entity.entityId
+    ) {
+      return { ok: false, status: 400, error: "message_attachment_scope_invalid" };
+    }
+    if (
+      attachment.fileAsset &&
+      (attachment.fileAsset.status !== "ready" || attachment.fileAsset.archivedAt)
+    ) {
+      return { ok: false, status: 409, error: "message_attachment_not_ready" };
+    }
+  }
+
+  return { ok: true };
 }
 
 function parseMessageLinkEntityType(value: unknown) {

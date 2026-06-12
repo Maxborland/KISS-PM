@@ -235,6 +235,10 @@ const baselineAssignmentRoleUnitsMigration = readFileSync(
   ),
   "utf8"
 );
+const callScreenShareEventsMigration = readFileSync(
+  new URL("../migrations/0045_call_screen_share_events.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -468,6 +472,17 @@ describe("Phase G.2 / 11.2 SQL migration", () => {
     expect(phaseG2ParticipantStateEventsMigration).toContain("participant_invited");
     expect(phaseG2ParticipantStateEventsMigration).toContain("participant_joining");
     expect(phaseG2ParticipantStateEventsMigration).toContain(
+      "ADD CONSTRAINT call_events_type_chk"
+    );
+  });
+
+  it("extends call event types for screen-share metadata", () => {
+    expect(callScreenShareEventsMigration).toContain(
+      "DROP CONSTRAINT IF EXISTS call_events_type_chk"
+    );
+    expect(callScreenShareEventsMigration).toContain("screen_share_started");
+    expect(callScreenShareEventsMigration).toContain("screen_share_stopped");
+    expect(callScreenShareEventsMigration).toContain(
       "ADD CONSTRAINT call_events_type_chk"
     );
   });

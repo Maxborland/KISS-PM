@@ -219,6 +219,49 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     });
   });
 
+  app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/screen-share", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const resolved = await resolveCallRoomAndSession(context.req.param("roomId"), context.req.param("sessionId"), actor, deps);
+    if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
+    if (!resolved.value.access.readDecision.allowed) {
+      return context.json({ error: resolved.value.access.readDecision.reason }, 403);
+    }
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const record = parseRecordBody(body.value);
+    if (!record.ok) return context.json({ error: record.error }, 400);
+    const parsed = parseScreenShareBody(record.value, actor, resolved.value.access);
+    if (!parsed.ok) {
+      if (parsed.status === 403) {
+        await callWorkspace.appendDeniedAudit({
+          actionType: "communications.denied",
+          actor,
+          commandInput: {
+            action: "screen-share.update",
+            roomId: resolved.value.room.id,
+            sessionId: resolved.value.session.id,
+            userId: typeof record.value.userId === "string" ? record.value.userId : null
+          },
+          permissionResult: resolved.value.access.manageDecision,
+          sourceEntity: resolved.value.access.sourceEntity
+        });
+      }
+      return context.json({ error: parsed.error }, parsed.status);
+    }
+    const result = await callWorkspace.updateScreenShareState({
+      access: resolved.value.access,
+      actor,
+      command: parsed.value,
+      room: resolved.value.room,
+      session: resolved.value.session
+    });
+    if (!result.ok) {
+      return context.json({ error: result.error }, result.status);
+    }
+    return context.json({ event: serializeCallEvent(result.event) });
+  });
+
   app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/end", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -375,6 +418,100 @@ function parseParticipantStateBody(
       userId: userId.value
     }
   };
+}
+
+const screenShareSources = ["screen", "window", "browser_tab", "unknown"] as const;
+type ScreenShareSource = typeof screenShareSources[number];
+const screenShareStates = ["started", "stopped"] as const;
+type ScreenShareState = typeof screenShareStates[number];
+const allowedScreenShareKeys = new Set(["label", "source", "state", "userId"]);
+const forbiddenScreenShareKeys = new Set([
+  "captureConstraints",
+  "deviceId",
+  "ice",
+  "localPath",
+  "providerPayload",
+  "providerRoomId",
+  "rawMediaState",
+  "sdp",
+  "storageKey",
+  "streamId",
+  "token"
+]);
+
+function parseScreenShareBody(
+  record: Record<string, unknown>,
+  actor: TenantUser,
+  access: CommunicationEntityAccessContext
+) {
+  if (hasUnsafeScreenShareMetadata(record)) {
+    return { ok: false as const, status: 400 as const, error: "screen_share_payload_unsafe" };
+  }
+
+  const state =
+    typeof record.state === "string" && screenShareStates.includes(record.state as ScreenShareState)
+      ? record.state as ScreenShareState
+      : null;
+  if (!state) return { ok: false as const, status: 400 as const, error: "screen_share_state_invalid" };
+
+  const source =
+    typeof record.source === "string" && screenShareSources.includes(record.source as ScreenShareSource)
+      ? record.source as ScreenShareSource
+      : "unknown";
+
+  const label = parseScreenShareLabel(record.label);
+  if (!label.ok) return label;
+
+  const userId =
+    record.userId === undefined || record.userId === null
+      ? { ok: true as const, value: actor.id }
+      : parseCollaborationId(record.userId, "participant_user_id_invalid");
+  if (!userId.ok) return { ok: false as const, status: 400 as const, error: userId.error };
+
+  if (userId.value !== actor.id && !(state === "stopped" && access.manageDecision.allowed)) {
+    return {
+      ok: false as const,
+      status: 403 as const,
+      error: access.manageDecision.reason
+    };
+  }
+
+  return {
+    ok: true as const,
+    value: {
+      label: label.value,
+      permissionResult: userId.value === actor.id ? access.readDecision : access.manageDecision,
+      source,
+      state,
+      userId: userId.value
+    }
+  };
+}
+
+function parseScreenShareLabel(value: unknown): { ok: true; value: string | null } | { ok: false; status: 400; error: string } {
+  if (value === undefined || value === null) return { ok: true, value: null };
+  if (typeof value !== "string") return { ok: false, status: 400, error: "screen_share_label_invalid" };
+  const label = value.replace(/\s+/g, " ").trim();
+  if (!label) return { ok: true, value: null };
+  if (label.length > 80) return { ok: false, status: 400, error: "screen_share_label_invalid" };
+  return { ok: true, value: label };
+}
+
+function hasUnsafeScreenShareMetadata(record: Record<string, unknown>): boolean {
+  for (const key of Object.keys(record)) {
+    if (!allowedScreenShareKeys.has(key)) return true;
+    if (forbiddenScreenShareKeys.has(key)) return true;
+  }
+  const url = record.url;
+  if (typeof url === "string") {
+    try {
+      const parsed = new URL(url);
+      if (parsed.username || parsed.password) return true;
+    } catch {
+      return true;
+    }
+  }
+  return false;
 }
 
 function parseRecordingBody(record: Record<string, unknown>) {

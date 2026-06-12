@@ -34,6 +34,10 @@ const dataset: SeedTenantDataset = {
         "tenant.clients.manage",
         "tenant.contacts.read",
         "tenant.contacts.manage",
+        "tenant.opportunities.read",
+        "tenant.opportunities.manage",
+        "tenant.products.read",
+        "tenant.products.manage",
         "tenant.communications.read",
         "tenant.communications.manage",
         "tenant.projects.read",
@@ -82,6 +86,18 @@ const dataset: SeedTenantDataset = {
       role: "Заказчик"
     }
   ],
+  products: [
+    {
+      id: "product-alpha",
+      tenantId: "tenant-alpha",
+      name: "Внедрение KISS PM",
+      type: "service",
+      unit: "час",
+      price: 6000
+    }
+  ],
+  projectTypes: [{ id: "project-type-alpha", tenantId: "tenant-alpha", name: "Внедрение" }],
+  dealStages: [{ id: "deal-stage-alpha-new", tenantId: "tenant-alpha", name: "Новая", sortOrder: 10 }],
   users: [
     {
       id: "user-alpha-admin",
@@ -141,6 +157,43 @@ describe("attachment and unified search API", () => {
       dataset,
       new Date("2026-05-24T00:00:00.000Z")
     );
+    await client`
+      INSERT INTO opportunities (
+        id,
+        tenant_id,
+        stage_id,
+        client_name,
+        contact_name,
+        title,
+        project_type,
+        planned_start,
+        planned_finish,
+        contract_value,
+        planned_hourly_rate,
+        planned_hours,
+        probability,
+        status,
+        created_at,
+        updated_at
+      ) VALUES (
+        'opportunity-alpha',
+        'tenant-alpha',
+        'deal-stage-alpha-new',
+        'ООО Альфа',
+        'Вера Контакт',
+        'CRM evidence opportunity',
+        'Внедрение',
+        '2026-06-01T00:00:00.000Z',
+        '2026-06-30T00:00:00.000Z',
+        120000,
+        6000,
+        20,
+        50,
+        'new',
+        '2026-05-24T00:00:00.000Z',
+        '2026-05-24T00:00:00.000Z'
+      )
+    `;
   });
 
   afterAll(async () => {
@@ -213,6 +266,100 @@ describe("attachment and unified search API", () => {
     });
     expect(wildcardSearch.status).toBe(200);
     await expect(wildcardSearch.json()).resolves.toEqual({ results: [] });
+  });
+
+  it("attaches CRM evidence references for supported CRM entities without leaking storage metadata", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const crmEntities = [
+      { entityType: "opportunity", entityId: "opportunity-alpha", route: "/opportunities/opportunity-alpha" },
+      { entityType: "client", entityId: "client-alpha", route: "/clients/client-alpha" },
+      { entityType: "contact", entityId: "contact-alpha", route: "/contacts/contact-alpha" },
+      { entityType: "product", entityId: "product-alpha", route: "/products/product-alpha" }
+    ] as const;
+
+    for (const entity of crmEntities) {
+      const title = `CRM evidence ${entity.entityType} storage boundary`;
+      const attach = await app.request("/api/workspace/attachments/external-references", {
+        method: "POST",
+        headers: jsonHeaders(cookie),
+        body: JSON.stringify({
+          entityType: entity.entityType,
+          entityId: entity.entityId,
+          title,
+          url: `https://example.test/${entity.entityType}-evidence.pdf`,
+          connectorType: "manual_link",
+          metadata: {
+            source: "contract",
+            provider: "s3",
+            storageProvider: "s3",
+            storageKey: `internal/${entity.entityType}/secret.pdf`,
+            nested: { storage_key: `nested/${entity.entityType}/secret.pdf` }
+          }
+        })
+      });
+
+      expect(attach.status).toBe(201);
+      const attachPayload = await attach.json();
+      expect(JSON.stringify(attachPayload)).not.toContain("storageKey");
+      expect(JSON.stringify(attachPayload)).not.toContain("storage_key");
+      expect(JSON.stringify(attachPayload)).not.toContain("storageProvider");
+      expect(JSON.stringify(attachPayload)).not.toContain("provider");
+      expect(JSON.stringify(attachPayload)).not.toContain("internal/");
+      expect(JSON.stringify(attachPayload)).not.toContain("nested/");
+
+      const list = await app.request(
+        `/api/workspace/attachments?entityType=${entity.entityType}&entityId=${entity.entityId}`,
+        { headers: { cookie } }
+      );
+      expect(list.status).toBe(200);
+      const listPayload = await list.json();
+      expect(listPayload).toMatchObject({
+        attachments: [expect.objectContaining({ entityType: entity.entityType, entityId: entity.entityId })]
+      });
+      expect(JSON.stringify(listPayload)).not.toContain("storageKey");
+      expect(JSON.stringify(listPayload)).not.toContain("storage_key");
+      expect(JSON.stringify(listPayload)).not.toContain("storageProvider");
+      expect(JSON.stringify(listPayload)).not.toContain("provider");
+      expect(JSON.stringify(listPayload)).not.toContain("internal/");
+      expect(JSON.stringify(listPayload)).not.toContain("nested/");
+
+      const feed = await app.request(
+        `/api/workspace/crm/${entity.entityType}/${entity.entityId}/activity`,
+        { headers: { cookie } }
+      );
+      expect(feed.status).toBe(200);
+      const feedPayload = await feed.json();
+      expect(feedPayload).toMatchObject({
+        attachmentItems: [
+          expect.objectContaining({
+            entityType: entity.entityType,
+            entityId: entity.entityId,
+            externalReference: expect.objectContaining({ title })
+          })
+        ]
+      });
+      expect(JSON.stringify(feedPayload)).not.toContain("storageKey");
+      expect(JSON.stringify(feedPayload)).not.toContain("storage_key");
+      expect(JSON.stringify(feedPayload)).not.toContain("storageProvider");
+      expect(JSON.stringify(feedPayload)).not.toContain("provider");
+      expect(JSON.stringify(feedPayload)).not.toContain("internal/");
+      expect(JSON.stringify(feedPayload)).not.toContain("nested/");
+
+      const search = await app.request(
+        `/api/workspace/search?q=${encodeURIComponent(title)}`,
+        { headers: { cookie } }
+      );
+      expect(search.status).toBe(200);
+      await expect(search.json()).resolves.toMatchObject({
+        results: [
+          expect.objectContaining({
+            type: "external_reference",
+            title,
+            route: entity.route
+          })
+        ]
+      });
+    }
   });
 
   it("supports communication channel attachments for call recordings", async () => {
@@ -403,6 +550,50 @@ describe("attachment and unified search API", () => {
     });
     expect(uploadPayload.attachment.fileAsset.storageKey).toBeUndefined();
 
+    const listBeforeArchive = await app.request(
+      "/api/workspace/attachments?entityType=client&entityId=client-alpha",
+      { headers: { cookie } }
+    );
+    expect(listBeforeArchive.status).toBe(200);
+    await expect(listBeforeArchive.json()).resolves.toMatchObject({
+      attachments: [
+        expect.objectContaining({
+          id: uploadPayload.attachment.id,
+          entityType: "client",
+          entityId: "client-alpha",
+          fileAsset: expect.objectContaining({ safeDisplayName: "brief.txt" })
+        })
+      ]
+    });
+
+    const feedBeforeArchive = await app.request(
+      "/api/workspace/crm/client/client-alpha/activity",
+      { headers: { cookie } }
+    );
+    expect(feedBeforeArchive.status).toBe(200);
+    await expect(feedBeforeArchive.json()).resolves.toMatchObject({
+      attachmentItems: [
+        expect.objectContaining({
+          id: uploadPayload.attachment.id,
+          fileAsset: expect.objectContaining({ safeDisplayName: "brief.txt" })
+        })
+      ]
+    });
+
+    const searchBeforeArchive = await app.request("/api/workspace/search?q=brief.txt", {
+      headers: { cookie }
+    });
+    expect(searchBeforeArchive.status).toBe(200);
+    await expect(searchBeforeArchive.json()).resolves.toMatchObject({
+      results: [
+        expect.objectContaining({
+          type: "file",
+          title: "brief.txt",
+          route: "/clients/client-alpha"
+        })
+      ]
+    });
+
     const download = await app.request(
       `/api/workspace/attachments/${uploadPayload.attachment.id}/download`,
       { headers: { cookie } }
@@ -419,6 +610,10 @@ describe("attachment and unified search API", () => {
       { headers: { cookie: deniedCookie } }
     );
     expect(deniedDownload.status).toBe(403);
+    const deniedDownloadBody = await deniedDownload.text();
+    expect(deniedDownloadBody).not.toContain("brief.txt");
+    expect(deniedDownloadBody).not.toContain("storageKey");
+    expect(deniedDownloadBody).not.toContain("provider");
 
     const audit = await app.request("/api/tenant/current/audit-events", {
       headers: { cookie }
@@ -432,6 +627,16 @@ describe("attachment and unified search API", () => {
         })
       ])
     );
+
+    const deniedArchive = await app.request(
+      `/api/workspace/attachments/${uploadPayload.attachment.id}`,
+      { method: "DELETE", headers: actionHeaders(deniedCookie) }
+    );
+    expect(deniedArchive.status).toBe(403);
+    const deniedArchiveBody = await deniedArchive.text();
+    expect(deniedArchiveBody).not.toContain("brief.txt");
+    expect(deniedArchiveBody).not.toContain("storageKey");
+    expect(deniedArchiveBody).not.toContain("provider");
 
     const remove = await app.request(
       `/api/workspace/attachments/${uploadPayload.attachment.id}`,
@@ -447,6 +652,28 @@ describe("attachment and unified search API", () => {
       { headers: { cookie } }
     );
     expect(afterArchive.status).toBe(404);
+
+    const listAfterArchive = await app.request(
+      "/api/workspace/attachments?entityType=client&entityId=client-alpha",
+      { headers: { cookie } }
+    );
+    expect(listAfterArchive.status).toBe(200);
+    await expect(listAfterArchive.json()).resolves.toEqual({ attachments: [] });
+
+    const feedAfterArchive = await app.request(
+      "/api/workspace/crm/client/client-alpha/activity",
+      { headers: { cookie } }
+    );
+    expect(feedAfterArchive.status).toBe(200);
+    await expect(feedAfterArchive.json()).resolves.toMatchObject({
+      attachmentItems: []
+    });
+
+    const searchAfterArchive = await app.request("/api/workspace/search?q=brief.txt", {
+      headers: { cookie }
+    });
+    expect(searchAfterArchive.status).toBe(200);
+    await expect(searchAfterArchive.json()).resolves.toEqual({ results: [] });
   });
 
   it("omits unreadable attachment metadata from unified search", async () => {
