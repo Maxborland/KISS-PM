@@ -93,6 +93,8 @@ import type {
   TaskActivityRecord,
   TaskMetadataInput,
   TaskRecord,
+  ProjectTaskStageInput,
+  ProjectTaskStageRecord,
   ProjectResourcePoolMemberInput,
   ProjectResourcePoolMemberRecord,
   TaskStatusInput,
@@ -629,6 +631,13 @@ export type ApiTenantDataSource = {
     tenantId: TenantId,
     statusId: string
   ): Promise<TaskStatusRecord | undefined>;
+  listProjectTaskStages?(tenantId: TenantId): Promise<ProjectTaskStageRecord[]>;
+  createProjectTaskStage?(input: ProjectTaskStageInput): Promise<ProjectTaskStageRecord>;
+  updateProjectTaskStage?(input: ProjectTaskStageInput): Promise<ProjectTaskStageRecord>;
+  archiveProjectTaskStage?(
+    tenantId: TenantId,
+    stageId: string
+  ): Promise<ProjectTaskStageRecord | undefined>;
   // Task planning fields are intentionally mutated only through applyPlanningCommand.
   // Compatibility task endpoints may update non-planning metadata after the command.
   updateTaskMetadata?(input: TaskMetadataInput): Promise<TaskRecord | undefined>;

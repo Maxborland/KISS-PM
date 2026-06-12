@@ -7,6 +7,7 @@ import type { PositionDemandRecord, ProjectRecord, ProjectStatus } from "./proje
 import {
   projectPositionDemands,
   projects,
+  projectTaskStages,
   taskActivities,
   taskAssignments,
   taskParticipants,
@@ -24,6 +25,7 @@ export type TaskStatus = TaskStatusCategory;
 export type TaskPriority = "low" | "normal" | "high" | "critical";
 export type TaskSource = "manual";
 export type ProjectMutableStatus = Extract<ProjectStatus, "active" | "paused">;
+export type ProjectTaskStageState = "active" | "archived";
 export type TaskParticipantRole =
   | "executor"
   | "co_executor"
@@ -46,6 +48,24 @@ export type TaskStatusRecord = {
 
 export type TaskStatusInput = Omit<
   TaskStatusRecord,
+  "createdAt" | "updatedAt" | "isSystem"
+> & {
+  isSystem?: boolean;
+};
+
+export type ProjectTaskStageRecord = {
+  id: string;
+  tenantId: TenantId;
+  name: string;
+  sortOrder: number;
+  status: ProjectTaskStageState;
+  isSystem: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ProjectTaskStageInput = Omit<
+  ProjectTaskStageRecord,
   "createdAt" | "updatedAt" | "isSystem"
 > & {
   isSystem?: boolean;
@@ -161,6 +181,13 @@ export type ProjectWorkRepository = {
     tenantId: TenantId,
     statusId: string
   ): Promise<TaskStatusRecord | undefined>;
+  listProjectTaskStages(tenantId: TenantId): Promise<ProjectTaskStageRecord[]>;
+  createProjectTaskStage(input: ProjectTaskStageInput): Promise<ProjectTaskStageRecord>;
+  updateProjectTaskStage(input: ProjectTaskStageInput): Promise<ProjectTaskStageRecord>;
+  archiveProjectTaskStage(
+    tenantId: TenantId,
+    stageId: string
+  ): Promise<ProjectTaskStageRecord | undefined>;
   listProjectTasksForProjects(tenantId: TenantId, projectIds: string[]): Promise<TaskRecord[]>;
   listProjectTasks(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
@@ -391,6 +418,69 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
         .returning();
 
       return row ? mapTaskStatusRecord(row) : undefined;
+    },
+    async listProjectTaskStages(tenantId) {
+      const rows = await db
+        .select()
+        .from(projectTaskStages)
+        .where(eq(projectTaskStages.tenantId, tenantId))
+        .orderBy(asc(projectTaskStages.sortOrder), asc(projectTaskStages.id));
+
+      return rows.map(mapProjectTaskStageRecord);
+    },
+    async createProjectTaskStage(input) {
+      const now = new Date();
+      const [row] = await db
+        .insert(projectTaskStages)
+        .values({
+          id: input.id,
+          tenantId: input.tenantId,
+          name: input.name,
+          sortOrder: input.sortOrder,
+          status: input.status,
+          isSystem: input.isSystem ?? false,
+          createdAt: now,
+          updatedAt: now
+        })
+        .returning();
+
+      if (!row) throw new Error("Project task stage insert returned no row");
+      return mapProjectTaskStageRecord(row);
+    },
+    async updateProjectTaskStage(input) {
+      const [row] = await db
+        .update(projectTaskStages)
+        .set({
+          name: input.name,
+          sortOrder: input.sortOrder,
+          status: input.status,
+          updatedAt: new Date()
+        })
+        .where(
+          and(eq(projectTaskStages.tenantId, input.tenantId), eq(projectTaskStages.id, input.id))
+        )
+        .returning();
+
+      if (!row) throw new Error("Project task stage update returned no row");
+      return mapProjectTaskStageRecord(row);
+    },
+    async archiveProjectTaskStage(tenantId, stageId) {
+      const [row] = await db
+        .update(projectTaskStages)
+        .set({
+          status: "archived",
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(projectTaskStages.tenantId, tenantId),
+            eq(projectTaskStages.id, stageId),
+            eq(projectTaskStages.isSystem, false)
+          )
+        )
+        .returning();
+
+      return row ? mapProjectTaskStageRecord(row) : undefined;
     },
     async listProjectTasksForProjects(tenantId, projectIds) {
       if (projectIds.length === 0) return [];
@@ -720,6 +810,21 @@ function mapTaskStatusRecord(
     category: row.category as TaskStatusCategory,
     sortOrder: row.sortOrder,
     status: row.status as TaskStatusRecord["status"],
+    isSystem: row.isSystem,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  };
+}
+
+function mapProjectTaskStageRecord(
+  row: typeof projectTaskStages.$inferSelect
+): ProjectTaskStageRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    name: row.name,
+    sortOrder: row.sortOrder,
+    status: row.status as ProjectTaskStageState,
     isSystem: row.isSystem,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt

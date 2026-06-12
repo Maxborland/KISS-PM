@@ -1107,5 +1107,56 @@ export const crmProjectSchemas = openApiSchemaFragment({
       taskStatus: schemaRef("TaskStatus")
     },
     additionalProperties: false
+  },
+  ProjectTaskStage: {
+    type: "object",
+    required: [
+      "id",
+      "tenantId",
+      "name",
+      "sortOrder",
+      "status",
+      "isSystem",
+      "createdAt",
+      "updatedAt"
+    ],
+    properties: {
+      id: stringIdSchema,
+      tenantId: stringIdSchema,
+      name: { type: "string", minLength: 2, maxLength: 80 },
+      sortOrder: { type: "integer", minimum: 1, maximum: 10000 },
+      status: crmStatusSchema,
+      isSystem: { type: "boolean" },
+      createdAt: dateTimeSchema,
+      updatedAt: dateTimeSchema
+    },
+    additionalProperties: false
+  },
+  ProjectTaskStageWriteRequest: {
+    type: "object",
+    required: ["id", "name", "sortOrder"],
+    properties: {
+      id: stringIdSchema,
+      name: { type: "string", minLength: 2, maxLength: 80 },
+      sortOrder: { type: "integer", minimum: 1, maximum: 10000 },
+      status: crmStatusSchema
+    },
+    additionalProperties: false
+  },
+  ProjectTaskStagesResponse: {
+    type: "object",
+    required: ["projectTaskStages"],
+    properties: {
+      projectTaskStages: { type: "array", items: schemaRef("ProjectTaskStage") }
+    },
+    additionalProperties: false
+  },
+  ProjectTaskStageResponse: {
+    type: "object",
+    required: ["projectTaskStage"],
+    properties: {
+      projectTaskStage: schemaRef("ProjectTaskStage")
+    },
+    additionalProperties: false
   }
 });

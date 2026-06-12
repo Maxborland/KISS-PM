@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   parseCreateTaskBody,
   parseCreateTaskStatusBody,
+  parseProjectTaskStageWriteBody,
   parseProjectIdParam,
+  parseProjectTaskStageIdParam,
   parseTaskIdParam,
   parseTaskStatusIdParam,
   parseTaskCommentBody,
@@ -25,6 +27,10 @@ describe("project work parsers", () => {
     expect(parseTaskStatusIdParam("task-status-new")).toEqual({
       ok: true,
       value: "task-status-new"
+    });
+    expect(parseProjectTaskStageIdParam("project-stage-backlog")).toEqual({
+      ok: true,
+      value: "project-stage-backlog"
     });
 
     expect(parseProjectIdParam("bad..project")).toEqual({
@@ -311,6 +317,22 @@ describe("project work parsers", () => {
         status: "active"
       }
     });
+    expect(
+      parseProjectTaskStageWriteBody({
+        id: "project-stage-waiting",
+        name: "Ожидает клиента",
+        sortOrder: 25
+      })
+    ).toEqual({
+      ok: true,
+      value: {
+        id: "project-stage-waiting",
+        name: "Ожидает клиента",
+        sortOrder: 25,
+        status: "active"
+      }
+    });
+
     expect(parseTaskCommentBody({ body: "Проверил ресурсный план." })).toEqual({
       ok: true,
       value: { body: "Проверил ресурсный план." }
@@ -326,6 +348,14 @@ describe("project work parsers", () => {
         sortOrder: 25
       })
     ).toEqual({ ok: false, error: "invalid_task_status_name" });
+
+    expect(
+      parseProjectTaskStageWriteBody({
+        id: "project-stage-paused",
+        name: "Пауза\nhidden",
+        sortOrder: 25
+      })
+    ).toEqual({ ok: false, error: "invalid_project_task_stage_name" });
 
     expect(parseTaskCommentBody({ body: "Проверил\u0000скрыто" })).toEqual({
       ok: false,
