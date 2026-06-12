@@ -177,6 +177,7 @@ describe("project work API routes", () => {
     description?: string | null;
     priority?: string;
     statusId?: string;
+    stageId?: string;
     plannedStart?: string;
     plannedFinish?: string;
     durationWorkingDays?: number;
@@ -189,6 +190,7 @@ describe("project work API routes", () => {
       description: input.description ?? null,
       priority: input.priority ?? "normal",
       statusId: input.statusId ?? "task-status-new",
+      stageId: input.stageId,
       plannedStart: input.plannedStart ?? "2026-06-02",
       plannedFinish: input.plannedFinish ?? "2026-06-05",
       durationWorkingDays: input.durationWorkingDays ?? 4,
@@ -289,6 +291,7 @@ describe("project work API routes", () => {
         title: "Подготовить план внедрения",
         description: "Собрать стартовый план работ",
         priority: "high",
+        stageId: "project-stage-in-work",
         plannedStart: "2026-06-02",
         plannedFinish: "2026-06-05",
         durationWorkingDays: 4,
@@ -318,6 +321,7 @@ describe("project work API routes", () => {
       task: {
         id: "task-alpha",
         projectId: "project-alpha",
+        stageId: "project-stage-in-work",
         title: "Подготовить план внедрения",
         durationWorkingDays: 4,
         plannedWork: 8,
@@ -330,11 +334,11 @@ describe("project work API routes", () => {
     expect(projectDetail.status).toBe(200);
     await expect(projectDetail.json()).resolves.toMatchObject({
       project: { id: "project-alpha", status: "active" },
-      tasks: [expect.objectContaining({ id: "task-alpha" })]
+      tasks: [expect.objectContaining({ id: "task-alpha", stageId: "project-stage-in-work" })]
     });
     expect(myWork.status).toBe(200);
     await expect(myWork.json()).resolves.toMatchObject({
-      tasks: [expect.objectContaining({ id: "task-alpha" })]
+      tasks: [expect.objectContaining({ id: "task-alpha", stageId: "project-stage-in-work" })]
     });
     await expect(audit.json()).resolves.toMatchObject({
       auditEvents: expect.arrayContaining([
@@ -392,6 +396,121 @@ describe("project work API routes", () => {
           title: "Задача создана"
         })
       ]
+    });
+  });
+
+  it("defaults a project task without stageId to the first active project task stage", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+
+    const createdTask = await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-stage-default",
+        title: "Задача без этапа",
+        priority: "normal",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        durationWorkingDays: 4,
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const projectDetail = await app.request("/api/workspace/projects/project-alpha", {
+      headers: { cookie: adminCookie }
+    });
+    const myWork = await app.request("/api/workspace/my-work", {
+      headers: { cookie: executorCookie }
+    });
+
+    expect(createdTask.status).toBe(201);
+    await expect(createdTask.json()).resolves.toMatchObject({
+      task: {
+        id: "task-stage-default",
+        projectId: "project-alpha",
+        stageId: "project-stage-backlog"
+      }
+    });
+    expect(projectDetail.status).toBe(200);
+    await expect(projectDetail.json()).resolves.toMatchObject({
+      tasks: [expect.objectContaining({ id: "task-stage-default", stageId: "project-stage-backlog" })]
+    });
+    expect(myWork.status).toBe(200);
+    await expect(myWork.json()).resolves.toMatchObject({
+      tasks: [expect.objectContaining({ id: "task-stage-default", stageId: "project-stage-backlog" })]
+    });
+  });
+
+  it("rejects unknown project task stages on task create and update", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+
+    const invalidCreate = await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-stage-missing",
+        title: "Проверить неизвестный этап",
+        priority: "normal",
+        stageId: "project-stage-missing",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        durationWorkingDays: 4,
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    expect(invalidCreate.status).toBe(400);
+    await expect(invalidCreate.json()).resolves.toEqual({
+      error: "project_task_stage_not_found"
+    });
+
+    const createdTask = await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-stage-validation",
+        title: "Проверить смену этапа",
+        priority: "normal",
+        stageId: "project-stage-todo",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        durationWorkingDays: 4,
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    expect(createdTask.status).toBe(201);
+    const createdBody = await createdTask.json();
+    const invalidUpdate = await app.request("/api/workspace/tasks/task-stage-validation", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify(
+        buildTaskPatchBody({
+          stageId: "project-stage-missing",
+          clientUpdatedAt: createdBody.task.updatedAt
+        })
+      )
+    });
+    expect(invalidUpdate.status).toBe(400);
+    await expect(invalidUpdate.json()).resolves.toEqual({
+      error: "project_task_stage_not_found"
     });
   });
 
@@ -1114,6 +1233,7 @@ describe("project work API routes", () => {
         title: "Права редактирования проверены",
         description: "Постановщик и администратор могут изменить задачу.",
         priority: "high",
+        stageId: "project-stage-review",
         plannedWork: 12,
         clientUpdatedAt: editVersionBody.task.updatedAt,
         participants: [{ userId: "user-alpha-executor", role: "executor" }]
@@ -1132,6 +1252,7 @@ describe("project work API routes", () => {
       task: {
         id: "task-field-guard",
         title: "Права редактирования проверены",
+        stageId: "project-stage-review",
         plannedWork: 12
       }
     });

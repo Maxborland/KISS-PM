@@ -12,7 +12,7 @@ export function MyWorkBlock() {
 
   return (
     <>
-      <PageIntro title="Моя работа" lead="Канбан и список задач в одном рабочем контуре." />
+      <PageIntro title="Моя работа" lead="Канбан показывает этапы проектного workflow, а статус остается состоянием исполнения." />
       <div className="view-toolbar">
         <Segmented
           name="my-work-mode"
@@ -28,25 +28,26 @@ export function MyWorkBlock() {
         <p className="u-text-sm u-text-muted">Список задач (демо переключения режима).</p>
       ) : (
         <KanbanBoard>
-          <KanbanColumn title="Бэклог" count={24}>
+          <KanbanColumn title="Этап: Бэклог" count={24}>
             <KanbanCard
               id="MDS-39"
               title="Новая страница продукта"
               priority="urgent"
-              priorityLabel="Urgent"
-              meta={[{ label: "Новая Homepage" }, { label: "Срок: 29 июля" }]}
+              priorityLabel="Срочно"
+              meta={[{ label: "Статус: Новая" }, { label: "Срок: 29 июля" }]}
               assignees={[{ initials: "ИИ", color: "c1" }]}
               comments={13}
               date="30.05.2024"
             />
           </KanbanColumn>
-          <KanbanColumn title="В работе" count={4}>
+          <KanbanColumn title="Этап: В работе" count={4}>
             <KanbanCard
               id="MDS-2"
               title="Sales deck"
               priority="low"
-              priorityLabel="Low"
+              priorityLabel="Низкий"
               highlight
+              meta={[{ label: "Статус: В работе" }]}
               assignees={[
                 { initials: "КБ", color: "c4" },
                 { initials: "МД", color: "c5" }
@@ -55,7 +56,7 @@ export function MyWorkBlock() {
               date="31.05.2024"
             />
           </KanbanColumn>
-          <KanbanColumn title="Готово" count={13}>
+          <KanbanColumn title="Этап: На проверке" count={13}>
             <p className="u-text-xs u-text-muted">Нет задач за сегодня</p>
           </KanbanColumn>
         </KanbanBoard>

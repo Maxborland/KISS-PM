@@ -111,6 +111,7 @@ export type TaskMetadataInput = {
   taskId: string;
   description: string | null;
   priority: TaskPriority;
+  stageId: string | null;
   requesterUserId: UserId;
   ownerUserId: UserId;
   requiresAcceptance: boolean;
@@ -664,6 +665,7 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
           .set({
             description: input.description,
             priority: input.priority,
+            stageId: input.stageId,
             requesterUserId: input.requesterUserId,
             ownerUserId: input.ownerUserId,
             requiresAcceptance: input.requiresAcceptance,

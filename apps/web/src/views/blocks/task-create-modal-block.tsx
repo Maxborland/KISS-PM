@@ -61,6 +61,19 @@ export function TaskCreateModalBlock() {
                 placeholder="Выбрать"
               />
             </Field>
+            <Field label="Этап проекта" htmlFor="t-stage">
+              <Select defaultValue="todo">
+                <SelectTrigger id="t-stage" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="backlog">Бэклог</SelectItem>
+                  <SelectItem value="todo">К выполнению</SelectItem>
+                  <SelectItem value="in-work">В работе</SelectItem>
+                  <SelectItem value="review">На проверке</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
             <Field label="Срок" htmlFor="t-due">
               <DatePicker placeholder="Выбрать дату" />
             </Field>

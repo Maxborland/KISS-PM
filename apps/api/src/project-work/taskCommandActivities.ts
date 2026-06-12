@@ -7,6 +7,7 @@ export function summarizeTask(task: TaskRecord): Record<string, unknown> {
   return {
     id: task.id,
     projectId: task.projectId,
+    stageId: task.stageId,
     title: task.title,
     status: task.status,
     statusId: task.statusId,

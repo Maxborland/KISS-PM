@@ -1021,6 +1021,20 @@ describe("KISS PM API Phase 1 shell", () => {
       async listTaskStatuses() {
         return [status];
       },
+      async listProjectTaskStages() {
+        return [
+          {
+            id: "project-stage-backlog",
+            tenantId: "tenant-db",
+            name: "Бэклог",
+            sortOrder: 10,
+            status: "active",
+            isSystem: true,
+            createdAt: new Date("2026-01-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-01-01T00:00:00.000Z")
+          }
+        ];
+      },
       async withTransaction(operation) {
         return operation(dataSource);
       },

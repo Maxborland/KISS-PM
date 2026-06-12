@@ -3,7 +3,7 @@ import {
   canManageProjects,
   type PolicyDecision
 } from "@kiss-pm/access-control";
-import type { TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
+import type { ProjectTaskStageRecord, TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
 
 import type { ApiTenantDataSource } from "../apiTypes";
 import { createTaskSystemActivity } from "./taskCommandActivities";
@@ -28,6 +28,7 @@ export function hasWorkspaceInboxCreateTaskDeps(deps: TaskCommandWorkspaceDeps):
     deps.dataSource.ensureWorkspaceInboxProject &&
       deps.dataSource.listWorkspaceUsers &&
       deps.dataSource.listTaskStatuses &&
+      deps.dataSource.listProjectTaskStages &&
       deps.dataSource.applyPlanningCommand &&
       deps.dataSource.updateTaskMetadata &&
       deps.dataSource.findTaskById &&
@@ -42,6 +43,7 @@ export function hasProjectCreateTaskDeps(deps: TaskCommandWorkspaceDeps): boolea
     deps.dataSource.listProjects &&
       deps.dataSource.listWorkspaceUsers &&
       deps.dataSource.listTaskStatuses &&
+      deps.dataSource.listProjectTaskStages &&
       deps.dataSource.applyPlanningCommand &&
       deps.dataSource.updateTaskMetadata &&
       deps.dataSource.findTaskById &&
@@ -120,6 +122,17 @@ export function resolveCreateTaskStatus(
   return statuses.find(
     (status) => status.id === taskStatus?.id && status.status === "active"
   );
+}
+
+export function resolveCreateTaskStage(
+  stages: ProjectTaskStageRecord[],
+  requestedStageId?: string
+): ProjectTaskStageRecord | undefined {
+  const taskStage =
+    requestedStageId !== undefined
+      ? stages.find((stage) => stage.id === requestedStageId)
+      : stages.find((stage) => stage.status === "active");
+  return stages.find((stage) => stage.id === taskStage?.id && stage.status === "active");
 }
 
 export async function appendCreatedTaskActivity(

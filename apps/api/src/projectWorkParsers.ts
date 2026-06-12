@@ -40,6 +40,7 @@ export type CreateTaskBody = {
   description: string | null;
   priority: (typeof taskPriorities)[number];
   statusId: string | undefined;
+  stageId: string | undefined;
   plannedStart: Date;
   plannedFinish: Date;
   durationWorkingDays: number;
@@ -149,6 +150,11 @@ export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
     return { ok: false, error: "invalid_task_priority" };
   }
 
+  const stageId = getOptionalString(input, "stageId") ?? undefined;
+  if (stageId !== undefined && !isSafeIdentifier(stageId)) {
+    return { ok: false, error: "invalid_project_task_stage_id" };
+  }
+
   const participants = parseParticipants(input);
   if (!participants.ok) return participants;
   if (!participants.value.some((participant) => participant.role === "executor")) {
@@ -163,6 +169,7 @@ export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
       description,
       priority,
       statusId: getOptionalString(input, "statusId") ?? undefined,
+      stageId,
       plannedStart,
       plannedFinish,
       durationWorkingDays,

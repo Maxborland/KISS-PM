@@ -278,6 +278,7 @@ describe("project work parsers", () => {
         title: "Уточнить ресурсную оценку",
         description: "Проверить роли",
         statusId: "task-status-waiting",
+        stageId: "project-task-stage-delivery",
         priority: "normal",
         plannedStart: "2026-06-02",
         plannedFinish: "2026-06-05",
@@ -295,6 +296,7 @@ describe("project work parsers", () => {
       value: expect.objectContaining({
         title: "Уточнить ресурсную оценку",
         statusId: "task-status-waiting",
+        stageId: "project-task-stage-delivery",
         clientUpdatedAt: new Date("2026-05-21T00:00:00.000Z"),
         durationWorkingDays: 4,
         requiresAcceptance: false
@@ -337,6 +339,36 @@ describe("project work parsers", () => {
       ok: true,
       value: { body: "Проверил ресурсный план." }
     });
+  });
+
+  it("rejects unsafe project task stage ids in task payloads", () => {
+    const baseTaskPayload = {
+      title: "Уточнить ресурсную оценку",
+      description: "Проверить роли",
+      statusId: "task-status-waiting",
+      priority: "normal",
+      plannedStart: "2026-06-02",
+      plannedFinish: "2026-06-05",
+      durationWorkingDays: 4,
+      plannedWork: 16,
+      requiresAcceptance: false,
+      participants: [
+        { userId: "user-alpha-admin", role: "requester" },
+        { userId: "user-alpha-executor", role: "executor" }
+      ],
+      stageId: "bad..stage"
+    };
+
+    expect(parseCreateTaskBody(baseTaskPayload)).toEqual({
+      ok: false,
+      error: "invalid_project_task_stage_id"
+    });
+    expect(
+      parseUpdateTaskBody({
+        ...baseTaskPayload,
+        clientUpdatedAt: "2026-05-21T00:00:00.000Z"
+      })
+    ).toEqual({ ok: false, error: "invalid_project_task_stage_id" });
   });
 
   it("rejects unsafe task status names and comments", () => {
