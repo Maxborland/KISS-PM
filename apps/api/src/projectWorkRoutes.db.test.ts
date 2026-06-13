@@ -1004,6 +1004,97 @@ describe("project work API routes", () => {
     });
   });
 
+  it("returns stable conflicts for duplicate project task stage names and sort order", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie: adminCookie
+    };
+
+    const alpha = await app.request("/api/workspace/project-task-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "project-stage-conflict-alpha",
+        name: "Конфликт альфа",
+        sortOrder: 210
+      })
+    });
+    const beta = await app.request("/api/workspace/project-task-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "project-stage-conflict-beta",
+        name: "Конфликт бета",
+        sortOrder: 220
+      })
+    });
+    const duplicateNameCreate = await app.request("/api/workspace/project-task-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "project-stage-conflict-name-create",
+        name: "Конфликт альфа",
+        sortOrder: 230
+      })
+    });
+    const duplicateSortOrderCreate = await app.request("/api/workspace/project-task-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "project-stage-conflict-sort-create",
+        name: "Конфликт гамма",
+        sortOrder: 210
+      })
+    });
+    const duplicateNameUpdate = await app.request(
+      "/api/workspace/project-task-stages/project-stage-conflict-alpha",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          id: "project-stage-conflict-alpha",
+          name: "Конфликт бета",
+          sortOrder: 210,
+          status: "active"
+        })
+      }
+    );
+    const duplicateSortOrderUpdate = await app.request(
+      "/api/workspace/project-task-stages/project-stage-conflict-alpha",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          id: "project-stage-conflict-alpha",
+          name: "Конфликт альфа",
+          sortOrder: 220,
+          status: "active"
+        })
+      }
+    );
+
+    expect(alpha.status).toBe(201);
+    expect(beta.status).toBe(201);
+    expect(duplicateNameCreate.status).toBe(409);
+    await expect(duplicateNameCreate.json()).resolves.toEqual({
+      error: "project_task_stage_name_conflict"
+    });
+    expect(duplicateSortOrderCreate.status).toBe(409);
+    await expect(duplicateSortOrderCreate.json()).resolves.toEqual({
+      error: "project_task_stage_sort_order_conflict"
+    });
+    expect(duplicateNameUpdate.status).toBe(409);
+    await expect(duplicateNameUpdate.json()).resolves.toEqual({
+      error: "project_task_stage_name_conflict"
+    });
+    expect(duplicateSortOrderUpdate.status).toBe(409);
+    await expect(duplicateSortOrderUpdate.json()).resolves.toEqual({
+      error: "project_task_stage_sort_order_conflict"
+    });
+  });
+
   it("lets requester accept review tasks without manage permission", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const requesterCookie = await loginAs("executor@kiss-pm.local", "executor12345");

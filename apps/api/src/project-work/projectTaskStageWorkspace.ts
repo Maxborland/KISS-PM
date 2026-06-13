@@ -99,32 +99,38 @@ async function createProjectTaskStage(
   });
   if (!decision.allowed) return { ok: false, status: 403, error: decision.reason };
 
-  return deps.runDataSourceTransaction(async (transactionDataSource) => {
-    if (!transactionDataSource.createProjectTaskStage || !transactionDataSource.appendAuditEvent) {
-      return { ok: false, status: 501, error: "persistence_not_configured" };
-    }
+  try {
+    return await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.createProjectTaskStage || !transactionDataSource.appendAuditEvent) {
+        return { ok: false, status: 501, error: "persistence_not_configured" };
+      }
 
-    const projectTaskStage = await transactionDataSource.createProjectTaskStage({
-      ...input.value,
-      tenantId: input.actor.tenantId
+      const projectTaskStage = await transactionDataSource.createProjectTaskStage({
+        ...input.value,
+        tenantId: input.actor.tenantId
+      });
+
+      await appendProjectTaskStageAudit(
+        deps,
+        {
+          actor: input.actor,
+          actionType: "project_task_stage.created",
+          stageId: projectTaskStage.id,
+          commandInput: input.value,
+          beforeState: null,
+          afterState: summarizeProjectTaskStage(projectTaskStage),
+          permissionReason: decision.reason
+        },
+        transactionDataSource
+      );
+
+      return { ok: true, projectTaskStage };
     });
-
-    await appendProjectTaskStageAudit(
-      deps,
-      {
-        actor: input.actor,
-        actionType: "project_task_stage.created",
-        stageId: projectTaskStage.id,
-        commandInput: input.value,
-        beforeState: null,
-        afterState: summarizeProjectTaskStage(projectTaskStage),
-        permissionReason: decision.reason
-      },
-      transactionDataSource
-    );
-
-    return { ok: true, projectTaskStage };
-  });
+  } catch (error) {
+    const conflict = mapProjectTaskStageConflictError(error);
+    if (conflict) return conflict;
+    throw error;
+  }
 }
 
 async function updateProjectTaskStage(
@@ -147,45 +153,51 @@ async function updateProjectTaskStage(
   });
   if (!decision.allowed) return { ok: false, status: 403, error: decision.reason };
 
-  return deps.runDataSourceTransaction(async (transactionDataSource) => {
-    if (
-      !transactionDataSource.updateProjectTaskStage ||
-      !transactionDataSource.listProjectTaskStages ||
-      !transactionDataSource.appendAuditEvent
-    ) {
-      return { ok: false, status: 501, error: "persistence_not_configured" };
-    }
+  try {
+    return await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.updateProjectTaskStage ||
+        !transactionDataSource.listProjectTaskStages ||
+        !transactionDataSource.appendAuditEvent
+      ) {
+        return { ok: false, status: 501, error: "persistence_not_configured" };
+      }
 
-    const before = (await transactionDataSource.listProjectTaskStages(input.actor.tenantId)).find(
-      (stage) => stage.id === input.stageId
-    );
-    if (!before) return { ok: false, status: 404, error: "project_task_stage_not_found" };
-    if (before.isSystem && input.value.status === "archived") {
-      return { ok: false, status: 409, error: "system_project_task_stage_required" };
-    }
+      const before = (await transactionDataSource.listProjectTaskStages(input.actor.tenantId)).find(
+        (stage) => stage.id === input.stageId
+      );
+      if (!before) return { ok: false, status: 404, error: "project_task_stage_not_found" };
+      if (before.isSystem && input.value.status === "archived") {
+        return { ok: false, status: 409, error: "system_project_task_stage_required" };
+      }
 
-    const projectTaskStage = await transactionDataSource.updateProjectTaskStage({
-      ...input.value,
-      id: input.stageId,
-      tenantId: input.actor.tenantId
+      const projectTaskStage = await transactionDataSource.updateProjectTaskStage({
+        ...input.value,
+        id: input.stageId,
+        tenantId: input.actor.tenantId
+      });
+
+      await appendProjectTaskStageAudit(
+        deps,
+        {
+          actor: input.actor,
+          actionType: "project_task_stage.updated",
+          stageId: projectTaskStage.id,
+          commandInput: input.value,
+          beforeState: summarizeProjectTaskStage(before),
+          afterState: summarizeProjectTaskStage(projectTaskStage),
+          permissionReason: decision.reason
+        },
+        transactionDataSource
+      );
+
+      return { ok: true, projectTaskStage };
     });
-
-    await appendProjectTaskStageAudit(
-      deps,
-      {
-        actor: input.actor,
-        actionType: "project_task_stage.updated",
-        stageId: projectTaskStage.id,
-        commandInput: input.value,
-        beforeState: summarizeProjectTaskStage(before),
-        afterState: summarizeProjectTaskStage(projectTaskStage),
-        permissionReason: decision.reason
-      },
-      transactionDataSource
-    );
-
-    return { ok: true, projectTaskStage };
-  });
+  } catch (error) {
+    const conflict = mapProjectTaskStageConflictError(error);
+    if (conflict) return conflict;
+    throw error;
+  }
 }
 
 async function archiveProjectTaskStage(
@@ -259,4 +271,29 @@ function summarizeProjectTaskStage(stage: ProjectTaskStageRecord) {
     status: stage.status,
     isSystem: stage.isSystem
   };
+}
+
+function mapProjectTaskStageConflictError(error: unknown): WorkspaceError | undefined {
+  if (isConstraintError(error, "project_task_stages_tenant_name_uidx")) {
+    return { ok: false, status: 409, error: "project_task_stage_name_conflict" };
+  }
+  if (isConstraintError(error, "project_task_stages_tenant_sort_order_uidx")) {
+    return { ok: false, status: 409, error: "project_task_stage_sort_order_conflict" };
+  }
+  if (isConstraintError(error, "project_task_stages_pkey")) {
+    return { ok: false, status: 409, error: "project_task_stage_id_conflict" };
+  }
+}
+
+function isConstraintError(error: unknown, constraintName: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as Record<string, unknown>;
+
+  return (
+    (record.code === "23505" &&
+      (record.constraint_name === constraintName ||
+        record.constraint === constraintName ||
+        String(record.message ?? "").includes(constraintName))) ||
+    isConstraintError(record.cause, constraintName)
+  );
 }
