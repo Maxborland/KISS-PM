@@ -7,6 +7,7 @@ import {
   getParticipantUserId,
   normalizeTaskParticipants
 } from "./taskCommandGuards";
+import { resolveCreateTaskStage } from "./taskCreateSupport";
 import type { TaskCommandWorkspaceDeps, TaskResult, UpdateTaskInput } from "./taskCommandTypes";
 
 export async function updateTask(
@@ -21,6 +22,7 @@ export async function updateTask(
     !deps.dataSource.updateTaskMetadata ||
     !deps.dataSource.incrementPlanVersion ||
     !deps.dataSource.listTaskStatuses ||
+    !deps.dataSource.listProjectTaskStages ||
     !deps.dataSource.listWorkspaceUsers ||
     !deps.dataSource.createTaskActivity ||
     !deps.dataSource.withTransaction
@@ -49,6 +51,7 @@ export async function updateTask(
       !transactionDataSource.listProjects ||
       !transactionDataSource.incrementPlanVersion ||
       !transactionDataSource.listTaskStatuses ||
+      !transactionDataSource.listProjectTaskStages ||
       !transactionDataSource.listWorkspaceUsers ||
       !transactionDataSource.createTaskActivity
     ) {
@@ -91,6 +94,17 @@ export async function updateTask(
     if (!currentNextStatus) {
       return { ok: false as const, status: 400, error: "task_status_not_found" };
     }
+    let nextStageId = currentTask.stageId;
+    if (input.body.stageId !== undefined) {
+      const currentNextStage = resolveCreateTaskStage(
+        await transactionDataSource.listProjectTaskStages(input.actor.tenantId),
+        input.body.stageId
+      );
+      if (!currentNextStage) {
+        return { ok: false as const, status: 400, error: "project_task_stage_not_found" };
+      }
+      nextStageId = currentNextStage.id;
+    }
 
     const snapshot = await transactionDataSource.getPlanSnapshot(
       input.actor.tenantId,
@@ -127,6 +141,7 @@ export async function updateTask(
       taskId: currentTask.id,
       description: input.body.description,
       priority: input.body.priority,
+      stageId: nextStageId,
       requesterUserId,
       ownerUserId,
       requiresAcceptance: input.body.requiresAcceptance,

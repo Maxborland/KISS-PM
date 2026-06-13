@@ -2,6 +2,7 @@ import { getOptionalString, getStringField } from "./parseHelpers";
 export type { RouteParamParseResult as ProjectWorkRouteIdParseResult } from "./routeParamParsers";
 export {
   parseProjectIdParam,
+  parseProjectTaskStageIdParam,
   parseTaskIdParam,
   parseTaskStatusIdParam
 } from "./routeParamParsers";
@@ -39,6 +40,7 @@ export type CreateTaskBody = {
   description: string | null;
   priority: (typeof taskPriorities)[number];
   statusId: string | undefined;
+  stageId: string | undefined;
   plannedStart: Date;
   plannedFinish: Date;
   durationWorkingDays: number;
@@ -79,8 +81,19 @@ export type CreateTaskStatusBody = {
   status: "active" | "archived";
 };
 
+export type ProjectTaskStageWriteBody = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  status: "active" | "archived";
+};
+
 export type CreateTaskStatusParseResult =
   | { ok: true; value: CreateTaskStatusBody }
+  | { ok: false; error: string };
+
+export type ProjectTaskStageWriteParseResult =
+  | { ok: true; value: ProjectTaskStageWriteBody }
   | { ok: false; error: string };
 
 export type TaskCommentBody = {
@@ -137,6 +150,11 @@ export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
     return { ok: false, error: "invalid_task_priority" };
   }
 
+  const stageId = getOptionalString(input, "stageId") ?? undefined;
+  if (stageId !== undefined && !isSafeIdentifier(stageId)) {
+    return { ok: false, error: "invalid_project_task_stage_id" };
+  }
+
   const participants = parseParticipants(input);
   if (!participants.ok) return participants;
   if (!participants.value.some((participant) => participant.role === "executor")) {
@@ -151,6 +169,7 @@ export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
       description,
       priority,
       statusId: getOptionalString(input, "statusId") ?? undefined,
+      stageId,
       plannedStart,
       plannedFinish,
       durationWorkingDays,
@@ -222,6 +241,37 @@ export function parseCreateTaskStatusBody(
       id,
       name,
       category,
+      sortOrder,
+      status
+    }
+  };
+}
+
+export function parseProjectTaskStageWriteBody(
+  input: unknown
+): ProjectTaskStageWriteParseResult {
+  const id = getOptionalString(input, "id");
+  if (!id || !isSafeIdentifier(id)) {
+    return { ok: false, error: "invalid_project_task_stage_id" };
+  }
+  const name = getStringField(input, "name") ?? "";
+  if (name.length < 2 || name.length > 80 || !isSafeSingleLineText(name)) {
+    return { ok: false, error: "invalid_project_task_stage_name" };
+  }
+  const sortOrder = getIntegerField(input, "sortOrder");
+  if (sortOrder === null || sortOrder < 1 || sortOrder > 10000) {
+    return { ok: false, error: "invalid_project_task_stage_sort_order" };
+  }
+  const status = getOptionalString(input, "status") ?? "active";
+  if (status !== "active" && status !== "archived") {
+    return { ok: false, error: "invalid_project_task_stage_state" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      id,
+      name,
       sortOrder,
       status
     }

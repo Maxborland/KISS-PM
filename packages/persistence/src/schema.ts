@@ -818,6 +818,38 @@ export const taskStatuses = pgTable(
   ]
 );
 
+export const projectTaskStages = pgTable(
+  "project_task_stages",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull(),
+    status: text("status").notNull().default("active"),
+    isSystem: boolean("is_system").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "project_task_stages_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("project_task_stages_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("project_task_stages_tenant_sort_order_uidx").on(
+      table.tenantId,
+      table.sortOrder
+    ),
+    uniqueIndex("project_task_stages_tenant_name_uidx").on(table.tenantId, table.name),
+    check(
+      "project_task_stages_status_chk",
+      sql`${table.status} in ('active', 'archived')`
+    )
+  ]
+);
+
 export const tasks = pgTable(
   "tasks",
   {
@@ -869,6 +901,11 @@ export const tasks = pgTable(
       columns: [table.tenantId, table.projectId],
       foreignColumns: [projects.tenantId, projects.id]
     }).onDelete("cascade"),
+    foreignKey({
+      name: "tasks_stage_fk",
+      columns: [table.tenantId, table.stageId],
+      foreignColumns: [projectTaskStages.tenantId, projectTaskStages.id]
+    }).onDelete("restrict"),
     foreignKey({
       name: "tasks_status_fk",
       columns: [table.tenantId, table.statusId],
@@ -3804,6 +3841,7 @@ export type PersistenceTableName =
   | "project_position_demands"
   | "project_resource_pool_members"
   | "task_statuses"
+  | "project_task_stages"
   | "tasks"
   | "plan_versions"
   | "project_calendars"
@@ -3905,6 +3943,7 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "project_position_demands",
   "project_resource_pool_members",
   "task_statuses",
+  "project_task_stages",
   "tasks",
   "plan_versions",
   "project_calendars",
@@ -3999,6 +4038,7 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "project_position_demands",
   "project_resource_pool_members",
   "task_statuses",
+  "project_task_stages",
   "tasks",
   "plan_versions",
   "project_calendars",
@@ -4272,6 +4312,16 @@ const tableColumns = {
     "tenant_id",
     "name",
     "category",
+    "sort_order",
+    "status",
+    "is_system",
+    "created_at",
+    "updated_at"
+  ],
+  project_task_stages: [
+    "id",
+    "tenant_id",
+    "name",
     "sort_order",
     "status",
     "is_system",

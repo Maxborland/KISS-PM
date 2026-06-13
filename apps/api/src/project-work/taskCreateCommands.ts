@@ -8,6 +8,7 @@ import {
   hasProjectCreateTaskDeps,
   hasWorkspaceInboxCreateTaskDeps,
   prepareCreateTaskParticipants,
+  resolveCreateTaskStage,
   resolveCreateTaskStatus,
   validateCreateTaskParticipants
 } from "./taskCreateSupport";
@@ -44,6 +45,7 @@ export async function createWorkspaceInboxTask(
       !transactionDataSource.ensureWorkspaceInboxProject ||
       !transactionDataSource.listWorkspaceUsers ||
       !transactionDataSource.listTaskStatuses ||
+      !transactionDataSource.listProjectTaskStages ||
       !transactionDataSource.applyPlanningCommand ||
       !transactionDataSource.updateTaskMetadata ||
       !transactionDataSource.findTaskById ||
@@ -63,6 +65,12 @@ export async function createWorkspaceInboxTask(
     const currentTaskStatus = resolveCreateTaskStatus(statuses, input.body.statusId);
     if (!currentTaskStatus) {
       return { ok: false as const, status: 400, error: "task_status_not_found" };
+    }
+
+    const stages = await transactionDataSource.listProjectTaskStages(input.actor.tenantId);
+    const currentTaskStage = resolveCreateTaskStage(stages, input.body.stageId);
+    if (!currentTaskStage) {
+      return { ok: false as const, status: 400, error: "project_task_stage_not_found" };
     }
 
     const inboxProject = await transactionDataSource.ensureWorkspaceInboxProject({
@@ -91,6 +99,7 @@ export async function createWorkspaceInboxTask(
       taskId,
       description: input.body.description,
       priority: input.body.priority,
+      stageId: currentTaskStage.id,
       requesterUserId,
       ownerUserId,
       requiresAcceptance: input.body.requiresAcceptance,
@@ -115,6 +124,7 @@ export async function createWorkspaceInboxTask(
           projectId: inboxProject.id,
           sourceType: inboxProject.sourceType,
           title: createdTask.title,
+          stageId: createdTask.stageId,
           participants: createdTask.participants,
           planningCommands: [planningCommand]
         },
@@ -124,6 +134,7 @@ export async function createWorkspaceInboxTask(
           projectId: createdTask.projectId,
           status: createdTask.status,
           statusId: createdTask.statusId,
+          stageId: createdTask.stageId,
           participants: createdTask.participants,
           planVersion
         },
@@ -178,6 +189,7 @@ export async function createProjectTask(
       !transactionDataSource.listProjects ||
       !transactionDataSource.listWorkspaceUsers ||
       !transactionDataSource.listTaskStatuses ||
+      !transactionDataSource.listProjectTaskStages ||
       !transactionDataSource.applyPlanningCommand ||
       !transactionDataSource.updateTaskMetadata ||
       !transactionDataSource.findTaskById ||
@@ -208,6 +220,12 @@ export async function createProjectTask(
       return { ok: false as const, status: 400, error: "task_status_not_found" };
     }
 
+    const stages = await transactionDataSource.listProjectTaskStages(input.actor.tenantId);
+    const currentTaskStage = resolveCreateTaskStage(stages, input.body.stageId);
+    if (!currentTaskStage) {
+      return { ok: false as const, status: 400, error: "project_task_stage_not_found" };
+    }
+
     const currentPlanningCommand = buildCreateTaskPlanningCommand({
       taskId,
       projectId: currentProject.id,
@@ -226,6 +244,7 @@ export async function createProjectTask(
       taskId,
       description: input.body.description,
       priority: input.body.priority,
+      stageId: currentTaskStage.id,
       requesterUserId,
       ownerUserId,
       requiresAcceptance: input.body.requiresAcceptance,
@@ -249,6 +268,7 @@ export async function createProjectTask(
         commandInput: {
           projectId: currentProject.id,
           title: createdTask.title,
+          stageId: createdTask.stageId,
           participants: createdTask.participants,
           planningCommands: [currentPlanningCommand]
         },
@@ -258,6 +278,7 @@ export async function createProjectTask(
           projectId: createdTask.projectId,
           status: createdTask.status,
           statusId: createdTask.statusId,
+          stageId: createdTask.stageId,
           participants: createdTask.participants,
           planVersion
         },

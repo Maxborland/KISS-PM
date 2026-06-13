@@ -14,6 +14,10 @@ export function parseTaskStatusIdParam(value: unknown): RouteParamParseResult {
   return parseRouteIdentifier(value, "invalid_task_status_id");
 }
 
+export function parseProjectTaskStageIdParam(value: unknown): RouteParamParseResult {
+  return parseRouteIdentifier(value, "invalid_project_task_stage_id");
+}
+
 export function parseControlSignalIdParam(value: unknown): RouteParamParseResult {
   return parseRouteIdentifier(value, "invalid_control_signal_id");
 }

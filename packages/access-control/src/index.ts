@@ -59,6 +59,7 @@ export const permissions = [
   "tenant.tasks.edit",
   "tenant.tasks.delete",
   "tenant.task_statuses.manage",
+  "tenant.project_stages.manage",
   "tenant.project_activation.manage",
   "tenant.resource_feasibility.read",
   "profile.read",
@@ -719,6 +720,17 @@ export function canManageTaskStatuses(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.task_statuses.manage"
+  });
+}
+
+export function canManageProjectStages(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.project_stages.manage"
   });
 }
 

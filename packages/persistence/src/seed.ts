@@ -12,6 +12,7 @@ import {
   dealStages,
   positions,
   products,
+  projectTaskStages,
   projectTypes,
   taskStatuses,
   tenantUsers,
@@ -126,6 +127,13 @@ export async function seedTenantDataset(
         await transaction
           .insert(taskStatuses)
           .values(status)
+          .onConflictDoNothing();
+      }
+
+      for (const stage of createDefaultProjectTaskStages(tenant.id, createdAt)) {
+        await transaction
+          .insert(projectTaskStages)
+          .values(stage)
           .onConflictDoNothing();
       }
     }
@@ -418,6 +426,7 @@ export function createTenantAdminSeedProfile(input: {
     "tenant.tasks.edit",
     "tenant.tasks.delete",
     "tenant.task_statuses.manage",
+    "tenant.project_stages.manage",
     "tenant.project_activation.manage",
     "tenant.resource_feasibility.read",
     "profile.read",
@@ -484,6 +493,61 @@ function createDefaultTaskStatuses(tenantId: string, createdAt: Date) {
       tenantId,
       name: "Выполнено",
       category: "done",
+      sortOrder: 50,
+      status: "active",
+      isSystem: true,
+      createdAt,
+      updatedAt: createdAt
+    }
+  ];
+}
+
+function createDefaultProjectTaskStages(tenantId: string, createdAt: Date) {
+  return [
+    {
+      id: "project-stage-backlog",
+      tenantId,
+      name: "Бэклог",
+      sortOrder: 10,
+      status: "active",
+      isSystem: true,
+      createdAt,
+      updatedAt: createdAt
+    },
+    {
+      id: "project-stage-todo",
+      tenantId,
+      name: "К выполнению",
+      sortOrder: 20,
+      status: "active",
+      isSystem: true,
+      createdAt,
+      updatedAt: createdAt
+    },
+    {
+      id: "project-stage-in-work",
+      tenantId,
+      name: "В работе",
+      sortOrder: 30,
+      status: "active",
+      isSystem: false,
+      createdAt,
+      updatedAt: createdAt
+    },
+    {
+      id: "project-stage-review",
+      tenantId,
+      name: "На проверке",
+      sortOrder: 40,
+      status: "active",
+      isSystem: false,
+      createdAt,
+      updatedAt: createdAt
+    },
+    {
+      id: "project-stage-done",
+      tenantId,
+      name: "Готово",
       sortOrder: 50,
       status: "active",
       isSystem: true,

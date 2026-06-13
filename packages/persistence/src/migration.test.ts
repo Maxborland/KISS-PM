@@ -239,6 +239,10 @@ const callScreenShareEventsMigration = readFileSync(
   new URL("../migrations/0045_call_screen_share_events.sql", import.meta.url),
   "utf8"
 );
+const projectTaskStagesMigration = readFileSync(
+  new URL("../migrations/0046_project_task_stages.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -484,6 +488,83 @@ describe("Phase G.2 / 11.2 SQL migration", () => {
     expect(callScreenShareEventsMigration).toContain("screen_share_stopped");
     expect(callScreenShareEventsMigration).toContain(
       "ADD CONSTRAINT call_events_type_chk"
+    );
+  });
+});
+
+describe("Project task stages SQL migration", () => {
+  it("creates tenant-scoped project task stages with uniqueness guards", () => {
+    expect(projectTaskStagesMigration).toContain(
+      "CREATE TABLE IF NOT EXISTS project_task_stages"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "CONSTRAINT project_task_stages_pkey PRIMARY KEY (tenant_id, id)"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "CONSTRAINT project_task_stages_status_chk CHECK (status IN ('active', 'archived'))"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "CREATE UNIQUE INDEX IF NOT EXISTS project_task_stages_tenant_sort_order_uidx"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "ON project_task_stages (tenant_id, sort_order)"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "CREATE UNIQUE INDEX IF NOT EXISTS project_task_stages_tenant_name_uidx"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "ON project_task_stages (tenant_id, name)"
+    );
+  });
+
+  it("seeds default stages once for each tenant", () => {
+    expect(projectTaskStagesMigration).toContain(
+      "INSERT INTO project_task_stages"
+    );
+    expect(projectTaskStagesMigration).toContain("FROM tenants");
+    expect(projectTaskStagesMigration).toContain(
+      "ON CONFLICT (tenant_id, id) DO NOTHING"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "('project-stage-backlog', 'Бэклог', 10, true)"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "('project-stage-todo', 'К выполнению', 20, true)"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "('project-stage-in-work', 'В работе', 30, false)"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "('project-stage-review', 'На проверке', 40, false)"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "('project-stage-done', 'Готово', 50, true)"
+    );
+  });
+
+  it("links tasks to stages through a tenant-scoped composite foreign key", () => {
+    expect(projectTaskStagesMigration).toContain("ALTER TABLE tasks");
+    expect(projectTaskStagesMigration).toContain(
+      "ADD CONSTRAINT tasks_stage_fk"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "FOREIGN KEY (tenant_id, stage_id)"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "REFERENCES project_task_stages (tenant_id, id)"
+    );
+    expect(projectTaskStagesMigration).toContain("ON DELETE RESTRICT");
+  });
+  it("backfills stage-management permission for existing project managers", () => {
+    expect(projectTaskStagesMigration).toContain("UPDATE access_profiles");
+    expect(projectTaskStagesMigration).toContain(
+      "permissions @> '[\"tenant.projects.manage\"]'::jsonb"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "permissions || '[\"tenant.project_stages.manage\"]'::jsonb"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "NOT permissions @> '[\"tenant.project_stages.manage\"]'::jsonb"
     );
   });
 });
