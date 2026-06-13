@@ -934,12 +934,11 @@ describe("project work API routes", () => {
           "x-kiss-pm-action": "same-origin",
           cookie: adminCookie
         },
-        body: JSON.stringify({
-          id: "project-stage-client-wait",
-          name: "Клиентская пауза",
-          sortOrder: 36,
-          status: "active"
-        })
+      body: JSON.stringify({
+        name: "Клиентская пауза",
+        sortOrder: 36,
+        status: "active"
+      })
       }
     );
     const archived = await app.request(

@@ -4038,6 +4038,7 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "project_position_demands",
   "project_resource_pool_members",
   "task_statuses",
+  "project_task_stages",
   "tasks",
   "plan_versions",
   "project_calendars",

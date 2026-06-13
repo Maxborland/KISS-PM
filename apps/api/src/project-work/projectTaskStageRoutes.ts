@@ -50,7 +50,10 @@ export function registerProjectTaskStageRoutes(app: Hono, deps: ProjectWorkRoute
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseProjectTaskStageWriteBody(body.value);
+    const parsed = parseProjectTaskStageWriteBody({
+      ...(typeof body.value === "object" && body.value !== null ? body.value : {}),
+      id: stageId.value
+    });
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const profile = await getActorProfile(actor);

@@ -555,6 +555,18 @@ describe("Project task stages SQL migration", () => {
     );
     expect(projectTaskStagesMigration).toContain("ON DELETE RESTRICT");
   });
+  it("backfills stage-management permission for existing project managers", () => {
+    expect(projectTaskStagesMigration).toContain("UPDATE access_profiles");
+    expect(projectTaskStagesMigration).toContain(
+      "permissions @> '[\"tenant.projects.manage\"]'::jsonb"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "permissions || '[\"tenant.project_stages.manage\"]'::jsonb"
+    );
+    expect(projectTaskStagesMigration).toContain(
+      "NOT permissions @> '[\"tenant.project_stages.manage\"]'::jsonb"
+    );
+  });
 });
 
 describe("Phase 12 Calendar & Occupancy V2 SQL migration", () => {

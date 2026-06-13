@@ -42,6 +42,11 @@ CROSS JOIN (
 ) AS stage(id, name, sort_order, is_system)
 ON CONFLICT (tenant_id, id) DO NOTHING;
 
+UPDATE access_profiles
+SET permissions = permissions || '["tenant.project_stages.manage"]'::jsonb
+WHERE permissions @> '["tenant.projects.manage"]'::jsonb
+  AND NOT permissions @> '["tenant.project_stages.manage"]'::jsonb;
+
 ALTER TABLE tasks
   ADD CONSTRAINT tasks_stage_fk
   FOREIGN KEY (tenant_id, stage_id)
