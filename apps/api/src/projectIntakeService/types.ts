@@ -41,7 +41,6 @@ export type ProjectIntakeServiceDataSource = Pick<
   | "lockTenantResourcePlanning"
   | "updateOpportunity"
   | "updateOpportunityFeasibility"
-  | "updateOpportunityStage"
   | "withTransaction"
 >;
 
@@ -60,7 +59,6 @@ export type ProjectIntakeMutationDataSource = Pick<
   | "lockTenantResourcePlanning"
   | "updateOpportunity"
   | "updateOpportunityFeasibility"
-  | "updateOpportunityStage"
 >;
 
 export type ProjectIntakeServiceDeps = {
@@ -93,14 +91,6 @@ export type CreateOpportunityResult =
   | {
       ok: true;
       status: 201;
-      opportunity: OpportunityRecord;
-    };
-
-export type ChangeOpportunityStageResult =
-  | ServiceError
-  | {
-      ok: true;
-      status: 200;
       opportunity: OpportunityRecord;
     };
 
@@ -150,10 +140,6 @@ export type ProjectIntakeService = {
   preflightCreateOpportunity(input: {
     actor: TenantUser;
   }): Promise<AuthorizedResult>;
-  preflightChangeOpportunityStage(input: {
-    actor: TenantUser;
-    opportunityId: string;
-  }): Promise<AuthorizedResult>;
   preflightUpdateOpportunity(input: {
     actor: TenantUser;
     opportunityId: string;
@@ -170,11 +156,6 @@ export type ProjectIntakeService = {
     actor: TenantUser;
     input: OpportunityInput;
   }): Promise<CreateOpportunityResult>;
-  changeOpportunityStage(input: {
-    actor: TenantUser;
-    opportunityId: string;
-    stageId: string;
-  }): Promise<ChangeOpportunityStageResult>;
   updateOpportunity(input: {
     actor: TenantUser;
     opportunityId: string;

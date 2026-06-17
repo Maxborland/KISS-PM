@@ -121,7 +121,7 @@ function parseOpportunityFields(
     return { ok: false, error: "invalid_project_type_id" };
   }
   if (!stageId || !idPattern.test(stageId)) {
-    return { ok: false, error: "invalid_deal_stage_id" };
+    return { ok: false, error: "invalid_opportunity_stage_id" };
   }
   if (hasCrmPipelineId !== hasCrmPipelineStageId) {
     return { ok: false, error: "invalid_crm_pipeline_state" };

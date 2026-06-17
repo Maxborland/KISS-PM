@@ -18,7 +18,6 @@ export async function authorizeOpportunityUpdate(
     !deps.dataSource.findClientById ||
     !deps.dataSource.findContactById ||
     !deps.dataSource.findProjectTypeById ||
-    !deps.dataSource.findDealStageById ||
     !deps.dataSource.updateOpportunity ||
     !deps.dataSource.withTransaction ||
     !deps.dataSource.appendAuditEvent
