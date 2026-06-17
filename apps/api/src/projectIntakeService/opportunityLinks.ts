@@ -4,7 +4,6 @@ import type {
   ApiTenantDataSource,
   ClientRecord,
   ContactRecord,
-  DealStageRecord,
   OpportunityInput,
   OpportunityRecord,
   ProjectTypeRecord
@@ -36,7 +35,6 @@ export async function resolveOpportunityLinks(
       contact: ContactRecord;
       owner: TenantUser | null;
       projectType: ProjectTypeRecord;
-      stage: DealStageRecord;
     }
   | {
       ok: false;
@@ -72,9 +70,12 @@ export async function resolveOpportunityLinks(
     return { ok: false, status: 404, error: "project_type_not_found" };
   }
 
-  const stage = await dataSource.findDealStageById?.(tenantId, input.stageId ?? "");
-  if (!stage || stage.status !== "active") {
-    return { ok: false, status: 404, error: "deal_stage_not_found" };
+  const compatibilityStage = await dataSource.findDealStageById?.(
+    tenantId,
+    input.stageId ?? ""
+  );
+  if (!compatibilityStage || compatibilityStage.status !== "active") {
+    return { ok: false, status: 404, error: "opportunity_stage_not_found" };
   }
 
   const hasCrmPipelineId = Object.prototype.hasOwnProperty.call(
@@ -149,7 +150,7 @@ export async function resolveOpportunityLinks(
     }
   }
 
-  return { ok: true, client, contact, owner: owner ?? null, projectType, stage };
+  return { ok: true, client, contact, owner: owner ?? null, projectType };
 }
 
 function initialCrmPipelineStageRequired(): {
