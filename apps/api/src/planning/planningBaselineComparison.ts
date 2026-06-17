@@ -1,6 +1,5 @@
 import {
   calculatePlan,
-  comparePlanDates,
   diffCalendarDays,
   resolveEffectiveAssignmentWork,
   type PlanSnapshot
@@ -67,15 +66,6 @@ export function dateDeltaDays(baselineDate: string | null, currentDate: string |
   return diffCalendarDays(baselineDate, currentDate);
 }
 
-function latestDate(dates: Array<string | null>): string {
-  const latest = dates.reduce<string | null>((currentLatest, date) => {
-    if (!date) return currentLatest;
-    if (!currentLatest) return date;
-    return comparePlanDates(date, currentLatest) > 0 ? date : currentLatest;
-  }, null);
-  if (!latest) throw new Error("planning_read_model_missing_range_finish");
-  return latest;
-}
 
 
 type BaselineAssignmentSnapshot = PlanSnapshot["baselines"][number]["assignments"][number];

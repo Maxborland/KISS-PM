@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   parseClientBody,
   parseContactBody,
-  parseDealStageBody,
   parseProductBody,
   parseProjectTypeBody
 } from "./crmParsers";
@@ -117,18 +116,6 @@ describe("crm parsers", () => {
         "tenant-alpha"
       )
     ).toEqual({ ok: false, error: "invalid_description" });
-
-    expect(
-      parseDealStageBody(
-        {
-          id: "deal-stage-new",
-          name: "Новая\tстадия",
-          sortOrder: 1,
-          status: "active"
-        },
-        "tenant-alpha"
-      )
-    ).toEqual({ ok: false, error: "invalid_deal_stage_name" });
   });
 
   it("normalizes contact email casing while preserving safe CRM text", () => {

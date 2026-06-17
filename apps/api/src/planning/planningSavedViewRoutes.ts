@@ -1,6 +1,5 @@
 import {
   canManageProjectPlan,
-  canReadProjectPlan
 } from "@kiss-pm/access-control";
 import type { Hono } from "hono";
 import { randomUUID } from "node:crypto";
@@ -10,7 +9,6 @@ import {
   parseProjectRouteParam,
   parseSavedViewRouteParam,
   requireActivePlanningProject,
-  requireReadablePlanningProject,
   type PlanningRouteDeps
 } from "./planningRouteHelpers";
 import { registerPlanningSavedViewListRoute } from "./planningSavedViewListRoute";

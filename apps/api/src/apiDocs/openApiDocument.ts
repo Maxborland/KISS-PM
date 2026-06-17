@@ -16,14 +16,10 @@ type RouteDoc = {
   availability?: "always" | "test-hooks";
 };
 
-const dealStageCompatibilityDescription =
-  "Compatibility surface for the legacy flat deal-stage dictionary. Current opportunity movement uses CRM pipeline stages and POST /api/workspace/opportunities/{opportunityId}/pipeline-transition.";
 
 const opportunityPipelineTransitionDescription =
   "Moves an opportunity between first-class CRM pipeline stages. Use this current contract for intake pipeline movement instead of the legacy flat opportunity stage patch.";
 
-const legacyOpportunityStagePatchDescription =
-  "Compatibility mutation for existing clients that still move opportunities through the legacy flat deal-stage dictionary. New clients should use POST /api/workspace/opportunities/{opportunityId}/pipeline-transition.";
 
 const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/openapi.json", tag: "API docs", summary: "OpenAPI 3.1 document", auth: "public" },
@@ -78,11 +74,7 @@ const routeDocs: RouteDoc[] = [
   { method: "patch", path: "/api/workspace/products/:productId", tag: "CRM", summary: "Update product or service", requestSchema: "ProductWriteRequest", successSchema: "ProductResponse" },
   { method: "get", path: "/api/workspace/project-types", tag: "CRM", summary: "List project types", successSchema: "ProjectTypesResponse" },
   { method: "post", path: "/api/workspace/project-types", tag: "CRM", summary: "Create project type", requestSchema: "ProjectTypeWriteRequest", successSchema: "ProjectTypeResponse", successStatus: 201 },
-  { method: "patch", path: "/api/workspace/project-types/:projectTypeId", tag: "CRM", summary: "Update project type", requestSchema: "ProjectTypeWriteRequest", successSchema: "ProjectTypeResponse" },
-  { method: "get", path: "/api/workspace/deal-stages", tag: "CRM", summary: "List legacy deal-stage dictionary", description: dealStageCompatibilityDescription, successSchema: "DealStagesResponse" },
-  { method: "post", path: "/api/workspace/deal-stages", tag: "CRM", summary: "Create legacy deal-stage dictionary entry", description: dealStageCompatibilityDescription, requestSchema: "DealStageWriteRequest", successSchema: "DealStageResponse", successStatus: 201 },
-  { method: "patch", path: "/api/workspace/deal-stages/:stageId", tag: "CRM", summary: "Update legacy deal-stage dictionary entry", description: dealStageCompatibilityDescription, requestSchema: "DealStageWriteRequest", successSchema: "DealStageResponse" },
-  { method: "get", path: "/api/workspace/crm/pipelines", tag: "CRM", summary: "List CRM pipelines", successSchema: "CrmPipelinesResponse" },
+  { method: "patch", path: "/api/workspace/project-types/:projectTypeId", tag: "CRM", summary: "Update project type", requestSchema: "ProjectTypeWriteRequest", successSchema: "ProjectTypeResponse" },  { method: "get", path: "/api/workspace/crm/pipelines", tag: "CRM", summary: "List CRM pipelines", successSchema: "CrmPipelinesResponse" },
   { method: "post", path: "/api/workspace/crm/pipelines", tag: "CRM", summary: "Create CRM pipeline", requestSchema: "CrmPipelineWriteRequest", successSchema: "CrmPipelineResponse", successStatus: 201 },
   { method: "patch", path: "/api/workspace/crm/pipelines/:pipelineId", tag: "CRM", summary: "Update CRM pipeline", requestSchema: "CrmPipelinePatchRequest", successSchema: "CrmPipelineResponse" },
   { method: "get", path: "/api/workspace/crm/pipelines/:pipelineId/stages", tag: "CRM", summary: "List CRM pipeline stages", successSchema: "CrmPipelineStagesResponse" },
@@ -98,9 +90,7 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/opportunities/:opportunityId", tag: "Project intake", summary: "Read opportunity", successSchema: "OpportunityResponse" },
   { method: "post", path: "/api/workspace/opportunities", tag: "Project intake", summary: "Create opportunity", requestSchema: "OpportunityWriteRequest", successSchema: "OpportunityResponse", successStatus: 201 },
   { method: "patch", path: "/api/workspace/opportunities/:opportunityId", tag: "Project intake", summary: "Update opportunity", requestSchema: "OpportunityWriteRequest", successSchema: "OpportunityResponse" },
-  { method: "post", path: "/api/workspace/opportunities/:opportunityId/pipeline-transition", tag: "Project intake", summary: "Transition opportunity CRM pipeline stage", description: opportunityPipelineTransitionDescription, requestSchema: "OpportunityPipelineTransitionRequest", successSchema: "OpportunityPipelineTransitionResponse" },
-  { method: "patch", path: "/api/workspace/opportunities/:opportunityId/stage", tag: "Project intake", summary: "Move legacy opportunity deal stage", description: legacyOpportunityStagePatchDescription, requestSchema: "OpportunityStagePatchRequest", successSchema: "OpportunityResponse" },
-  { method: "patch", path: "/api/workspace/opportunities/:opportunityId/finalize", tag: "Project intake", summary: "Finalize opportunity", requestSchema: "OpportunityFinalizeRequest", successSchema: "OpportunityResponse" },
+  { method: "post", path: "/api/workspace/opportunities/:opportunityId/pipeline-transition", tag: "Project intake", summary: "Transition opportunity CRM pipeline stage", description: opportunityPipelineTransitionDescription, requestSchema: "OpportunityPipelineTransitionRequest", successSchema: "OpportunityPipelineTransitionResponse" },  { method: "patch", path: "/api/workspace/opportunities/:opportunityId/finalize", tag: "Project intake", summary: "Finalize opportunity", requestSchema: "OpportunityFinalizeRequest", successSchema: "OpportunityResponse" },
   { method: "post", path: "/api/workspace/opportunities/:opportunityId/feasibility", tag: "Project intake", summary: "Preview resource feasibility", successSchema: "OpportunityFeasibilityResponse" },
   { method: "post", path: "/api/workspace/opportunities/:opportunityId/activate", tag: "Project intake", summary: "Activate project from opportunity", requestSchema: "ProjectActivationRequest", successSchema: "ProjectActivationResponse", successStatus: 201 },
   { method: "get", path: "/api/workspace/projects", tag: "Projects and tasks", summary: "List projects", successSchema: "ProjectsResponse" },

@@ -1,12 +1,10 @@
 import {
   canManageClients,
   canManageContacts,
-  canManageDealStages,
   canManageProducts,
   canManageProjectTypes,
   canReadClients,
   canReadContacts,
-  canReadDealStages,
   canReadProducts,
   canReadProjectTypes,
   type AccessProfile,
@@ -21,7 +19,6 @@ import type {
 import {
   parseClientBody,
   parseContactBody,
-  parseDealStageBody,
   parseProductBody,
   parseProjectTypeBody
 } from "./crmParsers";
@@ -29,7 +26,6 @@ import { readLimitedJsonBody } from "./jsonBody";
 import {
   parseClientIdParam,
   parseContactIdParam,
-  parseDealStageIdParam,
   parseProductIdParam,
   parseProjectTypeIdParam
 } from "./routeParamParsers";
@@ -624,145 +620,6 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     });
 
     return context.json({ projectType });
-  });
-
-  app.get("/api/workspace/deal-stages", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listDealStages) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadDealStages({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-
-    return context.json({ dealStages: await dataSource.listDealStages(actor.tenantId) });
-  });
-
-  app.post("/api/workspace/deal-stages", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createDealStage ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageDealStages({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "deal_stage.create_denied",
-        sourceEntity: { type: "DealStage", id: "unknown" },
-        commandInput: { endpoint: "createDealStage" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
-
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseDealStageBody(body.value, actor.tenantId);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
-    const dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createDealStage) {
-        throw new Error("transactional_deal_stage_create_not_configured");
-      }
-      const created = await transactionDataSource.createDealStage(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "deal_stage.created",
-          sourceEntity: { type: "DealStage", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
-    });
-
-    return context.json({ dealStage }, 201);
-  });
-
-  app.patch("/api/workspace/deal-stages/:stageId", async (context) => {
-    const parsedStageId = parseDealStageIdParam(context.req.param("stageId"));
-    if (!parsedStageId.ok) {
-      return context.json({ error: parsedStageId.error }, 400);
-    }
-
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.findDealStageById ||
-      !dataSource.updateDealStage ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageDealStages({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    const stageId = parsedStageId.value;
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "deal_stage.update_denied",
-        sourceEntity: { type: "DealStage", id: stageId },
-        commandInput: { endpoint: "updateDealStage", stageId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
-
-    const beforeState = await dataSource.findDealStageById(actor.tenantId, stageId);
-    if (!beforeState) return context.json({ error: "deal_stage_not_found" }, 404);
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
-    const parsed = parseDealStageBody({ ...body.value, id: stageId }, actor.tenantId);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
-    const dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateDealStage) {
-        throw new Error("transactional_deal_stage_update_not_configured");
-      }
-      const updated = await transactionDataSource.updateDealStage(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "deal_stage.updated",
-          sourceEntity: { type: "DealStage", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
-    });
-
-    return context.json({ dealStage });
   });
 
   async function getActor(cookie: string | null): Promise<TenantUser | undefined> {

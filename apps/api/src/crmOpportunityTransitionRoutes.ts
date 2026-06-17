@@ -2,7 +2,7 @@ import { canManageOpportunities, type PolicyDecision } from "@kiss-pm/access-con
 import { decideCrmPipelineTransition, type TenantUser } from "@kiss-pm/domain";
 import type { Context, Hono } from "hono";
 
-import type { ApiTenantDataSource, ManagementAuditEventInput } from "./apiTypes";
+import type { ManagementAuditEventInput } from "./apiTypes";
 import { parseCrmOpportunityPipelineTransitionBody } from "./crmParsers";
 import { readLimitedJsonBody } from "./jsonBody";
 import { parseOpportunityIdParam } from "./routeParamParsers";

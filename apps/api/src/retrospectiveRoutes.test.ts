@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type {
   PlanSnapshot,
-  ProjectClosureSnapshot,
   RetrospectiveLesson,
   RetrospectiveReadModel,
   TemplateImprovementAction,

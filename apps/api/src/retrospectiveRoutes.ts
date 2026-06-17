@@ -15,7 +15,6 @@ import {
   buildTemplateImprovementImpact,
   type ClosureLessonCategory,
   type ClosureLessonImpact,
-  type PlanSnapshot,
   type ProjectClosureSnapshot,
   type RetrospectiveLesson,
   type RetrospectiveReadModel,

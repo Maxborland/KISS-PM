@@ -2876,10 +2876,6 @@ describe("KISS PM API Phase 1 shell", () => {
         headers
       }
     );
-    const badDealStage = await app.request("/api/workspace/deal-stages/bad..stage", {
-      method: "PATCH",
-      headers
-    });
 
     expect(badClient.status).toBe(400);
     await expect(badClient.json()).resolves.toEqual({ error: "invalid_client_id" });
@@ -2891,10 +2887,6 @@ describe("KISS PM API Phase 1 shell", () => {
     await expect(badProjectType.json()).resolves.toEqual({
       error: "invalid_project_type_id"
     });
-    expect(badDealStage.status).toBe(400);
-    await expect(badDealStage.json()).resolves.toEqual({
-      error: "invalid_deal_stage_id"
-    });
   });
 
   it("rejects malformed opportunity route identifiers before session and persistence lookup", async () => {
@@ -2903,10 +2895,6 @@ describe("KISS PM API Phase 1 shell", () => {
 
     const detail = await app.request("/api/workspace/opportunities/bad..opportunity");
     const update = await app.request("/api/workspace/opportunities/bad..opportunity", {
-      method: "PATCH",
-      headers: actionHeaders
-    });
-    const stage = await app.request("/api/workspace/opportunities/bad..opportunity/stage", {
       method: "PATCH",
       headers: actionHeaders
     });
@@ -2932,7 +2920,7 @@ describe("KISS PM API Phase 1 shell", () => {
       }
     );
 
-    for (const response of [detail, update, stage, finalize, feasibility, activate]) {
+    for (const response of [detail, update, finalize, feasibility, activate]) {
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toEqual({
         error: "invalid_opportunity_id"

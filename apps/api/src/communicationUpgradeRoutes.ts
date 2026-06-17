@@ -24,7 +24,7 @@ import {
 } from "@kiss-pm/domain";
 import type { Hono } from "hono";
 
-import type { ApiTenantDataSource, ManagementAuditEventInput } from "./apiTypes";
+import type { ManagementAuditEventInput } from "./apiTypes";
 import {
   parseContentLength,
   parseMultipartContentType,

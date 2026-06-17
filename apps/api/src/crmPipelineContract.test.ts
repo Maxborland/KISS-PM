@@ -13,12 +13,25 @@ describe("CRM pipeline API contract schemas", () => {
       "name",
       "status",
       "lifecycleGraphMetadata",
-      "createdAt",
-      "updatedAt"
-    ]);
-    expect(schemas.CrmPipelineStage.required).toEqual([
-      "id",
-      "tenantId",
+    "createdAt",
+    "updatedAt"
+  ]);
+  expect(schemas.CrmPipelineLifecycleGraph.required).toEqual([
+    "pipelineId",
+    "initialStageId",
+    "finalStageIds",
+    "stages",
+    "transitions"
+  ]);
+  expect(schemas.CrmPipelineLifecycleGraphStage.required).toEqual([
+    "stageId",
+    "sortOrder",
+    "lifecycleState",
+    "isFinal"
+  ]);
+  expect(schemas.CrmPipelineStage.required).toEqual([
+    "id",
+    "tenantId",
       "pipelineId",
       "name",
       "sortOrder",
@@ -55,52 +68,7 @@ describe("CRM pipeline API contract schemas", () => {
     ]);
   });
 
-  it("documents lifecycle graph metadata separate from legacy flat deal stages", () => {
-    const document = createKissPmOpenApiDocument();
-    const schemas = document.components.schemas;
 
-    expect(schemas.CrmPipelineLifecycleGraph.required).toEqual([
-      "pipelineId",
-      "initialStageId",
-      "finalStageIds",
-      "stages",
-      "transitions"
-    ]);
-    expect(schemas.DealStage.required).toEqual([
-      "id",
-      "tenantId",
-      "name",
-      "sortOrder",
-      "status",
-      "createdAt",
-      "updatedAt"
-    ]);
-  });
-
-  it("documents deal stages as compatibility surface and pipeline transitions as current intake movement", () => {
-    const document = createKissPmOpenApiDocument() as {
-      components: {
-        schemas: Record<string, { description?: string; required?: string[] }>;
-      };
-      paths: Record<string, Record<string, { description?: string; requestBody?: unknown }>>;
-    };
-
-    expect(document.components.schemas.DealStage!.description).toMatch(/legacy flat deal-stage dictionary/i);
-    expect(document.components.schemas.OpportunityStagePatchRequest!.description).toMatch(/legacy flat opportunity stage/i);
-    expect(document.components.schemas.OpportunityPipelineTransitionRequest!.required).toEqual(["targetStageId"]);
-
-    expect(document.paths["/api/workspace/deal-stages"]?.get?.description).toContain("Compatibility surface");
-    expect(
-      document.paths["/api/workspace/opportunities/{opportunityId}/pipeline-transition"]?.post?.description
-    ).toContain("first-class CRM pipeline stages");
-    expect(document.paths["/api/workspace/opportunities/{opportunityId}/stage"]?.patch?.description).toContain(
-      "legacy flat deal-stage dictionary"
-    );
-    expect(
-      document.paths["/api/workspace/opportunities/{opportunityId}/pipeline-transition"]?.post?.requestBody
-    ).toBeDefined();
-    expect(document.paths["/api/workspace/opportunities/{opportunityId}/stage"]?.patch?.requestBody).toBeDefined();
-  });
 
   it("publishes first-class pipeline management routes", () => {
     const document = createKissPmOpenApiDocument() as {
