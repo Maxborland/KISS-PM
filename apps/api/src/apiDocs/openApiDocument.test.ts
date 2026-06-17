@@ -2,6 +2,12 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { callEventTypes } from "@kiss-pm/domain";
 import { describe, expect, it } from "vitest";
+import { crmOpportunityTransitionRouteDocs } from "../crmOpportunityTransitionRoutes";
+import { crmPipelineRouteDocs } from "../crmPipelineRoutes";
+import {
+  projectIntakeActionRouteDocs,
+  projectIntakeOpportunityRouteDocs,
+} from "../projectIntakeRoutes";
 import {
   createKissPmOpenApiDocument,
   listAllKnownApiRoutes,
@@ -19,6 +25,44 @@ describe("OpenAPI route inventory", () => {
     expect([...documentedRoutes].filter((route) => !actualRoutes.includes(route)).sort()).toEqual(
       []
     );
+  });
+
+  it("keeps CRM pipeline and opportunity route docs colocated with route modules", () => {
+    const colocatedRoutes = [
+      ...crmPipelineRouteDocs,
+      ...projectIntakeOpportunityRouteDocs,
+      ...crmOpportunityTransitionRouteDocs,
+      ...projectIntakeActionRouteDocs,
+    ];
+    const documentedRoutes = new Set(
+      listDocumentedApiRoutes().map((route) => `${route.method} ${route.path}`)
+    );
+
+    expect(colocatedRoutes.map((route) => `${route.method} ${route.path}`)).toEqual([
+      "get /api/workspace/crm/pipelines",
+      "post /api/workspace/crm/pipelines",
+      "patch /api/workspace/crm/pipelines/:pipelineId",
+      "get /api/workspace/crm/pipelines/:pipelineId/stages",
+      "post /api/workspace/crm/pipelines/:pipelineId/stages",
+      "patch /api/workspace/crm/pipelines/:pipelineId/stages/:stageId",
+      "get /api/workspace/crm/pipelines/:pipelineId/transition-rules",
+      "post /api/workspace/crm/pipelines/:pipelineId/transition-rules",
+      "patch /api/workspace/crm/pipelines/:pipelineId/transition-rules/:ruleId",
+      "get /api/workspace/crm/pipelines/:pipelineId/automations",
+      "post /api/workspace/crm/pipelines/:pipelineId/automations",
+      "patch /api/workspace/crm/pipelines/:pipelineId/automations/:automationId",
+      "get /api/workspace/opportunities",
+      "get /api/workspace/opportunities/:opportunityId",
+      "post /api/workspace/opportunities",
+      "patch /api/workspace/opportunities/:opportunityId",
+      "post /api/workspace/opportunities/:opportunityId/pipeline-transition",
+      "patch /api/workspace/opportunities/:opportunityId/finalize",
+      "post /api/workspace/opportunities/:opportunityId/feasibility",
+      "post /api/workspace/opportunities/:opportunityId/activate",
+    ]);
+    for (const route of colocatedRoutes) {
+      expect(documentedRoutes.has(`${route.method} ${route.path}`)).toBe(true);
+    }
   });
 
   it("omits test-hook routes from the public OpenAPI document", () => {

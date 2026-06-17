@@ -1,25 +1,8 @@
-type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
-
-type RouteDoc = {
-  method: HttpMethod;
-  path: string;
-  tag: string;
-  summary: string;
-  description?: string;
-  auth?: "public" | "session" | "dev";
-  body?: "json" | "multipart" | "none";
-  response?: "json" | "file" | "event-stream";
-  requestSchema?: string;
-  successSchema?: string;
-  successStatus?: 200 | 201;
-  queryParameters?: Array<Record<string, unknown>>;
-  availability?: "always" | "test-hooks";
-};
-
-
-const opportunityPipelineTransitionDescription =
-  "Moves an opportunity between first-class CRM pipeline stages. Use this current contract for intake pipeline movement instead of the legacy flat opportunity stage patch.";
-
+import { crmOpportunityTransitionRouteDocs } from "../crmOpportunityTransitionRoutes";
+import { crmPipelineRouteDocs } from "../crmPipelineRoutes";
+import { projectIntakeActionRouteDocs, projectIntakeOpportunityRouteDocs } from "../projectIntakeRoutes";
+import type { RouteDoc } from "./routeDoc";
+import { openApiSchemas } from "./schemas";
 
 const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/openapi.json", tag: "API docs", summary: "OpenAPI 3.1 document", auth: "public" },
@@ -74,25 +57,11 @@ const routeDocs: RouteDoc[] = [
   { method: "patch", path: "/api/workspace/products/:productId", tag: "CRM", summary: "Update product or service", requestSchema: "ProductWriteRequest", successSchema: "ProductResponse" },
   { method: "get", path: "/api/workspace/project-types", tag: "CRM", summary: "List project types", successSchema: "ProjectTypesResponse" },
   { method: "post", path: "/api/workspace/project-types", tag: "CRM", summary: "Create project type", requestSchema: "ProjectTypeWriteRequest", successSchema: "ProjectTypeResponse", successStatus: 201 },
-  { method: "patch", path: "/api/workspace/project-types/:projectTypeId", tag: "CRM", summary: "Update project type", requestSchema: "ProjectTypeWriteRequest", successSchema: "ProjectTypeResponse" },  { method: "get", path: "/api/workspace/crm/pipelines", tag: "CRM", summary: "List CRM pipelines", successSchema: "CrmPipelinesResponse" },
-  { method: "post", path: "/api/workspace/crm/pipelines", tag: "CRM", summary: "Create CRM pipeline", requestSchema: "CrmPipelineWriteRequest", successSchema: "CrmPipelineResponse", successStatus: 201 },
-  { method: "patch", path: "/api/workspace/crm/pipelines/:pipelineId", tag: "CRM", summary: "Update CRM pipeline", requestSchema: "CrmPipelinePatchRequest", successSchema: "CrmPipelineResponse" },
-  { method: "get", path: "/api/workspace/crm/pipelines/:pipelineId/stages", tag: "CRM", summary: "List CRM pipeline stages", successSchema: "CrmPipelineStagesResponse" },
-  { method: "post", path: "/api/workspace/crm/pipelines/:pipelineId/stages", tag: "CRM", summary: "Create CRM pipeline stage", requestSchema: "CrmPipelineStageWriteRequest", successSchema: "CrmPipelineStageResponse", successStatus: 201 },
-  { method: "patch", path: "/api/workspace/crm/pipelines/:pipelineId/stages/:stageId", tag: "CRM", summary: "Update CRM pipeline stage", requestSchema: "CrmPipelineStagePatchRequest", successSchema: "CrmPipelineStageResponse" },
-  { method: "get", path: "/api/workspace/crm/pipelines/:pipelineId/transition-rules", tag: "CRM", summary: "List CRM pipeline transition rules", successSchema: "CrmPipelineTransitionRulesResponse" },
-  { method: "post", path: "/api/workspace/crm/pipelines/:pipelineId/transition-rules", tag: "CRM", summary: "Create CRM pipeline transition rule", requestSchema: "CrmPipelineTransitionRuleWriteRequest", successSchema: "CrmPipelineTransitionRuleResponse", successStatus: 201 },
-  { method: "patch", path: "/api/workspace/crm/pipelines/:pipelineId/transition-rules/:ruleId", tag: "CRM", summary: "Update CRM pipeline transition rule", requestSchema: "CrmPipelineTransitionRulePatchRequest", successSchema: "CrmPipelineTransitionRuleResponse" },
-  { method: "get", path: "/api/workspace/crm/pipelines/:pipelineId/automations", tag: "CRM", summary: "List CRM pipeline stage automations", successSchema: "CrmPipelineStageAutomationsResponse" },
-  { method: "post", path: "/api/workspace/crm/pipelines/:pipelineId/automations", tag: "CRM", summary: "Create CRM pipeline stage automation", requestSchema: "CrmPipelineStageAutomationWriteRequest", successSchema: "CrmPipelineStageAutomationResponse", successStatus: 201 },
-  { method: "patch", path: "/api/workspace/crm/pipelines/:pipelineId/automations/:automationId", tag: "CRM", summary: "Update CRM pipeline stage automation", requestSchema: "CrmPipelineStageAutomationPatchRequest", successSchema: "CrmPipelineStageAutomationResponse" },
-  { method: "get", path: "/api/workspace/opportunities", tag: "Project intake", summary: "List opportunities", successSchema: "OpportunitiesResponse" },
-  { method: "get", path: "/api/workspace/opportunities/:opportunityId", tag: "Project intake", summary: "Read opportunity", successSchema: "OpportunityResponse" },
-  { method: "post", path: "/api/workspace/opportunities", tag: "Project intake", summary: "Create opportunity", requestSchema: "OpportunityWriteRequest", successSchema: "OpportunityResponse", successStatus: 201 },
-  { method: "patch", path: "/api/workspace/opportunities/:opportunityId", tag: "Project intake", summary: "Update opportunity", requestSchema: "OpportunityWriteRequest", successSchema: "OpportunityResponse" },
-  { method: "post", path: "/api/workspace/opportunities/:opportunityId/pipeline-transition", tag: "Project intake", summary: "Transition opportunity CRM pipeline stage", description: opportunityPipelineTransitionDescription, requestSchema: "OpportunityPipelineTransitionRequest", successSchema: "OpportunityPipelineTransitionResponse" },  { method: "patch", path: "/api/workspace/opportunities/:opportunityId/finalize", tag: "Project intake", summary: "Finalize opportunity", requestSchema: "OpportunityFinalizeRequest", successSchema: "OpportunityResponse" },
-  { method: "post", path: "/api/workspace/opportunities/:opportunityId/feasibility", tag: "Project intake", summary: "Preview resource feasibility", successSchema: "OpportunityFeasibilityResponse" },
-  { method: "post", path: "/api/workspace/opportunities/:opportunityId/activate", tag: "Project intake", summary: "Activate project from opportunity", requestSchema: "ProjectActivationRequest", successSchema: "ProjectActivationResponse", successStatus: 201 },
+  { method: "patch", path: "/api/workspace/project-types/:projectTypeId", tag: "CRM", summary: "Update project type", requestSchema: "ProjectTypeWriteRequest", successSchema: "ProjectTypeResponse" },
+  ...crmPipelineRouteDocs,
+  ...projectIntakeOpportunityRouteDocs,
+  ...crmOpportunityTransitionRouteDocs,
+  ...projectIntakeActionRouteDocs,
   { method: "get", path: "/api/workspace/projects", tag: "Projects and tasks", summary: "List projects", successSchema: "ProjectsResponse" },
   { method: "get", path: "/api/workspace/projects/:projectId", tag: "Projects and tasks", summary: "Read project detail", successSchema: "ProjectDetailResponse" },
   { method: "get", path: "/api/workspace/projects/:projectId/agent-context", tag: "Projects and tasks", summary: "Read project agent context snapshot", successSchema: "ProjectAgentContextResponse" },
@@ -242,8 +211,6 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/background-jobs/runs/:runId/events", tag: "Background jobs", summary: "List background job run events", successSchema: "BackgroundJobEventsResponse" },
   { method: "post", path: "/api/workspace/background-jobs/runs", tag: "Background jobs", summary: "Enqueue background job run", requestSchema: "BackgroundJobEnqueueRequest", successSchema: "BackgroundJobRunResponse", successStatus: 201 }
 ];
-
-import { openApiSchemas } from "./schemas";
 
 export function createKissPmOpenApiDocument() {
   const documentedRoutes = publicDocumentRoutes();

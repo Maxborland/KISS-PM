@@ -7,6 +7,7 @@ import {
 } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 import type { Context, Hono } from "hono";
+import type { RouteDoc } from "./apiDocs/routeDoc";
 import type { ApiTenantDataSource, ManagementAuditEventInput } from "./apiTypes";
 import {
   parseCrmPipelineBody,
@@ -22,6 +23,21 @@ import {
   parseCrmPipelineTransitionRuleIdParam
 } from "./routeParamParsers";
 import type { ApiRouteDeps } from "./routeTypes";
+
+export const crmPipelineRouteDocs: RouteDoc[] = [
+  { method: "get", path: "/api/workspace/crm/pipelines", tag: "CRM", summary: "List CRM pipelines", successSchema: "CrmPipelinesResponse" },
+  { method: "post", path: "/api/workspace/crm/pipelines", tag: "CRM", summary: "Create CRM pipeline", requestSchema: "CrmPipelineWriteRequest", successSchema: "CrmPipelineResponse", successStatus: 201 },
+  { method: "patch", path: "/api/workspace/crm/pipelines/:pipelineId", tag: "CRM", summary: "Update CRM pipeline", requestSchema: "CrmPipelinePatchRequest", successSchema: "CrmPipelineResponse" },
+  { method: "get", path: "/api/workspace/crm/pipelines/:pipelineId/stages", tag: "CRM", summary: "List CRM pipeline stages", successSchema: "CrmPipelineStagesResponse" },
+  { method: "post", path: "/api/workspace/crm/pipelines/:pipelineId/stages", tag: "CRM", summary: "Create CRM pipeline stage", requestSchema: "CrmPipelineStageWriteRequest", successSchema: "CrmPipelineStageResponse", successStatus: 201 },
+  { method: "patch", path: "/api/workspace/crm/pipelines/:pipelineId/stages/:stageId", tag: "CRM", summary: "Update CRM pipeline stage", requestSchema: "CrmPipelineStagePatchRequest", successSchema: "CrmPipelineStageResponse" },
+  { method: "get", path: "/api/workspace/crm/pipelines/:pipelineId/transition-rules", tag: "CRM", summary: "List CRM pipeline transition rules", successSchema: "CrmPipelineTransitionRulesResponse" },
+  { method: "post", path: "/api/workspace/crm/pipelines/:pipelineId/transition-rules", tag: "CRM", summary: "Create CRM pipeline transition rule", requestSchema: "CrmPipelineTransitionRuleWriteRequest", successSchema: "CrmPipelineTransitionRuleResponse", successStatus: 201 },
+  { method: "patch", path: "/api/workspace/crm/pipelines/:pipelineId/transition-rules/:ruleId", tag: "CRM", summary: "Update CRM pipeline transition rule", requestSchema: "CrmPipelineTransitionRulePatchRequest", successSchema: "CrmPipelineTransitionRuleResponse" },
+  { method: "get", path: "/api/workspace/crm/pipelines/:pipelineId/automations", tag: "CRM", summary: "List CRM pipeline stage automations", successSchema: "CrmPipelineStageAutomationsResponse" },
+  { method: "post", path: "/api/workspace/crm/pipelines/:pipelineId/automations", tag: "CRM", summary: "Create CRM pipeline stage automation", requestSchema: "CrmPipelineStageAutomationWriteRequest", successSchema: "CrmPipelineStageAutomationResponse", successStatus: 201 },
+  { method: "patch", path: "/api/workspace/crm/pipelines/:pipelineId/automations/:automationId", tag: "CRM", summary: "Update CRM pipeline stage automation", requestSchema: "CrmPipelineStageAutomationPatchRequest", successSchema: "CrmPipelineStageAutomationResponse" },
+];
 
 type CrmPipelinePolicy = (input: {
   actor: TenantUser;
