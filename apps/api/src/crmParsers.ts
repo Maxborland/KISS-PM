@@ -11,7 +11,6 @@ import type {
   CrmPipelineStageAutomationDefinitionInput,
   CrmPipelineStageInput,
   CrmPipelineTransitionRuleInput,
-  DealStageInput,
   ProductInput,
   ProjectTypeInput
 } from "./apiTypes";
@@ -385,35 +384,6 @@ export function parseCrmOpportunityPipelineTransitionBody(
   }
 
   return { ok: true, value: { targetStageId, reason } };
-}
-
-export function parseDealStageBody(
-  body: unknown,
-  tenantId: string
-): ParseResult<DealStageInput> {
-  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
-  const input = body as Record<string, unknown>;
-  const id = getOptionalString(input, "id") ?? `deal-stage-${crypto.randomUUID()}`;
-  const name = getOptionalString(input, "name");
-  const sortOrder = parsePositiveInteger(input.sortOrder);
-  const status = parseStatus(getOptionalString(input, "status") ?? "active");
-
-  if (!isId(id)) return { ok: false, error: "invalid_deal_stage_id" };
-  if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
-    return { ok: false, error: "invalid_deal_stage_name" };
-  }
-  if (sortOrder === null) return { ok: false, error: "invalid_sort_order" };
-  if (!status) return { ok: false, error: "invalid_status" };
-
-  return { ok: true, value: { id, tenantId, name, sortOrder, status } };
-}
-
-export function parseDealStageChangeBody(body: unknown): ParseResult<{ stageId: string }> {
-  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
-  const stageId = getOptionalString(body, "stageId");
-  if (!stageId || !isId(stageId)) return { ok: false, error: "invalid_deal_stage_id" };
-
-  return { ok: true, value: { stageId } };
 }
 
 export function isId(value: string): boolean {

@@ -74,10 +74,6 @@ export function parseProjectTypeIdParam(value: unknown): RouteParamParseResult {
   return parseCrmIdentifier(value, "invalid_project_type_id");
 }
 
-export function parseDealStageIdParam(value: unknown): RouteParamParseResult {
-  return parseCrmIdentifier(value, "invalid_deal_stage_id");
-}
-
 export function parseCrmPipelineIdParam(value: unknown): RouteParamParseResult {
   return parseCrmIdentifier(value, "invalid_crm_pipeline_id");
 }

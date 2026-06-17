@@ -216,49 +216,6 @@ export const crmProjectSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
-  DealStage: {
-    type: "object",
-    description:
-      "Legacy flat deal-stage dictionary entry retained for compatibility. Use CRM pipeline stages for current opportunity pipeline movement.",
-    required: ["id", "tenantId", "name", "sortOrder", "status", "createdAt", "updatedAt"],
-    properties: {
-      id: stringIdSchema,
-      tenantId: stringIdSchema,
-      name: { type: "string", minLength: 1, maxLength: 160 },
-      sortOrder: { type: "integer", minimum: 1, maximum: 2147483647 },
-      status: crmStatusSchema,
-      createdAt: dateTimeSchema,
-      updatedAt: dateTimeSchema
-    },
-    additionalProperties: false
-  },
-  DealStageWriteRequest: {
-    type: "object",
-    required: ["name", "sortOrder"],
-    properties: {
-      id: stringIdSchema,
-      name: { type: "string", minLength: 1, maxLength: 160 },
-      sortOrder: { type: "integer", minimum: 1, maximum: 2147483647 },
-      status: crmStatusSchema
-    },
-    additionalProperties: false
-  },
-  DealStagesResponse: {
-    type: "object",
-    required: ["dealStages"],
-    properties: {
-      dealStages: { type: "array", items: schemaRef("DealStage") }
-    },
-    additionalProperties: false
-  },
-  DealStageResponse: {
-    type: "object",
-    required: ["dealStage"],
-    properties: {
-      dealStage: schemaRef("DealStage")
-    },
-    additionalProperties: false
-  },
   CrmPipelineLifecycleGraphStage: {
     type: "object",
     required: ["stageId", "sortOrder", "lifecycleState", "isFinal"],
@@ -611,14 +568,6 @@ export const crmProjectSchemas = openApiSchemaFragment({
       opportunity: schemaRef("Opportunity"),
       transition: schemaRef("CrmPipelineTransitionDecision")
     },
-    additionalProperties: false
-  },
-  OpportunityStagePatchRequest: {
-    type: "object",
-    description:
-      "Compatibility request for the legacy flat opportunity stage mutation. New clients should use OpportunityPipelineTransitionRequest.",
-    required: ["stageId"],
-    properties: { stageId: stringIdSchema },
     additionalProperties: false
   },
   OpportunityFinalizeRequest: {

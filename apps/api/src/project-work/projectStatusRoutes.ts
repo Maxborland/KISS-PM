@@ -13,7 +13,7 @@ import {
 } from "./projectWorkAudit";
 
 export function registerProjectStatusRoutes(app: Hono, deps: ProjectWorkRouteDeps) {
-  const { getSessionActorFromHeaders, getActorProfile, dataSource } = deps;
+  const { getSessionActorFromHeaders, getActorProfile } = deps;
 
   app.patch("/api/workspace/projects/:projectId/status", async (context) => {
     const projectId = parseProjectIdParam(context.req.param("projectId"));

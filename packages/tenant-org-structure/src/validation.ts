@@ -1,7 +1,6 @@
 import {
   isPlacementConsistentWithNodes,
-  nodeByIdFrom,
-  unitNodeTypeForTrack
+  nodeByIdFrom
 } from "./graph";
 import type {
   OrgNodeType,

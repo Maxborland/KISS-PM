@@ -143,7 +143,7 @@ export function canApplyTaskCompatibilityPlanningCommands(
 export function canDeleteTask(
   actor: TenantUser,
   profile: AccessProfile,
-  task: TaskRecord
+  _task: TaskRecord
 ): PolicyDecision & Record<string, unknown> {
   const deleteDecision = canDeleteTasks({ actor, profile, targetTenantId: actor.tenantId });
   if (deleteDecision.allowed) {

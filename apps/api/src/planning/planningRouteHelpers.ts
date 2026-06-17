@@ -2,7 +2,6 @@ import type { AccessProfile } from "@kiss-pm/access-control";
 import type { PlanningCommand, ScenarioProposal, TenantUser, ValidationIssue } from "@kiss-pm/domain";
 import type { Handler } from "hono";
 import { createHash } from "node:crypto";
-import { auditActionForCommand } from "./planningAuditActions";
 
 import type { ApiTenantDataSource, ManagementAuditEventInput } from "../apiTypes";
 import {

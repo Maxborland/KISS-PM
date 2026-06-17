@@ -8,7 +8,6 @@ import { createPlanningReadModel } from "./planningReadModel";
 import { canReadPlanningReadModel, permissionForCommand } from "./planningRouteAuth";
 import { auditActionForCommand } from "./planningAuditActions";
 import {
-  errorResponseBody,
   parseProjectRouteParam,
   requireActivePlanningProject,
   validateCommandDataSourcePreconditions,

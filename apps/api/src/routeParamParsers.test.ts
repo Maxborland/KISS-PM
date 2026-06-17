@@ -10,7 +10,6 @@ import {
   parseControlSurfaceIdParam,
   parseCorrectiveActionIdParam,
   parseCustomFieldIdParam,
-  parseDealStageIdParam,
   parseManagementActionIdParam,
   parseOpportunityIdParam,
   parsePlanningScenarioRunIdParam,
@@ -80,10 +79,6 @@ describe("route param parsers", () => {
     expect(parseProjectTypeIdParam("project-type-implementation")).toEqual({
       ok: true,
       value: "project-type-implementation"
-    });
-    expect(parseDealStageIdParam("deal-stage-new")).toEqual({
-      ok: true,
-      value: "deal-stage-new"
     });
     expect(parseOpportunityIdParam("opportunity-alpha")).toEqual({
       ok: true,
@@ -172,10 +167,6 @@ describe("route param parsers", () => {
     expect(parseProjectTypeIdParam("bad..project-type")).toEqual({
       ok: false,
       error: "invalid_project_type_id"
-    });
-    expect(parseDealStageIdParam("bad/stage")).toEqual({
-      ok: false,
-      error: "invalid_deal_stage_id"
     });
     expect(parseOpportunityIdParam("bad..opportunity")).toEqual({
       ok: false,

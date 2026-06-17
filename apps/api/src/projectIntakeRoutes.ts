@@ -10,7 +10,6 @@ import type {
   ManagementAuditEventInput
 } from "./apiTypes";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
-import { parseDealStageChangeBody } from "./crmParsers";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
   parseOpportunityBody,
@@ -133,34 +132,6 @@ export function registerProjectIntakeRoutes(
       actor,
       opportunityId: opportunityId.value,
       input: parsed.value
-    });
-    if (!result.ok) return context.json({ error: result.error }, result.status);
-
-    return context.json({ opportunity: result.opportunity });
-  });
-
-  app.patch("/api/workspace/opportunities/:opportunityId/stage", async (context) => {
-    const opportunityId = parseOpportunityIdParam(context.req.param("opportunityId"));
-    if (!opportunityId.ok) return context.json({ error: opportunityId.error }, 400);
-
-    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-
-    const preflight = await projectIntakeService.preflightChangeOpportunityStage({
-      actor,
-      opportunityId: opportunityId.value
-    });
-    if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
-
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseDealStageChangeBody(body.value);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
-    const result = await projectIntakeService.changeOpportunityStage({
-      actor,
-      opportunityId: opportunityId.value,
-      stageId: parsed.value.stageId
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
 

@@ -140,7 +140,6 @@ async function buildAuditLearningInputs(input: {
     ...operationalProjects.map((project) => project.id),
     ...projects.slice(0, operationalProjectCandidateHydrationLimit).map((project) => project.id)
   ]);
-  const operationalProjectIds = operationalProjects.map((project) => project.id);
   const [tasks, signals, correctiveActions] = await Promise.all([
     dataSource.listProjectTasksForProjects?.(tenantId, learningProjectIds) ?? Promise.resolve([]),
     dataSource.listControlSignalsForProjects!(tenantId, learningProjectIds),

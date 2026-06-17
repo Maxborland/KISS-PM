@@ -1,5 +1,3 @@
-import { parseWorkspaceSearchLimit } from "./searchLimit";
-import { parseWorkspaceSearchQuery, parseWorkspaceSearchTypes, normalizeWorkspaceSearchQuery } from "./searchQuery";
 import { rankAndLimit } from "./searchScoring";
 import type { SearchResult, WorkspaceSearchInput, WorkspaceSearchSource } from "./searchTypes";
 import { workspaceSearchSources } from "./workspaceSearchSources";
