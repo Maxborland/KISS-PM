@@ -2,11 +2,25 @@ import { canManageOpportunities, type PolicyDecision } from "@kiss-pm/access-con
 import { decideCrmPipelineTransition, type TenantUser } from "@kiss-pm/domain";
 import type { Context, Hono } from "hono";
 
+import type { RouteDoc } from "./apiDocs/routeDoc";
 import type { ManagementAuditEventInput } from "./apiTypes";
 import { parseCrmOpportunityPipelineTransitionBody } from "./crmParsers";
 import { readLimitedJsonBody } from "./jsonBody";
 import { parseOpportunityIdParam } from "./routeParamParsers";
 import type { ApiRouteDeps } from "./routeTypes";
+
+export const crmOpportunityTransitionRouteDocs: RouteDoc[] = [
+  {
+    method: "post",
+    path: "/api/workspace/opportunities/:opportunityId/pipeline-transition",
+    tag: "Project intake",
+    summary: "Transition opportunity CRM pipeline stage",
+    description:
+      "Moves an opportunity between first-class CRM pipeline stages. Use this current contract for intake pipeline movement instead of the legacy flat opportunity stage patch.",
+    requestSchema: "OpportunityPipelineTransitionRequest",
+    successSchema: "OpportunityPipelineTransitionResponse",
+  },
+];
 
 type AuditInput = Omit<ManagementAuditEventInput, "tenantId" | "actorUserId" | "sourceWorkflow"> & {
   actor: TenantUser;

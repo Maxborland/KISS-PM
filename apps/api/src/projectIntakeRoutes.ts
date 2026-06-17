@@ -5,6 +5,7 @@ import {
 } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 import type { Hono } from "hono";
+import type { RouteDoc } from "./apiDocs/routeDoc";
 import type {
   ApiTenantDataSource,
   ManagementAuditEventInput
@@ -19,6 +20,24 @@ import {
 } from "./projectIntakeParsers";
 import { createProjectIntakeService } from "./projectIntakeService";
 import { parseOpportunityIdParam } from "./routeParamParsers";
+
+export const projectIntakeOpportunityRouteDocs: RouteDoc[] = [
+  { method: "get", path: "/api/workspace/opportunities", tag: "Project intake", summary: "List opportunities", successSchema: "OpportunitiesResponse" },
+  { method: "get", path: "/api/workspace/opportunities/:opportunityId", tag: "Project intake", summary: "Read opportunity", successSchema: "OpportunityResponse" },
+  { method: "post", path: "/api/workspace/opportunities", tag: "Project intake", summary: "Create opportunity", requestSchema: "OpportunityWriteRequest", successSchema: "OpportunityResponse", successStatus: 201 },
+  { method: "patch", path: "/api/workspace/opportunities/:opportunityId", tag: "Project intake", summary: "Update opportunity", requestSchema: "OpportunityWriteRequest", successSchema: "OpportunityResponse" },
+];
+
+export const projectIntakeActionRouteDocs: RouteDoc[] = [
+  { method: "patch", path: "/api/workspace/opportunities/:opportunityId/finalize", tag: "Project intake", summary: "Finalize opportunity", requestSchema: "OpportunityFinalizeRequest", successSchema: "OpportunityResponse" },
+  { method: "post", path: "/api/workspace/opportunities/:opportunityId/feasibility", tag: "Project intake", summary: "Preview resource feasibility", successSchema: "OpportunityFeasibilityResponse" },
+  { method: "post", path: "/api/workspace/opportunities/:opportunityId/activate", tag: "Project intake", summary: "Activate project from opportunity", requestSchema: "ProjectActivationRequest", successSchema: "ProjectActivationResponse", successStatus: 201 },
+];
+
+export const projectIntakeRouteDocs: RouteDoc[] = [
+  ...projectIntakeOpportunityRouteDocs,
+  ...projectIntakeActionRouteDocs,
+];
 
 type ProjectIntakeRouteDeps = {
   dataSource: ApiTenantDataSource;
