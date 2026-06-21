@@ -12,6 +12,7 @@ import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRo
 import { notifyPlanVersionChanged } from "../planningEventBus";
 import { registerPlanningEventsRoute } from "../planningEventsRoute";
 import { registerPlanningAutoSolverRoutes } from "./planningAutoSolverRoutes";
+import { registerPlanningForecastRoutes } from "./planningForecastRoutes";
 import { registerPlanningPreviewCommandRoute } from "./planningPreviewCommandRoute";
 import { registerPlanningSavedViewRoutes } from "./planningSavedViewRoutes";
 import {
@@ -65,6 +66,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     getActorProfile: deps.getActorProfile
   });
   registerPlanningAutoSolverRoutes(app, deps);
+  registerPlanningForecastRoutes(app, deps);
   registerPlanningSavedViewRoutes(app, deps);
 
   app.get("/api/workspace/projects/:projectId/planning/read-model", async (context) => {

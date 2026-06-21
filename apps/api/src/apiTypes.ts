@@ -69,6 +69,8 @@ import type {
   CrmActivityUpdateInput,
   PlanningCommandIdempotencyInput,
   PlanningCommandIdempotencyRecord,
+  PlanningForecastRunInput,
+  PlanningForecastRunRecord,
   PlanningScenarioRunInput,
   PlanningScenarioRunRecord,
   PlanningSolverRunInput,
@@ -890,6 +892,14 @@ export type ApiTenantDataSource = {
     projectId: string,
     runId: string
   ): Promise<PlanningSolverRunRecord | undefined>;
+  createPlanningForecastRun?(
+    input: PlanningForecastRunInput
+  ): Promise<PlanningForecastRunRecord>;
+  findPlanningForecastRun?(
+    tenantId: TenantId,
+    projectId: string,
+    runId: string
+  ): Promise<PlanningForecastRunRecord | undefined>;
   markPlanningSolverRunApplied?(input: {
     tenantId: TenantId;
     projectId: string;

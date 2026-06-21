@@ -7,6 +7,7 @@ import { auditActionForCommand } from "./planningAuditActions";
 import type { ApiTenantDataSource, ManagementAuditEventInput } from "../apiTypes";
 import {
   parsePlanningScenarioRunIdParam,
+  parsePlanningForecastRunIdParam,
   parsePlanningSolverProposalIdParam,
   parsePlanningSolverRunIdParam,
   parseProjectIdParam,
@@ -65,6 +66,10 @@ export function parseSavedViewRouteParam(context: Parameters<Handler>[0]): Route
 
 export function parseSolverRunRouteParam(context: Parameters<Handler>[0]): RouteParamParseResult {
   return parseRequiredRouteParam(context, parsePlanningSolverRunIdParam, "runId");
+}
+
+export function parsePlanningForecastRunRouteParam(context: Parameters<Handler>[0]): RouteParamParseResult {
+  return parseRequiredRouteParam(context, parsePlanningForecastRunIdParam, "runId");
 }
 
 export function parseSolverProposalRouteParam(context: Parameters<Handler>[0]): RouteParamParseResult {

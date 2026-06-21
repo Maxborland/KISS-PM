@@ -23,6 +23,49 @@ export class ApiError extends Error {
   }
 }
 
+export type PlanForecastHealth = "stable" | "watch" | "needs_decision" | "unstable" | "blocked";
+
+export type PlanForecastRiskDriver = {
+  code:
+    | "deadline_too_tight"
+    | "dependency_chain_fragile"
+    | "resource_overloaded"
+    | "review_bottleneck"
+    | "blocked_task"
+    | "historical_delay_pattern"
+    | "solver_has_no_safe_proposal";
+  severity: "info" | "warning" | "critical";
+  message: string;
+  taskIds: string[];
+  resourceIds: string[];
+  dependencyIds?: string[];
+  date?: string | null;
+  overloadMinutes?: number | null;
+  deadlineDeltaDays?: number | null;
+  validationIssueCodes?: string[];
+};
+
+export type PlanForecastRecommendation = {
+  code: "keep_plan" | "add_buffer" | "move_task" | "add_resource" | "reduce_scope" | "resolve_blocker" | "use_auto_solver";
+  message: string;
+  actionRequired: boolean;
+  taskIds: string[];
+  resourceIds: string[];
+};
+
+export type PlanForecastRunResponse = {
+  runId: string;
+  projectId: string;
+  clientPlanVersion: number;
+  engineVersion: string;
+  health: PlanForecastHealth;
+  managerSummary: string;
+  riskDrivers: PlanForecastRiskDriver[];
+  recommendations: PlanForecastRecommendation[];
+  expiresAt: string;
+  createdAt: string;
+};
+
 function mapStatusToCode(status: number, body: Record<string, unknown>): ApiErrorCode {
   const errorField = body.error;
   if (typeof errorField === "string") {

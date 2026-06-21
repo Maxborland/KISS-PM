@@ -112,6 +112,10 @@ export function parsePlanningSolverRunIdParam(value: unknown): RouteParamParseRe
   return parseCrmIdentifier(value, "invalid_planning_solver_run_id");
 }
 
+export function parsePlanningForecastRunIdParam(value: unknown): RouteParamParseResult {
+  return parseCrmIdentifier(value, "invalid_planning_forecast_run_id");
+}
+
 export function parsePlanningSolverProposalIdParam(value: unknown): RouteParamParseResult {
   return parseRouteIdentifier(value, "invalid_planning_solver_proposal_id");
 }

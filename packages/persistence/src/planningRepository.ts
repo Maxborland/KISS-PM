@@ -11,6 +11,9 @@ import type {
   PlanConstraint,
   PlanConstraintType,
   PlanDate,
+  PlanForecastHealth,
+  PlanForecastRecommendation,
+  PlanForecastRiskDriver,
   PlanResource,
   PlanSnapshot,
   PlanTask,
@@ -28,6 +31,7 @@ import {
   projectBaselines,
   projectBaselineTasks,
   projectCalendars,
+  planningForecastRuns,
   projects,
   resourceCalendars,
   resourceReservations,
@@ -101,6 +105,14 @@ export type PlanningRepository = {
     proposalId: string;
     appliedAt: Date;
   }): Promise<void>;
+  createPlanningForecastRun(
+    input: PlanningForecastRunInput
+  ): Promise<PlanningForecastRunRecord>;
+  findPlanningForecastRun(
+    tenantId: string,
+    projectId: string,
+    runId: string
+  ): Promise<PlanningForecastRunRecord | undefined>;
   findPlanningCommandIdempotency(
     tenantId: string,
     projectId: string,
@@ -165,6 +177,27 @@ export type PlanningSolverRunRecord = {
   appliedProposalId: string | null;
   appliedAt: Date | null;
   createdAt: Date;
+};
+
+export type PlanningForecastRunInput = Omit<PlanningForecastRunRecord, "createdAt"> & {
+  createdAt?: Date;
+};
+
+export type PlanningForecastRunRecord = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  clientPlanVersion: number;
+  engineVersion: string;
+  health: PlanForecastHealth;
+  managerSummary: string;
+  riskDrivers: PlanForecastRiskDriver[];
+  recommendations: PlanForecastRecommendation[];
+  engineMetadata: Record<string, unknown>;
+  engineDebug: Record<string, unknown> | null;
+  actorUserId: string;
+  createdAt: Date;
+  expiresAt: Date;
 };
 
 export type PlanningCommandIdempotencyInput = Omit<
@@ -602,6 +635,61 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             eq(planningSolverRuns.id, input.runId)
           )
         );
+    },
+
+    async createPlanningForecastRun(input) {
+      const [row] = await db
+        .insert(planningForecastRuns)
+        .values({
+          id: input.id,
+          tenantId: input.tenantId,
+          projectId: input.projectId,
+          clientPlanVersion: input.clientPlanVersion,
+          engineVersion: input.engineVersion,
+          health: input.health,
+          managerSummary: input.managerSummary,
+          riskDrivers: input.riskDrivers,
+          recommendations: input.recommendations,
+          engineMetadata: input.engineMetadata,
+          engineDebug: input.engineDebug,
+          actorUserId: input.actorUserId,
+          expiresAt: input.expiresAt,
+          createdAt: input.createdAt ?? new Date()
+        })
+        .onConflictDoUpdate({
+          target: [planningForecastRuns.tenantId, planningForecastRuns.projectId, planningForecastRuns.id],
+          set: {
+            clientPlanVersion: input.clientPlanVersion,
+            engineVersion: input.engineVersion,
+            health: input.health,
+            managerSummary: input.managerSummary,
+            riskDrivers: input.riskDrivers,
+            recommendations: input.recommendations,
+            engineMetadata: input.engineMetadata,
+            engineDebug: input.engineDebug,
+            actorUserId: input.actorUserId,
+            expiresAt: input.expiresAt,
+            createdAt: input.createdAt ?? new Date()
+          }
+        })
+        .returning();
+      if (!row) throw new Error("Planning forecast run insert returned no row");
+      return mapPlanningForecastRun(row);
+    },
+
+    async findPlanningForecastRun(tenantId, projectId, runId) {
+      const [row] = await db
+        .select()
+        .from(planningForecastRuns)
+        .where(
+          and(
+            eq(planningForecastRuns.tenantId, tenantId),
+            eq(planningForecastRuns.projectId, projectId),
+            eq(planningForecastRuns.id, runId)
+          )
+        )
+        .limit(1);
+      return row ? mapPlanningForecastRun(row) : undefined;
     },
 
     async findPlanningCommandIdempotency(tenantId, projectId, idempotencyKey) {
@@ -1838,6 +1926,27 @@ function mapPlanningSolverRun(
     appliedProposalId: row.appliedProposalId,
     appliedAt: row.appliedAt,
     createdAt: row.createdAt
+  };
+}
+
+function mapPlanningForecastRun(
+  row: typeof planningForecastRuns.$inferSelect
+): PlanningForecastRunRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    projectId: row.projectId,
+    clientPlanVersion: row.clientPlanVersion,
+    engineVersion: row.engineVersion,
+    health: row.health as PlanForecastHealth,
+    managerSummary: row.managerSummary,
+    riskDrivers: row.riskDrivers as PlanForecastRiskDriver[],
+    recommendations: row.recommendations as PlanForecastRecommendation[],
+    engineMetadata: row.engineMetadata,
+    engineDebug: row.engineDebug,
+    actorUserId: row.actorUserId,
+    createdAt: row.createdAt,
+    expiresAt: row.expiresAt
   };
 }
 

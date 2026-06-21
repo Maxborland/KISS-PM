@@ -123,6 +123,15 @@ describe("KISS PM API Phase 1 shell", () => {
         .requestBody.content["application/json"].schema
     ).toEqual({ $ref: "#/components/schemas/PlanningAutoSolverRunCreateRequest" });
     expect(
+      document.paths["/api/workspace/projects/{projectId}/planning/forecast-runs"].post
+        .requestBody.content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/PlanningForecastRunCreateRequest" });
+    expect(
+      document.paths["/api/workspace/projects/{projectId}/planning/forecast-runs/{runId}"].get
+        .responses["200"].content["application/json"].schema
+    ).toEqual({ $ref: "#/components/schemas/PlanningForecastRunResponse" });
+    expect(document.components.schemas.PlanningForecastRunResponse.properties.engineDebug).toBeUndefined();
+    expect(
       document.paths["/api/workspace/attachments"].get.parameters
     ).toContainEqual(
       expect.objectContaining({
