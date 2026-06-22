@@ -14,6 +14,7 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { mockProjectScreenTitle } from "@/views/catalog";
+import { demoAction } from "@/views/lib/demo";
 import { PageIntro } from "@/views/layout/page-intro";
 
 type WeekdayDef = { label: string; hours: string; on: boolean };
@@ -54,6 +55,7 @@ function ExceptionRow({ item, onRemove }: { item: Exception; onRemove?: () => vo
         aria-label={`Удалить ${item.reason}`}
         onClick={onRemove}
         type="button"
+        {...demoAction("удаление исключения")}
       >
         ×
       </Button>
@@ -66,21 +68,21 @@ export function ProjectCalendarsBlock() {
     <>
       <PageIntro
         title={mockProjectScreenTitle("Календари")}
-        lead="Рабочие часы и исключения tenant-календаря."
+        lead="Рабочие часы и исключения календаря организации."
         actions={
           <>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" {...demoAction("шаблоны календаря")}>
               <CalendarDays className="size-4" aria-hidden />
               Шаблоны
             </Button>
-            <Button variant="primary" size="sm">
+            <Button variant="primary" size="sm" {...demoAction("сохранение календаря")}>
               Сохранить
             </Button>
           </>
         }
       />
       <div className="grid-2">
-        <CardPanel title="Рабочая неделя" subtitle="Стандартный календарь tenant">
+        <CardPanel title="Рабочая неделя" subtitle="Стандартный календарь организации">
           <FormSection title="Шаблон" lead="Выберите базовый паттерн или настройте дни вручную.">
             <FormGrid columns={1}>
               <Field label="Шаблон" htmlFor="cal-template">
@@ -109,7 +111,7 @@ export function ProjectCalendarsBlock() {
           title="Исключения"
           subtitle={`${EXCEPTIONS.length} даты`}
           actions={
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" {...demoAction("добавление исключения")}>
               <Plus className="size-4" aria-hidden />
               Добавить
             </Button>

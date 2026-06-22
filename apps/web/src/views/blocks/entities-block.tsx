@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { IconButton } from "@/components/ui/icon-button";
 import { SearchPill } from "@/components/ui/search-pill";
+import { demoAction } from "@/views/lib/demo";
 import { PageIntro } from "@/views/layout/page-intro";
 
 export type EntityKind = "clients" | "contacts" | "products";
@@ -14,26 +15,26 @@ export type EntityKind = "clients" | "contacts" | "products";
 const COPY: Record<EntityKind, { title: string; lead: string; cols: string[]; rows: Array<Record<string, unknown>> }> = {
   clients: {
     title: "Клиенты",
-    lead: "Справочник клиентов tenant.",
+    lead: "Справочник клиентов рабочей области.",
     cols: ["Клиент", "Менеджер", "Сегмент", "Сделок", "Сумма"],
     rows: [
-      { name: "ООО «Ромашка»", code: "CLI-001", manager: { initials: "ИИ", color: "c1" as const, name: "Иванова" }, segment: "Enterprise", deals: 4, amount: "3 240 000 ₽" },
-      { name: "АО «Техно»", code: "CLI-002", manager: { initials: "АП", color: "c2" as const, name: "Петров" }, segment: "Mid-market", deals: 2, amount: "890 000 ₽" },
-      { name: "ACME Studio", code: "CLI-003", manager: { initials: "КБ", color: "c4" as const, name: "Козлова" }, segment: "SMB", deals: 1, amount: "320 000 ₽" }
+      { name: "ООО «Ромашка»", code: "CLI-001", manager: { initials: "ИИ", color: "c1" as const, name: "Иванова" }, segment: "Крупный бизнес", deals: 4, amount: "3 240 000 ₽" },
+      { name: "АО «Техно»", code: "CLI-002", manager: { initials: "АП", color: "c2" as const, name: "Петров" }, segment: "Средний бизнес", deals: 2, amount: "890 000 ₽" },
+      { name: "ACME Studio", code: "CLI-003", manager: { initials: "КБ", color: "c4" as const, name: "Козлова" }, segment: "Малый бизнес", deals: 1, amount: "320 000 ₽" }
     ]
   },
   contacts: {
     title: "Контакты",
-    lead: "Контактные лица и связи с CRM.",
+    lead: "Контактные лица и связи с CRM рабочей области.",
     cols: ["Контакт", "Компания", "Должность", "Email", "Активность"],
     rows: [
-      { name: "Алексей Иванов", code: "CTC-001", manager: { initials: "ИИ", color: "c1" as const, name: "Иванова" }, company: "ООО «Ромашка»", role: "CFO", email: "ai@romashka.ru" },
-      { name: "Мария Петрова", code: "CTC-002", manager: { initials: "АП", color: "c2" as const, name: "Петров" }, company: "АО «Техно»", role: "Operations", email: "mp@tehno.ru" }
+      { name: "Алексей Иванов", code: "CTC-001", manager: { initials: "ИИ", color: "c1" as const, name: "Иванова" }, company: "ООО «Ромашка»", role: "Финансовый директор", email: "ai@romashka.ru" },
+      { name: "Мария Петрова", code: "CTC-002", manager: { initials: "АП", color: "c2" as const, name: "Петров" }, company: "АО «Техно»", role: "Операционный директор", email: "mp@tehno.ru" }
     ]
   },
   products: {
     title: "Продукты",
-    lead: "Каталог продуктов для сделок и проектов.",
+    lead: "Каталог продуктов рабочей области для сделок и проектов.",
     cols: ["Продукт", "Категория", "Цена", "Активных сделок", "Статус"],
     rows: [
       { name: "Внедрение CRM", code: "PRD-CRM-01", price: "от 890 000 ₽", category: "Внедрение", deals: 8, status: "active" },
@@ -52,11 +53,11 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
         lead={c.lead}
         actions={
           <>
-            <Button variant="secondary">
+            <Button variant="secondary" {...demoAction("импорт записей")}>
               <Upload className="size-4" aria-hidden />
               Импорт
             </Button>
-            <Button variant="primary">
+            <Button variant="primary" {...demoAction("создание записи")}>
               <Plus className="size-4" aria-hidden />
               Добавить
             </Button>
@@ -64,7 +65,7 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
         }
       />
       <div className="view-toolbar">
-        <SearchPill className="u-w-280" placeholder={`Поиск в «${c.title}»`} />
+        <SearchPill className="u-w-280" placeholder={`Поиск в «${c.title}»`} disabled title="Демо-прототип: поиск подключится к рабочему приложению" />
         <Button variant="secondary" size="sm">
           <Filter className="size-4" aria-hidden />
           Фильтр
@@ -122,7 +123,7 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
                 </>
               ) : null}
               <td className="cell-actions">
-                <IconButton label="Действия" variant="ghost" size="sm">
+                <IconButton label="Действия" variant="ghost" size="sm" {...demoAction("действия записи")}>
                   <MoreHorizontal />
                 </IconButton>
               </td>

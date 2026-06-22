@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { IconButton } from "@/components/ui/icon-button";
 import { MOCK_PROJECT_CRM } from "@/views/catalog";
+import { demoAction } from "@/views/lib/demo";
 import { PageIntro } from "@/views/layout/page-intro";
 
 const USERS = [
@@ -25,7 +26,7 @@ export function AdminBlock() {
         title="Администрирование"
         lead="Пользователи, роли и политики рабочей области."
         actions={
-          <Button variant="primary">
+          <Button variant="primary" {...demoAction("приглашение пользователя")}>
             <UserPlus className="size-4" aria-hidden />
             Пригласить
           </Button>
@@ -56,10 +57,10 @@ export function AdminBlock() {
                     <Chip variant="info">{u.role}</Chip>
                   </td>
                   <td>
-                    {u.active ? <Chip variant="success">Активен</Chip> : <Chip>Заблокирован</Chip>}
+                    {u.active ? <Chip variant="success">Активен</Chip> : <Chip variant="danger">Заблокирован</Chip>}
                   </td>
                   <td className="cell-actions">
-                    <IconButton label="Действия" variant="ghost" size="sm">
+                    <IconButton label="Действия" variant="ghost" size="sm" {...demoAction("действия пользователя")}>
                       <MoreHorizontal />
                     </IconButton>
                   </td>
@@ -72,7 +73,7 @@ export function AdminBlock() {
           title="Политики безопасности"
           subtitle={`Рабочая область · ${MOCK_PROJECT_CRM}`}
           actions={
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" {...demoAction("журнал аудита")}>
               <ShieldCheck className="size-4" aria-hidden />
               Аудит
             </Button>
@@ -81,8 +82,8 @@ export function AdminBlock() {
           <SwitchRowList>
             <SwitchRow label="2FA обязательна" description="Двухфакторная аутентификация для всех" defaultChecked />
             <SwitchRow label="Сессии — 8 часов" description="Автовыход после 8 часов неактивности" defaultChecked />
-            <SwitchRow label="SSO (SAML)" description="Корпоративный single sign-on" />
-            <SwitchRow label="Domain allowlist" description="Только email из доменов tenant" />
+            <SwitchRow label="SSO (SAML)" description="Корпоративный единый вход (SSO)" />
+            <SwitchRow label="Белый список доменов" description="Только email из доменов организации" />
           </SwitchRowList>
         </CardPanel>
       </div>

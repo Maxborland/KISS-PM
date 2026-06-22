@@ -4,6 +4,8 @@ import { ErrorState } from "@/components/ui/error-state";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import { PageIntro } from "@/views/layout/page-intro";
+import { TaskCreateDialog } from "@/views/blocks/task-create-modal-block";
+import { demoAction } from "@/views/lib/demo";
 
 export type StateKind = "empty" | "error" | "forbidden" | "loading";
 
@@ -16,14 +18,24 @@ export function StateScreenBlock({ kind }: { kind: StateKind }) {
         <EmptyState
           title="Пока пусто"
           description="Добавьте задачу или измените фильтры."
-          action={<Button variant="primary">Создать задачу</Button>}
+          action={<TaskCreateDialog trigger={<Button variant="primary">Создать задачу</Button>} />}
         />
       )
     },
     error: {
       title: "Ошибка загрузки",
       lead: "Не удалось получить данные. Повторите позже.",
-      body: <ErrorState title="Что-то пошло не так" description="Проверьте соединение и повторите запрос." />
+      body: (
+        <ErrorState
+          title="Что-то пошло не так"
+          description="Проверьте соединение и повторите запрос."
+          action={
+            <Button variant="secondary" {...demoAction("повтор загрузки")}>
+              Повторить
+            </Button>
+          }
+        />
+      )
     },
     forbidden: {
       title: "Нет доступа",

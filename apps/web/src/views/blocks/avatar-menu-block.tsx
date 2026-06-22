@@ -20,7 +20,7 @@ export function AvatarMenuBlock() {
     <>
       <PageIntro title="Профиль пользователя" lead="Меню аватара и быстрые действия." />
       <div className="grid-2">
-        <CardPanel title="Раскрытое меню" subtitle="Превью dropdown · из topbar">
+        <CardPanel title="Раскрытое меню" subtitle="Превью меню · из верхней панели">
           <DropdownMenu defaultOpen>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary">
@@ -60,7 +60,7 @@ export function AvatarMenuBlock() {
                 <ShieldCheck className="size-4" aria-hidden />
                 Безопасность
               </DropdownMenuItem>
-              <DropdownMenuItem variant="destructive">
+              <DropdownMenuItem>
                 <LogOut className="size-4" aria-hidden />
                 Выйти
               </DropdownMenuItem>

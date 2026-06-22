@@ -7,6 +7,7 @@ import { Chip } from "@/components/ui/chip";
 import { SearchPill } from "@/components/ui/search-pill";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
+import { demoAction } from "@/views/lib/demo";
 
 const ENTRIES = [
   { who: { initials: "ИИ", color: "c1" as const, name: "Иванова М." }, when: "23.05 14:32", action: "Изменена стадия", body: "Квалификация → КП", tone: "info" },
@@ -20,13 +21,13 @@ export function ProjectAuditBlock() {
     <>
       <PageIntro title={mockProjectScreenTitle("Аудит")} lead="Журнал управленческих действий." />
       <div className="view-toolbar">
-        <SearchPill className="u-w-280" placeholder="Поиск по аудиту" />
-        <Button variant="secondary" size="sm">
+        <SearchPill className="u-w-280" placeholder="Поиск по аудиту" disabled title="Демо-прототип: поиск подключится к рабочему приложению" />
+        <Button variant="secondary" size="sm" {...demoAction("фильтр аудита")}>
           <Filter className="size-4" aria-hidden />
           Фильтр
         </Button>
       </div>
-      <CardPanel title="Журнал событий" subtitle={`${ENTRIES.length} записей`} flush>
+      <CardPanel title="Журнал событий" subtitle={`Записей: ${ENTRIES.length}`} flush>
         <ul className="audit-list">
           {ENTRIES.map((e, i) => (
             <li key={i} className="audit-list__item">

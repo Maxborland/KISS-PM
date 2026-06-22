@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { demoAction } from "@/views/lib/demo";
 
 export type KanbanColumnProps = {
   title: ReactNode;
@@ -19,7 +20,12 @@ export function KanbanColumn({ title, count, children }: KanbanColumnProps) {
           {title}
           {count != null ? <Badge variant="secondary">{count}</Badge> : null}
         </span>
-        <Button variant="ghost" size="icon-sm" aria-label="Действия колонки">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Действия колонки"
+          {...demoAction("действия колонки")}
+        >
           <MoreHorizontal className="size-4" />
         </Button>
       </div>

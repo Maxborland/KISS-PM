@@ -6,6 +6,7 @@
 @import "react-day-picker/dist/style.css" layer(components);
 @import "../styles/bem.css" layer(components);
 @import "../styles/bem-supplement.css" layer(components);
+@import "../styles/kiss-v4.css" layer(components);
 @import "../styles/widgets/resource-matrix.css" layer(components);
 @import "../styles/widgets/gantt.css" layer(components);
 

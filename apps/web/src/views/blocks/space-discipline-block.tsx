@@ -6,8 +6,8 @@ export function SpaceDisciplineBlock() {
   return (
     <>
       <PageIntro
-        title="Overlay вместо push"
-        lead="Уведомления, баннеры, фильтры не должны сдвигать контент. Только overlay."
+        title="Наложение вместо сдвига"
+        lead="Уведомления, баннеры, фильтры не должны сдвигать контент. Только наложение поверх контента."
       />
       <div className="grid-compare">
         <div>

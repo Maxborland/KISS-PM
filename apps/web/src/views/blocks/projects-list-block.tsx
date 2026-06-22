@@ -11,6 +11,7 @@ import { Chip } from "@/components/ui/chip";
 import { SearchPill } from "@/components/ui/search-pill";
 import { Segmented } from "@/components/ui/segmented";
 import { MOCK_PROJECT_CRM } from "@/views/catalog";
+import { demoAction } from "@/views/lib/demo";
 import { PageIntro } from "@/views/layout/page-intro";
 
 export function ProjectsListBlock() {
@@ -20,9 +21,9 @@ export function ProjectsListBlock() {
     <>
       <PageIntro
         title="Проекты"
-        lead="14 активных проектов, 3 на ревью, 2 на финальной стадии."
+        lead="Активные проекты рабочей области."
         actions={
-          <Button variant="primary">
+          <Button variant="primary" {...demoAction("создание проекта")}>
             <Plus className="size-4" aria-hidden />
             Проект
           </Button>
@@ -40,7 +41,12 @@ export function ProjectsListBlock() {
           ]}
         />
         <div className="view-toolbar__filters">
-          <SearchPill placeholder="Код или название" className="u-w-240" />
+          <SearchPill
+            placeholder="Код или название"
+            className="u-w-240"
+            disabled
+            title="Демо-прототип: поиск подключится к рабочему приложению"
+          />
           <Button variant="secondary" size="sm" disabled title="Демо Storybook: фильтр подключится к API">
             <Filter className="size-4" aria-hidden />
             Фильтр
@@ -64,7 +70,7 @@ export function ProjectsListBlock() {
           </tr>
         </thead>
         <tbody>
-          <tr className="is-selected">
+          <tr>
             <td>
               <CellStack
                 title={MOCK_PROJECT_CRM}
@@ -81,7 +87,7 @@ export function ProjectsListBlock() {
             </td>
             <td className="mono cell-muted">27.05.2026</td>
             <td className="cell-actions">
-              <Button variant="ghost" size="icon-sm" aria-label="Действия">
+              <Button variant="ghost" size="icon-sm" aria-label="Действия" {...demoAction("действия проекта")}>
                 <MoreHorizontal className="size-4" />
               </Button>
             </td>
@@ -99,7 +105,73 @@ export function ProjectsListBlock() {
             </td>
             <td className="mono cell-muted">12.06.2026</td>
             <td className="cell-actions">
-              <Button variant="ghost" size="icon-sm" aria-label="Действия">
+              <Button variant="ghost" size="icon-sm" aria-label="Действия" {...demoAction("действия проекта")}>
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <CellStack
+                title="Портал поддержки"
+                subtitle="PRJ-2026-021"
+                icon={<Folder className="size-4" aria-hidden />}
+              />
+            </td>
+            <td>ООО «Вектор»</td>
+            <td>
+              <BemAvatar initials="ЕС" color="c3" /> Смирнова Е.
+            </td>
+            <td>
+              <Chip variant="info">На ревью</Chip>
+            </td>
+            <td className="mono cell-muted">03.07.2026</td>
+            <td className="cell-actions">
+              <Button variant="ghost" size="icon-sm" aria-label="Действия" {...demoAction("действия проекта")}>
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <CellStack
+                title="Биллинг 2.0"
+                subtitle="PRJ-2026-026"
+                icon={<Folder className="size-4" aria-hidden />}
+              />
+            </td>
+            <td>АО «Энергия»</td>
+            <td>
+              <BemAvatar initials="ДК" color="c4" /> Козлов Д.
+            </td>
+            <td>
+              <Chip variant="info">В работе</Chip>
+            </td>
+            <td className="mono cell-muted">19.07.2026</td>
+            <td className="cell-actions">
+              <Button variant="ghost" size="icon-sm" aria-label="Действия" {...demoAction("действия проекта")}>
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <CellStack
+                title="Аналитика продаж"
+                subtitle="PRJ-2026-031"
+                icon={<Folder className="size-4" aria-hidden />}
+              />
+            </td>
+            <td>ООО «Гранит»</td>
+            <td>
+              <BemAvatar initials="ОМ" color="c5" /> Морозова О.
+            </td>
+            <td>
+              <Chip variant="info">На ревью</Chip>
+            </td>
+            <td className="mono cell-muted">08.08.2026</td>
+            <td className="cell-actions">
+              <Button variant="ghost" size="icon-sm" aria-label="Действия" {...demoAction("действия проекта")}>
                 <MoreHorizontal className="size-4" />
               </Button>
             </td>

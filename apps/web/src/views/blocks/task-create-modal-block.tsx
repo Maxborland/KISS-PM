@@ -1,8 +1,13 @@
-import { CardPanel } from "@/components/domain/card-panel";
+"use client";
+
+import { useState, type ReactNode } from "react";
+import { Plus } from "lucide-react";
+
 import { Field, FormGrid, FormSection, TagsInput } from "@/components/domain/form-layout";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
+import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -13,33 +18,100 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/cn";
 import { MOCK_PROJECT_CRM } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
+import { demoAction } from "@/views/lib/demo";
+import { PrototypeDialog } from "@/views/lib/prototype-dialog";
 
+const STEPS = ["Тип", "Параметры", "Назначение"];
+
+/**
+ * Создание задачи как РЕАЛЬНАЯ модалка (Dialog/overlay), а не CardPanel на странице
+ * (§6 DESIGN_CONTRACT). Stepper и кнопки «Назад/Далее» рабочие (fixture-навигация по
+ * шагам); «Создать» честно отключена — прототип не сохраняет.
+ */
 export function TaskCreateModalBlock() {
   return (
     <>
-      <PageIntro title="Новая задача" lead="Модальное создание с stepper и формой." />
-      <CardPanel className="modal-mock">
-        <ol className="stepper">
-          <li className="stepper__item is-done">
-            <span className="stepper__num">1</span>
-            <span>Тип</span>
-          </li>
-          <li className="stepper__item is-active">
-            <span className="stepper__num">2</span>
-            <span>Параметры</span>
-          </li>
-          <li className="stepper__item">
-            <span className="stepper__num">3</span>
-            <span>Назначение</span>
-          </li>
-        </ol>
-        <FormSection title="Параметры задачи" lead="Опишите контекст и сроки.">
+      <PageIntro
+        title="Новая задача"
+        lead="Создание задачи открывается модальным окном поверх рабочей области."
+      />
+      <p className="u-text-sm u-text-muted">
+        Ниже — превью модального создания. Шаги переключаются, форма в прототипе не сохраняется.
+      </p>
+      <TaskCreateDialog defaultOpen trigger={
+        <Button variant="primary">
+          <Plus className="size-4" aria-hidden />
+          Новая задача
+        </Button>
+      } />
+    </>
+  );
+}
+
+/** Переиспользуемая модалка создания задачи (триггер передаётся снаружи). */
+export function TaskCreateDialog({
+  trigger,
+  defaultOpen = false
+}: {
+  trigger: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [step, setStep] = useState(1);
+
+  return (
+    <PrototypeDialog
+      trigger={trigger}
+      defaultOpen={defaultOpen}
+      title="Новая задача"
+      description="Шаг за шагом: тип, параметры, назначение."
+      contentClassName="max-w-[640px]"
+      footer={
+        <DialogFooter className="sm:justify-between">
+          <DialogClose asChild>
+            <Button variant="ghost">Отмена</Button>
+          </DialogClose>
+          <div className="ml-auto flex gap-[var(--space-2)]">
+            <Button
+              variant="secondary"
+              disabled={step === 1}
+              onClick={() => setStep((s) => Math.max(1, s - 1))}
+            >
+              Назад
+            </Button>
+            {step < STEPS.length ? (
+              <Button variant="primary" onClick={() => setStep((s) => Math.min(STEPS.length, s + 1))}>
+                Далее
+              </Button>
+            ) : (
+              <Button variant="primary" {...demoAction("создание задачи")}>
+                Создать
+              </Button>
+            )}
+          </div>
+        </DialogFooter>
+      }
+    >
+      <ol className="stepper">
+        {STEPS.map((label, i) => {
+          const n = i + 1;
+          return (
+            <li
+              key={label}
+              className={cn("stepper__item", n === step && "is-active", n < step && "is-done")}
+            >
+              <span className="stepper__num">{n}</span>
+              <span>{label}</span>
+            </li>
+          );
+        })}
+      </ol>
+
+      {step === 1 ? (
+        <FormSection title="Тип задачи" lead="Выберите тип и проект.">
           <FormGrid>
-            <Field label="Название" full required htmlFor="t-name">
-              <Input id="t-name" placeholder="Согласовать ТЗ с клиентом" />
-            </Field>
             <Field label="Тип" htmlFor="t-type">
               <Select defaultValue="action">
                 <SelectTrigger id="t-type" className="w-full">
@@ -47,8 +119,8 @@ export function TaskCreateModalBlock() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="action">Действие</SelectItem>
-                  <SelectItem value="meeting">Митинг</SelectItem>
-                  <SelectItem value="review">Ревью</SelectItem>
+                  <SelectItem value="meeting">Встреча</SelectItem>
+                  <SelectItem value="review">Проверка</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -61,6 +133,16 @@ export function TaskCreateModalBlock() {
                 placeholder="Выбрать"
               />
             </Field>
+          </FormGrid>
+        </FormSection>
+      ) : null}
+
+      {step === 2 ? (
+        <FormSection title="Параметры задачи" lead="Опишите контекст и сроки.">
+          <FormGrid>
+            <Field label="Название" full required htmlFor="t-name">
+              <Input id="t-name" placeholder="Согласовать ТЗ с клиентом" />
+            </Field>
             <Field label="Срок" htmlFor="t-due">
               <DatePicker placeholder="Выбрать дату" />
             </Field>
@@ -68,7 +150,11 @@ export function TaskCreateModalBlock() {
               <Input id="t-dur" defaultValue="2д" />
             </Field>
             <Field label="Приоритет" full>
-              <RadioGroup defaultValue="normal" name="t-prio" className="grid grid-cols-3 gap-[var(--space-2)]">
+              <RadioGroup
+                defaultValue="normal"
+                name="t-prio"
+                className="grid grid-cols-1 gap-[var(--space-2)] sm:grid-cols-3"
+              >
                 <RadioGroupItem id="p-low" value="low">
                   Низкий
                 </RadioGroupItem>
@@ -80,6 +166,13 @@ export function TaskCreateModalBlock() {
                 </RadioGroupItem>
               </RadioGroup>
             </Field>
+          </FormGrid>
+        </FormSection>
+      ) : null}
+
+      {step === 3 ? (
+        <FormSection title="Назначение" lead="Теги и описание задачи.">
+          <FormGrid>
             <Field label="Теги" full>
               <TagsInput tags={["CRM", "Q3"]} />
             </Field>
@@ -88,14 +181,7 @@ export function TaskCreateModalBlock() {
             </Field>
           </FormGrid>
         </FormSection>
-        <div className="modal-mock__footer">
-          <Button variant="ghost">Отмена</Button>
-          <div className="ml-auto flex gap-[var(--space-2)]">
-            <Button variant="secondary">Назад</Button>
-            <Button variant="primary">Далее</Button>
-          </div>
-        </div>
-      </CardPanel>
-    </>
+      ) : null}
+    </PrototypeDialog>
   );
 }

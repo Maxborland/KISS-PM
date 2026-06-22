@@ -74,7 +74,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
   "00-space-discipline": {
     id: "00-space-discipline",
     storyTitle: "00 Дисциплина отступов",
-    pageTitle: "Overlay вместо push",
+    pageTitle: "Наложение вместо сдвига",
     lead: "Уведомления, баннеры, фильтры не должны сдвигать контент. Только overlay.",
     breadcrumb: [{ label: "Design", current: true }],
     activeNav: "Дашборд"
@@ -147,7 +147,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     id: "08-entities-clients",
     storyTitle: "08 Справочник клиентов",
     pageTitle: "Клиенты",
-    lead: "Справочник клиентов tenant.",
+    lead: "Справочник клиентов рабочей области.",
     breadcrumb: [{ label: "Справочники" }, { label: "Клиенты", current: true }],
     activeNav: "Интеграции"
   },
@@ -251,7 +251,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     id: "19-login",
     storyTitle: "19 Вход",
     pageTitle: "Войти в KISS PM",
-    lead: "Используйте корпоративный email tenant.",
+    lead: "Используйте корпоративный email рабочего пространства.",
     breadcrumb: [],
     variant: "login"
   },

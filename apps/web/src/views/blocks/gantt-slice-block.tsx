@@ -15,6 +15,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
+import { demoAction } from "@/views/lib/demo";
 import { PageIntro } from "@/views/layout/page-intro";
 import { GANTT_MOCK, Gantt } from "@/widgets/gantt";
 
@@ -33,11 +34,11 @@ export function GanttSliceBlock({ title, lead }: GanttSliceBlockProps) {
         lead={lead}
         actions={
           <>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" {...demoAction("выбор месяца")}>
               <Calendar className="size-4" aria-hidden />
               Май 2026
             </Button>
-            <Button variant="primary" size="sm">
+            <Button variant="primary" size="sm" {...demoAction("сохранение плана")}>
               <Save className="size-4" aria-hidden />
               Сохранить
             </Button>
@@ -46,38 +47,38 @@ export function GanttSliceBlock({ title, lead }: GanttSliceBlockProps) {
       />
       <div className="gantt-toolbar" role="toolbar" aria-label="Действия Ганта">
         <div className="gantt-toolbar__group">
-          <Button variant="ghost" size="icon-sm" aria-label="Добавить">
+          <Button variant="ghost" size="icon-sm" aria-label="Добавить" {...demoAction("добавление задачи")}>
             <Plus className="size-4" />
           </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Удалить">
+          <Button variant="ghost" size="icon-sm" aria-label="Удалить" {...demoAction("удаление задачи")}>
             <Trash2 className="size-4" />
           </Button>
         </div>
         <div className="gantt-toolbar__group">
-          <Button variant="ghost" size="icon-sm" aria-label="Уровень выше">
+          <Button variant="ghost" size="icon-sm" aria-label="Уровень выше" {...demoAction("повышение уровня задачи")}>
             <ChevronUp className="size-4" />
           </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Уровень глубже">
+          <Button variant="ghost" size="icon-sm" aria-label="Уровень глубже" {...demoAction("понижение уровня задачи")}>
             <ChevronDown className="size-4" />
           </Button>
         </div>
         <div className="gantt-toolbar__group">
-          <Button variant="ghost" size="icon-sm" aria-label="Связать">
+          <Button variant="ghost" size="icon-sm" aria-label="Связать" {...demoAction("связывание задач")}>
             <Link2 className="size-4" />
           </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Снять связь">
+          <Button variant="ghost" size="icon-sm" aria-label="Снять связь" {...demoAction("снятие связи задач")}>
             <Unlink className="size-4" />
           </Button>
         </div>
         <span className="gantt-toolbar__sep" />
-        <Button variant="ghost" size="sm">
+        <Button variant="ghost" size="sm" {...demoAction("показ критического пути")}>
           крит. путь
         </Button>
-        <Button variant="ghost" size="sm">
+        <Button variant="ghost" size="sm" {...demoAction("показ базового плана")}>
           Базовый план
         </Button>
         <span className="gantt-toolbar__sep" />
-        <Button variant="ghost" size="icon-sm" aria-label="Фильтр">
+        <Button variant="ghost" size="icon-sm" aria-label="Фильтр" {...demoAction("фильтрацию задач")}>
           <Filter className="size-4" />
         </Button>
         <div className="gantt-toolbar__spacer" />

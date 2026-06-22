@@ -20,6 +20,7 @@ import { Chip } from "@/components/ui/chip";
 import { MOCK_PROJECT_CRM } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
 import { IconButton } from "@/components/ui/icon-button";
+import { demoAction } from "@/views/lib/demo";
 
 export function DashboardBento() {
   return (
@@ -64,7 +65,7 @@ export function DashboardBento() {
               <TrendingUp className="size-4" aria-hidden />
               +2 неделя
             </span>
-            <span className="u-text-xs u-text-muted">vs прошлая</span>
+            <span className="u-text-xs u-text-muted">к прошлой неделе</span>
           </div>
         </div>
         <div className="bento__cell tile">
@@ -89,7 +90,7 @@ export function DashboardBento() {
             title="Фокус команды"
             subtitle="Аналитика продуктивности · сентябрь 2026"
             actions={
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" {...demoAction("период графика")}>
                 Месяц
               </Button>
             }
@@ -114,7 +115,7 @@ export function DashboardBento() {
             </svg>
             <div className="u-between u-mt-3">
               <span className="u-text-xs u-text-muted">
-                Avg концентрация: <strong className="u-text-strong">41%</strong>
+                Средняя концентрация: <strong className="u-text-strong">41%</strong>
               </span>
               <div className="legend-row">
                 <span className="legend-item">
@@ -129,17 +130,17 @@ export function DashboardBento() {
         </div>
 
         <div className="bento__cell bento__cell--4">
-          <CardPanel title="Митинги" subtitle="Сегодня — 4" actions={<IconButton label="Календарь"><Calendar className="size-4" /></IconButton>}>
+          <CardPanel title="Митинги" subtitle="Сегодня — 4" actions={<IconButton label="Календарь" {...demoAction("календарь встреч")}><Calendar className="size-4" /></IconButton>}>
             <div className="meeting-item">
               <span className="meeting-item__when">
                 <strong>Вт, 11 июл</strong>
                 08:15
               </span>
               <div>
-                <div className="meeting-item__title">Quick Daily</div>
+                <div className="meeting-item__title">Ежедневный созвон</div>
                 <div className="meeting-item__source">Zoom</div>
               </div>
-              <IconButton label="Открыть">
+              <IconButton label="Открыть" {...demoAction("открытие встречи")}>
                 <ExternalLink className="size-4" />
               </IconButton>
             </div>
@@ -149,10 +150,10 @@ export function DashboardBento() {
                 09:30
               </span>
               <div>
-                <div className="meeting-item__title">John Onboarding</div>
+                <div className="meeting-item__title">Онбординг Ивана</div>
                 <div className="meeting-item__source">Google Meet</div>
               </div>
-              <IconButton label="Открыть">
+              <IconButton label="Открыть" {...demoAction("открытие встречи")}>
                 <ExternalLink className="size-4" />
               </IconButton>
             </div>
@@ -165,7 +166,7 @@ export function DashboardBento() {
             subtitle="12 задач на сегодня"
             flush
             actions={
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" {...demoAction("список всех задач")}>
                 Вся работа
                 <ArrowUpRight className="size-4" aria-hidden />
               </Button>
@@ -233,7 +234,7 @@ export function DashboardBento() {
                 <div className="u-text-xs u-text-muted">112% на неделе 21</div>
               </div>
             </div>
-            <Button variant="secondary" className="u-w-full u-mt-3">
+            <Button variant="secondary" className="u-w-full u-mt-3" {...demoAction("управленческая поверхность")}>
               Открыть управленческую поверхность
               <ArrowUpRight className="size-4" aria-hidden />
             </Button>

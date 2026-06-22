@@ -12,7 +12,7 @@ const preview: Preview = {
     a11y: { test: "todo" },
     options: {
       storySort: {
-        order: ["Foundations", "Typography", "UI", "Domain", "Widgets", "Shell", "Views", "Catalog", "*"]
+        order: ["Project Delivery", "Foundations", "Typography", "UI", "Domain", "Widgets", "Shell", "Views", "Catalog", "*"]
       }
     },
     layout: "padded"

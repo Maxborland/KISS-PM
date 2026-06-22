@@ -1340,3 +1340,11 @@
     gap: var(--space-5);
   }
 }
+
+/* Воронка продаж на узких экранах — одна колонка.
+   Канонический `.funnel` (repeat(5,1fr)) определён выше в этом же файле,
+   который импортируется после bem.css, поэтому override живёт здесь.
+   Аудит-источник: docs/design-v3/STORYBOOK-INTERFACE-AUDIT-2026-06-22.md (P0-2). */
+@media (max-width: 720px) {
+  .funnel { grid-template-columns: 1fr; }
+}

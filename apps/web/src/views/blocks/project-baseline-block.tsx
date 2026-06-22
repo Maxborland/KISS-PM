@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { MOCK_PROJECT_CRM, mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
+import { demoAction } from "@/views/lib/demo";
 
 const ROWS = [
   { task: "Аудит процессов", code: "MDS-1", base: "27.05", actual: "29.05", delta: 2 },
@@ -43,8 +44,8 @@ export function ProjectBaselineBlock() {
         lead="Снимки плана и отклонения."
         actions={
           <>
-            <Button variant="secondary">Создать снимок</Button>
-            <Button variant="primary">Сравнить</Button>
+            <Button variant="secondary" {...demoAction("создание снимка")}>Создать снимок</Button>
+            <Button variant="primary" {...demoAction("сравнение планов")}>Сравнить</Button>
           </>
         }
       />

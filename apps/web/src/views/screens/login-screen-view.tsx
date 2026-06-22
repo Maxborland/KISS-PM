@@ -18,7 +18,7 @@ export function LoginScreenView() {
               </div>
             </div>
             <h1 className="login-card__title">Войти</h1>
-            <p className="login-card__lead">Корпоративный email и пароль tenant.</p>
+            <p className="login-card__lead">Корпоративный email и пароль рабочего пространства.</p>
             <div className="login-card__form">
               <Field label="Email" required htmlFor="login-email">
                 <Input
@@ -46,7 +46,7 @@ export function LoginScreenView() {
               </Button>
             </div>
           </form>
-          <p className="login-screen__footnote">SaaS · self-hosted · design-v3</p>
+          <p className="login-screen__footnote">Демо-прототип · вход не выполняется</p>
         </main>
       </div>
     </div>

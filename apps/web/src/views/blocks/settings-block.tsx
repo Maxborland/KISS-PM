@@ -6,6 +6,7 @@ import { CardPanel } from "@/components/domain/card-panel";
 import { Field, FormGrid, FormSection } from "@/components/domain/form-layout";
 import { SwitchRow, SwitchRowList } from "@/components/domain/switch-row";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import {
@@ -15,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { demoAction } from "@/views/lib/demo";
 import { PageIntro } from "@/views/layout/page-intro";
 
 export function SettingsBlock() {
@@ -25,7 +27,7 @@ export function SettingsBlock() {
       <PageIntro
         title="Настройки рабочей области"
         lead="Профиль, уведомления и интеграции."
-        actions={<Button variant="primary">Сохранить</Button>}
+        actions={<Button variant="primary" {...demoAction("сохранение настроек")}>Сохранить</Button>}
       />
       <div className="settings-tabs u-mb-3">
         <Segmented
@@ -40,15 +42,6 @@ export function SettingsBlock() {
           ]}
         />
       </div>
-      {tab !== "profile" ? (
-        <p className="u-text-sm u-text-muted u-mb-3">
-          {tab === "notifications"
-            ? "Вкладка «Уведомления» (демо переключения)."
-            : tab === "integrations"
-              ? "Вкладка «Интеграции» (демо переключения)."
-              : "Вкладка «Оплата» (демо переключения)."}
-        </p>
-      ) : null}
       <CardPanel>
         {tab === "profile" ? (
         <FormSection title="Профиль" lead="Имя, локаль и таймзона.">
@@ -66,7 +59,7 @@ export function SettingsBlock() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ru">Русский</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="en">Английский</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -98,11 +91,14 @@ export function SettingsBlock() {
               defaultChecked
             />
             <SwitchRow
-              label="Slack — control signals"
+              label="Slack — сигналы контроля"
               description="KPI-сигналы и риски сроков прямо в канал"
             />
           </SwitchRowList>
         </FormSection>
+        ) : null}
+        {tab === "integrations" || tab === "billing" ? (
+        <EmptyState title="Раздел в разработке" description="Появится в рабочем приложении." />
         ) : null}
       </CardPanel>
     </>
