@@ -131,10 +131,12 @@ type Authored = {
   reservations: ReservationA[];
   exceptions: ExceptionA[];
   acceptedOverloads: string[]; // ключи "resourceId|day"
+  baselines: BaselineA[]; // зафиксированные снимки плана (PlanBaseline); сравнение идёт с последним
 };
 
 type Dep = SeedDep & { id: string };
 type AssignmentA = { id: string; taskId: string; resourceId: string; role: string; unitsPermille: number; workMinutes: number };
+type BaselineA = { id: string; label: string; capturedAt: string; tasks: Array<{ taskId: string; plannedStart: string | null; plannedFinish: string | null; workMinutes: number }> };
 type AllocationA = { assignmentId: string; taskId: string; resourceId: string; day: number; workMinutes: number };
 type ReservationA = { id: string; resourceId: string; startDay: number; finishDay: number; workMinutesPerDay: number; reason: string };
 // resourceId=null → исключение календаря (праздник для всех); иначе — персональное (отсутствие)
@@ -172,12 +174,13 @@ function seedToAuthored(seedTasks: SeedTask[], seedDeps: SeedDep[], exceptions: 
     assignmentAllocations: [],
     reservations: [],
     exceptions,
-    acceptedOverloads: []
+    acceptedOverloads: [],
+    baselines: []
   };
 }
 
 function freshAuthored(): Authored {
-  return seedToAuthored(SEED, SEED_DEPS, [
+  const a = seedToAuthored(SEED, SEED_DEPS, [
     // праздник для всех (resourceId=null) — нерабочий день календаря проекта
     { id: "hol-1", calendarId: DEFAULT_CALENDAR, resourceId: null, day: 18, workingMinutes: 0, reason: "Корпоративный праздник" },
     // персональные отсутствия (отпуск Ивановой)
@@ -185,6 +188,18 @@ function freshAuthored(): Authored {
     { id: "ex-2", calendarId: DEFAULT_CALENDAR, resourceId: "u-ivanova", day: 32, workingMinutes: 0, reason: "Отпуск" },
     { id: "ex-3", calendarId: DEFAULT_CALENDAR, resourceId: "u-ivanova", day: 33, workingMinutes: 0, reason: "Отпуск" }
   ]);
+  // зафиксированный базовый план B2 — ПОЛНЫЙ снимок всех листовых задач: у части (base-поля)
+  // зафиксированы прежние позиции (видно сдвиг), остальные — на текущих (в графике).
+  const calc = schedule(a);
+  a.baselines = [{
+    id: "baseline-b2", label: "После kick-off", capturedAt: "2026-05-20T08:00:00.000Z",
+    tasks: a.tasks.filter((t) => t.kind !== "summary").map((t) => {
+      if (t.baseStartDay != null && t.baseDurDays != null) return { taskId: t.id, plannedStart: dayToIso(t.baseStartDay), plannedFinish: dayToIso(t.baseStartDay + t.baseDurDays), workMinutes: t.workMinutes };
+      const c = calc.get(t.id)!;
+      return { taskId: t.id, plannedStart: dayToIso(c.es), plannedFinish: dayToIso(c.ef), workMinutes: t.workMinutes };
+    })
+  }];
+  return a;
 }
 
 // Перенумерация wbs по дереву (parentTaskId) в порядке массива — id остаются стабильными
@@ -209,7 +224,8 @@ function cloneAuthored(a: Authored): Authored {
     assignmentAllocations: a.assignmentAllocations.map((x) => ({ ...x })),
     reservations: a.reservations.map((x) => ({ ...x })),
     exceptions: a.exceptions.map((x) => ({ ...x })),
-    acceptedOverloads: [...a.acceptedOverloads]
+    acceptedOverloads: [...a.acceptedOverloads],
+    baselines: a.baselines.map((b) => ({ ...b, tasks: b.tasks.map((t) => ({ ...t })) }))
   };
 }
 
@@ -224,7 +240,8 @@ function namespaceAuthored(a: Authored, pfx: string): Authored {
     assignmentAllocations: a.assignmentAllocations.map((x) => ({ ...x, assignmentId: pfx + x.assignmentId, taskId: pfx + x.taskId })),
     reservations: a.reservations.map((x) => ({ ...x, id: pfx + x.id })),
     exceptions: a.exceptions.map((x) => ({ ...x, id: pfx + x.id })),
-    acceptedOverloads: [...a.acceptedOverloads]
+    acceptedOverloads: [...a.acceptedOverloads],
+    baselines: a.baselines.map((b) => ({ ...b, id: pfx + b.id, tasks: b.tasks.map((t) => ({ ...t, taskId: pfx + t.taskId })) }))
   };
 }
 
@@ -492,20 +509,29 @@ function buildReadModel(a: Authored, planVersion: number): Record<string, unknow
     lagMinutes: d.lagDays * MIN_PER_DAY
   }));
 
-  const baselineTasks = a.tasks
-    .filter((t) => t.baseStartDay != null && t.baseDurDays != null)
-    .map((t) => ({
-      taskId: t.id,
-      baselineStart: dayToIso(t.baseStartDay!),
-      baselineFinish: dayToIso(t.baseStartDay! + t.baseDurDays!),
-      baselineWorkMinutes: t.workMinutes,
-      currentStart: dayToIso(calc.get(t.id)!.es),
-      currentFinish: dayToIso(calc.get(t.id)!.ef),
-      currentWorkMinutes: t.workMinutes,
-      startDeltaDays: calc.get(t.id)!.es - t.baseStartDay!,
-      finishDeltaDays: calc.get(t.id)!.ef - (t.baseStartDay! + t.baseDurDays!),
-      workDeltaMinutes: 0
-    }));
+  // сравнение с ПОСЛЕДНИМ зафиксированным baseline (latest-wins). Итерируем ИМЕННО baseline.tasks
+  // (как боевой createBaselineComparison): для задачи, удалённой после фиксации, current* = null.
+  const latestBaseline = a.baselines.length ? [...a.baselines].sort((x, y) => (x.capturedAt < y.capturedAt ? 1 : -1))[0]! : null;
+  const taskByIdLeaf = new Map(a.tasks.map((t) => [t.id, t]));
+  const baselineTasks = (latestBaseline?.tasks ?? []).map((bt) => {
+    const t = taskByIdLeaf.get(bt.taskId);
+    const c = t ? calc.get(t.id) : null;
+    const baseStartDay = bt.plannedStart != null ? isoToDay(bt.plannedStart) : null;
+    const baseFinishDay = bt.plannedFinish != null ? isoToDay(bt.plannedFinish) : null;
+    const currentWork = t ? t.workMinutes : null;
+    return {
+      taskId: bt.taskId,
+      baselineStart: bt.plannedStart,
+      baselineFinish: bt.plannedFinish,
+      baselineWorkMinutes: bt.workMinutes,
+      currentStart: c ? dayToIso(c.es) : null,
+      currentFinish: c ? dayToIso(c.ef) : null,
+      currentWorkMinutes: currentWork,
+      startDeltaDays: c && baseStartDay != null ? c.es - baseStartDay : null,
+      finishDeltaDays: c && baseFinishDay != null ? c.ef - baseFinishDay : null,
+      workDeltaMinutes: currentWork != null ? currentWork - bt.workMinutes : null
+    };
+  });
 
   const validationIssues = a.tasks
     .filter((t) => t.mode === "manual")
@@ -534,7 +560,8 @@ function buildReadModel(a: Authored, planVersion: number): Record<string, unknow
       dependencies,
       assignments: a.assignments.map((x) => ({ id: x.id, taskId: x.taskId, resourceId: x.resourceId, role: x.role, unitsPermille: x.unitsPermille, workMinutes: x.workMinutes, calendarId: null })),
       assignmentAllocations: a.assignmentAllocations.map((x) => ({ assignmentId: x.assignmentId, taskId: x.taskId, resourceId: x.resourceId, date: dayToIso(x.day), workMinutes: x.workMinutes })),
-      baselines: []
+      // форма как боевой snapshot.baselines (PlanBaseline {id,capturedAt,tasks}); label — graceful-доп (контрактный payload, на боевом дропается → UI делает fallback на дату)
+      baselines: a.baselines.map((b) => ({ id: b.id, capturedAt: b.capturedAt, label: b.label, tasks: b.tasks }))
     },
     calculatedPlan: {
       tenantId: "tenant-alpha",
@@ -551,8 +578,8 @@ function buildReadModel(a: Authored, planVersion: number): Record<string, unknow
       validationIssues
     },
     baselineComparison: {
-      baselineId: "baseline-b2",
-      capturedAt: "2026-05-20T08:00:00.000Z",
+      baselineId: latestBaseline?.id ?? null,
+      capturedAt: latestBaseline?.capturedAt ?? null,
       tasks: baselineTasks
     },
     resourceLoad: buildResourceLoad(a, calc),
@@ -804,6 +831,18 @@ function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; cha
       }
       return { ok: true, changedTaskIds: [t.id] };
     }
+    case "baseline.capture": {
+      const p = cmd.payload;
+      const id = String(p.baselineId ?? `baseline-${a.baselines.length + 1}`);
+      const label = String(p.label ?? "Снимок плана");
+      const calc = schedule(a);
+      const tasks = a.tasks.filter((t) => t.kind !== "summary").map((t) => { const c = calc.get(t.id)!; return { taskId: t.id, plannedStart: dayToIso(c.es), plannedFinish: dayToIso(c.ef), workMinutes: t.workMinutes }; });
+      const capturedAt = new Date().toISOString();
+      const existing = a.baselines.find((b) => b.id === id);
+      if (existing) { existing.label = label; existing.capturedAt = capturedAt; existing.tasks = tasks; }
+      else a.baselines.push({ id, label, capturedAt, tasks });
+      return { ok: true, changedTaskIds: [] };
+    }
     default:
       return { ok: false, changedTaskIds: [], error: "command_not_supported_in_prototype" };
   }
@@ -824,7 +863,8 @@ const AUDIT_ACTION: Record<string, string> = {
   "assignment.allocations.replace": "planning.assignment.allocations_replaced",
   "resource.reserve": "planning.resource_reserved",
   "calendar.exception.upsert": "planning.calendar_exception.upserted",
-  "risk.accept_overload": "planning.overload_risk_accepted"
+  "risk.accept_overload": "planning.overload_risk_accepted",
+  "baseline.capture": "planning.baseline.captured"
 };
 
 function changedByCascade(before: Authored, after: Authored): string[] {

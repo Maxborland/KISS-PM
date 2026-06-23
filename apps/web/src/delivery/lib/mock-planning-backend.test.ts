@@ -271,6 +271,31 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     expect(accepted).toContain(`${ov.resourceId}|${isoToDay(ov.date)}`);
   });
 
+  it("baselineComparison compares all leaf tasks against the latest baseline with real work delta + history", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const bc = rm.baselineComparison as unknown as { baselineId: string | null; tasks: Array<{ taskId: string; baselineStart: string | null; finishDeltaDays: number | null; workDeltaMinutes: number | null }> };
+    expect(bc.baselineId).toBe("baseline-b2");
+    expect(bc.tasks.filter((t) => t.baselineStart !== null).length).toBeGreaterThanOrEqual(4); // 1.1/1.2/2.2/3.2.1
+    expect(bc.tasks.some((t) => (t.finishDeltaDays ?? 0) !== 0)).toBe(true); // есть отклонения от базового плана
+    const baselines = (rm.authored as unknown as { baselines: Array<{ id: string; tasks: unknown[] }> }).baselines;
+    expect(baselines.some((b) => b.id === "baseline-b2" && b.tasks.length > 0)).toBe(true);
+  });
+
+  it("baseline.capture freezes the current plan (latest-wins; zero deltas vs the new baseline)", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const res = await c.applyCommand(MOCK_PROJECT_ID, {
+      command: { type: "baseline.capture", payload: { baselineId: "baseline-b3", label: "Контроль" } } as PlanningCommand,
+      clientPlanVersion: rm.planVersion
+    });
+    const bc = res.readModel.baselineComparison as unknown as { baselineId: string | null; tasks: Array<{ startDeltaDays: number | null; finishDeltaDays: number | null }> };
+    expect(bc.baselineId).toBe("baseline-b3");
+    expect(bc.tasks.length).toBeGreaterThan(0);
+    expect(bc.tasks.every((t) => t.startDeltaDays === 0 && t.finishDeltaDays === 0)).toBe(true);
+    expect((res.readModel.authored as unknown as { baselines: Array<{ id: string }> }).baselines.some((b) => b.id === "baseline-b3")).toBe(true);
+  });
+
   it("applies a command, bumps the version, and rejects a stale version with 409", async () => {
     const c = client();
     const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
