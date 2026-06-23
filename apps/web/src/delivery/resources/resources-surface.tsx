@@ -113,7 +113,11 @@ export function ProjectResources() {
   async function doAbsence(resourceId: string, typeLabel: string, start: string, finish: string) {
     const cmds: PlanningCommand[] = [];
     const end = isoToDay(finish);
-    for (let d = isoToDay(start); d <= end; d += 1) cmds.push({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: "cal-5x8", resourceId, date: dayToIso(d), workingMinutes: 0, reason: typeLabel } } as PlanningCommand);
+    for (let d = isoToDay(start); d <= end; d += 1) {
+      const dow = new Date(Date.UTC(2026, 2, 2) + d * 86_400_000).getUTCDay();
+      if (dow === 0 || dow === 6) continue; // только рабочие дни диапазона (пропускаем выходные)
+      cmds.push({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: "cal-5x8", resourceId, date: dayToIso(d), workingMinutes: 0, reason: typeLabel } } as PlanningCommand);
+    }
     if (cmds.length === 0) return;
     setBusy(true);
     const res = await applyBatch(cmds);

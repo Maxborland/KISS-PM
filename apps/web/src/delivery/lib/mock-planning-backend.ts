@@ -137,7 +137,8 @@ type Dep = SeedDep & { id: string };
 type AssignmentA = { id: string; taskId: string; resourceId: string; role: string; unitsPermille: number; workMinutes: number };
 type AllocationA = { assignmentId: string; taskId: string; resourceId: string; day: number; workMinutes: number };
 type ReservationA = { id: string; resourceId: string; startDay: number; finishDay: number; workMinutesPerDay: number; reason: string };
-type ExceptionA = { id: string; resourceId: string; day: number; workingMinutes: number; reason: string };
+// resourceId=null → исключение календаря (праздник для всех); иначе — персональное (отсутствие)
+type ExceptionA = { id: string; calendarId: string; resourceId: string | null; day: number; workingMinutes: number; reason: string };
 
 // Сборка авторской модели из сидов (используется и основным проектом, и портфельными)
 function seedToAuthored(seedTasks: SeedTask[], seedDeps: SeedDep[], exceptions: ExceptionA[] = []): Authored {
@@ -177,9 +178,12 @@ function seedToAuthored(seedTasks: SeedTask[], seedDeps: SeedDep[], exceptions: 
 
 function freshAuthored(): Authored {
   return seedToAuthored(SEED, SEED_DEPS, [
-    { id: "ex-1", resourceId: "u-ivanova", day: 31, workingMinutes: 0, reason: "Отпуск" },
-    { id: "ex-2", resourceId: "u-ivanova", day: 32, workingMinutes: 0, reason: "Отпуск" },
-    { id: "ex-3", resourceId: "u-ivanova", day: 33, workingMinutes: 0, reason: "Отпуск" }
+    // праздник для всех (resourceId=null) — нерабочий день календаря проекта
+    { id: "hol-1", calendarId: DEFAULT_CALENDAR, resourceId: null, day: 18, workingMinutes: 0, reason: "Корпоративный праздник" },
+    // персональные отсутствия (отпуск Ивановой)
+    { id: "ex-1", calendarId: DEFAULT_CALENDAR, resourceId: "u-ivanova", day: 31, workingMinutes: 0, reason: "Отпуск" },
+    { id: "ex-2", calendarId: DEFAULT_CALENDAR, resourceId: "u-ivanova", day: 32, workingMinutes: 0, reason: "Отпуск" },
+    { id: "ex-3", calendarId: DEFAULT_CALENDAR, resourceId: "u-ivanova", day: 33, workingMinutes: 0, reason: "Отпуск" }
   ]);
 }
 
@@ -371,16 +375,18 @@ function buildResourceLoad(a: Authored, calc: Map<string, Calc>, projectId: stri
   const dayBuckets: LoadBucket[] = [];
   for (const r of RESOURCES) {
     for (let day = 0; day <= lastDay; day++) {
-      const exc = a.exceptions.find((e) => e.resourceId === r.id && e.day === day);
-      const capacityMinutes = exc ? exc.workingMinutes : isWeekday(day) ? r.capacityMinPerDay : 0;
+      const rExc = a.exceptions.find((e) => e.resourceId === r.id && e.day === day); // персональное отсутствие
+      const hExc = a.exceptions.find((e) => e.resourceId === null && e.day === day); // праздник для всех
+      // праздник доминирует над персональным исключением (как в доменном employeeCapacity), затем будни
+      const capacityMinutes = hExc ? hExc.workingMinutes : rExc ? rExc.workingMinutes : isWeekday(day) ? r.capacityMinPerDay : 0;
       let assigned = 0;
       const aIds: string[] = []; const tIds: string[] = []; const aContribs: LoadBucket["assignmentContributions"] = [];
       for (const [aid, info] of asgPerDay) {
         if (info.resourceId !== r.id) continue;
         const explicit = explicitByAsg.get(aid);
         let m = 0;
-        if (explicit) m = explicit.get(day) ?? 0; // явная кривая — начисляем в любой день, который задан
-        else if (isWeekday(day) && day >= info.es && day < info.ef && info.per > 0) m = info.per; // ровное распределение — только в будни
+        if (explicit) m = explicit.get(day) ?? 0; // явная кривая — начисляем в любой заданный день (явный выбор пользователя)
+        else if (capacityMinutes > 0 && day >= info.es && day < info.ef && info.per > 0) m = info.per; // ровное — только в РАБОЧИЕ дни (не праздник/отсутствие/выходной)
         if (m <= 0) continue;
         assigned += m; aIds.push(aid); tIds.push(info.taskId); aContribs.push({ taskId: info.taskId, assignmentId: aid, workMinutes: m });
       }
@@ -392,7 +398,8 @@ function buildResourceLoad(a: Authored, calc: Map<string, Calc>, projectId: stri
       }
       const occContribs: LoadBucket["occupancyContributions"] = [];
       const excIds: string[] = [];
-      if (exc) { excIds.push(exc.id); occContribs.push({ occupancyId: exc.id, sourceType: "absence", sourceId: exc.id, workMinutes: r.capacityMinPerDay }); }
+      if (hExc) excIds.push(hExc.id); // праздник доминирует — нерабочий день календаря (не персональное отсутствие)
+      else if (rExc) { excIds.push(rExc.id); if (isWeekday(day)) occContribs.push({ occupancyId: rExc.id, sourceType: "absence", sourceId: rExc.id, workMinutes: r.capacityMinPerDay }); } // отсутствие красим только в будни (на выходных — обычный нерабочий)
       const committed = assigned + reserved;
       dayBuckets.push({
         resourceId: r.id, positionId: r.positionId, teamId: r.teamId, projectId, date: dayToIso(day), granularity: "day",
@@ -519,6 +526,9 @@ function buildReadModel(a: Authored, planVersion: number): Record<string, unknow
       deadline: "2026-07-12",
       calendarId: DEFAULT_CALENDAR
     },
+    // производственный календарь (5×8, read-only) + исключения (праздники resourceId=null / отсутствия)
+    calendars: [{ id: DEFAULT_CALENDAR, workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: MIN_PER_DAY }],
+    calendarExceptions: a.exceptions.map((x) => ({ id: x.id, calendarId: x.calendarId, resourceId: x.resourceId, date: dayToIso(x.day), workingMinutes: x.workingMinutes, reason: x.reason })),
     authored: {
       tasks,
       dependencies,
@@ -669,15 +679,16 @@ function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; cha
     }
     case "calendar.exception.upsert": {
       const p = cmd.payload;
+      // resourceId=null допустим — это праздник для всех (исключение календаря); иначе персональное отсутствие
       const resourceId = p.resourceId == null ? null : String(p.resourceId);
-      if (!resourceId) return { ok: false, changedTaskIds: [], error: "resource_required", issue: { code: "resource_required", message: "Для отсутствия нужен сотрудник", entityId: null } };
+      const calendarId = String(p.calendarId ?? DEFAULT_CALENDAR);
       const id = String(p.id);
       const existing = a.exceptions.find((x) => x.id === id);
       const day = isoToDay(String(p.date));
       const workingMinutes = (p.workingMinutes as number) ?? 0;
       const reason = String(p.reason ?? "");
-      if (existing) { existing.resourceId = resourceId; existing.day = day; existing.workingMinutes = workingMinutes; existing.reason = reason; }
-      else a.exceptions.push({ id, resourceId, day, workingMinutes, reason });
+      if (existing) { existing.calendarId = calendarId; existing.resourceId = resourceId; existing.day = day; existing.workingMinutes = workingMinutes; existing.reason = reason; }
+      else a.exceptions.push({ id, calendarId, resourceId, day, workingMinutes, reason });
       return { ok: true, changedTaskIds: [] };
     }
     case "risk.accept_overload": {
@@ -948,9 +959,10 @@ const PORTFOLIO_SEEDS: ProjSeed[] = [
 ];
 
 const PORTFOLIO_EXCEPTIONS: ExceptionA[] = [
-  { id: "pf-ex-1", resourceId: "u-ivanova", day: 31, workingMinutes: 0, reason: "Отпуск" },
-  { id: "pf-ex-2", resourceId: "u-ivanova", day: 32, workingMinutes: 0, reason: "Отпуск" },
-  { id: "pf-ex-3", resourceId: "u-ivanova", day: 33, workingMinutes: 0, reason: "Отпуск" }
+  { id: "pf-hol-1", calendarId: DEFAULT_CALENDAR, resourceId: null, day: 18, workingMinutes: 0, reason: "Корпоративный праздник" },
+  { id: "pf-ex-1", calendarId: DEFAULT_CALENDAR, resourceId: "u-ivanova", day: 31, workingMinutes: 0, reason: "Отпуск" },
+  { id: "pf-ex-2", calendarId: DEFAULT_CALENDAR, resourceId: "u-ivanova", day: 32, workingMinutes: 0, reason: "Отпуск" },
+  { id: "pf-ex-3", calendarId: DEFAULT_CALENDAR, resourceId: "u-ivanova", day: 33, workingMinutes: 0, reason: "Отпуск" }
 ];
 
 export type PortfolioModel = {
@@ -995,12 +1007,13 @@ export function buildPortfolioModel(): PortfolioModel {
   const dayBuckets: LoadBucket[] = [];
   for (const r of RESOURCES) {
     for (let day = 0; day <= lastDay; day++) {
-      const ex = PORTFOLIO_EXCEPTIONS.find((e) => e.resourceId === r.id && e.day === day);
-      const capacityMinutes = ex ? ex.workingMinutes : isWeekday(day) ? r.capacityMinPerDay : 0;
+      const hExc = PORTFOLIO_EXCEPTIONS.find((e) => e.resourceId === null && e.day === day); // праздник для всех
+      const rExc = PORTFOLIO_EXCEPTIONS.find((e) => e.resourceId === r.id && e.day === day); // персональное отсутствие
+      const capacityMinutes = hExc ? hExc.workingMinutes : rExc ? rExc.workingMinutes : isWeekday(day) ? r.capacityMinPerDay : 0;
       let assigned = 0;
       const tIds: string[] = []; const aIds: string[] = [];
       const aContribs: LoadBucket["assignmentContributions"] = [];
-      if (isWeekday(day)) {
+      if (capacityMinutes > 0) { // начисляем только в рабочие дни (не праздник/отсутствие/выходной)
         for (const c of contribs) {
           if (c.resourceId !== r.id || day < c.es || day >= c.ef || c.per <= 0) continue;
           assigned += c.per; tIds.push(c.taskId); aIds.push(c.assignmentId);
@@ -1009,7 +1022,8 @@ export function buildPortfolioModel(): PortfolioModel {
       }
       const occContribs: LoadBucket["occupancyContributions"] = [];
       const excIds: string[] = [];
-      if (ex) { excIds.push(ex.id); occContribs.push({ occupancyId: ex.id, sourceType: "absence", sourceId: ex.id, workMinutes: r.capacityMinPerDay }); }
+      if (hExc) excIds.push(hExc.id);
+      else if (rExc) { excIds.push(rExc.id); if (isWeekday(day)) occContribs.push({ occupancyId: rExc.id, sourceType: "absence", sourceId: rExc.id, workMinutes: r.capacityMinPerDay }); }
       dayBuckets.push({
         resourceId: r.id, positionId: r.positionId, teamId: r.teamId, projectId: "portfolio", date: dayToIso(day), granularity: "day",
         assignedMinutes: assigned, reservedMinutes: 0, occupiedMinutes: 0, capacityMinutes, freeMinutes: Math.max(0, capacityMinutes - assigned),

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createPlanningApiClient, PlanningApiError } from "@kiss-pm/planning-client";
 import type { PlanningCommand } from "@kiss-pm/domain";
 
-import { buildPortfolioModel, createMockPlanningFetch, isoToDay, MOCK_PROJECT_ID } from "./mock-planning-backend";
+import { buildPortfolioModel, createMockPlanningFetch, dayToIso, isoToDay, MOCK_PROJECT_ID } from "./mock-planning-backend";
 
 function client() {
   return createPlanningApiClient({ apiOrigin: "", fetchImpl: createMockPlanningFetch() });
@@ -191,6 +191,41 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     const buckets = (res.readModel.resourceLoad as unknown as { buckets: Array<{ resourceId: string; granularity: string; assignedMinutes: number }> }).buckets;
     const orlovaAssigned = buckets.filter((b) => b.resourceId === "u-orlova" && b.granularity === "day").reduce((s, b) => s + b.assignedMinutes, 0);
     expect(orlovaAssigned).toBe(0);
+  });
+
+  it("exposes the production calendar + exceptions; a company holiday (resourceId=null) zeroes capacity for everyone", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const cals = (rm as unknown as { calendars: Array<{ id: string; workingWeekdays: number[]; workingMinutesPerDay: number }> }).calendars;
+    expect(cals[0]!.workingWeekdays).toEqual([1, 2, 3, 4, 5]);
+    expect(cals[0]!.workingMinutesPerDay).toBe(480);
+    const exns = (rm as unknown as { calendarExceptions: Array<{ resourceId: string | null; date: string; workingMinutes: number }> }).calendarExceptions;
+    const holiday = exns.find((x) => x.resourceId === null && x.workingMinutes === 0);
+    expect(holiday).toBeTruthy();
+    const dayBuckets = (rm.resourceLoad as unknown as { buckets: Array<{ granularity: string; date: string; capacityMinutes: number; assignedMinutes: number }> }).buckets.filter((b) => b.granularity === "day" && b.date === holiday!.date);
+    expect(dayBuckets.length).toBeGreaterThan(0);
+    expect(dayBuckets.every((b) => b.capacityMinutes === 0)).toBe(true); // праздник у всех
+    // и никаких начисленных минут в праздник (нет фантомного перегруза), даже если задача его пересекает
+    expect(dayBuckets.every((b) => b.assignedMinutes === 0)).toBe(true);
+  });
+
+  it("portfolio respects company holidays (capacity 0 for everyone) — consistent with the project view", () => {
+    const m = buildPortfolioModel();
+    const holIso = dayToIso(18); // тот же корпоративный праздник, что и в проекте
+    const day = m.buckets.filter((b) => b.granularity === "day" && b.date === holIso);
+    expect(day.length).toBeGreaterThan(0);
+    expect(day.every((b) => b.capacityMinutes === 0 && b.assignedMinutes === 0)).toBe(true);
+  });
+
+  it("calendar.exception.upsert accepts a company holiday (resourceId=null) — no longer requires a resource", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const res = await c.applyCommand(MOCK_PROJECT_ID, {
+      command: { type: "calendar.exception.upsert", payload: { id: "hol-new", calendarId: "cal-5x8", resourceId: null, date: "2026-03-25", workingMinutes: 0, reason: "Праздник" } } as PlanningCommand,
+      clientPlanVersion: rm.planVersion
+    });
+    const exns = (res.readModel as unknown as { calendarExceptions: Array<{ id: string; resourceId: string | null }> }).calendarExceptions;
+    expect(exns.some((x) => x.id === "hol-new" && x.resourceId === null)).toBe(true);
   });
 
   it("applies a command, bumps the version, and rejects a stale version with 409", async () => {
