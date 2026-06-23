@@ -203,7 +203,7 @@ export function ProjectCalendars() {
               const st = dayState(day);
               const dt = new Date(BASE_MS + day * 86_400_000);
               const clickable = st.inMonth && !st.weekend && !(isResourceView && st.holiday);
-              const tone = st.holiday ? "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-text)]" : st.absence ? "border-[var(--violet)] bg-[color-mix(in_oklab,var(--violet)_14%,var(--panel))] text-[var(--violet)]" : st.weekend ? "border-[var(--border-subtle)] bg-[var(--panel-strong)] text-[var(--muted-soft)]" : "border-[var(--border-subtle)] bg-[var(--panel-subtle)] text-[var(--text)]";
+              const tone = st.holiday ? "border-[var(--warning)] bg-[color-mix(in_oklab,var(--warning)_28%,var(--panel))] text-[var(--warning-text)]" : st.absence ? "border-[var(--violet)] bg-[color-mix(in_oklab,var(--violet)_30%,var(--panel))] text-[var(--violet)]" : st.weekend ? "border-[var(--border-subtle)] bg-[color-mix(in_oklab,var(--muted-soft)_22%,var(--panel))] text-[var(--muted-strong)]" : "border-[var(--border-subtle)] bg-[var(--panel-subtle)] text-[var(--text)]";
               return (
                 <button key={day} type="button" disabled={!clickable || busy} onClick={() => toggleDay(day)} title={st.holiday ? `${ddmm(dayToIso(day))} · ${st.holiday.reason || "Праздник"}` : st.absence ? `${ddmm(dayToIso(day))} · ${st.absence.reason || "Отсутствие"}` : st.weekend ? "Выходной" : "Рабочий день — клик: нерабочий"} className={cn("relative flex h-[58px] flex-col rounded-[var(--radius-sm)] border p-1 text-left outline-none transition-colors", tone, !st.inMonth && "opacity-35", clickable && "hover:ring-1 hover:ring-[var(--accent)]")}>
                   <span className="text-[length:var(--text-xs)] font-semibold tabular-nums">{dt.getUTCDate()}</span>
@@ -214,9 +214,9 @@ export function ProjectCalendars() {
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[var(--muted-soft)]">
             <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-[var(--panel-subtle)] ring-1 ring-[var(--border-subtle)]" /> рабочий 8 ч</span>
-            <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-[var(--panel-strong)]" /> выходной</span>
-            <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-[var(--warning-soft)] ring-1 ring-[var(--warning)]" /> праздник</span>
-            <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: "color-mix(in oklab, var(--violet) 14%, var(--panel))", boxShadow: "inset 0 0 0 1px var(--violet)" }} /> отсутствие</span>
+            <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: "color-mix(in oklab, var(--muted-soft) 22%, var(--panel))" }} /> выходной</span>
+            <span className="flex items-center gap-1"><span className="size-2.5 rounded ring-1 ring-[var(--warning)]" style={{ background: "color-mix(in oklab, var(--warning) 28%, var(--panel))" }} /> праздник</span>
+            <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: "color-mix(in oklab, var(--violet) 30%, var(--panel))", boxShadow: "inset 0 0 0 1px var(--violet)" }} /> отсутствие</span>
           </div>
         </div>
 

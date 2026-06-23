@@ -37,6 +37,8 @@ export type RBucket = {
   assignmentContributions: Array<{ taskId: string; assignmentId: string; workMinutes: number }>;
   reservationContributions: Array<{ reservationId: string; workMinutes: number }>;
   occupancyContributions: Array<{ occupancyId: string; sourceType: string; sourceId: string; workMinutes: number }>;
+  // id исключений календаря в бакете: праздник (resourceId=null) отличаем от обычного выходного
+  calendarExceptionIds?: string[];
 };
 
 export type MatrixTask = { id: string; wbsCode: string; title: string; workMinutes: number; percentComplete: number; projectId?: string; projectName?: string };
@@ -97,16 +99,22 @@ function periodLabel(iso: string, gran: Gran): { top: string; sub: string; weeke
   return { top: dd, sub: mon, weekend: false };
 }
 
-/* цвет ячейки: зелёный по интенсивности ≤100% (норма), красный >100% (перегруз), фиолетовый — отсутствие */
-function cellTone(pct: number, cap: number, hasAbsence: boolean): { bg: string; fg: string } {
-  if (cap === 0) return hasAbsence ? { bg: "color-mix(in oklab, var(--violet) 20%, var(--panel))", fg: "var(--violet)" } : { bg: "var(--panel-strong)", fg: "var(--muted-soft)" };
+/* цвет ячейки: зелёный по интенсивности ≤100% (норма), красный >100% (перегруз).
+   Нерабочие дни различаем и делаем заметными: отпуск/отсутствие — фиолетовый,
+   праздник — янтарный, выходной — серый (раньше сливались в бледный panel-strong). */
+function cellTone(pct: number, cap: number, hasAbsence: boolean, holiday: boolean): { bg: string; fg: string } {
+  if (cap === 0) {
+    if (hasAbsence) return { bg: "color-mix(in oklab, var(--violet) 30%, var(--panel))", fg: "var(--violet)" };
+    if (holiday) return { bg: "color-mix(in oklab, var(--warning) 32%, var(--panel))", fg: "var(--warning-text)" };
+    return { bg: "color-mix(in oklab, var(--muted-soft) 24%, var(--panel))", fg: "var(--muted-strong)" }; // выходной
+  }
   if (pct === 0) return { bg: "var(--panel-subtle)", fg: "var(--muted-soft)" };
   if (pct > 100) return { bg: "var(--danger)", fg: "#fff" };
   const mix = Math.round(22 + Math.min(1, pct / 100) * 58);
   return { bg: `color-mix(in oklab, var(--success) ${mix}%, #fff)`, fg: pct >= 55 ? "#fff" : "var(--success-text)" };
 }
 
-type Cell = { committed: number; capacity: number; pct: number; bucket: RBucket | null; hasAbsence: boolean; overload: boolean; accepted: boolean };
+type Cell = { committed: number; capacity: number; pct: number; bucket: RBucket | null; hasAbsence: boolean; holiday: boolean; overload: boolean; accepted: boolean };
 type Rrow = { key: string; depth: number; isPerson: boolean; label: string; sub: string; resourceId?: string; memberIds: string[]; cells: Map<string, Cell> };
 
 const keyOf = (r: Resource, lvl: GroupLevel) => (lvl === "team" ? r.teamId : lvl === "role" ? r.positionId : r.id);
@@ -189,16 +197,21 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
       const committed = b ? committedFor(b) : 0;
       const capacity = b ? b.capacityMinutes : 0;
       const hasAbsence = !!b && b.occupancyContributions.some((o) => o.sourceType === "absence");
+      // праздник = БУДНИЙ день, обнулённый исключением календаря, но НЕ персональное отсутствие.
+      // Гард по будням важен: calendarExceptionIds непуст и для персонального отсутствия, попавшего
+      // на выходной (там нет occupancy-absence) — без гарда такой день красился бы как праздник.
+      const dow = new Date(date + "T00:00:00Z").getUTCDay();
+      const holiday = dow >= 1 && dow <= 5 && !hasAbsence && capacity === 0 && !!b && (b.calendarExceptionIds?.length ?? 0) > 0;
       const overload = committed > capacity && (capacity > 0 || committed > 0);
       const accepted = acceptedForPeriod(resourceId, date);
-      return { committed, capacity, pct: capacity > 0 ? Math.round((committed / capacity) * 100) : committed > 0 ? 999 : 0, bucket: b, hasAbsence, overload, accepted };
+      return { committed, capacity, pct: capacity > 0 ? Math.round((committed / capacity) * 100) : committed > 0 ? 999 : 0, bucket: b, hasAbsence, holiday, overload, accepted };
     };
     const aggCells = (resourceIds: string[]): Map<string, Cell> => {
       const m = new Map<string, Cell>();
       for (const date of periods) {
         let committed = 0, capacity = 0, over = false, abs = false;
         for (const rid of resourceIds) { const c = cellFor(rid, date); committed += c.committed; capacity += c.capacity; over = over || c.overload; abs = abs || c.hasAbsence; }
-        m.set(date, { committed, capacity, pct: capacity > 0 ? Math.round((committed / capacity) * 100) : committed > 0 ? 999 : 0, bucket: null, hasAbsence: abs, overload: over, accepted: false });
+        m.set(date, { committed, capacity, pct: capacity > 0 ? Math.round((committed / capacity) * 100) : committed > 0 ? 999 : 0, bucket: null, hasAbsence: abs, holiday: false, overload: over, accepted: false });
       }
       return m;
     };
@@ -338,7 +351,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
           }
 
           // ячейка СОТРУДНИКА: сплошной цветной блок (кликабельна → дрилдаун)
-          const tone = cellTone(c.pct, c.capacity, c.hasAbsence);
+          const tone = cellTone(c.pct, c.capacity, c.hasAbsence, c.holiday);
           const isSel = sel?.resourceId === r.resourceId && sel?.date === d;
           return (
             <button
@@ -440,7 +453,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
             {/* scrolling: периоды (flex-fill — без правого зазора) */}
             <div className="relative min-w-0 flex-1">
               <div className="flex border-b border-[var(--border-strong)] bg-[var(--panel-subtle)]" style={{ height: HEADER_H }}>
-                {periods.map((d) => { const pl = periodLabel(d, gran); const inCol = crosshair?.date === d; return <span key={d} className={cn("flex flex-col items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-xs)] leading-none", pl.weekend && "bg-[color-mix(in_oklab,var(--panel-strong)_50%,var(--panel))]", inCol && CROSS)} style={{ flex: `1 0 ${colW}px`, minWidth: colW }}><span className={cn("font-semibold", inCol ? "text-[var(--accent)]" : "text-[var(--muted-strong)]")}>{pl.top}</span><span className="mt-0.5 text-[9px] text-[var(--muted-soft)]">{pl.sub}</span></span>; })}
+                {periods.map((d) => { const pl = periodLabel(d, gran); const inCol = crosshair?.date === d; return <span key={d} className={cn("flex flex-col items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-xs)] leading-none", pl.weekend && "bg-[color-mix(in_oklab,var(--muted-soft)_18%,var(--panel))]", inCol && CROSS)} style={{ flex: `1 0 ${colW}px`, minWidth: colW }}><span className={cn("font-semibold", inCol ? "text-[var(--accent)]" : "text-[var(--muted-strong)]")}>{pl.top}</span><span className="mt-0.5 text-[9px] text-[var(--muted-soft)]">{pl.sub}</span></span>; })}
               </div>
               {rows.map((r) => periodRow(r))}
               {rows.length ? periodRow({ key: "__totals", depth: 0, isPerson: false, label: "Итого", sub: "", memberIds: allVisibleIds, cells: totalsCells }, { totals: true }) : null}
@@ -518,8 +531,9 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
         <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: "color-mix(in oklab, var(--success) 35%, #fff)" }} /> Ниже нормы</span>
         <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: "color-mix(in oklab, var(--success) 80%, #fff)" }} /> Полная (~100%)</span>
         <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-[var(--danger)]" /> Перегруз (&gt;100%)</span>
-        <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: "color-mix(in oklab, var(--violet) 20%, var(--panel))" }} /> Отсутствие</span>
-        <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-[var(--panel-strong)]" /> Выходной</span>
+        <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: "color-mix(in oklab, var(--violet) 30%, var(--panel))" }} /> Отпуск / отсутствие</span>
+        <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: "color-mix(in oklab, var(--warning) 32%, var(--panel))" }} /> Праздник</span>
+        <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: "color-mix(in oklab, var(--muted-soft) 24%, var(--panel))" }} /> Выходной</span>
         <span className="flex items-center gap-1.5"><span className="inline-flex h-3 w-5 items-center rounded bg-[color-mix(in_oklab,var(--panel-strong)_40%,var(--panel))] px-0.5"><span className="h-[3px] w-3 rounded-full bg-[var(--success)]" /></span> Свод (бар)</span>
         <span className="ml-auto text-[var(--muted-soft)]">Сотрудник — блок · свод — бар · наведение — прицел строки/столбца</span>
       </div>

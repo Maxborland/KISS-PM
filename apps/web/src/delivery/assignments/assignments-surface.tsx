@@ -25,6 +25,11 @@ const ROW_H = 34;
 const HEADER_H = 40;
 const LEFT_W = 360;
 const WORKING = new Set(["executor", "co_executor"]); // только эти роли создают нагрузку и учитываются в труде
+// «прицел» (как в матрице ресурсов): тонирующий inset-shadow строки/столбца под курсором
+const CROSS = "shadow-[inset_0_0_0_9999px_color-mix(in_oklab,var(--accent)_14%,transparent)]";
+const CROSS_SOFT = "shadow-[inset_0_0_0_9999px_color-mix(in_oklab,var(--accent)_8%,transparent)]";
+const CROSS_FOCAL = "shadow-[inset_0_0_0_9999px_color-mix(in_oklab,var(--accent)_26%,transparent)]";
+const WEEKEND_BG = "color-mix(in oklab, var(--muted-soft) 18%, var(--panel))"; // выходной столбец — заметный серый
 const resName = (id: string) => RESOURCES.find((r) => r.id === id)?.name ?? id;
 const resOf = (id: string) => RESOURCES.find((r) => r.id === id);
 const h1 = (min: number) => (Math.round((min / 60) * 10) / 10).toLocaleString("ru-RU");
@@ -44,6 +49,7 @@ export function ProjectAssignments() {
   const [notice, setNotice] = useState<string | null>(null);
   const [curveErr, setCurveErr] = useState<string | null>(null);
   const [draft, setDraft] = useState<Map<number, number> | null>(null); // ручная кривая: day → минуты
+  const [hover, setHover] = useState<{ key: string; col: number } | null>(null); // прицел: строка (key) + столбец (col=period.key)
 
   const model = useMemo(() => {
     if (!readModel) return null;
@@ -84,6 +90,8 @@ export function ProjectAssignments() {
 
   const projectMeta: ProjectMeta = { ...PROJECT, planVersion: `v${readModel.planVersion}` };
   const colW = COL_W[gran];
+  // эффективный прицел: под курсором (hover), либо строка выбранного назначения при открытом инспекторе
+  const crosshair = hover ?? (sel ? { key: `a:${sel}`, col: -1 } : null);
 
   // окно по месяцу
   const monthsList = [...new Set(Array.from({ length: model.maxDay - model.minDay + 1 }, (_, i) => dayToIso(model.minDay + i).slice(0, 7)))].sort();
@@ -181,7 +189,7 @@ export function ProjectAssignments() {
 
       <div className="relative">
         <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
-          <div className="flex min-w-full align-top">
+          <div className="flex min-w-full align-top" onMouseLeave={() => setHover(null)}>
             {/* sticky-left: задачи и исполнители */}
             <div className="sticky left-0 z-20 shrink-0 border-r border-[var(--border-strong)] bg-[var(--panel)]">
               <div className="flex items-center gap-2 border-b border-[var(--border-strong)] bg-[var(--panel-subtle)] px-3 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]" style={{ height: HEADER_H, width: LEFT_W }}>
@@ -191,7 +199,7 @@ export function ProjectAssignments() {
                 const asgs = model.asgByTask.get(t.id) ?? [];
                 return (
                   <div key={t.id}>
-                    <div className="flex items-center gap-1.5 border-b border-[var(--border-subtle)] bg-[color-mix(in_oklab,var(--panel-strong)_35%,var(--panel))] px-2" style={{ height: ROW_H, width: LEFT_W }}>
+                    <div onMouseEnter={() => setHover({ key: `t:${t.id}`, col: -1 })} className={cn("flex items-center gap-1.5 border-b border-[var(--border-subtle)] bg-[color-mix(in_oklab,var(--panel-strong)_35%,var(--panel))] px-2", crosshair?.key === `t:${t.id}` && CROSS_SOFT)} style={{ height: ROW_H, width: LEFT_W }}>
                       <span className="mono shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{t.wbsCode}</span>
                       <span className="min-w-0 flex-1 truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{t.title}</span>
                       <span className="shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]" title={`Труд задачи ${h1(t.workMinutes)} ч · сумма назначений ${h1(sumAsgWork(t.id))} ч`}>{h1(sumAsgWork(t.id))}/{h1(t.workMinutes)} ч</span>
@@ -206,7 +214,7 @@ export function ProjectAssignments() {
                       const m = model.metaByAsg.get(a.id)!;
                       const isSel = sel === a.id;
                       return (
-                        <button key={a.id} type="button" onClick={() => { setSel(a.id); setDraft(null); }} className={cn("flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-2 text-left outline-none hover:bg-[var(--panel-subtle)]", isSel && "bg-[var(--accent-soft)]")} style={{ height: ROW_H, width: LEFT_W, paddingLeft: 24 }}>
+                        <button key={a.id} type="button" onMouseEnter={() => setHover({ key: `a:${a.id}`, col: -1 })} onClick={() => { setSel(a.id); setDraft(null); }} className={cn("flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-2 text-left outline-none hover:bg-[var(--panel-subtle)]", isSel ? "bg-[var(--accent-soft)]" : crosshair?.key === `a:${a.id}` && CROSS_SOFT)} style={{ height: ROW_H, width: LEFT_W, paddingLeft: 24 }}>
                         <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[9px] font-semibold text-[var(--muted-strong)]">{r?.name.slice(0, 1)}</span>
                         <span className="min-w-0 flex-1 truncate text-[length:var(--text-sm)] text-[var(--text)]">{r?.name}{m.hasExplicit ? <span className="ml-1 text-[10px] text-[var(--accent)]">кривая</span> : null}</span>
                         <span className="w-[120px] shrink-0 truncate text-right text-[length:var(--text-xs)] text-[var(--muted)]">{roleLabel(a.role)} · {Math.round(a.unitsPermille / 10)}% · {h1(a.workMinutes)} ч</span>
@@ -221,23 +229,26 @@ export function ProjectAssignments() {
             {/* scrolling: периоды */}
             <div className="relative min-w-0 flex-1">
               <div className="flex border-b border-[var(--border-strong)] bg-[var(--panel-subtle)]" style={{ height: HEADER_H }}>
-                {periods.map((p) => <span key={p.key} className={cn("flex flex-col items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-xs)] leading-none", p.weekend && "bg-[color-mix(in_oklab,var(--panel-strong)_50%,var(--panel))]")} style={{ flex: `1 0 ${colW}px`, minWidth: colW }}><span className="font-semibold text-[var(--muted-strong)]">{p.top}</span><span className="mt-0.5 text-[9px] text-[var(--muted-soft)]">{p.sub}</span></span>)}
+                {periods.map((p) => { const inCol = crosshair?.col === p.key; return <span key={p.key} className={cn("flex flex-col items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-xs)] leading-none", p.weekend && "bg-[color-mix(in_oklab,var(--muted-soft)_18%,var(--panel))]", inCol && CROSS)} style={{ flex: `1 0 ${colW}px`, minWidth: colW }}><span className={cn("font-semibold", inCol ? "text-[var(--accent)]" : "text-[var(--muted-strong)]")}>{p.top}</span><span className="mt-0.5 text-[9px] text-[var(--muted-soft)]">{p.sub}</span></span>; })}
               </div>
               {model.leafTasks.map((t) => {
                 const asgs = model.asgByTask.get(t.id) ?? [];
                 const metas = asgs.map((a) => model.metaByAsg.get(a.id)!);
                 return (
                   <div key={t.id}>
-                    <div className="flex border-b border-[var(--border-subtle)] bg-[color-mix(in_oklab,var(--panel-strong)_22%,var(--panel))]" style={{ height: ROW_H }}>
-                      {periods.map((p) => { const tot = metas.reduce((s, m) => s + cellMin(m, p), 0); return <span key={p.key} className="flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[10px] font-semibold tabular-nums text-[var(--muted-strong)]" style={{ flex: `1 0 ${colW}px`, minWidth: colW }}>{tot > 0 ? Math.round(tot / 60) : ""}</span>; })}
+                    <div onMouseEnter={() => setHover((h) => ({ key: `t:${t.id}`, col: h?.col ?? -1 }))} className="flex border-b border-[var(--border-subtle)] bg-[color-mix(in_oklab,var(--panel-strong)_22%,var(--panel))]" style={{ height: ROW_H }}>
+                      {periods.map((p) => { const tot = metas.reduce((s, m) => s + cellMin(m, p), 0); const inCross = crosshair?.col === p.key || crosshair?.key === `t:${t.id}`; const isFocal = crosshair?.col === p.key && crosshair?.key === `t:${t.id}`; return <span key={p.key} onMouseEnter={() => setHover({ key: `t:${t.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[10px] font-semibold tabular-nums text-[var(--muted-strong)]", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW }}>{tot > 0 ? Math.round(tot / 60) : ""}</span>; })}
                     </div>
                     {asgs.length === 0 ? <div className="border-b border-[var(--border-subtle)]" style={{ height: ROW_H }} /> : metas.map((m) => (
-                      <div key={m.asg.id} className={cn("flex border-b border-[var(--border-subtle)]", sel === m.asg.id && "bg-[var(--accent-soft)]")} style={{ height: ROW_H }}>
+                      <div key={m.asg.id} onMouseEnter={() => setHover((h) => ({ key: `a:${m.asg.id}`, col: h?.col ?? -1 }))} className={cn("flex border-b border-[var(--border-subtle)]", sel === m.asg.id && "bg-[var(--accent-soft)]")} style={{ height: ROW_H }}>
                         {periods.map((p) => {
                           const mm = cellMin(m, p);
                           const hrs = mm / 60;
                           const intensity = Math.min(1, hrs / (p.days.length * 8));
-                          return <span key={p.key} className="flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[10px] tabular-nums" style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: mm > 0 ? `color-mix(in oklab, var(--accent) ${Math.round(14 + intensity * 46)}%, var(--panel))` : "transparent", color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resName(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? Math.round(hrs) : ""}</span>;
+                          const inCross = crosshair?.col === p.key || crosshair?.key === `a:${m.asg.id}`;
+                          const isFocal = crosshair?.col === p.key && crosshair?.key === `a:${m.asg.id}`;
+                          const bg = mm > 0 ? `color-mix(in oklab, var(--accent) ${Math.round(14 + intensity * 46)}%, var(--panel))` : p.weekend ? WEEKEND_BG : "transparent";
+                          return <span key={p.key} onMouseEnter={() => setHover({ key: `a:${m.asg.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[10px] tabular-nums", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: bg, color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resName(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? Math.round(hrs) : ""}</span>;
                         })}
                       </div>
                     ))}
@@ -320,9 +331,10 @@ export function ProjectAssignments() {
       </div>
 
       {notice ? <div className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
-      <div className="mt-3 flex items-center gap-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
         <span className="inline-flex items-center gap-1"><UserPlus className="size-3.5" aria-hidden />+ на строке задачи — добавить исполнителя</span>
-        <span>Число в ячейке — часы за период · «кривая» у имени — задана явная дневная раскладка</span>
+        <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: WEEKEND_BG }} /> выходной</span>
+        <span>Число в ячейке — часы за период · «кривая» у имени — задана явная дневная раскладка · наведение — прицел</span>
       </div>
     </DeliveryFrame>
   );
