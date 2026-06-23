@@ -228,6 +228,49 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     expect(exns.some((x) => x.id === "hol-new" && x.resourceId === null)).toBe(true);
   });
 
+  it("previewScenarios proposes 3 profiles; resilient removes the overload, aggressive keeps it (accepted)", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const ov = (rm.resourceLoad as unknown as { overloads: Array<{ resourceId: string; date: string; overloadMinutes: number; taskIds: string[] }> }).overloads[0]!;
+    const res = await c.previewScenarios(MOCK_PROJECT_ID, { target: { type: "resource_overload", resourceId: ov.resourceId, date: ov.date, overloadMinutes: ov.overloadMinutes, taskIds: ov.taskIds }, clientPlanVersion: rm.planVersion });
+    const props = res.proposals as Array<{ id: string; profile: string; conflictEffect: string; planDelta: { commands: Array<{ type: string }> }; explainability: { overloadMinutes: number } }>;
+    expect(props.map((p) => p.profile)).toEqual(["aggressive", "balanced", "resilient"]);
+    const agg = props.find((p) => p.profile === "aggressive")!;
+    const resilient = props.find((p) => p.profile === "resilient")!;
+    expect(agg.conflictEffect).toBe("accepted");
+    expect(agg.planDelta.commands.some((x) => x.type === "risk.accept_overload")).toBe(true);
+    expect(agg.explainability.overloadMinutes).toBeGreaterThan(0); // перегруз принят — остаётся
+    expect(resilient.explainability.overloadMinutes).toBe(0); // снят полностью
+    expect(resilient.planDelta.commands.every((x) => x.type === "assignment.upsert")).toBe(true);
+    // preview НЕ мутирует боевую модель
+    const rm2 = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    expect(rm2.planVersion).toBe(rm.planVersion);
+  });
+
+  it("applyScenario(balanced) bumps the version and adds a co-executor", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const ov = (rm.resourceLoad as unknown as { overloads: Array<{ resourceId: string; date: string; overloadMinutes: number; taskIds: string[] }> }).overloads[0]!;
+    await c.previewScenarios(MOCK_PROJECT_ID, { target: { type: "resource_overload", resourceId: ov.resourceId, date: ov.date, overloadMinutes: ov.overloadMinutes, taskIds: ov.taskIds }, clientPlanVersion: rm.planVersion });
+    const res = await c.applyScenario(MOCK_PROJECT_ID, "scenario-balanced", { clientPlanVersion: rm.planVersion });
+    expect(res.newPlanVersion).toBe(rm.planVersion + 1);
+    expect(typeof (res as unknown as { scenarioRunId: string }).scenarioRunId).toBe("string");
+    const asgs = (res.readModel.authored as unknown as { assignments: Array<{ role: string }> }).assignments;
+    expect(asgs.some((a) => a.role === "co_executor")).toBe(true);
+  });
+
+  it("applyScenario(aggressive) requires a risk reason (400), then accepts the overload", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const ov = (rm.resourceLoad as unknown as { overloads: Array<{ resourceId: string; date: string; overloadMinutes: number; taskIds: string[] }> }).overloads[0]!;
+    await c.previewScenarios(MOCK_PROJECT_ID, { target: { type: "resource_overload", resourceId: ov.resourceId, date: ov.date, overloadMinutes: ov.overloadMinutes, taskIds: ov.taskIds }, clientPlanVersion: rm.planVersion });
+    await expect(c.applyScenario(MOCK_PROJECT_ID, "scenario-aggressive", { clientPlanVersion: rm.planVersion })).rejects.toMatchObject({ code: "accepted_risk_reason_required" });
+    const res = await c.applyScenario(MOCK_PROJECT_ID, "scenario-aggressive", { clientPlanVersion: rm.planVersion, acceptedRiskReason: "Согласовано с руководителем проекта" });
+    expect(res.newPlanVersion).toBe(rm.planVersion + 1);
+    const accepted = (res.readModel.resourceLoad as unknown as { acceptedOverloads: string[] }).acceptedOverloads;
+    expect(accepted).toContain(`${ov.resourceId}|${isoToDay(ov.date)}`);
+  });
+
   it("applies a command, bumps the version, and rejects a stale version with 409", async () => {
     const c = client();
     const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);

@@ -840,6 +840,145 @@ function changedByCascade(before: Authored, after: Authored): string[] {
   return ids;
 }
 
+/* ============================================================
+   ДВИЖОК СЦЕНАРИЕВ (what-if разрешение перегруза ресурса).
+   Контракт: previewScenarios({target}) → 3 профиля; applyScenario(id).
+   Каждый профиль = набор PlanningCommand; метрики считаются на КЛОНЕ
+   тем же движком (schedule + buildResourceLoad), боевой authored не трогаем.
+   ============================================================ */
+type ScenarioTargetMock = { type: "resource_overload"; resourceId: string; date: string; overloadMinutes: number; taskIds: string[] };
+type ScenarioMetrics = { finishDay: number; finishDate: string; targetOverloadMinutes: number; overloadedResourceIds: string[]; changedTaskIds: string[] };
+// форма ровно как доменный ScenarioProposal (никаких мок-only полей — поверхность работает и с боевым API)
+type ScenarioProposalMock = {
+  id: string;
+  profile: "aggressive" | "balanced" | "resilient";
+  conflictEffect: "accepted" | "reduced" | "removed";
+  planDelta: { commands: PlanningCommand[]; changedTaskIds: string[]; changedAssignmentIds: string[]; acceptedRiskIds: string[] };
+  explainability: { finishDate: string | null; deadlineDeltaDays: number; overloadMinutes: number; overloadedResourceIds: string[]; changedTaskIds: string[]; changedAssignmentIds: string[]; dependencyWarnings: string[]; requiredApprovals: string[]; riskScore: number };
+};
+
+const projectFinishDay = (a: Authored, calc: Map<string, Calc>) => Math.max(0, ...a.tasks.filter((t) => t.kind !== "summary").map((t) => calc.get(t.id)?.ef ?? 0));
+const dayOverloadFor = (load: ReturnType<typeof buildResourceLoad>, resourceId: string, dateIso: string) => {
+  const b = load.buckets.find((x) => x.granularity === "day" && x.resourceId === resourceId && x.date === dateIso);
+  if (!b) return 0;
+  return Math.max(0, b.assignedMinutes + b.reservedMinutes + b.occupiedMinutes - b.capacityMinutes);
+};
+
+function evaluateScenario(base: Authored, commands: PlanningCommand[], target: ScenarioTargetMock): { ok: false; issue: CmdIssue } | ({ ok: true } & ScenarioMetrics) {
+  const work = cloneAuthored(base);
+  const changed = new Set<string>();
+  for (const c of commands) {
+    const r = applyCommand(work, c);
+    if (!r.ok) return { ok: false, issue: r.issue ?? { code: "planning_command_invalid", message: r.error ?? "invalid", entityId: null } };
+    r.changedTaskIds.forEach((id) => changed.add(id));
+  }
+  changedByCascade(base, work).forEach((id) => changed.add(id));
+  const calc = schedule(work);
+  const finishDay = projectFinishDay(work, calc);
+  const load = buildResourceLoad(work, calc);
+  return {
+    ok: true,
+    finishDay,
+    finishDate: dayToIso(finishDay),
+    targetOverloadMinutes: dayOverloadFor(load, target.resourceId, target.date),
+    overloadedResourceIds: [...new Set(load.overloads.map((o) => o.resourceId))],
+    changedTaskIds: [...changed]
+  };
+}
+
+// выбрать назначение перегруженного ресурса с наибольшим вкладом в таргет-день + наименее загруженного альт-исполнителя
+function pickReassignment(base: Authored, baseCalc: Map<string, Calc>, baseLoad: ReturnType<typeof buildResourceLoad>, target: ScenarioTargetMock) {
+  const bucket = baseLoad.buckets.find((x) => x.granularity === "day" && x.resourceId === target.resourceId && x.date === target.date);
+  if (!bucket) return null;
+  const byTask = new Map<string, number>();
+  for (const c of bucket.assignmentContributions) if (target.taskIds.includes(c.taskId)) byTask.set(c.taskId, (byTask.get(c.taskId) ?? 0) + c.workMinutes);
+  const taskId = [...byTask.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? target.taskIds[0];
+  if (!taskId) return null;
+  const task = base.tasks.find((t) => t.id === taskId);
+  const asg = base.assignments.find((a) => a.taskId === taskId && a.resourceId === target.resourceId && WORKING_ROLES.has(a.role));
+  if (!task || !asg) return null;
+  const c = baseCalc.get(taskId);
+  const es = c?.es ?? 0, ef = c?.ef ?? es;
+  const loadIn = (rid: string) => baseLoad.buckets.filter((b) => b.granularity === "day" && b.resourceId === rid && isoToDay(b.date) >= es && isoToDay(b.date) < ef).reduce((s, b) => s + b.assignedMinutes, 0);
+  const self = resOf(target.resourceId);
+  const alt = [...RESOURCES].filter((r) => r.id !== target.resourceId)
+    .sort((a, b) => {
+      const sameA = self && a.positionId === self.positionId ? 0 : 1;
+      const sameB = self && b.positionId === self.positionId ? 0 : 1;
+      if (sameA !== sameB) return sameA - sameB; // та же роль вперёд
+      const la = loadIn(a.id), lb = loadIn(b.id);
+      if (la !== lb) return la - lb; // наименее загруженный
+      return a.id < b.id ? -1 : 1;
+    })[0];
+  if (!alt) return null;
+  return { asg, task, alt, span: Math.max(1, ef - es) };
+}
+
+const reassignCommands = (asg: AssignmentA, taskId: string, altId: string, keepWork: number, movedWork: number): PlanningCommand[] => ([
+  { type: "assignment.upsert", payload: { id: asg.id, taskId, resourceId: asg.resourceId, role: asg.role, unitsPermille: asg.unitsPermille, workMinutes: keepWork } },
+  { type: "assignment.upsert", payload: { id: `${asg.id}-sc-${altId}`, taskId, resourceId: altId, role: "co_executor", unitsPermille: 1000, workMinutes: movedWork } }
+] as unknown as PlanningCommand[]);
+
+// подобрать объём переноса итеративно: "full" → перегруз 0; "half" → ≤ половины базового
+function searchReassign(base: Authored, target: ScenarioTargetMock, r: NonNullable<ReturnType<typeof pickReassignment>>, baseOverload: number, mode: "half" | "full") {
+  const originalWork = r.asg.workMinutes;
+  const goal = mode === "full" ? 0 : Math.ceil(baseOverload / 2);
+  const fractions = mode === "full" ? [0.5, 0.6, 0.7, 0.8, 0.9, 1] : [0.2, 0.3, 0.4, 0.5, 0.6];
+  let fallback: { commands: PlanningCommand[]; metrics: ScenarioMetrics; movedWork: number; keepWork: number } | null = null;
+  for (const f of fractions) {
+    const movedWork = Math.min(originalWork, Math.max(1, Math.round(originalWork * f)));
+    const keepWork = Math.max(0, originalWork - movedWork);
+    const commands = reassignCommands(r.asg, r.task.id, r.alt.id, keepWork, movedWork);
+    const m = evaluateScenario(base, commands, target);
+    if (!m.ok) continue;
+    const cand = { commands, metrics: m, movedWork, keepWork };
+    if (m.targetOverloadMinutes <= goal) return cand;
+    fallback = cand;
+  }
+  return fallback;
+}
+
+export function buildScenarioProposals(base: Authored, target: ScenarioTargetMock): ScenarioProposalMock[] {
+  const baseCalc = schedule(base);
+  const baseLoad = buildResourceLoad(base, baseCalc);
+  const baseOverload = dayOverloadFor(baseLoad, target.resourceId, target.date);
+  if (baseOverload <= 0) return [];
+
+  // proposal содержит ТОЛЬКО контрактные поля (как доменный ScenarioProposal): база/дельты/diff
+  // вычисляются на клиенте из explainability + planDelta.commands + live read-model.
+  const mk = (
+    profile: ScenarioProposalMock["profile"], conflictEffect: ScenarioProposalMock["conflictEffect"], riskScore: number,
+    commands: PlanningCommand[], m: ScenarioMetrics, changedAssignmentIds: string[]
+  ): ScenarioProposalMock => ({
+    id: `scenario-${profile}`, profile, conflictEffect,
+    planDelta: { commands, changedTaskIds: m.changedTaskIds, changedAssignmentIds, acceptedRiskIds: conflictEffect === "accepted" ? [`${target.resourceId}|${isoToDay(target.date)}`] : [] },
+    explainability: {
+      finishDate: m.finishDate, deadlineDeltaDays: 0, overloadMinutes: m.targetOverloadMinutes, overloadedResourceIds: m.overloadedResourceIds,
+      changedTaskIds: m.changedTaskIds, changedAssignmentIds, dependencyWarnings: [], requiredApprovals: conflictEffect === "accepted" ? ["tenant.planning_scenarios.apply"] : [], riskScore
+    }
+  });
+
+  const out: ScenarioProposalMock[] = [];
+
+  // aggressive — принять перегруз (срок не двигаем)
+  {
+    const commands = [{ type: "risk.accept_overload", payload: { overloadId: `${target.resourceId}|${isoToDay(target.date)}`, acceptedRiskReason: "Сохранить дату финиша, принять перегруз как риск" } }] as unknown as PlanningCommand[];
+    const m = evaluateScenario(base, commands, target);
+    if (m.ok) out.push(mk("aggressive", "accepted", 80, commands, m, []));
+  }
+
+  // balanced / resilient — перенос части труда на альт-исполнителя
+  const r = pickReassignment(base, baseCalc, baseLoad, target);
+  if (r) {
+    const altAsgId = `${r.asg.id}-sc-${r.alt.id}`;
+    const bal = searchReassign(base, target, r, baseOverload, "half");
+    if (bal && bal.metrics.targetOverloadMinutes < baseOverload) out.push(mk("balanced", "reduced", 40, bal.commands, bal.metrics, [r.asg.id, altAsgId]));
+    const res = searchReassign(base, target, r, baseOverload, "full");
+    if (res && res.metrics.targetOverloadMinutes === 0) out.push(mk("resilient", "removed", 20, res.commands, res.metrics, [r.asg.id, altAsgId]));
+  }
+  return out;
+}
+
 /* ---- Транспорт: fetchImpl, совместимый с createPlanningApiClient ---- */
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -847,6 +986,9 @@ const json = (body: unknown, status = 200) =>
 export function createMockPlanningFetch(): typeof fetch {
   let authored = freshAuthored();
   let planVersion = 17;
+  // кэш ТОЛЬКО последнего превью (один таргет за раз); боевой бэкенд хранит каждый прогон по уникальному id.
+  // UI сбрасывает proposals и перезапрашивает при смене таргета, поэтому отображаемый список всегда соответствует кэшу.
+  let lastPreview: { proposals: ScenarioProposalMock[]; planVersion: number; expiresAt: number } | null = null;
 
   const mockFetch: typeof fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
@@ -914,6 +1056,53 @@ export function createMockPlanningFetch(): typeof fetch {
       authored = after;
       planVersion += 1;
       return json({ applied: { changedTaskIds: [...allChanged], changedAssignmentIds: [], changedDependencyIds: [] }, newPlanVersion: planVersion, auditEventId: `audit-${planVersion}`, readModel: buildReadModel(authored, planVersion) });
+    }
+
+    // СЦЕНАРИИ: превью 3 профилей разрешения перегруза
+    if (method === "POST" && /\/planning\/scenarios\/preview$/.test(path)) {
+      const reqBody = init?.body ? (JSON.parse(String(init.body)) as { target: ScenarioTargetMock; clientPlanVersion: number }) : null;
+      if (!reqBody?.target) return json({ error: "validation_error" }, 400);
+      if (reqBody.clientPlanVersion !== planVersion) return json({ error: "plan_version_conflict", currentPlanVersion: planVersion }, 409);
+      const proposals = buildScenarioProposals(authored, reqBody.target);
+      lastPreview = { proposals, planVersion, expiresAt: Date.now() + 15 * 60 * 1000 };
+      return json({ proposals, planVersion, engineVersion: "planning-core-v1", expiresAt: new Date(lastPreview.expiresAt).toISOString() });
+    }
+
+    // СЦЕНАРИИ: применение выбранного профиля как пакета команд
+    const applyScenarioMatch = method === "POST" ? path.match(/\/planning\/scenarios\/([^/]+)\/apply$/) : null;
+    if (applyScenarioMatch) {
+      const scenarioId = decodeURIComponent(applyScenarioMatch[1]!);
+      const reqBody = init?.body ? (JSON.parse(String(init.body)) as { clientPlanVersion: number; acceptedRiskReason?: string | null }) : null;
+      if (!reqBody) return json({ error: "validation_error" }, 400);
+      if (!lastPreview) return json({ error: "scenario_not_found" }, 404);
+      if (Date.now() > lastPreview.expiresAt) return json({ error: "scenario_expired" }, 409);
+      const proposal = lastPreview.proposals.find((p) => p.id === scenarioId);
+      if (!proposal) return json({ error: "scenario_not_found" }, 404);
+      if (reqBody.clientPlanVersion !== planVersion) return json({ error: "plan_version_conflict", currentPlanVersion: planVersion }, 409);
+      const requiresReason = proposal.planDelta.commands.some((c) => (c as { type: string }).type === "risk.accept_overload");
+      if (requiresReason && !reqBody.acceptedRiskReason) return json({ error: "accepted_risk_reason_required" }, 400);
+      const before = cloneAuthored(authored);
+      const after = cloneAuthored(authored);
+      const allChanged = new Set<string>();
+      for (const command of proposal.planDelta.commands) {
+        const r = applyCommand(after, command);
+        if (!r.ok) {
+          const issue = r.issue ?? { code: "planning_command_invalid", message: r.error ?? "invalid", entityId: null };
+          return json({ error: "planning_precondition_failed", validationIssues: [{ code: issue.code, severity: "error", message: issue.message, entity: issue.entityId ? { type: "task", id: issue.entityId } : null }] }, 409);
+        }
+        r.changedTaskIds.forEach((cid) => allChanged.add(cid));
+      }
+      changedByCascade(before, after).forEach((cid) => allChanged.add(cid));
+      authored = after;
+      planVersion += 1;
+      lastPreview = null; // proposals одноразовые (как боевой markScenarioRunApplied)
+      return json({
+        scenarioRunId: `scenario-run-${planVersion}`,
+        newPlanVersion: planVersion,
+        auditEventId: `audit-${planVersion}`,
+        applied: { changedTaskIds: [...allChanged], changedAssignmentIds: proposal.planDelta.changedAssignmentIds, changedDependencyIds: [] },
+        readModel: buildReadModel(authored, planVersion)
+      });
     }
 
     return json({ error: "not_found" }, 404);

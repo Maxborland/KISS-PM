@@ -18,6 +18,13 @@ export type ApplyResult =
   | { ok: true; changed: string[]; planVersion: number }
   | { ok: false; conflict: boolean; message: string; issues?: ValidationHit[] };
 
+export type ScenarioPreviewResult =
+  | { ok: true; proposals: Array<Record<string, unknown>>; expiresAt: string }
+  | { ok: false; conflict: boolean; message: string };
+export type ScenarioApplyResult =
+  | { ok: true; planVersion: number; scenarioRunId: string }
+  | { ok: false; conflict: boolean; code?: string; message: string };
+
 /**
  * Работает через настоящий @kiss-pm/planning-client. Транспорт —
  * contract-mock (createMockPlanningFetch), отдельный на каждый монтаж
@@ -110,5 +117,41 @@ export function usePlanning(projectId: string) {
     [client, projectId, readModel, load]
   );
 
-  return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch };
+  const previewScenarios = useCallback(
+    async (target: Record<string, unknown>): Promise<ScenarioPreviewResult> => {
+      if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
+      try {
+        const res = await client.previewScenarios(projectId, { target, clientPlanVersion: readModel.planVersion });
+        return { ok: true, proposals: res.proposals, expiresAt: res.expiresAt };
+      } catch (e) {
+        if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
+          await load();
+          return { ok: false, conflict: true, message: "plan_version_conflict" };
+        }
+        return { ok: false, conflict: false, message: e instanceof Error ? e.message : "preview_failed" };
+      }
+    },
+    [client, projectId, readModel, load]
+  );
+
+  const applyScenario = useCallback(
+    async (scenarioId: string, acceptedRiskReason?: string): Promise<ScenarioApplyResult> => {
+      if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
+      try {
+        const res = await client.applyScenario(projectId, scenarioId, { clientPlanVersion: readModel.planVersion, ...(acceptedRiskReason ? { acceptedRiskReason } : {}) });
+        setReadModel(res.readModel);
+        return { ok: true, planVersion: res.newPlanVersion, scenarioRunId: res.scenarioRunId };
+      } catch (e) {
+        if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
+          await load();
+          return { ok: false, conflict: true, message: "plan_version_conflict" };
+        }
+        const code = e instanceof PlanningApiError ? e.code : undefined;
+        return { ok: false, conflict: false, ...(code ? { code } : {}), message: e instanceof Error ? e.message : "apply_scenario_failed" };
+      }
+    },
+    [client, projectId, readModel, load]
+  );
+
+  return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch, previewScenarios, applyScenario };
 }
