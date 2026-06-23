@@ -109,9 +109,12 @@ export function createCrmClient(options: CrmApiClientOptions) {
     listOpportunities() { return requestJson<{ opportunities: Opportunity[] }>("/api/workspace/opportunities"); },
     getOpportunity(id: string) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(id)}`); },
     createOpportunity(input: OpportunityCreateInput) { return requestJson<{ opportunity: Opportunity }>("/api/workspace/opportunities", { method: "POST", body: JSON.stringify(input) }); },
-    updateOpportunity(id: string, input: Record<string, unknown>) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(id)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     moveOpportunityStage(id: string, stageId: string) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(id)}/stage`, { method: "PATCH", body: JSON.stringify({ stageId }) }); },
     finalizeOpportunity(id: string, status: "won_closed" | "lost_rejected", reason: string) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(id)}/finalize`, { method: "PATCH", body: JSON.stringify({ status, reason }) }); }
+    // Отложено до поверхности «Карточка сделки»: updateOpportunity (PATCH /:id — full-replace, как
+    // боевой parseOpportunityUpdateBody), checkFeasibility (POST /:id/feasibility), activate
+    // (POST /:id/activate → ProjectRecord), listProjects (GET /projects). Тип ProjectRecord и поля
+    // feasibility* в Opportunity объявлены под них.
   };
 }
 

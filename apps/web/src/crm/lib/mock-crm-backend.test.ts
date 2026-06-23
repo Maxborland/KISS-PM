@@ -88,4 +88,42 @@ describe("contract-mock CRM backend", () => {
     const ok = await c.createProduct({ name: "Демо", unit: "шт", price: 1000 });
     expect(ok.product.price).toBe(1000);
   });
+
+  // ===== контракт-верность валидации (зеркало apps/api) =====
+  it("returns invalid_* (400), not *_not_found (404), for malformed link ids on create", async () => {
+    const c = client();
+    await expect(c.createOpportunity(baseInput({ clientId: "Bad Id" }))).rejects.toMatchObject({ status: 400, code: "invalid_client_id" });
+    await expect(c.createOpportunity(baseInput({ stageId: "ZZZ!" }))).rejects.toMatchObject({ status: 400, code: "invalid_deal_stage_id" });
+  });
+
+  it("validates ownerUserId: malformed → 400, unknown well-formed → 404 owner_user_not_found", async () => {
+    const c = client();
+    await expect(c.createOpportunity(baseInput({ ownerUserId: "BAD" }))).rejects.toMatchObject({ status: 400, code: "invalid_owner_user_id" });
+    await expect(c.createOpportunity(baseInput({ ownerUserId: "u-ghost" }))).rejects.toMatchObject({ status: 404, code: "owner_user_not_found" });
+    const ok = await c.createOpportunity(baseInput({ ownerUserId: "u-ivan" }));
+    expect(ok.opportunity.ownerUserId).toBe("u-ivan");
+  });
+
+  it("enforces demand bounds: hours ≤ 100000 and no duplicate positions", async () => {
+    const c = client();
+    await expect(c.createOpportunity(baseInput({ demand: [{ positionId: "backend", requiredHours: 200_000 }] }))).rejects.toMatchObject({ status: 400, code: "invalid_demand_hours" });
+    await expect(c.createOpportunity(baseInput({ demand: [{ positionId: "backend", requiredHours: 100 }, { positionId: "backend", requiredHours: 50 }] }))).rejects.toMatchObject({ status: 400, code: "duplicate_demand_position" });
+  });
+
+  it("rejects a planning horizon over 730 days (400 invalid_planned_dates)", async () => {
+    const c = client();
+    await expect(c.createOpportunity(baseInput({ plannedStart: "2026-01-01", plannedFinish: "2028-06-01" }))).rejects.toMatchObject({ status: 400, code: "invalid_planned_dates" });
+  });
+
+  it("lowercases and validates contact email (400 invalid_contact_email)", async () => {
+    const c = client();
+    await expect(c.createContact({ clientId: "client-romashka", name: "Бад", email: "not-an-email" })).rejects.toMatchObject({ status: 400, code: "invalid_contact_email" });
+    const ok = await c.createContact({ clientId: "client-romashka", name: "Ок", email: "Anna@ROMASHKA.RU" });
+    expect(ok.contact.email).toBe("anna@romashka.ru");
+  });
+
+  it("stage move with malformed stageId returns invalid_deal_stage_id (400)", async () => {
+    const c = client();
+    await expect(c.moveOpportunityStage("opp-2207", "ZZZ!")).rejects.toMatchObject({ status: 400, code: "invalid_deal_stage_id" });
+  });
 });

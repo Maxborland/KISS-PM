@@ -19,7 +19,7 @@ import type { DealStage, Opportunity } from "@/crm/lib/crm-client";
 type Mode = "kanban" | "list" | "forecast";
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
 const userById = new Map(CRM_USERS.map((u) => [u.id, u]));
-const ownerColor = (id: string | null) => AV[Math.max(0, CRM_USERS.findIndex((u) => u.id === id)) % AV.length]!;
+const ownerColor = (id: string | null): BemAvatarColor => { const i = CRM_USERS.findIndex((u) => u.id === id); return i < 0 ? "c5" : AV[i % AV.length]!; };
 const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean); return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—"; };
 const ownerName = (id: string | null) => (id ? userById.get(id)?.name ?? id : "—");
 const money = (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} млн ₽` : `${Math.round(v / 1000).toLocaleString("ru-RU")} тыс ₽`);
@@ -54,8 +54,11 @@ export function ProjectDeals() {
     const stages = [...data.dealStages].sort((a, b) => a.sortOrder - b.sortOrder);
     const byStage = new Map<string, Opportunity[]>();
     for (const s of stages) byStage.set(s.id, []);
-    for (const o of data.opportunities) { const arr = byStage.get(o.stageId ?? "") ?? byStage.get(stages[0]?.id ?? "") ?? []; arr.push(o); }
-    return { stages, byStage, opps: data.opportunities };
+    // сделки без стадии / с неизвестной стадией НЕ сваливаем в первую колонку (иначе счётчики врут) —
+    // собираем отдельно и показываем в колонке «Без стадии».
+    const unstaged: Opportunity[] = [];
+    for (const o of data.opportunities) { const arr = o.stageId ? byStage.get(o.stageId) : undefined; if (arr) arr.push(o); else unstaged.push(o); }
+    return { stages, byStage, unstaged, opps: data.opportunities };
   }, [data]);
 
   if (status === "loading" && !data) {
@@ -138,6 +141,21 @@ export function ProjectDeals() {
               </div>
             );
           })}
+          {model.unstaged.length ? (
+            <div className="flex w-[260px] shrink-0 flex-col rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--panel-subtle)]">
+              <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2"><span className="text-[length:var(--text-sm)] font-semibold text-[var(--muted-strong)]">Без стадии</span><span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-strong)]">{model.unstaged.length}</span></div>
+              <div className="flex flex-col gap-2 p-2">
+                {model.unstaged.map((o) => (
+                  <article key={o.id} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]">
+                    <div className="mb-1 flex items-center justify-between gap-2"><span className="v4-mono text-[10px] text-[var(--muted-soft)]">{o.id}</span><BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" /></div>
+                    <h3 className="text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">{o.title}</h3>
+                    <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{o.clientName}</p>
+                    <div className="v4-num mt-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : mode === "list" ? (
         <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
@@ -152,6 +170,7 @@ export function ProjectDeals() {
                   <td className="px-3 py-2 text-[var(--muted-strong)]">{o.clientName}</td>
                   <td className="px-3 py-2">
                     <select value={o.stageId ?? ""} disabled={busy || isFinal(o)} onChange={(e) => void doMove(o.id, e.target.value)} className="h-7 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-1.5 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60">
+                      {model.stages.some((s) => s.id === o.stageId) ? null : <option value={o.stageId ?? ""}>— без стадии —</option>}
                       {model.stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                     {isFinal(o) ? <Chip variant={o.status === "won_closed" ? "success" : "danger"} className="ml-1.5">{STATUS_LABEL[o.status]}</Chip> : null}
@@ -243,7 +262,7 @@ function CreateDealDialog({ stages, data, busy, setBusy, setNotice, create }: {
   const submit = async () => {
     if (!valid) return;
     setBusy(true); setNotice(null);
-    const res = await create({ clientId, primaryContactId: contactId, projectTypeId, stageId, title: title.trim(), plannedStart: start, plannedFinish: finish, contractValue: Math.round(Number(contractValue)), plannedHourlyRate: Math.round(Number(rate)), probability: Math.round(Number(probability)), demand: [{ positionId: "backend", requiredHours: Math.max(1, Math.floor(Number(contractValue) / Number(rate))) }] });
+    const res = await create({ clientId, primaryContactId: contactId, projectTypeId, stageId, title: title.trim(), plannedStart: start, plannedFinish: finish, contractValue: Math.round(Number(contractValue)), plannedHourlyRate: Math.round(Number(rate)), probability: Math.round(Number(probability)), demand: [{ positionId: "backend", requiredHours: Math.min(100000, Math.max(1, Math.floor(Number(contractValue) / Number(rate)))) }] });
     setBusy(false);
     if (res.ok) { setNotice("Сделка создана"); setOpen(false); setTitle(""); setClientId(""); setContactId(""); setStageId(""); }
     else setNotice(`Отклонено: ${ruErr(res.code, res.message)}`);
@@ -271,7 +290,7 @@ function CreateDealDialog({ stages, data, busy, setBusy, setNotice, create }: {
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Старт<Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Финиш<Input type="date" value={finish} onChange={(e) => setFinish(e.target.value)} aria-invalid={finish < start} /></label>
         </div>
-        <p className="text-[10px] text-[var(--muted-soft)]">Трудоёмкость рассчитается как сумма / ставка (POST /opportunities, статус «Новая»). Контакт валидируется как активный у выбранного клиента.</p>
+        <p className="text-[10px] text-[var(--muted-soft)]">Трудоёмкость = сумма / ставка (POST /opportunities, статус «Новая»); строка спроса в прототипе фиксирована (позиция backend). Контакт валидируется как активный у выбранного клиента.</p>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
           <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
