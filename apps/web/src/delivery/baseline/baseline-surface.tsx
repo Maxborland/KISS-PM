@@ -6,6 +6,7 @@ import { Camera, Check, GitCommitVertical, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
+import { PROJECT_FALLBACK } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import type { PlanningCommand } from "@kiss-pm/domain";
@@ -44,10 +45,10 @@ export function ProjectBaseline() {
   }, [readModel]);
 
   if (status === "loading" && !readModel) {
-    return <DeliveryFrame project={PROJECT} activeTab="Baseline"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка…</div></DeliveryFrame>;
+    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Baseline"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка…</div></DeliveryFrame>;
   }
   if (status === "error" || !model || !readModel) {
-    return <DeliveryFrame project={PROJECT} activeTab="Baseline"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
+    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Baseline"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
   }
 
   const tasks = model.bc.tasks;

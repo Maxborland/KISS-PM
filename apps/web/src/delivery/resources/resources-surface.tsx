@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
+import { PROJECT_FALLBACK } from "@/delivery/lib/project-chrome";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import {
@@ -50,10 +51,10 @@ export function ProjectResources() {
   }, [readModel]);
 
   if (status === "loading" && !readModel) {
-    return <DeliveryFrame project={PROJECT} activeTab="Ресурсы"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка ресурсной загрузки…</div></DeliveryFrame>;
+    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Ресурсы"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка ресурсной загрузки…</div></DeliveryFrame>;
   }
   if (status === "error" || !model || !readModel) {
-    return <DeliveryFrame project={PROJECT} activeTab="Ресурсы"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
+    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Ресурсы"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
   }
 
   const projectMeta: ProjectMeta = { ...PROJECT, planVersion: `v${readModel.planVersion}` };

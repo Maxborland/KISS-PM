@@ -8,6 +8,7 @@ import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
+import { PROJECT_FALLBACK } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { demoAction } from "@/views/lib/demo";
@@ -18,8 +19,7 @@ type CalRaw = { id: string; workingWeekdays: number[]; workingMinutesPerDay: num
 type TaskRaw = { id: string; schedulingMode: "auto" | "manual"; durationMinutes: number | null; customFields?: { kind?: string } };
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
-// шапка в загрузке/ошибке — нейтральная: финиш/вариацию даёт только живой план, без устаревших литералов
-const PROJECT_FALLBACK: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "—" };
+// PROJECT_FALLBACK (шапка loading/error) импортируется из delivery/lib/project-chrome
 const DOW_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const ddmmyyyy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 const calLabel = (c: CalRaw) => { const days = c.workingWeekdays.map((d) => DOW_RU[d] ?? "?"); const span = days.length ? `${days[0]}–${days[days.length - 1]}` : "—"; return `Производственный · ${span} ${Math.round(c.workingMinutesPerDay / 60)} ч`; };
@@ -83,8 +83,8 @@ export function ProjectSettings() {
 
   const reasonOk = reason.trim().length > 0;
   const deadlineChanged = draftDeadline !== "" && draftDeadline !== project.deadline;
-  // календарь — read-only из РЕАЛЬНОГО project.calendarId. Детали рабочей недели берём из mock-only
-  // readModel.calendars (на боевом API его нет → fallback на id/«—», без поломки на смене apiOrigin).
+  // календарь — read-only из РЕАЛЬНОГО project.calendarId; детали рабочей недели — из readModel.calendars
+  // (теперь top-level и в боевом read-model). fallback на id/«—» оставлен как защита.
   const calCurrent = model.calendars.find((c) => c.id === project.calendarId);
   const calendarText = calCurrent ? calLabel(calCurrent) : project.calendarId ?? "— (не задан)";
 

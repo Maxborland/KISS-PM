@@ -319,6 +319,16 @@ describe("planning API routes", () => {
         })
       ])
     );
+    // read-model отдаёт производственный календарь(и) и исключения top-level (контракт = mock-бэкенду)
+    expect(initialBody.calendars).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          workingWeekdays: expect.any(Array),
+          workingMinutesPerDay: expect.any(Number)
+        })
+      ])
+    );
+    expect(initialBody.calendarExceptions).toEqual(expect.any(Array));
 
     const command = {
       type: "dependency.upsert",

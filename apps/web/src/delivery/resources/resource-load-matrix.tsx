@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { dayToIso, isoToDay, type Resource } from "@/delivery/lib/mock-planning-backend";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
+import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
 
 /* ============================================================
    ResourceLoadMatrix — УНИВЕРСАЛЬНАЯ матрица загрузки.
@@ -104,9 +105,9 @@ function periodLabel(iso: string, gran: Gran): { top: string; sub: string; weeke
    праздник — янтарный, выходной — серый (раньше сливались в бледный panel-strong). */
 function cellTone(pct: number, cap: number, hasAbsence: boolean, holiday: boolean): { bg: string; fg: string } {
   if (cap === 0) {
-    if (hasAbsence) return { bg: "color-mix(in oklab, var(--violet) 30%, var(--panel))", fg: "var(--violet)" };
-    if (holiday) return { bg: "color-mix(in oklab, var(--warning) 32%, var(--panel))", fg: "color-mix(in oklab, var(--warning-text) 80%, #000)" }; // текст затемнён для AA ≥4.5:1
-    return { bg: "color-mix(in oklab, var(--muted-soft) 24%, var(--panel))", fg: "var(--muted-strong)" }; // выходной
+    if (hasAbsence) return NON_WORKING_TONE.absence;
+    if (holiday) return NON_WORKING_TONE.holiday;
+    return NON_WORKING_TONE.weekend;
   }
   if (pct === 0) return { bg: "var(--panel-subtle)", fg: "var(--muted-soft)" };
   if (pct > 100) return { bg: "var(--danger)", fg: "#fff" };
@@ -531,9 +532,9 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
         <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: "color-mix(in oklab, var(--success) 35%, #fff)" }} /> Ниже нормы</span>
         <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: "color-mix(in oklab, var(--success) 80%, #fff)" }} /> Полная (~100%)</span>
         <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-[var(--danger)]" /> Перегруз (&gt;100%)</span>
-        <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: "color-mix(in oklab, var(--violet) 30%, var(--panel))" }} /> Отпуск / отсутствие</span>
-        <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: "color-mix(in oklab, var(--warning) 32%, var(--panel))" }} /> Праздник</span>
-        <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: "color-mix(in oklab, var(--muted-soft) 24%, var(--panel))" }} /> Выходной</span>
+        <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: NON_WORKING_TONE.absence.bg }} /> Отпуск / отсутствие</span>
+        <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: NON_WORKING_TONE.holiday.bg }} /> Праздник</span>
+        <span className="flex items-center gap-1.5"><span className="size-3 rounded" style={{ background: NON_WORKING_TONE.weekend.bg }} /> Выходной</span>
         <span className="flex items-center gap-1.5"><span className="inline-flex h-3 w-5 items-center rounded bg-[color-mix(in_oklab,var(--panel-strong)_40%,var(--panel))] px-0.5"><span className="h-[3px] w-3 rounded-full bg-[var(--success)]" /></span> Свод (бар)</span>
         <span className="ml-auto text-[var(--muted-soft)]">Сотрудник — блок · свод — бар · наведение — прицел строки/столбца</span>
       </div>

@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, Columns3, Filter, GitBranch, IndentDecrease,
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
+import { PROJECT_FALLBACK } from "@/delivery/lib/project-chrome";
 import { demoAction } from "@/views/lib/demo";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
@@ -468,14 +469,14 @@ export function ProjectSchedule() {
 
   if (status === "loading" && !readModel) {
     return (
-      <DeliveryFrame project={PROJECT} activeTab="График">
+      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="График">
         <div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка плана из read-model…</div>
       </DeliveryFrame>
     );
   }
   if (status === "error" || !mapped || !readModel) {
     return (
-      <DeliveryFrame project={PROJECT} activeTab="График">
+      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="График">
         <div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить план: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div>
       </DeliveryFrame>
     );

@@ -42,6 +42,11 @@ export function createPlanningReadModel(snapshot: PlanSnapshot) {
     calculatedPlan,
     baselineComparison: createBaselineComparison(snapshot, calculatedPlan),
     resourceLoad,
+    // Производственный календарь(и) проекта + исключения (праздники resourceId=null / отсутствия).
+    // Поверхности Календари/Настройки читают их top-level — раньше отдавал только mock,
+    // теперь и боевой read-model (инвариант «смена apiOrigin без правок UI»).
+    calendars: snapshot.calendars,
+    calendarExceptions: snapshot.calendarExceptions,
     validationIssues: calculatedPlan.validationIssues,
     planVersion: snapshot.planVersion,
     engineVersion: PLANNING_ENGINE_VERSION

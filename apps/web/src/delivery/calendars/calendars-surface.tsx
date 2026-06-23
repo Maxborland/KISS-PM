@@ -6,6 +6,8 @@ import { CalendarDays, ChevronLeft, ChevronRight, Loader2, TriangleAlert, UserPl
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
+import { PROJECT_FALLBACK } from "@/delivery/lib/project-chrome";
+import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
@@ -67,10 +69,10 @@ export function ProjectCalendars() {
   }, [readModel]);
 
   if (status === "loading" && !readModel) {
-    return <DeliveryFrame project={PROJECT} activeTab="Календари"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка календарей…</div></DeliveryFrame>;
+    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Календари"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка календарей…</div></DeliveryFrame>;
   }
   if (status === "error" || !model || !readModel) {
-    return <DeliveryFrame project={PROJECT} activeTab="Календари"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
+    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Календари"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
   }
 
   const projectMeta: ProjectMeta = { ...PROJECT, planVersion: `v${readModel.planVersion}` };
@@ -203,9 +205,9 @@ export function ProjectCalendars() {
               const st = dayState(day);
               const dt = new Date(BASE_MS + day * 86_400_000);
               const clickable = st.inMonth && !st.weekend && !(isResourceView && st.holiday);
-              const tone = st.holiday ? "border-[var(--warning)] bg-[color-mix(in_oklab,var(--warning)_28%,var(--panel))] text-[color-mix(in_oklab,var(--warning-text)_80%,#000)]" : st.absence ? "border-[var(--violet)] bg-[color-mix(in_oklab,var(--violet)_30%,var(--panel))] text-[var(--violet)]" : st.weekend ? "border-[var(--border-subtle)] bg-[color-mix(in_oklab,var(--muted-soft)_22%,var(--panel))] text-[var(--muted-strong)]" : "border-[var(--border-subtle)] bg-[var(--panel-subtle)] text-[var(--text)]";
+              const dayTone = st.holiday ? NON_WORKING_TONE.holiday : st.absence ? NON_WORKING_TONE.absence : st.weekend ? NON_WORKING_TONE.weekend : { bg: "var(--panel-subtle)", fg: "var(--text)", border: "var(--border-subtle)" };
               return (
-                <button key={day} type="button" disabled={!clickable || busy} onClick={() => toggleDay(day)} title={st.holiday ? `${ddmm(dayToIso(day))} · ${st.holiday.reason || "Праздник"}` : st.absence ? `${ddmm(dayToIso(day))} · ${st.absence.reason || "Отсутствие"}` : st.weekend ? "Выходной" : "Рабочий день — клик: нерабочий"} className={cn("relative flex h-[58px] flex-col rounded-[var(--radius-sm)] border p-1 text-left outline-none transition-colors", tone, !st.inMonth && "opacity-35", clickable && "hover:ring-1 hover:ring-[var(--accent)]")}>
+                <button key={day} type="button" disabled={!clickable || busy} onClick={() => toggleDay(day)} title={st.holiday ? `${ddmm(dayToIso(day))} · ${st.holiday.reason || "Праздник"}` : st.absence ? `${ddmm(dayToIso(day))} · ${st.absence.reason || "Отсутствие"}` : st.weekend ? "Выходной" : "Рабочий день — клик: нерабочий"} style={{ background: dayTone.bg, color: dayTone.fg, borderColor: dayTone.border }} className={cn("relative flex h-[58px] flex-col rounded-[var(--radius-sm)] border p-1 text-left outline-none transition-colors", !st.inMonth && "opacity-35", clickable && "hover:ring-1 hover:ring-[var(--accent)]")}>
                   <span className="text-[length:var(--text-xs)] font-semibold tabular-nums">{dt.getUTCDate()}</span>
                   <span className="mt-auto self-end text-[10px] font-medium">{st.holiday ? "праздник" : st.absence ? (st.absence.reason || "отсутствие").toLowerCase() : st.weekend ? "" : "8 ч"}</span>
                 </button>
@@ -214,9 +216,9 @@ export function ProjectCalendars() {
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[var(--muted-soft)]">
             <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-[var(--panel-subtle)] ring-1 ring-[var(--border-subtle)]" /> рабочий 8 ч</span>
-            <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: "color-mix(in oklab, var(--muted-soft) 22%, var(--panel))" }} /> выходной</span>
-            <span className="flex items-center gap-1"><span className="size-2.5 rounded ring-1 ring-[var(--warning)]" style={{ background: "color-mix(in oklab, var(--warning) 28%, var(--panel))" }} /> праздник</span>
-            <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: "color-mix(in oklab, var(--violet) 30%, var(--panel))", boxShadow: "inset 0 0 0 1px var(--violet)" }} /> отсутствие</span>
+            <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: NON_WORKING_TONE.weekend.bg }} /> выходной</span>
+            <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: NON_WORKING_TONE.holiday.bg, boxShadow: `inset 0 0 0 1px ${NON_WORKING_TONE.holiday.border}` }} /> праздник</span>
+            <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: NON_WORKING_TONE.absence.bg, boxShadow: `inset 0 0 0 1px ${NON_WORKING_TONE.absence.border}` }} /> отсутствие</span>
           </div>
         </div>
 
