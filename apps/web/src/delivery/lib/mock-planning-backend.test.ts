@@ -132,6 +132,67 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     expect(projectsOfDay.size).toBeGreaterThan(1);
   });
 
+  it("assignment.allocations.replace rejects an unbalanced curve (409) and accepts a balanced one", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const asg = (rm.authored as unknown as { assignments: Array<{ id: string; taskId: string; workMinutes: number }> }).assignments[0]!;
+    // сумма ≠ труду → 409 planning_precondition_failed
+    await expect(
+      c.applyCommand(MOCK_PROJECT_ID, {
+        command: { type: "assignment.allocations.replace", payload: { assignmentId: asg.id, allocations: [{ date: "2026-03-03", workMinutes: 60 }] } } as PlanningCommand,
+        clientPlanVersion: rm.planVersion
+      })
+    ).rejects.toMatchObject({ code: "planning_precondition_failed", body: { validationIssues: [{ code: "planning_command_invalid" }] } });
+    // сбалансированная кривая (весь труд на один день) → ок и отражается в read-model
+    const res = await c.applyCommand(MOCK_PROJECT_ID, {
+      command: { type: "assignment.allocations.replace", payload: { assignmentId: asg.id, allocations: [{ date: "2026-03-03", workMinutes: asg.workMinutes }] } } as PlanningCommand,
+      clientPlanVersion: rm.planVersion
+    });
+    const allocs = (res.readModel.authored as unknown as { assignmentAllocations: Array<{ assignmentId: string; date: string; workMinutes: number }> }).assignmentAllocations;
+    expect(allocs.some((x) => x.assignmentId === asg.id && x.date === "2026-03-03" && x.workMinutes === asg.workMinutes)).toBe(true);
+  });
+
+  it("assignment.upsert clears the assignment's day-curve (work/units may change)", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const asg = (rm.authored as unknown as { assignments: Array<{ id: string; taskId: string; resourceId: string; role: string; unitsPermille: number; workMinutes: number }> }).assignments[0]!;
+    const r1 = await c.applyCommand(MOCK_PROJECT_ID, {
+      command: { type: "assignment.allocations.replace", payload: { assignmentId: asg.id, allocations: [{ date: "2026-03-03", workMinutes: asg.workMinutes }] } } as PlanningCommand,
+      clientPlanVersion: rm.planVersion
+    });
+    expect((r1.readModel.authored as unknown as { assignmentAllocations: Array<{ assignmentId: string }> }).assignmentAllocations.some((x) => x.assignmentId === asg.id)).toBe(true);
+    const r2 = await c.applyCommand(MOCK_PROJECT_ID, {
+      command: { type: "assignment.upsert", payload: { id: asg.id, taskId: asg.taskId, resourceId: asg.resourceId, role: asg.role, unitsPermille: asg.unitsPermille, workMinutes: asg.workMinutes } } as PlanningCommand,
+      clientPlanVersion: r1.newPlanVersion
+    });
+    expect((r2.readModel.authored as unknown as { assignmentAllocations: Array<{ assignmentId: string }> }).assignmentAllocations.some((x) => x.assignmentId === asg.id)).toBe(false);
+  });
+
+  it("assignment.delete removes the assignment and its day-curve and relabels the task", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const asg = (rm.authored as unknown as { assignments: Array<{ id: string; taskId: string }> }).assignments[0]!;
+    const res = await c.applyCommand(MOCK_PROJECT_ID, {
+      command: { type: "assignment.delete", payload: { assignmentId: asg.id } } as PlanningCommand,
+      clientPlanVersion: rm.planVersion
+    });
+    const list = (res.readModel.authored as unknown as { assignments: Array<{ id: string }> }).assignments;
+    expect(list.find((x) => x.id === asg.id)).toBeUndefined();
+  });
+
+  it("resourceLoad ignores non-working roles (an observer adds no load)", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    // Орлова (без назначений в сидах) как НАБЛЮДАТЕЛЬ с трудом — нагрузки быть не должно
+    const res = await c.applyCommand(MOCK_PROJECT_ID, {
+      command: { type: "assignment.upsert", payload: { id: "a-obs", taskId: "t-1.1", resourceId: "u-orlova", role: "observer", unitsPermille: 1000, workMinutes: 80 * 60 } } as PlanningCommand,
+      clientPlanVersion: rm.planVersion
+    });
+    const buckets = (res.readModel.resourceLoad as unknown as { buckets: Array<{ resourceId: string; granularity: string; assignedMinutes: number }> }).buckets;
+    const orlovaAssigned = buckets.filter((b) => b.resourceId === "u-orlova" && b.granularity === "day").reduce((s, b) => s + b.assignedMinutes, 0);
+    expect(orlovaAssigned).toBe(0);
+  });
+
   it("applies a command, bumps the version, and rejects a stale version with 409", async () => {
     const c = client();
     const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);

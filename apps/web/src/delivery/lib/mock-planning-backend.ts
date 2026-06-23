@@ -89,6 +89,8 @@ export const RESOURCES: Resource[] = [
   { id: "u-mikhail", name: "Михаил К.", positionId: "frontend", positionName: "Frontend-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 },
   { id: "u-kuznetsov", name: "Кузнецов Н.", positionId: "qa", positionName: "QA-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 }
 ];
+// Нагрузку на ресурс создают только исполнители; контролёр/согласующий/наблюдатель — нет (как в контракте).
+const WORKING_ROLES = new Set(["executor", "co_executor"]);
 const resName = (id: string) => RESOURCES.find((r) => r.id === id)?.name ?? id;
 const resOf = (id: string) => RESOURCES.find((r) => r.id === id);
 const nameToId = new Map(RESOURCES.map((r) => [r.name, r.id]));
@@ -124,6 +126,8 @@ type Authored = {
   }>;
   deps: Dep[];
   assignments: AssignmentA[];
+  // явная дневная кривая назначения (assignment.allocations.replace). Пусто = ровное распределение.
+  assignmentAllocations: AllocationA[];
   reservations: ReservationA[];
   exceptions: ExceptionA[];
   acceptedOverloads: string[]; // ключи "resourceId|day"
@@ -131,6 +135,7 @@ type Authored = {
 
 type Dep = SeedDep & { id: string };
 type AssignmentA = { id: string; taskId: string; resourceId: string; role: string; unitsPermille: number; workMinutes: number };
+type AllocationA = { assignmentId: string; taskId: string; resourceId: string; day: number; workMinutes: number };
 type ReservationA = { id: string; resourceId: string; startDay: number; finishDay: number; workMinutesPerDay: number; reason: string };
 type ExceptionA = { id: string; resourceId: string; day: number; workingMinutes: number; reason: string };
 
@@ -163,6 +168,7 @@ function seedToAuthored(seedTasks: SeedTask[], seedDeps: SeedDep[], exceptions: 
       unitsPermille: 1000,
       workMinutes: s.workH * 60
     })),
+    assignmentAllocations: [],
     reservations: [],
     exceptions,
     acceptedOverloads: []
@@ -196,6 +202,7 @@ function cloneAuthored(a: Authored): Authored {
     tasks: a.tasks.map((t) => ({ ...t })),
     deps: a.deps.map((d) => ({ ...d })),
     assignments: a.assignments.map((x) => ({ ...x })),
+    assignmentAllocations: a.assignmentAllocations.map((x) => ({ ...x })),
     reservations: a.reservations.map((x) => ({ ...x })),
     exceptions: a.exceptions.map((x) => ({ ...x })),
     acceptedOverloads: [...a.acceptedOverloads]
@@ -210,6 +217,7 @@ function namespaceAuthored(a: Authored, pfx: string): Authored {
     tasks: a.tasks.map((t) => ({ ...t, id: pfx + t.id, parentTaskId: nid(t.parentTaskId) })),
     deps: a.deps.map((d) => ({ ...d, id: pfx + d.id, pred: pfx + d.pred, succ: pfx + d.succ })),
     assignments: a.assignments.map((x) => ({ ...x, id: pfx + x.id, taskId: pfx + x.taskId })),
+    assignmentAllocations: a.assignmentAllocations.map((x) => ({ ...x, assignmentId: pfx + x.assignmentId, taskId: pfx + x.taskId })),
     reservations: a.reservations.map((x) => ({ ...x, id: pfx + x.id })),
     exceptions: a.exceptions.map((x) => ({ ...x, id: pfx + x.id })),
     acceptedOverloads: [...a.acceptedOverloads]
@@ -347,9 +355,17 @@ function buildResourceLoad(a: Authored, calc: Map<string, Calc>, projectId: stri
   // даёт ~8 ч/день (≈100%) для обычной задачи; перегруз — только на реальных пересечениях задач у ресурса.
   const asgPerDay = new Map<string, { es: number; ef: number; taskId: string; resourceId: string; per: number }>();
   for (const asg of a.assignments) {
+    if (!WORKING_ROLES.has(asg.role)) continue; // только исполнители грузят ресурс
     const c = calc.get(asg.taskId);
     if (!c) continue;
     asgPerDay.set(asg.id, { es: c.es, ef: c.ef, taskId: asg.taskId, resourceId: asg.resourceId, per: Math.round((asg.workMinutes * (asg.unitsPermille / 1000)) / Math.max(1, c.ef - c.es)) });
+  }
+  // явная дневная кривая: assignmentId → (day → минуты). Если у назначения она есть — берём её, иначе ровное per.
+  const explicitByAsg = new Map<string, Map<number, number>>();
+  for (const al of a.assignmentAllocations) {
+    let m = explicitByAsg.get(al.assignmentId);
+    if (!m) { m = new Map(); explicitByAsg.set(al.assignmentId, m); }
+    m.set(al.day, (m.get(al.day) ?? 0) + al.workMinutes);
   }
 
   const dayBuckets: LoadBucket[] = [];
@@ -359,11 +375,14 @@ function buildResourceLoad(a: Authored, calc: Map<string, Calc>, projectId: stri
       const capacityMinutes = exc ? exc.workingMinutes : isWeekday(day) ? r.capacityMinPerDay : 0;
       let assigned = 0;
       const aIds: string[] = []; const tIds: string[] = []; const aContribs: LoadBucket["assignmentContributions"] = [];
-      if (isWeekday(day)) {
-        for (const [aid, info] of asgPerDay) {
-          if (info.resourceId !== r.id || day < info.es || day >= info.ef || info.per <= 0) continue;
-          assigned += info.per; aIds.push(aid); tIds.push(info.taskId); aContribs.push({ taskId: info.taskId, assignmentId: aid, workMinutes: info.per });
-        }
+      for (const [aid, info] of asgPerDay) {
+        if (info.resourceId !== r.id) continue;
+        const explicit = explicitByAsg.get(aid);
+        let m = 0;
+        if (explicit) m = explicit.get(day) ?? 0; // явная кривая — начисляем в любой день, который задан
+        else if (isWeekday(day) && day >= info.es && day < info.ef && info.per > 0) m = info.per; // ровное распределение — только в будни
+        if (m <= 0) continue;
+        assigned += m; aIds.push(aid); tIds.push(info.taskId); aContribs.push({ taskId: info.taskId, assignmentId: aid, workMinutes: m });
       }
       let reserved = 0;
       const rIds: string[] = []; const rContribs: LoadBucket["reservationContributions"] = [];
@@ -504,7 +523,7 @@ function buildReadModel(a: Authored, planVersion: number): Record<string, unknow
       tasks,
       dependencies,
       assignments: a.assignments.map((x) => ({ id: x.id, taskId: x.taskId, resourceId: x.resourceId, role: x.role, unitsPermille: x.unitsPermille, workMinutes: x.workMinutes, calendarId: null })),
-      assignmentAllocations: [],
+      assignmentAllocations: a.assignmentAllocations.map((x) => ({ assignmentId: x.assignmentId, taskId: x.taskId, resourceId: x.resourceId, date: dayToIso(x.day), workMinutes: x.workMinutes })),
       baselines: []
     },
     calculatedPlan: {
@@ -535,6 +554,13 @@ function buildReadModel(a: Authored, planVersion: number): Record<string, unknow
 
 /* ---- Применение поддерживаемых команд к авторской модели ---- */
 type CmdIssue = { code: string; message: string; entityId: string | null };
+
+// t.res — производный label: список исполнителей задачи (с % при неполных единицах)
+function relabelTask(a: Authored, t: Authored["tasks"][number]): void {
+  const mine = a.assignments.filter((x) => x.taskId === t.id);
+  t.res = mine.length === 0 ? "—" : mine.map((x) => { const nm = resName(x.resourceId); return x.unitsPermille !== 1000 ? `${nm} · ${Math.round(x.unitsPermille / 10)}%` : nm; }).join(", ");
+}
+
 function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; changedTaskIds: string[]; error?: string; issue?: CmdIssue } {
   const cmd = command as { type: string; payload: Record<string, unknown> };
   const find = (id: string) => a.tasks.find((t) => t.id === id);
@@ -586,16 +612,48 @@ function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; cha
       const wm = p.workMinutes == null ? null : (p.workMinutes as number);
       let asg = id ? a.assignments.find((x) => x.id === id) : undefined;
       if (!asg && wm == null) asg = a.assignments.find((x) => x.taskId === taskId); // смена ресурса из грида
+      let target: AssignmentA;
       if (asg) {
         asg.resourceId = resourceId;
         asg.unitsPermille = units;
         if (wm != null) asg.workMinutes = wm;
+        target = asg;
       } else {
-        a.assignments.push({ id: id || `a-${a.assignments.length + 1}`, taskId, resourceId, role: String(p.role ?? "executor"), unitsPermille: units, workMinutes: wm ?? t.workMinutes });
+        target = { id: id || `a-${a.assignments.length + 1}`, taskId, resourceId, role: String(p.role ?? "executor"), unitsPermille: units, workMinutes: wm ?? t.workMinutes };
+        a.assignments.push(target);
       }
-      const primary = a.assignments.find((x) => x.taskId === taskId);
-      if (primary) { const nm = resName(primary.resourceId); t.res = primary.unitsPermille !== 1000 ? `${nm} · ${Math.round(primary.unitsPermille / 10)}%` : nm; }
+      // труд/единицы/ресурс изменились → прежняя дневная кривая больше не валидна (как в commandReducer)
+      a.assignmentAllocations = a.assignmentAllocations.filter((al) => al.assignmentId !== target.id);
+      relabelTask(a, t);
       return { ok: true, changedTaskIds: [t.id] };
+    }
+    case "assignment.delete": {
+      const id = String(cmd.payload.assignmentId);
+      const asg = a.assignments.find((x) => x.id === id);
+      a.assignments = a.assignments.filter((x) => x.id !== id);
+      a.assignmentAllocations = a.assignmentAllocations.filter((x) => x.assignmentId !== id);
+      if (asg) { const t = find(asg.taskId); if (t) relabelTask(a, t); }
+      return { ok: true, changedTaskIds: asg ? [asg.taskId] : [] };
+    }
+    case "assignment.allocations.replace": {
+      const p = cmd.payload as { assignmentId?: unknown; allocations?: unknown };
+      const assignmentId = String(p.assignmentId);
+      const asg = a.assignments.find((x) => x.id === assignmentId);
+      if (!asg) return { ok: false, changedTaskIds: [], error: "assignment_not_found" };
+      const allocs = Array.isArray(p.allocations) ? (p.allocations as Array<{ date: string; workMinutes: number }>) : [];
+      // контрактный инвариант: уникальные даты, минуты>0 и конечны, сумма === труд назначения
+      const seen = new Set<number>();
+      let sum = 0;
+      for (const al of allocs) {
+        const day = isoToDay(String(al.date));
+        const wm = Number(al.workMinutes);
+        if (!Number.isFinite(wm) || wm <= 0) return { ok: false, changedTaskIds: [], error: "allocation_invalid", issue: { code: "planning_command_invalid", message: "Часы распределения должны быть положительными", entityId: asg.taskId } };
+        if (seen.has(day)) return { ok: false, changedTaskIds: [], error: "allocation_duplicate", issue: { code: "planning_command_invalid", message: "Повторяющиеся даты в кривой распределения", entityId: asg.taskId } };
+        seen.add(day); sum += wm;
+      }
+      if (allocs.length > 0 && sum !== asg.workMinutes) return { ok: false, changedTaskIds: [], error: "allocation_sum_mismatch", issue: { code: "planning_command_invalid", message: `Сумма распределения (${Math.round(sum / 60)} ч) должна совпадать с трудоёмкостью назначения (${Math.round(asg.workMinutes / 60)} ч)`, entityId: asg.taskId } };
+      a.assignmentAllocations = a.assignmentAllocations.filter((x) => x.assignmentId !== assignmentId).concat(allocs.map((al) => ({ assignmentId, taskId: asg.taskId, resourceId: asg.resourceId, day: isoToDay(String(al.date)), workMinutes: Number(al.workMinutes) })));
+      return { ok: true, changedTaskIds: [asg.taskId] };
     }
     case "resource.reserve": {
       const p = cmd.payload;
@@ -702,6 +760,9 @@ function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; cha
       const ids = new Set([t.id, ...a.tasks.filter((x) => x.wbs.startsWith(t.wbs + ".")).map((x) => x.id)]);
       a.tasks = a.tasks.filter((x) => !ids.has(x.id));
       a.deps = a.deps.filter((d) => !ids.has(d.pred) && !ids.has(d.succ));
+      // каскад: убрать назначения и их дневные кривые удаляемого поддерева (иначе мусор в read-model)
+      a.assignments = a.assignments.filter((x) => !ids.has(x.taskId));
+      a.assignmentAllocations = a.assignmentAllocations.filter((x) => !ids.has(x.taskId));
       renumber(a);
       return { ok: true, changedTaskIds: [] };
     }
@@ -748,6 +809,8 @@ const AUDIT_ACTION: Record<string, string> = {
   "dependency.upsert": "planning.dependency.upserted",
   "dependency.delete": "planning.dependency.deleted",
   "assignment.upsert": "planning.assignment.upserted",
+  "assignment.delete": "planning.assignment.deleted",
+  "assignment.allocations.replace": "planning.assignment.allocations_replaced",
   "resource.reserve": "planning.resource_reserved",
   "calendar.exception.upsert": "planning.calendar_exception.upserted",
   "risk.accept_overload": "planning.overload_risk_accepted"
@@ -924,7 +987,7 @@ export function buildPortfolioModel(): PortfolioModel {
       const c = calc.get(asg.taskId);
       if (!c) continue;
       assignments.push({ id: asg.id, taskId: asg.taskId, resourceId: asg.resourceId, unitsPermille: asg.unitsPermille, workMinutes: asg.workMinutes, role: asg.role });
-      contribs.push({ resourceId: asg.resourceId, es: c.es, ef: c.ef, taskId: asg.taskId, assignmentId: asg.id, per: Math.round((asg.workMinutes * (asg.unitsPermille / 1000)) / Math.max(1, c.ef - c.es)) });
+      if (WORKING_ROLES.has(asg.role)) contribs.push({ resourceId: asg.resourceId, es: c.es, ef: c.ef, taskId: asg.taskId, assignmentId: asg.id, per: Math.round((asg.workMinutes * (asg.unitsPermille / 1000)) / Math.max(1, c.ef - c.es)) });
     }
   }
 
