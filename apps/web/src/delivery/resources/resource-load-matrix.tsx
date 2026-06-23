@@ -105,7 +105,7 @@ function periodLabel(iso: string, gran: Gran): { top: string; sub: string; weeke
 function cellTone(pct: number, cap: number, hasAbsence: boolean, holiday: boolean): { bg: string; fg: string } {
   if (cap === 0) {
     if (hasAbsence) return { bg: "color-mix(in oklab, var(--violet) 30%, var(--panel))", fg: "var(--violet)" };
-    if (holiday) return { bg: "color-mix(in oklab, var(--warning) 32%, var(--panel))", fg: "var(--warning-text)" };
+    if (holiday) return { bg: "color-mix(in oklab, var(--warning) 32%, var(--panel))", fg: "color-mix(in oklab, var(--warning-text) 80%, #000)" }; // текст затемнён для AA ≥4.5:1
     return { bg: "color-mix(in oklab, var(--muted-soft) 24%, var(--panel))", fg: "var(--muted-strong)" }; // выходной
   }
   if (pct === 0) return { bg: "var(--panel-subtle)", fg: "var(--muted-soft)" };
