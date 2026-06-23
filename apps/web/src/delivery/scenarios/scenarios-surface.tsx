@@ -6,7 +6,7 @@ import { Check, Loader2, RefreshCw, Sparkles, TriangleAlert, X } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
 
@@ -85,7 +85,7 @@ export function ProjectScenarios() {
     return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Сценарии"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
   }
 
-  const projectMeta: ProjectMeta = { ...PROJECT, planVersion: `v${readModel.planVersion}` };
+  const projectMeta = deriveProjectMeta(readModel, PROJECT);
   const list = proposals ?? [];
   const recommendedId = list.filter((p) => p.conflictEffect !== "accepted").sort((a, b) => a.explainability.riskScore - b.explainability.riskScore)[0]?.id ?? null;
   const compareP = compareId ? list.find((p) => p.id === compareId) ?? null : null;

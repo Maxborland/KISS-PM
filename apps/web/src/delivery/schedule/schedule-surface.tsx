@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight, Columns3, Filter, GitBranch, IndentDecrease,
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta } from "@/delivery/lib/project-chrome";
 import { demoAction } from "@/views/lib/demo";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
@@ -482,7 +482,7 @@ export function ProjectSchedule() {
     );
   }
 
-  const projectMeta: ProjectMeta = { ...PROJECT, planVersion: `v${readModel.planVersion}` };
+  const projectMeta = deriveProjectMeta(readModel, PROJECT);
   const { rows, deadlineDay, projectFinishDay } = mapped;
   const totalDays = Math.max(7, Math.ceil((Math.max(projectFinishDay, deadlineDay, ...rows.map((r) => r.dayStart + r.dayDur)) + 6) / 7) * 7);
   const weeks = totalDays / 7;

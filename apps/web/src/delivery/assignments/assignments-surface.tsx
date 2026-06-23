@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, UserPlus, X } from "l
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta } from "@/delivery/lib/project-chrome";
 import { dayToIso, isoToDay, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
 import { AddAssigneeDialog, distribute, presetWeights, ROLES, roleLabel } from "@/delivery/assignments/assignments-editors";
@@ -92,7 +92,7 @@ export function ProjectAssignments() {
     return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Назначения"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
   }
 
-  const projectMeta: ProjectMeta = { ...PROJECT, planVersion: `v${readModel.planVersion}` };
+  const projectMeta = deriveProjectMeta(readModel, PROJECT);
   const colW = COL_W[gran];
   // эффективный прицел: под курсором (hover), либо строка выбранного назначения при открытом инспекторе
   const crosshair = hover ?? (sel ? { key: `a:${sel}`, col: -1 } : null);

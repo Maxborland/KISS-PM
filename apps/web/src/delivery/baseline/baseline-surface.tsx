@@ -62,7 +62,7 @@ export function ProjectBaseline() {
   // хром выводим из РЕАЛЬНЫХ данных (а не статической заглушки PROJECT), чтобы шапка не противоречила плитке
   const projectMeta: ProjectMeta = {
     name: PROJECT.name, code: PROJECT.code, status: PROJECT.status, statusTone: PROJECT.statusTone ?? "info",
-    planVersion: `v${readModel.planVersion}`, deadline: PROJECT.deadline, finish: ddmmYyyy(model.projectFinish),
+    planVersion: `v${readModel.planVersion}`, deadline: ddmmYyyy((readModel.project as { deadline: string }).deadline), finish: ddmmYyyy(model.projectFinish),
     ...(baseFinishDay && projFinishDelta !== 0 ? { variance: { label: `${signDays(projFinishDelta)} к базовому плану`, tone: projFinishDelta > 0 ? ("warning" as const) : ("success" as const) } } : {})
   };
   const rows = onlyChanged ? changed : tasks;

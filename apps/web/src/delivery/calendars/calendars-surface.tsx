@@ -6,7 +6,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Loader2, TriangleAlert, UserPl
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta } from "@/delivery/lib/project-chrome";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
@@ -14,7 +14,7 @@ import { AbsenceDialog } from "@/delivery/resources/resources-editors";
 import type { PlanningCommand } from "@kiss-pm/domain";
 
 type CalRaw = { id: string; workingWeekdays: number[]; workingMinutesPerDay: number };
-type ExcRaw = { id: string; calendarId: string; resourceId: string | null; date: string; workingMinutes: number; reason: string };
+type ExcRaw = { id: string; calendarId: string; resourceId: string | null; date: string; workingMinutes: number; reason: string | null };
 type TaskRaw = { id: string; wbsCode: string; title: string; durationMinutes: number | null };
 type CalcRaw = { id: string; calculatedStart: string; calculatedFinish: string };
 
@@ -75,7 +75,7 @@ export function ProjectCalendars() {
     return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Календари"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
   }
 
-  const projectMeta: ProjectMeta = { ...PROJECT, planVersion: `v${readModel.planVersion}` };
+  const projectMeta = deriveProjectMeta(readModel, PROJECT);
   const focusMonth = model.monthsList[Math.max(0, Math.min(monthOffset, model.monthsList.length - 1))] ?? "";
   const monthLabel = focusMonth ? `${MONTHS_CAP[Number(focusMonth.slice(5, 7)) - 1]} ${focusMonth.slice(0, 4)}` : "";
   const isResourceView = selCal !== "project";
