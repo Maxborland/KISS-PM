@@ -38,15 +38,17 @@ export function ProjectOverview() {
   useEffect(() => {
     if (!readModel) return;
     void loadCommits().then((c) => setCommits(c.commits.slice(0, 4)));
-  }, [readModel?.planVersion, loadCommits, readModel]);
+  }, [readModel, loadCommits]);
 
   const model = useMemo(() => {
     if (!readModel) return null;
     const authored = (readModel.authored as unknown as { tasks: RawTask[] }).tasks;
     const cp = readModel.calculatedPlan as unknown as { tasks: CalcTask[]; projectFinish: string; criticalPathTaskIds: string[] };
     const calcById = new Map(cp.tasks.map((c) => [c.id, c]));
-    const leaves = authored.filter((t) => t.durationMinutes != null);
     const milestones = authored.filter((t) => t.customFields?.kind === "milestone");
+    // листья = задачи с длительностью, но БЕЗ вех (у вехи durationMinutes == 0, не null) —
+    // иначе веха попадает в прогресс/doneCount/«ключевые» с бессмысленным 100%-баром.
+    const leaves = authored.filter((t) => t.durationMinutes != null && t.customFields?.kind !== "milestone");
     const overloads = ((readModel.resourceLoad as unknown as { overloads: Array<{ resourceId: string; date: string; granularity?: string }> }).overloads ?? []).filter((o) => o.granularity === undefined || o.granularity === "day");
     const bc = (readModel.baselineComparison as unknown as { tasks: BcTask[] }).tasks ?? [];
     const issues = (readModel.validationIssues as unknown as unknown[]) ?? [];
@@ -76,6 +78,8 @@ export function ProjectOverview() {
   const critNoSlack = model.leaves.filter((t) => { const c = model.calcById.get(t.id); return c?.isCritical && (c.totalSlackMinutes ?? 0) <= 0; });
 
   const signals: Array<{ tone: "danger" | "warning" | "info"; icon: typeof Zap; title: string; detail: string; action: string }> = [];
+  // срыв дедлайна — самый критичный выводимый из плана факт, ведёт список
+  if (reserveDays < 0) signals.push({ tone: "danger", icon: AlertTriangle, title: `Финиш за дедлайном: +${-reserveDays} дн.`, detail: `расчётный ${ddmmyyyy(model.projectFinish)} · дедлайн ${ddmmyyyy(model.deadline)}`, action: "Открыть График" });
   if (overloadResources.length > 0) signals.push({ tone: "danger", icon: Zap, title: `Перегруз ресурсов: ${overloadResources.length}`, detail: `${overloadResources.map(resName).join(", ")} · ${model.overloads.length} дн с превышением`, action: "Открыть Сценарии" });
   if (projDelta > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Финиш сдвинут +${projDelta} дн от базового плана`, detail: `текущий ${ddmm(model.projectFinish)} · базовый ${ddmm(baseFinishDay ? model.bc.find((t) => t.baselineFinish && isoToDay(t.baselineFinish) === baseFinishDay)?.baselineFinish ?? null : null)}`, action: "Открыть Baseline" });
   if (overdue.length > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Просрочено задач: ${overdue.length}`, detail: `срок раньше ${ddmmyyyy(TODAY)}, не закрыты`, action: "Открыть График" });
@@ -87,8 +91,10 @@ export function ProjectOverview() {
     { key: "deadline", day: deadlineDay, date: ddmmyyyy(model.deadline), name: "Дедлайн релиза", wbs: "—", done: false }
   ].sort((a, b) => a.day - b.day);
 
-  // ключевые задачи: критпуть и ближайшие сроки (критические вперёд, затем по финишу), top-5
+  // ключевые задачи: критпуть и ближайшие сроки (критические вперёд, затем по финишу), top-5;
+  // закрытые исключаем — иначе наверх всплывают рано завершённые критические задачи
   const keyTasks = model.leaves
+    .filter((t) => t.statusId !== "done")
     .map((t) => { const c = model.calcById.get(t.id); return { t, c, crit: model.criticalIds.has(t.id), fin: c ? isoToDay(c.calculatedFinish) : 0 }; })
     .sort((a, b) => (a.crit === b.crit ? a.fin - b.fin : a.crit ? -1 : 1))
     .slice(0, 5);
@@ -96,7 +102,7 @@ export function ProjectOverview() {
   // шапка из РЕАЛЬНЫХ данных (финиш/variance), не из статической заглушки — чтобы не противоречить KPI
   const projectMeta: ProjectMeta = {
     name: PROJECT.name, code: PROJECT.code, status: PROJECT.status, statusTone: PROJECT.statusTone ?? "info",
-    planVersion: `v${readModel.planVersion}`, deadline: PROJECT.deadline, finish: ddmmyyyy(model.projectFinish),
+    planVersion: `v${readModel.planVersion}`, deadline: ddmmyyyy(model.deadline), finish: ddmmyyyy(model.projectFinish),
     ...(projDelta > 0 ? { variance: { label: `+${projDelta} дн. к базовому плану`, tone: "warning" as const } } : reserveDays < 0 ? { variance: { label: `+${-reserveDays} дн. к дедлайну`, tone: "danger" as const } } : {})
   };
 
