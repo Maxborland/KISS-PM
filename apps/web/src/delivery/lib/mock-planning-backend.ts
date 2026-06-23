@@ -1019,6 +1019,34 @@ export function buildScenarioProposals(base: Authored, target: ScenarioTargetMoc
   return out;
 }
 
+/* ---- Журнал коммитов (PM-as-code история сессии) ---- */
+type CommitMeta = { version: number; actionType: string; summary: string; changedTaskIds: string[]; auditEventId: string; at: string; revertible: boolean };
+// команды, для которых buildCompensatingCommands строит обратные (откат) — см. planning-client/undo
+const REVERTIBLE_TYPES = new Set(["task.update_identity", "task.update_schedule", "task.update_progress", "task.update_status", "task.update_work_model", "dependency.upsert", "dependency.delete"]);
+
+function summarizeCommand(cmd: PlanningCommand, a: Authored): string {
+  const c = cmd as { type: string; payload: Record<string, unknown> };
+  const title = (id: unknown) => a.tasks.find((t) => t.id === String(id))?.title ?? String(id);
+  switch (c.type) {
+    case "task.update_progress": return `Прогресс «${title(c.payload.taskId)}» → ${c.payload.percentComplete}%`;
+    case "task.update_schedule": return `Сроки «${title(c.payload.taskId)}» изменены`;
+    case "task.update_work_model": return `Трудоёмкость «${title(c.payload.taskId)}» изменена`;
+    case "task.update_identity": return `Переименование «${title(c.payload.taskId)}»`;
+    case "task.create": return `Создана задача «${String(c.payload.title ?? "Новая")}»`;
+    case "task.delete_or_archive": return `Удалена задача «${title(c.payload.taskId)}»`;
+    case "task.move_wbs": return `Перемещена задача «${title(c.payload.taskId)}»`;
+    case "assignment.upsert": return `Назначение на «${title(c.payload.taskId)}»`;
+    case "assignment.delete": return "Снят исполнитель";
+    case "assignment.allocations.replace": return "Кривая распределения назначения";
+    case "dependency.upsert": return "Связь добавлена/изменена";
+    case "dependency.delete": return "Связь удалена";
+    case "calendar.exception.upsert": return c.payload.resourceId == null ? "Праздник календаря" : "Отсутствие ресурса";
+    case "risk.accept_overload": return "Принят перегруз ресурса";
+    case "baseline.capture": return `Зафиксирован базовый план «${String(c.payload.label ?? "")}»`;
+    default: return c.type;
+  }
+}
+
 /* ---- Транспорт: fetchImpl, совместимый с createPlanningApiClient ---- */
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -1029,6 +1057,28 @@ export function createMockPlanningFetch(): typeof fetch {
   // кэш ТОЛЬКО последнего превью (один таргет за раз); боевой бэкенд хранит каждый прогон по уникальному id.
   // UI сбрасывает proposals и перезапрашивает при смене таргета, поэтому отображаемый список всегда соответствует кэшу.
   let lastPreview: { proposals: ScenarioProposalMock[]; planVersion: number; expiresAt: number } | null = null;
+
+  // журнал коммитов сессии (PM-as-code): сид-бутстрап «как собрался план v17» + живые правки
+  const commitLog: CommitMeta[] = [
+    { version: 17, actionType: "planning.task.updated", summary: "Прогресс «Планировочный движок» → 92%", changedTaskIds: ["t-3.1.1"], auditEventId: "audit-17", at: "2026-06-22T09:00:00.000Z", revertible: true },
+    { version: 16, actionType: "planning.task.updated", summary: "«Контур безопасности» → ручной режим (manual)", changedTaskIds: ["t-2.2"], auditEventId: "audit-16", at: "2026-06-20T15:30:00.000Z", revertible: false },
+    { version: 15, actionType: "planning.baseline.captured", summary: "Зафиксирован базовый план «После kick-off»", changedTaskIds: [], auditEventId: "audit-15", at: "2026-05-20T08:00:00.000Z", revertible: false }
+  ];
+  // данные отката последнего обратимого коммита (как Schedule undo: команды + read-model ДО)
+  const seedBefore = cloneAuthored(authored);
+  const seedT = seedBefore.tasks.find((t) => t.id === "t-3.1.1");
+  if (seedT) seedT.pct = 80;
+  let lastRevert: { auditEventId: string; commands: PlanningCommand[]; before: unknown } | null = {
+    auditEventId: "audit-17",
+    commands: [{ type: "task.update_progress", payload: { taskId: "t-3.1.1", percentComplete: 92 } }] as unknown as PlanningCommand[],
+    before: buildReadModel(seedBefore, 16)
+  };
+  const pushCommit = (commands: PlanningCommand[], changed: string[], summary: string, actionType: string, before: unknown) => {
+    const auditEventId = `audit-${planVersion}`;
+    const revertible = commands.length === 1 && REVERTIBLE_TYPES.has((commands[0] as { type: string }).type);
+    commitLog.unshift({ version: planVersion, actionType, summary, changedTaskIds: changed, auditEventId, at: new Date().toISOString(), revertible });
+    if (revertible) lastRevert = { auditEventId, commands, before };
+  };
 
   const mockFetch: typeof fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
@@ -1069,6 +1119,7 @@ export function createMockPlanningFetch(): typeof fetch {
       // apply
       authored = after;
       planVersion += 1;
+      pushCommit([reqBody.command], changed, summarizeCommand(reqBody.command, before), AUDIT_ACTION[(reqBody.command as { type: string }).type] ?? "planning.command.applied", buildReadModel(before, planVersion - 1));
       return json({
         applied: { changedTaskIds: changed, changedAssignmentIds: [], changedDependencyIds: [] },
         newPlanVersion: planVersion,
@@ -1095,6 +1146,7 @@ export function createMockPlanningFetch(): typeof fetch {
       changedByCascade(before, after).forEach((cid) => allChanged.add(cid));
       authored = after;
       planVersion += 1;
+      pushCommit(reqBody.commands, [...allChanged], reqBody.commands.length === 1 ? summarizeCommand(reqBody.commands[0]!, before) : `Пакет правок (${reqBody.commands.length})`, AUDIT_ACTION[(reqBody.commands[0] as { type: string } | undefined)?.type ?? ""] ?? "planning.command.applied", buildReadModel(before, planVersion - 1));
       return json({ applied: { changedTaskIds: [...allChanged], changedAssignmentIds: [], changedDependencyIds: [] }, newPlanVersion: planVersion, auditEventId: `audit-${planVersion}`, readModel: buildReadModel(authored, planVersion) });
     }
 
@@ -1136,6 +1188,7 @@ export function createMockPlanningFetch(): typeof fetch {
       authored = after;
       planVersion += 1;
       lastPreview = null; // proposals одноразовые (как боевой markScenarioRunApplied)
+      pushCommit(proposal.planDelta.commands, [...allChanged], `Сценарий «${proposal.profile}» применён`, "planning.scenario.applied", buildReadModel(before, planVersion - 1));
       return json({
         scenarioRunId: `scenario-run-${planVersion}`,
         newPlanVersion: planVersion,
@@ -1143,6 +1196,11 @@ export function createMockPlanningFetch(): typeof fetch {
         applied: { changedTaskIds: [...allChanged], changedAssignmentIds: proposal.planDelta.changedAssignmentIds, changedDependencyIds: [] },
         readModel: buildReadModel(authored, planVersion)
       });
+    }
+
+    // КОММИТЫ: журнал версий сессии + данные отката последнего обратимого коммита
+    if (method === "GET" && /\/planning\/commits$/.test(path)) {
+      return json({ commits: commitLog, latestRevert: lastRevert });
     }
 
     return json({ error: "not_found" }, 404);

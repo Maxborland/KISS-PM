@@ -24,6 +24,8 @@ export type ScenarioPreviewResult =
 export type ScenarioApplyResult =
   | { ok: true; planVersion: number; scenarioRunId: string }
   | { ok: false; conflict: boolean; code?: string; message: string };
+export type CommitMetaView = { version: number; actionType: string; summary: string; changedTaskIds: string[]; auditEventId: string; at: string; revertible: boolean };
+export type CommitsView = { commits: CommitMetaView[]; latestRevert: { auditEventId: string; commands: PlanningCommand[]; before: PlanningReadModel } | null };
 
 /**
  * Работает через настоящий @kiss-pm/planning-client. Транспорт —
@@ -32,9 +34,11 @@ export type ScenarioApplyResult =
  * apiOrigin и удаление fetchImpl.
  */
 export function usePlanning(projectId: string) {
+  const fetchRef = useRef<typeof fetch | null>(null);
+  if (fetchRef.current === null) fetchRef.current = createMockPlanningFetch();
   const clientRef = useRef<ReturnType<typeof createPlanningApiClient> | null>(null);
   if (clientRef.current === null) {
-    clientRef.current = createPlanningApiClient({ apiOrigin: "", fetchImpl: createMockPlanningFetch() });
+    clientRef.current = createPlanningApiClient({ apiOrigin: "", fetchImpl: fetchRef.current });
   }
   const client = clientRef.current;
 
@@ -153,5 +157,13 @@ export function usePlanning(projectId: string) {
     [client, projectId, readModel, load]
   );
 
-  return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch, previewScenarios, applyScenario };
+  // журнал коммитов сессии — МОК-маршрут поверхности (бьём в fetchImpl напрямую). На боевом API
+  // история берётся отдельным fetchProjectAuditEvents → /api/tenant/current/audit-events (другой путь,
+  // не участвует в «смене apiOrigin» как планировочные команды) — при интеграции вынести в метод клиента.
+  const loadCommits = useCallback(async (): Promise<CommitsView> => {
+    const res = await fetchRef.current!("/planning/commits");
+    return (await res.json()) as CommitsView;
+  }, []);
+
+  return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch, previewScenarios, applyScenario, loadCommits };
 }

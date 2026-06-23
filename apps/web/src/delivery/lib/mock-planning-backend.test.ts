@@ -296,6 +296,28 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     expect((res.readModel.authored as unknown as { baselines: Array<{ id: string }> }).baselines.some((b) => b.id === "baseline-b3")).toBe(true);
   });
 
+  it("commit log seeds the session history with a revertible latest commit (commands + before)", async () => {
+    const f = createMockPlanningFetch();
+    const body = (await (await f("/planning/commits")).json()) as { commits: Array<{ version: number; revertible: boolean }>; latestRevert: { auditEventId: string; commands: Array<{ type: string }>; before: { authored: { tasks: Array<{ id: string; percentComplete: number }> } } } | null };
+    expect(body.commits.length).toBeGreaterThanOrEqual(3);
+    expect(body.commits[0]!.version).toBe(17);
+    expect(body.latestRevert?.auditEventId).toBe("audit-17");
+    expect(body.latestRevert?.commands[0]?.type).toBe("task.update_progress");
+    // before-снимок несёт ПРЕЖНИЙ прогресс (80) — основа для компенсирующей команды отката
+    const beforeTask = body.latestRevert?.before.authored.tasks.find((t) => t.id === "t-3.1.1");
+    expect(beforeTask?.percentComplete).toBe(80);
+  });
+
+  it("a live apply appends a revertible commit to the session log", async () => {
+    const f = createMockPlanningFetch();
+    const applied = (await (await f("/planning/apply-command", { method: "POST", body: JSON.stringify({ command: { type: "task.update_progress", payload: { taskId: "t-1.1", percentComplete: 50 } }, clientPlanVersion: 17 }) })).json()) as { newPlanVersion: number };
+    expect(applied.newPlanVersion).toBe(18);
+    const body = (await (await f("/planning/commits")).json()) as { commits: Array<{ version: number; revertible: boolean; summary: string }>; latestRevert: { auditEventId: string } | null };
+    expect(body.commits[0]!.version).toBe(18);
+    expect(body.commits[0]!.revertible).toBe(true);
+    expect(body.latestRevert?.auditEventId).toBe("audit-18");
+  });
+
   it("applies a command, bumps the version, and rejects a stale version with 409", async () => {
     const c = client();
     const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
