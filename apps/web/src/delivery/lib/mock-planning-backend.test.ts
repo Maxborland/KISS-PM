@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createPlanningApiClient, PlanningApiError } from "@kiss-pm/planning-client";
 import type { PlanningCommand } from "@kiss-pm/domain";
 
-import { createMockPlanningFetch, MOCK_PROJECT_ID } from "./mock-planning-backend";
+import { buildPortfolioModel, createMockPlanningFetch, isoToDay, MOCK_PROJECT_ID } from "./mock-planning-backend";
 
 function client() {
   return createPlanningApiClient({ apiOrigin: "", fetchImpl: createMockPlanningFetch() });
@@ -77,6 +77,59 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
       clientPlanVersion: rm.planVersion
     });
     expect(res.newPlanVersion).toBe(rm.planVersion + 1);
+  });
+
+  it("serves a resource-load matrix with buckets and at least one overload", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const rl = rm.resourceLoad as unknown as { buckets: unknown[]; overloads: unknown[] };
+    expect(rl.buckets.length).toBeGreaterThan(50);
+    expect(rl.overloads.length).toBeGreaterThan(0);
+  });
+
+  it("accepts an overload (risk.accept_overload) and reflects it in the read-model", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const ov = (rm.resourceLoad as unknown as { overloads: Array<{ resourceId: string; date: string }> }).overloads[0]!;
+    const key = `${ov.resourceId}|${isoToDay(ov.date)}`;
+    const res = await c.applyCommand(MOCK_PROJECT_ID, {
+      command: { type: "risk.accept_overload", payload: { overloadId: key, acceptedRiskReason: "test" } } as PlanningCommand,
+      clientPlanVersion: rm.planVersion
+    });
+    expect((res.readModel.resourceLoad as unknown as { acceptedOverloads: string[] }).acceptedOverloads).toContain(key);
+  });
+
+  it("editing an assignment's work via assignment.upsert updates the authored model", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const asg = (rm.authored as unknown as { assignments: Array<{ id: string; taskId: string; resourceId: string; role: string; unitsPermille: number; workMinutes: number }> }).assignments[0]!;
+    const res = await c.applyCommand(MOCK_PROJECT_ID, {
+      command: { type: "assignment.upsert", payload: { id: asg.id, taskId: asg.taskId, resourceId: asg.resourceId, role: asg.role, unitsPermille: asg.unitsPermille, workMinutes: 9999 } } as PlanningCommand,
+      clientPlanVersion: rm.planVersion
+    });
+    const updated = (res.readModel.authored as unknown as { assignments: Array<{ id: string; workMinutes: number }> }).assignments.find((x) => x.id === asg.id)!;
+    expect(updated.workMinutes).toBe(9999);
+  });
+
+  it("portfolio: capacity is counted once per person (never summed across projects)", () => {
+    const m = buildPortfolioModel();
+    const days = m.buckets.filter((b) => b.granularity === "day");
+    // если бы ёмкость складывалась по 3 проектам, в будни было бы до 1440 мин — а должно быть ≤ 480
+    expect(Math.max(...days.map((b) => b.capacityMinutes))).toBe(480);
+    expect(m.projects.length).toBe(3);
+    expect(m.tasks.every((t) => typeof t.projectName === "string" && t.projectName.length > 0)).toBe(true);
+  });
+
+  it("portfolio: reveals cross-project overload (assigned in two projects > daily capacity)", () => {
+    const m = buildPortfolioModel();
+    const days = m.buckets.filter((b) => b.granularity === "day");
+    // Иванова занята и в основном проекте (макеты), и в мобильном (дизайн) — на пересечении перегруз
+    const over = days.filter((b) => b.resourceId === "u-ivanova" && b.capacityMinutes > 0 && b.assignedMinutes > b.capacityMinutes);
+    expect(over.length).toBeGreaterThan(0);
+    // вклад в перегруженный день приходит из ≥2 разных проектов
+    const sample = over[0]!;
+    const projectsOfDay = new Set(sample.assignmentContributions.map((c) => c.taskId.split("::")[0]));
+    expect(projectsOfDay.size).toBeGreaterThan(1);
   });
 
   it("applies a command, bumps the version, and rejects a stale version with 409", async () => {

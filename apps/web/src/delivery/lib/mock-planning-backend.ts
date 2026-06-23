@@ -76,20 +76,22 @@ const SEED_DEPS: SeedDep[] = [
   { pred: "4.1", succ: "4.2", type: "SS", lagDays: 0 }
 ];
 
-/* Ростер сотрудников (для выпадашки ресурсов) */
-export type Resource = { id: string; name: string };
+/* Ростер: роль (position) + команда (team) + дневная ёмкость */
+export type Resource = { id: string; name: string; positionId: string; positionName: string; teamId: string; teamName: string; capacityMinPerDay: number };
 export const RESOURCES: Resource[] = [
-  { id: "u-petrov", name: "Петров А." },
-  { id: "u-ivanova", name: "Иванова М." },
-  { id: "u-sergeev", name: "Сергеев П." },
-  { id: "u-dmitriev", name: "Дмитриев К." },
-  { id: "u-mikhail", name: "Михаил К." },
-  { id: "u-lebedeva", name: "Лебедева Е." },
-  { id: "u-kuznetsov", name: "Кузнецов Н." },
-  { id: "u-orlova", name: "Орлова Д." },
-  { id: "u-fedorov", name: "Фёдоров И." }
+  { id: "u-petrov", name: "Петров А.", positionId: "pm", positionName: "Менеджер проекта", teamId: "team-core", teamName: "Управление", capacityMinPerDay: 480 },
+  { id: "u-ivanova", name: "Иванова М.", positionId: "design", positionName: "Дизайнер", teamId: "team-product", teamName: "Продукт", capacityMinPerDay: 480 },
+  { id: "u-orlova", name: "Орлова Д.", positionId: "design", positionName: "Дизайнер", teamId: "team-product", teamName: "Продукт", capacityMinPerDay: 480 },
+  { id: "u-lebedeva", name: "Лебедева Е.", positionId: "analyst", positionName: "Аналитик", teamId: "team-product", teamName: "Продукт", capacityMinPerDay: 480 },
+  { id: "u-sergeev", name: "Сергеев П.", positionId: "backend", positionName: "Backend-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 },
+  { id: "u-dmitriev", name: "Дмитриев К.", positionId: "backend", positionName: "Backend-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 },
+  { id: "u-fedorov", name: "Фёдоров И.", positionId: "backend", positionName: "Backend-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 },
+  { id: "u-mikhail", name: "Михаил К.", positionId: "frontend", positionName: "Frontend-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 },
+  { id: "u-kuznetsov", name: "Кузнецов Н.", positionId: "qa", positionName: "QA-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 }
 ];
 const resName = (id: string) => RESOURCES.find((r) => r.id === id)?.name ?? id;
+const resOf = (id: string) => RESOURCES.find((r) => r.id === id);
+const nameToId = new Map(RESOURCES.map((r) => [r.name, r.id]));
 
 const idOf = (wbs: string) => `t-${wbs}`;
 const levelOf = (wbs: string) => wbs.split(".").length - 1;
@@ -121,13 +123,21 @@ type Authored = {
     baseDurDays?: number;
   }>;
   deps: Dep[];
+  assignments: AssignmentA[];
+  reservations: ReservationA[];
+  exceptions: ExceptionA[];
+  acceptedOverloads: string[]; // ключи "resourceId|day"
 };
 
 type Dep = SeedDep & { id: string };
+type AssignmentA = { id: string; taskId: string; resourceId: string; role: string; unitsPermille: number; workMinutes: number };
+type ReservationA = { id: string; resourceId: string; startDay: number; finishDay: number; workMinutesPerDay: number; reason: string };
+type ExceptionA = { id: string; resourceId: string; day: number; workingMinutes: number; reason: string };
 
-function freshAuthored(): Authored {
+// Сборка авторской модели из сидов (используется и основным проектом, и портфельными)
+function seedToAuthored(seedTasks: SeedTask[], seedDeps: SeedDep[], exceptions: ExceptionA[] = []): Authored {
   return {
-    tasks: SEED.map((s) => ({
+    tasks: seedTasks.map((s) => ({
       id: idOf(s.wbs),
       wbs: s.wbs,
       parentTaskId: levelOf(s.wbs) === 0 ? null : idOf(s.wbs.split(".").slice(0, -1).join(".")),
@@ -143,8 +153,28 @@ function freshAuthored(): Authored {
       ...(s.baseDurDays != null ? { baseDurDays: s.baseDurDays } : {})
     })),
     // связи храним по СТАБИЛЬНЫМ id (wbs — производный, перенумеровывается при move/create/delete)
-    deps: SEED_DEPS.map((d, i) => ({ id: `dep-${i + 1}`, pred: idOf(d.pred), succ: idOf(d.succ), type: d.type, lagDays: d.lagDays }))
+    deps: seedDeps.map((d, i) => ({ id: `dep-${i + 1}`, pred: idOf(d.pred), succ: idOf(d.succ), type: d.type, lagDays: d.lagDays })),
+    // назначения из ростера (исполнитель = первое имя в res); грузят ресурсную матрицу
+    assignments: seedTasks.filter((s) => s.kind === "task" && s.res !== "—" && nameToId.has(s.res.split(",")[0]!.trim())).map((s, i) => ({
+      id: `a-${i + 1}`,
+      taskId: idOf(s.wbs),
+      resourceId: nameToId.get(s.res.split(",")[0]!.trim())!,
+      role: "executor",
+      unitsPermille: 1000,
+      workMinutes: s.workH * 60
+    })),
+    reservations: [],
+    exceptions,
+    acceptedOverloads: []
   };
+}
+
+function freshAuthored(): Authored {
+  return seedToAuthored(SEED, SEED_DEPS, [
+    { id: "ex-1", resourceId: "u-ivanova", day: 31, workingMinutes: 0, reason: "Отпуск" },
+    { id: "ex-2", resourceId: "u-ivanova", day: 32, workingMinutes: 0, reason: "Отпуск" },
+    { id: "ex-3", resourceId: "u-ivanova", day: 33, workingMinutes: 0, reason: "Отпуск" }
+  ]);
 }
 
 // Перенумерация wbs по дереву (parentTaskId) в порядке массива — id остаются стабильными
@@ -162,7 +192,28 @@ function renumber(a: Authored): void {
 }
 
 function cloneAuthored(a: Authored): Authored {
-  return { tasks: a.tasks.map((t) => ({ ...t })), deps: a.deps.map((d) => ({ ...d })) };
+  return {
+    tasks: a.tasks.map((t) => ({ ...t })),
+    deps: a.deps.map((d) => ({ ...d })),
+    assignments: a.assignments.map((x) => ({ ...x })),
+    reservations: a.reservations.map((x) => ({ ...x })),
+    exceptions: a.exceptions.map((x) => ({ ...x })),
+    acceptedOverloads: [...a.acceptedOverloads]
+  };
+}
+
+// Префиксует id задач/связей/назначений именем проекта — чтобы одинаковые WBS
+// в разных проектах портфеля не сталкивались (t-1 есть в каждом проекте).
+function namespaceAuthored(a: Authored, pfx: string): Authored {
+  const nid = (id: string | null) => (id == null ? null : pfx + id);
+  return {
+    tasks: a.tasks.map((t) => ({ ...t, id: pfx + t.id, parentTaskId: nid(t.parentTaskId) })),
+    deps: a.deps.map((d) => ({ ...d, id: pfx + d.id, pred: pfx + d.pred, succ: pfx + d.succ })),
+    assignments: a.assignments.map((x) => ({ ...x, id: pfx + x.id, taskId: pfx + x.taskId })),
+    reservations: a.reservations.map((x) => ({ ...x, id: pfx + x.id })),
+    exceptions: a.exceptions.map((x) => ({ ...x, id: pfx + x.id })),
+    acceptedOverloads: [...a.acceptedOverloads]
+  };
 }
 
 /* ---- «Движок»: forward/backward CPM с FS/SS/FF/SF + lag ---- */
@@ -275,6 +326,86 @@ function schedule(a: Authored): Map<string, Calc> {
   return out;
 }
 
+/* ---- Движок ресурсной загрузки → ResourceLoadMatrix (день/неделя/месяц) ---- */
+type LoadBucket = {
+  resourceId: string; positionId: string | null; teamId: string | null; projectId: string;
+  date: string; granularity: "day" | "week" | "month";
+  assignedMinutes: number; reservedMinutes: number; occupiedMinutes: number; capacityMinutes: number; freeMinutes: number;
+  taskIds: string[]; assignmentIds: string[];
+  assignmentContributions: Array<{ taskId: string; assignmentId: string; workMinutes: number }>;
+  reservationContributions: Array<{ reservationId: string; workMinutes: number }>;
+  occupancyContributions: Array<{ occupancyId: string; sourceType: string; sourceId: string; workMinutes: number }>;
+  reservationIds: string[]; occupancyIds: string[]; calendarExceptionIds: string[];
+};
+
+function buildResourceLoad(a: Authored, calc: Map<string, Calc>, projectId: string = PROJECT_ID) {
+  const dow = (day: number) => new Date(BASE + day * 86_400_000).getUTCDay();
+  const isWeekday = (day: number) => { const d = dow(day); return d >= 1 && d <= 5; };
+  const lastDay = Math.max(34, ...a.tasks.filter((t) => t.kind !== "summary").map((t) => calc.get(t.id)?.ef ?? 0));
+
+  // часы/день = work / календарные дни интервала; начисляем ТОЛЬКО в будни (на выходных нагрузки нет).
+  // даёт ~8 ч/день (≈100%) для обычной задачи; перегруз — только на реальных пересечениях задач у ресурса.
+  const asgPerDay = new Map<string, { es: number; ef: number; taskId: string; resourceId: string; per: number }>();
+  for (const asg of a.assignments) {
+    const c = calc.get(asg.taskId);
+    if (!c) continue;
+    asgPerDay.set(asg.id, { es: c.es, ef: c.ef, taskId: asg.taskId, resourceId: asg.resourceId, per: Math.round((asg.workMinutes * (asg.unitsPermille / 1000)) / Math.max(1, c.ef - c.es)) });
+  }
+
+  const dayBuckets: LoadBucket[] = [];
+  for (const r of RESOURCES) {
+    for (let day = 0; day <= lastDay; day++) {
+      const exc = a.exceptions.find((e) => e.resourceId === r.id && e.day === day);
+      const capacityMinutes = exc ? exc.workingMinutes : isWeekday(day) ? r.capacityMinPerDay : 0;
+      let assigned = 0;
+      const aIds: string[] = []; const tIds: string[] = []; const aContribs: LoadBucket["assignmentContributions"] = [];
+      if (isWeekday(day)) {
+        for (const [aid, info] of asgPerDay) {
+          if (info.resourceId !== r.id || day < info.es || day >= info.ef || info.per <= 0) continue;
+          assigned += info.per; aIds.push(aid); tIds.push(info.taskId); aContribs.push({ taskId: info.taskId, assignmentId: aid, workMinutes: info.per });
+        }
+      }
+      let reserved = 0;
+      const rIds: string[] = []; const rContribs: LoadBucket["reservationContributions"] = [];
+      for (const rv of a.reservations) {
+        if (rv.resourceId !== r.id || day < rv.startDay || day > rv.finishDay || !isWeekday(day)) continue;
+        reserved += rv.workMinutesPerDay; rIds.push(rv.id); rContribs.push({ reservationId: rv.id, workMinutes: rv.workMinutesPerDay });
+      }
+      const occContribs: LoadBucket["occupancyContributions"] = [];
+      const excIds: string[] = [];
+      if (exc) { excIds.push(exc.id); occContribs.push({ occupancyId: exc.id, sourceType: "absence", sourceId: exc.id, workMinutes: r.capacityMinPerDay }); }
+      const committed = assigned + reserved;
+      dayBuckets.push({
+        resourceId: r.id, positionId: r.positionId, teamId: r.teamId, projectId, date: dayToIso(day), granularity: "day",
+        assignedMinutes: assigned, reservedMinutes: reserved, occupiedMinutes: 0, capacityMinutes, freeMinutes: Math.max(0, capacityMinutes - committed),
+        taskIds: tIds, assignmentIds: aIds, assignmentContributions: aContribs, reservationContributions: rContribs, occupancyContributions: occContribs, reservationIds: rIds, occupancyIds: [], calendarExceptionIds: excIds
+      });
+    }
+  }
+
+  const weekStart = (day: number) => { const d = dow(day); return day - (d === 0 ? 6 : d - 1); };
+  const monthStart = (day: number) => { const dt = new Date(BASE + day * 86_400_000); return Math.round((Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1) - BASE) / 86_400_000); };
+  const agg = (gran: "week" | "month", keyFn: (day: number) => number): LoadBucket[] => {
+    const map = new Map<string, LoadBucket>();
+    for (const b of dayBuckets) {
+      const periodStart = keyFn(isoToDay(b.date));
+      const key = `${b.resourceId}|${periodStart}`;
+      let bk = map.get(key);
+      if (!bk) { bk = { ...b, date: dayToIso(periodStart), granularity: gran, assignedMinutes: 0, reservedMinutes: 0, occupiedMinutes: 0, capacityMinutes: 0, freeMinutes: 0, taskIds: [], assignmentIds: [], assignmentContributions: [], reservationContributions: [], occupancyContributions: [], reservationIds: [], occupancyIds: [], calendarExceptionIds: [] }; map.set(key, bk); }
+      bk.assignedMinutes += b.assignedMinutes; bk.reservedMinutes += b.reservedMinutes; bk.occupiedMinutes += b.occupiedMinutes; bk.capacityMinutes += b.capacityMinutes;
+      bk.taskIds.push(...b.taskIds); bk.assignmentIds.push(...b.assignmentIds); bk.assignmentContributions.push(...b.assignmentContributions); bk.reservationContributions.push(...b.reservationContributions); bk.occupancyContributions.push(...b.occupancyContributions); bk.reservationIds.push(...b.reservationIds); bk.calendarExceptionIds.push(...b.calendarExceptionIds);
+    }
+    for (const bk of map.values()) bk.freeMinutes = Math.max(0, bk.capacityMinutes - bk.assignedMinutes - bk.reservedMinutes - bk.occupiedMinutes);
+    return [...map.values()];
+  };
+
+  const buckets = [...dayBuckets, ...agg("week", weekStart), ...agg("month", monthStart)];
+  const overloads = dayBuckets
+    .filter((b) => b.assignedMinutes + b.reservedMinutes + b.occupiedMinutes > b.capacityMinutes)
+    .map((b) => ({ ...b, overloadMinutes: b.assignedMinutes + b.reservedMinutes + b.occupiedMinutes - b.capacityMinutes, reasons: [...b.taskIds.map((id) => ({ type: "task", id })), ...b.reservationIds.map((id) => ({ type: "reservation", id }))] }));
+  return { buckets, overloads, freeCapacityBuckets: dayBuckets.filter((b) => b.freeMinutes > 0), acceptedOverloads: a.acceptedOverloads };
+}
+
 /* ---- Построение read-model в реальной форме контракта ---- */
 function buildReadModel(a: Authored, planVersion: number): Record<string, unknown> {
   const calc = schedule(a);
@@ -369,7 +500,13 @@ function buildReadModel(a: Authored, planVersion: number): Record<string, unknow
       deadline: "2026-07-12",
       calendarId: DEFAULT_CALENDAR
     },
-    authored: { tasks, dependencies, assignments: [], assignmentAllocations: [], baselines: [] },
+    authored: {
+      tasks,
+      dependencies,
+      assignments: a.assignments.map((x) => ({ id: x.id, taskId: x.taskId, resourceId: x.resourceId, role: x.role, unitsPermille: x.unitsPermille, workMinutes: x.workMinutes, calendarId: null })),
+      assignmentAllocations: [],
+      baselines: []
+    },
     calculatedPlan: {
       tenantId: "tenant-alpha",
       projectId: PROJECT_ID,
@@ -389,7 +526,7 @@ function buildReadModel(a: Authored, planVersion: number): Record<string, unknow
       capturedAt: "2026-05-20T08:00:00.000Z",
       tasks: baselineTasks
     },
-    resourceLoad: { buckets: [], overloads: [], freeCapacityBuckets: [] },
+    resourceLoad: buildResourceLoad(a, calc),
     validationIssues,
     planVersion,
     engineVersion: "planning-core-v1"
@@ -439,12 +576,56 @@ function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; cha
       return { ok: true, changedTaskIds: [t.id] };
     }
     case "assignment.upsert": {
-      const t = find(cmd.payload.taskId as string);
+      const p = cmd.payload;
+      const taskId = String(p.taskId);
+      const t = find(taskId);
       if (!t) return { ok: false, changedTaskIds: [], error: "task_not_found" };
-      const name = resName(String(cmd.payload.resourceId));
-      const units = (cmd.payload.unitsPermille as number) ?? 1000;
-      t.res = units !== 1000 ? `${name} · ${Math.round(units / 10)}%` : name;
+      const id = p.id ? String(p.id) : "";
+      const resourceId = String(p.resourceId);
+      const units = (p.unitsPermille as number) ?? 1000;
+      const wm = p.workMinutes == null ? null : (p.workMinutes as number);
+      let asg = id ? a.assignments.find((x) => x.id === id) : undefined;
+      if (!asg && wm == null) asg = a.assignments.find((x) => x.taskId === taskId); // смена ресурса из грида
+      if (asg) {
+        asg.resourceId = resourceId;
+        asg.unitsPermille = units;
+        if (wm != null) asg.workMinutes = wm;
+      } else {
+        a.assignments.push({ id: id || `a-${a.assignments.length + 1}`, taskId, resourceId, role: String(p.role ?? "executor"), unitsPermille: units, workMinutes: wm ?? t.workMinutes });
+      }
+      const primary = a.assignments.find((x) => x.taskId === taskId);
+      if (primary) { const nm = resName(primary.resourceId); t.res = primary.unitsPermille !== 1000 ? `${nm} · ${Math.round(primary.unitsPermille / 10)}%` : nm; }
       return { ok: true, changedTaskIds: [t.id] };
+    }
+    case "resource.reserve": {
+      const p = cmd.payload;
+      const id = String(p.id);
+      const start = isoToDay(String(p.start));
+      const finish = isoToDay(String(p.finish));
+      const total = (p.workMinutes as number) ?? 0;
+      const perDay = Math.max(0, Math.round(total / Math.max(1, finish - start + 1)));
+      const existing = a.reservations.find((x) => x.id === id);
+      if (existing) { existing.resourceId = String(p.resourceId); existing.startDay = start; existing.finishDay = finish; existing.workMinutesPerDay = perDay; existing.reason = String(p.reason ?? ""); }
+      else a.reservations.push({ id, resourceId: String(p.resourceId), startDay: start, finishDay: finish, workMinutesPerDay: perDay, reason: String(p.reason ?? "") });
+      return { ok: true, changedTaskIds: [] };
+    }
+    case "calendar.exception.upsert": {
+      const p = cmd.payload;
+      const resourceId = p.resourceId == null ? null : String(p.resourceId);
+      if (!resourceId) return { ok: false, changedTaskIds: [], error: "resource_required", issue: { code: "resource_required", message: "Для отсутствия нужен сотрудник", entityId: null } };
+      const id = String(p.id);
+      const existing = a.exceptions.find((x) => x.id === id);
+      const day = isoToDay(String(p.date));
+      const workingMinutes = (p.workingMinutes as number) ?? 0;
+      const reason = String(p.reason ?? "");
+      if (existing) { existing.resourceId = resourceId; existing.day = day; existing.workingMinutes = workingMinutes; existing.reason = reason; }
+      else a.exceptions.push({ id, resourceId, day, workingMinutes, reason });
+      return { ok: true, changedTaskIds: [] };
+    }
+    case "risk.accept_overload": {
+      const key = String(cmd.payload.overloadId);
+      if (!a.acceptedOverloads.includes(key)) a.acceptedOverloads.push(key);
+      return { ok: true, changedTaskIds: [] };
     }
     case "dependency.upsert": {
       const p = cmd.payload;
@@ -566,7 +747,10 @@ const AUDIT_ACTION: Record<string, string> = {
   "task.move_wbs": "planning.task.updated",
   "dependency.upsert": "planning.dependency.upserted",
   "dependency.delete": "planning.dependency.deleted",
-  "assignment.upsert": "planning.assignment.upserted"
+  "assignment.upsert": "planning.assignment.upserted",
+  "resource.reserve": "planning.resource_reserved",
+  "calendar.exception.upsert": "planning.calendar_exception.upserted",
+  "risk.accept_overload": "planning.overload_risk_accepted"
 };
 
 function changedByCascade(before: Authored, after: Authored): string[] {
@@ -662,6 +846,136 @@ export function createMockPlanningFetch(): typeof fetch {
   };
 
   return mockFetch;
+}
+
+/* ============================================================
+   ПОРТФЕЛЬ: тот же контракт загрузки на уровне команды/компании.
+   Тот же движок, но по нескольким проектам. КЛЮЧЕВОЕ: ёмкость
+   человека в день — глобальная (берётся ОДИН раз), а назначения
+   СУММИРУЮТСЯ по проектам → виден межпроектный перегруз, которого
+   не видно внутри одного проекта. Снимок in-memory, read-only.
+   ============================================================ */
+
+export type PortfolioProject = { id: string; name: string; code: string };
+type ProjSeed = PortfolioProject & { tasks: SeedTask[]; deps: SeedDep[] };
+
+const PORTFOLIO_SEEDS: ProjSeed[] = [
+  { id: PROJECT_ID, name: "Производственный портал · Релиз 2", code: "ПР", tasks: SEED, deps: SEED_DEPS },
+  {
+    id: "proj-mobile-mvp", name: "Мобильное приложение · MVP", code: "МП",
+    tasks: [
+      { wbs: "1", title: "Дизайн экранов", kind: "task", mode: "auto", durDays: 18, workH: 120, pct: 60, res: "Иванова М." },
+      { wbs: "2", title: "Мобильный фронт", kind: "task", mode: "auto", durDays: 32, workH: 240, pct: 30, res: "Михаил К.", startDay: 8 },
+      { wbs: "3", title: "Push-уведомления", kind: "task", mode: "auto", durDays: 14, workH: 96, pct: 0, res: "Фёдоров И.", startDay: 22 },
+      { wbs: "4", title: "QA мобильного", kind: "task", mode: "auto", durDays: 16, workH: 88, pct: 0, res: "Кузнецов Н.", startDay: 30 }
+    ],
+    deps: [{ pred: "1", succ: "2", type: "FS", lagDays: 0 }]
+  },
+  {
+    id: "proj-erp-integration", name: "Интеграции · ERP", code: "ИЭ",
+    tasks: [
+      { wbs: "1", title: "Коннектор ERP", kind: "task", mode: "auto", durDays: 28, workH: 200, pct: 40, res: "Сергеев П." },
+      { wbs: "2", title: "Маппинг данных", kind: "task", mode: "auto", durDays: 22, workH: 140, pct: 20, res: "Дмитриев К.", startDay: 6 },
+      { wbs: "3", title: "Аналитика интеграций", kind: "task", mode: "auto", durDays: 24, workH: 150, pct: 10, res: "Лебедева Е." },
+      { wbs: "4", title: "Приёмка интеграций", kind: "task", mode: "auto", durDays: 14, workH: 84, pct: 0, res: "Орлова Д.", startDay: 18 },
+      { wbs: "5", title: "Координация ERP", kind: "task", mode: "auto", durDays: 30, workH: 120, pct: 35, res: "Петров А." }
+    ],
+    deps: [{ pred: "1", succ: "2", type: "SS", lagDays: 4 }]
+  }
+];
+
+const PORTFOLIO_EXCEPTIONS: ExceptionA[] = [
+  { id: "pf-ex-1", resourceId: "u-ivanova", day: 31, workingMinutes: 0, reason: "Отпуск" },
+  { id: "pf-ex-2", resourceId: "u-ivanova", day: 32, workingMinutes: 0, reason: "Отпуск" },
+  { id: "pf-ex-3", resourceId: "u-ivanova", day: 33, workingMinutes: 0, reason: "Отпуск" }
+];
+
+export type PortfolioModel = {
+  buckets: LoadBucket[];
+  tasks: Array<{ id: string; wbsCode: string; title: string; workMinutes: number; percentComplete: number; projectId: string; projectName: string }>;
+  assignments: Array<{ id: string; taskId: string; resourceId: string; unitsPermille: number; workMinutes: number; role: string }>;
+  calc: Array<{ id: string; calculatedStart: string }>;
+  projects: PortfolioProject[];
+};
+
+export function buildPortfolioModel(): PortfolioModel {
+  const dow = (day: number) => new Date(BASE + day * 86_400_000).getUTCDay();
+  const isWeekday = (day: number) => { const d = dow(day); return d >= 1 && d <= 5; };
+
+  type Contrib = { resourceId: string; es: number; ef: number; per: number; taskId: string; assignmentId: string };
+  const contribs: Contrib[] = [];
+  const tasks: PortfolioModel["tasks"] = [];
+  const assignments: PortfolioModel["assignments"] = [];
+  const calcArr: PortfolioModel["calc"] = [];
+  let lastDay = 34;
+
+  for (const proj of PORTFOLIO_SEEDS) {
+    const exc = proj.id === PROJECT_ID ? PORTFOLIO_EXCEPTIONS : [];
+    const a = namespaceAuthored(seedToAuthored(proj.tasks, proj.deps, exc), `${proj.id}::`);
+    const calc = schedule(a);
+    for (const t of a.tasks) {
+      const c = calc.get(t.id);
+      if (!c || t.kind === "summary") continue;
+      lastDay = Math.max(lastDay, c.ef);
+      tasks.push({ id: t.id, wbsCode: t.wbs, title: t.title, workMinutes: t.workMinutes, percentComplete: t.pct, projectId: proj.id, projectName: proj.name });
+      calcArr.push({ id: t.id, calculatedStart: dayToIso(c.es) });
+    }
+    for (const asg of a.assignments) {
+      const c = calc.get(asg.taskId);
+      if (!c) continue;
+      assignments.push({ id: asg.id, taskId: asg.taskId, resourceId: asg.resourceId, unitsPermille: asg.unitsPermille, workMinutes: asg.workMinutes, role: asg.role });
+      contribs.push({ resourceId: asg.resourceId, es: c.es, ef: c.ef, taskId: asg.taskId, assignmentId: asg.id, per: Math.round((asg.workMinutes * (asg.unitsPermille / 1000)) / Math.max(1, c.ef - c.es)) });
+    }
+  }
+
+  // дневные ведра: ёмкость глобальная (один раз на человека), назначения суммируются по проектам
+  const dayBuckets: LoadBucket[] = [];
+  for (const r of RESOURCES) {
+    for (let day = 0; day <= lastDay; day++) {
+      const ex = PORTFOLIO_EXCEPTIONS.find((e) => e.resourceId === r.id && e.day === day);
+      const capacityMinutes = ex ? ex.workingMinutes : isWeekday(day) ? r.capacityMinPerDay : 0;
+      let assigned = 0;
+      const tIds: string[] = []; const aIds: string[] = [];
+      const aContribs: LoadBucket["assignmentContributions"] = [];
+      if (isWeekday(day)) {
+        for (const c of contribs) {
+          if (c.resourceId !== r.id || day < c.es || day >= c.ef || c.per <= 0) continue;
+          assigned += c.per; tIds.push(c.taskId); aIds.push(c.assignmentId);
+          aContribs.push({ taskId: c.taskId, assignmentId: c.assignmentId, workMinutes: c.per });
+        }
+      }
+      const occContribs: LoadBucket["occupancyContributions"] = [];
+      const excIds: string[] = [];
+      if (ex) { excIds.push(ex.id); occContribs.push({ occupancyId: ex.id, sourceType: "absence", sourceId: ex.id, workMinutes: r.capacityMinPerDay }); }
+      dayBuckets.push({
+        resourceId: r.id, positionId: r.positionId, teamId: r.teamId, projectId: "portfolio", date: dayToIso(day), granularity: "day",
+        assignedMinutes: assigned, reservedMinutes: 0, occupiedMinutes: 0, capacityMinutes, freeMinutes: Math.max(0, capacityMinutes - assigned),
+        taskIds: tIds, assignmentIds: aIds, assignmentContributions: aContribs, reservationContributions: [], occupancyContributions: occContribs, reservationIds: [], occupancyIds: [], calendarExceptionIds: excIds
+      });
+    }
+  }
+
+  const weekStart = (day: number) => { const d = dow(day); return day - (d === 0 ? 6 : d - 1); };
+  const monthStart = (day: number) => { const dt = new Date(BASE + day * 86_400_000); return Math.round((Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1) - BASE) / 86_400_000); };
+  const agg = (gran: "week" | "month", keyFn: (day: number) => number): LoadBucket[] => {
+    const map = new Map<string, LoadBucket>();
+    for (const b of dayBuckets) {
+      const periodStart = keyFn(isoToDay(b.date));
+      const key = `${b.resourceId}|${periodStart}`;
+      let bk = map.get(key);
+      if (!bk) { bk = { ...b, date: dayToIso(periodStart), granularity: gran, assignedMinutes: 0, reservedMinutes: 0, occupiedMinutes: 0, capacityMinutes: 0, freeMinutes: 0, taskIds: [], assignmentIds: [], assignmentContributions: [], reservationContributions: [], occupancyContributions: [], reservationIds: [], occupancyIds: [], calendarExceptionIds: [] }; map.set(key, bk); }
+      bk.assignedMinutes += b.assignedMinutes; bk.capacityMinutes += b.capacityMinutes;
+      bk.taskIds.push(...b.taskIds); bk.assignmentIds.push(...b.assignmentIds); bk.assignmentContributions.push(...b.assignmentContributions); bk.occupancyContributions.push(...b.occupancyContributions); bk.calendarExceptionIds.push(...b.calendarExceptionIds);
+    }
+    for (const bk of map.values()) bk.freeMinutes = Math.max(0, bk.capacityMinutes - bk.assignedMinutes);
+    return [...map.values()];
+  };
+
+  return {
+    buckets: [...dayBuckets, ...agg("week", weekStart), ...agg("month", monthStart)],
+    tasks, assignments, calc: calcArr,
+    projects: PORTFOLIO_SEEDS.map((p) => ({ id: p.id, name: p.name, code: p.code }))
+  };
 }
 
 export const MOCK_PROJECT_ID = PROJECT_ID;

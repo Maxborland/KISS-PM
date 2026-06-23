@@ -9,7 +9,7 @@ import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { demoAction } from "@/views/lib/demo";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
-import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu } from "@/delivery/schedule/schedule-editors";
+import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu, TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
 import type { PlanningCommand } from "@kiss-pm/domain";
 import { buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/planning-client";
 
@@ -273,6 +273,7 @@ export function ProjectSchedule() {
   const [batchMode, setBatchMode] = useState(false);
   const [staged, setStaged] = useState<PlanningCommand[]>([]);
   const [canUndo, setCanUndo] = useState(false);
+  const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; parentId: string | null; taskId?: string; initial: TaskModalValues } | null>(null);
   const [colW, setColW] = useState<number[]>(() => [...DEFAULT_COLW]);
   const [colDrag, setColDrag] = useState<ColDrag | null>(null);
   const [link, setLink] = useState<LinkDrag | null>(null);
@@ -535,7 +536,6 @@ export function ProjectSchedule() {
   const depAdd = (succId: string, predId: string, type: string, lagDays: number) => void applyCmd({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: predId, successorTaskId: succId, dependencyType: type, lagMinutes: lagDays * MIN_PER_DAY } } as PlanningCommand);
   const depRemove = (depId: string) => void applyCmd({ type: "dependency.delete", payload: { dependencyId: depId } } as PlanningCommand);
   const depUpsert = (depId: string, predId: string, succId: string, type: string, lagDays: number) => void applyCmd({ type: "dependency.upsert", payload: { id: depId, predecessorTaskId: predId, successorTaskId: succId, dependencyType: type, lagMinutes: lagDays * MIN_PER_DAY } } as PlanningCommand);
-  const createTask = (parentTaskId: string | null, title: string) => void applyCmd({ type: "task.create", payload: { id: genId("t"), projectId: MOCK_PROJECT_ID, parentTaskId, title, statusId: "todo", plannedStart: null, plannedFinish: null, durationMinutes: 5 * MIN_PER_DAY, workMinutes: 5 * MIN_PER_DAY, assignments: [] } } as PlanningCommand);
   const makeMilestone = (r: Row) => void applyCmd(workCmd(r.id, 0, 0));
   const deleteTask = (r: Row) => void applyCmd({ type: "task.delete_or_archive", payload: { taskId: r.id, mode: "delete" } } as PlanningCommand);
   const moveCmd = (taskId: string, parentTaskId: string | null): PlanningCommand => ({ type: "task.move_wbs", payload: { taskId, parentTaskId, sortOrder: 0 } }) as PlanningCommand;
@@ -544,6 +544,51 @@ export function ProjectSchedule() {
   const canOutdent = (r: Row) => r.parentId !== null;
   const indent = (r: Row) => { const ps = prevSibling(r); if (ps) void applyCmd(moveCmd(r.id, ps.id)); };
   const outdent = (r: Row) => { if (r.parentId) { const parent = rows.find((x) => x.id === r.parentId); void applyCmd(moveCmd(r.id, parent ? parent.parentId : null)); } };
+
+  async function runBatch(cmds: PlanningCommand[]) {
+    if (!cmds.length) return;
+    const base = readModel;
+    setBusy(true);
+    const res = await applyBatch(cmds);
+    setBusy(false);
+    if (res.ok) {
+      lastCommitRef.current = base ? { commands: cmds, before: base } : null;
+      setCanUndo(base != null);
+      setErrors(new Map());
+      setFlash(new Set(res.changed));
+      setNotice(`Коммит v${res.planVersion} применён · затронуто задач: ${res.changed.length}`);
+      window.setTimeout(() => setFlash(new Set()), 1700);
+    } else if (res.conflict) setNotice("Конфликт версий плана — перезагружено");
+    else { const m = new Map<string, string>(); (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); }); setErrors(m); setNotice(`Отклонено бэком: ${res.issues?.[0]?.message ?? res.message}`); }
+  }
+  const addFinish = (iso: string, dur: number) => dayToIso(isoToDay(iso) + dur);
+  const openCreate = (parentId: string | null) => setTaskModal({ mode: "create", parentId, initial: { title: "", assigneeId: "", startIso: "", durDays: 5, workH: 40, pct: 0 } });
+  const openEdit = (r: Row) => {
+    const asgs = (readModel.authored as unknown as { assignments: Array<{ taskId: string; resourceId: string }> }).assignments;
+    const asg = asgs.find((x) => x.taskId === r.id);
+    setTaskModal({ mode: "edit", parentId: r.parentId, taskId: r.id, initial: { title: r.name, assigneeId: asg?.resourceId ?? "", startIso: r.startIso, durDays: r.durDays, workH: r.workH, pct: r.pct } });
+  };
+  function submitTaskModal(v: TaskModalValues) {
+    const m = taskModal;
+    setTaskModal(null);
+    if (!m) return;
+    const cmds: PlanningCommand[] = [];
+    if (m.mode === "create") {
+      const id = genId("t");
+      cmds.push({ type: "task.create", payload: { id, projectId: MOCK_PROJECT_ID, parentTaskId: m.parentId, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? addFinish(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } } as PlanningCommand);
+      if (v.startIso) cmds.push({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: addFinish(v.startIso, v.durDays) } } as PlanningCommand);
+      if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: genId("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
+      if (v.pct > 0) cmds.push({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } } as PlanningCommand);
+    } else if (m.taskId) {
+      const id = m.taskId;
+      cmds.push({ type: "task.update_identity", payload: { taskId: id, title: v.title } } as PlanningCommand);
+      cmds.push({ type: "task.update_work_model", payload: { taskId: id, taskType: "fixed_duration", effortDriven: false, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60 } } as PlanningCommand);
+      if (v.startIso) cmds.push({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: addFinish(v.startIso, v.durDays) } } as PlanningCommand);
+      cmds.push({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } } as PlanningCommand);
+      if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: genId("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
+    }
+    void runBatch(cmds);
+  }
 
   function commitInline(r: Row) {
     const f = edit?.field;
@@ -591,8 +636,8 @@ export function ProjectSchedule() {
     <DeliveryFrame project={projectMeta} activeTab="График">
       {/* Toolbar */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
-        <Button variant="default" size="sm" onClick={() => createTask(null, "Новая задача")} disabled={busy}><Plus className="size-3.5" aria-hidden />Задача</Button>
-        <Button variant="secondary" size="sm" onClick={() => selected && createTask(selected.kind === "summary" ? selected.id : selected.parentId, "Новая подзадача")} disabled={busy || !selected}><Plus className="size-3.5" aria-hidden />Подзадача</Button>
+        <Button variant="default" size="sm" onClick={() => openCreate(null)} disabled={busy}><Plus className="size-3.5" aria-hidden />Задача</Button>
+        <Button variant="secondary" size="sm" onClick={() => selected && openCreate(selected.kind === "summary" ? selected.id : selected.parentId)} disabled={busy || !selected}><Plus className="size-3.5" aria-hidden />Подзадача</Button>
         <span className="mx-1 h-5 w-px bg-[var(--border)]" />
         <Button variant="ghost" size="sm" onClick={() => selected && outdent(selected)} disabled={busy || !selected || (selected ? !canOutdent(selected) : true)} title="На уровень выше"><IndentDecrease className="size-3.5" aria-hidden /></Button>
         <Button variant="ghost" size="sm" onClick={() => selected && indent(selected)} disabled={busy || !selected || (selected ? !canIndent(selected) : true)} title="На уровень глубже"><IndentIncrease className="size-3.5" aria-hidden /></Button>
@@ -662,8 +707,9 @@ export function ProjectSchedule() {
                       canIndent={canIndent(r)}
                       canOutdent={canOutdent(r)}
                       onOpen={() => openRow(r.id)}
-                      onAddSub={() => createTask(r.id, "Новая подзадача")}
-                      onAddBelow={() => createTask(r.parentId, "Новая задача")}
+                      onEdit={() => openEdit(r)}
+                      onAddSub={() => openCreate(r.id)}
+                      onAddBelow={() => openCreate(r.parentId)}
                       onIndent={() => indent(r)}
                       onOutdent={() => outdent(r)}
                       onMakeMilestone={() => makeMilestone(r)}
@@ -847,6 +893,8 @@ export function ProjectSchedule() {
         <span className="flex items-center gap-1.5"><svg width="22" height="8" aria-hidden><polyline points="1,4 14,4" fill="none" stroke="var(--muted-soft)" strokeWidth="1.25" /><polygon points="21,4 15,1.5 15,6.5" fill="var(--muted-soft)" /></svg> Связь</span>
         <span className="ml-auto text-[length:var(--text-xs)] text-[var(--muted-soft)]">2× клик — правка · ПКМ — меню · тяни бар — сдвиг/длительность · движок считает даты/критпуть</span>
       </div>
+
+      {taskModal ? <TaskModal open mode={taskModal.mode} initial={taskModal.initial} onOpenChange={(o) => { if (!o) setTaskModal(null); }} onSubmit={submitTaskModal} /> : null}
     </DeliveryFrame>
   );
 }

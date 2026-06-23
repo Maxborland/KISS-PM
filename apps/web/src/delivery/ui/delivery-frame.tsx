@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
-import { Search } from "lucide-react";
 
-import { BemAvatar } from "@/components/domain/bem-avatar";
 import { cn } from "@/lib/cn";
+import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 
 export type ProjectMeta = {
   name: string;
@@ -29,19 +28,6 @@ export const DELIVERY_TABS = [
 ] as const;
 
 export type DeliveryTab = (typeof DELIVERY_TABS)[number];
-
-const NAV: { title: string; items: { label: string; badge?: string; active?: boolean }[] }[] = [
-  {
-    title: "Работа",
-    items: [
-      { label: "Мои задачи", badge: "12" },
-      { label: "Проекты", badge: "8", active: true },
-      { label: "Сделки", badge: "37" },
-      { label: "Ресурсы", badge: "42" }
-    ]
-  },
-  { title: "Аналитика", items: [{ label: "Загрузка" }, { label: "KPI" }] }
-];
 
 function toneClass(tone: ProjectMeta["statusTone"] | "danger" | "success" | "warning") {
   switch (tone) {
@@ -86,64 +72,7 @@ export function DeliveryFrame({
   children: ReactNode;
 }) {
   return (
-    <div className="kiss-v4 flex min-h-screen w-full text-[length:var(--text-md)]">
-      {/* Sidebar */}
-      <aside className="hidden w-[232px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--panel)] md:flex">
-        <div className="flex items-center gap-2.5 px-4 py-3.5">
-          <span className="grid size-7 place-items-center rounded-[var(--radius-md)] bg-[var(--text-strong)] text-[length:var(--text-sm)] font-bold text-white">
-            К
-          </span>
-          <span className="font-[family-name:var(--font-display)] text-[length:var(--text-md)] font-bold text-[var(--text-strong)]">
-            KISS PM
-          </span>
-        </div>
-        <nav className="flex flex-col gap-4 px-2 py-1.5">
-          {NAV.map((group) => (
-            <div key={group.title} className="flex flex-col gap-0.5">
-              <div className="px-2.5 pb-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.06em] text-[var(--muted-soft)]">
-                {group.title}
-              </div>
-              {group.items.map((item) => (
-                <span
-                  key={item.label}
-                  title="Демо-прототип: навигация подключится в рабочем приложении"
-                  className={cn(
-                    "flex cursor-default items-center justify-between rounded-[var(--radius-md)] px-2.5 py-1.5 text-[length:var(--text-sm)]",
-                    item.active
-                      ? "bg-[var(--accent-soft)] font-semibold text-[var(--accent)]"
-                      : "font-medium text-[var(--muted-strong)]"
-                  )}
-                >
-                  {item.label}
-                  {item.badge ? (
-                    <span className="v4-num text-[length:var(--text-xs)] font-semibold text-[var(--muted-soft)]">
-                      {item.badge}
-                    </span>
-                  ) : null}
-                </span>
-              ))}
-            </div>
-          ))}
-        </nav>
-        <div className="mt-auto px-4 py-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">v0.1 · прототип</div>
-      </aside>
-
-      {/* Main */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Global topbar */}
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4">
-          <label className="flex h-9 max-w-md flex-1 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 text-[var(--muted)]">
-            <Search className="size-4 shrink-0" aria-hidden />
-            <input
-              className="min-w-0 flex-1 bg-transparent text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--muted-soft)]"
-              placeholder="Найти задачу или ресурс"
-              disabled
-              title="Демо-прототип: поиск подключится к рабочему приложению"
-            />
-          </label>
-          <BemAvatar initials="КБ" color="c4" size="sm" />
-        </header>
-
+    <WorkspaceShell activeNav="Проекты">
         {/* Project header */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--border)] bg-[var(--panel)] px-4 pt-3 pb-3 md:px-6">
           <span className="grid size-8 place-items-center rounded-[var(--radius-md)] bg-[var(--panel-strong)] text-[length:var(--text-sm)] font-bold text-[var(--muted-strong)]">
@@ -192,7 +121,6 @@ export function DeliveryFrame({
 
         {/* Surface content */}
         <main className="min-w-0 flex-1 overflow-auto bg-[var(--canvas)] p-4 md:p-6">{children}</main>
-      </div>
-    </div>
+    </WorkspaceShell>
   );
 }
