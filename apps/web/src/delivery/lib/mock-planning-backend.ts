@@ -132,6 +132,9 @@ type Authored = {
   exceptions: ExceptionA[];
   acceptedOverloads: string[]; // ключи "resourceId|day"
   baselines: BaselineA[]; // зафиксированные снимки плана (PlanBaseline); сравнение идёт с последним
+  // project-уровень (редактируется командами project.deadline.move / project.settings.update)
+  projectDeadline: string; // PlanDate (ISO) внешнего дедлайна релиза
+  projectCalendarId: string | null; // календарь проекта; каскадируется на задачи
 };
 
 type Dep = SeedDep & { id: string };
@@ -175,7 +178,9 @@ function seedToAuthored(seedTasks: SeedTask[], seedDeps: SeedDep[], exceptions: 
     reservations: [],
     exceptions,
     acceptedOverloads: [],
-    baselines: []
+    baselines: [],
+    projectDeadline: "2026-07-12",
+    projectCalendarId: DEFAULT_CALENDAR
   };
 }
 
@@ -225,7 +230,9 @@ function cloneAuthored(a: Authored): Authored {
     reservations: a.reservations.map((x) => ({ ...x })),
     exceptions: a.exceptions.map((x) => ({ ...x })),
     acceptedOverloads: [...a.acceptedOverloads],
-    baselines: a.baselines.map((b) => ({ ...b, tasks: b.tasks.map((t) => ({ ...t })) }))
+    baselines: a.baselines.map((b) => ({ ...b, tasks: b.tasks.map((t) => ({ ...t })) })),
+    projectDeadline: a.projectDeadline,
+    projectCalendarId: a.projectCalendarId
   };
 }
 
@@ -241,7 +248,9 @@ function namespaceAuthored(a: Authored, pfx: string): Authored {
     reservations: a.reservations.map((x) => ({ ...x, id: pfx + x.id })),
     exceptions: a.exceptions.map((x) => ({ ...x, id: pfx + x.id })),
     acceptedOverloads: [...a.acceptedOverloads],
-    baselines: a.baselines.map((b) => ({ ...b, id: pfx + b.id, tasks: b.tasks.map((t) => ({ ...t, taskId: pfx + t.taskId })) }))
+    baselines: a.baselines.map((b) => ({ ...b, id: pfx + b.id, tasks: b.tasks.map((t) => ({ ...t, taskId: pfx + t.taskId })) })),
+    projectDeadline: a.projectDeadline,
+    projectCalendarId: a.projectCalendarId
   };
 }
 
@@ -480,7 +489,7 @@ function buildReadModel(a: Authored, planVersion: number): Record<string, unknow
       durationMinutes: t.kind === "summary" ? null : t.durDays * MIN_PER_DAY,
       workMinutes: t.kind === "summary" ? rollWork(t.wbs) : t.workMinutes,
       percentComplete: t.kind === "summary" ? rollPct(t.wbs) : t.pct,
-      calendarId: DEFAULT_CALENDAR,
+      calendarId: a.projectCalendarId, // каскад project.settings.update: задачи наследуют календарь проекта
       customFields: { resLabel: t.res, kind: t.kind },
       constraint: null
     };
@@ -549,8 +558,8 @@ function buildReadModel(a: Authored, planVersion: number): Record<string, unknow
       sourceOpportunityId: "opp-2207",
       plannedStart: PROJECT_START_ISO,
       plannedFinish: dayToIso(projectFinish),
-      deadline: "2026-07-12",
-      calendarId: DEFAULT_CALENDAR
+      deadline: a.projectDeadline,
+      calendarId: a.projectCalendarId
     },
     // производственный календарь (5×8, read-only) + исключения (праздники resourceId=null / отсутствия)
     calendars: [{ id: DEFAULT_CALENDAR, workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: MIN_PER_DAY }],
@@ -843,6 +852,22 @@ function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; cha
       else a.baselines.push({ id, label, capturedAt, tasks });
       return { ok: true, changedTaskIds: [] };
     }
+    case "project.deadline.move": {
+      // контракт: перенос дедлайна требует непустую причину (reason → аудит)
+      const deadline = String(cmd.payload.deadline ?? "");
+      const reason = String(cmd.payload.reason ?? "");
+      if (reason.trim().length === 0) return { ok: false, changedTaskIds: [], error: "deadline_reason_required", issue: { code: "planning_command_invalid", message: "Перенос дедлайна требует причины", entityId: null } };
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline)) return { ok: false, changedTaskIds: [], error: "deadline_invalid", issue: { code: "planning_command_invalid", message: "Некорректная дата дедлайна", entityId: null } };
+      a.projectDeadline = deadline;
+      return { ok: true, changedTaskIds: [] };
+    }
+    case "project.settings.update": {
+      // контракт: calendarId !== null должен существовать в плане; затем каскад на все задачи
+      const calendarId = cmd.payload.calendarId == null ? null : String(cmd.payload.calendarId);
+      if (calendarId !== null && calendarId !== DEFAULT_CALENDAR) return { ok: false, changedTaskIds: [], error: "calendar_not_found", issue: { code: "planning_command_invalid", message: "Календарь проекта не найден в плане", entityId: null } };
+      a.projectCalendarId = calendarId; // per-task calendarId в read-model читается отсюда → каскад
+      return { ok: true, changedTaskIds: [] };
+    }
     default:
       return { ok: false, changedTaskIds: [], error: "command_not_supported_in_prototype" };
   }
@@ -860,11 +885,13 @@ const AUDIT_ACTION: Record<string, string> = {
   "dependency.delete": "planning.dependency.deleted",
   "assignment.upsert": "planning.assignment.upserted",
   "assignment.delete": "planning.assignment.deleted",
-  "assignment.allocations.replace": "planning.assignment.allocations_replaced",
+  "assignment.allocations.replace": "planning.assignment_allocations.replaced",
   "resource.reserve": "planning.resource_reserved",
   "calendar.exception.upsert": "planning.calendar_exception.upserted",
   "risk.accept_overload": "planning.overload_risk_accepted",
-  "baseline.capture": "planning.baseline.captured"
+  "baseline.capture": "planning.baseline.captured",
+  "project.deadline.move": "planning.task.updated",
+  "project.settings.update": "project.settings.update.applied"
 };
 
 function changedByCascade(before: Authored, after: Authored): string[] {
@@ -1043,6 +1070,8 @@ function summarizeCommand(cmd: PlanningCommand, a: Authored): string {
     case "calendar.exception.upsert": return c.payload.resourceId == null ? "Праздник календаря" : "Отсутствие ресурса";
     case "risk.accept_overload": return "Принят перегруз ресурса";
     case "baseline.capture": return `Зафиксирован базовый план «${String(c.payload.label ?? "")}»`;
+    case "project.deadline.move": { const d = String(c.payload.deadline ?? ""); const m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/); return `Дедлайн проекта → ${m ? `${m[3]}.${m[2]}.${m[1]}` : d}`; }
+    case "project.settings.update": return "Календарь проекта изменён";
     default: return c.type;
   }
 }

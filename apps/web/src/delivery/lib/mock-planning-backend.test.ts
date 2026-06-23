@@ -334,4 +334,51 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
       })
     ).rejects.toBeInstanceOf(PlanningApiError);
   });
+
+  // ===== Настройки проекта: project.deadline.move / project.settings.update =====
+  it("exposes editable project deadline and calendar in the read-model (authored, not literals)", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const project = rm.project as unknown as { deadline: string; calendarId: string | null };
+    expect(project.deadline).toBe("2026-07-12");
+    expect(project.calendarId).toBe("cal-5x8");
+  });
+
+  it("moves the project deadline (with reason): version bump + non-revertible commit", async () => {
+    const f = createMockPlanningFetch();
+    const res = (await (await f("/planning/apply-command", { method: "POST", body: JSON.stringify({ command: { type: "project.deadline.move", payload: { deadline: "2026-08-15", reason: "сдвиг по запросу заказчика" } }, clientPlanVersion: 17 }) })).json()) as { newPlanVersion: number; readModel: { project: { deadline: string } } };
+    expect(res.newPlanVersion).toBe(18);
+    expect(res.readModel.project.deadline).toBe("2026-08-15");
+    const log = (await (await f("/planning/commits")).json()) as { commits: Array<{ version: number; summary: string; revertible: boolean; actionType: string }> };
+    expect(log.commits[0]!.version).toBe(18);
+    expect(log.commits[0]!.summary).toBe("Дедлайн проекта → 15.08.2026");
+    expect(log.commits[0]!.revertible).toBe(false); // project-команды не покрыты buildCompensatingCommands
+  });
+
+  it("rejects a deadline move without a reason (409 planning_command_invalid)", async () => {
+    const f = createMockPlanningFetch();
+    const r = await f("/planning/apply-command", { method: "POST", body: JSON.stringify({ command: { type: "project.deadline.move", payload: { deadline: "2026-08-15", reason: "  " } }, clientPlanVersion: 17 }) });
+    expect(r.status).toBe(409);
+    const body = (await r.json()) as { error: string; validationIssues: Array<{ code: string }> };
+    expect(body.error).toBe("planning_precondition_failed");
+    expect(body.validationIssues[0]!.code).toBe("planning_command_invalid");
+  });
+
+  it("updates the project calendar and cascades it to every task", async () => {
+    const f = createMockPlanningFetch();
+    const res = (await (await f("/planning/apply-command", { method: "POST", body: JSON.stringify({ command: { type: "project.settings.update", payload: { calendarId: null } }, clientPlanVersion: 17 }) })).json()) as { newPlanVersion: number; readModel: { project: { calendarId: string | null }; authored: { tasks: Array<{ calendarId: string | null }> } } };
+    expect(res.newPlanVersion).toBe(18);
+    expect(res.readModel.project.calendarId).toBeNull();
+    expect(res.readModel.authored.tasks.every((t) => t.calendarId === null)).toBe(true); // каскад
+    const log = (await (await f("/planning/commits")).json()) as { commits: Array<{ actionType: string }> };
+    expect(log.commits[0]!.actionType).toBe("project.settings.update.applied");
+  });
+
+  it("rejects a settings update with a calendar that is not in the plan (409)", async () => {
+    const f = createMockPlanningFetch();
+    const r = await f("/planning/apply-command", { method: "POST", body: JSON.stringify({ command: { type: "project.settings.update", payload: { calendarId: "cal-unknown" } }, clientPlanVersion: 17 }) });
+    expect(r.status).toBe(409);
+    const body = (await r.json()) as { validationIssues: Array<{ code: string }> };
+    expect(body.validationIssues[0]!.code).toBe("planning_command_invalid");
+  });
 });
