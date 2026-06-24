@@ -144,7 +144,18 @@ export function useAuth() {
     [client]
   );
 
-  return { client, state, status, error, user, permissions, reload: refresh, login, logout, register, requestPasswordReset, confirmPasswordReset };
+  // Правка профиля в ТОЙ ЖЕ сессии (PATCH /api/profile + рефетч me). Нужна, чтобы ЛК
+  // работал на ОДНОМ useAuth (иначе useProfile создаёт отдельную мок-сессию → 401).
+  const updateProfile = useCallback(
+    (input: ProfileUpdateInput): Promise<AuthMutationResult> =>
+      guard(async () => {
+        await client.updateProfile(input);
+        await refresh();
+      }),
+    [client, refresh]
+  );
+
+  return { client, state, status, error, user, permissions, reload: refresh, login, logout, register, requestPasswordReset, confirmPasswordReset, updateProfile };
 }
 
 /* ============================================================
