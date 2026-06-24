@@ -145,9 +145,12 @@ export function createMockCrmFetch(): typeof fetch {
     if (clientPatch) {
       const c = db.clients.find((x) => x.id === decodeURIComponent(clientPatch[1]!));
       if (!c) return err("client_not_found", 404);
-      if (typeof body.name === "string") { if (!str(body.name) || str(body.name).length > 160) return err("invalid_client_name", 400); c.name = str(body.name); }
-      if ("description" in body) c.description = body.description == null ? null : str(body.description) || null;
-      if (body.status === "active" || body.status === "archived") c.status = body.status;
+      // боевой PATCH — full-replace (parseClientBody поверх всего тела): name обязателен
+      const name = str(body.name);
+      if (!name || name.length > 160) return err("invalid_client_name", 400);
+      c.name = name;
+      c.description = body.description == null ? null : str(body.description) || null;
+      c.status = body.status === "archived" ? "archived" : "active";
       c.updatedAt = nowIso();
       return json({ client: c });
     }
@@ -171,14 +174,19 @@ export function createMockCrmFetch(): typeof fetch {
     if (contactPatch) {
       const c = db.contacts.find((x) => x.id === decodeURIComponent(contactPatch[1]!));
       if (!c) return err("contact_not_found", 404);
-      if (typeof body.clientId === "string" && str(body.clientId) !== c.clientId) {
-        const client = db.clients.find((x) => x.id === str(body.clientId));
-        if (!client || client.status !== "active") return err("client_not_found", 404);
-        c.clientId = str(body.clientId);
-      }
-      if ("email" in body) { const em = body.email == null ? null : str(body.email).toLowerCase() || null; if (em && (em.length > 254 || !EMAIL_RE.test(em))) return err("invalid_contact_email", 400); c.email = em; }
-      for (const k of ["name", "phone", "telegram", "role"] as const) if (k in body) (c[k] as string | null) = body[k] == null ? null : str(body[k]) || (k === "name" ? c.name : null);
-      if (body.status === "active" || body.status === "archived") c.status = body.status;
+      // full-replace (parseContactBody): clientId + name обязательны; активный клиент — только при СМЕНЕ клиента
+      const clientId = str(body.clientId);
+      const name = str(body.name);
+      if (!ID_RE.test(clientId)) return err("invalid_client_id", 400);
+      if (!name || name.length > 160) return err("invalid_contact_name", 400);
+      const email = body.email == null ? null : str(body.email).toLowerCase() || null;
+      if (email && (email.length > 254 || !EMAIL_RE.test(email))) return err("invalid_contact_email", 400);
+      if (clientId !== c.clientId) { const client = db.clients.find((x) => x.id === clientId); if (!client || client.status !== "active") return err("client_not_found", 404); }
+      c.clientId = clientId; c.name = name; c.email = email;
+      c.phone = body.phone == null ? null : str(body.phone) || null;
+      c.telegram = body.telegram == null ? null : str(body.telegram) || null;
+      c.role = body.role == null ? null : str(body.role) || null;
+      c.status = body.status === "archived" ? "archived" : "active";
       c.updatedAt = nowIso();
       return json({ contact: c });
     }
@@ -200,12 +208,16 @@ export function createMockCrmFetch(): typeof fetch {
     if (productPatch) {
       const p = db.products.find((x) => x.id === decodeURIComponent(productPatch[1]!));
       if (!p) return err("product_not_found", 404);
-      if (typeof body.name === "string") { if (!str(body.name)) return err("invalid_product_name", 400); p.name = str(body.name); }
-      if (typeof body.price === "number") { if (!posInt(body.price)) return err("invalid_product_price", 400); p.price = body.price; }
-      if (body.type === "service" || body.type === "goods") p.type = body.type;
-      if (typeof body.unit === "string" && str(body.unit)) p.unit = str(body.unit);
-      if ("sku" in body) p.sku = body.sku == null ? null : str(body.sku) || null;
-      if (body.status === "active" || body.status === "archived") p.status = body.status;
+      // full-replace (parseProductBody): name/unit/price обязательны
+      const name = str(body.name); const unit = str(body.unit); const price = body.price;
+      if (!name || name.length > 160) return err("invalid_product_name", 400);
+      if (!unit || unit.length > 40) return err("invalid_product_unit", 400);
+      if (!posInt(price)) return err("invalid_product_price", 400);
+      p.name = name; p.unit = unit; p.price = price;
+      p.type = body.type === "goods" ? "goods" : "service";
+      p.sku = body.sku == null ? null : str(body.sku) || null;
+      p.description = body.description == null ? null : str(body.description) || null;
+      p.status = body.status === "archived" ? "archived" : "active";
       p.updatedAt = nowIso();
       return json({ product: p });
     }

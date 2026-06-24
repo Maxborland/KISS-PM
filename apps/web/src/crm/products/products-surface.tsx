@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr, rub } from "@/crm/ui/crm-bits";
 import { useCrm } from "@/crm/lib/use-crm";
+import type { Product } from "@/crm/lib/crm-client";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 const TYPE_LABEL = { service: "Услуга", goods: "Товар" } as const;
@@ -26,11 +27,13 @@ export function ProjectProducts() {
     return <CrmFrame activeTab="Продукты"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></CrmFrame>;
   }
 
-  const toggleArchive = async (id: string, to: "active" | "archived") => {
+  // архив/восстановление шлёт ПОЛНУЮ запись (боевой PATCH — full-replace, требует name/unit/price)
+  const toggleArchive = async (p: Product, to: "active" | "archived") => {
     setBusy(true); setNotice(null);
-    const res = await updateProduct(id, { status: to });
+    const res = await updateProduct(p.id, { name: p.name, type: p.type, unit: p.unit, price: p.price, sku: p.sku, description: p.description, status: to });
     setBusy(false);
-    setNotice(res.ok ? (to === "archived" ? "Продукт в архиве" : "Продукт восстановлен") : `Отклонено: ${crmErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) setNotice(to === "archived" ? "Продукт в архиве" : "Продукт восстановлен");
+    else setNotice(`Отклонено: ${crmErr(res.code, res.message)}`);
   };
 
   return (
@@ -56,8 +59,8 @@ export function ProjectProducts() {
                 <td className="px-3 py-2"><StatusChip status={p.status} /></td>
                 <td className="px-3 py-2 text-right">
                   {p.status === "active"
-                    ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(p.id, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
-                    : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(p.id, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                    ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(p, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                    : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(p, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
                 </td>
               </tr>
             ))}

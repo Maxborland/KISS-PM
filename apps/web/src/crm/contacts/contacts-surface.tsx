@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr } from "@/crm/ui/crm-bits";
 import { useCrm } from "@/crm/lib/use-crm";
+import type { Contact } from "@/crm/lib/crm-client";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 
@@ -17,7 +18,7 @@ export function ProjectContacts() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const clientName = useMemo(() => new Map((data?.clients ?? []).map((c) => [c.id, c.name])), [data]);
+  const clientById = useMemo(() => new Map((data?.clients ?? []).map((c) => [c.id, c])), [data]);
 
   if (status === "loading" && !data) {
     return <CrmFrame activeTab="Контакты"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка контактов…</div></CrmFrame>;
@@ -26,11 +27,15 @@ export function ProjectContacts() {
     return <CrmFrame activeTab="Контакты"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></CrmFrame>;
   }
 
-  const toggleArchive = async (id: string, to: "active" | "archived") => {
+  // имя клиента + пометка «(архив)», если клиент архивирован (контакт остаётся при архивации клиента)
+  const clientLabel = (id: string) => { const cl = clientById.get(id); return cl ? `${cl.name}${cl.status === "archived" ? " (архив)" : ""}` : id; };
+  // архив/восстановление шлёт ПОЛНУЮ запись (боевой PATCH — full-replace, требует name)
+  const toggleArchive = async (c: Contact, to: "active" | "archived") => {
     setBusy(true); setNotice(null);
-    const res = await updateContact(id, { status: to });
+    const res = await updateContact(c.id, { clientId: c.clientId, name: c.name, email: c.email, phone: c.phone, telegram: c.telegram, role: c.role, status: to });
     setBusy(false);
-    setNotice(res.ok ? (to === "archived" ? "Контакт в архиве" : "Контакт восстановлен") : `Отклонено: ${crmErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) setNotice(to === "archived" ? "Контакт в архиве" : "Контакт восстановлен");
+    else setNotice(`Отклонено: ${crmErr(res.code, res.message)}`);
   };
 
   return (
@@ -49,15 +54,15 @@ export function ProjectContacts() {
             {data.contacts.map((c) => (
               <tr key={c.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div><div className="v4-mono text-[10px] text-[var(--muted-soft)]">{c.id}</div></td>
-                <td className="px-3 py-2 text-[var(--muted-strong)]">{clientName.get(c.clientId) ?? c.clientId}</td>
+                <td className="px-3 py-2 text-[var(--muted-strong)]">{clientLabel(c.clientId)}</td>
                 <td className="px-3 py-2 text-[var(--muted)]">{c.role ?? "—"}</td>
                 <td className="px-3 py-2 text-[var(--muted)]">{c.email ?? "—"}</td>
                 <td className="px-3 py-2 text-[var(--muted)]">{c.phone ?? "—"}</td>
                 <td className="px-3 py-2"><StatusChip status={c.status} /></td>
                 <td className="px-3 py-2 text-right">
                   {c.status === "active"
-                    ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c.id, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
-                    : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c.id, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                    ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                    : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
                 </td>
               </tr>
             ))}

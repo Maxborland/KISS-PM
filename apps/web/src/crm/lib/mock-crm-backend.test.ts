@@ -127,13 +127,15 @@ describe("contract-mock CRM backend", () => {
     await expect(c.moveOpportunityStage("opp-2207", "ZZZ!")).rejects.toMatchObject({ status: 400, code: "invalid_deal_stage_id" });
   });
 
-  it("creates a client and archives/restores it (PATCH status)", async () => {
+  it("archives/restores a client via full-replace PATCH (как боевой: name обязателен)", async () => {
     const c = client();
     const created = await c.createClient({ name: "ООО «Тест»" });
     expect(created.client.status).toBe("active");
-    const archived = await c.updateClient(created.client.id, { status: "archived" });
+    // боевой PATCH — full-replace: status без name отвергается (400)
+    await expect(c.updateClient(created.client.id, { status: "archived" })).rejects.toMatchObject({ status: 400, code: "invalid_client_name" });
+    const archived = await c.updateClient(created.client.id, { name: created.client.name, status: "archived" });
     expect(archived.client.status).toBe("archived");
-    const restored = await c.updateClient(created.client.id, { status: "active" });
+    const restored = await c.updateClient(created.client.id, { name: created.client.name, status: "active" });
     expect(restored.client.status).toBe("active");
   });
 

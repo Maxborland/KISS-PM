@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr, money } from "@/crm/ui/crm-bits";
 import { useCrm } from "@/crm/lib/use-crm";
+import type { Client } from "@/crm/lib/crm-client";
 
 export function ProjectClients() {
   const { data, status, error, reload, createClient, updateClient } = useCrm();
@@ -19,8 +20,10 @@ export function ProjectClients() {
     if (!data) return null;
     const stats = new Map<string, { deals: number; sum: number; contacts: number }>();
     for (const c of data.clients) stats.set(c.id, { deals: 0, sum: 0, contacts: 0 });
-    for (const o of data.opportunities) { const s = o.clientId ? stats.get(o.clientId) : undefined; if (s) { s.deals += 1; s.sum += o.contractValue; } }
-    for (const ct of data.contacts) { const s = stats.get(ct.clientId); if (s) s.contacts += 1; }
+    // «Сделок»/«Сумма» — по сделкам клиента, КРОМЕ проигранных (как воронка/прогноз в Сделках);
+    // «Контактов» — только активные (архивные исключаем, как везде в CRM).
+    for (const o of data.opportunities) { if (o.status === "lost_rejected") continue; const s = o.clientId ? stats.get(o.clientId) : undefined; if (s) { s.deals += 1; s.sum += o.contractValue; } }
+    for (const ct of data.contacts) { if (ct.status !== "active") continue; const s = stats.get(ct.clientId); if (s) s.contacts += 1; }
     return { clients: data.clients, stats };
   }, [data]);
 
@@ -31,18 +34,20 @@ export function ProjectClients() {
     return <CrmFrame activeTab="Клиенты"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></CrmFrame>;
   }
 
-  const toggleArchive = async (id: string, to: "active" | "archived") => {
+  // архив/восстановление шлёт ПОЛНУЮ запись (боевой PATCH — full-replace, требует name), не только status
+  const toggleArchive = async (c: Client, to: "active" | "archived") => {
     setBusy(true); setNotice(null);
-    const res = await updateClient(id, { status: to });
+    const res = await updateClient(c.id, { name: c.name, description: c.description, status: to });
     setBusy(false);
-    setNotice(res.ok ? (to === "archived" ? "Клиент в архиве" : "Клиент восстановлен") : `Отклонено: ${crmErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) setNotice(to === "archived" ? "Клиент в архиве" : "Клиент восстановлен");
+    else setNotice(`Отклонено: ${crmErr(res.code, res.message)}`);
   };
 
   return (
     <CrmFrame activeTab="Клиенты" subtitle="Справочник клиентов" actions={<CreateClientDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createClient} />}>
       <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
         <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        Реальный контракт CRM: GET/POST/PATCH /api/workspace/clients (createCrmClient). «Сделок» и «Сумма» — производные от opportunities. Данные in-memory.
+        Реальный контракт CRM: GET/POST/PATCH /api/workspace/clients (createCrmClient). «Контактов» — активные; «Сделок»/«Сумма» — по сделкам клиента, кроме проигранных. PATCH — полная запись (как боевой). Данные in-memory.
       </div>
 
       <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
@@ -63,8 +68,8 @@ export function ProjectClients() {
                   <td className="px-3 py-2"><StatusChip status={c.status} /></td>
                   <td className="px-3 py-2 text-right">
                     {c.status === "active"
-                      ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c.id, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
-                      : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c.id, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                      ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                      : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
                   </td>
                 </tr>
               );

@@ -1,8 +1,8 @@
 import { Chip } from "@/components/ui/chip";
 
 /** Общие крошки CRM-поверхностей: форматирование сумм, чип статуса, RU-сообщения ошибок. */
-export const money = (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} млн ₽` : `${Math.round(v / 1000).toLocaleString("ru-RU")} тыс ₽`);
 export const rub = (v: number) => `${v.toLocaleString("ru-RU")} ₽`;
+export const money = (v: number) => (v < 1000 ? rub(v) : v >= 1_000_000 ? `${(v / 1_000_000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} млн ₽` : `${Math.round(v / 1000).toLocaleString("ru-RU")} тыс ₽`);
 
 const ERR: Record<string, string> = {
   invalid_client_name: "Укажите название",
@@ -12,8 +12,7 @@ const ERR: Record<string, string> = {
   client_not_found: "Клиент не найден или неактивен",
   invalid_product_name: "Укажите название",
   invalid_product_unit: "Укажите единицу измерения",
-  invalid_product_price: "Цена — положительное целое",
-  client_not_found_404: "Клиент не найден"
+  invalid_product_price: "Цена — положительное целое"
 };
 export const crmErr = (code?: string, fallback?: string) => (code && ERR[code]) || fallback || code || "Ошибка";
 
