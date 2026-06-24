@@ -167,13 +167,17 @@ function seed(): Store {
   // Активные проекты: пусто на старте (listProjects вернёт [] до первой активации).
   const projects: ProjectRecord[] = [];
 
-  // Досидируем opp-gamma-bi предзаполненной оценкой (status "warning"), рассчитанной доменом —
-  // чтобы виджет в UI рендерился сразу, а не после клика «Проверить реализуемость».
-  const gammaBi = opportunities.find((o) => o.id === "opp-gamma-bi")!;
-  const gammaBiAssessment = assessFeasibility(gammaBi, POSITIONS, projects);
-  gammaBi.feasibilityStatus = gammaBiAssessment.status;
-  gammaBi.feasibilityResult = serializeAssessment(gammaBiAssessment);
-  gammaBi.feasibilityCheckedAt = t;
+  // Досидируем предзаполненной доменной оценкой ВСЕ сделки, у которых в сиде выставлен
+  // feasibilityStatus — чтобы feasibilityStatus и feasibilityResult писались ВМЕСТЕ (как боевой
+  // updateOpportunityFeasibility: оба поля атомарно). Иначе виджет реализуемости и кнопка
+  // активации в карточке расходятся (status есть, result null — состояние, недостижимое на боевом API).
+  for (const id of ["opp-gamma-bi", "opp-gamma-contract", "opp-sever-contract-lowprob"]) {
+    const o = opportunities.find((x) => x.id === id)!;
+    const a = assessFeasibility(o, POSITIONS, projects);
+    o.feasibilityStatus = a.status;
+    o.feasibilityResult = serializeAssessment(a);
+    o.feasibilityCheckedAt = t;
+  }
 
   // CRM-активности для opp-2207 (2 comment, 1 task todo, 1 file) — лента карточки не пустая в демо.
   const act = (n: number, over: Partial<CrmActivity>): CrmActivity => ({
@@ -184,7 +188,7 @@ function seed(): Store {
   const activities: CrmActivity[] = [
     act(1, { type: "comment", body: "Клиент подтвердил бюджет, готовим договор.", authorUserId: "u-anna", createdAt: "2026-01-12T09:10:00.000Z", updatedAt: "2026-01-12T09:10:00.000Z" }),
     act(2, { type: "comment", body: "Согласовали состав команды на релиз 2.", authorUserId: "u-sergey", createdAt: "2026-01-12T10:30:00.000Z", updatedAt: "2026-01-12T10:30:00.000Z" }),
-    act(3, { type: "task", title: "Подготовить смету по релизу 2", body: "Уточнить часы backend и сроки.", status: "todo", dueDate: "2026-02-01", assigneeUserId: "u-ivan", authorUserId: "u-anna", createdAt: "2026-01-12T11:00:00.000Z", updatedAt: "2026-01-12T11:00:00.000Z" }),
+    act(3, { type: "task", title: "Подготовить смету по релизу 2", body: "Уточнить часы backend и сроки.", status: "todo", dueDate: "2026-02-01T00:00:00.000Z", assigneeUserId: "u-ivan", authorUserId: "u-anna", createdAt: "2026-01-12T11:00:00.000Z", updatedAt: "2026-01-12T11:00:00.000Z" }),
     act(4, { type: "file", title: "Договор (черновик).pdf", fileUrl: "https://files.example.com/opp-2207/contract-draft.pdf", mimeType: "application/pdf", fileSizeBytes: 482_311, authorUserId: "u-anna", createdAt: "2026-01-12T12:00:00.000Z", updatedAt: "2026-01-12T12:00:00.000Z" })
   ];
 
@@ -248,10 +252,34 @@ const hasControlSingleLine = (v: string): boolean => {
   return false;
 };
 const safeSingleLine = (v: string, max: number) => v.length <= max && !hasControlSingleLine(v);
-// http/https URL ≤ max (как боевой parseExternalReferenceUrl): валидный absolute URL со схемой http(s)
+// Приватные/loopback/link-local хосты (зеркало parseExternalReferenceUrl.isBlockedHost): мок отвергает их, как боевой.
+const isBlockedHost = (host: string): boolean => {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  if (h === "localhost" || h.endsWith(".localhost")) return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const a = Number(m[1]), b = Number(m[2]);
+    if (a === 127 || a === 10 || a === 0) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+  }
+  if (h === "::1" || h === "::") return true;
+  if (/^f[cd][0-9a-f]*:/.test(h)) return true; // ULA fc00::/7
+  if (/^fe[89ab][0-9a-f]*:/.test(h)) return true; // link-local fe80::/10
+  if (h.startsWith("::ffff:")) return isBlockedHost(h.slice(7)); // mapped IPv4
+  return false;
+};
+// http/https URL ≤ max (зеркало parseExternalReferenceUrl): схема http(s), без user:pass, не приватный хост.
 const isHttpUrl = (v: string, max = 1_200): boolean => {
   if (v.length === 0 || v.length > max) return false;
-  try { const u = new URL(v); return u.protocol === "http:" || u.protocol === "https:"; } catch { return false; }
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    if (u.username || u.password) return false;
+    if (isBlockedHost(u.hostname)) return false;
+    return true;
+  } catch { return false; }
 };
 
 type PipelineParse = { ok: true; name: string; description: string | null; isDefault: boolean; sortOrder: number; status: "active" | "archived" } | { ok: false; error: string };
@@ -297,23 +325,28 @@ type OppUpdateParse =
   | { ok: false; error: string };
 // Тело PATCH /opportunities/:id — full-replace (зеркало parseOpportunityUpdateBody): порядок и коды как create + templateId.
 function parseOpportunityUpdateBody(body: Record<string, unknown>): OppUpdateParse {
+  // Порядок проверок полей — как боевой parseOpportunityFields: client → contact → owner →
+  // projectType → stage → title → description → templateId → dates → value → rate → probability → demand.
   const clientId = str(body.clientId), primaryContactId = str(body.primaryContactId), projectTypeId = str(body.projectTypeId), stageId = str(body.stageId), title = str(body.title);
   if (!ID_RE.test(clientId)) return { ok: false, error: "invalid_client_id" };
   if (!ID_RE.test(primaryContactId)) return { ok: false, error: "invalid_primary_contact_id" };
+  const ownerProvided = body.ownerUserId != null; // absent/null → fallback в хендлере (existing→actor)
+  const ownerUserId = ownerProvided ? str(body.ownerUserId) : null;
+  if (ownerProvided && !ID_RE.test(ownerUserId!)) return { ok: false, error: "invalid_owner_user_id" };
   if (!ID_RE.test(projectTypeId)) return { ok: false, error: "invalid_project_type_id" };
   if (!ID_RE.test(stageId)) return { ok: false, error: "invalid_deal_stage_id" };
   if (!title || !safeSingleLine(title, 160)) return { ok: false, error: "invalid_opportunity_title" };
+  const description = body.description == null ? null : str(body.description) || null; // опц multiline ≤1000, ''→null
+  if (description !== null && !safeMultiline(description)) return { ok: false, error: "invalid_description" };
+  const templateProvided = body.templateId != null;
+  const templateId = templateProvided ? str(body.templateId) : null;
+  if (templateProvided && !ID_RE.test(templateId!)) return { ok: false, error: "invalid_template_id" };
   const plannedStart = str(body.plannedStart), plannedFinish = str(body.plannedFinish);
   if (!DATE_RE.test(plannedStart) || !DATE_RE.test(plannedFinish) || plannedFinish < plannedStart || dayDiff(plannedStart, plannedFinish) > MAX_HORIZON_DAYS) return { ok: false, error: "invalid_planned_dates" };
   const contractValue = body.contractValue, plannedHourlyRate = body.plannedHourlyRate, probability = body.probability;
   if (!posInt(contractValue)) return { ok: false, error: "invalid_contract_value" };
   if (!posInt(plannedHourlyRate)) return { ok: false, error: "invalid_planned_hourly_rate" };
   if (typeof probability !== "number" || !Number.isInteger(probability) || probability < 0 || probability > 100) return { ok: false, error: "invalid_probability" };
-  // ownerUserId: опционально; absent/null оставляем для fallback в хендлере (existing→actor).
-  const ownerProvided = body.ownerUserId != null;
-  const ownerUserId = ownerProvided ? str(body.ownerUserId) : null;
-  if (ownerProvided && !ID_RE.test(ownerUserId!)) return { ok: false, error: "invalid_owner_user_id" };
-  // demand: те же границы, что и в create (после owner-формата, как у боевого порядка).
   const demandRaw = Array.isArray(body.demand) ? (body.demand as Array<{ positionId?: unknown; requiredHours?: unknown }>) : [];
   if (demandRaw.length < 1 || demandRaw.length > 12) return { ok: false, error: "invalid_demand" };
   const seenPos = new Set<string>();
@@ -326,12 +359,6 @@ function parseOpportunityUpdateBody(body: Record<string, unknown>): OppUpdatePar
     seenPos.add(positionId);
     demand.push({ positionId, requiredHours: d.requiredHours as number });
   }
-  // description: опц multiline ≤1000, ''→null; templateId: опц ID|null.
-  const description = body.description == null ? null : str(body.description) || null;
-  if (description !== null && !safeMultiline(description)) return { ok: false, error: "invalid_description" };
-  const templateProvided = body.templateId != null;
-  const templateId = templateProvided ? str(body.templateId) : null;
-  if (templateProvided && !ID_RE.test(templateId!)) return { ok: false, error: "invalid_template_id" };
   return { ok: true, clientId, primaryContactId, projectTypeId, stageId, title, description, plannedStart, plannedFinish, contractValue, plannedHourlyRate, probability, ownerProvided, ownerUserId, templateId, demand };
 }
 
@@ -355,7 +382,10 @@ export function createMockCrmFetch(): typeof fetch {
     const method = (init?.method ?? "GET").toUpperCase();
     const path = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0]!;
     let body: Record<string, unknown> = {};
-    if (init?.body) { try { const p: unknown = JSON.parse(String(init.body)); if (p && typeof p === "object" && !Array.isArray(p)) body = p as Record<string, unknown>; } catch { return err("invalid_json", 400); } }
+    // Тип присланного тела — для invalid_body (как боевые isObjectBody/typeof-гварды парсеров):
+    // CRM-активности отвергают массив И примитив; opportunity-update — только примитив (массив идёт к field-кодам).
+    let bodyArray = false, bodyPrimitive = false;
+    if (init?.body) { try { const p: unknown = JSON.parse(String(init.body)); if (p && typeof p === "object" && !Array.isArray(p)) body = p as Record<string, unknown>; else if (Array.isArray(p)) bodyArray = true; else bodyPrimitive = true; } catch { return err("invalid_json", 400); } }
 
     /* ---- справочники: deal-stages, project-types (read-only сид) ---- */
     if (method === "GET" && path === "/api/workspace/deal-stages") return json({ dealStages: [...db.dealStages].sort((a, b) => a.sortOrder - b.sortOrder) });
@@ -643,6 +673,7 @@ export function createMockCrmFetch(): typeof fetch {
     if (oppUpdate) {
       const opportunityId = decodeURIComponent(oppUpdate[1]!);
       if (!ID_RE.test(opportunityId)) return err("invalid_opportunity_id", 400); // 1) формат :id
+      if (bodyPrimitive) return err("invalid_body", 400); // тело-примитив → invalid_body (как боевой parseOpportunityUpdateBody guard; массив идёт к field-кодам)
       const parsed = parseOpportunityUpdateBody(body); // 2) тело (порядок кодов как create)
       if (!parsed.ok) return err(parsed.error, 400);
       const o = db.opportunities.find((x) => x.id === opportunityId);
@@ -655,7 +686,8 @@ export function createMockCrmFetch(): typeof fetch {
       if (!contact || contact.status !== "active" || contact.clientId !== client.id) return err("contact_not_found", 404);
       // ownerUserId: absent/null → existing → CURRENT_ACTOR_ID (fallback); если задан — валидируем 404 (после contact).
       const ownerUserId = parsed.ownerProvided ? parsed.ownerUserId! : o.ownerUserId ?? CURRENT_ACTOR_ID;
-      if (parsed.ownerProvided && !CRM_USERS.some((u) => u.id === ownerUserId)) return err("owner_user_not_found", 404);
+      // итоговый владелец валидируется ВСЕГДА (как боевой resolveOpportunityLinks: проверка при любом truthy ownerUserId).
+      if (!CRM_USERS.some((u) => u.id === ownerUserId)) return err("owner_user_not_found", 404);
       const ptype = db.projectTypes.find((x) => x.id === parsed.projectTypeId);
       if (!ptype || ptype.status !== "active") return err("project_type_not_found", 404);
       const stage = db.dealStages.find((x) => x.id === parsed.stageId);
@@ -760,6 +792,7 @@ export function createMockCrmFetch(): typeof fetch {
       const entity = resolveCrmEntity(entityType, entityId);
       if (!entity) return err("crm_entity_not_found", 404);
       if (entity.isLocked) return err("crm_activity_locked", 409);
+      if (bodyArray || bodyPrimitive) return err("invalid_body", 400); // тело-не-объект → invalid_body (боевой isObjectBody)
       const base = { id: `crm-activity-${genId("u")}`, tenantId: TENANT, entityType, entityId, authorUserId: CURRENT_ACTOR_ID, createdAt: nowIso(), updatedAt: nowIso() };
       if (kind === "comments") {
         const text = typeof body.body === "string" ? body.body.trim() : "";
@@ -771,10 +804,11 @@ export function createMockCrmFetch(): typeof fetch {
       if (kind === "tasks") {
         const title = typeof body.title === "string" ? body.title.trim() : "";
         if (!title || !safeSingleLine(title, 180)) return err("task_title_required", 400);
-        const taskBody = body.body == null || body.body === "" ? null : str(body.body);
+        const tb = str(body.body); const taskBody = tb === "" ? null : tb; // whitespace-only → null (боевой parseOptionalString)
         if (taskBody !== null && (taskBody.length > 4000 || !safeMultiline(taskBody, 4000))) return err("task_body_invalid", 400);
         let dueDate: string | null = null;
-        if (body.dueDate != null && body.dueDate !== "") { const d = str(body.dueDate); if (!DATE_RE.test(d)) return err("task_due_date_invalid", 400); dueDate = d; }
+        // боевой parseOptionalDate(UTC) + serializeCrmActivity(.toISOString()) → полная ISO-датавремя UTC-полночь.
+        if (body.dueDate != null && body.dueDate !== "") { const d = str(body.dueDate); if (!DATE_RE.test(d)) return err("task_due_date_invalid", 400); dueDate = new Date(`${d}T00:00:00Z`).toISOString(); }
         let assigneeUserId: string | null = null;
         if (body.assigneeUserId != null && body.assigneeUserId !== "") {
           const a = str(body.assigneeUserId);
@@ -791,10 +825,10 @@ export function createMockCrmFetch(): typeof fetch {
       if (body.fileUrl == null || str(body.fileUrl) === "") return err("file_url_required", 400);
       const fileUrl = str(body.fileUrl);
       if (!isHttpUrl(fileUrl, 1200)) return err("file_url_invalid", 400);
-      const fileBody = body.body == null || body.body === "" ? null : str(body.body);
+      const fb = str(body.body); const fileBody = fb === "" ? null : fb; // whitespace-only → null
       if (fileBody !== null && (fileBody.length > 4000 || !safeMultiline(fileBody, 4000))) return err("file_description_invalid", 400);
       let mimeType: string | null = null;
-      if (body.mimeType != null && body.mimeType !== "") { const m = str(body.mimeType); if (!safeSingleLine(m, 160)) return err("file_mime_type_invalid", 400); mimeType = m; }
+      if (body.mimeType != null) { const m = str(body.mimeType); if (m === "") { mimeType = null; } else if (!safeSingleLine(m, 160)) return err("file_mime_type_invalid", 400); else mimeType = m; } // whitespace-only → null
       let fileSizeBytes: number | null = null;
       if (body.fileSizeBytes != null && body.fileSizeBytes !== "") {
         const n = body.fileSizeBytes;
@@ -818,6 +852,7 @@ export function createMockCrmFetch(): typeof fetch {
       const entity = resolveCrmEntity(entityType, entityId);
       if (!entity) return err("crm_entity_not_found", 404);
       if (entity.isLocked) return err("crm_activity_locked", 409);
+      if (bodyArray || bodyPrimitive) return err("invalid_body", 400); // тело-не-объект → invalid_body (боевой isObjectBody)
       if (body.status !== "todo" && body.status !== "done") return err("task_status_invalid", 400);
       const activity = db.activities.find((a) => a.id === activityId && a.entityType === entityType && a.entityId === entityId && a.type === "task");
       if (!activity) return err("crm_task_not_found", 404);
