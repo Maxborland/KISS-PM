@@ -59,6 +59,23 @@
   gap: var(--space-2);
 }
 
+/* Компактный fallback состояний для узких экранов (SurfaceState narrow): без иллюстрации, плотнее. */
+.state-narrow .state-illu__art {
+  display: none;
+}
+.state-narrow .state-illu {
+  border: 0;
+  padding: var(--space-4) var(--space-3);
+  margin: 0 auto;
+}
+.state-narrow .skeleton-page {
+  padding: var(--space-3);
+}
+.state-narrow .state-illu__title {
+  font-size: var(--text-md);
+  line-height: var(--lh-md);
+}
+
 .state-empty__actions {
   display: flex;
   justify-content: center;
