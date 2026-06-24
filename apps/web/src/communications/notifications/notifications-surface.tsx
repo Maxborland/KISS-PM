@@ -223,7 +223,9 @@ function NotificationsFeed() {
    ============================================================ */
 type PrefRow = { enabled: boolean; digestFrequency: DigestFrequency };
 
-function NotificationsPrefs() {
+// Экспортируется для переиспользования во вкладке «Уведомления» поверхности настроек
+// (самодостаточен: собственный useNotificationPreferences + SurfaceState внутри).
+export function NotificationsPrefs() {
   const { data, status, error, reload, savePreferences } = useNotificationPreferences();
   // Локальная матрица настроек: ключ channel::type → {enabled, digestFrequency}.
   const [rows, setRows] = useState<Map<string, PrefRow>>(new Map());

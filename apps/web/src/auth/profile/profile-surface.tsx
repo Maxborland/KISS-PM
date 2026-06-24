@@ -183,7 +183,8 @@ function ProtoBanner() {
 }
 
 // Контент ЛК: карточка профиля + форма правки.
-function ProfileContent({
+// Экспортируется для переиспользования во вкладке «Профиль» поверхности настроек.
+export function ProfileContent({
   user,
   permissions,
   update,

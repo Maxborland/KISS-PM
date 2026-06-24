@@ -28,7 +28,6 @@ export const SCREEN_IDS = [
   "00-space-discipline",
   "01-dashboard",
   "04-create-task-modal",
-  "10-settings",
   "16-project-kpi",
   "state-empty",
   "state-error",
@@ -62,14 +61,6 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     lead: "Модальное создание с stepper и формой.",
     breadcrumb: [{ label: "Задачи", current: true }],
     activeNav: "Задачи"
-  },
-  "10-settings": {
-    id: "10-settings",
-    storyTitle: "10 Настройки",
-    pageTitle: "Настройки рабочей области",
-    lead: "Профиль, уведомления и интеграции.",
-    breadcrumb: [{ label: "Настройки", current: true }],
-    activeNav: "Настройки"
   },
   "16-project-kpi": {
     id: "16-project-kpi",

@@ -38,19 +38,6 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(source).not.toMatch(/from "@\/components\/ui\/table"/);
   });
 
-  it("surviving views blocks avoid fake segmented and noop onChange (batch 13g)", () => {
-    // Прежде проверялись 5 блоков; 4 из них (projects-list/deals/gantt/my-work) удалены как
-    // дубли функциональных surface. settings-block остаётся честным прототипом (10 Настройки)
-    // до его перевода в функциональный — проверка fake-affordance сохраняется для него.
-    const blockFiles = ["src/views/blocks/settings-block.tsx"];
-    for (const rel of blockFiles) {
-      const source = read(rel);
-      expect(source).not.toMatch(/<button[^>]*segmented__btn/);
-      expect(source).not.toMatch(/onChange=\{\(\) => \{\}\}/);
-      expect(source).toContain("onChange={");
-    }
-  });
-
   it("WorkspaceChrome default topbar actions are disabled with reason (batch 13g)", () => {
     const source = read("src/views/layout/workspace-chrome.tsx");
     expect(source).toMatch(/disabled title="Демо Storybook: экспорт подключится к API"/);
@@ -101,6 +88,7 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       "src/views/blocks/project-audit-block.tsx",
       "src/views/blocks/project-calendars-block.tsx",
       "src/views/blocks/avatar-menu-block.tsx",
+      "src/views/blocks/settings-block.tsx",
       "src/views/screens/login-screen-view.tsx"
     ];
     for (const rel of deletedBlocks) {
@@ -121,6 +109,7 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       "project-audit-block",
       "project-calendars-block",
       "avatar-menu-block",
+      "settings-block",
       "login-screen-view"
     ];
     for (const mod of forbiddenImports) {
@@ -149,7 +138,8 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       "src/delivery/commits/commits-surface.tsx",
       "src/delivery/calendars/calendars-surface.tsx",
       "src/auth/login/login-surface.tsx",
-      "src/auth/avatar-menu/avatar-menu-surface.tsx"
+      "src/auth/avatar-menu/avatar-menu-surface.tsx",
+      "src/workspace/settings/settings-surface.tsx"
     ];
     for (const rel of successors) {
       expect(existsSync(join(webRoot, rel)), `${rel} must exist`).toBe(true);
