@@ -705,11 +705,12 @@ export type ApiTenantDataSource = {
   findPasswordResetTokenByHash?(
     tokenHash: string
   ): Promise<PasswordResetTokenRecord | undefined>;
+  // Возвращает число затронутых строк (атомарное single-use: WHERE consumed_at IS NULL).
   markPasswordResetTokenConsumed?(
     tenantId: TenantId,
     id: string,
     consumedAt: Date
-  ): Promise<void>;
+  ): Promise<number>;
   deletePasswordResetTokensByUserId?(
     tenantId: TenantId,
     userId: UserId

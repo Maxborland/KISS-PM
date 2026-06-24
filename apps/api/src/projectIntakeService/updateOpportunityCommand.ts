@@ -1,5 +1,6 @@
 import type { TenantUser } from "@kiss-pm/domain";
 import type { OpportunityUpdateInput } from "../apiTypes";
+import { evaluateOpportunityStageTransition } from "./changeOpportunityStageCommand";
 import { validateOpportunityCustomFieldValues } from "./opportunityCustomFields";
 import { resolveOpportunityLinks } from "./opportunityLinks";
 import { isFinalOpportunityStatus } from "./opportunityStatus";
@@ -27,6 +28,23 @@ export async function updateOpportunity(
   if (!opportunity) return { ok: false, status: 404, error: "opportunity_not_found" };
   if (isFinalOpportunityStatus(opportunity.status)) {
     return { ok: false, status: 409, error: "opportunity_update_locked" };
+  }
+
+  // Мультиворонки: смену stageId через полное сохранение карточки прогоняем через те же
+  // гварды перехода, что и эндпоинт /stage (иначе full-update протаскивал бы переход мимо правил).
+  const nextStageId = input.input.stageId;
+  if (nextStageId && nextStageId !== opportunity.stageId) {
+    const stage = await deps.dataSource.findDealStageById!(input.actor.tenantId, nextStageId);
+    if (!stage || stage.status !== "active") {
+      return { ok: false, status: 404, error: "deal_stage_not_found" };
+    }
+    const transitionGuard = await evaluateOpportunityStageTransition(
+      deps.dataSource,
+      input.actor.tenantId,
+      opportunity,
+      stage
+    );
+    if (!transitionGuard.ok) return transitionGuard;
   }
 
   const inputWithOwner = {

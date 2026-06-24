@@ -30,7 +30,7 @@ export function ProjectResources() {
   const { readModel, status, error, reload, apply, applyBatch } = usePlanning(MOCK_PROJECT_ID);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; taskId?: string; initial: TaskModalValues } | null>(null);
+  const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; taskId?: string; asgId?: string; initial: TaskModalValues } | null>(null);
 
   const model = useMemo(() => {
     if (!readModel) return null;
@@ -38,6 +38,11 @@ export function ProjectResources() {
     const authored = readModel.authored as unknown as { tasks: RawTask[]; assignments: RawAssignment[] };
     const calc = (readModel.calculatedPlan as unknown as { tasks: Array<{ id: string; calculatedStart: string }> }).tasks;
     const rawById = new Map(authored.tasks.map((t) => [t.id, t]));
+    // id календаря для команд отсутствия = реальный календарь плана (project.calendarId / первый из read-model),
+    // а не литерал "cal-5x8": на live чужой calendarId не пройдёт precondition команды. Инвариант «live = смена apiOrigin».
+    const calendars = (readModel as unknown as { calendars: Array<{ id: string }> }).calendars ?? [];
+    const projCalId = (readModel.project as { calendarId?: unknown }).calendarId;
+    const calendarId = (typeof projCalId === "string" ? calendars.find((c) => c.id === projCalId)?.id : undefined) ?? calendars[0]?.id ?? "cal-5x8";
     const data: MatrixData = {
       buckets: rl.buckets ?? [],
       resources: RESOURCES,
@@ -46,7 +51,7 @@ export function ProjectResources() {
       calcStartById: new Map(calc.map((c) => [c.id, c.calculatedStart])),
       accepted: new Set(rl.acceptedOverloads ?? [])
     };
-    return { data, rawById };
+    return { data, rawById, calendarId };
   }, [readModel]);
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
@@ -78,11 +83,14 @@ export function ProjectResources() {
     const t = model.rawById.get(taskId);
     if (!t) return;
     const asg = [...model.data.asgById.values()].find((x) => x.taskId === taskId);
-    setTaskModal({ mode: "edit", taskId, initial: { title: t.title, assigneeId: asg?.resourceId ?? "", startIso: model.data.calcStartById.get(taskId) ?? "", durDays: Math.round((t.durationMinutes ?? 0) / MIN_PER_DAY), workH: Math.round(t.workMinutes / 60), pct: t.percentComplete } });
+    // запоминаем id текущего назначения, чтобы upsert обновлял его, а не плодил второе (двойной учёт нагрузки)
+    setTaskModal({ mode: "edit", taskId, ...(asg ? { asgId: asg.id } : {}), initial: { title: t.title, assigneeId: asg?.resourceId ?? "", startIso: model.data.calcStartById.get(taskId) ?? "", durDays: Math.round((t.durationMinutes ?? 0) / MIN_PER_DAY), workH: Math.round(t.workMinutes / 60), pct: t.percentComplete } });
   };
 
   const acceptOverload = (resourceId: string, dateIso: string) =>
-    void applyCmd({ type: "risk.accept_overload", payload: { overloadId: `${resourceId}|${isoToDay(dateIso)}`, acceptedRiskReason: "Подтверждено на ресурсной матрице" } } as PlanningCommand);
+    // канонический ключ перегрузки домена — `${resourceId}:${dateIso}` (ISO), как в scenarioPlanning/commandReducer;
+    // payload пишется в acceptedRiskIds дословно, поэтому отправляем именно каноничную форму, а не resourceId|day.
+    void applyCmd({ type: "risk.accept_overload", payload: { overloadId: `${resourceId}:${dateIso}`, acceptedRiskReason: "Подтверждено на ресурсной матрице" } } as PlanningCommand);
 
   const editUnits = (asg: MatrixAssignment, hours: number) => {
     const wm = Math.round(hours * 60);
@@ -107,7 +115,8 @@ export function ProjectResources() {
       cmds.push({ type: "task.update_work_model", payload: { taskId: id, taskType: "fixed_duration", effortDriven: false, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60 } } as PlanningCommand);
       if (v.startIso) cmds.push({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: fin(v.startIso, v.durDays) } } as PlanningCommand);
       cmds.push({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } } as PlanningCommand);
-      if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: nid("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
+      // upsert по id СУЩЕСТВУЮЩЕГО назначения (reduceAssignmentUpsert ключ — payload.id), новый id только когда назначения ещё нет
+      if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: m.asgId ?? nid("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
     }
     if (!cmds.length) return;
     setBusy(true);
@@ -117,12 +126,13 @@ export function ProjectResources() {
   }
 
   async function doAbsence(resourceId: string, typeLabel: string, start: string, finish: string) {
+    if (!model) return;
     const cmds: PlanningCommand[] = [];
     const end = isoToDay(finish);
     for (let d = isoToDay(start); d <= end; d += 1) {
       const dow = new Date(Date.UTC(2026, 2, 2) + d * 86_400_000).getUTCDay();
       if (dow === 0 || dow === 6) continue; // только рабочие дни диапазона (пропускаем выходные)
-      cmds.push({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: "cal-5x8", resourceId, date: dayToIso(d), workingMinutes: 0, reason: typeLabel } } as PlanningCommand);
+      cmds.push({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: model.calendarId, resourceId, date: dayToIso(d), workingMinutes: 0, reason: typeLabel } } as PlanningCommand);
     }
     if (cmds.length === 0) return;
     setBusy(true);

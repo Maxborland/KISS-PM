@@ -45,22 +45,28 @@ export function useCrm() {
   const load = useCallback(async () => {
     setStatus("loading");
     try {
-      const [opps, stages, clients, contacts, products, ptypes, pipelines, projects] = await Promise.all([
+      const [opps, stages, clients, contacts, products, ptypes, pipelines] = await Promise.all([
         client.listOpportunities(),
         client.listDealStages(),
         client.listClients(),
         client.listContacts(),
         client.listProducts(),
         client.listProjectTypes(),
-        client.listPipelines(),
-        client.listProjects()
+        client.listPipelines()
       ]);
+      // Проекты — НЕ в основном Promise.all: /api/workspace/projects независимо гейтится
+      // canReadProjects и отдаёт 403. Пользователь с CRM-правами, но без projects.read не
+      // должен ронять весь раздел — глотаем 403 → пустой список, прочие ошибки пробрасываем.
+      const projects = await client
+        .listProjects()
+        .then((r) => r.projects)
+        .catch((e) => (e instanceof CrmApiError && e.status === 403 ? [] : Promise.reject(e)));
       // Переходы — после получения воронок: грузим правила каждой и собираем плоский список.
       const transitionsByPipeline = await Promise.all(
         pipelines.pipelines.map((p) => client.listStageTransitions(p.id))
       );
       const stageTransitions = transitionsByPipeline.flatMap((r) => r.stageTransitions);
-      setData({ opportunities: opps.opportunities, dealStages: stages.dealStages, clients: clients.clients, contacts: contacts.contacts, products: products.products, projectTypes: ptypes.projectTypes, pipelines: pipelines.pipelines, stageTransitions, projects: projects.projects });
+      setData({ opportunities: opps.opportunities, dealStages: stages.dealStages, clients: clients.clients, contacts: contacts.contacts, products: products.products, projectTypes: ptypes.projectTypes, pipelines: pipelines.pipelines, stageTransitions, projects });
       setStatus("ready");
       setError(null);
     } catch (e) {

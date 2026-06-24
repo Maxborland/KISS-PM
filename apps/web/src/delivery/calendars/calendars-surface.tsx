@@ -39,7 +39,11 @@ export function ProjectCalendars() {
 
   const model = useMemo(() => {
     if (!readModel) return null;
-    const cal = ((readModel as unknown as { calendars: CalRaw[] }).calendars ?? [])[0] ?? { id: "cal-5x8", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: MIN_PER_DAY };
+    const calendars = (readModel as unknown as { calendars: CalRaw[] }).calendars ?? [];
+    // календарь, по которому реально считается расписание = project.calendarId (а не просто первый из списка);
+    // на live это может быть НЕ дефолтный тенантный календарь, поэтому праздники должны писаться именно сюда.
+    const projCalId = (readModel.project as { calendarId?: unknown }).calendarId;
+    const cal = (typeof projCalId === "string" ? calendars.find((c) => c.id === projCalId) : undefined) ?? calendars[0] ?? { id: "cal-5x8", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: MIN_PER_DAY };
     const exns = (readModel as unknown as { calendarExceptions: ExcRaw[] }).calendarExceptions ?? [];
     const full = cal.workingMinutesPerDay;
     // нерабочие исключения (workingMinutes < полного дня): праздники (resourceId=null) и отсутствия
@@ -50,6 +54,16 @@ export function ProjectCalendars() {
       const day = isoToDay(x.date);
       if (x.resourceId === null) holidayByDay.set(day, x);
       else { let m = absByResDay.get(x.resourceId); if (!m) { m = new Map(); absByResDay.set(x.resourceId, m); } m.set(day, x); }
+    }
+    // ВСЕ исключения календаря проекта (включая реактивированные workingMinutes=full): чтобы повторный тогл
+    // off→on переиспользовал существующий id записи на эту дату/ресурс, а не плодил дубликат (десинк ёмкости).
+    const anyHolidayByDay = new Map<number, ExcRaw>();
+    const anyAbsByResDay = new Map<string, Map<number, ExcRaw>>();
+    for (const x of exns) {
+      if (x.calendarId !== cal.id) continue;
+      const day = isoToDay(x.date);
+      if (x.resourceId === null) anyHolidayByDay.set(day, x);
+      else { let m = anyAbsByResDay.get(x.resourceId); if (!m) { m = new Map(); anyAbsByResDay.set(x.resourceId, m); } m.set(day, x); }
     }
     const authored = readModel.authored as unknown as { tasks: TaskRaw[] };
     const calc = (readModel.calculatedPlan as unknown as { tasks: CalcRaw[] }).tasks;
@@ -66,7 +80,7 @@ export function ProjectCalendars() {
     let maxDay = 34;
     for (const c of calc) maxDay = Math.max(maxDay, isoToDay(c.calculatedFinish));
     const monthsList = [...new Set(Array.from({ length: maxDay + 1 }, (_, i) => dayToIso(i).slice(0, 7)))].sort();
-    return { cal, full, holidayByDay, absByResDay, leafTasks, conflicts, monthsList };
+    return { cal, full, holidayByDay, absByResDay, anyHolidayByDay, anyAbsByResDay, leafTasks, conflicts, monthsList };
   }, [readModel]);
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
@@ -118,11 +132,12 @@ export function ProjectCalendars() {
     if (st.weekend) return; // выходные задаются календарём (read-only)
     if (!isResourceView) {
       if (st.holiday) void applyCmd({ type: "calendar.exception.upsert", payload: { id: st.holiday.id, calendarId: model.cal.id, resourceId: null, date: dayToIso(day), workingMinutes: model.full, reason: "" } } as PlanningCommand, "Праздник снят");
-      else void applyCmd({ type: "calendar.exception.upsert", payload: { id: nid("hol"), calendarId: model.cal.id, resourceId: null, date: dayToIso(day), workingMinutes: 0, reason: "Праздник" } } as PlanningCommand, "Праздник добавлен");
+      // переиспользуем id уже существующей записи на эту дату (в т.ч. реактивированной), иначе минтим новую — без дубликата
+      else { const existing = model.anyHolidayByDay.get(day); void applyCmd({ type: "calendar.exception.upsert", payload: { id: existing?.id ?? nid("hol"), calendarId: model.cal.id, resourceId: null, date: dayToIso(day), workingMinutes: 0, reason: "Праздник" } } as PlanningCommand, "Праздник добавлен"); }
     } else {
       if (st.holiday) return; // праздник — общий, снимается в календаре проекта
       if (st.absence) void applyCmd({ type: "calendar.exception.upsert", payload: { id: st.absence.id, calendarId: model.cal.id, resourceId: selCal, date: dayToIso(day), workingMinutes: model.full, reason: "" } } as PlanningCommand, "Отсутствие снято");
-      else void applyCmd({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: model.cal.id, resourceId: selCal, date: dayToIso(day), workingMinutes: 0, reason: "Отсутствие" } } as PlanningCommand, "Отсутствие добавлено");
+      else { const existing = model.anyAbsByResDay.get(selCal)?.get(day); void applyCmd({ type: "calendar.exception.upsert", payload: { id: existing?.id ?? nid("ex"), calendarId: model.cal.id, resourceId: selCal, date: dayToIso(day), workingMinutes: 0, reason: "Отсутствие" } } as PlanningCommand, "Отсутствие добавлено"); }
     }
   };
   const removeExc = (x: ExcRaw) => void applyCmd({ type: "calendar.exception.upsert", payload: { id: x.id, calendarId: x.calendarId, resourceId: x.resourceId, date: x.date, workingMinutes: model.full, reason: "" } } as PlanningCommand, "Исключение снято");

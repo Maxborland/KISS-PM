@@ -270,7 +270,9 @@ export function ProjectDeals() {
 
 function Forecast({ stages, byStage }: { stages: DealStage[]; byStage: Map<string, Opportunity[]> }) {
   const all = stages.flatMap((s) => byStage.get(s.id) ?? []);
-  const open = all.filter((o) => o.status !== "lost_rejected");
+  // В воронке/прогнозе — только незакрытые: исключаем ОБА финала (lost_rejected и won_closed),
+  // иначе won-сделка считается и в открытой воронке, и отдельно в «Выиграно» (двойной счёт).
+  const open = all.filter((o) => o.status !== "lost_rejected" && o.status !== "won_closed");
   const weighted = open.reduce((a, o) => a + (o.contractValue * o.probability) / 100, 0);
   const total = open.reduce((a, o) => a + o.contractValue, 0);
   const won = all.filter((o) => o.status === "won_closed").reduce((a, o) => a + o.contractValue, 0);
@@ -289,7 +291,7 @@ function Forecast({ stages, byStage }: { stages: DealStage[]; byStage: Map<strin
           </tr></thead>
           <tbody>
             {stages.map((s) => {
-              const items = (byStage.get(s.id) ?? []).filter((o) => o.status !== "lost_rejected");
+              const items = (byStage.get(s.id) ?? []).filter((o) => o.status !== "lost_rejected" && o.status !== "won_closed");
               const sum = items.reduce((a, o) => a + o.contractValue, 0);
               const w = items.reduce((a, o) => a + (o.contractValue * o.probability) / 100, 0);
               return (

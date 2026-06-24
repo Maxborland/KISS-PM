@@ -40,6 +40,14 @@ export async function changeOpportunityPipeline(
   );
   if (!stage) return { ok: false, status: 404, error: "deal_stage_not_found" };
 
+  // Перенос ВНУТРИ той же воронки — это не смена воронки, а смена стадии: её гварды
+  // (stage_transitions / minProbability / requireFeasibilityOk) проверяет только /stage.
+  // evaluatePipelineChange их не загружает, поэтому здесь блокируем no-op-воронку, чтобы
+  // через /pipeline нельзя было протащить запрещённый внутриворонковый переход.
+  if (pipeline.id === opportunity.pipelineId) {
+    return { ok: false, status: 409, error: "cross_pipeline_move" };
+  }
+
   // Финальность сделки вычисляет вызывающий (домен её не знает) и передаёт флагом.
   const decision = evaluatePipelineChange({
     opportunity: { finalized: isFinalOpportunityStatus(opportunity.status) },

@@ -4,6 +4,7 @@ import type { TenantId } from "@kiss-pm/domain";
 
 import type { KissPmDatabase } from "./connection";
 import {
+  dealStages,
   opportunities,
   opportunityDemands,
   projectPositionDemands,
@@ -246,6 +247,16 @@ export function createProjectIntakeRepository(
     },
     async createOpportunity(input) {
       return db.transaction(async (transaction) => {
+        // Мультиворонки: воронку выводим из целевой стадии (все боевые/мигрированные
+        // стадии принадлежат воронке). Иначе сделка создаётся с pipeline_id = null,
+        // и карточка открывается с воронкой «—» без валидного списка стадий, пока
+        // не починит отдельная смена стадии. Зеркалит mock-crm-backend (create берёт
+        // pipelineId из стадии). null оставляем только если у сделки нет стадии.
+        const pipelineId = await resolveStagePipelineId(
+          transaction,
+          input.tenantId,
+          input.stageId
+        );
         const [row] = await transaction
           .insert(opportunities)
           .values({
@@ -256,6 +267,7 @@ export function createProjectIntakeRepository(
             ownerUserId: input.ownerUserId ?? null,
             projectTypeId: input.projectTypeId,
             stageId: input.stageId,
+            pipelineId,
             clientName: input.clientName,
             contactName: input.contactName,
             title: input.title,
@@ -272,8 +284,6 @@ export function createProjectIntakeRepository(
             customFieldValues: input.customFieldValues ?? {},
             createdAt: new Date(),
             updatedAt: new Date()
-            // pipeline_id не задаётся в create-flow: воронка проставляется сервером
-            // при первой смене стадии/переносе между воронками.
           })
           .returning();
 
@@ -322,6 +332,15 @@ export function createProjectIntakeRepository(
     async updateOpportunity(input) {
       return db.transaction(async (transaction) => {
         const now = new Date();
+        // Мультиворонки: full-update (полное сохранение карточки) может сменить stageId
+        // в другую воронку — выводим pipeline_id из целевой стадии, иначе строка остаётся
+        // с устаревшей/null воронкой при перенесённой стадии и выпадает из видов по воронке
+        // (Сделки фильтруют по pipelineId). null оставляем только если у сделки нет стадии.
+        const pipelineId = await resolveStagePipelineId(
+          transaction,
+          input.tenantId,
+          input.stageId
+        );
         const [row] = await transaction
           .update(opportunities)
           .set({
@@ -330,6 +349,7 @@ export function createProjectIntakeRepository(
             ownerUserId: input.ownerUserId ?? null,
             projectTypeId: input.projectTypeId,
             stageId: input.stageId,
+            pipelineId,
             clientName: input.clientName,
             contactName: input.contactName,
             title: input.title,
@@ -674,6 +694,29 @@ export function createProjectIntakeRepository(
       });
     }
   };
+}
+
+// Транзакционный исполнитель (db.transaction callback) — у него тот же query-builder,
+// что и у соединения, поэтому хелперы внутри транзакции принимают этот тип.
+type TransactionExecutor = Parameters<
+  Parameters<KissPmDatabase["transaction"]>[0]
+>[0];
+
+// Мультиворонки: воронка сделки выводится из её стадии. Возвращаем pipeline_id
+// целевой стадии (tenant-scoped) или null, если стадии нет / стадия не найдена /
+// у стадии нет воронки (legacy). Вызывать ВНУТРИ транзакции записи сделки.
+async function resolveStagePipelineId(
+  transaction: TransactionExecutor,
+  tenantId: TenantId,
+  stageId: string | null
+): Promise<string | null> {
+  if (!stageId) return null;
+  const [stage] = await transaction
+    .select({ pipelineId: dealStages.pipelineId })
+    .from(dealStages)
+    .where(and(eq(dealStages.tenantId, tenantId), eq(dealStages.id, stageId)))
+    .limit(1);
+  return stage?.pipelineId ?? null;
 }
 
 function isSingleSourceOpportunityProjectError(error: unknown): boolean {

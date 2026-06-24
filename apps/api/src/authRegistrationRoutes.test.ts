@@ -94,10 +94,13 @@ function createAuthFakeDataSource() {
       return [...resetTokens.values()].find((token) => token.tokenHash === tokenHash);
     },
     async markPasswordResetTokenConsumed(tenantId, id, consumedAt) {
+      // Атомарное single-use: консьюмим только непогашенный токен; возвращаем число затронутых строк.
       const token = resetTokens.get(id);
-      if (token && token.tenantId === tenantId) {
+      if (token && token.tenantId === tenantId && token.consumedAt === null) {
         resetTokens.set(id, { ...token, consumedAt });
+        return 1;
       }
+      return 0;
     },
     async deletePasswordResetTokensByUserId(tenantId, userId) {
       for (const [id, token] of resetTokens) {

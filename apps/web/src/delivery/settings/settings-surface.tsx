@@ -15,7 +15,7 @@ import { usePlanning } from "@/delivery/lib/use-planning";
 import { demoAction } from "@/views/lib/demo";
 import type { PlanningCommand } from "@kiss-pm/domain";
 
-type ProjRaw = { id: string; sourceType: string; sourceOpportunityId: string | null; plannedStart: string; plannedFinish: string; deadline: string; calendarId: string | null };
+type ProjRaw = { id: string; sourceType: string; sourceOpportunityId: string | null; plannedStart: string; plannedFinish: string; deadline: string | null; calendarId: string | null };
 type CalRaw = { id: string; workingWeekdays: number[]; workingMinutesPerDay: number };
 type TaskRaw = { id: string; schedulingMode: "auto" | "manual"; durationMinutes: number | null; customFields?: { kind?: string } };
 
@@ -81,11 +81,12 @@ export function ProjectSettings() {
 
   const { project } = model;
   const finishDay = isoToDay(model.finish);
-  const deadlineDay = isoToDay(project.deadline);
-  const reserveDays = deadlineDay - finishDay;
+  // дедлайн домена nullable: без него резерв не считаем (иначе NaN), показываем «—» как deriveProjectMeta
+  const deadlineDay = project.deadline ? isoToDay(project.deadline) : null;
+  const reserveDays = deadlineDay != null ? deadlineDay - finishDay : null;
   const projectMeta: ProjectMeta = {
     ...PROJECT, planVersion: `v${readModel.planVersion}`, deadline: ddmmyyyy(project.deadline), finish: ddmmyyyy(model.finish),
-    ...(reserveDays < 0 ? { variance: { label: `+${-reserveDays} дн. к дедлайну`, tone: "danger" as const } } : { variance: { label: `резерв ${reserveDays} дн. до дедлайна`, tone: "success" as const } })
+    ...(reserveDays == null ? {} : reserveDays < 0 ? { variance: { label: `+${-reserveDays} дн. к дедлайну`, tone: "danger" as const } } : { variance: { label: `резерв ${reserveDays} дн. до дедлайна`, tone: "success" as const } })
   };
 
   const reasonOk = reason.trim().length > 0;
@@ -103,7 +104,7 @@ export function ProjectSettings() {
     else setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
   }
 
-  const openDeadlineEdit = () => { setDraftDeadline(project.deadline); setReason(""); setEditDeadline(true); setNotice(null); };
+  const openDeadlineEdit = () => { setDraftDeadline(project.deadline ?? ""); setReason(""); setEditDeadline(true); setNotice(null); };
   const submitDeadline = () => void applyCmd({ type: "project.deadline.move", payload: { deadline: draftDeadline, reason: reason.trim() } } as PlanningCommand, "Дедлайн перенесён", () => { setEditDeadline(false); setReason(""); });
 
   return (
@@ -144,7 +145,7 @@ export function ProjectSettings() {
                 <ROValue mono>
                   <span className="flex items-center justify-between gap-2">
                     {ddmmyyyy(model.finish)}
-                    {reserveDays < 0 ? <Chip variant="danger">за дедлайном +{-reserveDays} дн.</Chip> : <Chip variant="success">резерв {reserveDays} дн.</Chip>}
+                    {reserveDays == null ? <Chip>дедлайн не задан</Chip> : reserveDays < 0 ? <Chip variant="danger">за дедлайном +{-reserveDays} дн.</Chip> : <Chip variant="success">резерв {reserveDays} дн.</Chip>}
                   </span>
                 </ROValue>
               </Field>

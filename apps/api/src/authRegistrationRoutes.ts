@@ -136,6 +136,15 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
           email,
           ...hashPassword(password)
         });
+        // Базовый набор системных статусов задач (как в dev-seed): без них
+        // resolveCreateTaskStatus не найдёт статус категории "new" и первая
+        // задача владельца упадёт 400 task_status_not_found. Сидируем только при
+        // наличии tx.createTaskStatus (опциональная возможность data-source).
+        if (tx.createTaskStatus) {
+          for (const status of defaultTaskStatuses(tenantId)) {
+            await tx.createTaskStatus(status);
+          }
+        }
         // Авто-логин: выдаём сессию так же, как в /api/auth/login.
         await tx.createSession({
           id: `session-${randomUUID()}`,
@@ -246,7 +255,12 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
           resetUrl: buildResetUrl(context, rawToken)
         });
       }
-      await deps.authRateLimiter.recordSuccess(rateLimitInput, {
+      // Каждый reset-request считаем попыткой (recordFailure), а НЕ успехом:
+      // recordSuccess удаляет email-bucket, обнуляя накопление к maxFailures,
+      // что позволило бы генерировать неограниченно токенов/писем для известного
+      // адреса. recordFailure инкрементит bucket к блокировке; резерв освобождаем
+      // через опцию reserved, сохраняя семантику reserveAttempt.
+      await deps.authRateLimiter.recordFailure(rateLimitInput, {
         reserved: reservedAttempt
       });
       return context.json({ status: "ok" }, 202);
@@ -318,7 +332,12 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
         return context.json({ error: "token_expired" }, 400);
       }
 
-      await dataSource.withTransaction(async (tx) => {
+      // Погашение токена выполняем ВНУТРИ транзакции и первым шагом: атомарный
+      // UPDATE ... WHERE consumed_at IS NULL возвращает число строк. pre-check выше
+      // ловит обычный повтор, но две параллельные confirm-операции с одним валидным
+      // токеном обе проходят pre-check; здесь побеждает ровно одна (1 строка),
+      // вторая получает 0 и откатывается без смены пароля.
+      const consumed = await dataSource.withTransaction(async (tx) => {
         if (
           !tx.updateCredentialPassword ||
           !tx.markPasswordResetTokenConsumed ||
@@ -328,12 +347,21 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
           throw new Error("transactional_password_reset_not_configured");
         }
 
+        const affected = await tx.markPasswordResetTokenConsumed(
+          record.tenantId,
+          record.id,
+          now
+        );
+        if (affected === 0) {
+          // Токен уже погашен параллельным запросом — пароль не трогаем.
+          return false;
+        }
+
         await tx.updateCredentialPassword(
           record.tenantId,
           record.userId,
           hashPassword(password)
         );
-        await tx.markPasswordResetTokenConsumed(record.tenantId, record.id, now);
         // Инвалидируем прочие токены сброса и разлогиниваем все сессии пользователя.
         await tx.deletePasswordResetTokensByUserId(record.tenantId, record.userId);
         await tx.deleteSessionsByUserId(record.tenantId, record.userId);
@@ -352,7 +380,16 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
           },
           tx
         );
+
+        return true;
       });
+
+      if (!consumed) {
+        await deps.authRateLimiter.recordFailure(rateLimitInput, {
+          reserved: reservedAttempt
+        });
+        return context.json({ error: "reset_token_used" }, 400);
+      }
 
       await deps.authRateLimiter.recordSuccess(rateLimitInput, {
         reserved: reservedAttempt
@@ -390,4 +427,19 @@ function deriveTenantName(ownerName: string, email: string): string {
 function buildResetUrl(context: Context, rawToken: string): string {
   const origin = new URL(context.req.url).origin;
   return `${origin}/auth/reset-password?token=${rawToken}`;
+}
+
+// Системные статусы задач нового тенанта — повторяют дефолты dev-seed
+// (createDefaultTaskStatuses). Обязателен хотя бы статус категории "new", иначе
+// getRequiredStatusByCategory вернёт undefined и create-task вернёт 400.
+function defaultTaskStatuses(tenantId: string) {
+  // PK task_statuses_pkey = (tenant_id, id), поэтому константные id безопасны
+  // для каждого нового тенанта (коллизий между тенантами нет).
+  return [
+    { id: "task-status-new", tenantId, name: "Новая", category: "new" as const, sortOrder: 10, status: "active" as const, isSystem: true },
+    { id: "task-status-waiting", tenantId, name: "Ожидает", category: "waiting" as const, sortOrder: 20, status: "active" as const, isSystem: false },
+    { id: "task-status-in-progress", tenantId, name: "В работе", category: "in_progress" as const, sortOrder: 30, status: "active" as const, isSystem: false },
+    { id: "task-status-review", tenantId, name: "На контроле", category: "review" as const, sortOrder: 40, status: "active" as const, isSystem: false },
+    { id: "task-status-done", tenantId, name: "Выполнено", category: "done" as const, sortOrder: 50, status: "active" as const, isSystem: true }
+  ];
 }

@@ -19,7 +19,7 @@ type RawTask = { id: string; wbsCode: string; title: string };
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
 const h = (min: number) => Math.round(min / 60);
 const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
-const ddmmYyyy = (iso: string) => { const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
+const ddmmYyyy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 const dt = (iso: string) => { const d = new Date(iso); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}, ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
 const deltaCls = (d: number) => (d > 0 ? "text-[var(--warning-text)]" : d < 0 ? "text-[var(--success-text)]" : "text-[var(--muted)]");
 const signDays = (d: number) => `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d)} дн.`;
@@ -69,7 +69,7 @@ export function ProjectBaseline() {
   // хром выводим из РЕАЛЬНЫХ данных (а не статической заглушки PROJECT), чтобы шапка не противоречила плитке
   const projectMeta: ProjectMeta = {
     name: PROJECT.name, code: PROJECT.code, status: PROJECT.status, statusTone: PROJECT.statusTone ?? "info",
-    planVersion: `v${readModel.planVersion}`, deadline: ddmmYyyy((readModel.project as { deadline: string }).deadline), finish: ddmmYyyy(model.projectFinish),
+    planVersion: `v${readModel.planVersion}`, deadline: ddmmYyyy(typeof readModel.project.deadline === "string" ? readModel.project.deadline : null), finish: ddmmYyyy(model.projectFinish),
     ...(baseFinishDay && projFinishDelta !== 0 ? { variance: { label: `${signDays(projFinishDelta)} к базовому плану`, tone: projFinishDelta > 0 ? ("warning" as const) : ("success" as const) } } : {})
   };
   const rows = onlyChanged ? changed : tasks;

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createPlanningApiClient, PlanningApiError } from "@kiss-pm/planning-client";
 import type { PlanningCommand } from "@kiss-pm/domain";
 
-import { buildPortfolioModel, createMockPlanningFetch, dayToIso, isoToDay, MOCK_PROJECT_ID } from "./mock-planning-backend";
+import { buildPortfolioModel, createMockPlanningFetch, dayToIso, MOCK_PROJECT_ID } from "./mock-planning-backend";
 
 function client() {
   return createPlanningApiClient({ apiOrigin: "", fetchImpl: createMockPlanningFetch() });
@@ -91,7 +91,7 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     const c = client();
     const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
     const ov = (rm.resourceLoad as unknown as { overloads: Array<{ resourceId: string; date: string }> }).overloads[0]!;
-    const key = `${ov.resourceId}|${isoToDay(ov.date)}`;
+    const key = `${ov.resourceId}:${ov.date}`;
     const res = await c.applyCommand(MOCK_PROJECT_ID, {
       command: { type: "risk.accept_overload", payload: { overloadId: key, acceptedRiskReason: "test" } } as PlanningCommand,
       clientPlanVersion: rm.planVersion
@@ -268,7 +268,7 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     const res = await c.applyScenario(MOCK_PROJECT_ID, "scenario-aggressive", { clientPlanVersion: rm.planVersion, acceptedRiskReason: "Согласовано с руководителем проекта" });
     expect(res.newPlanVersion).toBe(rm.planVersion + 1);
     const accepted = (res.readModel.resourceLoad as unknown as { acceptedOverloads: string[] }).acceptedOverloads;
-    expect(accepted).toContain(`${ov.resourceId}|${isoToDay(ov.date)}`);
+    expect(accepted).toContain(`${ov.resourceId}:${ov.date}`);
   });
 
   it("baselineComparison compares all leaf tasks against the latest baseline with real work delta + history", async () => {

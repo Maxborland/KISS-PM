@@ -236,7 +236,9 @@ export function TaskModal({ open, mode, initial, onOpenChange, onSubmit }: { ope
     if (open) { setTitle(initial.title); setAssigneeId(initial.assigneeId); setStartIso(initial.startIso); setDurDays(String(initial.durDays)); setWorkH(String(initial.workH)); setPct(String(initial.pct)); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-  const d = Math.max(0, Number(durDays) || 0);
+  // длительность ≥ 1: домен отклоняет durationMinutes <= 0 (task.create/update_work_model),
+  // поэтому модалка никогда не отправляет 0 дн. Веха задаётся отдельным действием.
+  const d = Math.max(1, Number(durDays) || 0);
   const units = d > 0 ? Math.round(((Number(workH) || 0) / (d * 8)) * 100) : 100;
   const submit = () => { if (!title.trim()) return; onSubmit({ title: title.trim(), assigneeId, startIso, durDays: d, workH: Math.max(0, Number(workH) || 0), pct: Math.max(0, Math.min(100, Number(pct) || 0)) }); onOpenChange(false); };
   const FIELD = "rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1.5 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]";

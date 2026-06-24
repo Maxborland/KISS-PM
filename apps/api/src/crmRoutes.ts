@@ -680,17 +680,40 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseDealStageBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
+    // Мультиворонки: новая стадия должна попасть в реальную воронку, иначе она
+    // выпадает из всех колонок Deals (фильтр по pipelineId). Если pipelineId передан
+    // явно — он должен ссылаться на существующую воронку; если опущен (контрактный
+    // клиент его прислать не может) — берём дефолтную воронку тенанта.
+    let resolvedPipelineId = parsed.value.pipelineId;
+    if (resolvedPipelineId !== null) {
+      if (!dataSource.findPipelineById) {
+        return context.json({ error: "persistence_not_configured" }, 501);
+      }
+      const pipeline = await dataSource.findPipelineById(actor.tenantId, resolvedPipelineId);
+      if (!pipeline) return context.json({ error: "pipeline_not_found" }, 404);
+    } else {
+      if (!dataSource.listPipelines) {
+        return context.json({ error: "persistence_not_configured" }, 501);
+      }
+      const pipelines = await dataSource.listPipelines(actor.tenantId);
+      const defaultPipeline =
+        pipelines.find((pipeline) => pipeline.isDefault) ?? pipelines[0];
+      if (!defaultPipeline) return context.json({ error: "pipeline_not_found" }, 404);
+      resolvedPipelineId = defaultPipeline.id;
+    }
+    const stageInput = { ...parsed.value, pipelineId: resolvedPipelineId };
+
     const dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.createDealStage) {
         throw new Error("transactional_deal_stage_create_not_configured");
       }
-      const created = await transactionDataSource.createDealStage(parsed.value);
+      const created = await transactionDataSource.createDealStage(stageInput);
       await appendManagementAuditEvent(
         auditInput({
           actor,
           actionType: "deal_stage.created",
           sourceEntity: { type: "DealStage", id: created.id },
-          commandInput: parsed.value,
+          commandInput: stageInput,
           beforeState: null,
           afterState: created,
           permissionResult: decision
@@ -744,8 +767,10 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     if (!body.ok) return context.json({ error: body.error }, body.status);
     if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
     // Мультиворонки: сохраняем существующую воронку стадии (тело её не несёт).
+    // pipelineId ставится ПОСЛЕ спреда тела, чтобы случайный/постороний pipelineId
+    // в body не смог переместить стадию в другую воронку мимо контракта.
     const parsed = parseDealStageBody(
-      { pipelineId: beforeState.pipelineId, ...body.value, id: stageId },
+      { ...body.value, pipelineId: beforeState.pipelineId, id: stageId },
       actor.tenantId
     );
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
@@ -889,7 +914,19 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
-    const parsed = parsePipelineBody({ ...body.value, id: pipelineId }, actor.tenantId);
+    // Мультиворонки: isDefault/status опциональны в контракте, а парсер дефолтит их
+    // (false / "active"). Подмешиваем before-state ДО спреда тела, чтобы частичное
+    // обновление (rename/reorder) не сбрасывало флаг дефолта и не реактивировало
+    // архивную воронку; явно присланные поля тела по-прежнему перекрывают before-state.
+    const parsed = parsePipelineBody(
+      {
+        isDefault: beforeState.isDefault,
+        status: beforeState.status,
+        ...body.value,
+        id: pipelineId
+      },
+      actor.tenantId
+    );
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const pipeline = await runDataSourceTransaction(async (transactionDataSource) => {
@@ -1115,7 +1152,8 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
         );
       });
 
-      return context.json({ ok: true });
+      // OkResponse-контракт: { status: "ok" } (как logout/saved-views delete).
+      return context.json({ status: "ok" });
     }
   );
 

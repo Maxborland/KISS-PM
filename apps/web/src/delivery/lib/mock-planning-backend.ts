@@ -130,7 +130,7 @@ type Authored = {
   assignmentAllocations: AllocationA[];
   reservations: ReservationA[];
   exceptions: ExceptionA[];
-  acceptedOverloads: string[]; // ключи "resourceId|day"
+  acceptedOverloads: string[]; // каноничные ключи "resourceId:dateIso" (как acceptedRiskIds домена)
   baselines: BaselineA[]; // зафиксированные снимки плана (PlanBaseline); сравнение идёт с последним
   // project-уровень (редактируется командами project.deadline.move / project.settings.update)
   projectDeadline: string; // PlanDate (ISO) внешнего дедлайна релиза
@@ -381,14 +381,26 @@ function buildResourceLoad(a: Authored, calc: Map<string, Calc>, projectId: stri
   const isWeekday = (day: number) => { const d = dow(day); return d >= 1 && d <= 5; };
   const lastDay = Math.max(34, ...a.tasks.filter((t) => t.kind !== "summary").map((t) => calc.get(t.id)?.ef ?? 0));
 
-  // часы/день = work / календарные дни интервала; начисляем ТОЛЬКО в будни (на выходных нагрузки нет).
-  // даёт ~8 ч/день (≈100%) для обычной задачи; перегруз — только на реальных пересечениях задач у ресурса.
+  // часы/день = work / РАБОЧИЕ дни интервала; начисляем ТОЛЬКО в будни (на выходных нагрузки нет).
+  // делим на число рабочих дней (будни с capacity>0), а не на календарные — иначе для задачи
+  // с выходными внутри интервала сумма начислений < workMinutes (занижение загрузки/перегруза).
+  // capacity ресурса в день = праздник доминирует над персональным отсутствием, затем будни.
+  const capacityOf = (resourceId: string, day: number): number => {
+    const hExc = a.exceptions.find((e) => e.resourceId === null && e.day === day);
+    if (hExc) return hExc.workingMinutes;
+    const rExc = a.exceptions.find((e) => e.resourceId === resourceId && e.day === day);
+    if (rExc) return rExc.workingMinutes;
+    return isWeekday(day) ? resOf(resourceId)?.capacityMinPerDay ?? 0 : 0;
+  };
   const asgPerDay = new Map<string, { es: number; ef: number; taskId: string; resourceId: string; per: number }>();
   for (const asg of a.assignments) {
     if (!WORKING_ROLES.has(asg.role)) continue; // только исполнители грузят ресурс
     const c = calc.get(asg.taskId);
     if (!c) continue;
-    asgPerDay.set(asg.id, { es: c.es, ef: c.ef, taskId: asg.taskId, resourceId: asg.resourceId, per: Math.round((asg.workMinutes * (asg.unitsPermille / 1000)) / Math.max(1, c.ef - c.es)) });
+    let workingDays = 0;
+    for (let day = c.es; day < c.ef; day++) if (capacityOf(asg.resourceId, day) > 0) workingDays += 1;
+    const work = asg.workMinutes * (asg.unitsPermille / 1000);
+    asgPerDay.set(asg.id, { es: c.es, ef: c.ef, taskId: asg.taskId, resourceId: asg.resourceId, per: Math.round(work / Math.max(1, workingDays)) });
   }
   // явная дневная кривая: assignmentId → (day → минуты). Если у назначения она есть — берём её, иначе ровное per.
   const explicitByAsg = new Map<string, Map<number, number>>();
@@ -647,6 +659,20 @@ function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; cha
       t.title = String(cmd.payload.title ?? t.title);
       return { ok: true, changedTaskIds: [t.id] };
     }
+    case "task.update_custom_field": {
+      // Зеркало реального редьюсера (commandReducer.ts): пишем customFields[fieldKey]=value.
+      // В моке используется только поле "kind" (summary/task/milestone) — сериализуется в
+      // customFields.kind (см. ~505). «Сделать вехой» = kind:"milestone".
+      const t = find(cmd.payload.taskId as string);
+      if (!t) return { ok: false, changedTaskIds: [], error: "task_not_found" };
+      const fieldKey = String(cmd.payload.fieldKey ?? "");
+      if (fieldKey.trim().length === 0) return { ok: false, changedTaskIds: [], error: "planning_command_invalid" };
+      if (fieldKey === "kind") {
+        const v = String(cmd.payload.value);
+        if (v === "summary" || v === "task" || v === "milestone") t.kind = v;
+      }
+      return { ok: true, changedTaskIds: [t.id] };
+    }
     case "assignment.upsert": {
       const p = cmd.payload;
       const taskId = String(p.taskId);
@@ -663,6 +689,7 @@ function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; cha
         asg.resourceId = resourceId;
         asg.unitsPermille = units;
         if (wm != null) asg.workMinutes = wm;
+        if (p.role != null) asg.role = String(p.role); // смена роли (executor↔observer) меняет членство WORKING_ROLES → пересчёт загрузки
         target = asg;
       } else {
         target = { id: id || `a-${a.assignments.length + 1}`, taskId, resourceId, role: String(p.role ?? "executor"), unitsPermille: units, workMinutes: wm ?? t.workMinutes };
@@ -768,8 +795,14 @@ function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; cha
       const p = cmd.payload;
       const id = String(p.id);
       const parentId = (p.parentTaskId as string | null) ?? null;
+      // контракт: даты авторские (plannedStart/plannedFinish); finish без start → null;
+      // длительность считается из дат, если обе заданы, иначе из durationMinutes (дефолт 5 дн.).
+      const ps = (p.plannedStart as string | null) ?? null;
+      const pf = (p.plannedFinish as string | null) ?? null;
       const dm = p.durationMinutes as number | null;
-      const durDays = dm != null ? Math.max(0, Math.round(dm / MIN_PER_DAY)) : 5;
+      const durDays = ps != null && pf != null
+        ? Math.max(0, isoToDay(pf) - isoToDay(ps))
+        : dm != null ? Math.max(0, Math.round(dm / MIN_PER_DAY)) : 5;
       let wbs: string;
       let insertAt: number;
       if (parentId) {
@@ -780,24 +813,46 @@ function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; cha
         const descendants = a.tasks.filter((t) => t.wbs.startsWith(parent.wbs + "."));
         const lastDesc = descendants[descendants.length - 1] ?? parent;
         insertAt = a.tasks.indexOf(lastDesc) + 1;
+        // лист → summary: его собственные назначения/кривые сбрасываются (rollup от детей, не от него)
+        if (parent.kind !== "summary") {
+          a.assignments = a.assignments.filter((x) => x.taskId !== parentId);
+          a.assignmentAllocations = a.assignmentAllocations.filter((x) => x.taskId !== parentId);
+          relabelTask(a, parent);
+        }
         parent.kind = "summary";
       } else {
         wbs = `${a.tasks.filter((t) => t.parentTaskId === null).length + 1}`;
         insertAt = a.tasks.length;
       }
-      a.tasks.splice(insertAt, 0, {
+      const created = {
         id,
         wbs,
         parentTaskId: parentId,
         title: String(p.title ?? "Новая задача"),
-        kind: "task",
-        mode: "auto",
+        kind: "task" as Kind,
+        mode: "auto" as Mode,
         durDays,
         workMinutes: typeof p.workMinutes === "number" ? p.workMinutes : durDays * MIN_PER_DAY,
         pct: 0,
         res: "—",
-        startDay: null
-      });
+        // авторский старт = ограничение «не раньше» (как task.update_schedule), если задан
+        startDay: ps != null ? isoToDay(ps) : null
+      };
+      a.tasks.splice(insertAt, 0, created);
+      // встроенные назначения payload-а (как реальный reducer): id по умолчанию `${taskId}-assignment-N`
+      if (Array.isArray(p.assignments)) {
+        (p.assignments as Array<Record<string, unknown>>).forEach((asg, index) => {
+          a.assignments.push({
+            id: asg.id != null ? String(asg.id) : `${id}-assignment-${index + 1}`,
+            taskId: id,
+            resourceId: String(asg.resourceId),
+            role: String(asg.role ?? "executor"),
+            unitsPermille: (asg.unitsPermille as number) ?? 1000,
+            workMinutes: asg.workMinutes == null ? created.workMinutes : (asg.workMinutes as number)
+          });
+        });
+        relabelTask(a, created); // res-label из назначений
+      }
       renumber(a);
       return { ok: true, changedTaskIds: [id] };
     }
@@ -811,6 +866,10 @@ function applyCommand(a: Authored, command: PlanningCommand): { ok: boolean; cha
       a.assignments = a.assignments.filter((x) => !ids.has(x.taskId));
       a.assignmentAllocations = a.assignmentAllocations.filter((x) => !ids.has(x.taskId));
       renumber(a);
+      // summary без детей (удалили последнего ребёнка) → обратно обычная задача (как в task.move_wbs)
+      for (const s of a.tasks) {
+        if (s.kind === "summary" && !a.tasks.some((x) => x.parentTaskId === s.id)) { s.kind = "task"; if (s.durDays === 0) s.durDays = 5; }
+      }
       return { ok: true, changedTaskIds: [] };
     }
     case "task.move_wbs": {
@@ -1018,7 +1077,7 @@ export function buildScenarioProposals(base: Authored, target: ScenarioTargetMoc
     commands: PlanningCommand[], m: ScenarioMetrics, changedAssignmentIds: string[]
   ): ScenarioProposalMock => ({
     id: `scenario-${profile}`, profile, conflictEffect,
-    planDelta: { commands, changedTaskIds: m.changedTaskIds, changedAssignmentIds, acceptedRiskIds: conflictEffect === "accepted" ? [`${target.resourceId}|${isoToDay(target.date)}`] : [] },
+    planDelta: { commands, changedTaskIds: m.changedTaskIds, changedAssignmentIds, acceptedRiskIds: conflictEffect === "accepted" ? [`${target.resourceId}:${target.date}`] : [] },
     explainability: {
       finishDate: m.finishDate, deadlineDeltaDays: 0, overloadMinutes: m.targetOverloadMinutes, overloadedResourceIds: m.overloadedResourceIds,
       changedTaskIds: m.changedTaskIds, changedAssignmentIds, dependencyWarnings: [], requiredApprovals: conflictEffect === "accepted" ? ["tenant.planning_scenarios.apply"] : [], riskScore
@@ -1029,7 +1088,7 @@ export function buildScenarioProposals(base: Authored, target: ScenarioTargetMoc
 
   // aggressive — принять перегруз (срок не двигаем)
   {
-    const commands = [{ type: "risk.accept_overload", payload: { overloadId: `${target.resourceId}|${isoToDay(target.date)}`, acceptedRiskReason: "Сохранить дату финиша, принять перегруз как риск" } }] as unknown as PlanningCommand[];
+    const commands = [{ type: "risk.accept_overload", payload: { overloadId: `${target.resourceId}:${target.date}`, acceptedRiskReason: "Сохранить дату финиша, принять перегруз как риск" } }] as unknown as PlanningCommand[];
     const m = evaluateScenario(base, commands, target);
     if (m.ok) out.push(mk("aggressive", "accepted", 80, commands, m, []));
   }

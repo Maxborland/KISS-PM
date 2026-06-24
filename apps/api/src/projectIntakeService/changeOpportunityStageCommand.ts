@@ -1,11 +1,70 @@
 import { evaluateStageTransition } from "@kiss-pm/domain";
 import type { TenantUser } from "@kiss-pm/domain";
+import type {
+  DealStageRecord,
+  OpportunityRecord
+} from "../apiTypes";
 import { authorizeOpportunityStageChange } from "./authorization";
 import { isFinalOpportunityStatus } from "./opportunityStatus";
 import type {
   ChangeOpportunityStageResult,
-  ProjectIntakeServiceDeps
+  ProjectIntakeServiceDataSource,
+  ProjectIntakeServiceDeps,
+  ServiceError
 } from "./types";
+
+// Мультиворонки: общая проверка правил перехода ВНУТРИ воронки сделки.
+// Используется и эндпоинтом /stage, и full-update PATCH /opportunities/:id
+// (чтобы смену stageId через полное сохранение карточки нельзя было протащить
+// мимо гвардов перехода). Чистая часть правил живёт в домене evaluateStageTransition;
+// здесь — резолв исходной воронки/переходов из хранилища и маппинг отказа в статус.
+export async function evaluateOpportunityStageTransition(
+  dataSource: Pick<
+    ProjectIntakeServiceDataSource,
+    "findDealStageById" | "listStageTransitions"
+  >,
+  tenantId: TenantUser["tenantId"],
+  opportunity: OpportunityRecord,
+  targetStage: Pick<DealStageRecord, "id" | "pipelineId">
+): Promise<{ ok: true } | ServiceError> {
+  // Исходную воронку берём из текущей стадии сделки; если её нет (сделка без
+  // стадии, метод/правила не настроены) — переход разрешён (back-compat).
+  const currentStage = opportunity.stageId
+    ? await dataSource.findDealStageById!(tenantId, opportunity.stageId)
+    : undefined;
+  const sourcePipelineId = currentStage?.pipelineId ?? null;
+  const transitions =
+    sourcePipelineId && dataSource.listStageTransitions
+      ? await dataSource.listStageTransitions(tenantId, sourcePipelineId)
+      : [];
+  const decision = evaluateStageTransition({
+    opportunity: {
+      finalized: false,
+      stageId: opportunity.stageId ?? null,
+      pipelineId: sourcePipelineId,
+      probability: opportunity.probability,
+      feasibilityStatus: opportunity.feasibilityStatus ?? null
+    },
+    targetStage: { id: targetStage.id, pipelineId: targetStage.pipelineId ?? null },
+    transitions: transitions.map((transition) => ({
+      fromStageId: transition.fromStageId,
+      toStageId: transition.toStageId,
+      requireFeasibilityOk: transition.requireFeasibilityOk,
+      minProbability: transition.minProbability
+    }))
+  });
+  if (!decision.allowed) {
+    // Условия перехода (вероятность/реализуемость) → 422; остальное (запрет
+    // перехода, кросс-воронка, финал) → 409.
+    const status =
+      decision.reason === "condition_probability" ||
+      decision.reason === "condition_feasibility"
+        ? 422
+        : 409;
+    return { ok: false, status, error: decision.reason };
+  }
+  return { ok: true };
+}
 
 export async function changeOpportunityStage(
   deps: ProjectIntakeServiceDeps,
@@ -35,43 +94,14 @@ export async function changeOpportunityStage(
     return { ok: false, status: 404, error: "deal_stage_not_found" };
   }
 
-  // Мультиворонки: проверка правил перехода ВНУТРИ воронки сделки.
-  // Исходную воронку берём из текущей стадии сделки; если её нет (сделка без
-  // стадии, метод/правила не настроены) — переход разрешён (back-compat).
-  const currentStage = opportunity.stageId
-    ? await deps.dataSource.findDealStageById!(input.actor.tenantId, opportunity.stageId)
-    : undefined;
-  const sourcePipelineId = currentStage?.pipelineId ?? null;
-  const transitions =
-    sourcePipelineId && deps.dataSource.listStageTransitions
-      ? await deps.dataSource.listStageTransitions(input.actor.tenantId, sourcePipelineId)
-      : [];
-  const decision = evaluateStageTransition({
-    opportunity: {
-      finalized: false,
-      stageId: opportunity.stageId ?? null,
-      pipelineId: sourcePipelineId,
-      probability: opportunity.probability,
-      feasibilityStatus: opportunity.feasibilityStatus ?? null
-    },
-    targetStage: { id: stage.id, pipelineId: stage.pipelineId ?? null },
-    transitions: transitions.map((transition) => ({
-      fromStageId: transition.fromStageId,
-      toStageId: transition.toStageId,
-      requireFeasibilityOk: transition.requireFeasibilityOk,
-      minProbability: transition.minProbability
-    }))
-  });
-  if (!decision.allowed) {
-    // Условия перехода (вероятность/реализуемость) → 422; остальное (запрет
-    // перехода, кросс-воронка, финал) → 409.
-    const status =
-      decision.reason === "condition_probability" ||
-      decision.reason === "condition_feasibility"
-        ? 422
-        : 409;
-    return { ok: false, status, error: decision.reason };
-  }
+  // Мультиворонки: проверка правил перехода ВНУТРИ воронки сделки (общий хелпер).
+  const transitionGuard = await evaluateOpportunityStageTransition(
+    deps.dataSource,
+    input.actor.tenantId,
+    opportunity,
+    stage
+  );
+  if (!transitionGuard.ok) return transitionGuard;
 
   const opportunityAfterChange = await deps.runDataSourceTransaction(
     async (transactionDataSource) => {

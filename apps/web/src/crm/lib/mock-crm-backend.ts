@@ -658,6 +658,8 @@ export function createMockCrmFetch(): typeof fetch {
       if (!pipeline) return err("pipeline_not_found", 404);
       const stage = db.dealStages.find((x) => x.id === stageId);
       if (!stage) return err("deal_stage_not_found", 404);
+      // Тот же пайплайн — это не «перенос в воронку» (зеркало боевого changeOpportunityPipelineCommand).
+      if (pipeline.id === o.pipelineId) return err("cross_pipeline_move", 409);
       const decision = evaluatePipelineChange({
         opportunity: { finalized: isFinal(o) },
         targetPipeline: { id: pipeline.id, status: pipeline.status },

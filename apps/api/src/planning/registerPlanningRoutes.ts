@@ -1,6 +1,8 @@
 import {
   canApplyPlanningScenarios,
-  canPreviewPlanningScenarios
+  canManageProjectResources,
+  canPreviewPlanningScenarios,
+  canReadProjectResources
 } from "@kiss-pm/access-control";
 import { isBlockingValidationIssue, proposePlanningScenarios } from "@kiss-pm/domain";
 import type { Handler, Hono } from "hono";
@@ -80,7 +82,15 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, parsedProjectId.value);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
 
-    return context.json(createPlanningReadModel(snapshot));
+    // Ресурсные исключения календаря (персональные отсутствия resourceId!=null) отдаём только
+    // актору с правом на ресурсы — read/manage. Без права read-model вернёт лишь общепроектные
+    // праздники (resourceId=null), чтобы не раскрывать чужие отсутствия.
+    const resourcePermissionInput = { actor, profile, targetTenantId: actor.tenantId };
+    const includeResourceExceptions =
+      canReadProjectResources(resourcePermissionInput).allowed ||
+      canManageProjectResources(resourcePermissionInput).allowed;
+
+    return context.json(createPlanningReadModel(snapshot, { includeResourceExceptions }));
   });
 
   app.post("/api/workspace/projects/:projectId/planning/preview-command", async (context) => {

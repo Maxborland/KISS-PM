@@ -81,7 +81,8 @@ function mapRows(rm: PlanningReadModel): { rows: Row[]; deadlineDay: number; pro
     const dayStart = start ? isoToDay(start) : 0;
     const dayDur = start && finish ? isoToDay(finish) - dayStart : 0;
     const cf = t.customFields ?? {};
-    const kind: Kind = cf.kind === "summary" ? "summary" : t.durationMinutes === 0 ? "milestone" : "task";
+    // веха: пользовательское поле kind=milestone (как в overview/inspector/settings) ИЛИ нулевая длительность
+    const kind: Kind = cf.kind === "summary" ? "summary" : cf.kind === "milestone" || t.durationMinutes === 0 ? "milestone" : "task";
     const predList = predsBySucc.get(t.id) ?? [];
     const predDisplay = predList.length
       ? predList.map((p) => `${wbsById.get(p.predId) ?? "?"} ${DEP_RU[p.type] ?? p.type}${p.lagDays ? ` +${p.lagDays}д` : ""}`).join(", ")
@@ -303,7 +304,9 @@ export function ProjectSchedule() {
   const [batchMode, setBatchMode] = useState(false);
   const [staged, setStaged] = useState<PlanningCommand[]>([]);
   const [canUndo, setCanUndo] = useState(false);
-  const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; parentId: string | null; taskId?: string; initial: TaskModalValues } | null>(null);
+  // asgId — id текущего назначения редактируемой задачи: reuse в submitTaskModal, чтобы upsert
+  // обновлял его (а не плодил второе назначение, удваивая нагрузку — реальный редьюсер upsert-ит по id).
+  const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; parentId: string | null; taskId?: string; asgId?: string; initial: TaskModalValues } | null>(null);
   const [colW, setColW] = useState<number[]>(() => [...DEFAULT_COLW]);
   const [colDrag, setColDrag] = useState<ColDrag | null>(null);
   const [link, setLink] = useState<LinkDrag | null>(null);
@@ -316,6 +319,10 @@ export function ProjectSchedule() {
   const lastCommitRef = useRef<{ commands: PlanningCommand[]; before: PlanningReadModel } | null>(null);
   const batchBaseRef = useRef<PlanningReadModel | null>(null);
   const ganttRef = useRef<HTMLDivElement>(null);
+  // Актуальный read-model для window-обработчиков drag/resize (без устаревшего замыкания эффекта):
+  // нужен, чтобы в момент отпускания резолвить текущее назначение задачи и синхронить его труд.
+  const readModelRef = useRef(readModel);
+  readModelRef.current = readModel;
 
   // drag/resize баров: window-слушатели (надёжно, без устаревших замыканий)
   useEffect(() => {
@@ -354,7 +361,15 @@ export function ProjectSchedule() {
       } else {
         const nd = Math.max(1, cur.origDur + cur.deltaDays);
         const u = cur.origDur > 0 ? cur.origWorkH / (cur.origDur * HPD) : 1;
-        void applyCmd({ type: "task.update_work_model", payload: { taskId: cur.id, taskType: "fixed_duration", effortDriven: false, durationMinutes: nd * MIN_PER_DAY, workMinutes: Math.max(0, Math.round(nd * HPD * u * 60)) } } as PlanningCommand);
+        const wm = Math.max(0, Math.round(nd * HPD * u * 60));
+        const cmds: PlanningCommand[] = [
+          { type: "task.update_work_model", payload: { taskId: cur.id, taskType: "fixed_duration", effortDriven: false, durationMinutes: nd * MIN_PER_DAY, workMinutes: wm } } as PlanningCommand
+        ];
+        // синхронизируем труд назначения (загрузка ресурса считается из assignment.workMinutes)
+        const asgs = (readModelRef.current?.authored as unknown as { assignments: Array<{ id: string; taskId: string; resourceId: string; role?: string; unitsPermille?: number }> } | undefined)?.assignments;
+        const asg = asgs?.find((x) => x.taskId === cur.id);
+        if (asg) cmds.push({ type: "assignment.upsert", payload: { id: asg.id, taskId: cur.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } } as PlanningCommand);
+        if (cmds.length > 1) void runBatch(cmds); else void applyCmd(cmds[0]!);
       }
     };
     window.addEventListener("pointermove", move);
@@ -562,27 +577,86 @@ export function ProjectSchedule() {
   const openRow = (id: string) => { setSel(id); setInspectorOpen(true); };
 
   // --- команды ---
+  // Текущее назначение задачи из read-model (по taskId): нужен его id, чтобы upsert
+  // обновлял существующее назначение, а не плодил второе (реальный редьюсер upsert-ит строго по id).
+  type AsgRM = { id: string; taskId: string; resourceId: string; role?: string; unitsPermille?: number; workMinutes?: number | null };
+  const authoredAsgs = (readModel.authored as unknown as { assignments: AsgRM[] }).assignments;
+  const currentAsg = (taskId: string): AsgRM | undefined => authoredAsgs.find((x) => x.taskId === taskId);
   const workCmd = (taskId: string, durDays: number, workH: number): PlanningCommand =>
     ({ type: "task.update_work_model", payload: { taskId, taskType: "fixed_duration", effortDriven: false, durationMinutes: durDays * MIN_PER_DAY, workMinutes: Math.max(0, Math.round(workH * 60)) } }) as PlanningCommand;
-  const editDuration = (r: Row, days: number) => { const u = r.durDays > 0 ? r.workH / (r.durDays * HPD) : 1; void applyCmd(workCmd(r.id, days, Math.round(days * HPD * u))); };
-  const editWork = (r: Row, workH: number) => void applyCmd(workCmd(r.id, r.durDays, workH));
-  const editUnits = (r: Row, pct: number) => void applyCmd(workCmd(r.id, r.durDays, Math.round(r.durDays * HPD * (pct / 100))));
+  // Правка труда/длительности должна синхронизировать ТРУД назначения: загрузка ресурса
+  // считается из assignment.workMinutes, иначе WBS покажет новые часы, а Ресурсы/Сценарии —
+  // старую нагрузку. Шлём task.update_work_model + assignment.upsert (по id текущего назначения).
+  const workEdit = (r: Row, durDays: number, workH: number) => {
+    const wm = Math.max(0, Math.round(workH * 60));
+    const cmds: PlanningCommand[] = [workCmd(r.id, durDays, workH)];
+    const asg = currentAsg(r.id);
+    if (asg) cmds.push({ type: "assignment.upsert", payload: { id: asg.id, taskId: r.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } } as PlanningCommand);
+    void runBatch(cmds);
+  };
+  const editDuration = (r: Row, days: number) => { const u = r.durDays > 0 ? r.workH / (r.durDays * HPD) : 1; workEdit(r, days, Math.round(days * HPD * u)); };
+  const editWork = (r: Row, workH: number) => workEdit(r, r.durDays, workH);
+  const editUnits = (r: Row, pct: number) => workEdit(r, r.durDays, Math.round(r.durDays * HPD * (pct / 100)));
   const editName = (r: Row, title: string) => void applyCmd({ type: "task.update_identity", payload: { taskId: r.id, title } } as PlanningCommand);
   const editPct = (r: Row, pct: number) => void applyCmd({ type: "task.update_progress", payload: { taskId: r.id, percentComplete: Math.max(0, Math.min(100, pct)) } } as PlanningCommand);
   const editDate = (r: Row, iso: string) => void applyCmd({ type: "task.update_schedule", payload: { taskId: r.id, plannedStart: iso, plannedFinish: dayToIso(isoToDay(iso) + r.dayDur) } } as PlanningCommand);
-  const editFinish = (r: Row, iso: string) => { const startIso = r.startIso || dayToIso(r.dayStart); if (isoToDay(iso) > isoToDay(startIso)) void applyCmd({ type: "task.update_schedule", payload: { taskId: r.id, plannedStart: startIso, plannedFinish: iso } } as PlanningCommand); };
-  const assignRes = (taskId: string, resourceId: string) => void applyCmd({ type: "assignment.upsert", payload: { id: genId("a"), taskId, resourceId, role: "executor", unitsPermille: 1000, workMinutes: null } } as PlanningCommand);
+  // Перенос окончания = изменение длительности: помимо update_schedule (авторские даты)
+  // шлём update_work_model с новой длительностью + синхроним труд назначения, иначе на живом
+  // read-model длина бара (она идёт от durationMinutes движка) осталась бы прежней.
+  const editFinish = (r: Row, iso: string) => {
+    const startIso = r.startIso || dayToIso(r.dayStart);
+    const newDur = isoToDay(iso) - isoToDay(startIso);
+    if (newDur < 1) return;
+    const u = r.durDays > 0 ? r.workH / (r.durDays * HPD) : 1;
+    const workH = Math.round(newDur * HPD * u);
+    const cmds: PlanningCommand[] = [
+      { type: "task.update_schedule", payload: { taskId: r.id, plannedStart: startIso, plannedFinish: iso } } as PlanningCommand,
+      workCmd(r.id, newDur, workH)
+    ];
+    const asg = currentAsg(r.id);
+    if (asg) cmds.push({ type: "assignment.upsert", payload: { id: asg.id, taskId: r.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: Math.max(0, Math.round(workH * 60)) } } as PlanningCommand);
+    void runBatch(cmds);
+  };
+  // Переназначение ресурса: переиспользуем id текущего назначения (если есть), иначе genId —
+  // реальный редьюсер upsert-ит строго по payload.id, новый id добавил бы второе назначение.
+  const assignRes = (taskId: string, resourceId: string) => { const asg = currentAsg(taskId); void applyCmd({ type: "assignment.upsert", payload: { id: asg?.id ?? genId("a"), taskId, resourceId, role: asg?.role ?? "executor", unitsPermille: asg?.unitsPermille ?? 1000, workMinutes: null } } as PlanningCommand); };
   const depAdd = (succId: string, predId: string, type: string, lagDays: number) => void applyCmd({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: predId, successorTaskId: succId, dependencyType: type, lagMinutes: lagDays * MIN_PER_DAY } } as PlanningCommand);
   const depRemove = (depId: string) => void applyCmd({ type: "dependency.delete", payload: { dependencyId: depId } } as PlanningCommand);
   const depUpsert = (depId: string, predId: string, succId: string, type: string, lagDays: number) => void applyCmd({ type: "dependency.upsert", payload: { id: depId, predecessorTaskId: predId, successorTaskId: succId, dependencyType: type, lagMinutes: lagDays * MIN_PER_DAY } } as PlanningCommand);
-  const makeMilestone = (r: Row) => void applyCmd(workCmd(r.id, 0, 0));
-  const deleteTask = (r: Row) => void applyCmd({ type: "task.delete_or_archive", payload: { taskId: r.id, mode: "delete" } } as PlanningCommand);
-  const moveCmd = (taskId: string, parentTaskId: string | null): PlanningCommand => ({ type: "task.move_wbs", payload: { taskId, parentTaskId, sortOrder: 0 } }) as PlanningCommand;
-  const prevSibling = (r: Row): Row | null => { const sibs = rows.filter((x) => x.parentId === r.parentId); const i = sibs.findIndex((x) => x.id === r.id); return i > 0 ? sibs[i - 1]! : null; };
+  // Веха = пользовательское поле kind=milestone (как читают overview/inspector/settings),
+  // а НЕ durationMinutes:0 — домен отклоняет нулевую длительность (validateWorkModelPayload).
+  const makeMilestone = (r: Row) => void applyCmd({ type: "task.update_custom_field", payload: { taskId: r.id, fieldKey: "kind", value: "milestone" } } as PlanningCommand);
+  const deleteTask = (r: Row) => {
+    // Удаление summary: реальный редьюсер сносит только саму задачу и оставляет детей сиротами.
+    // Шлём явный пакет удаления всего поддерева (summary + потомки по wbs), а не один delete.
+    if (r.kind === "summary") {
+      const subtree = rows.filter((x) => x.id === r.id || x.wbs.startsWith(r.wbs + "."));
+      // снизу вверх (сначала листья), чтобы не удалять родителя раньше детей
+      const ordered = subtree.slice().sort((a, b) => b.wbs.length - a.wbs.length);
+      void runBatch(ordered.map((x) => ({ type: "task.delete_or_archive", payload: { taskId: x.id, mode: "delete" } }) as PlanningCommand));
+      return;
+    }
+    void applyCmd({ type: "task.delete_or_archive", payload: { taskId: r.id, mode: "delete" } } as PlanningCommand);
+  };
+  // sortOrder = целевой индекс среди детей нового родителя (реальный редьюсер вставляет по нему;
+  // 0 всегда ставил бы строку перед всеми сиблингами). Мок sortOrder игнорирует — паритет сохраняется.
+  const moveCmd = (taskId: string, parentTaskId: string | null, sortOrder: number): PlanningCommand => ({ type: "task.move_wbs", payload: { taskId, parentTaskId, sortOrder } }) as PlanningCommand;
+  const childrenOf = (parentId: string | null) => rows.filter((x) => x.parentId === parentId);
+  const prevSibling = (r: Row): Row | null => { const sibs = childrenOf(r.parentId); const i = sibs.findIndex((x) => x.id === r.id); return i > 0 ? sibs[i - 1]! : null; };
   const canIndent = (r: Row) => prevSibling(r) !== null;
   const canOutdent = (r: Row) => r.parentId !== null;
-  const indent = (r: Row) => { const ps = prevSibling(r); if (ps) void applyCmd(moveCmd(r.id, ps.id)); };
-  const outdent = (r: Row) => { if (r.parentId) { const parent = rows.find((x) => x.id === r.parentId); void applyCmd(moveCmd(r.id, parent ? parent.parentId : null)); } };
+  // indent: новый родитель — предыдущий сиблинг; индекс = в конец его текущих детей.
+  const indent = (r: Row) => { const ps = prevSibling(r); if (ps) void applyCmd(moveCmd(r.id, ps.id, childrenOf(ps.id).length)); };
+  // outdent: новый родитель — родитель текущего родителя; индекс = позиция бывшего родителя
+  // среди своих сиблингов + 1 (встаёт сразу после него, а не перед всеми).
+  const outdent = (r: Row) => {
+    if (!r.parentId) return;
+    const parent = rows.find((x) => x.id === r.parentId);
+    const grandId = parent ? parent.parentId : null;
+    const grandKids = childrenOf(grandId);
+    const at = parent ? grandKids.findIndex((x) => x.id === parent.id) + 1 : grandKids.length;
+    void applyCmd(moveCmd(r.id, grandId, Math.max(0, at)));
+  };
 
   async function runBatch(cmds: PlanningCommand[]) {
     if (!cmds.length) return;
@@ -603,9 +677,8 @@ export function ProjectSchedule() {
   const addFinish = (iso: string, dur: number) => dayToIso(isoToDay(iso) + dur);
   const openCreate = (parentId: string | null) => setTaskModal({ mode: "create", parentId, initial: { title: "", assigneeId: "", startIso: "", durDays: 5, workH: 40, pct: 0 } });
   const openEdit = (r: Row) => {
-    const asgs = (readModel.authored as unknown as { assignments: Array<{ taskId: string; resourceId: string }> }).assignments;
-    const asg = asgs.find((x) => x.taskId === r.id);
-    setTaskModal({ mode: "edit", parentId: r.parentId, taskId: r.id, initial: { title: r.name, assigneeId: asg?.resourceId ?? "", startIso: r.startIso, durDays: r.durDays, workH: r.workH, pct: r.pct } });
+    const asg = currentAsg(r.id);
+    setTaskModal({ mode: "edit", parentId: r.parentId, taskId: r.id, ...(asg ? { asgId: asg.id } : {}), initial: { title: r.name, assigneeId: asg?.resourceId ?? "", startIso: r.startIso, durDays: r.durDays, workH: r.workH, pct: r.pct } });
   };
   function submitTaskModal(v: TaskModalValues) {
     const m = taskModal;
@@ -624,7 +697,8 @@ export function ProjectSchedule() {
       cmds.push({ type: "task.update_work_model", payload: { taskId: id, taskType: "fixed_duration", effortDriven: false, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60 } } as PlanningCommand);
       if (v.startIso) cmds.push({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: addFinish(v.startIso, v.durDays) } } as PlanningCommand);
       cmds.push({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } } as PlanningCommand);
-      if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: genId("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
+      // переиспользуем id текущего назначения (если было) — иначе upsert добавит второе и удвоит нагрузку
+      if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: m.asgId ?? genId("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
     }
     void runBatch(cmds);
   }
@@ -689,7 +763,7 @@ export function ProjectSchedule() {
     const n = Number(draft);
     if (f === "name") { if (draft.trim() && draft !== r.name) editName(r, draft.trim()); return; }
     if (Number.isNaN(n)) return;
-    if (f === "dur" && n >= 0 && n !== r.durDays) editDuration(r, n);
+    if (f === "dur") { if (n > 0 && n !== r.durDays) editDuration(r, n); else if (n <= 0) setNotice("Длительность задачи должна быть больше 0 (для вехи — пункт меню «Сделать вехой»)"); }
     else if (f === "work" && n >= 0 && n !== r.workH) editWork(r, n);
     else if (f === "pct" && n !== r.pct) editPct(r, n);
     else if (f === "units" && n > 0) editUnits(r, n);
@@ -758,7 +832,7 @@ export function ProjectSchedule() {
       {/* Toolbar */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <Button variant="default" size="sm" onClick={() => openCreate(null)} disabled={busy}><Plus className="size-3.5" aria-hidden />Задача</Button>
-        <Button variant="secondary" size="sm" onClick={() => selected && openCreate(selected.kind === "summary" ? selected.id : selected.parentId)} disabled={busy || !selected}><Plus className="size-3.5" aria-hidden />Подзадача</Button>
+        <Button variant="secondary" size="sm" onClick={() => selected && openCreate(selected.id)} disabled={busy || !selected}><Plus className="size-3.5" aria-hidden />Подзадача</Button>
         <span className="mx-1 h-5 w-px bg-[var(--border)]" />
         <Button variant="ghost" size="sm" onClick={() => selected && outdent(selected)} disabled={busy || !selected || (selected ? !canOutdent(selected) : true)} title="На уровень выше"><IndentDecrease className="size-3.5" aria-hidden /></Button>
         <Button variant="ghost" size="sm" onClick={() => selected && indent(selected)} disabled={busy || !selected || (selected ? !canIndent(selected) : true)} title="На уровень глубже"><IndentIncrease className="size-3.5" aria-hidden /></Button>

@@ -167,7 +167,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
       return b.assignmentContributions.filter((c) => projOf(c.taskId) === projectFilter).reduce((s, c) => s + c.workMinutes, 0);
     };
 
-    // принятие перегруза хранится по дням (resourceId|day). Чтобы оно не «воскресало»
+    // принятие перегруза хранится по дням каноничным ключом `resourceId:dateIso`. Чтобы оно не «воскресало»
     // при переключении на неделю/месяц, откатываем его по дням периода: ячейка «принята»,
     // если ВСЕ перегруженные дни внутри периода приняты (зависит и от фильтра по проекту).
     const dayRangeOf = (iso: string): [number, number] => {
@@ -187,7 +187,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
         const com = committedFor(db);
         if (com > db.capacityMinutes && (db.capacityMinutes > 0 || com > 0)) {
           anyOver = true;
-          if (!data.accepted.has(`${resourceId}|${day}`)) return false;
+          if (!data.accepted.has(`${resourceId}:${dayToIso(day)}`)) return false;
         }
       }
       return anyOver;

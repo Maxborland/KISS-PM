@@ -8,7 +8,7 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
-import { dayToIso, isoToDay, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
 import { AddAssigneeDialog, distribute, presetWeights, ROLES, roleLabel } from "@/delivery/assignments/assignments-editors";
 import type { PlanningCommand } from "@kiss-pm/domain";
@@ -18,6 +18,8 @@ type AsgRaw = { id: string; taskId: string; resourceId: string; role: string; un
 type AllocRaw = { assignmentId: string; taskId: string; resourceId: string; date: string; workMinutes: number };
 type TaskRaw = { id: string; wbsCode: string; title: string; workMinutes: number; durationMinutes: number | null };
 type CalcRaw = { id: string; calculatedStart: string; calculatedFinish: string };
+type ExcRaw = { id: string; calendarId: string; resourceId: string | null; date: string; workingMinutes: number; reason: string | null };
+type CalRaw = { id: string; workingWeekdays: number[]; workingMinutesPerDay: number };
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
 const MONTHS_CAP = ["", "Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
@@ -38,7 +40,11 @@ const WEEKEND_BG = "color-mix(in oklab, var(--muted-soft) 18%, transparent)";
 const resName = (id: string) => RESOURCES.find((r) => r.id === id)?.name ?? id;
 const resOf = (id: string) => RESOURCES.find((r) => r.id === id);
 const h1 = (min: number) => (Math.round((min / 60) * 10) / 10).toLocaleString("ru-RU");
-const isWeekday = (day: number) => { const d = new Date(Date.UTC(2026, 2, 2) + day * 86_400_000).getUTCDay(); return d >= 1 && d <= 5; };
+// Источник дат таймлайна — read-model (project.plannedStart), а не хардкод mock-бэка: «переключение на live = смена apiOrigin».
+// Чистые помощники относительно произвольного начала (baseMs); внутри компонента биндятся на origin плана.
+const dayToIsoAt = (baseMs: number, day: number) => new Date(baseMs + day * 86_400_000).toISOString().slice(0, 10);
+const isoToDayAt = (baseMs: number, iso: string) => Math.round((Date.parse(iso + "T00:00:00Z") - baseMs) / 86_400_000);
+const isWeekdayAt = (baseMs: number, day: number) => { const d = new Date(baseMs + day * 86_400_000).getUTCDay(); return d >= 1 && d <= 5; };
 
 let NID = 0;
 const nid = (p: string) => `${p}-n${(NID += 1)}`;
@@ -56,6 +62,14 @@ export function ProjectAssignments() {
   const [draft, setDraft] = useState<Map<number, number> | null>(null); // ручная кривая: day → минуты
   const [hover, setHover] = useState<{ key: string; col: number } | null>(null); // прицел: строка (key) + столбец (col=period.key)
 
+  // origin таймлайна = плановый старт проекта из read-model (на live меняется автоматически)
+  const baseMs = useMemo(() => {
+    const start = (readModel?.project as { plannedStart?: unknown } | undefined)?.plannedStart;
+    return typeof start === "string" ? Date.parse(start + "T00:00:00Z") : Date.UTC(2026, 2, 2);
+  }, [readModel]);
+  const dayToIso = (day: number) => dayToIsoAt(baseMs, day);
+  const isoToDay = (iso: string) => isoToDayAt(baseMs, iso);
+
   const model = useMemo(() => {
     if (!readModel) return null;
     const authored = readModel.authored as unknown as { tasks: TaskRaw[]; assignments: AsgRaw[]; assignmentAllocations: AllocRaw[] };
@@ -65,15 +79,29 @@ export function ProjectAssignments() {
     const asgByTask = new Map<string, AsgRaw[]>();
     for (const a of authored.assignments) { const arr = asgByTask.get(a.taskId) ?? []; arr.push(a); asgByTask.set(a.taskId, arr); }
     const allocByAsg = new Map<string, Map<number, number>>();
-    for (const al of authored.assignmentAllocations) { let m = allocByAsg.get(al.assignmentId); if (!m) { m = new Map(); allocByAsg.set(al.assignmentId, m); } m.set(isoToDay(al.date), (m.get(isoToDay(al.date)) ?? 0) + al.workMinutes); }
+    for (const al of authored.assignmentAllocations) { let m = allocByAsg.get(al.assignmentId); if (!m) { m = new Map(); allocByAsg.set(al.assignmentId, m); } m.set(isoToDayAt(baseMs, al.date), (m.get(isoToDayAt(baseMs, al.date)) ?? 0) + al.workMinutes); }
+
+    // нерабочие дни календаря: праздники (resourceId=null) и отсутствия по ресурсу (workingMinutes < полного дня) —
+    // тот же фильтр, что на вкладке «Календари». Пресеты не должны раскладывать труд на праздник/отсутствие (нулевая ёмкость).
+    const cal = ((readModel as unknown as { calendars: CalRaw[] }).calendars ?? [])[0];
+    const full = cal?.workingMinutesPerDay ?? MIN_PER_DAY;
+    const exns = ((readModel as unknown as { calendarExceptions: ExcRaw[] }).calendarExceptions ?? []).filter((x) => x.workingMinutes < full);
+    const holidayDays = new Set<number>();
+    const absenceByRes = new Map<string, Set<number>>();
+    for (const x of exns) {
+      const day = isoToDayAt(baseMs, x.date);
+      if (x.resourceId === null) holidayDays.add(day);
+      else { let s = absenceByRes.get(x.resourceId); if (!s) { s = new Set(); absenceByRes.set(x.resourceId, s); } s.add(day); }
+    }
+    const isWorkingFor = (resourceId: string, day: number) => isWeekdayAt(baseMs, day) && !holidayDays.has(day) && !(absenceByRes.get(resourceId)?.has(day) ?? false);
 
     const metaByAsg = new Map<string, AsgMeta>();
     for (const a of authored.assignments) {
       const c = calcById.get(a.taskId);
-      const es = c ? isoToDay(c.calculatedStart) : 0;
-      const ef = c ? isoToDay(c.calculatedFinish) : es;
+      const es = c ? isoToDayAt(baseMs, c.calculatedStart) : 0;
+      const ef = c ? isoToDayAt(baseMs, c.calculatedFinish) : es;
       const days: number[] = [];
-      for (let d = es; d < Math.max(ef, es + 1); d++) if (isWeekday(d)) days.push(d);
+      for (let d = es; d < Math.max(ef, es + 1); d++) if (isWorkingFor(a.resourceId, d)) days.push(d);
       const explicit = allocByAsg.get(a.id) ?? new Map<number, number>();
       const span = Math.max(1, ef - es);
       // flatPer как у движка загрузки (work*units/calendar-days), чтобы грид совпадал с экраном «Ресурсы»
@@ -84,7 +112,7 @@ export function ProjectAssignments() {
     for (const m of metaByAsg.values()) for (const d of m.days) { minDay = Math.min(minDay, d); maxDay = Math.max(maxDay, d); }
     if (minDay > maxDay) { minDay = 0; maxDay = 34; }
     return { leafTasks, asgByTask, metaByAsg, calcById, minDay, maxDay };
-  }, [readModel]);
+  }, [readModel, baseMs]);
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
   // готовый контент — только при наличии model+readModel. Frame-обёртку сохраняем.
@@ -114,10 +142,10 @@ export function ProjectAssignments() {
   for (let d = model.minDay; d <= model.maxDay; d++) if (inWindow(d)) windowDays.push(d);
   const periods: Array<{ key: number; days: number[]; top: string; sub: string; weekend: boolean }> = [];
   if (gran === "day") {
-    for (const d of windowDays) { const dt = new Date(Date.UTC(2026, 2, 2) + d * 86_400_000); const wd = dt.getUTCDay(); periods.push({ key: d, days: [d], top: String(dt.getUTCDate()).padStart(2, "0"), sub: DOW[wd] ?? "", weekend: wd === 0 || wd === 6 }); }
+    for (const d of windowDays) { const dt = new Date(baseMs + d * 86_400_000); const wd = dt.getUTCDay(); periods.push({ key: d, days: [d], top: String(dt.getUTCDate()).padStart(2, "0"), sub: DOW[wd] ?? "", weekend: wd === 0 || wd === 6 }); }
   } else {
     const seen = new Set<number>();
-    for (const d of windowDays) { const wd = new Date(Date.UTC(2026, 2, 2) + d * 86_400_000).getUTCDay(); const monday = d - (wd === 0 ? 6 : wd - 1); if (seen.has(monday)) continue; seen.add(monday); const dt = new Date(Date.UTC(2026, 2, 2) + monday * 86_400_000); periods.push({ key: monday, days: [0, 1, 2, 3, 4].map((k) => monday + k), top: String(dt.getUTCDate()).padStart(2, "0"), sub: MONTHS_CAP[dt.getUTCMonth() + 1] ?? "", weekend: false }); }
+    for (const d of windowDays) { const wd = new Date(baseMs + d * 86_400_000).getUTCDay(); const monday = d - (wd === 0 ? 6 : wd - 1); if (seen.has(monday)) continue; seen.add(monday); const dt = new Date(baseMs + monday * 86_400_000); periods.push({ key: monday, days: [0, 1, 2, 3, 4].map((k) => monday + k), top: String(dt.getUTCDate()).padStart(2, "0"), sub: MONTHS_CAP[dt.getUTCMonth() + 1] ?? "", weekend: false }); }
   }
 
   const minutesOn = (m: AsgMeta, day: number) => (m.hasExplicit ? m.explicit.get(day) ?? 0 : m.scheduledSet.has(day) ? m.flatPer : 0);
@@ -316,7 +344,7 @@ export function ProjectAssignments() {
               {curveErr ? <div className="mb-2 rounded-[var(--radius-sm)] border border-[var(--danger)] bg-[var(--danger-soft)] px-2 py-1 text-[length:var(--text-xs)] text-[var(--danger-text)]">{curveErr}</div> : null}
               <div className="max-h-[240px] overflow-auto rounded-[var(--radius-md)] border border-[var(--border)]">
                 {editDaysOf(selMeta).length === 0 ? <div className="px-2 py-3 text-center text-[length:var(--text-xs)] text-[var(--muted)]">Нет рабочих дней в расписании задачи.</div> : editDaysOf(selMeta).map((d) => {
-                  const dt = new Date(Date.UTC(2026, 2, 2) + d * 86_400_000);
+                  const dt = new Date(baseMs + d * 86_400_000);
                   const cur = curDraft(selMeta).get(d) ?? 0;
                   return (
                     <label key={d} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-1 last:border-b-0">

@@ -98,12 +98,22 @@ function useCommsLoad<T>(fetcher: () => Promise<T>): CommsLoadState<T> {
   return { data, status, error, setData, reload };
 }
 
-// Общий клиент/транспорт: один createMockCommsFetch на монтаж (изолированная сессия).
+// Общий клиент/транспорт: ОДИН createMockCommsFetch на весь модуль (общий стор).
+// Раньше каждый хук строил свой стор → канал/комната, созданные родительским
+// useChannels()/useCallRooms(), не были видны детальным useChannel()/useCallRoom()
+// (getChannel(newId) → channel_not_found): create-then-open ломался. Теперь все хуки
+// делят один стор. Переключение на боевой API = смена apiOrigin + удаление fetchImpl.
+let sharedCommsClient: ReturnType<typeof createCommsClient> | null = null;
+function getSharedCommsClient(): ReturnType<typeof createCommsClient> {
+  if (sharedCommsClient === null) {
+    sharedCommsClient = createCommsClient({ apiOrigin: "", fetchImpl: createMockCommsFetch() });
+  }
+  return sharedCommsClient;
+}
+
 function useCommsClient() {
-  const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null) fetchRef.current = createMockCommsFetch();
   const clientRef = useRef<ReturnType<typeof createCommsClient> | null>(null);
-  if (clientRef.current === null) clientRef.current = createCommsClient({ apiOrigin: "", fetchImpl: fetchRef.current });
+  if (clientRef.current === null) clientRef.current = getSharedCommsClient();
   return clientRef.current;
 }
 

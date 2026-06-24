@@ -29,9 +29,12 @@ const PERMISSION_GROUPS: { key: string; label: string; permissions: Permission[]
 })();
 
 // Слаг из названия роли → допустимый route-id (a-z0-9 старт, далее _-, длина 3..120).
+// Кириллица-only имя (частый кейс RU-UI, напр. «Координатор») целиком вырезается
+// → base='' → нужен уникальный суффикс, иначе все такие роли коллапсируют в один id
+// и второе создание ловит access_role_id_taken.
 const slugify = (name: string): string => {
   const base = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  const id = base.length >= 3 ? base : `role-${base}`;
+  const id = base.length >= 3 ? base : `${base || "role"}-${Date.now().toString(36)}`;
   return `role-${id}`.replace(/^role-role-/, "role-").slice(0, 120);
 };
 

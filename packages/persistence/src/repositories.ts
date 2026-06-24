@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
@@ -194,11 +194,14 @@ export type PostgresTenantDataSource = CrmRepository &
   findPasswordResetTokenByHash(
     tokenHash: string
   ): Promise<PasswordResetTokenRecord | undefined>;
+  // Возвращает число затронутых строк: 1 — токен погашен этим вызовом, 0 —
+  // он уже был погашен (гонка двойного использования). Условие IS NULL делает
+  // погашение атомарным, а вызывающий код проверяет результат внутри транзакции.
   markPasswordResetTokenConsumed(
     tenantId: TenantId,
     id: string,
     consumedAt: Date
-  ): Promise<void>;
+  ): Promise<number>;
   deletePasswordResetTokensByUserId(
     tenantId: TenantId,
     userId: UserId
@@ -630,15 +633,22 @@ export function createPostgresTenantDataSource(
       return row ? mapPasswordResetTokenRecord(row) : undefined;
     },
     async markPasswordResetTokenConsumed(tenantId, id, consumedAt) {
-      await db
+      // Атомарное одноразовое погашение: WHERE ... AND consumed_at IS NULL.
+      // .returning() даёт реально обновлённые строки — длина 0 означает, что
+      // токен уже был погашен (параллельный confirm), и вызывающий код прервёт
+      // транзакцию с reset_token_used.
+      const rows = await db
         .update(passwordResetTokens)
         .set({ consumedAt })
         .where(
           and(
             eq(passwordResetTokens.tenantId, tenantId),
-            eq(passwordResetTokens.id, id)
+            eq(passwordResetTokens.id, id),
+            isNull(passwordResetTokens.consumedAt)
           )
-        );
+        )
+        .returning({ id: passwordResetTokens.id });
+      return rows.length;
     },
     async deletePasswordResetTokensByUserId(tenantId, userId) {
       await db

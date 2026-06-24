@@ -218,10 +218,21 @@ export const crmProjectSchemas = openApiSchemaFragment({
   },
   DealStage: {
     type: "object",
-    required: ["id", "tenantId", "name", "sortOrder", "status", "createdAt", "updatedAt"],
+    required: [
+      "id",
+      "tenantId",
+      "pipelineId",
+      "name",
+      "sortOrder",
+      "status",
+      "createdAt",
+      "updatedAt"
+    ],
     properties: {
       id: stringIdSchema,
       tenantId: stringIdSchema,
+      // Мультиворонки: воронка стадии (string|null для legacy-стадий без воронки).
+      pipelineId: nullableStringSchema,
       name: { type: "string", minLength: 1, maxLength: 160 },
       sortOrder: { type: "integer", minimum: 1, maximum: 2147483647 },
       status: crmStatusSchema,
