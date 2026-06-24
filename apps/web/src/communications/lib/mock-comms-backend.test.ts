@@ -269,6 +269,18 @@ describe("contract-mock Comms backend — каналы", () => {
     await expect(c.getChannel("channel-zzz")).rejects.toMatchObject({ status: 404, code: "communication_channel_not_found" });
   });
 
+  it("GET channel/:id: системный «Общий» доступен в СВЕЖЕМ сторе (без предварительного GET списка)", async () => {
+    // Регресс: workspace_general создавался лениво только в GET списка; деталь (useChannel) —
+    // отдельный изолированный стор, где GET /:id падал 404. Теперь канал засеян в каждый стор.
+    const c = client();
+    const detail = await c.getChannel("channel-workspace-general");
+    expect(detail.channel.channelType).toBe("workspace_general");
+    expect(detail.channel.title).toBe("Общий");
+    const conv = await c.getChannelConversation("channel-workspace-general");
+    expect(conv.conversation.entityType).toBe("communication_channel");
+    expect(conv.conversation.entityId).toBe("channel-workspace-general");
+  });
+
   it("PATCH channel: редактирует title/description; пустой patch → 400 communication_channel_patch_empty", async () => {
     const c = client();
     const { channel } = await c.patchChannel("channel-team", { title: "Команда (обновл.)" });

@@ -266,6 +266,10 @@ function seed(): Store {
     ...over
   });
   const channels: Channel[] = [
+    // Системный канал «Общий» (workspace_general) сидится в каждый стор, чтобы GET /:id и
+    // /:id/conversation находили его даже в изолированном сторе детали (useChannel — отдельный
+    // монтаж). ensureWorkspaceGeneralChannel остаётся как no-op-страховка. id/поля идентичны ensure.
+    channel({ id: "channel-workspace-general", channelType: "workspace_general", title: "Общий", description: "Общий канал рабочей области" }),
     channel({ id: "channel-team", channelType: "team", title: "Команда портала", description: "Рабочая группа релиза 2", scopeEntityType: "org_unit", scopeEntityId: "org-portal" }),
     channel({ id: "channel-project", channelType: "project_general", title: "Проект: Портал", description: "Общий канал проекта", scopeEntityType: "project", scopeEntityId: "proj-portal" }),
     channel({ id: "channel-coffee", channelType: "custom", title: "Случайный кофе", description: "Неформальное общение" })
