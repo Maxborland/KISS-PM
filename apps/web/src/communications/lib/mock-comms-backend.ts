@@ -163,7 +163,8 @@ const canManageEntity = (_entityType: string, _entityId: string): boolean => tru
    read = workspace_general ИЛИ членство ИЛИ manage; manage = canManageCommunications(=true для actor)
    ИЛИ роль actor в канале owner/moderator. В демо actor — owner созданных каналов и сидового custom. */
 const channelCanManage = (channelId: string, channelType: string, members: ChannelMember[]): boolean => {
-  if (channelType === "workspace_general") return false; // системный канал не управляется
+  // Боевой resolveCommunicationChannelAccess НЕ исключает workspace_general из manage:
+  // canManage = canManageCommunications(=true для actor) ИЛИ роль owner/moderator. Для всех типов одинаково.
   const m = members.find((x) => x.channelId === channelId && x.userId === CURRENT_ACTOR_ID && x.archivedAt === null);
   // canManageCommunications в моке = true для actor → manage на всех каналах (упрощение демо RBAC).
   return true || m?.role === "owner" || m?.role === "moderator";
@@ -511,28 +512,31 @@ function seed(): Store {
   };
 }
 
+/* Порядковое (ordinal) сравнение строк — зеркало SQL asc/desc по text-колонке (без локали, в отличие от localeCompare). */
+const byOrdinal = (x: string, y: string): number => (x < y ? -1 : x > y ? 1 : 0);
+
 /* ---- Транспорт: fetchImpl, совместимый с createCommsClient ---- */
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const err = (error: string, status: number) => json({ error }, status);
 
 // Маршрут уведомления по типу сущности (зеркало routeForEntity боевого API).
+// Боевой подставляет СЫРОЙ entityId без encodeURIComponent (collaborationRoutes.ts:1215-1223).
 const routeForEntity = (entityType: string, entityId: string): string => {
-  const enc = encodeURIComponent(entityId);
   switch (entityType) {
     case "project":
-      return `/projects/${enc}`;
+      return `/projects/${entityId}`;
     case "task":
-      return `/tasks/${enc}`;
+      return `/tasks/${entityId}`;
     case "opportunity":
-      return `/crm/opportunities/${enc}`;
+      return `/crm/opportunities/${entityId}`;
     case "client":
-      return `/clients/${enc}`;
+      return `/clients/${entityId}`;
     case "contact":
-      return `/contacts/${enc}`;
+      return `/contacts/${entityId}`;
     case "product":
-      return `/products/${enc}`;
+      return `/products/${entityId}`;
     default:
-      return `/communication-channels/${enc}`;
+      return `/communication-channels/${entityId}`;
   }
 };
 
@@ -556,8 +560,9 @@ const parseClampLimit = (raw: string | null, def: number, cap: number): number =
 };
 
 /* ---- SSRF-валидатор внешних ссылок митинга (зеркало parseExternalReferenceUrl, дубль из mock-crm-backend) ---- */
-const maxExternalUrlLength = 2048;
-const maxExternalTitleLength = 200;
+// Боевой attachmentValidation.ts: maxUrlLength=1200, maxDisplayNameLength=180.
+const maxExternalUrlLength = 1200;
+const maxExternalTitleLength = 180;
 // Приватные/loopback/link-local хосты — отвергаются как боевым SSRF-guard.
 const isBlockedHost = (host: string): boolean => {
   const h = host.toLowerCase().replace(/^\[|\]$/g, "");
@@ -591,29 +596,54 @@ const parseExternalUrl = (value: unknown): { ok: true; value: string } | { ok: f
   if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, error: "external_url_invalid" };
   if (u.username || u.password) return { ok: false, error: "external_url_invalid" };
   if (isBlockedHost(u.hostname)) return { ok: false, error: "external_url_private_host" };
-  return { ok: true, value: v };
+  // Боевой возвращает НОРМАЛИЗОВАННЫЙ url.toString() (хост в нижнем регистре, trailing '/', нормализация пути).
+  return { ok: true, value: u.toString() };
 };
-// Заголовок ссылки (зеркало parseReferenceTitle): required → invalid (control-chars), trim + collapse whitespace, slice.
+// Заголовок ссылки (зеркало parseReferenceTitle): required → invalid (control-chars по СЫРОМУ значению) → trim+collapse → slice 180.
+// controlCharacterPattern боевого = /[\u0000-\u001f\u007f]/ — отвергает ЛЮБОЙ управляющий символ, включая \t \n \r и DEL (0x7f).
 const parseExternalTitle = (value: unknown): { ok: true; value: string } | { ok: false; error: string } => {
   if (typeof value !== "string") return { ok: false, error: "external_title_required" };
-  // Управляющие символы (кроме \t\r\n, которые схлопнем в пробел) → invalid.
-  if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value)) return { ok: false, error: "external_title_invalid" };
-  const collapsed = value.replace(/\s+/g, " ").trim();
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(value)) return { ok: false, error: "external_title_invalid" };
+  const collapsed = value.trim().replace(/\s+/g, " ");
   if (collapsed === "") return { ok: false, error: "external_title_required" };
   return { ok: true, value: collapsed.slice(0, maxExternalTitleLength) };
 };
 
-// dueDate action-item: строгий формат YYYY-MM-DD + календарная валидность (inline, parseMeetingActionItemBody в домене НЕТ).
-const isValidDueDate = (value: string): boolean => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [y, m, d] = value.split("-").map(Number) as [number, number, number];
-  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
-};
+// dueDate action-item: ТОЛЬКО формат YYYY-MM-DD (зеркало боевого parseOptionalDate — без календарной валидации).
+const isValidDueDate = (value: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
-// Типы сущности, на которые action-item дефолтит target (meetingActionTargetTypes ∩ entity-types).
-const DEFAULT_TARGET_ENTITY_TYPES = new Set(["task", "project", "opportunity"]);
+// Типы сущности, на которые action-item дефолтит target (= meetingActionTargetTypes боевого: isMeetingActionTargetType).
+const DEFAULT_TARGET_ENTITY_TYPES = new Set(["task", "corrective_action", "project", "opportunity"]);
+
+// Допустимые entityType для metadata.links (зеркало parseMessageLinkEntityType, collaborationRoutes.ts:1171-1184).
+const MESSAGE_LINK_ENTITY_TYPES = new Set(["project", "task", "opportunity", "kpi_signal", "corrective_action", "control_action"]);
+
+/* parseMessageMetadata: зеркало collaborationRoutes.ts:1148-1169.
+   links: Array, slice ≤20, оставить только записи с валидным entityType ∈ allowed и валидным entityId;
+   attachmentIds: Array, slice ≤20, оставить только валидные collaboration-id; невалидные молча отбрасываются. */
+const parseMessageMetadata = (value: unknown): Record<string, unknown> => {
+  const record = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const links = Array.isArray(record.links)
+    ? record.links.slice(0, 20).flatMap((link) => {
+        const linkRecord = link && typeof link === "object" && !Array.isArray(link) ? (link as Record<string, unknown>) : {};
+        const typeOk = typeof linkRecord.entityType === "string" && MESSAGE_LINK_ENTITY_TYPES.has(linkRecord.entityType);
+        const idParsed = parseCollaborationId(linkRecord.entityId, "link_entity_id_invalid");
+        if (!typeOk || !idParsed.ok) return [];
+        return [{ entityType: linkRecord.entityType, entityId: idParsed.value }];
+      })
+    : [];
+  const attachmentIds = Array.isArray(record.attachmentIds)
+    ? record.attachmentIds.slice(0, 20).flatMap((attachmentId) => {
+        const parsed = parseCollaborationId(attachmentId, "attachment_id_invalid");
+        return parsed.ok ? [parsed.value] : [];
+      })
+    : [];
+  return {
+    ...(links.length ? { links } : {}),
+    ...(attachmentIds.length ? { attachmentIds } : {})
+  };
+};
 
 export function createMockCommsFetch(): typeof fetch {
   const db = seed();
@@ -649,13 +679,14 @@ export function createMockCommsFetch(): typeof fetch {
         description: "Общий канал рабочей области",
         scopeEntityType: null,
         scopeEntityId: null,
-        canManage: false,
+        canManage: true, // боевой serializeChannel пересчитает; workspace_general управляем actor'ом
         createdByUserId: CURRENT_ACTOR_ID,
         createdAt: nowIso(),
         updatedAt: nowIso(),
         archivedAt: null
       };
-      db.channels.unshift(ch);
+      // Порядок задаёт сортировка в GET (route 10); push для чистоты.
+      db.channels.push(ch);
     }
     return ch;
   };
@@ -679,7 +710,8 @@ export function createMockCommsFetch(): typeof fetch {
   const resolveConversation = (rawId: string): { ok: true; conversation: Conversation } | { ok: false; error: string; status: number } => {
     const idParsed = parseCollaborationId(decodeURIComponent(rawId), "conversation_id_invalid");
     if (!idParsed.ok) return { ok: false, error: idParsed.error, status: 400 };
-    const conv = db.conversations.find((c) => c.id === idParsed.value);
+    // Боевой findConversation фильтрует isNull(archivedAt) → архивная беседа = 404.
+    const conv = db.conversations.find((c) => c.id === idParsed.value && c.archivedAt === null);
     if (!conv) return { ok: false, error: "conversation_not_found", status: 404 };
     // сущность беседы существует (в моке demo-сущности/каналы всегда есть) и читаема actor'ом.
     if (!canReadEntity(conv.entityType, conv.entityId)) return { ok: false, error: "permission_missing", status: 403 };
@@ -777,16 +809,21 @@ export function createMockCommsFetch(): typeof fetch {
     const path = fullPath.split("?")[0]!;
     const query = new URLSearchParams(fullPath.includes("?") ? fullPath.slice(fullPath.indexOf("?") + 1) : "");
 
-    // Тело: invalid_json ловим через try/catch (как mock-crm-backend; body-size коды опускаем — см. шапку).
-    let body: Record<string, unknown> = {};
-    if (init?.body) {
+    /* Тело читаем ЛЕНИВО в правильной точке порядка каждого write-обработчика — как боевой readLimitedJsonBody.
+       Боевые роуты вызывают resolve/manage ДО чтения тела, поэтому invalid_json не должен опережать
+       conversation_not_found(404)/permission_missing(403). parseBody вызывается каждым хендлером в нужной позиции:
+       для большинства — ПОСЛЕ resolve беседы/канала; для pin — ПОСЛЕ manage; для create-роутов (тело ДО access)
+       — в начале обработчика, как в боевом. invalid_json ловим через try/catch (body-size коды опускаем — см. шапку). */
+    const parseBody = (): { ok: true; body: Record<string, unknown> } | { ok: false } => {
+      if (!init?.body) return { ok: true, body: {} };
       try {
         const p: unknown = JSON.parse(String(init.body));
-        if (p && typeof p === "object" && !Array.isArray(p)) body = p as Record<string, unknown>;
+        if (p && typeof p === "object" && !Array.isArray(p)) return { ok: true, body: p as Record<string, unknown> };
+        return { ok: true, body: {} };
       } catch {
-        return err("invalid_json", 400);
+        return { ok: false };
       }
-    }
+    };
 
     /* ============================================================
        ЧАТ (1-9)
@@ -802,8 +839,10 @@ export function createMockCommsFetch(): typeof fetch {
       if (!canReadEntity(typeParsed.value, idParsed.value)) return err("permission_missing", 403);
       // Побочка: ensure default-беседа.
       ensureConversation(typeParsed.value, idParsed.value, "Обсуждение");
+      // Боевой listConversationsByEntity: isNull(archivedAt) + orderBy(asc(conversationType), asc(createdAt)).
       const conversations = db.conversations
-        .filter((c) => c.entityType === typeParsed.value && c.entityId === idParsed.value)
+        .filter((c) => c.entityType === typeParsed.value && c.entityId === idParsed.value && c.archivedAt === null)
+        .sort((a, b) => a.conversationType.localeCompare(b.conversationType) || a.createdAt.localeCompare(b.createdAt))
         .map((c) => ({ ...c, readState: getReadState(c.id) }));
       return json({ conversations });
     }
@@ -821,17 +860,22 @@ export function createMockCommsFetch(): typeof fetch {
         if (!cParsed.ok) return err(cParsed.error, 400);
         cursorId = cParsed.value;
       }
-      // Все сообщения беседы по времени (включая archived — soft-delete не исчезает).
-      const all = db.messages.filter((m) => m.conversationId === resolved.conversation.id).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
-      // Обратная пагинация: берём ХВОСТ (самые свежие). cursor (если есть) — верхняя граница (исключительно): сообщения СТРОГО до него.
-      let slice = all;
+      // Боевой listDiscussionMessages: keyset-пагинация по НЕархивным (isNull(archivedAt)) сообщениям.
+      // Сообщения беседы (НЕархивные) по времени asc(createdAt), asc(id).
+      const nonArchived = db.messages
+        .filter((m) => m.conversationId === resolved.conversation.id && m.archivedAt === null)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+      // Cursor ищется ТОЛЬКО среди НЕархивных; если задан и не найден → пустая страница (collaborationRepository.ts:591).
+      let slice = nonArchived;
       if (cursorId) {
-        const idx = all.findIndex((m) => m.id === cursorId);
-        slice = idx >= 0 ? all.slice(0, idx) : all;
+        const idx = nonArchived.findIndex((m) => m.id === cursorId);
+        if (idx < 0) return json({ messages: [], nextCursor: null });
+        slice = nonArchived.slice(0, idx); // строго ДО cursor (исключительно)
       }
+      // Обратная пагинация: берём ХВОСТ (самые свежие), массив возвращаем по возрастанию.
       const page = slice.slice(Math.max(0, slice.length - limit));
       const messages = page.map(withExtras);
-      const nextCursor = messages[0]?.id ?? null; // первый элемент страницы (обратная пагинация)
+      const nextCursor = messages[0]?.id ?? null; // первый (самый старый) элемент страницы
       return json({ messages, nextCursor });
     }
 
@@ -840,9 +884,12 @@ export function createMockCommsFetch(): typeof fetch {
     if (msgCreate) {
       const resolved = resolveConversation(msgCreate[1]!);
       if (!resolved.ok) return err(resolved.error, resolved.status);
-      // stickerAssetId (опц.): формат → существование.
+      const parsedBody = parseBody(); // тело читаем ПОСЛЕ resolve (как боевой readLimitedJsonBody)
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
+      // stickerAssetId (опц.): формат → существование. Пустая строка '' = отсутствие (parseOptionalCollaborationId).
       let stickerAsset: StickerAsset | null = null;
-      if (body.stickerAssetId != null) {
+      if (body.stickerAssetId != null && body.stickerAssetId !== "") {
         const sParsed = parseCollaborationId(body.stickerAssetId, "sticker_asset_id_invalid");
         if (!sParsed.ok) return err(sParsed.error, 400);
         stickerAsset = db.stickerAssets.find((s) => s.id === sParsed.value) ?? null;
@@ -859,7 +906,7 @@ export function createMockCommsFetch(): typeof fetch {
         conversationId: resolved.conversation.id,
         authorUserId: CURRENT_ACTOR_ID,
         body: bodyParsed.value,
-        metadata: {}, // metadata.links/attachmentIds: невалидные молча отбрасываются — в моке упрощено до {}
+        metadata: parseMessageMetadata(body.metadata), // зеркало parseMessageMetadata: валидные links/attachmentIds эхом
         createdAt: nowIso(),
         editedAt: null,
         archivedAt: null,
@@ -915,14 +962,21 @@ export function createMockCommsFetch(): typeof fetch {
         return err("permission_missing", 403);
       }
       if (method === "PATCH") {
-        // 4) edit: body обязателен.
+        // 4) edit: тело ПОСЛЕ resolve+RBAC (как боевой readLimitedJsonBody внутри транзакции).
+        const parsedBody = parseBody();
+        if (!parsedBody.ok) return err("invalid_json", 400);
+        const body = parsedBody.body;
         const bodyParsed = parseMessageBody(body.body);
         if (!bodyParsed.ok) return err(bodyParsed.error, 400);
+        // Архив-гард: боевой updateDiscussionMessage фильтрует isNull(archivedAt) → undefined → 404 (ПОСЛЕ RBAC).
+        if (message.archivedAt !== null) return err("message_not_found", 404);
         message.body = bodyParsed.value;
         message.editedAt = nowIso();
+        if (body.metadata !== undefined) message.metadata = parseMessageMetadata(body.metadata);
         return json({ message });
       }
-      // 5) delete: soft-delete (archivedAt).
+      // 5) delete: soft-delete (archivedAt). Архив-гард: повторное удаление архивного → 404 (ПОСЛЕ RBAC).
+      if (message.archivedAt !== null) return err("message_not_found", 404);
       message.archivedAt = nowIso();
       return json({ message });
     }
@@ -936,6 +990,9 @@ export function createMockCommsFetch(): typeof fetch {
       const message = db.messages.find((m) => m.id === messageId && m.conversationId === resolved.conversation.id);
       // POST reactions: archived-сообщение → 404 (в отличие от DELETE).
       if (!message || message.archivedAt !== null) return err("message_not_found", 404);
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       const emojiParsed = parseMessageReactionEmoji(body.emoji);
       if (!emojiParsed.ok) return err(emojiParsed.error, 400);
       // upsert по userId+emoji.
@@ -974,6 +1031,8 @@ export function createMockCommsFetch(): typeof fetch {
       const messageId = decodeURIComponent(pin[2]!);
       const message = db.messages.find((m) => m.id === messageId && m.conversationId === resolved.conversation.id);
       if (!message) return err("message_not_found", 404);
+      // Архив-гард: боевой pinDiscussionMessage фильтрует isNull(archivedAt) → undefined → 404 (ПОСЛЕ manage+find).
+      if (message.archivedAt !== null) return err("message_not_found", 404);
       message.pinnedAt = nowIso();
       message.pinnedByUserId = CURRENT_ACTOR_ID;
       return json({ message });
@@ -984,10 +1043,11 @@ export function createMockCommsFetch(): typeof fetch {
     if (readState) {
       const resolved = resolveConversation(readState[1]!);
       if (!resolved.ok) return err(resolved.error, resolved.status);
-      // Самое свежее сообщение беседы → lastReadMessageId.
+      // Самое свежее НЕархивное сообщение → lastReadMessageId (боевой markConversationRead:
+      // isNull(archivedAt) + desc(createdAt),desc(id) limit 1 ≡ asc-сорт + .at(-1)).
       const last = db.messages
-        .filter((m) => m.conversationId === resolved.conversation.id)
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .filter((m) => m.conversationId === resolved.conversation.id && m.archivedAt === null)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
         .at(-1);
       let rs = db.readStates.find((r) => r.conversationId === resolved.conversation.id && r.userId === CURRENT_ACTOR_ID);
       if (!rs) {
@@ -1012,10 +1072,12 @@ export function createMockCommsFetch(): typeof fetch {
         const typeParsed = parseCommunicationChannelType(typeRaw);
         if (!typeParsed.ok) return err(typeParsed.error, 400); // communication_channel_type_invalid
       }
+      // Боевой listCommunicationChannels: orderBy(asc(channelType), asc(createdAt)) — ordinal-сравнение по text-колонкам.
       const channels = db.channels
         .filter((c) => c.archivedAt === null)
         .filter((c) => (typeRaw && typeRaw !== "" ? c.channelType === typeRaw : true))
         .filter((c) => channelCanRead(c.id, c.channelType)) // per-channel read (в демо все читаемы)
+        .sort((a, b) => byOrdinal(a.channelType, b.channelType) || byOrdinal(a.createdAt, b.createdAt))
         .map(serializeChannel);
       return json({ channels });
     }
@@ -1023,7 +1085,10 @@ export function createMockCommsFetch(): typeof fetch {
     /* 11) POST /communication-channels — создать (workspace_general не создаётся; создатель→owner). */
     if (method === "POST" && path === "/api/workspace/communication-channels") {
       // 403 permission_missing (canManageCommunications) — в демо actor имеет право (стаб).
-      // Тело: type → not_creatable → title → description → scope.
+      // Тело ДО access (боевой parseChannelCreateBody): type → not_creatable → title → description → scope.
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       const typeParsed = parseCommunicationChannelType(body.channelType);
       if (!typeParsed.ok) return err(typeParsed.error, 400);
       if (typeParsed.value === "workspace_general") return err("communication_channel_type_not_creatable", 400);
@@ -1032,6 +1097,7 @@ export function createMockCommsFetch(): typeof fetch {
       const descParsed = parseCommunicationChannelDescription(body.description);
       if (!descParsed.ok) return err(descParsed.error, 400);
       // Scope: team→org_unit, project_general→project (+проверка существования), custom→опц (project|org_unit).
+      // Боевой parseChannelCreateBody НЕ валидирует формат scopeEntityId (String(record.scopeEntityId)) — берём сырое.
       const scopeTypeRaw = body.scopeEntityType;
       const scopeIdRaw = body.scopeEntityId;
       let scopeEntityType: "project" | "org_unit" | null = null;
@@ -1040,10 +1106,8 @@ export function createMockCommsFetch(): typeof fetch {
         if (scopeTypeRaw == null || scopeIdRaw == null || scopeIdRaw === "") return err("communication_channel_scope_required", 400);
         const expected = typeParsed.value === "team" ? "org_unit" : "project";
         if (scopeTypeRaw !== expected) return err("communication_channel_scope_type_invalid", 400);
-        const sidParsed = parseCollaborationId(scopeIdRaw, "communication_channel_scope_required");
-        if (!sidParsed.ok) return err(sidParsed.error, 400);
         scopeEntityType = expected;
-        scopeEntityId = sidParsed.value;
+        scopeEntityId = String(scopeIdRaw);
         // project_general: проект должен существовать в тенанте (в моке известна только demo-сущность proj-portal).
         if (typeParsed.value === "project_general" && scopeEntityId !== DEMO_ENTITY.entityId) {
           return err("communication_channel_scope_not_found", 404);
@@ -1053,9 +1117,7 @@ export function createMockCommsFetch(): typeof fetch {
         if (scopeTypeRaw !== "project" && scopeTypeRaw !== "org_unit") return err("communication_channel_scope_type_invalid", 400);
         scopeEntityType = scopeTypeRaw;
         if (scopeIdRaw != null && scopeIdRaw !== "") {
-          const sidParsed = parseCollaborationId(scopeIdRaw, "communication_channel_scope_required");
-          if (!sidParsed.ok) return err(sidParsed.error, 400);
-          scopeEntityId = sidParsed.value;
+          scopeEntityId = String(scopeIdRaw);
         }
       }
       const id = genId("channel");
@@ -1083,7 +1145,7 @@ export function createMockCommsFetch(): typeof fetch {
     if (chGet) {
       const idParsed = parseCollaborationId(decodeURIComponent(chGet[1]!), "communication_channel_id_invalid");
       if (!idParsed.ok) return err(idParsed.error, 400);
-      const ch = db.channels.find((c) => c.id === idParsed.value);
+      const ch = db.channels.find((c) => c.id === idParsed.value && c.archivedAt === null);
       if (!ch) return err("communication_channel_not_found", 404);
       if (!channelCanRead(ch.id, ch.channelType)) return err("permission_missing", 403);
       const members = db.channelMembers.filter((m) => m.channelId === ch.id && m.archivedAt === null);
@@ -1095,9 +1157,12 @@ export function createMockCommsFetch(): typeof fetch {
     if (chPatch) {
       const idParsed = parseCollaborationId(decodeURIComponent(chPatch[1]!), "communication_channel_id_invalid");
       if (!idParsed.ok) return err(idParsed.error, 400);
-      const ch = db.channels.find((c) => c.id === idParsed.value);
+      const ch = db.channels.find((c) => c.id === idParsed.value && c.archivedAt === null);
       if (!ch) return err("communication_channel_not_found", 404);
       if (!channelCanManage(ch.id, ch.channelType, db.channelMembers)) return err("permission_missing", 403);
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       const hasTitle = body.title !== undefined;
       const hasDesc = body.description !== undefined;
       if (!hasTitle && !hasDesc) return err("communication_channel_patch_empty", 400);
@@ -1120,7 +1185,7 @@ export function createMockCommsFetch(): typeof fetch {
     if (chConv) {
       const idParsed = parseCollaborationId(decodeURIComponent(chConv[1]!), "communication_channel_id_invalid");
       if (!idParsed.ok) return err(idParsed.error, 400);
-      const ch = db.channels.find((c) => c.id === idParsed.value);
+      const ch = db.channels.find((c) => c.id === idParsed.value && c.archivedAt === null);
       if (!ch) return err("communication_channel_not_found", 404);
       if (!channelCanRead(ch.id, ch.channelType)) return err("permission_missing", 403);
       // Побочка: ensureConversation entityType=communication_channel, entityId=channelId.
@@ -1133,9 +1198,12 @@ export function createMockCommsFetch(): typeof fetch {
     if (memAdd) {
       const idParsed = parseCollaborationId(decodeURIComponent(memAdd[1]!), "communication_channel_id_invalid");
       if (!idParsed.ok) return err(idParsed.error, 400);
-      const ch = db.channels.find((c) => c.id === idParsed.value);
+      const ch = db.channels.find((c) => c.id === idParsed.value && c.archivedAt === null);
       if (!ch) return err("communication_channel_not_found", 404);
       if (!channelCanManage(ch.id, ch.channelType, db.channelMembers)) return err("permission_missing", 403);
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       const userParsed = parseCollaborationId(body.userId, "tenant_user_id_invalid");
       if (!userParsed.ok) return err(userParsed.error, 400);
       let role: ChannelMember["role"] = "member";
@@ -1162,7 +1230,7 @@ export function createMockCommsFetch(): typeof fetch {
     if (memDel) {
       const idParsed = parseCollaborationId(decodeURIComponent(memDel[1]!), "communication_channel_id_invalid");
       if (!idParsed.ok) return err(idParsed.error, 400);
-      const ch = db.channels.find((c) => c.id === idParsed.value);
+      const ch = db.channels.find((c) => c.id === idParsed.value && c.archivedAt === null);
       if (!ch) return err("communication_channel_not_found", 404);
       if (!channelCanManage(ch.id, ch.channelType, db.channelMembers)) return err("permission_missing", 403);
       const userParsed = parseCollaborationId(decodeURIComponent(memDel[2]!), "tenant_user_id_invalid");
@@ -1185,15 +1253,20 @@ export function createMockCommsFetch(): typeof fetch {
       if (!idParsed.ok) return err(idParsed.error, 400);
       // 404 communications_entity_not_found / 403 — в демо не активируются (RBAC-стаб).
       if (!canReadEntity(typeParsed.value, idParsed.value)) return err("permission_missing", 403);
+      // Боевой listCallRoomsByEntity: orderBy(desc(createdAt), desc(id)) — сортируем ДО serialize (он омитит createdAt/id).
       const callRooms = db.callRooms
         .filter((r) => r.entityType === typeParsed.value && r.entityId === idParsed.value && r.archivedAt === null)
+        .sort((a, b) => byOrdinal(b.createdAt, a.createdAt) || byOrdinal(b.id, a.id))
         .map(serializeCallRoom);
       return json({ callRooms });
     }
 
     /* 18) POST /call-rooms — создать комнату (status forced 'open'; событие room_created). */
     if (method === "POST" && path === "/api/workspace/call-rooms") {
-      // Порядок: entity → title → mediaKind → provider → meetingId → providerRoomId → access → conflict.
+      // Тело ДО access (боевой читает тело до резолва entity). Порядок: entity → title → mediaKind → provider → meetingId → providerRoomId → access → conflict.
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       const typeParsed = parseCollaborationEntityType(body.entityType);
       if (!typeParsed.ok) return err(typeParsed.error, 400);
       const entityIdParsed = parseCollaborationId(body.entityId, "collaboration_entity_id_invalid");
@@ -1312,6 +1385,9 @@ export function createMockCommsFetch(): typeof fetch {
     if (partState) {
       const resolved = resolveCallRoomAndSession(partState[1]!, partState[2]!);
       if (!resolved.ok) return err(resolved.error, resolved.status);
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       // Порядок: state → userId → non-self manage → session active → user existence.
       const stateParsed = parseCallParticipantState(body.state);
       if (!stateParsed.ok) return err(stateParsed.error, 400);
@@ -1335,7 +1411,8 @@ export function createMockCommsFetch(): typeof fetch {
       ps.state = stateParsed.value;
       ps.lastSeenAt = now;
       if (stateParsed.value === "joined" && ps.joinedAt === null) ps.joinedAt = now;
-      if (stateParsed.value === "left" || stateParsed.value === "removed") ps.leftAt = now;
+      // Боевой upsertCallParticipantState задаёт leftAt БЕЗУСЛОВНО: left/removed → now; иначе null (сброс при возврате).
+      ps.leftAt = stateParsed.value === "left" || stateParsed.value === "removed" ? now : null;
       // Маппинг события по состоянию.
       const eventType: CallEvent["eventType"] =
         stateParsed.value === "invited"
@@ -1374,6 +1451,9 @@ export function createMockCommsFetch(): typeof fetch {
       if (!resolved.ok) return err(resolved.error, resolved.status);
       // manage ДО разбора тела.
       if (!canManageEntity(resolved.room.entityType, resolved.room.entityId)) return err("permission_missing", 403);
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       // Порядок: attachmentId → title → sessionId → (session existence).
       const attParsed = parseCollaborationId(body.attachmentId, "attachment_id_invalid");
       if (!attParsed.ok) return err(attParsed.error, 400);
@@ -1430,13 +1510,19 @@ export function createMockCommsFetch(): typeof fetch {
       const idParsed = parseCollaborationId(query.get("entityId") ?? "", "collaboration_entity_id_invalid");
       if (!idParsed.ok) return err(idParsed.error, 400);
       if (!canReadEntity(typeParsed.value, idParsed.value)) return err("permission_missing", 403);
-      const meetings = db.meetings.filter((m) => m.entityType === typeParsed.value && m.entityId === idParsed.value && m.archivedAt === null);
+      // Боевой listMeetingsByEntity: orderBy(asc(scheduledStart), asc(id)).
+      const meetings = db.meetings
+        .filter((m) => m.entityType === typeParsed.value && m.entityId === idParsed.value && m.archivedAt === null)
+        .sort((a, b) => byOrdinal(a.scheduledStart, b.scheduledStart) || byOrdinal(a.id, b.id));
       return json({ meetings });
     }
 
     /* 27) POST /meetings — создать (тело+участники ДО access; организатор авто; meeting_invite побочка). */
     if (method === "POST" && path === "/api/workspace/meetings") {
-      // Порядок (тело ДО access): entity → title → agenda → start → finish → schedule → participants → tenant_user → access.
+      // Тело ДО access (боевой). Порядок: entity → title → agenda → start → finish → schedule → participants → tenant_user → access.
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       const typeParsed = parseCollaborationEntityType(body.entityType);
       if (!typeParsed.ok) return err(typeParsed.error, 400);
       const entityIdParsed = parseCollaborationId(body.entityId, "collaboration_entity_id_invalid");
@@ -1517,6 +1603,9 @@ export function createMockCommsFetch(): typeof fetch {
       const resolved = resolveMeeting(meetingPatch[1]!);
       if (!resolved.ok) return err(resolved.error, resolved.status);
       if (!canManageEntity(resolved.meeting.entityType, resolved.meeting.entityId)) return err("permission_missing", 403);
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       const m = resolved.meeting;
       // Поля partial: missing → keep current. Порядок title → agenda → start → finish → schedule → status.
       let nextTitle = m.title;
@@ -1563,6 +1652,9 @@ export function createMockCommsFetch(): typeof fetch {
       const resolved = resolveMeeting(extLink[1]!);
       if (!resolved.ok) return err(resolved.error, resolved.status);
       if (!canManageEntity(resolved.meeting.entityType, resolved.meeting.entityId)) return err("permission_missing", 403);
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       const providerParsed = parseMeetingExternalLinkProvider(body.provider);
       if (!providerParsed.ok) return err(providerParsed.error, 400);
       const urlParsed = parseExternalUrl(body.url);
@@ -1592,6 +1684,9 @@ export function createMockCommsFetch(): typeof fetch {
       // Авторизация ДО body: участник ИЛИ manage.
       const isParticipant = db.meetingParticipants.some((p) => p.meetingId === resolved.meeting.id && p.userId === CURRENT_ACTOR_ID);
       if (!isParticipant && !canManageEntity(resolved.meeting.entityType, resolved.meeting.entityId)) return err("permission_missing", 403);
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       const bodyParsed = parseMeetingNoteBody(body.body);
       if (!bodyParsed.ok) return err(bodyParsed.error, 400);
       const note: MeetingNote = {
@@ -1614,6 +1709,9 @@ export function createMockCommsFetch(): typeof fetch {
       const resolved = resolveMeeting(actionItem[1]!);
       if (!resolved.ok) return err(resolved.error, resolved.status);
       if (!canManageEntity(resolved.meeting.entityType, resolved.meeting.entityId)) return err("permission_missing", 403);
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       // title (reuse parseConversationTitle) → owner → dueDate → target → tenant_user.
       const titleParsed = parseConversationTitle(body.title);
       if (!titleParsed.ok) return err(titleParsed.error, 400);
@@ -1624,26 +1722,27 @@ export function createMockCommsFetch(): typeof fetch {
         if (typeof body.dueDate !== "string" || !isValidDueDate(body.dueDate)) return err("meeting_action_due_date_invalid", 400);
         dueDate = body.dueDate;
       }
-      // target: xor-правило. target дефолтит на entity ТОЛЬКО если entityType ∈ {task,project,opportunity}.
-      const hasType = body.targetEntityType != null;
-      const hasId = body.targetEntityId != null && body.targetEntityId !== "";
+      // target (зеркало parseMeetingActionItemBody): наличие по `!== undefined` (null/'' = ПЕРЕДАНО).
+      // required-предикат и парс — 1:1 с боевым: undefined-поле дефолтит, переданное (incl null/'') парсится.
+      const canDefault = DEFAULT_TARGET_ENTITY_TYPES.has(resolved.meeting.entityType);
+      const hasType = body.targetEntityType !== undefined;
+      const hasId = body.targetEntityId !== undefined;
+      if ((!canDefault || hasType !== hasId) && (!hasType || !hasId)) return err("meeting_action_target_required", 400);
       let targetEntityType: MeetingActionItem["targetEntityType"];
-      let targetEntityId: string;
-      if (!hasType && !hasId) {
-        // оба отсутствуют — дефолт на entity только для допустимых типов
-        if (!DEFAULT_TARGET_ENTITY_TYPES.has(resolved.meeting.entityType)) return err("meeting_action_target_required", 400);
-        targetEntityType = resolved.meeting.entityType as MeetingActionItem["targetEntityType"];
-        targetEntityId = resolved.meeting.entityId;
-      } else if (hasType && hasId) {
+      if (!hasType) {
+        targetEntityType = (canDefault ? resolved.meeting.entityType : "project") as MeetingActionItem["targetEntityType"];
+      } else {
         const ttParsed = parseMeetingActionTargetType(body.targetEntityType);
         if (!ttParsed.ok) return err(ttParsed.error, 400);
+        targetEntityType = ttParsed.value;
+      }
+      let targetEntityId: string;
+      if (!hasId) {
+        targetEntityId = resolved.meeting.entityId;
+      } else {
         const tidParsed = parseCollaborationId(body.targetEntityId, "meeting_action_target_id_invalid");
         if (!tidParsed.ok) return err(tidParsed.error, 400);
-        targetEntityType = ttParsed.value;
         targetEntityId = tidParsed.value;
-      } else {
-        // только одно из двух (xor) → required
-        return err("meeting_action_target_required", 400);
       }
       // tenant_user existence для owner.
       if (!COMMS_USERS.some((u) => u.id === ownerParsed.value)) return err("tenant_user_not_found", 400);
@@ -1689,13 +1788,13 @@ export function createMockCommsFetch(): typeof fetch {
       }
       // limit: def 20, cap 100, мусор → 20.
       const limit = parseClampLimit(query.get("limit"), 20, 100);
-      // Self-scoped: уведомления актора. В демо лента собирается для actor; сид-mention адресован u-ivan,
-      // поэтому показываем уведомления всех известных пользователей (упрощение: один «текущий» просмотр).
+      // Self-scoped: только уведомления актора (боевой DB-фильтр userId=actor.id, согласовано с routes 33/34).
       // Сорт createdAt DESC, id DESC. archivedAt всегда null (DB-фильтр isNull).
       const notifications = db.notifications
+        .filter((n) => n.userId === CURRENT_ACTOR_ID)
         .filter((n) => n.archivedAt === null)
         .filter((n) => (statusRaw === "unread" ? n.readAt === null : statusRaw === "read" ? n.readAt !== null : true))
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+        .sort((a, b) => byOrdinal(b.createdAt, a.createdAt) || byOrdinal(b.id, a.id))
         .slice(0, limit);
       return json({ notifications });
     }
@@ -1724,6 +1823,9 @@ export function createMockCommsFetch(): typeof fetch {
 
     /* 35) PUT /notification-preferences — UPSERT ([]→ранний выход []; ≤100; полный re-list). */
     if (method === "PUT" && path === "/api/workspace/notification-preferences") {
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const body = parsedBody.body;
       const rawPrefs = body.preferences;
       if (!Array.isArray(rawPrefs)) return err("notification_preferences_invalid", 400);
       if (rawPrefs.length > 100) return err("notification_preferences_too_many", 400);

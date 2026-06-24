@@ -30,16 +30,26 @@ describe("contract-mock Comms backend — чат", () => {
     await expect(c.listConversations("widget" as never, "x")).rejects.toMatchObject({ status: 400, code: "collaboration_entity_type_invalid" });
   });
 
-  it("GET messages: обратная курсорная пагинация (nextCursor = первый элемент), reactions/stickers подтянуты", async () => {
+  it("GET messages: archived (message-6) исключён; nextCursor = первый элемент; reactions/stickers подтянуты", async () => {
     const c = client();
     const { messages, nextCursor } = await c.listMessages("conversation-portal");
-    expect(messages.length).toBeGreaterThanOrEqual(6);
+    // Боевой listDiscussionMessages фильтрует isNull(archivedAt): сидовое message-6 заархивировано → не в ленте.
+    expect(messages.length).toBe(5);
+    expect(messages.some((m) => m.id === "message-6")).toBe(false);
     // nextCursor = id первого (самого старого в странице) сообщения.
     expect(nextCursor).toBe(messages[0]?.id);
     const pinned = messages.find((m) => m.id === "message-1");
     expect(pinned?.reactions.length).toBe(2); // 👍 + 🎉
     const withSticker = messages.find((m) => m.id === "message-2");
     expect(withSticker?.stickers.length).toBe(1);
+  });
+
+  it("GET messages: курсор не среди НЕархивных → пустая страница (keyset, как боевой)", async () => {
+    const c = client();
+    // message-6 заархивировано → как cursor не найдётся среди НЕархивных → {messages:[], nextCursor:null}.
+    const res = await c.listMessages("conversation-portal", { cursor: "message-6" });
+    expect(res.messages).toEqual([]);
+    expect(res.nextCursor).toBeNull();
   });
 
   it("GET messages: limit ограничивает страницу, курсор отдаёт более старые", async () => {
@@ -68,13 +78,39 @@ describe("contract-mock Comms backend — чат", () => {
     await expect(c.postMessage("conversation-portal", {})).rejects.toMatchObject({ status: 400, code: "message_body_required" });
   });
 
-  it("POST message: @mention порождает уведомление mention", async () => {
+  it("POST message: @mention порождает MessageMention (уведомление адресовано получателю, в self-scoped ленту актора не попадает)", async () => {
     const c = client();
-    await c.postMessage("conversation-portal", { body: "Привет @u-sergey, нужна помощь" });
+    const { mentions } = await c.postMessage("conversation-portal", { body: "Привет @u-sergey, нужна помощь" });
+    // Упоминание зарегистрировано на получателя.
+    expect(mentions.some((m) => m.mentionedUserId === "u-sergey")).toBe(true);
+    // Лента актора self-scoped: чужое (u-sergey) уведомление в ней не появляется (зеркало боевого userId=actor.id).
     const { notifications } = await c.listNotifications();
-    const mention = notifications.find((n) => n.userId === "u-sergey" && n.notificationType === "mention");
-    expect(mention).toBeTruthy();
-    expect(mention?.title).toBe("Вас упомянули");
+    expect(notifications.every((n) => n.userId === "u-anna")).toBe(true);
+    expect(notifications.some((n) => n.userId === "u-sergey")).toBe(false);
+  });
+
+  it("POST message metadata: валидные links/attachmentIds эхом сохраняются, невалидные молча отброшены", async () => {
+    const c = client();
+    const { message } = await c.postMessage("conversation-portal", {
+      body: "Сообщение со ссылками",
+      metadata: {
+        links: [
+          { entityType: "project", entityId: "proj-portal" },
+          { entityType: "bogus", entityId: "x" } // невалидный entityType → отброшен
+        ],
+        attachmentIds: ["att-1", "bad/id"] // bad/id невалиден → отброшен
+      }
+    });
+    const meta = message.metadata as { links?: { entityType: string; entityId: string }[]; attachmentIds?: string[] };
+    expect(meta.links).toEqual([{ entityType: "project", entityId: "proj-portal" }]);
+    expect(meta.attachmentIds).toEqual(["att-1"]);
+  });
+
+  it("POST message: stickerAssetId='' трактуется как отсутствие стикера (parseOptionalCollaborationId), не 400", async () => {
+    const c = client();
+    const { message } = await c.postMessage("conversation-portal", { body: "Текст без стикера", stickerAssetId: "" });
+    expect(message.body).toBe("Текст без стикера");
+    expect(message.stickers.length).toBe(0);
   });
 
   it("POST message со стикером: тело необязательно (emoji подставляется); неизвестный стикер → 404", async () => {
@@ -103,6 +139,14 @@ describe("contract-mock Comms backend — чат", () => {
     const c = client();
     await expect(c.editMessage("conversation-portal", "message-zzz", { body: "x" })).rejects.toMatchObject({ status: 404, code: "message_not_found" });
     await expect(c.deleteMessage("conversation-portal", "message-zzz")).rejects.toMatchObject({ status: 404, code: "message_not_found" });
+  });
+
+  it("edit/delete/pin над archived-сообщением → 404 (боевой re-archive-guard)", async () => {
+    const c = client();
+    // message-6 заархивировано в сиде → все мутации возвращают message_not_found.
+    await expect(c.editMessage("conversation-portal", "message-6", { body: "x" })).rejects.toMatchObject({ status: 404, code: "message_not_found" });
+    await expect(c.deleteMessage("conversation-portal", "message-6")).rejects.toMatchObject({ status: 404, code: "message_not_found" });
+    await expect(c.pinMessage("conversation-portal", "message-6")).rejects.toMatchObject({ status: 404, code: "message_not_found" });
   });
 
   it("POST reaction: добавляет (upsert), невалидный emoji → 400, на archived-сообщение → 404", async () => {
@@ -139,19 +183,28 @@ describe("contract-mock Comms backend — чат", () => {
     expect(before?.readState?.unreadCount).toBe(2);
     const { readState } = await c.markRead("conversation-portal");
     expect(readState.unreadCount).toBe(0);
-    expect(readState.lastReadMessageId).not.toBeNull();
+    // lastReadMessageId = последнее НЕархивное (message-6 archived) → message-5, как боевой markConversationRead.
+    expect(readState.lastReadMessageId).toBe("message-5");
     const after = (await c.listConversations("project", "proj-portal")).conversations.find((x) => x.id === "conversation-portal");
     expect(after?.readState?.unreadCount).toBe(0);
   });
 });
 
 describe("contract-mock Comms backend — каналы", () => {
-  it("GET channels: workspace_general всегда присутствует + сидовые каналы", async () => {
+  it("GET channels: workspace_general присутствует (canManage:true) + сорт asc(channelType),asc(createdAt)", async () => {
     const c = client();
     const { channels } = await c.listChannels();
-    expect(channels.some((x) => x.channelType === "workspace_general")).toBe(true);
+    const wg = channels.find((x) => x.channelType === "workspace_general");
+    expect(wg).toBeTruthy();
+    // Боевой serializeChannel: workspace_general управляем actor'ом (canManage не жёстко false).
+    expect(wg?.canManage).toBe(true);
     expect(channels.find((x) => x.id === "channel-team")?.title).toBe("Команда портала");
     expect(channels.find((x) => x.id === "channel-project")?.channelType).toBe("project_general");
+    // Сорт по channelType (ordinal): custom < project_general < team < workspace_general → workspace_general ПОСЛЕДНИЙ.
+    const types = channels.map((x) => x.channelType);
+    const sorted = [...types].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    expect(types).toEqual(sorted);
+    expect(types[types.length - 1]).toBe("workspace_general");
   });
 
   it("GET channels?type: фильтр по типу; невалидный тип → 400", async () => {
@@ -186,6 +239,16 @@ describe("contract-mock Comms backend — каналы", () => {
     await expect(c.createChannel({ channelType: "team", title: "Команда", scopeEntityType: "project", scopeEntityId: "org-x" })).rejects.toMatchObject({ status: 400, code: "communication_channel_scope_type_invalid" });
     const ok = await c.createChannel({ channelType: "team", title: "Команда", scopeEntityType: "org_unit", scopeEntityId: "org-x" });
     expect(ok.channel.scopeEntityType).toBe("org_unit");
+  });
+
+  it("POST channel: scopeEntityId НЕ валидируется по формату (боевой String() без parseCollaborationId)", async () => {
+    const c = client();
+    // custom со scopeEntityId, содержащим слэш — боевой принимает сырой String; мок не должен валидировать формат.
+    const ok = await c.createChannel({ channelType: "custom", title: "Кастом со слэшем", scopeEntityType: "org_unit", scopeEntityId: "org/with/slash" });
+    expect(ok.channel.scopeEntityId).toBe("org/with/slash");
+    // team со слэшем в scopeEntityId — тоже принимается (downstream-проверок формата нет).
+    const team = await c.createChannel({ channelType: "team", title: "Команда слэш", scopeEntityType: "org_unit", scopeEntityId: "org/x/y" });
+    expect(team.channel.scopeEntityId).toBe("org/x/y");
   });
 
   it("POST channel: project_general с несуществующим проектом → 404 communication_channel_scope_not_found", async () => {
@@ -323,6 +386,15 @@ describe("contract-mock Comms backend — звонки", () => {
     ).rejects.toMatchObject({ status: 400, code: "call_participant_state_invalid" });
   });
 
+  it("POST participant-state: left → back сбрасывает leftAt в null (боевой upsert безусловно)", async () => {
+    const c = client();
+    const left = await c.participantState("call-room-live", "call-session-live", { state: "left" });
+    expect(left.participantState.leftAt).not.toBeNull();
+    // Возврат в joined: leftAt сбрасывается в null (зеркало upsertCallParticipantState).
+    const back = await c.participantState("call-room-live", "call-session-live", { state: "joined" });
+    expect(back.participantState.leftAt).toBeNull();
+  });
+
   it("POST sessions/end: завершает; повтор → 409 call_session_not_active", async () => {
     const c = client();
     const ended = await c.endSession("call-room-live", "call-session-live");
@@ -353,12 +425,15 @@ describe("contract-mock Comms backend — звонки", () => {
 });
 
 describe("contract-mock Comms backend — митинги", () => {
-  it("GET /meetings: митинги сущности (scheduled + completed)", async () => {
+  it("GET /meetings: митинги сущности (scheduled + completed); сорт asc(scheduledStart)", async () => {
     const c = client();
     const { meetings } = await c.listMeetings("project", "proj-portal");
     expect(meetings.length).toBe(2);
     expect(meetings.find((m) => m.id === "meeting-kickoff")?.status).toBe("scheduled");
     expect(meetings.find((m) => m.id === "meeting-retro")?.status).toBe("completed");
+    // Боевой listMeetingsByEntity: asc(scheduledStart) → retro (2026-01-10) ПЕРЕД kickoff (2026-06-25).
+    expect(meetings[0]?.id).toBe("meeting-retro");
+    expect(meetings[1]?.id).toBe("meeting-kickoff");
   });
 
   it("POST /meetings: создаёт (organizer accepted) + побочка meeting_invite каждому ≠ actor", async () => {
@@ -377,9 +452,10 @@ describe("contract-mock Comms backend — митинги", () => {
     expect(organizer?.role).toBe("organizer");
     expect(organizer?.response).toBe("accepted");
     expect(participants.find((p) => p.userId === "u-ivan")?.response).toBe("pending");
-    // meeting_invite порождён для u-ivan/u-sergey.
+    // meeting_invite адресован u-ivan/u-sergey, но лента актора self-scoped → чужие приглашения в ней не видны.
     const { notifications } = await c.listNotifications();
-    expect(notifications.some((n) => n.userId === "u-ivan" && n.notificationType === "meeting_invite" && n.title === "Новая встреча")).toBe(true);
+    expect(notifications.every((n) => n.userId === "u-anna")).toBe(true);
+    expect(notifications.some((n) => n.userId === "u-ivan")).toBe(false);
   });
 
   it("POST /meetings: finish ≤ start → 400 meeting_schedule_invalid", async () => {
@@ -413,6 +489,26 @@ describe("contract-mock Comms backend — митинги", () => {
     expect(externalLink.provider).toBe("teams");
   });
 
+  it("POST external-link: url нормализуется (toString); порог длины 1200; title control-char→invalid, slice 180", async () => {
+    const c = client();
+    // Нормализация: bare host → trailing '/', host в нижнем регистре (зеркало parseExternalReferenceUrl: url.toString()).
+    const norm = await c.addExternalLink("meeting-kickoff", { provider: "other", url: "https://Zoom.US", title: "Зум" });
+    expect(norm.externalLink.url).toBe("https://zoom.us/");
+    // URL длиной 1201 → external_url_too_long (боевой maxUrlLength=1200).
+    const longUrl = `https://example.com/${"a".repeat(1201 - "https://example.com/".length)}`;
+    expect(longUrl.length).toBe(1201);
+    await expect(
+      c.addExternalLink("meeting-kickoff", { provider: "other", url: longUrl, title: "Длинный" })
+    ).rejects.toMatchObject({ status: 400, code: "external_url_too_long" });
+    // title с переводом строки → external_title_invalid (боевой controlCharacterPattern отвергает \n).
+    await expect(
+      c.addExternalLink("meeting-kickoff", { provider: "other", url: "https://example.com/x", title: "Zoom\nroom" })
+    ).rejects.toMatchObject({ status: 400, code: "external_title_invalid" });
+    // title длиной 181 → обрезается до 180 (boevой maxDisplayNameLength).
+    const okLong = await c.addExternalLink("meeting-kickoff", { provider: "other", url: "https://example.com/y", title: "t".repeat(181) });
+    expect(okLong.externalLink.title.length).toBe(180);
+  });
+
   it("POST note: участник может добавить (ДО body); невалидное тело → 400", async () => {
     const c = client();
     // actor u-anna — организатор kickoff (участник).
@@ -427,24 +523,39 @@ describe("contract-mock Comms backend — митинги", () => {
     expect(actionItem.status).toBe("open");
     expect(actionItem.targetEntityType).toBe("project");
     expect(actionItem.targetEntityId).toBe("proj-portal");
-    // owner ≠ actor → meeting_action_item уведомление.
+    // owner ≠ actor → meeting_action_item адресован u-sergey; лента актора self-scoped → чужое не видно.
     const { notifications } = await c.listNotifications();
-    expect(notifications.some((n) => n.userId === "u-sergey" && n.notificationType === "meeting_action_item")).toBe(true);
+    expect(notifications.every((n) => n.userId === "u-anna")).toBe(true);
   });
 
-  it("POST action-item: невалидный dueDate → 400 meeting_action_due_date_invalid", async () => {
+  it("POST action-item: dueDate валидируется ТОЛЬКО regex (как боевой parseOptionalDate)", async () => {
     const c = client();
+    // Боевой parseOptionalDate принимает любую YYYY-MM-DD без календарной проверки: '2026-02-30' → 201.
+    const ok = await c.addActionItem("meeting-kickoff", { title: "Календарно-невалидная дата", ownerUserId: "u-anna", dueDate: "2026-02-30" });
+    expect(ok.actionItem.dueDate).toBe("2026-02-30");
+    // Несоответствие формату regex → 400.
     await expect(
-      c.addActionItem("meeting-kickoff", { title: "X", ownerUserId: "u-anna", dueDate: "2026-13-40" })
+      c.addActionItem("meeting-kickoff", { title: "X", ownerUserId: "u-anna", dueDate: "2026/13/40" })
     ).rejects.toMatchObject({ status: 400, code: "meeting_action_due_date_invalid" });
+  });
+
+  it("POST action-item: targetEntityType:null = ПРИСУТСТВИЕ (не отсутствие) → парсится → 400 (как боевой !== undefined)", async () => {
+    const c = client();
+    // null засчитывается как переданное → parseMeetingActionTargetType(null) → meeting_action_target_type_invalid.
+    await expect(
+      c.addActionItem("meeting-kickoff", { title: "X", ownerUserId: "u-anna", targetEntityType: null as never, targetEntityId: null as never })
+    ).rejects.toMatchObject({ status: 400, code: "meeting_action_target_type_invalid" });
   });
 });
 
 describe("contract-mock Comms backend — уведомления", () => {
-  it("GET /notifications: status-фильтр (unread/read) + limit", async () => {
+  it("GET /notifications: self-scoped (только u-anna) + status-фильтр (unread/read) + limit", async () => {
     const c = client();
     const all = await c.listNotifications();
-    expect(all.notifications.length).toBeGreaterThanOrEqual(4);
+    // Self-scope: 3 сидовых уведомления актора (meeting_invite, action_item(read), mention). Чужое (u-ivan) НЕ возвращается.
+    expect(all.notifications.length).toBe(3);
+    expect(all.notifications.every((n) => n.userId === "u-anna")).toBe(true);
+    expect(all.notifications.some((n) => n.id === "notification-mention-seed")).toBe(false); // u-ivan
     const unread = await c.listNotifications({ status: "unread" });
     expect(unread.notifications.every((n) => n.readAt === null)).toBe(true);
     const read = await c.listNotifications({ status: "read" });
