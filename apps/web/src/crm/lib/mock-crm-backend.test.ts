@@ -126,4 +126,22 @@ describe("contract-mock CRM backend", () => {
     const c = client();
     await expect(c.moveOpportunityStage("opp-2207", "ZZZ!")).rejects.toMatchObject({ status: 400, code: "invalid_deal_stage_id" });
   });
+
+  it("creates a client and archives/restores it (PATCH status)", async () => {
+    const c = client();
+    const created = await c.createClient({ name: "ООО «Тест»" });
+    expect(created.client.status).toBe("active");
+    const archived = await c.updateClient(created.client.id, { status: "archived" });
+    expect(archived.client.status).toBe("archived");
+    const restored = await c.updateClient(created.client.id, { status: "active" });
+    expect(restored.client.status).toBe("active");
+  });
+
+  it("creates a product (service, positive price) and lists it", async () => {
+    const c = client();
+    const { product } = await c.createProduct({ name: "Консультация", unit: "час", price: 5000, type: "service" });
+    expect(product).toMatchObject({ type: "service", unit: "час", price: 5000, status: "active" });
+    const { products } = await c.listProducts();
+    expect(products.find((p) => p.id === product.id)).toBeTruthy();
+  });
 });
