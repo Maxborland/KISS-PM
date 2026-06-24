@@ -100,6 +100,7 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       "src/views/blocks/project-scenarios-block.tsx",
       "src/views/blocks/project-audit-block.tsx",
       "src/views/blocks/project-calendars-block.tsx",
+      "src/views/blocks/avatar-menu-block.tsx",
       "src/views/screens/login-screen-view.tsx"
     ];
     for (const rel of deletedBlocks) {
@@ -119,6 +120,7 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       "project-scenarios-block",
       "project-audit-block",
       "project-calendars-block",
+      "avatar-menu-block",
       "login-screen-view"
     ];
     for (const mod of forbiddenImports) {
@@ -146,7 +148,8 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       "src/delivery/scenarios/scenarios-surface.tsx",
       "src/delivery/commits/commits-surface.tsx",
       "src/delivery/calendars/calendars-surface.tsx",
-      "src/auth/login/login-surface.tsx"
+      "src/auth/login/login-surface.tsx",
+      "src/auth/avatar-menu/avatar-menu-surface.tsx"
     ];
     for (const rel of successors) {
       expect(existsSync(join(webRoot, rel)), `${rel} must exist`).toBe(true);

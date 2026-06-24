@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-import { AvatarMenuBlock } from "@/views/blocks/avatar-menu-block";
 import { DashboardBento } from "@/views/blocks/dashboard-bento";
 import { ProjectKpiBlock } from "@/views/blocks/project-kpi-block";
 import { ScreenPlaceholderBlock } from "@/views/blocks/screen-placeholder-block";
@@ -18,14 +17,14 @@ import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
    и удалены отсюда как дубли. Здесь остаются ТОЛЬКО экраны без полного
    функционального аналога — честные прототипы с demoAction:
    00 дисциплина отступов, 01 дашборд (персональный home), 04 модалка
-   создания задачи, 10 настройки, 11 меню аватара, 16 KPI, состояния.
+   создания задачи, 10 настройки, 16 KPI, состояния.
+   (11 меню аватара переведено в функциональный auth/avatar-menu.)
    ============================================================ */
 const BLOCK_BY_ID: Partial<Record<ScreenId, () => ReactNode>> = {
   "00-space-discipline": () => <SpaceDisciplineBlock />,
   "01-dashboard": () => <DashboardBento />,
   "04-create-task-modal": () => <TaskCreateModalBlock />,
   "10-settings": () => <SettingsBlock />,
-  "11-avatar-menu": () => <AvatarMenuBlock />,
   "16-project-kpi": () => <ProjectKpiBlock />,
   "state-empty": () => <StateScreenBlock kind="empty" />,
   "state-error": () => <StateScreenBlock kind="error" />,

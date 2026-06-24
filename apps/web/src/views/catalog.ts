@@ -29,7 +29,6 @@ export const SCREEN_IDS = [
   "01-dashboard",
   "04-create-task-modal",
   "10-settings",
-  "11-avatar-menu",
   "16-project-kpi",
   "state-empty",
   "state-error",
@@ -71,14 +70,6 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     lead: "Профиль, уведомления и интеграции.",
     breadcrumb: [{ label: "Настройки", current: true }],
     activeNav: "Настройки"
-  },
-  "11-avatar-menu": {
-    id: "11-avatar-menu",
-    storyTitle: "11 Меню аватара",
-    pageTitle: "Профиль пользователя",
-    lead: "Меню аватара и быстрые действия.",
-    breadcrumb: [{ label: "Профиль", current: true }],
-    activeNav: "Дашборд"
   },
   "16-project-kpi": {
     id: "16-project-kpi",
