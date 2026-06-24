@@ -618,6 +618,34 @@ export const userSessions = pgTable(
   ]
 );
 
+// Одноразовые токены сброса пароля (тенант-скоупленные, с истечением и фактом погашения).
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    requestedIp: text("requested_ip"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "password_reset_tokens_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "password_reset_tokens_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    uniqueIndex("password_reset_tokens_token_hash_uidx").on(table.tokenHash),
+    index("password_reset_tokens_user_id_idx").on(table.tenantId, table.userId)
+  ]
+);
+
 export const taskStatuses = pgTable(
   "task_statuses",
   {
@@ -3702,6 +3730,7 @@ export type PersistenceTableName =
   | "tenant_users"
   | "user_credentials"
   | "user_sessions"
+  | "password_reset_tokens"
   | "audit_events";
 
 export type TenantOwnedTableName = Exclude<PersistenceTableName, "tenants">;
@@ -3800,6 +3829,7 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "tenant_users",
   "user_credentials",
   "user_sessions",
+  "password_reset_tokens",
   "audit_events"
 ];
 
@@ -3891,6 +3921,7 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "tenant_users",
   "user_credentials",
   "user_sessions",
+  "password_reset_tokens",
   "audit_events"
 ];
 
@@ -4927,6 +4958,16 @@ const tableColumns = {
     "user_id",
     "token_hash",
     "expires_at",
+    "created_at"
+  ],
+  password_reset_tokens: [
+    "id",
+    "tenant_id",
+    "user_id",
+    "token_hash",
+    "expires_at",
+    "consumed_at",
+    "requested_ip",
     "created_at"
   ],
   audit_events: [

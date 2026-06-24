@@ -97,6 +97,7 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_users",
       "user_credentials",
       "user_sessions",
+      "password_reset_tokens",
       "audit_events"
     ]);
   });
@@ -190,12 +191,24 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_users",
       "user_credentials",
       "user_sessions",
+      "password_reset_tokens",
       "audit_events"
     ]);
 
     for (const tableName of tenantOwnedTableNames) {
       expect(getPersistenceTableColumns(tableName)).toContain("tenant_id");
     }
+  });
+
+  it("stores the Phase I password reset token contract", () => {
+    expect(getPersistenceTableColumns("password_reset_tokens")).toEqual(
+      expect.arrayContaining([
+        "token_hash",
+        "expires_at",
+        "consumed_at",
+        "user_id"
+      ])
+    );
   });
 
   it("stores Phase 12 personal calendars and occupancy events", () => {
