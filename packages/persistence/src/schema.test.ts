@@ -18,7 +18,9 @@ describe("PostgreSQL persistence schema", () => {
       "contacts",
       "products",
       "project_types",
+      "pipelines",
       "deal_stages",
+      "stage_transitions",
       "opportunities",
       "opportunity_demands",
       "projects",
@@ -109,7 +111,9 @@ describe("PostgreSQL persistence schema", () => {
       "contacts",
       "products",
       "project_types",
+      "pipelines",
       "deal_stages",
+      "stage_transitions",
       "opportunities",
       "opportunity_demands",
       "projects",
@@ -349,6 +353,28 @@ describe("PostgreSQL persistence schema", () => {
     );
     expect(getPersistenceTableColumns("products")).toEqual(
       expect.arrayContaining(["sku", "type", "unit", "price", "status"])
+    );
+  });
+
+  it("models multi-funnel pipelines, stage transitions and links stages/opportunities to a pipeline", () => {
+    expect(getPersistenceTableColumns("pipelines")).toEqual(
+      expect.arrayContaining(["name", "description", "is_default", "sort_order", "status"])
+    );
+    expect(getPersistenceTableColumns("stage_transitions")).toEqual(
+      expect.arrayContaining([
+        "pipeline_id",
+        "from_stage_id",
+        "to_stage_id",
+        "require_feasibility_ok",
+        "min_probability",
+        "guard_note"
+      ])
+    );
+    expect(getPersistenceTableColumns("deal_stages")).toEqual(
+      expect.arrayContaining(["pipeline_id"])
+    );
+    expect(getPersistenceTableColumns("opportunities")).toEqual(
+      expect.arrayContaining(["pipeline_id"])
     );
   });
 

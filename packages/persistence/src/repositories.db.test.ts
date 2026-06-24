@@ -298,6 +298,7 @@ describe("PostgreSQL tenant data source", () => {
     const stage = await dataSource.createDealStage({
       id: "deal-stage-new",
       tenantId: "tenant-alpha",
+      pipelineId: null,
       name: "Новая",
       sortOrder: 10,
       status: "active"

@@ -10,9 +10,11 @@ import {
   clients,
   contacts,
   dealStages,
+  pipelines,
   positions,
   products,
   projectTypes,
+  stageTransitions,
   taskStatuses,
   tenantUsers,
   tenants,
@@ -277,27 +279,112 @@ export async function seedTenantDataset(
         });
     }
 
+    // Группируем стадии по тенанту, чтобы для каждого тенанта со стадиями
+    // создать дефолтную воронку и привязать к ней стадии + цепочку переходов.
+    const stagesByTenant = new Map<string, SeedDealStage[]>();
     for (const stage of dataset.dealStages ?? []) {
+      const bucket = stagesByTenant.get(stage.tenantId) ?? [];
+      bucket.push(stage);
+      stagesByTenant.set(stage.tenantId, bucket);
+    }
+
+    for (const [tenantId, tenantStages] of stagesByTenant) {
+      const pipelineId = `${tenantId}-pipeline-default`;
+
       await transaction
-        .insert(dealStages)
+        .insert(pipelines)
         .values({
-          id: stage.id,
-          tenantId: stage.tenantId,
-          name: stage.name,
-          sortOrder: stage.sortOrder,
-          status: stage.status ?? "active",
+          id: pipelineId,
+          tenantId,
+          name: "Основная воронка",
+          description: null,
+          isDefault: true,
+          sortOrder: 1,
+          status: "active",
           createdAt,
           updatedAt: createdAt
         })
         .onConflictDoUpdate({
-          target: [dealStages.tenantId, dealStages.id],
+          target: [pipelines.tenantId, pipelines.id],
           set: {
             name: sql`excluded.name`,
+            description: sql`excluded.description`,
+            isDefault: sql`excluded.is_default`,
             sortOrder: sql`excluded.sort_order`,
             status: sql`excluded.status`,
             updatedAt: sql`excluded.updated_at`
           }
         });
+
+      // Стадии в порядке воронки (по sortOrder).
+      const orderedStages = [...tenantStages].sort(
+        (left, right) => left.sortOrder - right.sortOrder
+      );
+
+      for (const stage of orderedStages) {
+        await transaction
+          .insert(dealStages)
+          .values({
+            id: stage.id,
+            tenantId: stage.tenantId,
+            pipelineId,
+            name: stage.name,
+            sortOrder: stage.sortOrder,
+            status: stage.status ?? "active",
+            createdAt,
+            updatedAt: createdAt
+          })
+          .onConflictDoUpdate({
+            target: [dealStages.tenantId, dealStages.id],
+            set: {
+              pipelineId: sql`excluded.pipeline_id`,
+              name: sql`excluded.name`,
+              sortOrder: sql`excluded.sort_order`,
+              status: sql`excluded.status`,
+              updatedAt: sql`excluded.updated_at`
+            }
+          });
+      }
+
+      // Линейная цепочка переходов stage[i] -> stage[i + 1].
+      for (let index = 0; index < orderedStages.length - 1; index += 1) {
+        const fromStage = orderedStages[index];
+        const toStage = orderedStages[index + 1];
+        if (!fromStage || !toStage) {
+          continue;
+        }
+        const isFinalTransition = index === orderedStages.length - 2;
+
+        await transaction
+          .insert(stageTransitions)
+          .values({
+            id: `${pipelineId}-transition-${fromStage.id}-to-${toStage.id}`,
+            tenantId,
+            pipelineId,
+            fromStageId: fromStage.id,
+            toStageId: toStage.id,
+            // Финальный переход (в выигрышную/последнюю стадию) защищён гвардом.
+            requireFeasibilityOk: isFinalTransition,
+            minProbability: isFinalTransition ? 50 : null,
+            guardNote: isFinalTransition
+              ? "Требуется пройденная проверка реализуемости и вероятность ≥ 50%"
+              : null,
+            createdAt,
+            updatedAt: createdAt
+          })
+          .onConflictDoUpdate({
+            target: [stageTransitions.tenantId, stageTransitions.id],
+            set: {
+              pipelineId: sql`excluded.pipeline_id`,
+              fromStageId: sql`excluded.from_stage_id`,
+              toStageId: sql`excluded.to_stage_id`,
+              requireFeasibilityOk: sql`excluded.require_feasibility_ok`,
+              minProbability: sql`excluded.min_probability`,
+              guardNote: sql`excluded.guard_note`,
+              updatedAt: sql`excluded.updated_at`
+            }
+          });
+      }
     }
 
     for (const user of dataset.users) {

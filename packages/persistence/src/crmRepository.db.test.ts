@@ -68,6 +68,7 @@ describe("Phase 3.1 CRM persistence", () => {
     const stage = await dataSource.createDealStage({
       id: "deal-stage-new",
       tenantId: "tenant-alpha",
+      pipelineId: null,
       name: "Новая",
       sortOrder: 10,
       status: "active"
@@ -148,6 +149,7 @@ describe("Phase 3.1 CRM persistence", () => {
     const nextStage = await dataSource.createDealStage({
       id: "deal-stage-qualified",
       tenantId: "tenant-alpha",
+      pipelineId: null,
       name: "Квалификация",
       sortOrder: 20,
       status: "active"

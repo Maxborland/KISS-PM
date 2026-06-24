@@ -227,6 +227,36 @@ export const projectTypes = pgTable(
   ]
 );
 
+// Воронки продаж: тенант может вести несколько параллельных воронок (мультиворонки).
+export const pipelines = pgTable(
+  "pipelines",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    isDefault: boolean("is_default").notNull().default(false),
+    sortOrder: integer("sort_order").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "pipelines_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    index("pipelines_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("pipelines_tenant_id_name_uidx").on(table.tenantId, table.name),
+    uniqueIndex("pipelines_tenant_id_sort_order_uidx").on(
+      table.tenantId,
+      table.sortOrder
+    )
+  ]
+);
+
 export const dealStages = pgTable(
   "deal_stages",
   {
@@ -234,6 +264,8 @@ export const dealStages = pgTable(
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    // Привязка стадии к конкретной воронке (nullable для legacy-строк до бэкфилла).
+    pipelineId: text("pipeline_id"),
     name: text("name").notNull(),
     sortOrder: integer("sort_order").notNull(),
     status: text("status").notNull().default("active"),
@@ -245,12 +277,70 @@ export const dealStages = pgTable(
       name: "deal_stages_pkey",
       columns: [table.tenantId, table.id]
     }),
+    foreignKey({
+      name: "deal_stages_pipeline_fk",
+      columns: [table.tenantId, table.pipelineId],
+      foreignColumns: [pipelines.tenantId, pipelines.id]
+    }).onDelete("restrict"),
     index("deal_stages_tenant_id_idx").on(table.tenantId),
     uniqueIndex("deal_stages_tenant_id_sort_order_uidx").on(
       table.tenantId,
+      table.pipelineId,
       table.sortOrder
     ),
-    uniqueIndex("deal_stages_tenant_id_name_uidx").on(table.tenantId, table.name)
+    uniqueIndex("deal_stages_tenant_id_name_uidx").on(
+      table.tenantId,
+      table.pipelineId,
+      table.name
+    )
+  ]
+);
+
+// Условия переходов между стадиями внутри воронки (гварды этапов сделки).
+export const stageTransitions = pgTable(
+  "stage_transitions",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    pipelineId: text("pipeline_id").notNull(),
+    fromStageId: text("from_stage_id").notNull(),
+    toStageId: text("to_stage_id").notNull(),
+    requireFeasibilityOk: boolean("require_feasibility_ok").notNull().default(false),
+    minProbability: integer("min_probability"),
+    guardNote: text("guard_note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "stage_transitions_pkey",
+      columns: [table.tenantId, table.id]
+    }),
+    foreignKey({
+      name: "stage_transitions_pipeline_fk",
+      columns: [table.tenantId, table.pipelineId],
+      foreignColumns: [pipelines.tenantId, pipelines.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "stage_transitions_from_stage_fk",
+      columns: [table.tenantId, table.fromStageId],
+      foreignColumns: [dealStages.tenantId, dealStages.id]
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "stage_transitions_to_stage_fk",
+      columns: [table.tenantId, table.toStageId],
+      foreignColumns: [dealStages.tenantId, dealStages.id]
+    }).onDelete("restrict"),
+    index("stage_transitions_tenant_id_idx").on(table.tenantId),
+    index("stage_transitions_pipeline_id_idx").on(table.tenantId, table.pipelineId),
+    uniqueIndex("stage_transitions_unique_uidx").on(
+      table.tenantId,
+      table.pipelineId,
+      table.fromStageId,
+      table.toStageId
+    )
   ]
 );
 
@@ -266,6 +356,7 @@ export const opportunities = pgTable(
     ownerUserId: text("owner_user_id"),
     projectTypeId: text("project_type_id"),
     stageId: text("stage_id"),
+    pipelineId: text("pipeline_id"),
     clientName: text("client_name").notNull(),
     contactName: text("contact_name").notNull(),
     title: text("title").notNull(),
@@ -313,10 +404,16 @@ export const opportunities = pgTable(
       columns: [table.tenantId, table.stageId],
       foreignColumns: [dealStages.tenantId, dealStages.id]
     }).onDelete("restrict"),
+    foreignKey({
+      name: "opportunities_pipeline_fk",
+      columns: [table.tenantId, table.pipelineId],
+      foreignColumns: [pipelines.tenantId, pipelines.id]
+    }).onDelete("restrict"),
     index("opportunities_tenant_id_idx").on(table.tenantId),
     index("opportunities_status_idx").on(table.status),
     index("opportunities_owner_user_id_idx").on(table.tenantId, table.ownerUserId),
-    index("opportunities_stage_id_idx").on(table.tenantId, table.stageId)
+    index("opportunities_stage_id_idx").on(table.tenantId, table.stageId),
+    index("opportunities_pipeline_id_idx").on(table.tenantId, table.pipelineId)
   ]
 );
 
@@ -3526,7 +3623,9 @@ export type PersistenceTableName =
   | "contacts"
   | "products"
   | "project_types"
+  | "pipelines"
   | "deal_stages"
+  | "stage_transitions"
   | "opportunities"
   | "opportunity_demands"
   | "projects"
@@ -3622,7 +3721,9 @@ export const persistenceTableNames: readonly PersistenceTableName[] = [
   "contacts",
   "products",
   "project_types",
+  "pipelines",
   "deal_stages",
+  "stage_transitions",
   "opportunities",
   "opportunity_demands",
   "projects",
@@ -3711,7 +3812,9 @@ export const tenantOwnedTableNames: readonly TenantOwnedTableName[] = [
   "contacts",
   "products",
   "project_types",
+  "pipelines",
   "deal_stages",
+  "stage_transitions",
   "opportunities",
   "opportunity_demands",
   "projects",
@@ -3861,12 +3964,36 @@ const tableColumns = {
     "created_at",
     "updated_at"
   ],
-  deal_stages: [
+  pipelines: [
     "id",
     "tenant_id",
     "name",
+    "description",
+    "is_default",
     "sort_order",
     "status",
+    "created_at",
+    "updated_at"
+  ],
+  deal_stages: [
+    "id",
+    "tenant_id",
+    "pipeline_id",
+    "name",
+    "sort_order",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  stage_transitions: [
+    "id",
+    "tenant_id",
+    "pipeline_id",
+    "from_stage_id",
+    "to_stage_id",
+    "require_feasibility_ok",
+    "min_probability",
+    "guard_note",
     "created_at",
     "updated_at"
   ],
@@ -3878,6 +4005,7 @@ const tableColumns = {
     "owner_user_id",
     "project_type_id",
     "stage_id",
+    "pipeline_id",
     "client_name",
     "contact_name",
     "title",
