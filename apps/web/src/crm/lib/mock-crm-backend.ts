@@ -13,9 +13,9 @@
    сделки, lock финальных статусов, и т.д.
    ============================================================ */
 
-import { evaluatePipelineChange, evaluateStageTransition } from "@kiss-pm/domain";
+import { assessOpportunityFeasibility, calculatePlannedHours, evaluatePipelineChange, evaluateStageTransition, type OpportunityFeasibilityAssessment } from "@kiss-pm/domain";
 
-import type { Client, Contact, DealStage, Opportunity, Pipeline, PositionDemand, Product, ProjectType, StageTransition } from "./crm-client";
+import type { Client, Contact, CrmActivity, CrmActivityEntityType, DealStage, Opportunity, Pipeline, PositionDemand, Product, ProjectRecord, ProjectType, StageTransition } from "./crm-client";
 
 const TENANT = "tenant-alpha";
 const ID_RE = /^[a-z][a-z0-9-]{2,80}$/;
@@ -37,6 +37,19 @@ export const CRM_USERS: CrmUser[] = [
   { id: "u-sergey", name: "Сергей П.", positionId: "lead", positionName: "Тимлид" }
 ];
 
+/* Позиции (должности) с числом активных исполнителей — справочник для оценки реализуемости.
+   id совпадают с positionId в demand сидовых сделок. Боевой эквивалент: listPositions × активные users.
+   activeUsers подобраны так, чтобы демо давало РАЗНЫЕ статусы (ok/warning/conflict) — см. сид сделок ниже. */
+export type CrmPosition = { id: string; name: string; activeUsers: number };
+export const POSITIONS: CrmPosition[] = [
+  { id: "backend", name: "Backend", activeUsers: 6 },
+  { id: "frontend", name: "Frontend", activeUsers: 4 },
+  { id: "analyst", name: "Аналитик", activeUsers: 3 }
+];
+
+// Домен принимает Date; мок хранит даты как ISO 'YYYY-MM-DD'. Конвертация в UTC-полночь.
+const toDate = (iso: string): Date => new Date(`${iso}T00:00:00Z`);
+
 const nowIso = () => new Date().toISOString();
 let SEQ = 0;
 const genId = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(SEQ += 1).toString(36)}`;
@@ -50,6 +63,8 @@ type Store = {
   opportunities: Opportunity[];
   pipelines: Pipeline[];
   stageTransitions: StageTransition[];
+  projects: ProjectRecord[]; // активированные проекты (источник listProjects + activeProjectReservations)
+  activities: CrmActivity[]; // CRM-активности (даты уже в ISO — сериализованная форма)
 };
 
 function seed(): Store {
@@ -138,13 +153,71 @@ function seed(): Store {
     opp({ id: "opp-gamma-mvp", clientId: "client-gamma", contactId: "ctc-gamma", ownerUserId: "u-sergey", stageId: "stage-qual", title: "Мобильное приложение · MVP", contractValue: 1_600_000, rate: 3500, probability: 40, status: "new", start: "2026-05-04", finish: "2026-09-01", positionId: "frontend", hours: 420 }),
     opp({ id: "opp-delta-audit", clientId: "client-delta", contactId: "ctc-delta", ownerUserId: "u-ivan", stageId: "stage-lead", title: "Аудит и роадмап", contractValue: 650_000, rate: 5000, probability: 25, status: "new", start: "2026-03-16", finish: "2026-05-01", positionId: "analyst", hours: 120 }),
     opp({ id: "opp-romashka-support", clientId: "client-romashka", contactId: "ctc-romashka", ownerUserId: "u-anna", stageId: "stage-lead", title: "Поддержка портала · год", contractValue: 2_160_000, rate: 3000, probability: 30, status: "new", start: "2026-07-13", finish: "2027-07-12", positionId: "backend", hours: 700 }),
-    opp({ id: "opp-gamma-bi", clientId: "client-gamma", contactId: "ctc-gamma", ownerUserId: "u-sergey", stageId: "stage-proposal", title: "BI-витрина продаж", contractValue: 1_950_000, rate: 4200, probability: 60, status: "new", start: "2026-04-20", finish: "2026-07-30", positionId: "backend", hours: 460 }),
+    // Сделка с ПРЕДЗАПОЛНЕННЫМ feasibilityResult (status "warning") — чтобы виджет реализуемости
+    // рендерился в UI без клика. Сам assessment досидируется ниже через домен (контракт-верно).
+    opp({ id: "opp-gamma-bi", clientId: "client-gamma", contactId: "ctc-gamma", ownerUserId: "u-sergey", stageId: "stage-proposal", title: "BI-витрина продаж", contractValue: 1_950_000, rate: 4200, probability: 60, status: "ready_to_activate", start: "2026-04-20", finish: "2026-07-30", positionId: "backend", hours: 460, feasibilityStatus: "warning" }),
     opp({ id: "opp-sever-portal", clientId: "client-sever", contactId: "ctc-sever", ownerUserId: "u-ivan", stageId: "stage-won", title: "Портал самообслуживания", contractValue: 3_300_000, rate: 4000, probability: 100, status: "won_closed", start: "2026-01-15", finish: "2026-04-30", positionId: "frontend", hours: 800 }),
     // Партнёрская воронка: сделка на её первой стадии — для демо back-compat-переходов и кросс-пайплайн.
-    opp({ id: "opp-partner-acme", clientId: "client-delta", contactId: "ctc-delta", ownerUserId: "u-sergey", stageId: "stage-partner-lead", title: "Партнёрская интеграция · ACME", contractValue: 1_200_000, rate: 4000, probability: 35, status: "new", start: "2026-05-01", finish: "2026-08-01", positionId: "backend", hours: 300 })
+    opp({ id: "opp-partner-acme", clientId: "client-delta", contactId: "ctc-delta", ownerUserId: "u-sergey", stageId: "stage-partner-lead", title: "Партнёрская интеграция · ACME", contractValue: 1_200_000, rate: 4000, probability: 35, status: "new", start: "2026-05-01", finish: "2026-08-01", positionId: "backend", hours: 300 }),
+    // Демо-сделка с гарантированным feasibility=conflict: required(900) > plannedHours(200) →
+    // блокер demand_exceeds_planned_hours. Нужна для демо активации с риском (risk_acceptance_required).
+    opp({ id: "opp-conflict-demo", clientId: "client-delta", contactId: "ctc-delta", ownerUserId: "u-ivan", stageId: "stage-proposal", title: "Срочный аврал · перегруз спроса", contractValue: 1_000_000, rate: 5000, probability: 50, status: "new", start: "2026-06-01", finish: "2026-10-30", positionId: "backend", hours: 900 })
   ];
 
-  return { clients, contacts, products, dealStages, projectTypes, opportunities, pipelines, stageTransitions };
+  // Активные проекты: пусто на старте (listProjects вернёт [] до первой активации).
+  const projects: ProjectRecord[] = [];
+
+  // Досидируем opp-gamma-bi предзаполненной оценкой (status "warning"), рассчитанной доменом —
+  // чтобы виджет в UI рендерился сразу, а не после клика «Проверить реализуемость».
+  const gammaBi = opportunities.find((o) => o.id === "opp-gamma-bi")!;
+  const gammaBiAssessment = assessFeasibility(gammaBi, POSITIONS, projects);
+  gammaBi.feasibilityStatus = gammaBiAssessment.status;
+  gammaBi.feasibilityResult = serializeAssessment(gammaBiAssessment);
+  gammaBi.feasibilityCheckedAt = t;
+
+  // CRM-активности для opp-2207 (2 comment, 1 task todo, 1 file) — лента карточки не пустая в демо.
+  const act = (n: number, over: Partial<CrmActivity>): CrmActivity => ({
+    id: `crm-activity-${n}`, tenantId: TENANT, entityType: "opportunity", entityId: "opp-2207",
+    type: "comment", title: null, body: null, status: null, dueDate: null, assigneeUserId: null,
+    authorUserId: "u-anna", fileUrl: null, fileSizeBytes: null, mimeType: null, createdAt: t, updatedAt: t, ...over
+  });
+  const activities: CrmActivity[] = [
+    act(1, { type: "comment", body: "Клиент подтвердил бюджет, готовим договор.", authorUserId: "u-anna", createdAt: "2026-01-12T09:10:00.000Z", updatedAt: "2026-01-12T09:10:00.000Z" }),
+    act(2, { type: "comment", body: "Согласовали состав команды на релиз 2.", authorUserId: "u-sergey", createdAt: "2026-01-12T10:30:00.000Z", updatedAt: "2026-01-12T10:30:00.000Z" }),
+    act(3, { type: "task", title: "Подготовить смету по релизу 2", body: "Уточнить часы backend и сроки.", status: "todo", dueDate: "2026-02-01", assigneeUserId: "u-ivan", authorUserId: "u-anna", createdAt: "2026-01-12T11:00:00.000Z", updatedAt: "2026-01-12T11:00:00.000Z" }),
+    act(4, { type: "file", title: "Договор (черновик).pdf", fileUrl: "https://files.example.com/opp-2207/contract-draft.pdf", mimeType: "application/pdf", fileSizeBytes: 482_311, authorUserId: "u-anna", createdAt: "2026-01-12T12:00:00.000Z", updatedAt: "2026-01-12T12:00:00.000Z" })
+  ];
+
+  return { clients, contacts, products, dealStages, projectTypes, opportunities, pipelines, stageTransitions, projects, activities };
+}
+
+/* ---- Реализуемость (feasibility): тонкая обёртка над доменом ---- */
+// Активные проекты → плоский список резерваций (даты ISO→Date). Боевой эквивалент в feasibilityAssessment.ts.
+const activeReservations = (projects: ProjectRecord[]) =>
+  projects
+    .filter((p) => p.status === "active")
+    .flatMap((p) => p.demand.map((line) => ({
+      projectId: p.id, positionId: line.positionId, requiredHours: line.requiredHours,
+      plannedStart: toDate(p.plannedStart), plannedFinish: toDate(p.plannedFinish)
+    })));
+
+// Оценка реализуемости сделки через домен (НЕ дублируем логику). Даты конвертируем ISO→Date(UTC).
+function assessFeasibility(o: Opportunity, positions: CrmPosition[], projects: ProjectRecord[]): OpportunityFeasibilityAssessment {
+  return assessOpportunityFeasibility({
+    opportunity: { id: o.id, plannedStart: toDate(o.plannedStart), plannedFinish: toDate(o.plannedFinish), contractValue: o.contractValue, plannedHourlyRate: o.plannedHourlyRate },
+    demand: o.demand,
+    positions,
+    activeProjectReservations: activeReservations(projects)
+  });
+}
+
+// Сериализация оценки в plain-object (зеркало serializeFeasibilityAssessment боевого checkFeasibilityCommand).
+function serializeAssessment(a: OpportunityFeasibilityAssessment): Record<string, unknown> {
+  return {
+    opportunityId: a.opportunityId, plannedHours: a.plannedHours, totalRequiredHours: a.totalRequiredHours,
+    workingDays: a.workingDays, status: a.status, blockers: [...a.blockers], warnings: [...a.warnings],
+    rows: a.rows.map((r) => ({ ...r }))
+  };
 }
 
 /* ---- Транспорт: fetchImpl, совместимый с createCrmClient ---- */
@@ -166,6 +239,20 @@ const hasControlChar = (v: string): boolean => {
 const safeMultiline = (v: string, max = MAX_DESCRIPTION) => v.length <= max && !hasControlChar(v);
 // undefined → дефолт false; boolean → как есть; иное → null (ошибка тела), как боевой parseOptionalBoolean
 const optBool = (v: unknown): boolean | null => (v === undefined ? false : typeof v === "boolean" ? v : null);
+// single-line текст: длина ≤ max, без управляющих символов (включая tab/LF/CR), как боевой isSafeSingleLineText
+const hasControlSingleLine = (v: string): boolean => {
+  for (let i = 0; i < v.length; i += 1) {
+    const c = v.charCodeAt(i);
+    if (c <= 0x1f || c === 0x7f) return true;
+  }
+  return false;
+};
+const safeSingleLine = (v: string, max: number) => v.length <= max && !hasControlSingleLine(v);
+// http/https URL ≤ max (как боевой parseExternalReferenceUrl): валидный absolute URL со схемой http(s)
+const isHttpUrl = (v: string, max = 1_200): boolean => {
+  if (v.length === 0 || v.length > max) return false;
+  try { const u = new URL(v); return u.protocol === "http:" || u.protocol === "https:"; } catch { return false; }
+};
 
 type PipelineParse = { ok: true; name: string; description: string | null; isDefault: boolean; sortOrder: number; status: "active" | "archived" } | { ok: false; error: string };
 // Мультиворонки: тело воронки (create/full-replace). Зеркало parsePipelineBody (crmParsers): порядок и коды.
@@ -205,8 +292,63 @@ function parseStageTransitionBody(body: Record<string, unknown>): StageTransitio
   return { ok: true, fromStageId, toStageId, requireFeasibilityOk, minProbability, guardNote };
 }
 
+type OppUpdateParse =
+  | { ok: true; clientId: string; primaryContactId: string; projectTypeId: string; stageId: string; title: string; description: string | null; plannedStart: string; plannedFinish: string; contractValue: number; plannedHourlyRate: number; probability: number; ownerProvided: boolean; ownerUserId: string | null; templateId: string | null; demand: PositionDemand[] }
+  | { ok: false; error: string };
+// Тело PATCH /opportunities/:id — full-replace (зеркало parseOpportunityUpdateBody): порядок и коды как create + templateId.
+function parseOpportunityUpdateBody(body: Record<string, unknown>): OppUpdateParse {
+  const clientId = str(body.clientId), primaryContactId = str(body.primaryContactId), projectTypeId = str(body.projectTypeId), stageId = str(body.stageId), title = str(body.title);
+  if (!ID_RE.test(clientId)) return { ok: false, error: "invalid_client_id" };
+  if (!ID_RE.test(primaryContactId)) return { ok: false, error: "invalid_primary_contact_id" };
+  if (!ID_RE.test(projectTypeId)) return { ok: false, error: "invalid_project_type_id" };
+  if (!ID_RE.test(stageId)) return { ok: false, error: "invalid_deal_stage_id" };
+  if (!title || !safeSingleLine(title, 160)) return { ok: false, error: "invalid_opportunity_title" };
+  const plannedStart = str(body.plannedStart), plannedFinish = str(body.plannedFinish);
+  if (!DATE_RE.test(plannedStart) || !DATE_RE.test(plannedFinish) || plannedFinish < plannedStart || dayDiff(plannedStart, plannedFinish) > MAX_HORIZON_DAYS) return { ok: false, error: "invalid_planned_dates" };
+  const contractValue = body.contractValue, plannedHourlyRate = body.plannedHourlyRate, probability = body.probability;
+  if (!posInt(contractValue)) return { ok: false, error: "invalid_contract_value" };
+  if (!posInt(plannedHourlyRate)) return { ok: false, error: "invalid_planned_hourly_rate" };
+  if (typeof probability !== "number" || !Number.isInteger(probability) || probability < 0 || probability > 100) return { ok: false, error: "invalid_probability" };
+  // ownerUserId: опционально; absent/null оставляем для fallback в хендлере (existing→actor).
+  const ownerProvided = body.ownerUserId != null;
+  const ownerUserId = ownerProvided ? str(body.ownerUserId) : null;
+  if (ownerProvided && !ID_RE.test(ownerUserId!)) return { ok: false, error: "invalid_owner_user_id" };
+  // demand: те же границы, что и в create (после owner-формата, как у боевого порядка).
+  const demandRaw = Array.isArray(body.demand) ? (body.demand as Array<{ positionId?: unknown; requiredHours?: unknown }>) : [];
+  if (demandRaw.length < 1 || demandRaw.length > 12) return { ok: false, error: "invalid_demand" };
+  const seenPos = new Set<string>();
+  const demand: PositionDemand[] = [];
+  for (const d of demandRaw) {
+    const positionId = str(d.positionId);
+    if (!ID_RE.test(positionId)) return { ok: false, error: "invalid_demand_position" };
+    if (!posInt(d.requiredHours, MAX_DEMAND_HOURS)) return { ok: false, error: "invalid_demand_hours" };
+    if (seenPos.has(positionId)) return { ok: false, error: "duplicate_demand_position" };
+    seenPos.add(positionId);
+    demand.push({ positionId, requiredHours: d.requiredHours as number });
+  }
+  // description: опц multiline ≤1000, ''→null; templateId: опц ID|null.
+  const description = body.description == null ? null : str(body.description) || null;
+  if (description !== null && !safeMultiline(description)) return { ok: false, error: "invalid_description" };
+  const templateProvided = body.templateId != null;
+  const templateId = templateProvided ? str(body.templateId) : null;
+  if (templateProvided && !ID_RE.test(templateId!)) return { ok: false, error: "invalid_template_id" };
+  return { ok: true, clientId, primaryContactId, projectTypeId, stageId, title, description, plannedStart, plannedFinish, contractValue, plannedHourlyRate, probability, ownerProvided, ownerUserId, templateId, demand };
+}
+
 export function createMockCrmFetch(): typeof fetch {
   const db = seed();
+
+  // Резолв CRM-сущности для activity-ручек (вернуть запись + lock-флаг). isLocked=true ТОЛЬКО для
+  // opportunity в финальном статусе; client/contact/product всегда unlocked (как боевой resolveCrmEntity).
+  const resolveCrmEntity = (entityType: CrmActivityEntityType, entityId: string): { isLocked: boolean } | null => {
+    if (entityType === "opportunity") { const o = db.opportunities.find((x) => x.id === entityId); return o ? { isLocked: isFinal(o) } : null; }
+    if (entityType === "client") { const c = db.clients.find((x) => x.id === entityId); return c ? { isLocked: false } : null; }
+    if (entityType === "contact") { const c = db.contacts.find((x) => x.id === entityId); return c ? { isLocked: false } : null; }
+    const p = db.products.find((x) => x.id === entityId); return p ? { isLocked: false } : null;
+  };
+  // Формат-код id сущности по типу (зеркало parseCrmEntityRouteParams).
+  const entityIdErr = (entityType: CrmActivityEntityType): string =>
+    entityType === "opportunity" ? "invalid_opportunity_id" : entityType === "client" ? "invalid_client_id" : entityType === "contact" ? "invalid_contact_id" : "invalid_product_id";
 
   const mockFetch: typeof fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
@@ -346,11 +488,11 @@ export function createMockCrmFetch(): typeof fetch {
       if (!client || client.status !== "active") return err("client_not_found", 404);
       const contact = db.contacts.find((x) => x.id === contactId);
       if (!contact || contact.status !== "active" || contact.clientId !== client.id) return err("contact_not_found", 404);
+      if (ownerProvided && !CRM_USERS.some((u) => u.id === ownerUserId)) return err("owner_user_not_found", 404); // owner после contact (как боевой resolveOpportunityLinks)
       const ptype = db.projectTypes.find((x) => x.id === projectTypeId);
       if (!ptype || ptype.status !== "active") return err("project_type_not_found", 404);
       const stage = db.dealStages.find((x) => x.id === stageId);
       if (!stage || stage.status !== "active") return err("deal_stage_not_found", 404);
-      if (ownerProvided && !CRM_USERS.some((u) => u.id === ownerUserId)) return err("owner_user_not_found", 404);
       const o: Opportunity = {
         id: genId("opp"), tenantId: TENANT,
         clientId, primaryContactId: contactId, ownerUserId, projectTypeId, stageId, pipelineId: stage.pipelineId, // мультиворонки: воронка из целевой стадии
@@ -496,10 +638,192 @@ export function createMockCrmFetch(): typeof fetch {
       return json({ opportunity: o });
     }
 
-    // PATCH /opportunities/:id (полное обновление) намеренно НЕ реализован здесь: боевой контракт —
-    // full-replace через parseOpportunityUpdateBody (резолв связей + ре-денормализация имён + пересчёт
-    // plannedHours от value И rate). Реализуем вместе с поверхностью «Карточка сделки», чтобы не
-    // вводить частичный merge, расходящийся с боем. До тех пор такой PATCH отдаёт not_found.
+    /* ---- Карточка сделки: PATCH /opportunities/:id (full-replace) ---- */
+    const oppUpdate = method === "PATCH" ? path.match(/^\/api\/workspace\/opportunities\/([^/]+)$/) : null;
+    if (oppUpdate) {
+      const opportunityId = decodeURIComponent(oppUpdate[1]!);
+      if (!ID_RE.test(opportunityId)) return err("invalid_opportunity_id", 400); // 1) формат :id
+      const parsed = parseOpportunityUpdateBody(body); // 2) тело (порядок кодов как create)
+      if (!parsed.ok) return err(parsed.error, 400);
+      const o = db.opportunities.find((x) => x.id === opportunityId);
+      if (!o) return err("opportunity_not_found", 404); // 3) сделка
+      if (isFinal(o)) return err("opportunity_update_locked", 409); // 4) финал заблокирован для правок
+      // 5) резолв связей: client → contact → owner → project_type → deal_stage (как боевой resolveOpportunityLinks).
+      const client = db.clients.find((x) => x.id === parsed.clientId);
+      if (!client || client.status !== "active") return err("client_not_found", 404);
+      const contact = db.contacts.find((x) => x.id === parsed.primaryContactId);
+      if (!contact || contact.status !== "active" || contact.clientId !== client.id) return err("contact_not_found", 404);
+      // ownerUserId: absent/null → existing → CURRENT_ACTOR_ID (fallback); если задан — валидируем 404 (после contact).
+      const ownerUserId = parsed.ownerProvided ? parsed.ownerUserId! : o.ownerUserId ?? CURRENT_ACTOR_ID;
+      if (parsed.ownerProvided && !CRM_USERS.some((u) => u.id === ownerUserId)) return err("owner_user_not_found", 404);
+      const ptype = db.projectTypes.find((x) => x.id === parsed.projectTypeId);
+      if (!ptype || ptype.status !== "active") return err("project_type_not_found", 404);
+      const stage = db.dealStages.find((x) => x.id === parsed.stageId);
+      if (!stage || stage.status !== "active") return err("deal_stage_not_found", 404);
+      // 6) server-managed запись: статус СОХРАНЯЕТСЯ, pipelineId НЕ трогается, feasibility* НЕ трогаются,
+      // stageId пишется БЕЗ guard-переходов, plannedHours пересчитывается доменом, customFieldValues всегда {}
+      // (вход customFieldValues сознательно игнорируем — упрощение мока, см. заметки).
+      o.clientId = parsed.clientId; o.primaryContactId = parsed.primaryContactId; o.projectTypeId = parsed.projectTypeId;
+      o.stageId = parsed.stageId; o.ownerUserId = ownerUserId; o.title = parsed.title; o.description = parsed.description;
+      o.clientName = client.name; o.contactName = contact.name; o.projectType = ptype.name;
+      o.plannedStart = parsed.plannedStart; o.plannedFinish = parsed.plannedFinish;
+      o.contractValue = parsed.contractValue; o.plannedHourlyRate = parsed.plannedHourlyRate;
+      o.plannedHours = calculatePlannedHours(parsed.contractValue, parsed.plannedHourlyRate);
+      o.probability = parsed.probability; o.templateId = parsed.templateId; o.customFieldValues = {};
+      o.updatedAt = nowIso();
+      return json({ opportunity: o });
+    }
+
+    /* ---- Карточка сделки: POST /opportunities/:id/feasibility ---- */
+    const oppFeasibility = method === "POST" ? path.match(/^\/api\/workspace\/opportunities\/([^/]+)\/feasibility$/) : null;
+    if (oppFeasibility) {
+      const opportunityId = decodeURIComponent(oppFeasibility[1]!);
+      if (!ID_RE.test(opportunityId)) return err("invalid_opportunity_id", 400); // 1) формат :id
+      const o = db.opportunities.find((x) => x.id === opportunityId);
+      if (!o) return err("opportunity_not_found", 404); // 2) сделка
+      if (isFinal(o)) return err("opportunity_not_feasible", 409); // 3) финал
+      // 4) собираем оценку через домен; 5) пишем результат в сделку + переводим статус.
+      const assessment = assessFeasibility(o, POSITIONS, db.projects);
+      o.feasibilityStatus = assessment.status;
+      o.feasibilityResult = serializeAssessment(assessment);
+      o.feasibilityCheckedAt = nowIso();
+      o.status = assessment.status === "ok" || assessment.status === "warning" ? "ready_to_activate" : "feasibility";
+      o.updatedAt = nowIso();
+      return json({ opportunity: o, assessment }); // 6) 200
+    }
+
+    /* ---- Карточка сделки: POST /opportunities/:id/activate ---- */
+    const oppActivate = method === "POST" ? path.match(/^\/api\/workspace\/opportunities\/([^/]+)\/activate$/) : null;
+    if (oppActivate) {
+      const opportunityId = decodeURIComponent(oppActivate[1]!);
+      if (!ID_RE.test(opportunityId)) return err("invalid_opportunity_id", 400); // 1) формат :id
+      // 2) тело: invalid_project_id → invalid_risk_reason.
+      const idProvided = body.id != null;
+      const projectId = idProvided ? str(body.id) : null;
+      if (idProvided && !ID_RE.test(projectId!)) return err("invalid_project_id", 400);
+      const riskProvided = body.acceptedRiskReason != null;
+      const riskRaw = riskProvided ? str(body.acceptedRiskReason) : "";
+      if (riskProvided && riskRaw !== "" && !safeMultiline(riskRaw, 500)) return err("invalid_risk_reason", 400);
+      const acceptedRiskReason = riskRaw === "" ? null : riskRaw; // ''→null (как боевой)
+      const o = db.opportunities.find((x) => x.id === opportunityId);
+      if (!o) return err("opportunity_not_found", 404); // 3) сделка
+      if (isFinal(o)) return err("opportunity_not_activatable", 409); // 4) финал (ловит повторную активацию)
+      if (o.feasibilityStatus == null) return err("feasibility_required", 400); // 5) нужна оценка
+      // 6) пересчитываем оценку тем же доменом и решаем по статусу.
+      const assessment = assessFeasibility(o, POSITIONS, db.projects);
+      if (assessment.status === "blocked") return err("opportunity_not_activatable", 409);
+      if (assessment.status === "conflict" && !acceptedRiskReason) return err("risk_acceptance_required", 409);
+      // 7) создаём проект (копии из сделки), 8) сделку → won_closed, 9) 201.
+      const project: ProjectRecord = {
+        id: projectId ?? genId("project"), tenantId: TENANT,
+        sourceType: "opportunity", sourceOpportunityId: o.id,
+        clientId: o.clientId, projectTypeId: o.projectTypeId, title: o.title, clientName: o.clientName,
+        status: "active", plannedStart: o.plannedStart, plannedFinish: o.plannedFinish,
+        contractValue: o.contractValue, plannedHours: o.plannedHours, templateId: o.templateId,
+        createdAt: nowIso(), activatedAt: nowIso(), closedAt: null, demand: o.demand.map((d) => ({ ...d }))
+      };
+      db.projects.unshift(project);
+      o.status = "won_closed"; o.updatedAt = nowIso();
+      return json({ project }, 201);
+    }
+
+    /* ---- Карточка сделки: GET /projects (только активные) ---- */
+    if (path === "/api/workspace/projects" && method === "GET") {
+      const projects = [...db.projects]
+        .filter((p) => p.status === "active")
+        .sort((a, b) => (b.activatedAt ?? "").localeCompare(a.activatedAt ?? "") || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+      return json({ projects });
+    }
+
+    /* ---- CRM-активности: GET /crm/:entityType/:entityId/activity ---- */
+    const crmActivityList = method === "GET" ? path.match(/^\/api\/workspace\/crm\/([^/]+)\/([^/]+)\/activity$/) : null;
+    if (crmActivityList) {
+      const entityType = decodeURIComponent(crmActivityList[1]!) as CrmActivityEntityType;
+      if (entityType !== "opportunity" && entityType !== "client" && entityType !== "contact" && entityType !== "product") return err("crm_entity_type_invalid", 400);
+      const entityId = decodeURIComponent(crmActivityList[2]!);
+      if (!ID_RE.test(entityId)) return err(entityIdErr(entityType), 400);
+      if (!resolveCrmEntity(entityType, entityId)) return err("crm_entity_not_found", 404);
+      const activities = db.activities
+        .filter((a) => a.entityType === entityType && a.entityId === entityId)
+        .sort((x, y) => y.createdAt.localeCompare(x.createdAt) || y.id.localeCompare(x.id));
+      return json({ activities, attachmentItems: [], systemEvents: [], canReadRawAudit: false, auditEvents: null });
+    }
+
+    /* ---- CRM-активности: POST comments / tasks / files ---- */
+    const crmActivityCreate = method === "POST" ? path.match(/^\/api\/workspace\/crm\/([^/]+)\/([^/]+)\/(comments|tasks|files)$/) : null;
+    if (crmActivityCreate) {
+      const entityType = decodeURIComponent(crmActivityCreate[1]!) as CrmActivityEntityType;
+      if (entityType !== "opportunity" && entityType !== "client" && entityType !== "contact" && entityType !== "product") return err("crm_entity_type_invalid", 400);
+      const entityId = decodeURIComponent(crmActivityCreate[2]!);
+      if (!ID_RE.test(entityId)) return err(entityIdErr(entityType), 400);
+      const kind = crmActivityCreate[3]!;
+      const entity = resolveCrmEntity(entityType, entityId);
+      if (!entity) return err("crm_entity_not_found", 404);
+      if (entity.isLocked) return err("crm_activity_locked", 409);
+      const base = { id: `crm-activity-${genId("u")}`, tenantId: TENANT, entityType, entityId, authorUserId: CURRENT_ACTOR_ID, createdAt: nowIso(), updatedAt: nowIso() };
+      if (kind === "comments") {
+        const text = typeof body.body === "string" ? body.body.trim() : "";
+        if (!text || text.length > 4000 || !safeMultiline(text, 4000)) return err("comment_body_required", 400);
+        const activity: CrmActivity = { ...base, type: "comment", title: null, body: text, status: null, dueDate: null, assigneeUserId: null, fileUrl: null, fileSizeBytes: null, mimeType: null };
+        db.activities.unshift(activity);
+        return json({ activity }, 201);
+      }
+      if (kind === "tasks") {
+        const title = typeof body.title === "string" ? body.title.trim() : "";
+        if (!title || !safeSingleLine(title, 180)) return err("task_title_required", 400);
+        const taskBody = body.body == null || body.body === "" ? null : str(body.body);
+        if (taskBody !== null && (taskBody.length > 4000 || !safeMultiline(taskBody, 4000))) return err("task_body_invalid", 400);
+        let dueDate: string | null = null;
+        if (body.dueDate != null && body.dueDate !== "") { const d = str(body.dueDate); if (!DATE_RE.test(d)) return err("task_due_date_invalid", 400); dueDate = d; }
+        let assigneeUserId: string | null = null;
+        if (body.assigneeUserId != null && body.assigneeUserId !== "") {
+          const a = str(body.assigneeUserId);
+          if (!/^[a-z0-9][a-z0-9_-]{2,119}$/.test(a) || !CRM_USERS.some((u) => u.id === a)) return err("task_assignee_invalid", 400);
+          assigneeUserId = a;
+        }
+        const activity: CrmActivity = { ...base, type: "task", title, body: taskBody, status: "todo", dueDate, assigneeUserId, fileUrl: null, fileSizeBytes: null, mimeType: null };
+        db.activities.unshift(activity);
+        return json({ activity }, 201);
+      }
+      // files
+      const title = typeof body.title === "string" ? body.title.trim() : "";
+      if (!title || !safeSingleLine(title, 240)) return err("file_title_required", 400);
+      if (body.fileUrl == null || str(body.fileUrl) === "") return err("file_url_required", 400);
+      const fileUrl = str(body.fileUrl);
+      if (!isHttpUrl(fileUrl, 1200)) return err("file_url_invalid", 400);
+      const fileBody = body.body == null || body.body === "" ? null : str(body.body);
+      if (fileBody !== null && (fileBody.length > 4000 || !safeMultiline(fileBody, 4000))) return err("file_description_invalid", 400);
+      let mimeType: string | null = null;
+      if (body.mimeType != null && body.mimeType !== "") { const m = str(body.mimeType); if (!safeSingleLine(m, 160)) return err("file_mime_type_invalid", 400); mimeType = m; }
+      let fileSizeBytes: number | null = null;
+      if (body.fileSizeBytes != null && body.fileSizeBytes !== "") {
+        const n = body.fileSizeBytes;
+        if (typeof n !== "number" || !Number.isInteger(n) || n < 0) return err("file_size_invalid", 400);
+        fileSizeBytes = n;
+      }
+      const activity: CrmActivity = { ...base, type: "file", title, body: fileBody, status: null, dueDate: null, assigneeUserId: null, fileUrl, fileSizeBytes, mimeType };
+      db.activities.unshift(activity);
+      return json({ activity }, 201);
+    }
+
+    /* ---- CRM-активности: PATCH /crm/:entityType/:entityId/tasks/:activityId ---- */
+    const crmTaskPatch = method === "PATCH" ? path.match(/^\/api\/workspace\/crm\/([^/]+)\/([^/]+)\/tasks\/([^/]+)$/) : null;
+    if (crmTaskPatch) {
+      const entityType = decodeURIComponent(crmTaskPatch[1]!) as CrmActivityEntityType;
+      if (entityType !== "opportunity" && entityType !== "client" && entityType !== "contact" && entityType !== "product") return err("crm_entity_type_invalid", 400);
+      const entityId = decodeURIComponent(crmTaskPatch[2]!);
+      if (!ID_RE.test(entityId)) return err(entityIdErr(entityType), 400);
+      const activityId = decodeURIComponent(crmTaskPatch[3]!);
+      if (!ID_RE.test(activityId)) return err("invalid_crm_activity_id", 400);
+      const entity = resolveCrmEntity(entityType, entityId);
+      if (!entity) return err("crm_entity_not_found", 404);
+      if (entity.isLocked) return err("crm_activity_locked", 409);
+      if (body.status !== "todo" && body.status !== "done") return err("task_status_invalid", 400);
+      const activity = db.activities.find((a) => a.id === activityId && a.entityType === entityType && a.entityId === entityId && a.type === "task");
+      if (!activity) return err("crm_task_not_found", 404);
+      activity.status = body.status; activity.updatedAt = nowIso(); // идемпотентно
+      return json({ activity });
+    }
 
     return err("not_found", 404);
   };

@@ -10,6 +10,31 @@
    от планирования). Каждая мутация возвращает затронутую сущность.
    ============================================================ */
 
+/* Реэкспорт доменных типов оценки реализуемости (feasibility) — единый источник правды.
+   UI и мок используют ЭТИ типы, чтобы виджет реализуемости был контракт-верен. */
+export type {
+  OpportunityFeasibilityAssessment,
+  OpportunityFeasibilityStatus,
+  OpportunityFeasibilityBlocker,
+  OpportunityFeasibilityWarning,
+  OpportunityFeasibilityRow
+} from "@kiss-pm/domain";
+import type {
+  OpportunityFeasibilityAssessment,
+  OpportunityFeasibilityStatus,
+  OpportunityFeasibilityBlocker,
+  OpportunityFeasibilityWarning,
+  OpportunityFeasibilityRow
+} from "@kiss-pm/domain";
+
+/* Сериализованная оценка реализуемости (даты доменом не передаются — assessment чисто числовой,
+   поэтому serialized-форма совпадает с доменной). Алиасы для удобства UI/стори. */
+export type FeasibilityAssessment = OpportunityFeasibilityAssessment;
+export type FeasibilityStatus = OpportunityFeasibilityStatus;
+export type FeasibilityRow = OpportunityFeasibilityRow;
+export type FeasibilityBlocker = OpportunityFeasibilityBlocker;
+export type FeasibilityWarning = OpportunityFeasibilityWarning;
+
 export type CrmApiClientOptions = { apiOrigin: string; fetchImpl?: typeof fetch; credentials?: RequestCredentials };
 
 export class CrmApiError extends Error {
@@ -70,6 +95,35 @@ export type OpportunityCreateInput = {
   ownerUserId?: string | null;
 };
 
+// Форма ПОЛНОГО обновления сделки (PATCH /:id — full-replace, как боевой parseOpportunityUpdateBody).
+// = тело create + опциональный templateId. Статус/воронка/feasibility — server-managed (тело их не несёт).
+export type OpportunityUpdateInput = OpportunityCreateInput & { templateId?: string | null };
+
+// Тело активации проекта из сделки (POST /:id/activate). Оба поля опциональны.
+export type ProjectActivationInput = { id?: string; acceptedRiskReason?: string | null };
+
+// Сущность CRM-активности (сериализованная: даты — ISO-строки). Зеркало CrmActivityRecord боевого API.
+export type CrmActivityType = "comment" | "task" | "file";
+export type CrmActivityEntityType = "opportunity" | "client" | "contact" | "product";
+export type CrmActivity = {
+  id: string; tenantId: string;
+  entityType: CrmActivityEntityType; entityId: string;
+  type: CrmActivityType;
+  title: string | null; body: string | null;
+  status: "todo" | "done" | null;
+  dueDate: string | null; assigneeUserId: string | null; authorUserId: string;
+  fileUrl: string | null; fileSizeBytes: number | null; mimeType: string | null;
+  createdAt: string; updatedAt: string;
+};
+// Ответ GET .../activity: лента активностей + (в моке пустые/false) системные и attachment-секции.
+export type CrmActivityFeed = {
+  activities: CrmActivity[];
+  attachmentItems: unknown[];
+  systemEvents: unknown[];
+  canReadRawAudit: boolean;
+  auditEvents: unknown[] | null;
+};
+
 export function createCrmClient(options: CrmApiClientOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const credentials = options.credentials ?? "include";
@@ -125,11 +179,23 @@ export function createCrmClient(options: CrmApiClientOptions) {
     listStageTransitions(pipelineId: string) { return requestJson<{ stageTransitions: StageTransition[] }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`); },
     createStageTransition(pipelineId: string, input: { fromStageId: string; toStageId: string; requireFeasibilityOk?: boolean; minProbability?: number | null; guardNote?: string | null }) { return requestJson<{ stageTransition: StageTransition }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`, { method: "POST", body: JSON.stringify(input) }); },
     deleteStageTransition(pipelineId: string, transitionId: string) { return requestJson<{ ok: true }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions/${enc(transitionId)}`, { method: "DELETE" }); },
-    moveOpportunityPipeline(opportunityId: string, input: { pipelineId: string; stageId: string }) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(opportunityId)}/pipeline`, { method: "PATCH", body: JSON.stringify(input) }); }
-    // Отложено до поверхности «Карточка сделки»: updateOpportunity (PATCH /:id — full-replace, как
-    // боевой parseOpportunityUpdateBody), checkFeasibility (POST /:id/feasibility), activate
-    // (POST /:id/activate → ProjectRecord), listProjects (GET /projects). Тип ProjectRecord и поля
-    // feasibility* в Opportunity объявлены под них.
+    moveOpportunityPipeline(opportunityId: string, input: { pipelineId: string; stageId: string }) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(opportunityId)}/pipeline`, { method: "PATCH", body: JSON.stringify(input) }); },
+
+    // Карточка сделки: полное обновление (full-replace, как боевой parseOpportunityUpdateBody).
+    updateOpportunity(id: string, input: OpportunityUpdateInput) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(id)}`, { method: "PATCH", body: JSON.stringify(input) }); },
+    // Проверка реализуемости: пересчёт оценки + запись в сделку (status/feasibility*). Тело не шлём.
+    checkFeasibility(id: string) { return requestJson<{ opportunity: Opportunity; assessment: FeasibilityAssessment }>(`/api/workspace/opportunities/${enc(id)}/feasibility`, { method: "POST" }); },
+    // Активация: создаёт проект из сделки, сделку переводит в won_closed. input опционален.
+    activate(id: string, input?: ProjectActivationInput) { return requestJson<{ project: ProjectRecord }>(`/api/workspace/opportunities/${enc(id)}/activate`, { method: "POST", body: JSON.stringify(input ?? {}) }); },
+    // Активные проекты (только status==="active"), сортировка activatedAt desc → createdAt desc → id desc.
+    listProjects() { return requestJson<{ projects: ProjectRecord[] }>("/api/workspace/projects"); },
+
+    // CRM-активности (лента + создание comment/task/file + смена статуса задачи).
+    listActivities(entityType: CrmActivityEntityType, entityId: string) { return requestJson<CrmActivityFeed>(`/api/workspace/crm/${enc(entityType)}/${enc(entityId)}/activity`); },
+    createComment(entityType: CrmActivityEntityType, entityId: string, body: string) { return requestJson<{ activity: CrmActivity }>(`/api/workspace/crm/${enc(entityType)}/${enc(entityId)}/comments`, { method: "POST", body: JSON.stringify({ body }) }); },
+    createTask(entityType: CrmActivityEntityType, entityId: string, input: { title: string; body?: string | null; dueDate?: string | null; assigneeUserId?: string | null }) { return requestJson<{ activity: CrmActivity }>(`/api/workspace/crm/${enc(entityType)}/${enc(entityId)}/tasks`, { method: "POST", body: JSON.stringify(input) }); },
+    createFile(entityType: CrmActivityEntityType, entityId: string, input: { title: string; fileUrl: string; body?: string | null; mimeType?: string | null; fileSizeBytes?: number | null }) { return requestJson<{ activity: CrmActivity }>(`/api/workspace/crm/${enc(entityType)}/${enc(entityId)}/files`, { method: "POST", body: JSON.stringify(input) }); },
+    updateTaskStatus(entityType: CrmActivityEntityType, entityId: string, activityId: string, status: "todo" | "done") { return requestJson<{ activity: CrmActivity }>(`/api/workspace/crm/${enc(entityType)}/${enc(entityId)}/tasks/${enc(activityId)}`, { method: "PATCH", body: JSON.stringify({ status }) }); }
   };
 }
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CrmApiError, createCrmClient, type Client, type Contact, type CrmStatus, type DealStage, type Opportunity, type OpportunityCreateInput, type Pipeline, type Product, type ProjectType, type StageTransition } from "./crm-client";
+import { CrmApiError, createCrmClient, type Client, type Contact, type CrmActivity, type CrmActivityEntityType, type CrmStatus, type DealStage, type FeasibilityAssessment, type Opportunity, type OpportunityCreateInput, type OpportunityUpdateInput, type Pipeline, type Product, type ProjectActivationInput, type ProjectRecord, type ProjectType, type StageTransition } from "./crm-client";
 import { createMockCrmFetch } from "./mock-crm-backend";
 
 export type CrmLoadStatus = "loading" | "ready" | "error";
@@ -15,8 +15,11 @@ export type CrmData = {
   projectTypes: ProjectType[];
   pipelines: Pipeline[];
   stageTransitions: StageTransition[]; // плоский список переходов ВСЕХ воронок
+  projects: ProjectRecord[]; // активные проекты (источник списка «Проекты» + активаций сделок)
 };
 export type CrmMutationResult = { ok: true } | { ok: false; code?: string; message: string };
+// Результат мутации, ВОЗВРАЩАЮЩЕЙ данные для UI (feasibility-оценка, проект, лента активностей).
+export type CrmDataResult<T> = { ok: true; data: T } | { ok: false; code?: string; message: string };
 
 /**
  * Работает через настоящий createCrmClient. Транспорт — contract-mock
@@ -40,21 +43,22 @@ export function useCrm() {
   const load = useCallback(async () => {
     setStatus("loading");
     try {
-      const [opps, stages, clients, contacts, products, ptypes, pipelines] = await Promise.all([
+      const [opps, stages, clients, contacts, products, ptypes, pipelines, projects] = await Promise.all([
         client.listOpportunities(),
         client.listDealStages(),
         client.listClients(),
         client.listContacts(),
         client.listProducts(),
         client.listProjectTypes(),
-        client.listPipelines()
+        client.listPipelines(),
+        client.listProjects()
       ]);
       // Переходы — после получения воронок: грузим правила каждой и собираем плоский список.
       const transitionsByPipeline = await Promise.all(
         pipelines.pipelines.map((p) => client.listStageTransitions(p.id))
       );
       const stageTransitions = transitionsByPipeline.flatMap((r) => r.stageTransitions);
-      setData({ opportunities: opps.opportunities, dealStages: stages.dealStages, clients: clients.clients, contacts: contacts.contacts, products: products.products, projectTypes: ptypes.projectTypes, pipelines: pipelines.pipelines, stageTransitions });
+      setData({ opportunities: opps.opportunities, dealStages: stages.dealStages, clients: clients.clients, contacts: contacts.contacts, products: products.products, projectTypes: ptypes.projectTypes, pipelines: pipelines.pipelines, stageTransitions, projects: projects.projects });
       setStatus("ready");
       setError(null);
     } catch (e) {
@@ -78,6 +82,17 @@ export function useCrm() {
     }
   }, []);
 
+  // как guard, но возвращает данные мутации для UI (feasibility-оценка, проект, активность).
+  const guardData = useCallback(async <T,>(fn: () => Promise<T>): Promise<CrmDataResult<T>> => {
+    try {
+      const data = await fn();
+      return { ok: true, data };
+    } catch (e) {
+      if (e instanceof CrmApiError) return { ok: false, code: e.code, message: e.code };
+      return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
+    }
+  }, []);
+
   const patchOpp = (o: Opportunity) => setData((d) => (d ? { ...d, opportunities: d.opportunities.map((x) => (x.id === o.id ? o : x)) } : d));
 
   const moveStage = useCallback((id: string, stageId: string) => guard(async () => { const r = await client.moveOpportunityStage(id, stageId); patchOpp(r.opportunity); }), [client, guard]);
@@ -95,5 +110,23 @@ export function useCrm() {
   const createProduct = useCallback((input: { name: string; unit: string; price: number; type?: "service" | "goods"; sku?: string | null; description?: string | null }) => guard(async () => { const r = await client.createProduct(input); setData((d) => (d ? { ...d, products: [r.product, ...d.products] } : d)); }), [client, guard]);
   const updateProduct = useCallback((id: string, input: Record<string, unknown>) => guard(async () => { const r = await client.updateProduct(id, input); setData((d) => (d ? { ...d, products: d.products.map((x) => (x.id === id ? r.product : x)) } : d)); }), [client, guard]);
 
-  return { client, data, status, error, reload: load, moveStage, movePipeline, finalize, createOpportunity, createClient, updateClient, createContact, updateContact, createProduct, updateProduct, createPipeline, createStageTransition, deleteStageTransition };
+  // ---- Карточка сделки ----
+  // Полное обновление сделки (через guard — данные UI не нужны, обновляем кэш).
+  const updateOpportunity = useCallback((id: string, input: OpportunityUpdateInput) => guard(async () => { const r = await client.updateOpportunity(id, input); patchOpp(r.opportunity); }), [client, guard]);
+  // Проверка реализуемости: возвращает оценку для UI + обновляет сделку в кэше (status/feasibility*).
+  const checkFeasibility = useCallback((id: string): Promise<CrmDataResult<FeasibilityAssessment>> => guardData(async () => { const r = await client.checkFeasibility(id); patchOpp(r.opportunity); return r.assessment; }), [client, guardData]);
+  // Активация: возвращает проект для UI + переводит сделку в won_closed + добавляет проект в кэш.
+  const activate = useCallback((id: string, input?: ProjectActivationInput): Promise<CrmDataResult<ProjectRecord>> => guardData(async () => {
+    const r = await client.activate(id, input);
+    setData((d) => (d ? { ...d, projects: [r.project, ...d.projects], opportunities: d.opportunities.map((x) => (x.id === id ? { ...x, status: "won_closed" as const } : x)) } : d));
+    return r.project;
+  }), [client, guardData]);
+  // Лента активностей сущности (для UI; кэш активностей в data не держим — они per-entity).
+  const loadActivities = useCallback((entityType: CrmActivityEntityType, entityId: string): Promise<CrmDataResult<CrmActivity[]>> => guardData(async () => { const r = await client.listActivities(entityType, entityId); return r.activities; }), [client, guardData]);
+  const createComment = useCallback((entityType: CrmActivityEntityType, entityId: string, body: string): Promise<CrmDataResult<CrmActivity>> => guardData(async () => { const r = await client.createComment(entityType, entityId, body); return r.activity; }), [client, guardData]);
+  const createTask = useCallback((entityType: CrmActivityEntityType, entityId: string, input: { title: string; body?: string | null; dueDate?: string | null; assigneeUserId?: string | null }): Promise<CrmDataResult<CrmActivity>> => guardData(async () => { const r = await client.createTask(entityType, entityId, input); return r.activity; }), [client, guardData]);
+  const createFile = useCallback((entityType: CrmActivityEntityType, entityId: string, input: { title: string; fileUrl: string; body?: string | null; mimeType?: string | null; fileSizeBytes?: number | null }): Promise<CrmDataResult<CrmActivity>> => guardData(async () => { const r = await client.createFile(entityType, entityId, input); return r.activity; }), [client, guardData]);
+  const updateTaskStatus = useCallback((entityType: CrmActivityEntityType, entityId: string, activityId: string, status: "todo" | "done"): Promise<CrmDataResult<CrmActivity>> => guardData(async () => { const r = await client.updateTaskStatus(entityType, entityId, activityId, status); return r.activity; }), [client, guardData]);
+
+  return { client, data, status, error, reload: load, moveStage, movePipeline, finalize, createOpportunity, createClient, updateClient, createContact, updateContact, createProduct, updateProduct, createPipeline, createStageTransition, deleteStageTransition, updateOpportunity, checkFeasibility, activate, loadActivities, createComment, createTask, createFile, updateTaskStatus };
 }

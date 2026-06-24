@@ -254,4 +254,141 @@ describe("contract-mock CRM backend", () => {
     const { pipelines } = await c.listPipelines();
     expect(pipelines.find((p) => p.id === pipeline.id)).toBeTruthy();
   });
+
+  // ===== Карточка сделки: full-replace update =====
+  const updateInput = (over: Partial<OpportunityCreateInput> = {}) => ({ ...baseInput(over) });
+
+  it("updates an opportunity (full-replace): recomputes plannedHours, preserves status, does not touch pipelineId", async () => {
+    const c = client();
+    const before = (await c.getOpportunity("opp-2207")).opportunity;
+    const { opportunity } = await c.updateOpportunity("opp-2207", updateInput({
+      clientId: "client-romashka", primaryContactId: "ctc-romashka", projectTypeId: "pt-impl", stageId: "stage-proposal",
+      title: "Производственный портал · Релиз 2 (обновлён)", contractValue: 6_000_000, plannedHourlyRate: 5000,
+      plannedStart: "2026-03-02", plannedFinish: "2026-07-12", probability: 70, demand: [{ positionId: "backend", requiredHours: 900 }]
+    }));
+    expect(opportunity.plannedHours).toBe(Math.floor(6_000_000 / 5000)); // 1200, пересчитан доменом
+    expect(opportunity.status).toBe(before.status); // статус СОХРАНЁН (PATCH не меняет статус)
+    expect(opportunity.pipelineId).toBe(before.pipelineId); // pipelineId НЕ тронут
+    expect(opportunity.stageId).toBe("stage-proposal"); // stageId записан без guard-проверок
+    expect(opportunity.title).toBe("Производственный портал · Релиз 2 (обновлён)");
+  });
+
+  it("rejects updating a finalized opportunity (409 opportunity_update_locked)", async () => {
+    const c = client();
+    await expect(c.updateOpportunity("opp-sever-portal", updateInput())).rejects.toMatchObject({ status: 409, code: "opportunity_update_locked" });
+  });
+
+  it("update validates body: malformed contractValue → 400 invalid_contract_value", async () => {
+    const c = client();
+    await expect(c.updateOpportunity("opp-2207", updateInput({ contractValue: -1 }))).rejects.toMatchObject({ status: 400, code: "invalid_contract_value" });
+  });
+
+  it("update with malformed :id returns 400 invalid_opportunity_id", async () => {
+    const c = client();
+    await expect(c.updateOpportunity("Bad Id", updateInput())).rejects.toMatchObject({ status: 400, code: "invalid_opportunity_id" });
+  });
+
+  // ===== Карточка сделки: feasibility =====
+  it("checks feasibility on a non-final opportunity: 200 assessment, records status/result/checkedAt, sets status", async () => {
+    const c = client();
+    const { opportunity, assessment } = await c.checkFeasibility("opp-gamma-contract"); // ok-кейс (req==plannedHours)
+    expect(assessment.status).toBe("ok");
+    expect(opportunity.feasibilityStatus).toBe("ok");
+    expect(opportunity.feasibilityResult).toMatchObject({ status: "ok" });
+    expect(opportunity.feasibilityCheckedAt).not.toBeNull();
+    expect(opportunity.status).toBe("ready_to_activate"); // ok|warning → ready_to_activate
+  });
+
+  it("feasibility yields different statuses for different deals (ok / warning / conflict)", async () => {
+    const c = client();
+    const ok = (await c.checkFeasibility("opp-gamma-contract")).assessment.status;
+    const warning = (await c.checkFeasibility("opp-2207")).assessment.status; // req 1100 < plannedHours 1200 → warning
+    const conflict = (await c.checkFeasibility("opp-conflict-demo")).assessment; // req 900 > plannedHours 200 → conflict
+    expect(ok).toBe("ok");
+    expect(warning).toBe("warning");
+    expect(conflict.status).toBe("conflict");
+    expect(conflict.blockers).toContain("demand_exceeds_planned_hours");
+    // conflict-сделка переводится в status "feasibility", не ready_to_activate
+    expect((await c.getOpportunity("opp-conflict-demo")).opportunity.status).toBe("feasibility");
+  });
+
+  it("rejects feasibility on a finalized opportunity (409 opportunity_not_feasible)", async () => {
+    const c = client();
+    await expect(c.checkFeasibility("opp-sever-portal")).rejects.toMatchObject({ status: 409, code: "opportunity_not_feasible" });
+  });
+
+  // ===== Карточка сделки: activate + projects =====
+  it("requires a feasibility check before activation (400 feasibility_required)", async () => {
+    const c = client();
+    // opp-sever-erp: feasibilityStatus=null до проверки.
+    await expect(c.activate("opp-sever-erp")).rejects.toMatchObject({ status: 400, code: "feasibility_required" });
+  });
+
+  it("activates an opportunity after an ok/warning feasibility check: 201 project, deal → won_closed, project in listProjects", async () => {
+    const c = client();
+    expect((await c.listProjects()).projects).toEqual([]); // пусто до активации
+    await c.checkFeasibility("opp-gamma-contract"); // ok
+    const { project } = await c.activate("opp-gamma-contract");
+    expect(project).toMatchObject({ sourceType: "opportunity", sourceOpportunityId: "opp-gamma-contract", status: "active" });
+    expect((await c.getOpportunity("opp-gamma-contract")).opportunity.status).toBe("won_closed");
+    const { projects } = await c.listProjects();
+    expect(projects.find((p) => p.id === project.id)).toBeTruthy();
+    // повторная активация ловится финал-проверкой (сделка уже won_closed).
+    await expect(c.activate("opp-gamma-contract")).rejects.toMatchObject({ status: 409, code: "opportunity_not_activatable" });
+  });
+
+  it("conflict feasibility blocks activation without risk acceptance, allows it with a reason", async () => {
+    const c = client();
+    const a = await c.checkFeasibility("opp-conflict-demo");
+    expect(a.assessment.status).toBe("conflict");
+    await expect(c.activate("opp-conflict-demo")).rejects.toMatchObject({ status: 409, code: "risk_acceptance_required" });
+    const { project } = await c.activate("opp-conflict-demo", { acceptedRiskReason: "Приняли риск перегруза" });
+    expect(project.sourceOpportunityId).toBe("opp-conflict-demo");
+    expect((await c.getOpportunity("opp-conflict-demo")).opportunity.status).toBe("won_closed");
+  });
+
+  it("listProjects returns only active projects", async () => {
+    const c = client();
+    await c.checkFeasibility("opp-gamma-contract");
+    await c.activate("opp-gamma-contract");
+    const { projects } = await c.listProjects();
+    expect(projects.length).toBeGreaterThanOrEqual(1);
+    expect(projects.every((p) => p.status === "active")).toBe(true);
+  });
+
+  // ===== CRM-активности =====
+  it("lists seeded activities for opp-2207, sorted createdAt desc", async () => {
+    const c = client();
+    const feed = await c.listActivities("opportunity", "opp-2207");
+    expect(feed.activities.length).toBeGreaterThanOrEqual(4);
+    expect(feed.canReadRawAudit).toBe(false);
+    expect(feed.auditEvents).toBeNull();
+    const created = feed.activities.map((a) => a.createdAt);
+    expect(created).toEqual([...created].sort((x, y) => y.localeCompare(x)));
+  });
+
+  it("creates a comment (201), and rejects it on a finalized opportunity (409 crm_activity_locked)", async () => {
+    const c = client();
+    const { activity } = await c.createComment("opportunity", "opp-2207", "Новый комментарий");
+    expect(activity).toMatchObject({ type: "comment", body: "Новый комментарий", authorUserId: "u-anna" });
+    await expect(c.createComment("opportunity", "opp-sever-portal", "Поздно")).rejects.toMatchObject({ status: 409, code: "crm_activity_locked" });
+  });
+
+  it("rejects a task with an invalid assignee (400 task_assignee_invalid)", async () => {
+    const c = client();
+    await expect(c.createTask("opportunity", "opp-2207", { title: "Задача", assigneeUserId: "u-ghost" })).rejects.toMatchObject({ status: 400, code: "task_assignee_invalid" });
+  });
+
+  it("transitions a task todo→done (200), and rejects a non-task id (404 crm_task_not_found)", async () => {
+    const c = client();
+    const done = await c.updateTaskStatus("opportunity", "opp-2207", "crm-activity-3", "done");
+    expect(done.activity.status).toBe("done");
+    // crm-activity-1 — это comment, не task → not found как задача.
+    await expect(c.updateTaskStatus("opportunity", "opp-2207", "crm-activity-1", "done")).rejects.toMatchObject({ status: 404, code: "crm_task_not_found" });
+  });
+
+  it("rejects an invalid entityType (400 crm_entity_type_invalid)", async () => {
+    const c = client();
+    await expect(c.listActivities("widget" as never, "opp-2207")).rejects.toMatchObject({ status: 400, code: "crm_entity_type_invalid" });
+  });
 });
