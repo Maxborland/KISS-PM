@@ -108,7 +108,7 @@ export function FormError({ code, fallback, className }: { code?: string | null;
     <div
       role="alert"
       className={cn(
-        "rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--danger-text)]",
+        "anim-rise-in rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--danger-text)]",
         className
       )}
     >

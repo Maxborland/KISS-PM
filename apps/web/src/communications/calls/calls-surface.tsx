@@ -177,7 +177,7 @@ export function CallsSurface() {
         </section>
       </div>
 
-      {notice ? <div className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
+      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CommsFrame>
   );
 }
@@ -359,7 +359,7 @@ function RoomDetail({ roomId }: { roomId: string }) {
         )}
       </section>
 
-      {notice ? <div className="text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
+      {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
 
       {/* Диалог join-ссылки с честной плашкой */}
       <JoinDialog open={joinOpen} onOpenChange={setJoinOpen} join={join} />

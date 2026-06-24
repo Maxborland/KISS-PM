@@ -271,7 +271,7 @@ export function ProjectScenarios() {
       )}
 
       {scenarioErr ? <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--danger)] bg-[var(--danger-soft)] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text)]">{scenarioErr}</div> : null}
-      {notice ? <div className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
+      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </DeliveryFrame>
   );
 }

@@ -307,7 +307,7 @@ function DealCardBody({ crm, data, opp }: { crm: ReturnType<typeof useCrm>; data
         </div>
       </div>
 
-      {notice ? <div className="text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
+      {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </div>
   );
 }

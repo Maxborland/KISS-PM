@@ -428,7 +428,7 @@ function ChatPane({
       {/* Композер: «Отправить» → реальный postMessage; вложения/упоминания/эмодзи — честно demoAction */}
       <Composer busy={busy} onSend={(body) => void run(() => conv.postMessage(cid, { body }))} />
 
-      {notice ? <div className="border-t border-[var(--border)] px-4 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
+      {notice ? <div key={notice} className="anim-rise-in-fast border-t border-[var(--border)] px-4 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </>
   );
 }

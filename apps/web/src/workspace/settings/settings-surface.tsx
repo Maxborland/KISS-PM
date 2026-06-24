@@ -54,15 +54,17 @@ export function SettingsSurface() {
           <Segmented name="settings-tab" value={tab} onChange={setTab} options={TAB_OPTIONS} />
         </div>
 
-        {tab === "profile" ? (
-          <ProfileTab />
-        ) : tab === "notifications" ? (
-          <NotificationsPrefs />
-        ) : tab === "integrations" ? (
-          <IntegrationsTab />
-        ) : (
-          <BillingTab />
-        )}
+        <div key={tab} className="anim-fade-in">
+          {tab === "profile" ? (
+            <ProfileTab />
+          ) : tab === "notifications" ? (
+            <NotificationsPrefs />
+          ) : tab === "integrations" ? (
+            <IntegrationsTab />
+          ) : (
+            <BillingTab />
+          )}
+        </div>
       </main>
     </WorkspaceShell>
   );

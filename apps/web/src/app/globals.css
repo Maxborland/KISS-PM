@@ -1,6 +1,10 @@
 @layer reset, tokens, base, components, utilities;
 
 @import "tailwindcss";
+/* Активируем enter/exit-утилиты (animate-in/out, fade/zoom/slide) для Radix-оверлеев.
+   Они уже размечены в components/ui/* (dialog/popover/dropdown/select/tooltip), но без
+   подключения плагина к Tailwind v4 не генерировали CSS — оверлеи появлялись резко. */
+@plugin "tailwindcss-animate";
 @import "../styles/tokens.css" layer(tokens);
 @import "../styles/tokens.planning.css" layer(tokens);
 @import "react-day-picker/dist/style.css" layer(components);
@@ -66,5 +70,42 @@
   .mono, code, kbd, samp, pre {
     font-family: var(--font-mono);
     font-feature-settings: "tnum", "zero";
+  }
+}
+
+/* ============================================================
+   Motion-примитивы появления контента (design-v3).
+   Определены ЗДЕСЬ, в globals.css, а НЕ в @import-компонентном CSS
+   (bem-supplement): Storybook-preview подхватывает только то, что
+   Tailwind обрабатывает в этом entry-файле; @import «../styles/*.css»
+   там не резолвятся, поэтому классы из bem-supplement в Storybook не
+   применяются. Свои keyframes (не зависим от ds-fade-in из bem-supplement).
+   Применяются к ready-контенту (SurfaceState), инлайн-нотисам/алертам,
+   свопам вкладок. reduced-motion-гард ниже. Оверлеи (dialog/popover/
+   dropdown/select/tooltip) анимируются отдельно — через tailwindcss-animate
+   (@plugin выше), их разметка уже в components/ui/*.
+   ============================================================ */
+@keyframes ds-anim-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ds-anim-rise {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.anim-fade-in {
+  animation: ds-anim-fade var(--duration-base, 200ms) var(--ease-out, cubic-bezier(0, 0, .2, 1));
+}
+.anim-rise-in {
+  animation: ds-anim-rise var(--duration-base, 200ms) var(--ease-out, cubic-bezier(0, 0, .2, 1));
+}
+.anim-rise-in-fast {
+  animation: ds-anim-rise var(--duration-fast, 120ms) var(--ease-out, cubic-bezier(0, 0, .2, 1));
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-in,
+  .anim-rise-in,
+  .anim-rise-in-fast {
+    animation: none !important;
   }
 }

@@ -883,7 +883,7 @@ export function ProjectSchedule() {
           </div>
         </div>
       ) : null}
-      {notice ? <div className="mt-2 flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]"><GitBranch className="size-3.5 text-[var(--accent)]" aria-hidden />{notice}</div> : null}
+      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]"><GitBranch className="size-3.5 text-[var(--accent)]" aria-hidden />{notice}</div> : null}
 
       {/* Legend */}
       <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[length:var(--text-sm)] text-[var(--muted)]">

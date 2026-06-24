@@ -53,12 +53,14 @@ export function SurfaceState({
   forbidden,
   className
 }: SurfaceStateProps) {
-  if (status === "ready") return <>{children}</>;
+  // ready-контент мягко проявляется (один раз на переход в ready), вместо резкого снапа.
+  // Обёртка-блок безопасна: SurfaceState всегда стоит в блочном потоке контента фрейма.
+  if (status === "ready") return <div className="anim-fade-in">{children}</div>;
 
   const wrap = (node: ReactNode) => (
     <div
       className={cn(
-        "grid place-items-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4",
+        "anim-fade-in grid place-items-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4",
         narrow && "state-narrow",
         className
       )}

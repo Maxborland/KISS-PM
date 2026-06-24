@@ -268,7 +268,7 @@ export function MyWorkSurface() {
           )}
         </SurfaceState>
 
-        {notice ? <div className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
+        {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
       </main>
     </WorkspaceShell>
   );

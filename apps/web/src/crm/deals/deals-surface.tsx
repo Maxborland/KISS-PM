@@ -167,6 +167,7 @@ export function ProjectDeals() {
 
       <MovePipelineDialog target={moveTarget} pipelines={model.pipelines} allStages={model.allStages} currentPipelineId={pipelineOfStage(moveTarget?.stageId ?? null)} busy={busy} onClose={() => setMoveTarget(null)} onMove={doMovePipeline} />
 
+      <div key={mode} className="anim-fade-in">
       {mode === "kanban" ? (
         <div className="flex gap-3 overflow-x-auto pb-2">
           {model.stages.map((s) => {
@@ -258,10 +259,11 @@ export function ProjectDeals() {
       ) : (
         <Forecast stages={model.stages} byStage={model.byStage} />
       )}
+      </div>
 
       <TransitionsPanel transitions={model.transitions} pipelineName={model.selected?.name ?? "—"} stageName={stageName} />
 
-      {notice ? <div className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
+      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CrmFrame>
   );
 }

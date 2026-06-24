@@ -94,7 +94,7 @@ export function NotificationsSurface() {
         </span>
       </div>
 
-      {view === "feed" ? <NotificationsFeed /> : <NotificationsPrefs />}
+      <div key={view} className="anim-fade-in">{view === "feed" ? <NotificationsFeed /> : <NotificationsPrefs />}</div>
     </CommsFrame>
   );
 }
@@ -211,7 +211,7 @@ function NotificationsFeed() {
       )}
       </SurfaceState>
 
-      {notice ? <div className="text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
+      {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </div>
   );
 }
@@ -355,7 +355,7 @@ export function NotificationsPrefs() {
         PUT /notification-preferences — полный upsert: отправляются все {CHANNELS.length * NOTIF_TYPES.length} ячеек (channel × тип), сервер возвращает актуальный набор. Пустой набор → ранний выход (никаких изменений).
       </p>
 
-      {notice ? <div className="text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
+      {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </div>
   );
 }
