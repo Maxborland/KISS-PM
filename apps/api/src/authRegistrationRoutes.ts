@@ -16,6 +16,23 @@ import type { TenantUser } from "@kiss-pm/domain";
 // Срок жизни токена сброса пароля: 60 минут от момента запроса.
 const passwordResetTtlMs = 60 * 60 * 1000;
 
+// Гонка регистрации одного email (TOCTOU): pre-check прошёл, но глобальный uniqueIndex
+// user_credentials_email_uidx отверг параллельную вставку. Распознаём нарушение уникальности
+// (Postgres 23505), чтобы вернуть чистый 409 email_taken вместо 500 (house-паттерн, как
+// isActiveSessionConflictError). Обходим error.cause на случай обёрток драйвера.
+function isCredentialEmailConflict(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 8; depth += 1) {
+    const rec = current as { code?: unknown; constraint?: unknown; constraint_name?: unknown; message?: unknown; cause?: unknown };
+    if (rec.code === "23505") {
+      const marker = String(rec.constraint ?? rec.constraint_name ?? rec.message ?? "");
+      if (marker.includes("user_credentials_email_uidx")) return true;
+    }
+    current = rec.cause;
+  }
+  return false;
+}
+
 // Регистрирует ручки самостоятельной регистрации нового тенанта и сброса пароля.
 // Все три — обычные мутации: требуют заголовок x-kiss-pm-action:same-origin
 // (в исключения requiresSameOriginActionHeader НЕ добавляются).
@@ -163,6 +180,12 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
         201
       );
     } catch (error) {
+      // Гонка по email (параллельная регистрация одного адреса): отдаём 409 email_taken, как на
+      // не-гоночном пути (recordFailure расходует резерв). Транзакция уже откатилась — частичного тенанта нет.
+      if (isCredentialEmailConflict(error)) {
+        await deps.authRateLimiter.recordFailure(rateLimitInput, { reserved: reservedAttempt });
+        return context.json({ error: "email_taken" }, 409);
+      }
       if (reservedAttempt) {
         await deps.authRateLimiter.releaseReservedAttempt?.(rateLimitInput);
       }

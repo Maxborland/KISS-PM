@@ -378,15 +378,17 @@ export function createMockAuthFetch(): typeof fetch {
 
     // POST /api/auth/password-reset/confirm {token,password}
     //   400 invalid_reset_confirm_payload → 400 weak_password → 400 invalid_reset_token
-    //   → 400 token_expired → 400 reset_token_used → 200 {status:"ok"}.
+    //   → 400 reset_token_used → 400 token_expired → 200 {status:"ok"} (порядок как боевой).
     if (path === "/api/auth/password-reset/confirm" && method === "POST") {
-      const token = str(body.token);
-      if (!token) return err("invalid_reset_confirm_payload", 400);
+      // token: формат как боевой parseResetConfirmInput (string 1..256, /^[A-Za-z0-9]+$/, без trim).
+      const token = typeof body.token === "string" ? body.token : "";
+      if (token.length < 1 || token.length > 256 || !/^[A-Za-z0-9]+$/.test(token)) return err("invalid_reset_confirm_payload", 400);
       if (isWeakPassword(body.password)) return err("weak_password", 400);
       const record = resetTokens.get(token);
       if (!record) return err("invalid_reset_token", 400);
-      if (Date.now() > record.expiresAt) return err("token_expired", 400);
+      // порядок как боевой: used (consumed) ДО expired; граница истечения нестрогая (>=).
       if (record.consumedAt !== null) return err("reset_token_used", 400);
+      if (Date.now() >= record.expiresAt) return err("token_expired", 400);
       // Сменить пароль, consumedAt=now, сбросить сессии пользователя.
       const user = findUser(record.userId);
       if (user) credentials.set(user.email, { userId: user.id, password: body.password as string });
