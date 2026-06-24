@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Archive, Loader2, Plus, RotateCcw } from "lucide-react";
+import { Archive, Plus, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr, money } from "@/crm/ui/crm-bits";
 import { useCrm } from "@/crm/lib/use-crm";
@@ -27,12 +28,17 @@ export function ProjectClients() {
     return { clients: data.clients, stats };
   }, [data]);
 
-  if (status === "loading" && !data) {
-    return <CrmFrame activeTab="Клиенты"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка клиентов…</div></CrmFrame>;
-  }
-  if (status === "error" || !model || !data) {
-    return <CrmFrame activeTab="Клиенты"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></CrmFrame>;
-  }
+  // Верхнеуровневый статус поверхности: forbidden/error/loading из хука; пустой справочник → empty; иначе ready.
+  const surfaceStatus =
+    status === "forbidden"
+      ? "forbidden"
+      : status === "error"
+        ? "error"
+        : !data || !model
+          ? "loading"
+          : model.clients.length === 0
+            ? "empty"
+            : "ready";
 
   // архив/восстановление шлёт ПОЛНУЮ запись (боевой PATCH — full-replace, требует name), не только status
   const toggleArchive = async (c: Client, to: "active" | "archived") => {
@@ -50,33 +56,47 @@ export function ProjectClients() {
         Реальный контракт CRM: GET/POST/PATCH /api/workspace/clients (createCrmClient). «Контактов» — активные; «Сделок»/«Сумма» — по сделкам клиента, кроме проигранных. PATCH — полная запись (как боевой). Данные in-memory.
       </div>
 
-      <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
-        <table className="w-full border-collapse text-[length:var(--text-sm)]">
-          <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
-            <th className="px-3 py-2 font-semibold">Клиент</th><th className="px-3 py-2 font-semibold">Описание</th><th className="px-3 py-2 text-right font-semibold">Контактов</th><th className="px-3 py-2 text-right font-semibold">Сделок</th><th className="px-3 py-2 text-right font-semibold">Сумма</th><th className="px-3 py-2 font-semibold">Статус</th><th className="px-3 py-2" />
-          </tr></thead>
-          <tbody>
-            {model.clients.map((c) => {
-              const s = model.stats.get(c.id) ?? { deals: 0, sum: 0, contacts: 0 };
-              return (
-                <tr key={c.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div><div className="v4-mono text-[10px] text-[var(--muted-soft)]">{c.id}</div></td>
-                  <td className="max-w-[280px] truncate px-3 py-2 text-[var(--muted)]">{c.description ?? "—"}</td>
-                  <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{s.contacts}</td>
-                  <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{s.deals}</td>
-                  <td className="px-3 py-2 text-right v4-num font-semibold text-[var(--text-strong)]">{s.sum > 0 ? money(s.sum) : "—"}</td>
-                  <td className="px-3 py-2"><StatusChip status={c.status} /></td>
-                  <td className="px-3 py-2 text-right">
-                    {c.status === "active"
-                      ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
-                      : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <SurfaceState
+        status={surfaceStatus}
+        error={error}
+        onRetry={() => void reload()}
+        errorFormat={crmErr}
+        loadingLabel="Загрузка клиентов…"
+        empty={{
+          title: "Нет клиентов",
+          description: "Справочник клиентов пуст — создайте первого клиента.",
+          action: <CreateClientDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createClient} />
+        }}
+        forbidden={{ title: "Доступ к клиентам ограничен", description: "У вас нет прав на просмотр справочника клиентов." }}
+      >
+        <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+          <table className="w-full border-collapse text-[length:var(--text-sm)]">
+            <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
+              <th className="px-3 py-2 font-semibold">Клиент</th><th className="px-3 py-2 font-semibold">Описание</th><th className="px-3 py-2 text-right font-semibold">Контактов</th><th className="px-3 py-2 text-right font-semibold">Сделок</th><th className="px-3 py-2 text-right font-semibold">Сумма</th><th className="px-3 py-2 font-semibold">Статус</th><th className="px-3 py-2" />
+            </tr></thead>
+            <tbody>
+              {(model?.clients ?? []).map((c) => {
+                const s = model?.stats.get(c.id) ?? { deals: 0, sum: 0, contacts: 0 };
+                return (
+                  <tr key={c.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
+                    <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div><div className="v4-mono text-[10px] text-[var(--muted-soft)]">{c.id}</div></td>
+                    <td className="max-w-[280px] truncate px-3 py-2 text-[var(--muted)]">{c.description ?? "—"}</td>
+                    <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{s.contacts}</td>
+                    <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{s.deals}</td>
+                    <td className="px-3 py-2 text-right v4-num font-semibold text-[var(--text-strong)]">{s.sum > 0 ? money(s.sum) : "—"}</td>
+                    <td className="px-3 py-2"><StatusChip status={c.status} /></td>
+                    <td className="px-3 py-2 text-right">
+                      {c.status === "active"
+                        ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                        : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </SurfaceState>
       {notice ? <div className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CrmFrame>
   );

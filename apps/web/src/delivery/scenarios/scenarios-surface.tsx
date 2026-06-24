@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, Loader2, RefreshCw, Sparkles, TriangleAlert, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
 
@@ -78,11 +79,18 @@ export function ProjectScenarios() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readModel?.planVersion, targetKey, proposals, target?.resourceId, target?.date]);
 
-  if (status === "loading" && !readModel) {
-    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Сценарии"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка…</div></DeliveryFrame>;
-  }
-  if (status === "error" || !model || !readModel) {
-    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Сценарии"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
+  // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
+  // готовый контент — только при наличии model+readModel. Frame-обёртку сохраняем.
+  // ВНИМАНИЕ: вложенный preview-спиннер «Расчёт сценариев…» (Loader2 ниже) НЕ трогаем.
+  if (status !== "ready" || !model || !readModel) {
+    const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
+    return (
+      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Сценарии">
+        <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
+          <span />
+        </SurfaceState>
+      </DeliveryFrame>
+    );
   }
 
   const projectMeta = deriveProjectMeta(readModel, PROJECT);

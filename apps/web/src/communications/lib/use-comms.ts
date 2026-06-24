@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 import {
   CommsApiError,
@@ -45,10 +45,58 @@ import { createMockCommsFetch } from "./mock-comms-backend";
    следующего агента — рантайм-тестов на них в этом слайсе нет.
    ============================================================ */
 
-export type CommsLoadStatus = "loading" | "ready" | "error";
+// forbidden — РЕАЛЬНОЕ состояние: при 403 (permission_missing) от боевого RBAC.
+// На текущем contract-mock RBAC-стаб (canReadEntity/…) отдаёт true, поэтому 403
+// на сид-данных не активируется; ветка проведена честно и сработает на боевом API
+// (apiOrigin) или при ужесточении стаба — поверхностям менять ничего не нужно.
+export type CommsLoadStatus = "loading" | "ready" | "error" | "forbidden";
 export type CommsMutationResult = { ok: true } | { ok: false; code?: string; message: string };
 // Результат мутации, ВОЗВРАЩАЮЩЕЙ данные для UI (например, join-token, action-item).
 export type CommsDataResult<T> = { ok: true; data: T } | { ok: false; code?: string; message: string };
+
+/* ============================================================
+   Общий load-state хелпер для 7 хуков блока «Коммуникации».
+   Инкапсулирует data/status/error + загрузку с разводкой 403→forbidden,
+   чтобы не дублировать try/catch и проводку forbidden в каждом хуке.
+   ============================================================ */
+export type CommsLoadState<T> = {
+  data: T | null;
+  status: CommsLoadStatus;
+  error: string | null;
+  setData: Dispatch<SetStateAction<T | null>>;
+  reload: () => Promise<void>;
+};
+
+function useCommsLoad<T>(fetcher: () => Promise<T>): CommsLoadState<T> {
+  const [data, setData] = useState<T | null>(null);
+  const [status, setStatus] = useState<CommsLoadStatus>("loading");
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setStatus("loading");
+    try {
+      const next = await fetcher();
+      setData(next);
+      setStatus("ready");
+      setError(null);
+    } catch (e) {
+      // 403 (permission_missing) → forbidden; прочие ошибки → error. error хранит код.
+      if (e instanceof CommsApiError && e.status === 403) {
+        setStatus("forbidden");
+        setError(e.code);
+        return;
+      }
+      setStatus("error");
+      setError(e instanceof CommsApiError ? e.code : e instanceof Error ? e.message : "load_failed");
+    }
+  }, [fetcher]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return { data, status, error, setData, reload };
+}
 
 // Общий клиент/транспорт: один createMockCommsFetch на монтаж (изолированная сессия).
 function useCommsClient() {
@@ -97,9 +145,21 @@ export type ConversationData = {
 export function useConversation(entityType: EntityType, entityId: string) {
   const client = useCommsClient();
   const { guard, guardData } = useGuard();
-  const [data, setData] = useState<ConversationData | null>(null);
-  const [status, setStatus] = useState<CommsLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
+
+  // fetcher для общего load-state: беседы сущности + сообщения первой беседы.
+  const fetcher = useCallback(async (): Promise<ConversationData> => {
+    const { conversations } = await client.listConversations(entityType, entityId);
+    const first = conversations[0] ?? null;
+    let messages: Message[] = [];
+    let nextCursor: string | null = null;
+    if (first) {
+      const res = await client.listMessages(first.id);
+      messages = res.messages;
+      nextCursor = res.nextCursor;
+    }
+    return { conversations, selectedConversationId: first?.id ?? null, messages, nextCursor };
+  }, [client, entityType, entityId]);
+  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
 
   // Загрузка сообщений выбранной беседы.
   const loadMessages = useCallback(
@@ -107,33 +167,8 @@ export function useConversation(entityType: EntityType, entityId: string) {
       const res = await client.listMessages(conversationId);
       setData((d) => (d ? { ...d, selectedConversationId: conversationId, messages: res.messages, nextCursor: res.nextCursor } : d));
     },
-    [client]
+    [client, setData]
   );
-
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const { conversations } = await client.listConversations(entityType, entityId);
-      const first = conversations[0] ?? null;
-      let messages: Message[] = [];
-      let nextCursor: string | null = null;
-      if (first) {
-        const res = await client.listMessages(first.id);
-        messages = res.messages;
-        nextCursor = res.nextCursor;
-      }
-      setData({ conversations, selectedConversationId: first?.id ?? null, messages, nextCursor });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
-  }, [client, entityType, entityId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const selectConversation = useCallback((conversationId: string) => guard(async () => { await loadMessages(conversationId); }), [guard, loadMessages]);
   const reloadMessages = useCallback(() => guard(async () => { const id = data?.selectedConversationId; if (id) await loadMessages(id); }), [guard, loadMessages, data?.selectedConversationId]);
@@ -190,26 +225,12 @@ export function useConversation(entityType: EntityType, entityId: string) {
 export function useChannels() {
   const client = useCommsClient();
   const { guard } = useGuard();
-  const [data, setData] = useState<{ channels: Channel[] } | null>(null);
-  const [status, setStatus] = useState<CommsLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const { channels } = await client.listChannels();
-      setData({ channels });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
+  const fetcher = useCallback(async (): Promise<{ channels: Channel[] }> => {
+    const { channels } = await client.listChannels();
+    return { channels };
   }, [client]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
 
   const createChannel = useCallback(
     (input: ChannelCreateInput) => guard(async () => { const r = await client.createChannel(input); setData((d) => (d ? { ...d, channels: [...d.channels, r.channel] } : d)); }),
@@ -227,26 +248,12 @@ export type ChannelDetail = { channel: Channel; members: ChannelMember[]; conver
 export function useChannel(channelId: string) {
   const client = useCommsClient();
   const { guard } = useGuard();
-  const [data, setData] = useState<ChannelDetail | null>(null);
-  const [status, setStatus] = useState<CommsLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const [detail, conv] = await Promise.all([client.getChannel(channelId), client.getChannelConversation(channelId)]);
-      setData({ channel: detail.channel, members: detail.members, conversation: conv.conversation });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
+  const fetcher = useCallback(async (): Promise<ChannelDetail> => {
+    const [detail, conv] = await Promise.all([client.getChannel(channelId), client.getChannelConversation(channelId)]);
+    return { channel: detail.channel, members: detail.members, conversation: conv.conversation };
   }, [client, channelId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
 
   const patchChannel = useCallback(
     (input: ChannelPatchInput) => guard(async () => { const r = await client.patchChannel(channelId, input); setData((d) => (d ? { ...d, channel: r.channel } : d)); }),
@@ -271,26 +278,12 @@ export function useChannel(channelId: string) {
 export function useCallRooms(entityType: EntityType, entityId: string) {
   const client = useCommsClient();
   const { guard } = useGuard();
-  const [data, setData] = useState<{ callRooms: CallRoom[] } | null>(null);
-  const [status, setStatus] = useState<CommsLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const { callRooms } = await client.listCallRooms(entityType, entityId);
-      setData({ callRooms });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
+  const fetcher = useCallback(async (): Promise<{ callRooms: CallRoom[] }> => {
+    const { callRooms } = await client.listCallRooms(entityType, entityId);
+    return { callRooms };
   }, [client, entityType, entityId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
 
   const createRoom = useCallback(
     (input: CallRoomCreateInput) => guard(async () => { const r = await client.createCallRoom(input); setData((d) => (d ? { ...d, callRooms: [r.callRoom, ...d.callRooms] } : d)); }),
@@ -305,26 +298,12 @@ export type CallRoomDetail = { callRoom: CallRoom; events: CallEvent[]; recordin
 export function useCallRoom(roomId: string) {
   const client = useCommsClient();
   const { guard, guardData } = useGuard();
-  const [data, setData] = useState<CallRoomDetail | null>(null);
-  const [status, setStatus] = useState<CommsLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const res = await client.getCallRoom(roomId);
-      setData({ callRoom: res.callRoom, events: res.events, recordings: res.recordings });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
+  const fetcher = useCallback(async (): Promise<CallRoomDetail> => {
+    const res = await client.getCallRoom(roomId);
+    return { callRoom: res.callRoom, events: res.events, recordings: res.recordings };
   }, [client, roomId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, status, error, reload: load } = useCommsLoad(fetcher);
 
   const startSession = useCallback((): Promise<CommsDataResult<CallSession>> => guardData(async () => { const r = await client.startSession(roomId); await load(); return r.session; }), [client, guardData, roomId, load]);
   const joinToken = useCallback((sessionId: string): Promise<CommsDataResult<VideoJoinContract>> => guardData(async () => { const r = await client.joinToken(roomId, sessionId); return r.join; }), [client, guardData, roomId]);
@@ -348,26 +327,12 @@ export function useCallRoom(roomId: string) {
 export function useMeetings(entityType: EntityType, entityId: string) {
   const client = useCommsClient();
   const { guard } = useGuard();
-  const [data, setData] = useState<{ meetings: Meeting[] } | null>(null);
-  const [status, setStatus] = useState<CommsLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const { meetings } = await client.listMeetings(entityType, entityId);
-      setData({ meetings });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
+  const fetcher = useCallback(async (): Promise<{ meetings: Meeting[] }> => {
+    const { meetings } = await client.listMeetings(entityType, entityId);
+    return { meetings };
   }, [client, entityType, entityId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
 
   const createMeeting = useCallback(
     (input: MeetingCreateInput) => guard(async () => { const r = await client.createMeeting(input); setData((d) => (d ? { ...d, meetings: [r.meeting, ...d.meetings] } : d)); }),
@@ -395,26 +360,12 @@ export function useMeetings(entityType: EntityType, entityId: string) {
 export function useNotifications(filterStatus?: "unread" | "read") {
   const client = useCommsClient();
   const { guard } = useGuard();
-  const [data, setData] = useState<{ notifications: UserNotification[] } | null>(null);
-  const [status, setStatus] = useState<CommsLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const { notifications } = await client.listNotifications(filterStatus ? { status: filterStatus } : undefined);
-      setData({ notifications });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
+  const fetcher = useCallback(async (): Promise<{ notifications: UserNotification[] }> => {
+    const { notifications } = await client.listNotifications(filterStatus ? { status: filterStatus } : undefined);
+    return { notifications };
   }, [client, filterStatus]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, status, error, reload: load } = useCommsLoad(fetcher);
 
   const markRead = useCallback((notificationId: string) => guard(async () => { await client.markNotificationRead(notificationId); await load(); }), [client, guard, load]);
 
@@ -424,26 +375,12 @@ export function useNotifications(filterStatus?: "unread" | "read") {
 export function useNotificationPreferences() {
   const client = useCommsClient();
   const { guard } = useGuard();
-  const [data, setData] = useState<{ preferences: NotificationPreference[] } | null>(null);
-  const [status, setStatus] = useState<CommsLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const { preferences } = await client.getNotificationPreferences();
-      setData({ preferences });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
+  const fetcher = useCallback(async (): Promise<{ preferences: NotificationPreference[] }> => {
+    const { preferences } = await client.getNotificationPreferences();
+    return { preferences };
   }, [client]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
 
   const savePreferences = useCallback(
     (preferences: PreferenceInput[]) => guard(async () => { const r = await client.putNotificationPreferences(preferences); setData({ preferences: r.preferences }); }),

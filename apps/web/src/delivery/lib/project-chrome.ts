@@ -17,6 +17,21 @@ export const PROJECT_FALLBACK: ProjectMeta = {
   finish: "—"
 };
 
+/**
+ * RU-маппер кодов ошибок загрузки плана для <SurfaceState errorFormat>. Коды приходят
+ * из usePlanning (load_failed) и из PlanningApiError.code/сетевых сообщений транспорта.
+ * Неизвестный код отдаём как есть (или общий fallback).
+ */
+const PLANNING_ERR_RU: Record<string, string> = {
+  load_failed: "Не удалось загрузить план проекта",
+  request_failed: "Запрос к планировщику не выполнен",
+  invalid_json_response: "Некорректный ответ планировщика",
+  plan_version_conflict: "Конфликт версий плана — обновите страницу",
+  forbidden: "Нет прав на просмотр плана проекта"
+};
+export const planningErr = (code?: string): string =>
+  (code && PLANNING_ERR_RU[code]) || code || "Не удалось загрузить план";
+
 const ddmmyyyy = (iso: string | null): string => {
   if (!iso) return "—";
   const d = new Date(`${iso}T00:00:00Z`);

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { GitCommitVertical, Loader2, RotateCcw } from "lucide-react";
+import { GitCommitVertical, RotateCcw } from "lucide-react";
 import { buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/planning-client";
 
 import { Button } from "@/components/ui/button";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
 import { MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning, type CommitMetaView, type CommitsView } from "@/delivery/lib/use-planning";
 
@@ -42,11 +43,17 @@ export function ProjectCommits() {
     return (id: string) => { const t = m.get(id); return t ? `${t.wbsCode} ${t.title}` : id; };
   }, [readModel]);
 
-  if (status === "loading" && !readModel) {
-    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Коммиты"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка…</div></DeliveryFrame>;
-  }
-  if (status === "error" || !readModel) {
-    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Коммиты"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
+  // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
+  // готовый контент — только при наличии readModel. Frame-обёртку сохраняем.
+  if (status !== "ready" || !readModel) {
+    const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
+    return (
+      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Коммиты">
+        <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
+          <span />
+        </SurfaceState>
+      </DeliveryFrame>
+    );
   }
 
   const projectMeta = deriveProjectMeta(readModel, PROJECT);

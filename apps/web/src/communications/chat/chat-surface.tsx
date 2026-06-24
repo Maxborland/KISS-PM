@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CheckCheck, Loader2, MoreHorizontal, Pencil, Pin, Send, Smile, Trash2, X } from "lucide-react";
+import { CheckCheck, MoreHorizontal, Pencil, Pin, Send, Smile, Trash2, X } from "lucide-react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
@@ -43,46 +44,43 @@ export function ChatSurface() {
   const conv = useConversation(DEMO_ENTITY_TYPE, DEMO_ENTITY_ID);
   const { data, status, error, reload, selectConversation } = conv;
 
-  if (status === "loading" && !data) {
-    return (
-      <CommsFrame activeTab="Чат">
-        <div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]">
-          <Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка чата…
-        </div>
-      </CommsFrame>
-    );
-  }
-  if (status === "error" || !data) {
-    return (
-      <CommsFrame activeTab="Чат">
-        <div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]">
-          <span>Не удалось загрузить: {error ?? "unknown"}</span>
-          <Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button>
-        </div>
-      </CommsFrame>
-    );
-  }
-
-  const selected = data.conversations.find((c) => c.id === data.selectedConversationId) ?? null;
+  // Верхнеуровневый статус поверхности: forbidden (403) / error / loading / ready.
+  // (ВЛОЖЕННЫЙ EmptyState «Нет бесед» — НЕ top-level: остаётся внутри ready-разметки.)
+  const surfaceStatus =
+    status === "forbidden" ? "forbidden" : status === "error" || !data ? (status === "loading" ? "loading" : "error") : "ready";
+  const selected = data?.conversations.find((c) => c.id === data.selectedConversationId) ?? null;
 
   return (
     <CommsFrame activeTab="Чат" subtitle="Беседы проекта · proj-portal">
       <div className="flex flex-col gap-3">
         <PrototypeBanner />
-        <div className="grid min-h-0 gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
-          <ConversationList
-            conversations={data.conversations}
-            selectedId={data.selectedConversationId}
-            onSelect={(id) => void selectConversation(id)}
-          />
-          {selected ? (
-            <ChatPane key={selected.id} conv={conv} conversation={selected} messages={data.messages} />
-          ) : (
-            <div className="grid min-h-[480px] place-items-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
-              <EmptyState title="Нет бесед" description="У этой сущности пока нет бесед." />
+        <SurfaceState
+          status={surfaceStatus}
+          error={error}
+          onRetry={() => void reload()}
+          errorFormat={commsErr}
+          loadingLabel="Загрузка чата…"
+          forbidden={{ title: "Нет доступа к беседам", description: "У вас нет прав на просмотр коммуникаций этой сущности." }}
+        >
+          {data ? (
+            <div className="grid min-h-0 gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+              <ConversationList
+                conversations={data.conversations}
+                selectedId={data.selectedConversationId}
+                onSelect={(id) => void selectConversation(id)}
+              />
+              {selected ? (
+                <ChatPane key={selected.id} conv={conv} conversation={selected} messages={data.messages} />
+              ) : (
+                <div className="grid min-h-[480px] place-items-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
+                  <EmptyState title="Нет бесед" description="У этой сущности пока нет бесед." />
+                </div>
+              )}
             </div>
+          ) : (
+            <span />
           )}
-        </div>
+        </SurfaceState>
       </div>
     </CommsFrame>
   );

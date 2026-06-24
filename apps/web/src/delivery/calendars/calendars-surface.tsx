@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Loader2, TriangleAlert, UserPlus, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, TriangleAlert, UserPlus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
@@ -68,11 +69,17 @@ export function ProjectCalendars() {
     return { cal, full, holidayByDay, absByResDay, leafTasks, conflicts, monthsList };
   }, [readModel]);
 
-  if (status === "loading" && !readModel) {
-    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Календари"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка календарей…</div></DeliveryFrame>;
-  }
-  if (status === "error" || !model || !readModel) {
-    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Календари"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
+  // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
+  // готовый контент — только при наличии model+readModel. Frame-обёртку сохраняем.
+  if (status !== "ready" || !model || !readModel) {
+    const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
+    return (
+      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Календари">
+        <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка календарей…">
+          <span />
+        </SurfaceState>
+      </DeliveryFrame>
+    );
   }
 
   const projectMeta = deriveProjectMeta(readModel, PROJECT);

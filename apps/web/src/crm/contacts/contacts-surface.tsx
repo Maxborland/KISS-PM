@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Archive, Loader2, Plus, RotateCcw } from "lucide-react";
+import { Archive, Plus, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr } from "@/crm/ui/crm-bits";
 import { useCrm } from "@/crm/lib/use-crm";
@@ -20,12 +21,17 @@ export function ProjectContacts() {
 
   const clientById = useMemo(() => new Map((data?.clients ?? []).map((c) => [c.id, c])), [data]);
 
-  if (status === "loading" && !data) {
-    return <CrmFrame activeTab="Контакты"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка контактов…</div></CrmFrame>;
-  }
-  if (status === "error" || !data) {
-    return <CrmFrame activeTab="Контакты"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></CrmFrame>;
-  }
+  // Верхнеуровневый статус поверхности: forbidden/error/loading из хука; пустой справочник → empty; иначе ready.
+  const surfaceStatus =
+    status === "forbidden"
+      ? "forbidden"
+      : status === "error"
+        ? "error"
+        : !data
+          ? "loading"
+          : data.contacts.length === 0
+            ? "empty"
+            : "ready";
 
   // имя клиента + пометка «(архив)», если клиент архивирован (контакт остаётся при архивации клиента)
   const clientLabel = (id: string) => { const cl = clientById.get(id); return cl ? `${cl.name}${cl.status === "archived" ? " (архив)" : ""}` : id; };
@@ -39,36 +45,50 @@ export function ProjectContacts() {
   };
 
   return (
-    <CrmFrame activeTab="Контакты" subtitle="Справочник контактов" actions={<CreateContactDialog data={data} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createContact} />}>
+    <CrmFrame activeTab="Контакты" subtitle="Справочник контактов" actions={data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createContact} /> : null}>
       <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
         <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         Реальный контракт CRM: GET/POST/PATCH /api/workspace/contacts. Контакт создаётся только к активному клиенту; email приводится к нижнему регистру и валидируется. Данные in-memory.
       </div>
 
-      <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
-        <table className="w-full border-collapse text-[length:var(--text-sm)]">
-          <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
-            <th className="px-3 py-2 font-semibold">Контакт</th><th className="px-3 py-2 font-semibold">Клиент</th><th className="px-3 py-2 font-semibold">Должность</th><th className="px-3 py-2 font-semibold">Email</th><th className="px-3 py-2 font-semibold">Телефон</th><th className="px-3 py-2 font-semibold">Статус</th><th className="px-3 py-2" />
-          </tr></thead>
-          <tbody>
-            {data.contacts.map((c) => (
-              <tr key={c.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div><div className="v4-mono text-[10px] text-[var(--muted-soft)]">{c.id}</div></td>
-                <td className="px-3 py-2 text-[var(--muted-strong)]">{clientLabel(c.clientId)}</td>
-                <td className="px-3 py-2 text-[var(--muted)]">{c.role ?? "—"}</td>
-                <td className="px-3 py-2 text-[var(--muted)]">{c.email ?? "—"}</td>
-                <td className="px-3 py-2 text-[var(--muted)]">{c.phone ?? "—"}</td>
-                <td className="px-3 py-2"><StatusChip status={c.status} /></td>
-                <td className="px-3 py-2 text-right">
-                  {c.status === "active"
-                    ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
-                    : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <SurfaceState
+        status={surfaceStatus}
+        error={error}
+        onRetry={() => void reload()}
+        errorFormat={crmErr}
+        loadingLabel="Загрузка контактов…"
+        empty={{
+          title: "Нет контактов",
+          description: "Справочник контактов пуст — создайте первый контакт (нужен активный клиент).",
+          action: data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createContact} /> : undefined
+        }}
+        forbidden={{ title: "Доступ к контактам ограничен", description: "У вас нет прав на просмотр справочника контактов." }}
+      >
+        <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+          <table className="w-full border-collapse text-[length:var(--text-sm)]">
+            <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
+              <th className="px-3 py-2 font-semibold">Контакт</th><th className="px-3 py-2 font-semibold">Клиент</th><th className="px-3 py-2 font-semibold">Должность</th><th className="px-3 py-2 font-semibold">Email</th><th className="px-3 py-2 font-semibold">Телефон</th><th className="px-3 py-2 font-semibold">Статус</th><th className="px-3 py-2" />
+            </tr></thead>
+            <tbody>
+              {(data?.contacts ?? []).map((c) => (
+                <tr key={c.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
+                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div><div className="v4-mono text-[10px] text-[var(--muted-soft)]">{c.id}</div></td>
+                  <td className="px-3 py-2 text-[var(--muted-strong)]">{clientLabel(c.clientId)}</td>
+                  <td className="px-3 py-2 text-[var(--muted)]">{c.role ?? "—"}</td>
+                  <td className="px-3 py-2 text-[var(--muted)]">{c.email ?? "—"}</td>
+                  <td className="px-3 py-2 text-[var(--muted)]">{c.phone ?? "—"}</td>
+                  <td className="px-3 py-2"><StatusChip status={c.status} /></td>
+                  <td className="px-3 py-2 text-right">
+                    {c.status === "active"
+                      ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                      : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SurfaceState>
       {notice ? <div className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CrmFrame>
   );

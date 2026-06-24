@@ -5,7 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CrmApiError, createCrmClient, type Client, type Contact, type CrmActivity, type CrmActivityEntityType, type CrmStatus, type DealStage, type FeasibilityAssessment, type Opportunity, type OpportunityCreateInput, type OpportunityUpdateInput, type Pipeline, type Product, type ProjectActivationInput, type ProjectRecord, type ProjectType, type StageTransition } from "./crm-client";
 import { createMockCrmFetch } from "./mock-crm-backend";
 
-export type CrmLoadStatus = "loading" | "ready" | "error";
+// forbidden — отдельный статус загрузки: при CrmApiError.status===403 surface рендерит
+// SurfaceState forbidden (а не error). В моке 403 теоретичен, но проводка нужна для боевого API.
+export type CrmLoadStatus = "loading" | "ready" | "error" | "forbidden";
 export type CrmData = {
   opportunities: Opportunity[];
   dealStages: DealStage[];
@@ -62,6 +64,12 @@ export function useCrm() {
       setStatus("ready");
       setError(null);
     } catch (e) {
+      // 403 → forbidden (нет прав на раздел), иначе — обычная ошибка загрузки.
+      if (e instanceof CrmApiError && e.status === 403) {
+        setStatus("forbidden");
+        setError(e.code);
+        return;
+      }
       setStatus("error");
       setError(e instanceof Error ? e.message : "load_failed");
     }

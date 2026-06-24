@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarClock, CheckSquare, Link2, Loader2, Plus, Send, StickyNote, Users } from "lucide-react";
+import { CalendarClock, CheckSquare, Link2, Plus, Send, StickyNote, Users } from "lucide-react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Chip } from "@/components/ui/chip";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
@@ -137,22 +138,21 @@ export function MeetingsSurface() {
     return meetings.find((m) => m.id === selectedId) ?? meetings[0] ?? null;
   }, [meetings, selectedId]);
 
-  if (status === "loading" && !data) {
+  // Верхнеуровневый статус поверхности: forbidden (403) / error / loading.
+  // ВНУТРЕННИЙ EmptyState «Встреч пока нет» (data есть, список пуст) — НЕ top-level: остаётся в ready.
+  if (status === "forbidden" || status === "error" || !data) {
     return (
       <CommsFrame activeTab="Встречи" subtitle="Встречи проекта">
-        <div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]">
-          <Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка встреч…
-        </div>
-      </CommsFrame>
-    );
-  }
-  if (status === "error" || !data) {
-    return (
-      <CommsFrame activeTab="Встречи" subtitle="Встречи проекта">
-        <div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]">
-          <span>Не удалось загрузить: {commsErr(error ?? undefined)}</span>
-          <Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button>
-        </div>
+        <SurfaceState
+          status={status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error"}
+          error={error}
+          onRetry={() => void reload()}
+          errorFormat={commsErr}
+          loadingLabel="Загрузка встреч…"
+          forbidden={{ title: "Нет доступа к встречам", description: "У вас нет прав на просмотр встреч этой сущности." }}
+        >
+          <span />
+        </SurfaceState>
       </CommsFrame>
     );
   }

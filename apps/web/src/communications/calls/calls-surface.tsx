@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
 import { CallStatusChip, commsErr, relTime, userName } from "@/communications/lib/comms-bits";
@@ -86,22 +87,33 @@ export function CallsSurface() {
     return rooms.find((r) => r.status === "active")?.roomId ?? rooms[0]?.roomId ?? null;
   }, [selectedId, rooms]);
 
-  if (status === "loading" && !data) {
-    return (
-      <CommsFrame activeTab="Звонки">
-        <div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]">
-          <Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка звонков…
-        </div>
-      </CommsFrame>
+  // Верхнеуровневый статус поверхности: forbidden (403) / error / loading / empty (нет комнат).
+  // Кнопку создания сохраняем и в шапке, и в empty-action — пустое состояние остаётся рабочим.
+  if (status === "forbidden" || status === "error" || !data || rooms.length === 0) {
+    const createAction = (
+      <CreateRoomDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRoom} onCreated={(id) => setSelectedId(id)} />
     );
-  }
-  if (status === "error" || !data) {
     return (
-      <CommsFrame activeTab="Звонки">
-        <div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]">
-          <span>Не удалось загрузить: {commsErr(undefined, error ?? "unknown")}</span>
-          <Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button>
-        </div>
+      <CommsFrame activeTab="Звонки" actions={data && rooms.length === 0 ? createAction : undefined}>
+        <SurfaceState
+          status={
+            status === "forbidden"
+              ? "forbidden"
+              : status === "error"
+                ? "error"
+                : !data
+                  ? "loading"
+                  : "empty"
+          }
+          error={error}
+          onRetry={() => void reload()}
+          errorFormat={commsErr}
+          loadingLabel="Загрузка звонков…"
+          forbidden={{ title: "Нет доступа к звонкам", description: "У вас нет прав на просмотр звонков этой сущности." }}
+          empty={{ title: "Нет комнат звонков", description: "Создайте первую комнату кнопкой «Комната».", action: createAction }}
+        >
+          <span />
+        </SurfaceState>
       </CommsFrame>
     );
   }
@@ -123,14 +135,9 @@ export function CallsSurface() {
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
-        {/* СЛЕВА: список комнат */}
+        {/* СЛЕВА: список комнат (rooms непуст — пустой список разведён в top-level SurfaceState empty) */}
         <aside className="flex flex-col gap-2">
-          {rooms.length === 0 ? (
-            <div className="grid place-items-center rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-8 text-center text-[length:var(--text-xs)] text-[var(--muted-soft)]">
-              Комнат звонков пока нет. Создайте первую кнопкой «Комната».
-            </div>
-          ) : (
-            rooms.map((r) => {
+          {rooms.map((r) => {
               const selected = r.roomId === activeRoomId;
               return (
                 <button
@@ -155,8 +162,7 @@ export function CallsSurface() {
                   </div>
                 </button>
               );
-            })
-          )}
+            })}
         </aside>
 
         {/* СПРАВА: детальная комната */}
@@ -188,19 +194,21 @@ function RoomDetail({ roomId }: { roomId: string }) {
   const [join, setJoin] = useState<VideoJoinContract | null>(null);
   const [joinOpen, setJoinOpen] = useState(false);
 
-  if (status === "loading" && !data) {
+  // Верхнеуровневое состояние детальной комнаты: forbidden (403) / error / loading.
+  if (status === "forbidden" || status === "error" || !data) {
     return (
-      <div className="flex h-[320px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]">
-        <Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка комнаты…
-      </div>
-    );
-  }
-  if (status === "error" || !data) {
-    return (
-      <div className="flex h-[320px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]">
-        <span>Не удалось загрузить комнату: {commsErr(undefined, error ?? "unknown")}</span>
-        <Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button>
-      </div>
+      <SurfaceState
+        status={status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error"}
+        error={error}
+        onRetry={() => void reload()}
+        errorFormat={commsErr}
+        errorTitle="Не удалось загрузить комнату"
+        loadingLabel="Загрузка комнаты…"
+        height="320px"
+        forbidden={{ title: "Нет доступа к комнате", description: "У вас нет прав на просмотр этого звонка." }}
+      >
+        <span />
+      </SurfaceState>
     );
   }
 

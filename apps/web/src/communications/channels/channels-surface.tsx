@@ -10,6 +10,7 @@ import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogT
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
@@ -89,22 +90,21 @@ export function ChannelsSurface() {
   // Выбранный канал: явный выбор → первый в списке.
   const selected = useMemo<Channel | null>(() => channels.find((c) => c.id === selectedId) ?? channels[0] ?? null, [channels, selectedId]);
 
-  if (status === "loading" && !data) {
+  // Верхнеуровневый статус поверхности: forbidden (403) / error / loading.
+  // ВНУТРЕННИЙ EmptyState «Нет каналов» (data есть, список пуст) — НЕ top-level: остаётся в ready.
+  if (status === "forbidden" || status === "error" || !data) {
     return (
       <CommsFrame activeTab="Каналы">
-        <div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]">
-          <Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка каналов…
-        </div>
-      </CommsFrame>
-    );
-  }
-  if (status === "error" || !data) {
-    return (
-      <CommsFrame activeTab="Каналы">
-        <div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]">
-          <span>Не удалось загрузить: {commsErr(error ?? undefined)}</span>
-          <Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button>
-        </div>
+        <SurfaceState
+          status={status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error"}
+          error={error}
+          onRetry={() => void reload()}
+          errorFormat={commsErr}
+          loadingLabel="Загрузка каналов…"
+          forbidden={{ title: "Нет доступа к каналам", description: "У вас нет прав на просмотр каналов рабочей области." }}
+        >
+          <span />
+        </SurfaceState>
       </CommsFrame>
     );
   }
@@ -203,12 +203,20 @@ function ChannelDetail({ channelId, fallback }: { channelId: string; fallback: C
   const system = channel.channelType === "workspace_general";
   const canManage = channel.canManage && !system;
 
-  if (status === "error" && !data) {
+  // Верхнеуровневое состояние детальной панели канала: forbidden (403) / error.
+  // (Пока есть fallback-данные из листинга — рендерим контент; loading показывается инлайн ниже.)
+  if ((status === "forbidden" || status === "error") && !data) {
     return (
-      <div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]">
-        <span>Не удалось загрузить канал: {commsErr(error ?? undefined)}</span>
-        <Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button>
-      </div>
+      <SurfaceState
+        status={status === "forbidden" ? "forbidden" : "error"}
+        error={error}
+        onRetry={() => void reload()}
+        errorFormat={commsErr}
+        errorTitle="Не удалось загрузить канал"
+        forbidden={{ title: "Нет доступа к каналу", description: "У вас нет прав на просмотр этого канала." }}
+      >
+        <span />
+      </SurfaceState>
     );
   }
 

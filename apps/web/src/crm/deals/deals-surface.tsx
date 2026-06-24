@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowLeftRight, Loader2, Plus } from "lucide-react";
+import { ArrowLeftRight, Plus } from "lucide-react";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Chip } from "@/components/ui/chip";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { StatTile } from "@/delivery/ui/bento";
 import { cn } from "@/lib/cn";
 import { CrmFrame } from "@/crm/ui/crm-frame";
@@ -81,11 +82,26 @@ export function ProjectDeals() {
     return { pipelines, selected, stages, byStage, unstaged, opps: inPipeline, transitions, allStages: data.dealStages };
   }, [data, pipelineId]);
 
-  if (status === "loading" && !data) {
-    return <CrmFrame activeTab="Сделки"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка сделок…</div></CrmFrame>;
-  }
-  if (status === "error" || !model || !data) {
-    return <CrmFrame activeTab="Сделки"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></CrmFrame>;
+  // Верхнеуровневые loading/error/forbidden — через SurfaceState (внутри CrmFrame).
+  // Сохраняем прежнее условие входа (loading&&!data → loading; error/forbidden/нет model → состояние),
+  // т.к. ниже тело дереференсит model. Reload-с-данными по-прежнему рендерит ready (поведение не меняем).
+  // НЕ трогаем вложенные состояния (per-column «перетащите сюда», панель переходов) — это ready-контент.
+  if ((status === "loading" && !data) || status === "error" || status === "forbidden" || !model || !data) {
+    const stateStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
+    return (
+      <CrmFrame activeTab="Сделки">
+        <SurfaceState
+          status={stateStatus}
+          error={error}
+          onRetry={() => void reload()}
+          errorFormat={ruErr}
+          loadingLabel="Загрузка сделок…"
+          forbidden={{ title: "Доступ к сделкам ограничен", description: "У вас нет прав на просмотр воронки продаж." }}
+        >
+          <span />
+        </SurfaceState>
+      </CrmFrame>
+    );
   }
 
   const stageName = (id: string | null) => model.allStages.find((s) => s.id === id)?.name ?? "—";

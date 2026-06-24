@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { money } from "@/crm/ui/crm-bits";
 import { useCrm } from "@/crm/lib/use-crm";
@@ -71,11 +72,26 @@ export function DealCard() {
     return data.opportunities.find((o) => o.id === selectedId) ?? data.opportunities.find((o) => o.id === "opp-2207") ?? data.opportunities[0] ?? null;
   }, [data, selectedId]);
 
-  if (status === "loading" && !data) {
-    return <CrmFrame activeTab="Сделки"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка сделки…</div></CrmFrame>;
-  }
-  if (status === "error" || !data || !selected) {
-    return <CrmFrame activeTab="Сделки"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "нет сделок"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></CrmFrame>;
+  // Верхнеуровневые loading/error/forbidden — через SurfaceState (внутри CrmFrame).
+  // Тело ниже дереференсит data/selected, поэтому сохраняем early-return для не-ready состояний.
+  // НЕ трогаем вложенные состояния (лента активностей, виджет осуществимости) — это ready-контент.
+  // selected===null при наличии data = «нет сделок» — показываем как ошибку (как было раньше).
+  if ((status === "loading" && !data) || status === "error" || status === "forbidden" || !data || !selected) {
+    const stateStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
+    return (
+      <CrmFrame activeTab="Сделки">
+        <SurfaceState
+          status={stateStatus}
+          error={error ?? "нет сделок"}
+          onRetry={() => void reload()}
+          errorFormat={ruErr}
+          loadingLabel="Загрузка сделки…"
+          forbidden={{ title: "Доступ к сделке ограничен", description: "У вас нет прав на просмотр карточки сделки." }}
+        >
+          <span />
+        </SurfaceState>
+      </CrmFrame>
+    );
   }
 
   return (

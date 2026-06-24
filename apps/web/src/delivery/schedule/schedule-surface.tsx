@@ -1,12 +1,13 @@
 "use client";
 
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Columns3, Filter, GitBranch, IndentDecrease, IndentIncrease, Layers, Loader2, Plus, TriangleAlert, Undo2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Columns3, Filter, GitBranch, IndentDecrease, IndentIncrease, Layers, Plus, TriangleAlert, Undo2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
 import { demoAction } from "@/views/lib/demo";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
@@ -467,17 +468,17 @@ export function ProjectSchedule() {
     }
   }
 
-  if (status === "loading" && !readModel) {
+  // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
+  // готовый контент — только при наличии mapped+readModel. Frame-обёртку сохраняем.
+  // ВНИМАНИЕ: инлайн валидационный блок ошибок задач (errors map) — это НЕ состояние
+  // загрузки поверхности, его НЕ трогаем.
+  if (status !== "ready" || !mapped || !readModel) {
+    const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
       <DeliveryFrame project={PROJECT_FALLBACK} activeTab="График">
-        <div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка плана из read-model…</div>
-      </DeliveryFrame>
-    );
-  }
-  if (status === "error" || !mapped || !readModel) {
-    return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="График">
-        <div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить план: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div>
+        <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка плана из read-model…">
+          <span />
+        </SurfaceState>
       </DeliveryFrame>
     );
   }

@@ -11,7 +11,10 @@ import {
 
 import { createMockPlanningFetch } from "./mock-planning-backend";
 
-export type PlanningStatus = "loading" | "ready" | "error";
+// "forbidden" — 403 при загрузке read-model (нет права на проект). В моке теоретичен
+// (бэкенд отдаёт 200 для демо-сессии), но проводка позволяет поверхностям показывать
+// единый ForbiddenState через <SurfaceState>, а не «ошибку» с кнопкой повтора.
+export type PlanningStatus = "loading" | "ready" | "error" | "forbidden";
 
 export type ValidationHit = { message: string; entityId?: string };
 export type ApplyResult =
@@ -54,6 +57,12 @@ export function usePlanning(projectId: string) {
       setStatus("ready");
       setError(null);
     } catch (e) {
+      // 403 → forbidden (нет права на проект): отдельный статус, не «ошибка загрузки».
+      if (e instanceof PlanningApiError && e.status === 403) {
+        setStatus("forbidden");
+        setError(e.code || "forbidden");
+        return;
+      }
       setStatus("error");
       setError(e instanceof Error ? e.message : "load_failed");
     }

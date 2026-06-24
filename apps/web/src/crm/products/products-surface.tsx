@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, Loader2, Plus, RotateCcw } from "lucide-react";
+import { Archive, Plus, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr, rub } from "@/crm/ui/crm-bits";
 import { useCrm } from "@/crm/lib/use-crm";
@@ -20,12 +21,17 @@ export function ProjectProducts() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  if (status === "loading" && !data) {
-    return <CrmFrame activeTab="Продукты"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка продуктов…</div></CrmFrame>;
-  }
-  if (status === "error" || !data) {
-    return <CrmFrame activeTab="Продукты"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></CrmFrame>;
-  }
+  // Верхнеуровневый статус поверхности: forbidden/error/loading из хука; пустой справочник → empty; иначе ready.
+  const surfaceStatus =
+    status === "forbidden"
+      ? "forbidden"
+      : status === "error"
+        ? "error"
+        : !data
+          ? "loading"
+          : data.products.length === 0
+            ? "empty"
+            : "ready";
 
   // архив/восстановление шлёт ПОЛНУЮ запись (боевой PATCH — full-replace, требует name/unit/price)
   const toggleArchive = async (p: Product, to: "active" | "archived") => {
@@ -43,30 +49,44 @@ export function ProjectProducts() {
         Реальный контракт CRM: GET/POST/PATCH /api/workspace/products. Цена — положительное целое (₽). Данные in-memory.
       </div>
 
-      <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
-        <table className="w-full border-collapse text-[length:var(--text-sm)]">
-          <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
-            <th className="px-3 py-2 font-semibold">Продукт</th><th className="px-3 py-2 font-semibold">SKU</th><th className="px-3 py-2 font-semibold">Тип</th><th className="px-3 py-2 font-semibold">Ед.</th><th className="px-3 py-2 text-right font-semibold">Цена</th><th className="px-3 py-2 font-semibold">Статус</th><th className="px-3 py-2" />
-          </tr></thead>
-          <tbody>
-            {data.products.map((p) => (
-              <tr key={p.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{p.name}</div><div className="v4-mono text-[10px] text-[var(--muted-soft)]">{p.id}</div></td>
-                <td className="px-3 py-2 v4-mono text-[var(--muted)]">{p.sku ?? "—"}</td>
-                <td className="px-3 py-2"><Chip variant={p.type === "service" ? "info" : "violet"}>{TYPE_LABEL[p.type]}</Chip></td>
-                <td className="px-3 py-2 text-[var(--muted-strong)]">{p.unit}</td>
-                <td className="px-3 py-2 text-right v4-num font-semibold text-[var(--text-strong)]">{rub(p.price)}</td>
-                <td className="px-3 py-2"><StatusChip status={p.status} /></td>
-                <td className="px-3 py-2 text-right">
-                  {p.status === "active"
-                    ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(p, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
-                    : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(p, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <SurfaceState
+        status={surfaceStatus}
+        error={error}
+        onRetry={() => void reload()}
+        errorFormat={crmErr}
+        loadingLabel="Загрузка продуктов…"
+        empty={{
+          title: "Нет продуктов",
+          description: "Справочник продуктов пуст — создайте первый продукт.",
+          action: <CreateProductDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createProduct} />
+        }}
+        forbidden={{ title: "Доступ к продуктам ограничен", description: "У вас нет прав на просмотр справочника продуктов." }}
+      >
+        <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+          <table className="w-full border-collapse text-[length:var(--text-sm)]">
+            <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
+              <th className="px-3 py-2 font-semibold">Продукт</th><th className="px-3 py-2 font-semibold">SKU</th><th className="px-3 py-2 font-semibold">Тип</th><th className="px-3 py-2 font-semibold">Ед.</th><th className="px-3 py-2 text-right font-semibold">Цена</th><th className="px-3 py-2 font-semibold">Статус</th><th className="px-3 py-2" />
+            </tr></thead>
+            <tbody>
+              {(data?.products ?? []).map((p) => (
+                <tr key={p.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
+                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{p.name}</div><div className="v4-mono text-[10px] text-[var(--muted-soft)]">{p.id}</div></td>
+                  <td className="px-3 py-2 v4-mono text-[var(--muted)]">{p.sku ?? "—"}</td>
+                  <td className="px-3 py-2"><Chip variant={p.type === "service" ? "info" : "violet"}>{TYPE_LABEL[p.type]}</Chip></td>
+                  <td className="px-3 py-2 text-[var(--muted-strong)]">{p.unit}</td>
+                  <td className="px-3 py-2 text-right v4-num font-semibold text-[var(--text-strong)]">{rub(p.price)}</td>
+                  <td className="px-3 py-2"><StatusChip status={p.status} /></td>
+                  <td className="px-3 py-2 text-right">
+                    {p.status === "active"
+                      ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(p, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                      : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(p, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SurfaceState>
       {notice ? <div className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CrmFrame>
   );

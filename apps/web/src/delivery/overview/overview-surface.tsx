@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowUpRight, Flag, GitCommit, Loader2, TrendingUp, Zap } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Flag, GitCommit, TrendingUp, Zap } from "lucide-react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { Bento, BentoCard, StatTile } from "@/delivery/ui/bento";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning, type CommitMetaView } from "@/delivery/lib/use-planning";
 import { demoAction } from "@/views/lib/demo";
@@ -57,11 +58,17 @@ export function ProjectOverview() {
     return { authored, leaves, milestones, calcById, projectFinish: cp.projectFinish, criticalIds: new Set(cp.criticalPathTaskIds), overloads, bc, issues, deadline };
   }, [readModel]);
 
-  if (status === "loading" && !readModel) {
-    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Обзор"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка…</div></DeliveryFrame>;
-  }
-  if (status === "error" || !model || !readModel) {
-    return <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Обзор"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></DeliveryFrame>;
+  // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error),
+  // готовый контент рендерим только при наличии model+readModel. Frame-обёртку сохраняем.
+  if (status !== "ready" || !model || !readModel) {
+    const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
+    return (
+      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Обзор">
+        <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
+          <span />
+        </SurfaceState>
+      </DeliveryFrame>
+    );
   }
 
   // ===== KPI и сигналы из РЕАЛЬНОГО read-model =====

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCheck, Loader2, RotateCcw, Save } from "lucide-react";
+import { CheckCheck, Loader2, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Segmented } from "@/components/ui/segmented";
+import { SurfaceState } from "@/components/domain/surface-state";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
@@ -154,16 +155,18 @@ function NotificationsFeed() {
         </Button>
       </div>
 
-      {status === "loading" && !data ? (
-        <div className="flex h-[320px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]">
-          <Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка уведомлений…
-        </div>
-      ) : status === "error" ? (
-        <div className="flex h-[320px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]">
-          <span>Не удалось загрузить: {commsErr(undefined, error ?? "unknown")}</span>
-          <Button variant="secondary" size="sm" onClick={() => void reload()}><RotateCcw className="size-3.5" aria-hidden />Повторить</Button>
-        </div>
-      ) : notifications.length === 0 ? (
+      {/* Верхнеуровневые состояния ленты: forbidden (403) / error / loading — через SurfaceState.
+          ВЛОЖЕННЫЙ EmptyState ленты (filter-aware «…нет») остаётся nested-состоянием в ready. */}
+      <SurfaceState
+        status={status === "forbidden" ? "forbidden" : status === "error" ? "error" : status === "loading" && !data ? "loading" : "ready"}
+        error={error}
+        onRetry={() => void reload()}
+        errorFormat={commsErr}
+        height="320px"
+        loadingLabel="Загрузка уведомлений…"
+        forbidden={{ title: "Нет доступа к уведомлениям", description: "У вас нет прав на просмотр уведомлений." }}
+      >
+        {notifications.length === 0 ? (
         <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] py-6 shadow-[var(--shadow-card)]">
           <EmptyState
             title={filter === "unread" ? "Непрочитанных уведомлений нет" : filter === "read" ? "Прочитанных уведомлений нет" : "Уведомлений пока нет"}
@@ -206,6 +209,7 @@ function NotificationsFeed() {
           })}
         </ul>
       )}
+      </SurfaceState>
 
       {notice ? <div className="text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </div>
@@ -266,19 +270,20 @@ function NotificationsPrefs() {
     setNotice(res.ok ? "Настройки сохранены" : `Не удалось: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
   }
 
-  if (status === "loading" && !data) {
+  // Верхнеуровневое состояние настроек: forbidden (403) / error / loading.
+  if (status === "forbidden" || status === "error" || !data) {
     return (
-      <div className="flex h-[320px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]">
-        <Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка настроек…
-      </div>
-    );
-  }
-  if (status === "error" || !data) {
-    return (
-      <div className="flex h-[320px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]">
-        <span>Не удалось загрузить: {commsErr(undefined, error ?? "unknown")}</span>
-        <Button variant="secondary" size="sm" onClick={() => void reload()}><RotateCcw className="size-3.5" aria-hidden />Повторить</Button>
-      </div>
+      <SurfaceState
+        status={status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error"}
+        error={error}
+        onRetry={() => void reload()}
+        errorFormat={commsErr}
+        height="320px"
+        loadingLabel="Загрузка настроек…"
+        forbidden={{ title: "Нет доступа к настройкам", description: "У вас нет прав на изменение настроек уведомлений." }}
+      >
+        <span />
+      </SurfaceState>
     );
   }
 
