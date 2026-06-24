@@ -47,6 +47,15 @@ describe("evaluateStageTransition", () => {
     expect(decision.allowed).toBe(true);
   });
 
+  it("does not restrict moves when the pipeline has no declared transitions (back-compat)", () => {
+    const decision = evaluateStageTransition({
+      opportunity: baseOpportunity,
+      targetStage: { id: "won", pipelineId: "pipeline-main" },
+      transitions: []
+    });
+    expect(decision.allowed).toBe(true);
+  });
+
   it("blocks a transition not declared in the pipeline", () => {
     const decision = evaluateStageTransition({
       opportunity: baseOpportunity,

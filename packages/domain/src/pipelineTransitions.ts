@@ -81,6 +81,12 @@ export function evaluateStageTransition(input: {
     return { allowed: true };
   }
 
+  // Воронка без объявленных переходов не ограничивает переносы — правила переходов
+  // включаются опционально (обратная совместимость с одиночными воронками без правил).
+  if (transitions.length === 0) {
+    return { allowed: true };
+  }
+
   const rule = transitions.find(
     (transition) =>
       transition.fromStageId === opportunity.stageId &&
