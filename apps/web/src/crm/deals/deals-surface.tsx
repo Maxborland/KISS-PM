@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { ArrowLeftRight, Loader2, Plus } from "lucide-react";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { cn } from "@/lib/cn";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { useCrm } from "@/crm/lib/use-crm";
 import { CRM_USERS } from "@/crm/lib/mock-crm-backend";
-import type { DealStage, Opportunity } from "@/crm/lib/crm-client";
+import type { DealStage, Opportunity, Pipeline, StageTransition } from "@/crm/lib/crm-client";
 
 type Mode = "kanban" | "list" | "forecast";
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
@@ -37,13 +37,25 @@ const ERR_RU: Record<string, string> = {
   client_not_found: "Клиент не найден или неактивен",
   contact_not_found: "Контакт не найден или не у этого клиента",
   project_type_not_found: "Тип проекта не найден",
-  deal_stage_not_found_create: "Стадия не найдена"
+  deal_stage_not_found_create: "Стадия не найдена",
+  // мультиворонки: причины блокировки перехода (домен evaluateStageTransition/evaluatePipelineChange)
+  transition_not_allowed: "Переход между этими стадиями не разрешён в воронке",
+  condition_probability: "Условие не выполнено: недостаточная вероятность",
+  condition_feasibility: "Условие не выполнено: реализуемость не подтверждена (feasibility ≠ ok)",
+  cross_pipeline_move: "Это другая воронка — используйте «Перенести в воронку»",
+  pipeline_archived: "Целевая воронка архивирована",
+  deal_stage_inactive: "Целевая стадия архивирована",
+  stage_not_in_pipeline: "Стадия не принадлежит выбранной воронке",
+  opportunity_finalized: "Сделка завершена — перенос недоступен",
+  pipeline_not_found: "Воронка не найдена"
 };
 const ruErr = (code?: string, fallback?: string) => (code && ERR_RU[code]) || fallback || code || "Ошибка";
 
 export function ProjectDeals() {
-  const { data, status, error, reload, moveStage, createOpportunity } = useCrm();
+  const { data, status, error, reload, moveStage, movePipeline, createOpportunity } = useCrm();
   const [mode, setMode] = useState<Mode>("kanban");
+  const [pipelineId, setPipelineId] = useState<string | null>(null);
+  const [moveTarget, setMoveTarget] = useState<Opportunity | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -51,15 +63,24 @@ export function ProjectDeals() {
 
   const model = useMemo(() => {
     if (!data) return null;
-    const stages = [...data.dealStages].sort((a, b) => a.sortOrder - b.sortOrder);
+    const pipelines = [...data.pipelines].sort((a, b) => a.sortOrder - b.sortOrder);
+    const selected = pipelines.find((p) => p.id === pipelineId) ?? pipelines.find((p) => p.isDefault) ?? pipelines[0] ?? null;
+    // Стадии и сделки — ТОЛЬКО выбранной воронки (стадия сделки определяет её воронку).
+    // Сделки без стадии показываем отдельной колонкой «Без стадии» (они вне воронок);
+    // сделки чужих воронок в этом виде скрыты (видны при выборе их воронки).
+    const stages = data.dealStages.filter((s) => selected && s.pipelineId === selected.id).sort((a, b) => a.sortOrder - b.sortOrder);
     const byStage = new Map<string, Opportunity[]>();
     for (const s of stages) byStage.set(s.id, []);
-    // сделки без стадии / с неизвестной стадией НЕ сваливаем в первую колонку (иначе счётчики врут) —
-    // собираем отдельно и показываем в колонке «Без стадии».
+    const inPipeline: Opportunity[] = [];
     const unstaged: Opportunity[] = [];
-    for (const o of data.opportunities) { const arr = o.stageId ? byStage.get(o.stageId) : undefined; if (arr) arr.push(o); else unstaged.push(o); }
-    return { stages, byStage, unstaged, opps: data.opportunities };
-  }, [data]);
+    for (const o of data.opportunities) {
+      if (!o.stageId) { unstaged.push(o); continue; }
+      const arr = byStage.get(o.stageId);
+      if (arr) { arr.push(o); inPipeline.push(o); }
+    }
+    const transitions = data.stageTransitions.filter((t) => selected && t.pipelineId === selected.id);
+    return { pipelines, selected, stages, byStage, unstaged, opps: inPipeline, transitions, allStages: data.dealStages };
+  }, [data, pipelineId]);
 
   if (status === "loading" && !data) {
     return <CrmFrame activeTab="Сделки"><div className="flex h-[420px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Загрузка сделок…</div></CrmFrame>;
@@ -68,13 +89,23 @@ export function ProjectDeals() {
     return <CrmFrame activeTab="Сделки"><div className="flex h-[420px] flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"><span>Не удалось загрузить: {error ?? "unknown"}</span><Button variant="secondary" size="sm" onClick={() => void reload()}>Повторить</Button></div></CrmFrame>;
   }
 
-  const stageName = (id: string | null) => model.stages.find((s) => s.id === id)?.name ?? "—";
+  const stageName = (id: string | null) => model.allStages.find((s) => s.id === id)?.name ?? "—";
+  const pipelineName = (id: string | null) => model.pipelines.find((p) => p.id === id)?.name ?? "—";
+  const pipelineOfStage = (stageId: string | null) => model.allStages.find((s) => s.id === stageId)?.pipelineId ?? null;
 
   async function doMove(id: string, stageId: string) {
     setBusy(true); setNotice(null);
     const res = await moveStage(id, stageId);
     setBusy(false);
     setNotice(res.ok ? `Сделка перемещена в «${stageName(stageId)}»` : `Отклонено: ${ruErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+  }
+
+  async function doMovePipeline(id: string, targetPipelineId: string, targetStageId: string) {
+    setBusy(true); setNotice(null);
+    const res = await movePipeline(id, targetPipelineId, targetStageId);
+    setBusy(false);
+    setMoveTarget(null);
+    setNotice(res.ok ? `Сделка перенесена в воронку «${pipelineName(targetPipelineId)}» → «${stageName(targetStageId)}»` : `Отклонено: ${ruErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
   }
 
   const dropOn = (stageId: string) => {
@@ -86,15 +117,40 @@ export function ProjectDeals() {
 
   return (
     <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={<CreateDealDialog stages={model.stages} data={data} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createOpportunity} />}>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <Segmented name="deals-mode" value={mode} onChange={setMode} options={[{ value: "kanban", label: "Канбан" }, { value: "list", label: "Список" }, { value: "forecast", label: "Прогноз" }]} />
-        {mode === "kanban" ? <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Перетащите карточку между стадиями</span> : null}
+      {/* мультиворонки: выбор воронки — фильтрует стадии/сделки/переходы */}
+      <div className="mb-2 flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Воронка:</span>
+        {model.pipelines.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => setPipelineId(p.id)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[length:var(--text-xs)] font-medium transition-colors",
+              model.selected?.id === p.id
+                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-text)]"
+                : "border-[var(--border)] bg-[var(--panel)] text-[var(--muted-strong)] hover:border-[var(--accent-muted)]"
+            )}
+          >
+            {p.name}
+            {p.isDefault ? <span className="rounded-full bg-[var(--panel-strong)] px-1 text-[9px] uppercase tracking-[0.03em] text-[var(--muted-soft)]">по умолч.</span> : null}
+            {p.status === "archived" ? <span className="text-[9px] uppercase text-[var(--danger-text)]">архив</span> : null}
+          </button>
+        ))}
       </div>
 
-      <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        Реальный контракт CRM: /api/workspace/opportunities + deal-stages (createCrmClient). Перенос стадии — PATCH /opportunities/:id/stage; создание — POST. Без planVersion (плоский REST). Данные in-memory.
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <Segmented name="deals-mode" value={mode} onChange={setMode} options={[{ value: "kanban", label: "Канбан" }, { value: "list", label: "Список" }, { value: "forecast", label: "Прогноз" }]} />
+        {mode === "kanban" ? <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Перетащите карточку между стадиями (переход проверяется условиями воронки)</span> : null}
+        {mode === "list" ? <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Кнопка «⇄ Воронка» — перенос сделки в другую воронку</span> : null}
       </div>
+
+      <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span>Реальный контракт CRM: /api/workspace/{"{pipelines, deal-stages, opportunities}"}. Перенос стадии — PATCH /opportunities/:id/stage (условия переходов воронки: 422 — условие не выполнено, 409 — переход запрещён); перенос между воронками — PATCH /opportunities/:id/pipeline. Без planVersion (плоский REST). Данные in-memory.</span>
+      </div>
+
+      <MovePipelineDialog target={moveTarget} pipelines={model.pipelines} allStages={model.allStages} currentPipelineId={pipelineOfStage(moveTarget?.stageId ?? null)} busy={busy} onClose={() => setMoveTarget(null)} onMove={doMovePipeline} />
 
       {mode === "kanban" ? (
         <div className="flex gap-3 overflow-x-auto pb-2">
@@ -161,7 +217,7 @@ export function ProjectDeals() {
         <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
           <table className="w-full border-collapse text-[length:var(--text-sm)]">
             <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
-              <th className="px-3 py-2 font-semibold">Сделка</th><th className="px-3 py-2 font-semibold">Клиент</th><th className="px-3 py-2 font-semibold">Стадия</th><th className="px-3 py-2 text-right font-semibold">Сумма</th><th className="px-3 py-2 text-right font-semibold">Вероятн.</th><th className="px-3 py-2 font-semibold">Владелец</th>
+              <th className="px-3 py-2 font-semibold">Сделка</th><th className="px-3 py-2 font-semibold">Клиент</th><th className="px-3 py-2 font-semibold">Стадия</th><th className="px-3 py-2 text-right font-semibold">Сумма</th><th className="px-3 py-2 text-right font-semibold">Вероятн.</th><th className="px-3 py-2 font-semibold">Владелец</th><th className="px-3 py-2" />
             </tr></thead>
             <tbody>
               {model.opps.map((o) => (
@@ -178,6 +234,7 @@ export function ProjectDeals() {
                   <td className="px-3 py-2 text-right"><span className="v4-num font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</span></td>
                   <td className="px-3 py-2 text-right"><span className="v4-num text-[var(--muted-strong)]">{o.probability}%</span></td>
                   <td className="px-3 py-2"><span className="flex items-center gap-1.5"><BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" /><span className="text-[length:var(--text-xs)] text-[var(--muted)]">{ownerName(o.ownerUserId)}</span></span></td>
+                  <td className="px-3 py-2 text-right"><Button variant="ghost" size="sm" disabled={busy || isFinal(o)} onClick={() => setMoveTarget(o)} title="Перенести в другую воронку"><ArrowLeftRight className="size-3.5" aria-hidden />Воронка</Button></td>
                 </tr>
               ))}
             </tbody>
@@ -186,6 +243,8 @@ export function ProjectDeals() {
       ) : (
         <Forecast stages={model.stages} byStage={model.byStage} />
       )}
+
+      <TransitionsPanel transitions={model.transitions} pipelineName={model.selected?.name ?? "—"} stageName={stageName} />
 
       {notice ? <div className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CrmFrame>
@@ -233,6 +292,80 @@ function Forecast({ stages, byStage }: { stages: DealStage[]; byStage: Map<strin
 }
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
+
+// Мультиворонки: правила переходов выбранной воронки (read) — документируют «условия переходов» для хендоффа.
+function TransitionsPanel({ transitions, pipelineName, stageName }: { transitions: StageTransition[]; pipelineName: string; stageName: (id: string | null) => string }) {
+  return (
+    <div className="mt-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel-subtle)] p-3">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h3 className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Условия переходов</h3>
+        <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">воронка «{pipelineName}» · GET /pipelines/:id/stage-transitions</span>
+      </div>
+      {transitions.length === 0 ? (
+        <p className="text-[length:var(--text-xs)] text-[var(--muted)]">Переходы не настроены — переносы между стадиями этой воронки не ограничены.</p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {transitions.map((t) => (
+            <li key={t.id} className="flex flex-wrap items-center gap-2 text-[length:var(--text-xs)]">
+              <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 py-0.5 text-[var(--muted-strong)]">
+                {stageName(t.fromStageId)} <span className="text-[var(--muted-soft)]">→</span> {stageName(t.toStageId)}
+              </span>
+              {t.requireFeasibilityOk ? <Chip variant="warning">feasibility = ok</Chip> : null}
+              {t.minProbability !== null ? <Chip variant="warning">вероятность ≥ {t.minProbability}%</Chip> : null}
+              {!t.requireFeasibilityOk && t.minProbability === null ? <span className="text-[var(--muted-soft)]">без условий</span> : null}
+              {t.guardNote ? <span className="truncate text-[var(--muted-soft)]">· {t.guardNote}</span> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// Мультиворонки: перенос сделки в другую воронку (PATCH /opportunities/:id/pipeline).
+function MovePipelineDialog({ target, pipelines, allStages, currentPipelineId, busy, onClose, onMove }: {
+  target: Opportunity | null;
+  pipelines: Pipeline[];
+  allStages: DealStage[];
+  currentPipelineId: string | null;
+  busy: boolean;
+  onClose: () => void;
+  onMove: (id: string, pipelineId: string, stageId: string) => void;
+}) {
+  const [targetPipelineId, setTargetPipelineId] = useState("");
+  const [targetStageId, setTargetStageId] = useState("");
+  const options = pipelines.filter((p) => p.status === "active" && p.id !== currentPipelineId);
+  const stages = allStages.filter((s) => s.pipelineId === targetPipelineId && s.status === "active").sort((a, b) => a.sortOrder - b.sortOrder);
+  const valid = Boolean(targetPipelineId && targetStageId);
+  const reset = () => { setTargetPipelineId(""); setTargetStageId(""); };
+  return (
+    <Dialog open={target !== null} onOpenChange={(o) => { if (!o) { onClose(); reset(); } }}>
+      <DialogContent className="max-w-[460px]">
+        <DialogHeader><DialogTitle>Перенести сделку в другую воронку</DialogTitle></DialogHeader>
+        {target ? <p className="text-[length:var(--text-xs)] text-[var(--muted)]">«{target.title}» · текущая воронка: {pipelines.find((p) => p.id === currentPipelineId)?.name ?? "—"}</p> : null}
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Целевая воронка
+            <select value={targetPipelineId} onChange={(e) => { setTargetPipelineId(e.target.value); setTargetStageId(""); }} className={selCls}>
+              <option value="" disabled>Выберите воронку…</option>
+              {options.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Стадия в целевой воронке
+            <select value={targetStageId} onChange={(e) => setTargetStageId(e.target.value)} disabled={!targetPipelineId} className={selCls}>
+              <option value="" disabled>{targetPipelineId ? "Выберите стадию…" : "Сначала воронка"}</option>
+              {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+        </div>
+        <p className="text-[10px] text-[var(--muted-soft)]">PATCH /opportunities/:id/pipeline — стадия и воронка сделки меняются на целевые. Финальные сделки и архивные воронки/стадии отклоняются (409).</p>
+        <DialogFooter>
+          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
+          <Button variant="default" disabled={!valid || busy} onClick={() => { if (target && valid) onMove(target.id, targetPipelineId, targetStageId); }}><ArrowLeftRight className="size-3.5" aria-hidden />Перенести</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function CreateDealDialog({ stages, data, busy, setBusy, setNotice, create }: {
   stages: DealStage[];
