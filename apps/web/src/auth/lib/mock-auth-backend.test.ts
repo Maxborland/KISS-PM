@@ -74,21 +74,85 @@ describe("contract-mock Auth backend", () => {
     await expect(c.me()).rejects.toMatchObject({ status: 401, code: "session_required" });
   });
 
-  /* ===== профиль (правка) ===== */
+  /* ===== профиль: PATCH /api/profile (БОЕВОЙ, name/phone/telegram) ===== */
 
-  it("updates the profile → 200 with the updated user; validates fields with 400; 401 without a session", async () => {
-    const anon = client();
-    await expect(anon.updateProfile({ name: "Без сессии" })).rejects.toMatchObject({ status: 401, code: "session_required" });
-
+  it("PATCH /api/profile updates name/phone/telegram → 200 with the updated user", async () => {
     const c = client();
     await c.login(ADMIN, ADMIN_PASSWORD);
-    const updated = await c.updateProfile({ name: "Новое имя", theme: "dark", accentColor: "#123abc" });
+    const updated = await c.updateProfile({ name: "Новое имя", phone: "+7 999 111-22-33", telegram: "@new_handle" });
     expect(updated.user.name).toBe("Новое имя");
-    expect(updated.user.theme).toBe("dark");
-    expect(updated.user.accentColor).toBe("#123abc");
+    expect(updated.user.phone).toBe("+7 999 111-22-33");
+    expect(updated.user.telegram).toBe("@new_handle");
+    // theme/accentColor этой ручкой НЕ трогаются (остаются сидовыми light / #0f766e).
+    expect(updated.user.theme).toBe("light");
+    expect(updated.user.accentColor).toBe("#0f766e");
+  });
 
-    await expect(c.updateProfile({ theme: "neon" as never })).rejects.toMatchObject({ status: 400, code: "invalid_profile_theme" });
-    await expect(c.updateProfile({ accentColor: "red" })).rejects.toMatchObject({ status: 400, code: "invalid_profile_accent_color" });
+  it("PATCH /api/profile clears phone/telegram with empty string → null", async () => {
+    const c = client();
+    await c.login(ADMIN, ADMIN_PASSWORD);
+    const updated = await c.updateProfile({ phone: "", telegram: "" });
+    expect(updated.user.phone).toBeNull();
+    expect(updated.user.telegram).toBeNull();
+  });
+
+  it("PATCH /api/profile keeps the current name when an empty name is sent", async () => {
+    const c = client();
+    const before = await c.login(ADMIN, ADMIN_PASSWORD);
+    const updated = await c.updateProfile({ name: "   " });
+    // пустое после trim → имя не меняется (остаётся сидовым).
+    expect(updated.user.name).toBe(before.user.name);
+  });
+
+  it("PATCH /api/profile rejects any invalid field with the single 400 invalid_profile_payload", async () => {
+    const c = client();
+    await c.login(ADMIN, ADMIN_PASSWORD);
+    // name 121 символ (> лимит 120) → единый код.
+    await expect(c.updateProfile({ name: "x".repeat(121) })).rejects.toMatchObject({ status: 400, code: "invalid_profile_payload" });
+    // phone 65 символов (> лимит 64) → единый код.
+    await expect(c.updateProfile({ phone: "1".repeat(65) })).rejects.toMatchObject({ status: 400, code: "invalid_profile_payload" });
+    // не string → единый код.
+    await expect(c.updateProfile({ telegram: 123 as never })).rejects.toMatchObject({ status: 400, code: "invalid_profile_payload" });
+  });
+
+  it("PATCH /api/profile without a session → 401 session_required", async () => {
+    const anon = client();
+    await expect(anon.updateProfile({ name: "Без сессии" })).rejects.toMatchObject({ status: 401, code: "session_required" });
+  });
+
+  /* ===== профиль: PATCH /api/profile/theme (БОЕВОЙ, theme/accentColor) ===== */
+
+  it("PATCH /api/profile/theme updates theme/accentColor (accent lowercased)", async () => {
+    const c = client();
+    await c.login(ADMIN, ADMIN_PASSWORD);
+    const updated = await c.updateTheme({ theme: "dark", accentColor: "#123ABC" });
+    expect(updated.user.theme).toBe("dark");
+    expect(updated.user.accentColor).toBe("#123abc"); // toLowerCase
+  });
+
+  it("PATCH /api/profile/theme rejects 'system' theme → 400 invalid_theme", async () => {
+    const c = client();
+    await c.login(ADMIN, ADMIN_PASSWORD);
+    await expect(c.updateTheme({ theme: "system" as never })).rejects.toMatchObject({ status: 400, code: "invalid_theme" });
+  });
+
+  it("PATCH /api/profile/theme rejects an invalid accent → 400 invalid_accent_color", async () => {
+    const c = client();
+    await c.login(ADMIN, ADMIN_PASSWORD);
+    await expect(c.updateTheme({ accentColor: "red" })).rejects.toMatchObject({ status: 400, code: "invalid_accent_color" });
+  });
+
+  it("PATCH /api/profile/theme keeps current theme/accent when fields are empty/absent", async () => {
+    const c = client();
+    await c.login(ADMIN, ADMIN_PASSWORD);
+    const updated = await c.updateTheme({});
+    expect(updated.user.theme).toBe("light");
+    expect(updated.user.accentColor).toBe("#0f766e");
+  });
+
+  it("PATCH /api/profile/theme without a session → 401 session_required", async () => {
+    const anon = client();
+    await expect(anon.updateTheme({ theme: "dark" })).rejects.toMatchObject({ status: 401, code: "session_required" });
   });
 
   /* ===== register (GREENFIELD) ===== */

@@ -24,12 +24,11 @@ const ERR: Record<string, string> = {
   auth_not_configured: "Аутентификация недоступна",
   // сессия (БОЕВОЙ)
   session_required: "Требуется вход в систему",
-  // профиль (правка)
-  invalid_profile_name: "Некорректное имя",
-  invalid_profile_phone: "Некорректный телефон",
-  invalid_profile_telegram: "Некорректный Telegram",
-  invalid_profile_theme: "Некорректная тема оформления",
-  invalid_profile_accent_color: "Некорректный цвет акцента",
+  // профиль (БОЕВОЙ, profileRoutes.ts) — РЕАЛЬНЫЕ коды двух ручек
+  invalid_profile_payload: "Проверьте имя, телефон и Telegram", // PATCH /api/profile — единый код
+  invalid_theme: "Недопустимая тема", // PATCH /api/profile/theme
+  invalid_accent_color: "Цвет в формате #RRGGBB", // PATCH /api/profile/theme
+  persistence_not_configured: "Хранилище профиля недоступно",
   // GREENFIELD: register
   invalid_register_payload: "Проверьте имя, email и пароль",
   weak_password: "Пароль слишком простой — минимум 8 символов",

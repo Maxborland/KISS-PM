@@ -34,7 +34,11 @@ const MIN_EMAIL = 3;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Политика пароля для GREENFIELD register/reset (предложенная: ≥8, ≤1024, без control-chars).
 const MIN_STRONG_PASSWORD = 8;
-const MAX_NAME = 160;
+const MAX_NAME = 160; // GREENFIELD register: имя single-line ≤160 (не профиль).
+// Лимиты правки профиля — ДОСЛОВНО боевой parseProfileTextField (profileRoutes.ts:50-52).
+const MAX_PROFILE_NAME = 120;
+const MAX_PROFILE_PHONE = 64;
+const MAX_PROFILE_TELEGRAM = 64;
 // Демо-окно rate-limit: БОЕВОЕ = 5 неудач / 15 мин на email+ip + Retry-After.
 // Здесь окно ужато для проходимости стори (3 попытки), коды/статус — боевые.
 const RL_MAX_FAILURES = 3; // демо-окно, боевое 5/15мин
@@ -141,6 +145,33 @@ function parseLoginCredentials(body: Record<string, unknown>): { ok: true; email
 
 // GREENFIELD: единая политика пароля (≥8, ≤1024, без control-chars). Предложенная, боевого модуля нет.
 const isWeakPassword = (v: unknown): boolean => typeof v !== "string" || v.length < MIN_STRONG_PASSWORD || v.length > MAX_PASSWORD || hasControlChar(v);
+
+/* ---- PROFILE: парсеры ДОСЛОВНО зеркалят боевой profileRoutes.ts/parseHelpers.ts ---- */
+
+type ProfileTextFieldParseResult = { ok: true; value: string | undefined } | { ok: false };
+
+// Зеркало parseProfileTextField (profileRoutes.ts:180): ключ отсутствует → undefined (не менять);
+// не string ИЛИ control-char ИЛИ trimmed > maxLength → невалидно; иначе trimmed.
+function parseProfileTextField(body: Record<string, unknown>, key: string, maxLength: number): ProfileTextFieldParseResult {
+  if (!(key in body)) return { ok: true, value: undefined };
+  const value = body[key];
+  if (typeof value !== "string") return { ok: false };
+  if (hasControlChar(value)) return { ok: false };
+  const trimmed = value.trim();
+  if (trimmed.length > maxLength) return { ok: false };
+  return { ok: true, value: trimmed };
+}
+
+// Зеркало getStringField (parseHelpers.ts:9): ключ отсутствует/не string → undefined; иначе trim.
+const getStringField = (body: Record<string, unknown>, key: string): string | undefined => {
+  if (!(key in body)) return undefined;
+  const value = body[key];
+  return typeof value === "string" ? value.trim() : undefined;
+};
+// Зеркало isWorkspaceTheme (parseHelpers.ts:15): ТОЛЬКО light|dark (НЕ system).
+const isWorkspaceTheme = (value: string): value is WorkspaceUser["theme"] => value === "light" || value === "dark";
+// Зеркало isAccentColor (parseHelpers.ts:19): /^#[0-9a-fA-F]{6}$/.
+const isAccentColor = (value: string): boolean => /^#[0-9a-fA-F]{6}$/.test(value);
 // GREENFIELD: валидация email только по формату (для register/reset-request).
 const isValidEmail = (v: unknown): v is string => typeof v === "string" && (() => { const e = v.trim().toLowerCase(); return e.length >= MIN_EMAIL && e.length <= MAX_EMAIL && !hasControlChar(e) && EMAIL_RE.test(e); })();
 
@@ -240,39 +271,49 @@ export function createMockAuthFetch(): typeof fetch {
       return json({ user: actor, permissions: SEED_PERMISSIONS, workspace: { id: actor.tenantId } });
     }
 
-    /* ---- PROFILE: правка профиля (боевой me + правка полей WorkspaceUser) ---- */
-    // PATCH /api/profile — нет сессии 401; валидация полей (400) → 200 {user:WorkspaceUser} обновлённый.
+    /* ---- PROFILE: ДВЕ боевые ручки (profileRoutes.ts зеркаль 1:1) ---- */
+
+    // PATCH /api/profile — ТОЛЬКО name/phone/telegram (theme/accentColor этой ручкой НЕ трогаются).
+    // нет сессии 401; ЕДИНЫЙ код invalid_profile_payload при любом невалидном поле (400);
+    // лимиты 120/64/64; control-char-чек; trim; empty-name → keep; phone/telegram ''→null.
     if (path === "/api/profile" && method === "PATCH") {
       if (sessionToken === null || currentUserId === null) return err("session_required", 401);
       const actor = findUser(currentUserId);
       if (!actor) return err("session_required", 401);
-      // name: single-line ≤160, непустой при наличии.
-      if (body.name !== undefined) {
-        const name = str(body.name);
-        if (!name || name.length > MAX_NAME || hasControlChar(name)) return err("invalid_profile_name", 400);
-        actor.name = name;
-      }
-      // phone/telegram: ≤160, ''/null → null.
-      if (body.phone !== undefined) {
-        const phone = body.phone == null ? null : str(body.phone) || null;
-        if (phone !== null && (phone.length > MAX_NAME || hasControlChar(phone))) return err("invalid_profile_phone", 400);
-        actor.phone = phone;
-      }
-      if (body.telegram !== undefined) {
-        const telegram = body.telegram == null ? null : str(body.telegram) || null;
-        if (telegram !== null && (telegram.length > MAX_NAME || hasControlChar(telegram))) return err("invalid_profile_telegram", 400);
-        actor.telegram = telegram;
-      }
-      // theme ∈ light|dark|system.
-      if (body.theme !== undefined) {
-        if (body.theme !== "light" && body.theme !== "dark" && body.theme !== "system") return err("invalid_profile_theme", 400);
-        actor.theme = body.theme;
-      }
-      // accentColor /^#[0-9a-fA-F]{6}$/.
-      if (body.accentColor !== undefined) {
-        if (typeof body.accentColor !== "string" || !/^#[0-9a-fA-F]{6}$/.test(body.accentColor)) return err("invalid_profile_accent_color", 400);
-        actor.accentColor = body.accentColor;
-      }
+
+      const nameInput = parseProfileTextField(body, "name", MAX_PROFILE_NAME);
+      const phoneInput = parseProfileTextField(body, "phone", MAX_PROFILE_PHONE);
+      const telegramInput = parseProfileTextField(body, "telegram", MAX_PROFILE_TELEGRAM);
+      // ЛЮБОЕ невалидное из трёх → единый код (без дробных invalid_profile_*).
+      if (!nameInput.ok || !phoneInput.ok || !telegramInput.ok) return err("invalid_profile_payload", 400);
+
+      // name: undefined ИЛИ пусто после trim → оставить текущее; иначе trimmed.
+      actor.name = nameInput.value === undefined || nameInput.value.length === 0 ? actor.name : nameInput.value;
+      // phone/telegram: undefined → оставить; иначе trimmed || null (пустая строка → null).
+      actor.phone = phoneInput.value === undefined ? actor.phone : phoneInput.value || null;
+      actor.telegram = telegramInput.value === undefined ? actor.telegram : telegramInput.value || null;
+      return json({ user: actor });
+    }
+
+    // PATCH /api/profile/theme — ОТДЕЛЬНАЯ ручка: ТОЛЬКО theme/accentColor.
+    // нет сессии 401; theme/accentColor пусто/отсутствует → keep; isWorkspaceTheme (light|dark) →
+    // иначе invalid_theme(400); isAccentColor (#RRGGBB) → иначе invalid_accent_color(400);
+    // применяется theme + accentColor.toLowerCase().
+    if (path === "/api/profile/theme" && method === "PATCH") {
+      if (sessionToken === null || currentUserId === null) return err("session_required", 401);
+      const actor = findUser(currentUserId);
+      if (!actor) return err("session_required", 401);
+
+      const themeInput = getStringField(body, "theme");
+      const accentInput = getStringField(body, "accentColor");
+      const theme = themeInput === undefined || themeInput === "" ? actor.theme : themeInput;
+      const accentColor = accentInput === undefined || accentInput === "" ? actor.accentColor : accentInput;
+
+      if (!isWorkspaceTheme(theme)) return err("invalid_theme", 400);
+      if (!isAccentColor(accentColor)) return err("invalid_accent_color", 400);
+
+      actor.theme = theme;
+      actor.accentColor = accentColor.toLowerCase();
       return json({ user: actor });
     }
 

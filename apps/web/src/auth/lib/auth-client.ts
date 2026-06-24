@@ -51,7 +51,7 @@ export type WorkspaceUser = TenantUser & {
   phone: string | null;
   telegram: string | null;
   status: "active" | "inactive";
-  theme: "light" | "dark" | "system";
+  theme: "light" | "dark"; // боевой isWorkspaceTheme допускает ТОЛЬКО light|dark (НЕ system).
   accentColor: string;
 };
 
@@ -66,12 +66,16 @@ export type AuthSessionResponse = { user: TenantUser; workspace: WorkspaceIdenti
 /* GET /api/auth/me → полный (или усечённый) user + права + workspace. */
 export type AuthMeResponse = { user: TenantUser | WorkspaceUser; permissions: string[]; workspace: WorkspaceIdentity };
 
-/* Тело правки профиля (PATCH профиля): подмножество полей WorkspaceUser. */
+/* Тело PATCH /api/profile (боевой): ТОЛЬКО name/phone/telegram. theme/accentColor — отдельная ручка. */
 export type ProfileUpdateInput = Partial<{
   name: string;
   phone: string | null;
   telegram: string | null;
-  theme: "light" | "dark" | "system";
+}>;
+
+/* Тело PATCH /api/profile/theme (боевой): ТОЛЬКО theme/accentColor (light|dark / #RRGGBB). */
+export type ThemeUpdateInput = Partial<{
+  theme: "light" | "dark";
   accentColor: string;
 }>;
 
@@ -128,9 +132,13 @@ export function createAuthClient(options: AuthApiClientOptions) {
     me() {
       return requestJson<AuthMeResponse>("/api/auth/me");
     },
-    // PATCH профиля (форма правки полей WorkspaceUser) → обновлённый user.
+    // PATCH /api/profile — ТОЛЬКО name/phone/telegram → обновлённый WorkspaceUser (боевой).
     updateProfile(input: ProfileUpdateInput) {
       return requestJson<{ user: WorkspaceUser }>("/api/profile", { method: "PATCH", body: JSON.stringify(input) });
+    },
+    // PATCH /api/profile/theme — ОТДЕЛЬНАЯ ручка: ТОЛЬКО theme/accentColor → обновлённый WorkspaceUser (боевой).
+    updateTheme(input: ThemeUpdateInput) {
+      return requestJson<{ user: WorkspaceUser }>("/api/profile/theme", { method: "PATCH", body: JSON.stringify(input) });
     },
 
     /* ---- GREENFIELD ручки (контракта в боевом нет, мок задаёт предложенный) ---- */

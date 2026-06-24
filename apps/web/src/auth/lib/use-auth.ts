@@ -9,6 +9,7 @@ import {
   type ProfileUpdateInput,
   type RegisterRequest,
   type TenantUser,
+  type ThemeUpdateInput,
   type WorkspaceUser
 } from "./auth-client";
 import { createMockAuthFetch } from "./mock-auth-backend";
@@ -144,8 +145,8 @@ export function useAuth() {
     [client]
   );
 
-  // Правка профиля в ТОЙ ЖЕ сессии (PATCH /api/profile + рефетч me). Нужна, чтобы ЛК
-  // работал на ОДНОМ useAuth (иначе useProfile создаёт отдельную мок-сессию → 401).
+  // Правка профиля в ТОЙ ЖЕ сессии (PATCH /api/profile, ТОЛЬКО name/phone/telegram + рефетч me).
+  // Нужна, чтобы ЛК работал на ОДНОМ useAuth (иначе useProfile создаёт отдельную мок-сессию → 401).
   const updateProfile = useCallback(
     (input: ProfileUpdateInput): Promise<AuthMutationResult> =>
       guard(async () => {
@@ -155,7 +156,17 @@ export function useAuth() {
     [client, refresh]
   );
 
-  return { client, state, status, error, user, permissions, reload: refresh, login, logout, register, requestPasswordReset, confirmPasswordReset, updateProfile };
+  // Правка темы в ТОЙ ЖЕ сессии (PATCH /api/profile/theme, ТОЛЬКО theme/accentColor + рефетч me).
+  const updateTheme = useCallback(
+    (input: ThemeUpdateInput): Promise<AuthMutationResult> =>
+      guard(async () => {
+        await client.updateTheme(input);
+        await refresh();
+      }),
+    [client, refresh]
+  );
+
+  return { client, state, status, error, user, permissions, reload: refresh, login, logout, register, requestPasswordReset, confirmPasswordReset, updateProfile, updateTheme };
 }
 
 /* ============================================================
@@ -168,6 +179,9 @@ export function useProfile() {
   const [data, setData] = useState<WorkspaceUser | null>(null);
   const [status, setStatus] = useState<AuthLoadStatus>("loading");
   const [error, setError] = useState<string | null>(null);
+  // 401 — это НЕ ошибка загрузки: standalone-потребитель показывает forbidden/login,
+  // а не «ошибку» (по образцу useAuth.refresh 401-ветки → anonymous).
+  const [unauthorized, setUnauthorized] = useState(false);
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -177,15 +191,19 @@ export function useProfile() {
       setData("email" in me.user ? (me.user as WorkspaceUser) : null);
       setStatus("ready");
       setError(null);
+      setUnauthorized(false);
     } catch (e) {
       if (e instanceof AuthApiError && e.status === 401) {
+        // Нет сессии: ready + data=null + unauthorized=true (НЕ status="error").
         setData(null);
-        setStatus("error");
-        setError("session_required");
+        setStatus("ready");
+        setError(null);
+        setUnauthorized(true);
         return;
       }
       setStatus("error");
       setError(e instanceof Error ? e.message : "load_failed");
+      setUnauthorized(false);
     }
   }, [client]);
 
@@ -193,6 +211,7 @@ export function useProfile() {
     void load();
   }, [load]);
 
+  // Правка профиля (ТОЛЬКО name/phone/telegram) → PATCH /api/profile.
   const update = useCallback(
     (input: ProfileUpdateInput): Promise<AuthMutationResult> =>
       guard(async () => {
@@ -202,5 +221,15 @@ export function useProfile() {
     [client]
   );
 
-  return { data, status, error, reload: load, update };
+  // Правка темы (ТОЛЬКО theme/accentColor) → PATCH /api/profile/theme.
+  const updateTheme = useCallback(
+    (input: ThemeUpdateInput): Promise<AuthMutationResult> =>
+      guard(async () => {
+        const r = await client.updateTheme(input);
+        setData(r.user);
+      }),
+    [client]
+  );
+
+  return { data, status, error, unauthorized, reload: load, update, updateTheme };
 }

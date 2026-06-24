@@ -12,7 +12,7 @@ import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { cn } from "@/lib/cn";
 import { authErr, FormError } from "@/auth/lib/auth-bits";
 import { useAuth } from "@/auth/lib/use-auth";
-import type { ProfileUpdateInput, WorkspaceUser } from "@/auth/lib/auth-client";
+import type { ProfileUpdateInput, ThemeUpdateInput, WorkspaceUser } from "@/auth/lib/auth-client";
 
 /* ============================================================
    ЛК/Профиль (authenticated) — внутренний экран рабочего пространства.
@@ -43,10 +43,10 @@ const avatarColor = (name: string): BemAvatarColor => {
   return colors[h % colors.length]!;
 };
 
+// Боевой isWorkspaceTheme допускает ТОЛЬКО light|dark (НЕ system).
 const THEME_LABEL: Record<WorkspaceUser["theme"], string> = {
   light: "Светлая",
-  dark: "Тёмная",
-  system: "Системная"
+  dark: "Тёмная"
 };
 
 // Демо-креды активного админа (§5 сид).
@@ -60,7 +60,7 @@ const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium t
 export function ProfileSurface() {
   // ЕДИНЫЙ useAuth: вход + профиль (user из me) + права + правка — одна мок-сессия.
   // (Раздельный useProfile создавал бы ОТДЕЛЬНУЮ изолированную сессию → 401.)
-  const { state, status, error, user, permissions, login, logout, reload, updateProfile } = useAuth();
+  const { state, status, error, user, permissions, login, logout, reload, updateProfile, updateTheme } = useAuth();
 
   // Авто-вход демо-кредами ОДИН раз (мок стартует anonymous). useRef — защита от StrictMode-двойного эффекта.
   const autoLoginRef = useRef(false);
@@ -156,7 +156,11 @@ export function ProfileSurface() {
             description: "Сессия не найдена — войдите, чтобы открыть профиль."
           }}
         >
-          {profileUser ? <ProfileContent user={profileUser} permissions={permissions} update={updateProfile} /> : <span />}
+          {profileUser ? (
+            <ProfileContent user={profileUser} permissions={permissions} update={updateProfile} updateTheme={updateTheme} />
+          ) : (
+            <span />
+          )}
         </SurfaceState>
       </main>
     </WorkspaceShell>
@@ -171,7 +175,7 @@ function ProtoBanner() {
         Прототип
       </span>
       <span>
-        Боевой контракт: GET /api/auth/me + PATCH /api/profile (правка имени, телефона, Telegram, темы и акцентного цвета).
+        Боевой контракт: GET /api/auth/me + PATCH /api/profile (имя, телефон, Telegram) + PATCH /api/profile/theme (тема, акцентный цвет).
         Транспорт — contract-mock; переключение на боевой = apiOrigin. Данные in-memory.
       </span>
     </div>
@@ -179,11 +183,21 @@ function ProtoBanner() {
 }
 
 // Контент ЛК: карточка профиля + форма правки.
-function ProfileContent({ user, permissions, update }: { user: WorkspaceUser; permissions: string[]; update: ReturnType<typeof useAuth>["updateProfile"] }) {
+function ProfileContent({
+  user,
+  permissions,
+  update,
+  updateTheme
+}: {
+  user: WorkspaceUser;
+  permissions: string[];
+  update: ReturnType<typeof useAuth>["updateProfile"];
+  updateTheme: ReturnType<typeof useAuth>["updateTheme"];
+}) {
   return (
     <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
       <ProfileCard user={user} permissions={permissions} />
-      <ProfileForm user={user} update={update} />
+      <ProfileForm user={user} update={update} updateTheme={updateTheme} />
     </div>
   );
 }
@@ -246,8 +260,19 @@ function PermissionsList({ permissions }: { permissions: string[] }) {
   );
 }
 
-// Форма правки профиля → PATCH /api/profile (только изменённые поля).
-function ProfileForm({ user, update }: { user: WorkspaceUser; update: ReturnType<typeof useAuth>["updateProfile"] }) {
+// Форма правки профиля → ДВЕ боевые ручки:
+//   PATCH /api/profile      (name/phone/telegram, update)
+//   PATCH /api/profile/theme (theme/accentColor,   updateTheme)
+// Шлём только изменённую группу; если менялись обе — зовём обе и объединяем результат.
+function ProfileForm({
+  user,
+  update,
+  updateTheme
+}: {
+  user: WorkspaceUser;
+  update: ReturnType<typeof useAuth>["updateProfile"];
+  updateTheme: ReturnType<typeof useAuth>["updateTheme"];
+}) {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone ?? "");
   const [telegram, setTelegram] = useState(user.telegram ?? "");
@@ -258,7 +283,7 @@ function ProfileForm({ user, update }: { user: WorkspaceUser; update: ReturnType
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Синхронизация формы с сервером после успешного PATCH (data обновляется через update).
+  // Синхронизация формы с сервером после успешного PATCH (user обновляется через рефетч me).
   useEffect(() => {
     setName(user.name);
     setPhone(user.phone ?? "");
@@ -267,8 +292,8 @@ function ProfileForm({ user, update }: { user: WorkspaceUser; update: ReturnType
     setAccentColor(user.accentColor);
   }, [user]);
 
-  // Считаем дельту: шлём только изменённые поля (пустая строка телефона/телеграма → null).
-  const diff = useMemo<ProfileUpdateInput>(() => {
+  // Дельта профиля (PATCH /api/profile): name/phone/telegram (пустая строка → null).
+  const profileDiff = useMemo<ProfileUpdateInput>(() => {
     const out: ProfileUpdateInput = {};
     const trimmedName = name.trim();
     if (trimmedName !== user.name) out.name = trimmedName;
@@ -276,12 +301,21 @@ function ProfileForm({ user, update }: { user: WorkspaceUser; update: ReturnType
     if (phoneVal !== user.phone) out.phone = phoneVal;
     const tgVal = telegram.trim() === "" ? null : telegram.trim();
     if (tgVal !== user.telegram) out.telegram = tgVal;
+    return out;
+  }, [name, phone, telegram, user]);
+
+  // Дельта темы (PATCH /api/profile/theme): theme/accentColor.
+  const themeDiff = useMemo<ThemeUpdateInput>(() => {
+    const out: ThemeUpdateInput = {};
     if (theme !== user.theme) out.theme = theme;
     if (accentColor !== user.accentColor) out.accentColor = accentColor;
     return out;
-  }, [name, phone, telegram, theme, accentColor, user]);
+  }, [theme, accentColor, user]);
 
-  const dirty = Object.keys(diff).length > 0;
+  const profileChanged = Object.keys(profileDiff).length > 0;
+  const themeChanged = Object.keys(themeDiff).length > 0;
+  const changedCount = Object.keys(profileDiff).length + Object.keys(themeDiff).length;
+  const dirty = changedCount > 0;
   const accentValid = /^#[0-9a-fA-F]{6}$/.test(accentColor);
   const canSave = dirty && !busy && name.trim().length > 0 && accentValid;
 
@@ -291,10 +325,20 @@ function ProfileForm({ user, update }: { user: WorkspaceUser; update: ReturnType
     setBusy(true);
     setErrorCode(null);
     setSaved(false);
-    const res = await update(diff);
+    // Разносим по ручкам: профиль и тема — раздельно; обе группы → обе ручки.
+    // Первая ошибка любой ручки останавливает сохранение и показывается через FormError.
+    let failureCode: string | null = null;
+    if (profileChanged) {
+      const res = await update(profileDiff);
+      if (!res.ok) failureCode = res.code ?? res.message;
+    }
+    if (failureCode === null && themeChanged) {
+      const res = await updateTheme(themeDiff);
+      if (!res.ok) failureCode = res.code ?? res.message;
+    }
     setBusy(false);
-    if (res.ok) setSaved(true);
-    else setErrorCode(res.code ?? res.message);
+    if (failureCode !== null) setErrorCode(failureCode);
+    else setSaved(true);
   }
 
   return (
@@ -305,7 +349,7 @@ function ProfileForm({ user, update }: { user: WorkspaceUser; update: ReturnType
     >
       <div>
         <h2 className="text-[length:var(--text-md)] font-semibold text-[var(--text-strong)]">Редактирование профиля</h2>
-        <p className="text-[length:var(--text-xs)] text-[var(--muted)]">PATCH /api/profile — отправляются только изменённые поля.</p>
+        <p className="text-[length:var(--text-xs)] text-[var(--muted)]">PATCH /api/profile (имя/телефон/Telegram) и /api/profile/theme (тема/цвет) — только изменённые поля.</p>
       </div>
 
       <FormError code={errorCode} />
@@ -331,7 +375,6 @@ function ProfileForm({ user, update }: { user: WorkspaceUser; update: ReturnType
           <select value={theme} onChange={(e) => setTheme(e.target.value as WorkspaceUser["theme"])} className={selCls}>
             <option value="light">Светлая</option>
             <option value="dark">Тёмная</option>
-            <option value="system">Системная</option>
           </select>
         </label>
 
@@ -359,7 +402,7 @@ function ProfileForm({ user, update }: { user: WorkspaceUser; update: ReturnType
 
       <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-3">
         <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">
-          {dirty ? `Изменено полей: ${Object.keys(diff).length}` : "Нет изменений"}
+          {dirty ? `Изменено полей: ${changedCount}` : "Нет изменений"}
         </span>
         <span className="flex items-center gap-2">
           {saved ? (
