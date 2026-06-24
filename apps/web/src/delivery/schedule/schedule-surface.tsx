@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Columns3, Filter, GitBranch, IndentDecrease, IndentIncrease, Layers, Plus, TriangleAlert, Undo2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ const genId = (p: string) => `${p}-new-${++SEQ}`;
 
 type Kind = "summary" | "task" | "milestone";
 type Mode = "auto" | "manual";
+type EditField = "name" | "dur" | "work" | "pct"; // редактируемые ячейки сетки (для Tab-навигации)
 type Pred = { depId: string; predId: string; type: string; lagDays: number };
 type Row = {
   id: string;
@@ -292,6 +293,8 @@ export function ProjectSchedule() {
   // parentId — родитель создаваемой задачи (null=верхний уровень; r.id=подзадача r; r.parentId=рядом с r).
   const [inlineNew, setInlineNew] = useState<{ parentId: string | null; afterId: string; draft: string } | null>(null);
   const inlineRef = useRef<HTMLInputElement | null>(null);
+  // При Tab-навигации moveEdit уже коммитит текущую ячейку; подавляем повторный коммит из onBlur.
+  const skipBlurRef = useRef(false);
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -693,6 +696,35 @@ export function ProjectSchedule() {
   }
   const beginEdit = (r: Row, field: "name" | "dur" | "work" | "pct" | "units", cur: string | number) => { setEdit({ id: r.id, field }); setDraft(String(cur)); };
 
+  // Excel-навигация по редактируемым ячейкам существующих строк.
+  // Поля строки: name всегда; dur/work/pct — только у task (summary/milestone их пропускают).
+  const editableFields = (r: Row): EditField[] => (r.kind === "task" ? ["name", "dur", "work", "pct"] : ["name"]);
+  const cellValue = (r: Row, f: EditField): string | number => (f === "name" ? r.name : f === "dur" ? r.durDays : f === "work" ? r.workH : r.pct);
+  // Tab/Shift+Tab: коммит текущей ячейки + переход к следующей/предыдущей редактируемой
+  // (с переносом на соседнюю строку; нередактируемые ячейки пропускаются).
+  function moveEdit(r: Row, field: EditField, dir: 1 | -1) {
+    skipBlurRef.current = true; // moveEdit сам коммитит — гасим повторный onBlur старого инпута
+    commitInline(r);
+    const rowIdx = visibleRows.findIndex((x) => x.id === r.id);
+    if (rowIdx < 0) return;
+    const fields = editableFields(r);
+    const ni = fields.indexOf(field) + dir;
+    if (ni >= 0 && ni < fields.length) { const nf = fields[ni]!; beginEdit(r, nf, cellValue(r, nf)); return; }
+    for (let ri = rowIdx + dir; ri >= 0 && ri < visibleRows.length; ri += dir) {
+      const nr = visibleRows[ri]!;
+      const nf = editableFields(nr);
+      if (nf.length) { const f2 = dir > 0 ? nf[0]! : nf[nf.length - 1]!; beginEdit(nr, f2, cellValue(nr, f2)); return; }
+    }
+  }
+  // Общий обработчик клавиш ячейки: Enter — коммит; Esc — отмена; Tab/Shift+Tab — навигация.
+  const cellKeyDown = (e: ReactKeyboardEvent, r: Row, field: EditField) => {
+    if (e.key === "Enter") { e.preventDefault(); commitInline(r); }
+    else if (e.key === "Escape") { e.preventDefault(); setEdit(null); }
+    else if (e.key === "Tab") { e.preventDefault(); moveEdit(r, field, e.shiftKey ? -1 : 1); }
+  };
+  // Коммит по потере фокуса (клик мимо), но НЕ при Tab-навигации (там коммит уже сделан).
+  const cellBlur = (r: Row) => { if (skipBlurRef.current) { skipBlurRef.current = false; return; } commitInline(r); };
+
   function depOptions(r: Row) {
     const banned = new Set([r.id, ...r.predList.map((p) => p.predId)]);
     return rows.filter((t) => t.id !== r.id && !t.wbs.startsWith(r.wbs + ".") && !banned.has(t.id) && t.kind !== "summary").map((t) => ({ id: t.id, label: `${t.wbs} ${t.name}` }));
@@ -818,18 +850,18 @@ export function ProjectSchedule() {
                             {r.critical ? <span className="size-1.5 shrink-0 rounded-full bg-[var(--critical-stripe)]" title="На критическом пути" /> : null}
                             {r.warning ? <span className="inline-flex shrink-0" title={r.warnMsg ?? "Предупреждение планировщика"}><TriangleAlert className="size-3 text-[var(--warning)]" aria-hidden /></span> : null}
                             {edit?.id === r.id && edit.field === "name" ? (
-                              <input autoFocus value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => commitInline(r)} onKeyDown={(e) => { if (e.key === "Enter") commitInline(r); if (e.key === "Escape") setEdit(null); }} className="w-full rounded-[var(--radius-xs)] border border-[var(--accent)] bg-[var(--panel)] px-1 text-[length:var(--text-sm)] outline-none" />
+                              <input autoFocus value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "name")} className="w-full rounded-[var(--radius-xs)] border border-[var(--accent)] bg-[var(--panel)] px-1 text-[length:var(--text-sm)] outline-none" />
                             ) : <span className={cn("truncate", r.kind === "summary" ? "font-bold text-[var(--text-strong)]" : "font-medium text-[var(--text)]")}>{r.name}</span>}
                           </span>
                         </td>
                         <td className="num muted" onDoubleClick={(e) => { if (r.kind === "task") { stop(e); beginEdit(r, "dur", r.durDays); } }}>
-                          {edit?.id === r.id && edit.field === "dur" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => commitInline(r)} onKeyDown={(e) => { if (e.key === "Enter") commitInline(r); if (e.key === "Escape") setEdit(null); }} className={numInput} /> : r.kind === "milestone" ? "0 дн" : `${r.durDays} дн`}
+                          {edit?.id === r.id && edit.field === "dur" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "dur")} className={numInput} /> : r.kind === "milestone" ? "0 дн" : `${r.durDays} дн`}
                         </td>
                         <td className="num muted" onDoubleClick={(e) => { if (r.kind === "task") { stop(e); beginEdit(r, "work", r.workH); } }}>
-                          {edit?.id === r.id && edit.field === "work" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => commitInline(r)} onKeyDown={(e) => { if (e.key === "Enter") commitInline(r); if (e.key === "Escape") setEdit(null); }} className={numInput} /> : r.kind === "milestone" ? "—" : `${r.workH} ч`}
+                          {edit?.id === r.id && edit.field === "work" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "work")} className={numInput} /> : r.kind === "milestone" ? "—" : `${r.workH} ч`}
                         </td>
                         <td className="num" onDoubleClick={(e) => { if (r.kind === "task") { stop(e); beginEdit(r, "pct", r.pct); } }}>
-                          {edit?.id === r.id && edit.field === "pct" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => commitInline(r)} onKeyDown={(e) => { if (e.key === "Enter") commitInline(r); if (e.key === "Escape") setEdit(null); }} className={numInput} /> : `${r.pct}%`}
+                          {edit?.id === r.id && edit.field === "pct" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "pct")} className={numInput} /> : `${r.pct}%`}
                         </td>
                         <td className="mono muted">
                           {r.kind === "milestone" || r.kind === "task" ? <DateEditor valueIso={r.startIso} onPick={(iso) => editDate(r, iso)}><button type="button" onClick={stop} className={cellBtn}>{fmtDate(r.startIso)}</button></DateEditor> : fmtDate(r.startIso)}
