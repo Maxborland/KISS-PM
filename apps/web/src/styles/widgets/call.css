@@ -1,0 +1,156 @@
+/* Call widget styles (widgets/call/*). The ONLY place call CSS lives — no inline
+   style and no hex/rgba in the TSX. Colours come from design tokens. */
+
+.call-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  min-height: 100%;
+}
+
+.call-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+}
+
+.call-stage__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.call-stage__title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--text);
+}
+
+.call-stage__phase {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.call-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+}
+
+.call-grid--multi {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 1024px) {
+  .call-grid--multi {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.call-tile {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--panel-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.call-tile--speaking {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.call-tile__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.call-tile__video--self {
+  transform: scaleX(-1);
+}
+
+.call-tile__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.call-tile__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  background: linear-gradient(to top, var(--panel), transparent);
+}
+
+.call-tile__name {
+  font-size: var(--text-sm);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.call-tile__muted {
+  display: inline-flex;
+  align-items: center;
+  color: var(--danger);
+}
+
+.call-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.call-controls__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--panel);
+  color: var(--text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background var(--duration-base), border-color var(--duration-base);
+}
+
+.call-controls__btn:hover:not(:disabled) {
+  background: var(--panel-strong);
+}
+
+.call-controls__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.call-controls__btn--off {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.call-controls__btn--leave {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.call-controls__btn--leave:hover:not(:disabled) {
+  background: var(--danger-soft, var(--panel-strong));
+}
