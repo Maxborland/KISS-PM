@@ -18,12 +18,6 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(UI_VARIANT_ITEMS.button.length).toBeGreaterThan(0);
   });
 
-  it("dashboard uses PageIntro instead of welcome-hero title", () => {
-    const source = read("src/views/blocks/dashboard-bento.tsx");
-    expect(source).toContain("PageIntro");
-    expect(source).not.toMatch(/welcome-hero__title/);
-  });
-
   it("state screens use bare variant in catalog", () => {
     const source = read("src/views/catalog.ts");
     expect(source).toContain('"state-empty"');
@@ -60,8 +54,8 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       const source = readFileSync(file, "utf8");
       expect(source, rel).not.toMatch(/welcome-hero/);
     }
-    // Уцелевшие блоки-прототипы всё ещё используют общий PageIntro-заголовок.
-    const blocks = ["src/views/blocks/space-discipline-block.tsx", "src/views/blocks/dashboard-bento.tsx"];
+    // Уцелевший блок-прототип всё ещё использует общий PageIntro-заголовок.
+    const blocks = ["src/views/blocks/space-discipline-block.tsx"];
     for (const rel of blocks) {
       const source = read(rel);
       expect(source).toContain("PageIntro");
@@ -75,6 +69,7 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     // surface-аналог, удалены, а роутер screen-view.tsx больше их не импортирует. Это заменяет
     // прежние текстовые пины на удаляемую разметку (deals/projects-list/my-work/…).
     const deletedBlocks = [
+      "src/views/blocks/dashboard-bento.tsx",
       "src/views/blocks/my-work-block.tsx",
       "src/views/blocks/deals-block.tsx",
       "src/views/blocks/projects-list-block.tsx",
@@ -96,6 +91,7 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     }
     const screenView = read("src/views/screens/screen-view.tsx");
     const forbiddenImports = [
+      "dashboard-bento",
       "my-work-block",
       "deals-block",
       "projects-list-block",
@@ -139,7 +135,8 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       "src/delivery/calendars/calendars-surface.tsx",
       "src/auth/login/login-surface.tsx",
       "src/auth/avatar-menu/avatar-menu-surface.tsx",
-      "src/workspace/settings/settings-surface.tsx"
+      "src/workspace/settings/settings-surface.tsx",
+      "src/workspace/dashboard/dashboard-surface.tsx"
     ];
     for (const rel of successors) {
       expect(existsSync(join(webRoot, rel)), `${rel} must exist`).toBe(true);

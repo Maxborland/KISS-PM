@@ -26,7 +26,6 @@ export type ScreenMeta = {
 // Остаются только прототипы без полного функционального аналога.
 export const SCREEN_IDS = [
   "00-space-discipline",
-  "01-dashboard",
   "04-create-task-modal",
   "16-project-kpi",
   "state-empty",
@@ -45,14 +44,6 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     lead: "Уведомления, баннеры, фильтры не должны сдвигать контент. Только overlay.",
     breadcrumb: [{ label: "Design", current: true }],
     activeNav: "Дашборд"
-  },
-  "01-dashboard": {
-    id: "01-dashboard",
-    storyTitle: "01 Дашборд",
-    pageTitle: "Добро пожаловать, Камил",
-    lead: "Ваш персональный дашборд: 12 задач, 8 сделок, 3 митинга на сегодня.",
-    breadcrumb: [{ label: "Дашборд", current: true }],
-    activeNav: "Задачи"
   },
   "04-create-task-modal": {
     id: "04-create-task-modal",
