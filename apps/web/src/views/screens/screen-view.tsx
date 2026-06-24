@@ -20,6 +20,24 @@ import { SettingsBlock } from "@/views/blocks/settings-block";
 import { SpaceDisciplineBlock } from "@/views/blocks/space-discipline-block";
 import { StateScreenBlock } from "@/views/blocks/state-screen-block";
 import { TaskCreateModalBlock } from "@/views/blocks/task-create-modal-block";
+import {
+  CallActiveBlock,
+  CallDeviceSettingsBlock,
+  CallInChatBlock,
+  CallLobbyBlock,
+  CallReconnectingBlock,
+  CallScreenShareBlock
+} from "@/views/blocks/call-screen-blocks";
+import {
+  ChatChannelsBlock,
+  ChatComposerBlock,
+  ChatThreadBlock
+} from "@/views/blocks/chat-screen-blocks";
+import {
+  MeetingDetailBlock,
+  MeetingsListBlock,
+  NotificationsBlock
+} from "@/views/blocks/comms-collab-blocks";
 import { LoginScreenView } from "@/views/screens/login-screen-view";
 import { MOCK_PROJECT_CRM, mockTaskProjectRef, type ScreenId, SCREEN_META } from "@/views/catalog";
 import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
@@ -71,7 +89,19 @@ const BLOCK_BY_ID: Record<ScreenId, () => ReactNode> = {
   "state-empty": () => <StateScreenBlock kind="empty" />,
   "state-error": () => <StateScreenBlock kind="error" />,
   "state-forbidden": () => <StateScreenBlock kind="forbidden" />,
-  "state-loading": () => <StateScreenBlock kind="loading" />
+  "state-loading": () => <StateScreenBlock kind="loading" />,
+  "comms-channels": () => <ChatChannelsBlock />,
+  "comms-thread": () => <ChatThreadBlock />,
+  "comms-composer": () => <ChatComposerBlock />,
+  "comms-notifications": () => <NotificationsBlock />,
+  "comms-meetings": () => <MeetingsListBlock />,
+  "comms-meeting-detail": () => <MeetingDetailBlock />,
+  "call-lobby": () => <CallLobbyBlock />,
+  "call-active": () => <CallActiveBlock />,
+  "call-screen-share": () => <CallScreenShareBlock />,
+  "call-in-chat": () => <CallInChatBlock />,
+  "call-device-settings": () => <CallDeviceSettingsBlock />,
+  "call-reconnecting": () => <CallReconnectingBlock />
 };
 
 export function ScreenView({ id }: { id: ScreenId }) {

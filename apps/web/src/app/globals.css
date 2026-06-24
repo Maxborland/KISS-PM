@@ -10,6 +10,7 @@
 @import "../styles/widgets/gantt.css" layer(components);
 @import "../styles/widgets/call.css" layer(components);
 @import "../styles/widgets/chat.css" layer(components);
+@import "../styles/widgets/comms.css" layer(components);
 
 @theme inline {
   --color-background: var(--canvas);
