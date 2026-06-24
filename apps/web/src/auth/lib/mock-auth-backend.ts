@@ -1,0 +1,349 @@
+/* ============================================================
+   Contract-grounded mock backend для Auth/Профиль (Storybook).
+
+   ЧЕСТНОСТЬ: in-memory мок, реализующий реальный REST-контракт
+   /api/auth/{login,logout,me} (БОЕВОЙ) + правку профиля + GREENFIELD
+   register / password-reset/{request,confirm}. Компонент работает через
+   настоящий createAuthClient (с fetchImpl), поэтому переключение на боевой
+   API = смена apiOrigin.
+
+   СЕССИЯ В МОКЕ (важно): боевой ставит HttpOnly-cookie kiss_pm_session,
+   который JS прочитать НЕ может. Поэтому мок НЕ эмулирует чтение
+   document.cookie — состояние логина держит замыкание (sessionToken /
+   currentUserId). Set-Cookie в Response КОСМЕТИЧЕСКИЙ (клиент его не
+   парсит). Это зеркало CURRENT_ACTOR_ID-стаба mock-comms-backend, но с
+   переключаемым логин-состоянием. Каждый монтаж создаёт свой
+   createMockAuthFetch() → изолированная сессия (как useCrm).
+
+   РАЗГРАНИЧЕНИЕ боевое/greenfield:
+   - login/logout/me + правка профиля — зеркаль дословно коды/статусы/
+     порядок из apps/api/src/authRoutes.ts (rawMaps area auth-login).
+   - register / password-reset/* — помечены блоком GREENFIELD: боевого
+     контракта нет, мок задаёт предложенный (как comms задавал звонки).
+   ============================================================ */
+
+import type { TenantUser, WorkspaceUser } from "./auth-client";
+
+const TENANT = "tenant-alpha";
+const ACCESS_PROFILE = "ap-admin"; // дефолтная роль демо-тенанта (на боевом — access_profile_id NOT NULL)
+
+// Боевые параметры login-валидации (parseLoginCredentials, authRoutes.ts:160).
+const MAX_EMAIL = 254;
+const MAX_PASSWORD = 1024;
+const MIN_EMAIL = 3;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Политика пароля для GREENFIELD register/reset (предложенная: ≥8, ≤1024, без control-chars).
+const MIN_STRONG_PASSWORD = 8;
+const MAX_NAME = 160;
+// Демо-окно rate-limit: БОЕВОЕ = 5 неудач / 15 мин на email+ip + Retry-After.
+// Здесь окно ужато для проходимости стори (3 попытки), коды/статус — боевые.
+const RL_MAX_FAILURES = 3; // демо-окно, боевое 5/15мин
+const RL_WINDOW_MS = 15 * 60 * 1000; // демо-окно, боевое 15мин
+const RL_RETRY_AFTER_SEC = 900; // Retry-After в секундах (боевое окно)
+
+let SEQ = 0;
+const nowIso = () => new Date().toISOString();
+// rawToken/session-token — 64-hex (боевой формат randomBytes(32).toString("hex")).
+const hex64 = (seed: number) => (seed.toString(16).padStart(2, "0").repeat(32)).slice(0, 64);
+const genToken = () => hex64((Date.now() & 0xff) ^ ((SEQ += 1) & 0xff) ^ 0xa5);
+
+// Управляющие символы: коды 0x00..0x1f и 0x7f (как боевой parseLoginCredentials).
+const hasControlChar = (v: string): boolean => {
+  for (let i = 0; i < v.length; i += 1) {
+    const c = v.charCodeAt(i);
+    if (c <= 0x1f || c === 0x7f) return true;
+  }
+  return false;
+};
+
+type Credential = { userId: string; password: string }; // plaintext-демо, НЕ scrypt (честное упрощение мока)
+type ResetToken = { userId: string; expiresAt: number; consumedAt: number | null };
+
+/* ---- Сид (§5): пользователи + креды + reset-токены ---- */
+function seedUsers(): WorkspaceUser[] {
+  const base = (over: Partial<WorkspaceUser> & { id: string; name: string; email: string }): WorkspaceUser => ({
+    tenantId: TENANT,
+    accessProfileId: ACCESS_PROFILE,
+    positionId: null,
+    positionName: null,
+    phone: null,
+    telegram: null,
+    status: "active",
+    theme: "light",
+    accentColor: "#0f766e", // дефолт схемы tenant_users
+    ...over
+  });
+  return [
+    // Активный демо-админ (seed-кред seed.ts:424; theme light, accentColor #0f766e).
+    base({
+      id: "u-admin",
+      name: "Администратор",
+      email: "admin@kiss-pm.local",
+      accessProfileId: ACCESS_PROFILE,
+      positionId: "pm",
+      positionName: "Менеджер проектов",
+      phone: "+7 999 000-00-00",
+      telegram: "@kisspm_admin"
+    }),
+    // Неактивный пользователь — для демонстрации 403 user_inactive на login.
+    base({ id: "u-inactive", name: "Пётр Неактивный", email: "inactive@kiss-pm.local", status: "inactive" })
+  ];
+}
+
+// Реалистичный набор прав (подмножество adminPermissions из seed.ts:455).
+const SEED_PERMISSIONS = [
+  "tenant.users.read",
+  "tenant.clients.read",
+  "tenant.clients.manage",
+  "tenant.opportunities.read",
+  "tenant.opportunities.manage",
+  "tenant.projects.read",
+  "tenant.project_plan.read",
+  "tenant.project_plan.manage",
+  "tenant.communications.read",
+  "tenant.communications.manage",
+  "profile.read",
+  "profile.update",
+  "workspace.theme.manage"
+];
+
+/* ---- Транспорт: fetchImpl, совместимый с createAuthClient ---- */
+const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
+const err = (error: string, status: number, headers: Record<string, string> = {}) => json({ error }, status, headers);
+const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+
+// Усечение WorkspaceUser → TenantUser (боевой toPublicUser): login отдаёт усечённую форму.
+const toPublicUser = (u: WorkspaceUser): TenantUser => ({ id: u.id, tenantId: u.tenantId, name: u.name, accessProfileId: u.accessProfileId });
+
+// Косметический Set-Cookie (клиент его НЕ парсит; состояние — в замыкании).
+const sessionCookie = (rawToken: string) => `kiss_pm_session=${rawToken}; HttpOnly; Path=/; SameSite=Lax; Priority=High; Max-Age=604800`;
+const expiredCookie = () => "kiss_pm_session=; HttpOnly; Path=/; SameSite=Lax; Priority=High; Max-Age=0";
+
+/* Валидация login-тела ДОСЛОВНО как боевой parseLoginCredentials (authRoutes.ts:160):
+   email trim+lowercase, длина 3..254, без control-chars, паттерн; password 1..1024. */
+function parseLoginCredentials(body: Record<string, unknown>): { ok: true; email: string; password: string } | { ok: false } {
+  if (typeof body.email !== "string" || typeof body.password !== "string") return { ok: false };
+  const email = body.email.trim().toLowerCase();
+  const password = body.password;
+  if (
+    email.length < MIN_EMAIL ||
+    email.length > MAX_EMAIL ||
+    hasControlChar(email) ||
+    !EMAIL_RE.test(email) ||
+    password.length < 1 ||
+    password.length > MAX_PASSWORD
+  ) {
+    return { ok: false };
+  }
+  return { ok: true, email, password };
+}
+
+// GREENFIELD: единая политика пароля (≥8, ≤1024, без control-chars). Предложенная, боевого модуля нет.
+const isWeakPassword = (v: unknown): boolean => typeof v !== "string" || v.length < MIN_STRONG_PASSWORD || v.length > MAX_PASSWORD || hasControlChar(v);
+// GREENFIELD: валидация email только по формату (для register/reset-request).
+const isValidEmail = (v: unknown): v is string => typeof v === "string" && (() => { const e = v.trim().toLowerCase(); return e.length >= MIN_EMAIL && e.length <= MAX_EMAIL && !hasControlChar(e) && EMAIL_RE.test(e); })();
+
+export function createMockAuthFetch(): typeof fetch {
+  // ---- In-memory модель в замыкании (изолирована на каждый монтаж) ----
+  let sessionToken: string | null = null; // null = anonymous (зеркало "нет валидного cookie")
+  let currentUserId: string | null = null;
+  const users: WorkspaceUser[] = seedUsers();
+  // Креды: email → {userId, password}. plaintext-демо, НЕ scrypt — честное упрощение мока.
+  const credentials = new Map<string, Credential>([
+    ["admin@kiss-pm.local", { userId: "u-admin", password: "kiss-pm-admin" }],
+    ["inactive@kiss-pm.local", { userId: "u-inactive", password: "kiss-pm-inactive" }]
+  ]);
+  // Reset-токены: один валидный, один просроченный, один использованный (rawToken — 64-hex).
+  const VALID_RESET = "a".repeat(64);
+  const EXPIRED_RESET = "b".repeat(64);
+  const USED_RESET = "c".repeat(64);
+  const resetTokens = new Map<string, ResetToken>([
+    [VALID_RESET, { userId: "u-admin", expiresAt: Date.now() + 60 * 60 * 1000, consumedAt: null }],
+    [EXPIRED_RESET, { userId: "u-admin", expiresAt: Date.now() - 60 * 1000, consumedAt: null }],
+    [USED_RESET, { userId: "u-admin", expiresAt: Date.now() + 60 * 60 * 1000, consumedAt: Date.now() - 30 * 1000 }]
+  ]);
+  // Демо-rate-limiter: счётчик неудач по email в окне (боевое — email+ip+global, 5/15мин).
+  const failures = new Map<string, { count: number; resetAt: number }>();
+
+  const findUser = (id: string) => users.find((u) => u.id === id);
+
+  const rateLimited = (email: string): boolean => {
+    const rec = failures.get(email);
+    if (!rec) return false;
+    if (Date.now() > rec.resetAt) { failures.delete(email); return false; }
+    return rec.count >= RL_MAX_FAILURES;
+  };
+  const recordFailure = (email: string) => {
+    const rec = failures.get(email);
+    if (!rec || Date.now() > rec.resetAt) failures.set(email, { count: 1, resetAt: Date.now() + RL_WINDOW_MS });
+    else rec.count += 1;
+  };
+  const recordSuccess = (email: string) => { failures.delete(email); };
+
+  // Установка/сброс сессии (зеркало createSession + Set-Cookie / expired-cookie).
+  const startSession = (userId: string): string => { const t = genToken(); sessionToken = t; currentUserId = userId; return t; };
+  const clearSession = () => { sessionToken = null; currentUserId = null; };
+
+  const mockFetch: typeof fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    const method = (init?.method ?? "GET").toUpperCase();
+    const path = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0]!;
+    let body: Record<string, unknown> = {};
+    if (init?.body) {
+      try {
+        const p: unknown = JSON.parse(String(init.body));
+        if (p && typeof p === "object" && !Array.isArray(p)) body = p as Record<string, unknown>;
+        else return err("invalid_json", 400); // тело не объект (как боевой readLimitedJsonBody / parse-гварды)
+      } catch {
+        return err("invalid_json", 400);
+      }
+    }
+
+    /* ============================================================
+       БОЕВЫЕ ручки — зеркаль дословно коды/статусы/порядок (authRoutes.ts)
+       ============================================================ */
+
+    // POST /api/auth/login — порядок: payload(400) → rate-limit(429) → credentials(401) → active(403) → 200.
+    if (path === "/api/auth/login" && method === "POST") {
+      const parsed = parseLoginCredentials(body);
+      if (!parsed.ok) return err("invalid_login_payload", 400);
+      const { email, password } = parsed;
+      // rate-limit ДО проверки пароля (боевой reserveAttempt/check).
+      if (rateLimited(email)) return err("too_many_login_attempts", 429, { "Retry-After": String(RL_RETRY_AFTER_SEC) });
+      const credential = credentials.get(email);
+      // ЕДИНЫЙ код invalid_credentials и для неизвестного email, и для неверного пароля (anti-enumeration).
+      if (!credential || credential.password !== password) {
+        recordFailure(email);
+        return err("invalid_credentials", 401);
+      }
+      recordSuccess(email);
+      const actor = findUser(credential.userId);
+      // user_not_found(404) в моке не воспроизводим — сид консистентен; оставляем как страховку.
+      if (!actor) return err("user_not_found", 404);
+      if (actor.status === "inactive") return err("user_inactive", 403);
+      const rawToken = startSession(actor.id);
+      return json({ user: toPublicUser(actor), workspace: { id: actor.tenantId } }, 200, { "Set-Cookie": sessionCookie(rawToken) });
+    }
+
+    // POST /api/auth/logout — идемпотентно, всегда 200 {status:"ok"} + expired-cookie.
+    if (path === "/api/auth/logout" && method === "POST") {
+      clearSession();
+      return json({ status: "ok" }, 200, { "Set-Cookie": expiredCookie() });
+    }
+
+    // GET /api/auth/me — нет сессии 401 session_required; иначе полный WorkspaceUser + права + workspace.
+    if (path === "/api/auth/me" && method === "GET") {
+      if (sessionToken === null || currentUserId === null) return err("session_required", 401);
+      const actor = findUser(currentUserId);
+      if (!actor) return err("session_required", 401);
+      return json({ user: actor, permissions: SEED_PERMISSIONS, workspace: { id: actor.tenantId } });
+    }
+
+    /* ---- PROFILE: правка профиля (боевой me + правка полей WorkspaceUser) ---- */
+    // PATCH /api/profile — нет сессии 401; валидация полей (400) → 200 {user:WorkspaceUser} обновлённый.
+    if (path === "/api/profile" && method === "PATCH") {
+      if (sessionToken === null || currentUserId === null) return err("session_required", 401);
+      const actor = findUser(currentUserId);
+      if (!actor) return err("session_required", 401);
+      // name: single-line ≤160, непустой при наличии.
+      if (body.name !== undefined) {
+        const name = str(body.name);
+        if (!name || name.length > MAX_NAME || hasControlChar(name)) return err("invalid_profile_name", 400);
+        actor.name = name;
+      }
+      // phone/telegram: ≤160, ''/null → null.
+      if (body.phone !== undefined) {
+        const phone = body.phone == null ? null : str(body.phone) || null;
+        if (phone !== null && (phone.length > MAX_NAME || hasControlChar(phone))) return err("invalid_profile_phone", 400);
+        actor.phone = phone;
+      }
+      if (body.telegram !== undefined) {
+        const telegram = body.telegram == null ? null : str(body.telegram) || null;
+        if (telegram !== null && (telegram.length > MAX_NAME || hasControlChar(telegram))) return err("invalid_profile_telegram", 400);
+        actor.telegram = telegram;
+      }
+      // theme ∈ light|dark|system.
+      if (body.theme !== undefined) {
+        if (body.theme !== "light" && body.theme !== "dark" && body.theme !== "system") return err("invalid_profile_theme", 400);
+        actor.theme = body.theme;
+      }
+      // accentColor /^#[0-9a-fA-F]{6}$/.
+      if (body.accentColor !== undefined) {
+        if (typeof body.accentColor !== "string" || !/^#[0-9a-fA-F]{6}$/.test(body.accentColor)) return err("invalid_profile_accent_color", 400);
+        actor.accentColor = body.accentColor;
+      }
+      return json({ user: actor });
+    }
+
+    /* ============================================================
+       GREENFIELD: предложенный контракт, боевого нет.
+       Помечено блоком; при появлении боевых слайсов (3B) мок зеркалит их.
+       ============================================================ */
+
+    // GREENFIELD: POST /api/auth/register {email,password,name}
+    //   400 invalid_register_payload → 400 weak_password → 409 email_taken → 201 (авто-логин).
+    if (path === "/api/auth/register" && method === "POST") {
+      const email = isValidEmail(body.email) ? str(body.email).toLowerCase() : null;
+      const name = str(body.name);
+      // payload: email формат + name single-line 1..160 (по образцу login-валидации).
+      if (!email || !name || name.length > MAX_NAME || hasControlChar(name)) return err("invalid_register_payload", 400);
+      // weak_password ПОСЛЕ payload (порядок как в карте).
+      if (isWeakPassword(body.password)) return err("weak_password", 400);
+      // email занят глобально (по credentials; на боевом — findCredentialByEmail глобально уникален).
+      if (credentials.has(email)) return err("email_taken", 409);
+      // Создать user в фикс демо-тенанте с дефолтной ролью + авто-логин.
+      const id = `u-${(SEQ += 1).toString(36)}-${Date.now().toString(36)}`;
+      const user: WorkspaceUser = {
+        id, tenantId: TENANT, name, accessProfileId: ACCESS_PROFILE, email,
+        positionId: null, positionName: null, phone: null, telegram: null,
+        status: "active", theme: "light", accentColor: "#0f766e"
+      };
+      users.push(user);
+      credentials.set(email, { userId: id, password: body.password as string });
+      const rawToken = startSession(id); // авто-логин
+      return json({ user: toPublicUser(user), workspace: { id: TENANT } }, 201, { "Set-Cookie": sessionCookie(rawToken) });
+    }
+
+    // GREENFIELD: POST /api/auth/password-reset/request {email}
+    //   400 invalid_email (только формат) → ВСЕГДА 202 {status:"ok"} (anti-enumeration).
+    if (path === "/api/auth/password-reset/request" && method === "POST") {
+      if (!isValidEmail(body.email)) return err("invalid_email", 400);
+      const email = str(body.email).toLowerCase();
+      const credential = credentials.get(email);
+      // Если email есть — создать reset-токен (доставки письма нет: токен честно показывается в UI).
+      if (credential) {
+        const rawToken = genToken();
+        resetTokens.set(rawToken, { userId: credential.userId, expiresAt: Date.now() + 60 * 60 * 1000, consumedAt: null });
+        // НЕ раскрываем существование email в статусе; токен возвращаем отдельным полем для honest-показа.
+        return json({ status: "ok", devToken: rawToken }, 202); // devToken — демо-показ (письма нет)
+      }
+      // Несуществующий email → ВСЕ РАВНО 202 (НЕ раскрывать email_not_found).
+      return json({ status: "ok" }, 202);
+    }
+
+    // GREENFIELD: POST /api/auth/password-reset/confirm {token,password}
+    //   400 invalid_reset_confirm_payload → 400 weak_password → 400 invalid_reset_token
+    //   → 400 token_expired → 400 reset_token_used → 200 {status:"ok"}.
+    if (path === "/api/auth/password-reset/confirm" && method === "POST") {
+      const token = str(body.token);
+      if (!token) return err("invalid_reset_confirm_payload", 400);
+      if (isWeakPassword(body.password)) return err("weak_password", 400);
+      const record = resetTokens.get(token);
+      if (!record) return err("invalid_reset_token", 400);
+      if (Date.now() > record.expiresAt) return err("token_expired", 400);
+      if (record.consumedAt !== null) return err("reset_token_used", 400);
+      // Сменить пароль, consumedAt=now, сбросить сессии пользователя.
+      const user = findUser(record.userId);
+      if (user) credentials.set(user.email, { userId: user.id, password: body.password as string });
+      record.consumedAt = Date.now();
+      if (currentUserId === record.userId) clearSession(); // инвалидация сессий пользователя
+      return json({ status: "ok" });
+    }
+
+    // Неизвестный путь — 404 (как боевой роутер).
+    return err("not_found", 404);
+  };
+
+  return mockFetch;
+}
