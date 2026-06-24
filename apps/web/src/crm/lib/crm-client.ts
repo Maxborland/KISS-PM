@@ -31,14 +31,20 @@ export type CrmStatus = "active" | "archived";
 export type Client = { id: string; tenantId: string; name: string; description: string | null; status: CrmStatus; createdAt: string; updatedAt: string };
 export type Contact = { id: string; tenantId: string; clientId: string; name: string; email: string | null; phone: string | null; telegram: string | null; role: string | null; status: CrmStatus; createdAt: string; updatedAt: string };
 export type Product = { id: string; tenantId: string; name: string; sku: string | null; type: "service" | "goods"; unit: string; price: number; description: string | null; status: CrmStatus; createdAt: string; updatedAt: string };
-export type DealStage = { id: string; tenantId: string; name: string; sortOrder: number; status: CrmStatus; createdAt: string; updatedAt: string };
+// Мультиворонки: стадия получает воронку (pipelineId), к которой принадлежит (null — legacy-стадия без воронки).
+export type DealStage = { id: string; tenantId: string; pipelineId: string | null; name: string; sortOrder: number; status: CrmStatus; createdAt: string; updatedAt: string };
 export type ProjectType = { id: string; tenantId: string; name: string; description: string | null; status: CrmStatus; createdAt: string; updatedAt: string };
+
+// Мультиворонки: воронка (набор стадий со своими правилами переходов).
+export type Pipeline = { id: string; tenantId: string; name: string; description: string | null; isDefault: boolean; sortOrder: number; status: CrmStatus; createdAt: string; updatedAt: string };
+// Мультиворонки: правило перехода между двумя стадиями ОДНОЙ воронки (гвард опционален).
+export type StageTransition = { id: string; tenantId: string; pipelineId: string; fromStageId: string; toStageId: string; requireFeasibilityOk: boolean; minProbability: number | null; guardNote: string | null; createdAt: string; updatedAt: string };
 
 export type PositionDemand = { positionId: string; requiredHours: number };
 export type OpportunityStatus = "new" | "feasibility" | "ready_to_activate" | "won_closed" | "lost_rejected";
 export type Opportunity = {
   id: string; tenantId: string;
-  clientId: string | null; primaryContactId: string | null; ownerUserId: string | null; projectTypeId: string | null; stageId: string | null;
+  clientId: string | null; primaryContactId: string | null; ownerUserId: string | null; projectTypeId: string | null; stageId: string | null; pipelineId: string | null;
   clientName: string; contactName: string; title: string; projectType: string; description: string | null;
   plannedStart: string; plannedFinish: string;
   contractValue: number; plannedHourlyRate: number; plannedHours: number; probability: number;
@@ -110,7 +116,16 @@ export function createCrmClient(options: CrmApiClientOptions) {
     getOpportunity(id: string) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(id)}`); },
     createOpportunity(input: OpportunityCreateInput) { return requestJson<{ opportunity: Opportunity }>("/api/workspace/opportunities", { method: "POST", body: JSON.stringify(input) }); },
     moveOpportunityStage(id: string, stageId: string) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(id)}/stage`, { method: "PATCH", body: JSON.stringify({ stageId }) }); },
-    finalizeOpportunity(id: string, status: "won_closed" | "lost_rejected", reason: string) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(id)}/finalize`, { method: "PATCH", body: JSON.stringify({ status, reason }) }); }
+    finalizeOpportunity(id: string, status: "won_closed" | "lost_rejected", reason: string) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(id)}/finalize`, { method: "PATCH", body: JSON.stringify({ status, reason }) }); },
+
+    // мультиворонки (pipelines + stage-transitions + cross-pipeline move)
+    listPipelines() { return requestJson<{ pipelines: Pipeline[] }>("/api/workspace/pipelines"); },
+    createPipeline(input: { name: string; sortOrder: number; description?: string | null; isDefault?: boolean; status?: CrmStatus }) { return requestJson<{ pipeline: Pipeline }>("/api/workspace/pipelines", { method: "POST", body: JSON.stringify(input) }); },
+    updatePipeline(pipelineId: string, input: { name: string; sortOrder: number; description?: string | null; isDefault?: boolean; status?: CrmStatus }) { return requestJson<{ pipeline: Pipeline }>(`/api/workspace/pipelines/${enc(pipelineId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
+    listStageTransitions(pipelineId: string) { return requestJson<{ stageTransitions: StageTransition[] }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`); },
+    createStageTransition(pipelineId: string, input: { fromStageId: string; toStageId: string; requireFeasibilityOk?: boolean; minProbability?: number | null; guardNote?: string | null }) { return requestJson<{ stageTransition: StageTransition }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`, { method: "POST", body: JSON.stringify(input) }); },
+    deleteStageTransition(pipelineId: string, transitionId: string) { return requestJson<{ ok: true }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions/${enc(transitionId)}`, { method: "DELETE" }); },
+    moveOpportunityPipeline(opportunityId: string, input: { pipelineId: string; stageId: string }) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(opportunityId)}/pipeline`, { method: "PATCH", body: JSON.stringify(input) }); }
     // Отложено до поверхности «Карточка сделки»: updateOpportunity (PATCH /:id — full-replace, как
     // боевой parseOpportunityUpdateBody), checkFeasibility (POST /:id/feasibility), activate
     // (POST /:id/activate → ProjectRecord), listProjects (GET /projects). Тип ProjectRecord и поля

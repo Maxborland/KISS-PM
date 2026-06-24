@@ -13,7 +13,9 @@
    сделки, lock финальных статусов, и т.д.
    ============================================================ */
 
-import type { Client, Contact, DealStage, Opportunity, PositionDemand, Product, ProjectType } from "./crm-client";
+import { evaluatePipelineChange, evaluateStageTransition } from "@kiss-pm/domain";
+
+import type { Client, Contact, DealStage, Opportunity, Pipeline, PositionDemand, Product, ProjectType, StageTransition } from "./crm-client";
 
 const TENANT = "tenant-alpha";
 const ID_RE = /^[a-z][a-z0-9-]{2,80}$/;
@@ -46,6 +48,8 @@ type Store = {
   dealStages: DealStage[];
   projectTypes: ProjectType[];
   opportunities: Opportunity[];
+  pipelines: Pipeline[];
+  stageTransitions: StageTransition[];
 };
 
 function seed(): Store {
@@ -53,15 +57,36 @@ function seed(): Store {
   const client = (id: string, name: string): Client => ({ id, tenantId: TENANT, name, description: null, status: "active", createdAt: t, updatedAt: t });
   const contact = (id: string, clientId: string, name: string, email: string, role: string): Contact => ({ id, tenantId: TENANT, clientId, name, email, phone: null, telegram: null, role, status: "active", createdAt: t, updatedAt: t });
   const product = (id: string, name: string, type: "service" | "goods", unit: string, price: number): Product => ({ id, tenantId: TENANT, name, sku: null, type, unit, price, description: null, status: "active", createdAt: t, updatedAt: t });
-  const stage = (id: string, name: string, sortOrder: number): DealStage => ({ id, tenantId: TENANT, name, sortOrder, status: "active", createdAt: t, updatedAt: t });
+  // Мультиворонки: каждая стадия принадлежит воронке (pipelineId).
+  const stage = (id: string, pipelineId: string, name: string, sortOrder: number): DealStage => ({ id, tenantId: TENANT, pipelineId, name, sortOrder, status: "active", createdAt: t, updatedAt: t });
   const ptype = (id: string, name: string): ProjectType => ({ id, tenantId: TENANT, name, description: null, status: "active", createdAt: t, updatedAt: t });
+  const pipeline = (id: string, name: string, sortOrder: number, isDefault: boolean): Pipeline => ({ id, tenantId: TENANT, name, description: null, isDefault, sortOrder, status: "active", createdAt: t, updatedAt: t });
+  const transition = (id: string, pipelineId: string, fromStageId: string, toStageId: string, guard?: { requireFeasibilityOk?: boolean; minProbability?: number | null; guardNote?: string | null }): StageTransition => ({ id, tenantId: TENANT, pipelineId, fromStageId, toStageId, requireFeasibilityOk: guard?.requireFeasibilityOk ?? false, minProbability: guard?.minProbability ?? null, guardNote: guard?.guardNote ?? null, createdAt: t, updatedAt: t });
 
+  // Основная воронка (pipeline-main) — существующие 5 стадий; партнёрская (pipeline-partner) — 3 новые.
+  const pipelines = [
+    pipeline("pipeline-main", "Основная воронка", 1, true),
+    pipeline("pipeline-partner", "Партнёрская воронка", 2, false)
+  ];
   const dealStages = [
-    stage("stage-lead", "Лид", 1),
-    stage("stage-qual", "Квалификация", 2),
-    stage("stage-proposal", "КП", 3),
-    stage("stage-contract", "Договор", 4),
-    stage("stage-won", "Закрыто", 5)
+    stage("stage-lead", "pipeline-main", "Лид", 1),
+    stage("stage-qual", "pipeline-main", "Квалификация", 2),
+    stage("stage-proposal", "pipeline-main", "КП", 3),
+    stage("stage-contract", "pipeline-main", "Договор", 4),
+    stage("stage-won", "pipeline-main", "Закрыто", 5),
+    stage("stage-partner-lead", "pipeline-partner", "Партнёрский лид", 1),
+    stage("stage-partner-poc", "pipeline-partner", "Пилот (PoC)", 2),
+    stage("stage-partner-won", "pipeline-partner", "Партнёрская сделка закрыта", 3)
+  ];
+  // Переходы: основная — линейная цепочка, переход contract→won под гвардом
+  // (feasibility=ok И вероятность ≥ 50%); партнёрская — линейная без гвардов.
+  const stageTransitions = [
+    transition("st-main-lead-qual", "pipeline-main", "stage-lead", "stage-qual"),
+    transition("st-main-qual-proposal", "pipeline-main", "stage-qual", "stage-proposal"),
+    transition("st-main-proposal-contract", "pipeline-main", "stage-proposal", "stage-contract"),
+    transition("st-main-contract-won", "pipeline-main", "stage-contract", "stage-won", { requireFeasibilityOk: true, minProbability: 50, guardNote: "Требуется feasibility=ok и вероятность ≥ 50%" }),
+    transition("st-partner-lead-poc", "pipeline-partner", "stage-partner-lead", "stage-partner-poc"),
+    transition("st-partner-poc-won", "pipeline-partner", "stage-partner-poc", "stage-partner-won")
   ];
   const clients = [
     client("client-romashka", "ООО «Ромашка»"),
@@ -86,30 +111,40 @@ function seed(): Store {
   const opp = (o: {
     id: string; clientId: string; contactId: string; ownerUserId: string; stageId: string; title: string;
     contractValue: number; rate: number; probability: number; status: Opportunity["status"]; start: string; finish: string; positionId: string; hours: number;
+    feasibilityStatus?: string | null;
   }): Opportunity => {
     const c = clients.find((x) => x.id === o.clientId)!;
     const ct = contacts.find((x) => x.id === o.contactId)!;
+    // Мультиворонки: воронку сделки выводим из её стадии (server-managed поле).
+    const st = dealStages.find((x) => x.id === o.stageId)!;
     return {
       id: o.id, tenantId: TENANT,
-      clientId: o.clientId, primaryContactId: o.contactId, ownerUserId: o.ownerUserId, projectTypeId: "pt-impl", stageId: o.stageId,
+      clientId: o.clientId, primaryContactId: o.contactId, ownerUserId: o.ownerUserId, projectTypeId: "pt-impl", stageId: o.stageId, pipelineId: st.pipelineId,
       clientName: c.name, contactName: ct.name, title: o.title, projectType: "Внедрение", description: null,
       plannedStart: o.start, plannedFinish: o.finish,
       contractValue: o.contractValue, plannedHourlyRate: o.rate, plannedHours: Math.floor(o.contractValue / o.rate), probability: o.probability,
-      status: o.status, templateId: null, feasibilityStatus: null, feasibilityResult: null, feasibilityCheckedAt: null,
+      status: o.status, templateId: null, feasibilityStatus: o.feasibilityStatus ?? null, feasibilityResult: null, feasibilityCheckedAt: null,
       createdAt: t, updatedAt: t, demand: [{ positionId: o.positionId, requiredHours: o.hours }], customFieldValues: {}
     };
   };
   const opportunities = [
+    // На стадии «Договор» с feasibility=null (≠ok) и prob 80 — гвард contract→won отклоняет по реализуемости (422 condition_feasibility).
     opp({ id: "opp-2207", clientId: "client-romashka", contactId: "ctc-romashka", ownerUserId: "u-anna", stageId: "stage-contract", title: "Производственный портал · Релиз 2", contractValue: 4_800_000, rate: 4000, probability: 80, status: "ready_to_activate", start: "2026-03-02", finish: "2026-07-12", positionId: "backend", hours: 1100 }),
+    // На стадии «Договор» с feasibility=ok и prob 75 — гвард contract→won РАЗРЕШАЕТ переход.
+    opp({ id: "opp-gamma-contract", clientId: "client-gamma", contactId: "ctc-gamma", ownerUserId: "u-anna", stageId: "stage-contract", title: "Платформа лояльности · Договор", contractValue: 2_800_000, rate: 4000, probability: 75, status: "ready_to_activate", start: "2026-03-10", finish: "2026-08-20", positionId: "backend", hours: 700, feasibilityStatus: "ok" }),
+    // На стадии «Договор» с feasibility=ok, но prob 40 (<50) — гвард contract→won отклоняет по вероятности (422 condition_probability).
+    opp({ id: "opp-sever-contract-lowprob", clientId: "client-sever", contactId: "ctc-sever", ownerUserId: "u-ivan", stageId: "stage-contract", title: "ERP-миграция · Договор (низкая вероятность)", contractValue: 2_000_000, rate: 4000, probability: 40, status: "ready_to_activate", start: "2026-04-05", finish: "2026-09-05", positionId: "backend", hours: 500, feasibilityStatus: "ok" }),
     opp({ id: "opp-sever-erp", clientId: "client-sever", contactId: "ctc-sever", ownerUserId: "u-ivan", stageId: "stage-proposal", title: "Интеграция ERP", contractValue: 2_400_000, rate: 3800, probability: 55, status: "feasibility", start: "2026-04-01", finish: "2026-08-15", positionId: "backend", hours: 600 }),
     opp({ id: "opp-gamma-mvp", clientId: "client-gamma", contactId: "ctc-gamma", ownerUserId: "u-sergey", stageId: "stage-qual", title: "Мобильное приложение · MVP", contractValue: 1_600_000, rate: 3500, probability: 40, status: "new", start: "2026-05-04", finish: "2026-09-01", positionId: "frontend", hours: 420 }),
     opp({ id: "opp-delta-audit", clientId: "client-delta", contactId: "ctc-delta", ownerUserId: "u-ivan", stageId: "stage-lead", title: "Аудит и роадмап", contractValue: 650_000, rate: 5000, probability: 25, status: "new", start: "2026-03-16", finish: "2026-05-01", positionId: "analyst", hours: 120 }),
     opp({ id: "opp-romashka-support", clientId: "client-romashka", contactId: "ctc-romashka", ownerUserId: "u-anna", stageId: "stage-lead", title: "Поддержка портала · год", contractValue: 2_160_000, rate: 3000, probability: 30, status: "new", start: "2026-07-13", finish: "2027-07-12", positionId: "backend", hours: 700 }),
     opp({ id: "opp-gamma-bi", clientId: "client-gamma", contactId: "ctc-gamma", ownerUserId: "u-sergey", stageId: "stage-proposal", title: "BI-витрина продаж", contractValue: 1_950_000, rate: 4200, probability: 60, status: "new", start: "2026-04-20", finish: "2026-07-30", positionId: "backend", hours: 460 }),
-    opp({ id: "opp-sever-portal", clientId: "client-sever", contactId: "ctc-sever", ownerUserId: "u-ivan", stageId: "stage-won", title: "Портал самообслуживания", contractValue: 3_300_000, rate: 4000, probability: 100, status: "won_closed", start: "2026-01-15", finish: "2026-04-30", positionId: "frontend", hours: 800 })
+    opp({ id: "opp-sever-portal", clientId: "client-sever", contactId: "ctc-sever", ownerUserId: "u-ivan", stageId: "stage-won", title: "Портал самообслуживания", contractValue: 3_300_000, rate: 4000, probability: 100, status: "won_closed", start: "2026-01-15", finish: "2026-04-30", positionId: "frontend", hours: 800 }),
+    // Партнёрская воронка: сделка на её первой стадии — для демо back-compat-переходов и кросс-пайплайн.
+    opp({ id: "opp-partner-acme", clientId: "client-delta", contactId: "ctc-delta", ownerUserId: "u-sergey", stageId: "stage-partner-lead", title: "Партнёрская интеграция · ACME", contractValue: 1_200_000, rate: 4000, probability: 35, status: "new", start: "2026-05-01", finish: "2026-08-01", positionId: "backend", hours: 300 })
   ];
 
-  return { clients, contacts, products, dealStages, projectTypes, opportunities };
+  return { clients, contacts, products, dealStages, projectTypes, opportunities, pipelines, stageTransitions };
 }
 
 /* ---- Транспорт: fetchImpl, совместимый с createCrmClient ---- */
@@ -117,6 +152,58 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 const err = (error: string, status: number) => json({ error }, status);
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 const isFinal = (o: Opportunity) => o.status === "won_closed" || o.status === "lost_rejected";
+const MAX_DESCRIPTION = 1_000;
+// Управляющие символы для multiline-текста (как боевой isSafeMultilineText): 0x00–0x08, 0x0B, 0x0C,
+// 0x0E–0x1F, 0x7F. Допускаются tab(0x09), LF(0x0A), CR(0x0D). Без литералов в исходнике — по кодам.
+const hasControlChar = (v: string): boolean => {
+  for (let i = 0; i < v.length; i += 1) {
+    const c = v.charCodeAt(i);
+    if ((c <= 0x08) || c === 0x0b || c === 0x0c || (c >= 0x0e && c <= 0x1f) || c === 0x7f) return true;
+  }
+  return false;
+};
+// текст описания/guardNote: длина ≤ max, без управляющих символов (как боевой isSafeMultilineText)
+const safeMultiline = (v: string, max = MAX_DESCRIPTION) => v.length <= max && !hasControlChar(v);
+// undefined → дефолт false; boolean → как есть; иное → null (ошибка тела), как боевой parseOptionalBoolean
+const optBool = (v: unknown): boolean | null => (v === undefined ? false : typeof v === "boolean" ? v : null);
+
+type PipelineParse = { ok: true; name: string; description: string | null; isDefault: boolean; sortOrder: number; status: "active" | "archived" } | { ok: false; error: string };
+// Мультиворонки: тело воронки (create/full-replace). Зеркало parsePipelineBody (crmParsers): порядок и коды.
+function parsePipelineBody(body: Record<string, unknown>): PipelineParse {
+  const name = str(body.name);
+  const description = body.description == null ? null : str(body.description) || null;
+  const sortOrder = body.sortOrder;
+  const isDefault = optBool(body.isDefault);
+  const status = body.status === undefined ? "active" : body.status;
+  if (!name || name.length > 160) return { ok: false, error: "invalid_pipeline_name" };
+  if (description !== null && !safeMultiline(description)) return { ok: false, error: "invalid_description" };
+  if (!posInt(sortOrder)) return { ok: false, error: "invalid_pipeline_sort_order" };
+  if (isDefault === null) return { ok: false, error: "invalid_body" };
+  if (status !== "active" && status !== "archived") return { ok: false, error: "invalid_status" };
+  return { ok: true, name, description, isDefault, sortOrder: sortOrder as number, status };
+}
+
+type StageTransitionParse = { ok: true; fromStageId: string; toStageId: string; requireFeasibilityOk: boolean; minProbability: number | null; guardNote: string | null } | { ok: false; error: string };
+// Мультиворонки: тело правила перехода. Зеркало parseStageTransitionBody (crmParsers): порядок и коды.
+function parseStageTransitionBody(body: Record<string, unknown>): StageTransitionParse {
+  const fromStageId = str(body.fromStageId);
+  const toStageId = str(body.toStageId);
+  const requireFeasibilityOk = optBool(body.requireFeasibilityOk);
+  const guardNote = body.guardNote == null ? null : str(body.guardNote) || null;
+  if (!ID_RE.test(fromStageId)) return { ok: false, error: "invalid_deal_stage_id" };
+  if (!ID_RE.test(toStageId)) return { ok: false, error: "invalid_deal_stage_id" };
+  if (fromStageId === toStageId) return { ok: false, error: "invalid_transition_stages" };
+  if (requireFeasibilityOk === null) return { ok: false, error: "invalid_body" };
+  // minProbability: опционально; если задано — целое 0..100.
+  let minProbability: number | null = null;
+  if (body.minProbability !== undefined && body.minProbability !== null) {
+    const mp = body.minProbability;
+    if (typeof mp !== "number" || !Number.isInteger(mp) || mp < 0 || mp > 100) return { ok: false, error: "invalid_min_probability" };
+    minProbability = mp;
+  }
+  if (guardNote !== null && !safeMultiline(guardNote)) return { ok: false, error: "invalid_description" };
+  return { ok: true, fromStageId, toStageId, requireFeasibilityOk, minProbability, guardNote };
+}
 
 export function createMockCrmFetch(): typeof fetch {
   const db = seed();
@@ -266,7 +353,7 @@ export function createMockCrmFetch(): typeof fetch {
       if (ownerProvided && !CRM_USERS.some((u) => u.id === ownerUserId)) return err("owner_user_not_found", 404);
       const o: Opportunity = {
         id: genId("opp"), tenantId: TENANT,
-        clientId, primaryContactId: contactId, ownerUserId, projectTypeId, stageId,
+        clientId, primaryContactId: contactId, ownerUserId, projectTypeId, stageId, pipelineId: stage.pipelineId, // мультиворонки: воронка из целевой стадии
         clientName: client.name, contactName: contact.name, title, projectType: ptype.name, description: body.description == null ? null : str(body.description) || null,
         plannedStart: start, plannedFinish: finish,
         contractValue, plannedHourlyRate: rate, plannedHours: Math.floor(contractValue / rate), probability,
@@ -288,10 +375,26 @@ export function createMockCrmFetch(): typeof fetch {
       if (!ID_RE.test(stageId)) return err("invalid_deal_stage_id", 400); // формат до резолва (как parseDealStageChangeBody)
       const o = db.opportunities.find((x) => x.id === decodeURIComponent(oppStage[1]!));
       if (!o) return err("opportunity_not_found", 404);
-      if (isFinal(o)) return err("opportunity_stage_locked", 409);
+      if (isFinal(o)) return err("opportunity_stage_locked", 409); // финал лочится ДО доменной проверки (как сейчас)
       const stage = db.dealStages.find((x) => x.id === stageId);
       if (!stage || stage.status !== "active") return err("deal_stage_not_found", 404);
-      o.stageId = stageId; o.updatedAt = nowIso();
+      // Мультиворонки: проверка правил перехода ВНУТРИ воронки сделки. Исходную воронку берём
+      // из ТЕКУЩЕЙ стадии сделки; её stage_transitions передаём в домен evaluateStageTransition.
+      // Back-compat: нет стадии/воронки/правил → разрешено (домен возвращает allowed).
+      const currentStage = o.stageId ? db.dealStages.find((x) => x.id === o.stageId) : undefined;
+      const sourcePipelineId = currentStage?.pipelineId ?? null;
+      const transitions = sourcePipelineId ? db.stageTransitions.filter((tr) => tr.pipelineId === sourcePipelineId) : [];
+      const decision = evaluateStageTransition({
+        opportunity: { finalized: false, stageId: o.stageId, pipelineId: sourcePipelineId, probability: o.probability, feasibilityStatus: o.feasibilityStatus },
+        targetStage: { id: stage.id, pipelineId: stage.pipelineId },
+        transitions: transitions.map((tr) => ({ fromStageId: tr.fromStageId, toStageId: tr.toStageId, requireFeasibilityOk: tr.requireFeasibilityOk, minProbability: tr.minProbability }))
+      });
+      if (!decision.allowed) {
+        // Условия перехода (вероятность/реализуемость) → 422; запрет/кросс-воронка/финал → 409.
+        const status = decision.reason === "condition_probability" || decision.reason === "condition_feasibility" ? 422 : 409;
+        return err(decision.reason, status);
+      }
+      o.stageId = stageId; o.pipelineId = stage.pipelineId; o.updatedAt = nowIso(); // синхронизируем воронку с целевой стадией
       return json({ opportunity: o });
     }
     const oppFinalize = method === "PATCH" ? path.match(/^\/api\/workspace\/opportunities\/([^/]+)\/finalize$/) : null;
@@ -304,6 +407,95 @@ export function createMockCrmFetch(): typeof fetch {
       o.status = body.status; o.updatedAt = nowIso();
       return json({ opportunity: o });
     }
+    /* ---- мультиворонки: pipelines ---- */
+    if (path === "/api/workspace/pipelines" && method === "GET") return json({ pipelines: [...db.pipelines].sort((a, b) => a.sortOrder - b.sortOrder) });
+    if (path === "/api/workspace/pipelines" && method === "POST") {
+      const parsed = parsePipelineBody(body);
+      if (!parsed.ok) return err(parsed.error, 400);
+      const p: Pipeline = { id: genId("pipeline"), tenantId: TENANT, name: parsed.name, description: parsed.description, isDefault: parsed.isDefault, sortOrder: parsed.sortOrder, status: parsed.status, createdAt: nowIso(), updatedAt: nowIso() };
+      db.pipelines.push(p);
+      return json({ pipeline: p }, 201);
+    }
+    const pipelinePatch = method === "PATCH" ? path.match(/^\/api\/workspace\/pipelines\/([^/]+)$/) : null;
+    if (pipelinePatch) {
+      const pipelineId = decodeURIComponent(pipelinePatch[1]!);
+      if (!ID_RE.test(pipelineId)) return err("invalid_pipeline_id", 400); // формат параметра до резолва
+      const p = db.pipelines.find((x) => x.id === pipelineId);
+      if (!p) return err("pipeline_not_found", 404);
+      const parsed = parsePipelineBody(body); // full-replace (name/sortOrder обязательны)
+      if (!parsed.ok) return err(parsed.error, 400);
+      p.name = parsed.name; p.description = parsed.description; p.isDefault = parsed.isDefault; p.sortOrder = parsed.sortOrder; p.status = parsed.status; p.updatedAt = nowIso();
+      return json({ pipeline: p });
+    }
+
+    /* ---- мультиворонки: stage-transitions ---- */
+    const stTrList = method === "GET" ? path.match(/^\/api\/workspace\/pipelines\/([^/]+)\/stage-transitions$/) : null;
+    if (stTrList) {
+      const pipelineId = decodeURIComponent(stTrList[1]!);
+      if (!ID_RE.test(pipelineId)) return err("invalid_pipeline_id", 400);
+      if (!db.pipelines.some((x) => x.id === pipelineId)) return err("pipeline_not_found", 404);
+      return json({ stageTransitions: db.stageTransitions.filter((tr) => tr.pipelineId === pipelineId) });
+    }
+    const stTrCreate = method === "POST" ? path.match(/^\/api\/workspace\/pipelines\/([^/]+)\/stage-transitions$/) : null;
+    if (stTrCreate) {
+      const pipelineId = decodeURIComponent(stTrCreate[1]!);
+      if (!ID_RE.test(pipelineId)) return err("invalid_pipeline_id", 400); // параметр
+      if (!db.pipelines.some((x) => x.id === pipelineId)) return err("pipeline_not_found", 404);
+      const parsed = parseStageTransitionBody(body);
+      if (!parsed.ok) return err(parsed.error, 400);
+      // Обе стадии должны существовать и принадлежать этой воронке.
+      const fromStage = db.dealStages.find((x) => x.id === parsed.fromStageId);
+      if (!fromStage) return err("deal_stage_not_found", 404);
+      if (fromStage.pipelineId !== pipelineId) return err("stage_not_in_pipeline", 400);
+      const toStage = db.dealStages.find((x) => x.id === parsed.toStageId);
+      if (!toStage) return err("deal_stage_not_found", 404);
+      if (toStage.pipelineId !== pipelineId) return err("stage_not_in_pipeline", 400);
+      // Дубль пары (from,to) в воронке → 409.
+      if (db.stageTransitions.some((tr) => tr.pipelineId === pipelineId && tr.fromStageId === parsed.fromStageId && tr.toStageId === parsed.toStageId)) {
+        return err("stage_transition_conflict", 409);
+      }
+      const tr: StageTransition = { id: genId("stage-transition"), tenantId: TENANT, pipelineId, fromStageId: parsed.fromStageId, toStageId: parsed.toStageId, requireFeasibilityOk: parsed.requireFeasibilityOk, minProbability: parsed.minProbability, guardNote: parsed.guardNote, createdAt: nowIso(), updatedAt: nowIso() };
+      db.stageTransitions.push(tr);
+      return json({ stageTransition: tr }, 201);
+    }
+    const stTrDelete = method === "DELETE" ? path.match(/^\/api\/workspace\/pipelines\/([^/]+)\/stage-transitions\/([^/]+)$/) : null;
+    if (stTrDelete) {
+      const pipelineId = decodeURIComponent(stTrDelete[1]!);
+      const transitionId = decodeURIComponent(stTrDelete[2]!);
+      if (!ID_RE.test(pipelineId)) return err("invalid_pipeline_id", 400);
+      if (!ID_RE.test(transitionId)) return err("invalid_transition_id", 400);
+      // Правило должно существовать И принадлежать указанной воронке.
+      const idx = db.stageTransitions.findIndex((tr) => tr.id === transitionId && tr.pipelineId === pipelineId);
+      if (idx < 0) return err("stage_transition_not_found", 404);
+      db.stageTransitions.splice(idx, 1);
+      return json({ ok: true });
+    }
+
+    /* ---- мультиворонки: кросс-пайплайн перенос сделки ---- */
+    const oppPipeline = method === "PATCH" ? path.match(/^\/api\/workspace\/opportunities\/([^/]+)\/pipeline$/) : null;
+    if (oppPipeline) {
+      const opportunityId = decodeURIComponent(oppPipeline[1]!);
+      if (!ID_RE.test(opportunityId)) return err("invalid_opportunity_id", 400); // параметр
+      // Тело: pipelineId + stageId (формат-валидация до резолва).
+      const pipelineId = str(body.pipelineId), stageId = str(body.stageId);
+      if (!ID_RE.test(pipelineId)) return err("invalid_pipeline_id", 400);
+      if (!ID_RE.test(stageId)) return err("invalid_deal_stage_id", 400);
+      const o = db.opportunities.find((x) => x.id === opportunityId);
+      if (!o) return err("opportunity_not_found", 404);
+      const pipeline = db.pipelines.find((x) => x.id === pipelineId);
+      if (!pipeline) return err("pipeline_not_found", 404);
+      const stage = db.dealStages.find((x) => x.id === stageId);
+      if (!stage) return err("deal_stage_not_found", 404);
+      const decision = evaluatePipelineChange({
+        opportunity: { finalized: isFinal(o) },
+        targetPipeline: { id: pipeline.id, status: pipeline.status },
+        targetStage: { pipelineId: stage.pipelineId, status: stage.status }
+      });
+      if (!decision.allowed) return err(decision.reason, 409);
+      o.stageId = stage.id; o.pipelineId = pipeline.id; o.updatedAt = nowIso();
+      return json({ opportunity: o });
+    }
+
     // PATCH /opportunities/:id (полное обновление) намеренно НЕ реализован здесь: боевой контракт —
     // full-replace через parseOpportunityUpdateBody (резолв связей + ре-денормализация имён + пересчёт
     // plannedHours от value И rate). Реализуем вместе с поверхностью «Карточка сделки», чтобы не
