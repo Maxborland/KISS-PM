@@ -1,18 +1,39 @@
 "use client";
 
-import { MicOff } from "lucide-react";
+import { MicOff, MonitorUp } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { cn } from "@/lib/cn";
-import type { ParticipantTileView } from "@/lib/call/types";
+import type { ParticipantTileView, QualityLevel } from "@/lib/call/types";
 
-// Pure presentational tile: renders a live <video> when the engine supplies an
-// attach callback and the camera is on, otherwise the avatar fallback. Imports no
-// media SDK — the SDK lives only under lib/call/*.
+const QUALITY_LABEL: Record<QualityLevel, string> = {
+  excellent: "Отличная связь",
+  good: "Хорошая связь",
+  poor: "Слабая связь",
+  lost: "Связь потеряна",
+  unknown: "Связь неизвестна"
+};
+
+function QualityBars({ quality }: { quality: QualityLevel }) {
+  return (
+    <span
+      className={cn("call-quality", `call-quality--${quality}`)}
+      role="img"
+      aria-label={QUALITY_LABEL[quality]}
+    >
+      <span className="call-quality__bar" />
+      <span className="call-quality__bar" />
+      <span className="call-quality__bar" />
+    </span>
+  );
+}
+
+// Pure presentational tile. Renders a live <video> when the engine supplies an
+// attach callback (camera or shared screen), otherwise the avatar fallback.
 export function ParticipantTile({ view }: { view: ParticipantTileView }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const showVideo = view.camera === "on" && Boolean(view.attachVideo);
+  const showVideo = Boolean(view.attachVideo);
   const attachVideo = view.attachVideo;
 
   useEffect(() => {
@@ -27,7 +48,10 @@ export function ParticipantTile({ view }: { view: ParticipantTileView }) {
       {showVideo ? (
         <video
           ref={videoRef}
-          className={cn("call-tile__video", view.self && "call-tile__video--self")}
+          className={cn(
+            "call-tile__video",
+            view.self && !view.sharingScreen && "call-tile__video--self"
+          )}
           autoPlay
           playsInline
           muted={view.self}
@@ -44,6 +68,12 @@ export function ParticipantTile({ view }: { view: ParticipantTileView }) {
           </span>
         ) : null}
         <span className="call-tile__name">{view.name}</span>
+        {view.sharingScreen ? (
+          <span className="call-tile__share" aria-label="Демонстрирует экран">
+            <MonitorUp aria-hidden size={13} />
+          </span>
+        ) : null}
+        {view.quality ? <QualityBars quality={view.quality} /> : null}
       </div>
     </div>
   );

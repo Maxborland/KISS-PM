@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ConnectionQuality,
   ConnectionState,
   Room,
   RoomEvent,
@@ -15,7 +16,8 @@ import type {
   CallLocalControls,
   CallPhase,
   CallStageView,
-  ParticipantTileView
+  ParticipantTileView,
+  QualityLevel
 } from "@/lib/call/types";
 
 // The ONLY module that imports `livekit-client`. It maps the imperative Room state
@@ -53,13 +55,34 @@ function phaseFromConnectionState(state: ConnectionState): CallPhase {
   }
 }
 
+function qualityFrom(quality: ConnectionQuality): QualityLevel {
+  switch (quality) {
+    case ConnectionQuality.Excellent:
+      return "excellent";
+    case ConnectionQuality.Good:
+      return "good";
+    case ConnectionQuality.Poor:
+      return "poor";
+    case ConnectionQuality.Lost:
+      return "lost";
+    default:
+      return "unknown";
+  }
+}
+
 function tileFor(participant: Participant, self: boolean, speakingIds: Set<string>): ParticipantTileView {
   const cameraPublication = participant.getTrackPublication(Track.Source.Camera);
   const microphonePublication = participant.getTrackPublication(Track.Source.Microphone);
-  const videoTrack = cameraPublication?.videoTrack;
-  const cameraOn = Boolean(cameraPublication) && !cameraPublication?.isMuted && Boolean(videoTrack);
+  const screenPublication = participant.getTrackPublication(Track.Source.ScreenShare);
+  const cameraTrack = cameraPublication?.videoTrack;
+  const screenTrack = screenPublication?.videoTrack;
+  const cameraOn = Boolean(cameraPublication) && !cameraPublication?.isMuted && Boolean(cameraTrack);
   const microphoneOn = Boolean(microphonePublication) && !microphonePublication?.isMuted;
+  const sharingScreen = Boolean(screenPublication) && !screenPublication?.isMuted && Boolean(screenTrack);
   const name = participant.name || participant.identity;
+
+  // Prefer the shared screen, then the camera, for the visible track.
+  const displayTrack = sharingScreen ? screenTrack : cameraOn ? cameraTrack : undefined;
 
   const tile: ParticipantTileView = {
     id: participant.identity,
@@ -69,13 +92,15 @@ function tileFor(participant: Participant, self: boolean, speakingIds: Set<strin
     camera: cameraOn ? "on" : "off",
     mic: microphoneOn ? "on" : "off",
     speaking: speakingIds.has(participant.identity),
+    sharingScreen,
+    quality: qualityFrom(participant.connectionQuality),
     self
   };
 
-  if (cameraOn && videoTrack) {
+  if (displayTrack) {
     tile.attachVideo = (element) => {
-      if (element) videoTrack.attach(element);
-      else videoTrack.detach();
+      if (element) displayTrack.attach(element);
+      else displayTrack.detach();
     };
   }
 
@@ -111,7 +136,8 @@ export function useCallEngine(roomId: string): CallEngineState {
     setStage(buildStage(room));
     setControls({
       micOn: room.localParticipant.isMicrophoneEnabled,
-      cameraOn: room.localParticipant.isCameraEnabled
+      cameraOn: room.localParticipant.isCameraEnabled,
+      screenShareOn: room.localParticipant.isScreenShareEnabled
     });
   }, []);
 
@@ -133,6 +159,7 @@ export function useCallEngine(roomId: string): CallEngineState {
       .on(RoomEvent.LocalTrackPublished, onChange)
       .on(RoomEvent.LocalTrackUnpublished, onChange)
       .on(RoomEvent.ActiveSpeakersChanged, onChange)
+      .on(RoomEvent.ConnectionQualityChanged, onChange)
       .on(RoomEvent.ConnectionStateChanged, onChange)
       .on(RoomEvent.Disconnected, onChange);
 
@@ -177,6 +204,13 @@ export function useCallEngine(roomId: string): CallEngineState {
         if (!room) return;
         void room.localParticipant
           .setCameraEnabled(!room.localParticipant.isCameraEnabled)
+          .then(refresh);
+      },
+      onToggleScreenShare: () => {
+        const room = roomRef.current;
+        if (!room) return;
+        void room.localParticipant
+          .setScreenShareEnabled(!room.localParticipant.isScreenShareEnabled)
           .then(refresh);
       },
       onLeave: () => {

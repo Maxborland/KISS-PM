@@ -12,6 +12,8 @@ export type CallPhase =
 
 export type MediaState = "on" | "off";
 
+export type QualityLevel = "excellent" | "good" | "poor" | "lost" | "unknown";
+
 /**
  * Attach/detach callback supplied by the engine for a live video track. The
  * widget only renders a <video> and hands its element here; it never imports the
@@ -27,6 +29,8 @@ export type ParticipantTileView = {
   camera: MediaState;
   mic: MediaState;
   speaking?: boolean;
+  sharingScreen?: boolean;
+  quality?: QualityLevel;
   self?: boolean;
   attachVideo?: VideoAttach;
 };
@@ -39,10 +43,12 @@ export type CallStageView = {
 export type CallLocalControls = {
   micOn: boolean;
   cameraOn: boolean;
+  screenShareOn?: boolean;
 };
 
 export type CallControlHandlers = {
   onToggleMic: () => void;
   onToggleCamera: () => void;
+  onToggleScreenShare: () => void;
   onLeave: () => void;
 };

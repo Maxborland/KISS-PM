@@ -1,6 +1,6 @@
 "use client";
 
-import { Mic, MicOff, PhoneOff, Video, VideoOff } from "lucide-react";
+import { Mic, MicOff, PhoneOff, ScreenShare, ScreenShareOff, Video, VideoOff } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import type {
@@ -31,6 +31,7 @@ export type CallStageProps = {
 // literal mock (Storybook twin) and from live engine state (runtime container).
 export function CallStage({ view, controls, handlers, disabled }: CallStageProps) {
   const count = view.participants.length;
+  const screenShareOn = controls.screenShareOn ?? false;
   return (
     <section className="call-stage" aria-label="Звонок команды">
       <header className="call-stage__head">
@@ -72,6 +73,23 @@ export function CallStage({ view, controls, handlers, disabled }: CallStageProps
         >
           {controls.cameraOn ? <Video aria-hidden size={18} /> : <VideoOff aria-hidden size={18} />}
           <span>Камера</span>
+        </button>
+
+        <button
+          type="button"
+          className={cn("call-controls__btn", screenShareOn && "call-controls__btn--active")}
+          aria-pressed={screenShareOn}
+          aria-label={screenShareOn ? "Остановить демонстрацию экрана" : "Демонстрировать экран"}
+          disabled={disabled}
+          title={disabled ? "Демо Storybook: подключение медиа отключено" : undefined}
+          onClick={handlers?.onToggleScreenShare}
+        >
+          {screenShareOn ? (
+            <ScreenShareOff aria-hidden size={18} />
+          ) : (
+            <ScreenShare aria-hidden size={18} />
+          )}
+          <span>Экран</span>
         </button>
 
         <button

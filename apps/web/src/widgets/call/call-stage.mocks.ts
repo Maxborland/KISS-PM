@@ -4,8 +4,8 @@ import type { CallStageView } from "@/lib/call/types";
 export const CALL_STAGE_MOCK: CallStageView = {
   phase: "connected",
   participants: [
-    { id: "u-anna", name: "Анна Кузнецова", initials: "АК", color: "c1", camera: "off", mic: "on", speaking: true },
-    { id: "u-boris", name: "Борис Орлов", initials: "БО", color: "c3", camera: "off", mic: "off" },
-    { id: "u-self", name: "Вы", initials: "Я", color: "c5", camera: "off", mic: "on", self: true }
+    { id: "u-anna", name: "Анна Кузнецова", initials: "АК", color: "c1", camera: "off", mic: "on", speaking: true, quality: "excellent" },
+    { id: "u-boris", name: "Борис Орлов", initials: "БО", color: "c3", camera: "off", mic: "off", sharingScreen: true, quality: "good" },
+    { id: "u-self", name: "Вы", initials: "Я", color: "c5", camera: "off", mic: "on", self: true, quality: "poor" }
   ]
 };
