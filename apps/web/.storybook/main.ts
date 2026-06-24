@@ -14,6 +14,8 @@ const config: StorybookConfig = {
     "../src/crm/**/*.stories.@(ts|tsx)",
     "../src/communications/**/*.stories.@(ts|tsx)",
     "../src/auth/**/*.stories.@(ts|tsx)",
+    "../src/workspace/**/*.stories.@(ts|tsx)",
+    "../src/admin/**/*.stories.@(ts|tsx)",
     "../src/stories/foundations/**/*.stories.@(ts|tsx)",
     "../src/stories/catalog/**/*.stories.@(ts|tsx)"
   ],
