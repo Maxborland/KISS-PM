@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, Check, ChevronDown, LogOut, Moon, Settings, ShieldCheck, Sun, User } from "lucide-react";
+import { Bell, Check, ChevronDown, LogOut, Moon, Settings, ShieldCheck, Sun, TriangleAlert, User } from "lucide-react";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
@@ -56,7 +56,8 @@ export function AvatarMenuSurface() {
   const [bootstrapping, setBootstrapping] = useState(true);
   const [loggedOut, setLoggedOut] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  // notice несёт исход (ok), чтобы провал НЕ рисовался как успех (зелёная галочка).
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     if (autoLoginRef.current) return;
@@ -77,7 +78,11 @@ export function AvatarMenuSurface() {
     setNotice(null);
     const res = await updateTheme({ theme: next });
     setBusy(false);
-    setNotice(res.ok ? `Тема сохранена: ${THEME_LABEL[next]}` : `Не удалось: ${authErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    setNotice(
+      res.ok
+        ? { ok: true, text: `Тема сохранена: ${THEME_LABEL[next]}` }
+        : { ok: false, text: `Не удалось: ${authErr(res.code, res.message)}` }
+    );
   }
 
   async function handleLogout() {
@@ -206,9 +211,16 @@ export function AvatarMenuSurface() {
                   </DropdownMenuContent>
                 </DropdownMenu>
                 {notice ? (
-                  <div className="mt-3 inline-flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-                    <Check className="size-3.5 text-[var(--success-text)]" aria-hidden />
-                    {notice}
+                  <div
+                    {...(notice.ok ? {} : { role: "alert" })}
+                    className={`mt-3 inline-flex items-center gap-1.5 text-[length:var(--text-xs)] ${notice.ok ? "text-[var(--muted-strong)]" : "text-[var(--danger-text)]"}`}
+                  >
+                    {notice.ok ? (
+                      <Check className="size-3.5 text-[var(--success-text)]" aria-hidden />
+                    ) : (
+                      <TriangleAlert className="size-3.5 text-[var(--danger-text)]" aria-hidden />
+                    )}
+                    {notice.text}
                   </div>
                 ) : null}
               </section>

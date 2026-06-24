@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CreditCard, Plug } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -70,26 +70,32 @@ export function SettingsSurface() {
 
 /* Вкладка «Профиль» — единый useAuth + авто-вход демо-кредами (мок стартует anonymous). */
 function ProfileTab() {
-  const { state, status, error, user, permissions, login, reload, updateProfile, updateTheme } = useAuth();
+  const { state, status, error, user, permissions, login, updateProfile, updateTheme } = useAuth();
 
   const autoLoginRef = useRef(false);
   const [bootstrapping, setBootstrapping] = useState(true);
+  // Исход авто-входа: при провале показываем error (а не forbidden), как в остальных surface.
+  const [loginErr, setLoginErr] = useState<string | null>(null);
+
+  const bootstrap = useCallback(async () => {
+    setBootstrapping(true);
+    setLoginErr(null);
+    const r = await login(DEMO_EMAIL, DEMO_PASSWORD);
+    if (!r.ok) setLoginErr(r.code ?? r.message);
+    setBootstrapping(false);
+  }, [login]);
 
   useEffect(() => {
     if (autoLoginRef.current) return;
     autoLoginRef.current = true;
-    void (async () => {
-      await login(DEMO_EMAIL, DEMO_PASSWORD);
-      setBootstrapping(false);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void bootstrap();
+  }, [bootstrap]);
 
   const profileUser: WorkspaceUser | null = user && "email" in user ? (user as WorkspaceUser) : null;
   const surfaceStatus =
     bootstrapping || status === "loading"
       ? "loading"
-      : status === "error"
+      : status === "error" || loginErr
         ? "error"
         : state === "authenticated" && profileUser
           ? "ready"
@@ -98,8 +104,8 @@ function ProfileTab() {
   return (
     <SurfaceState
       status={surfaceStatus}
-      error={error}
-      onRetry={() => void reload()}
+      error={error ?? loginErr}
+      onRetry={() => void bootstrap()}
       loadingLabel="Демо: выполняем вход…"
       errorFormat={authErr}
       forbidden={{ title: "Требуется вход в систему", description: "Сессия не найдена — войдите, чтобы открыть профиль." }}

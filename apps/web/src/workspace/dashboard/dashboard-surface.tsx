@@ -27,6 +27,14 @@ import type { Opportunity } from "@/crm/lib/crm-client";
    Переключение на боевой = apiOrigin; данные in-memory.
    ============================================================ */
 
+// RU-маппинг кодов загрузки (как myWorkErr/crmErr в соседних surface).
+const ERR_RU: Record<string, string> = {
+  load_failed: "Не удалось загрузить данные",
+  request_failed: "Ошибка запроса к серверу",
+  not_found: "Данные не найдены"
+};
+const dashboardErr = (code?: string) => (code && ERR_RU[code]) || code || "Не удалось собрать сводку";
+
 const money = (v: number) =>
   v >= 1_000_000
     ? `${(v / 1_000_000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} млн ₽`
@@ -68,8 +76,10 @@ export function DashboardSurface() {
   const crm = useCrm();
 
   const errored = myWork.status === "error" || projects.status === "error" || crm.status === "error";
+  // CRM может вернуть forbidden (403) на боевом API — иначе дашборд завис бы в loading навсегда.
+  const forbidden = crm.status === "forbidden";
   const ready = Boolean(myWork.data && projects.data && crm.data);
-  const surfaceStatus = errored ? "error" : ready ? "ready" : "loading";
+  const surfaceStatus = errored ? "error" : forbidden ? "forbidden" : ready ? "ready" : "loading";
   const errorCode = myWork.error ?? projects.error ?? crm.error ?? null;
 
   return (
@@ -91,6 +101,8 @@ export function DashboardSurface() {
           }}
           loadingLabel="Собираем сводку…"
           errorTitle="Не удалось собрать сводку"
+          errorFormat={dashboardErr}
+          forbidden={{ title: "Доступ к CRM ограничен", description: "У вас нет прав на просмотр сделок — сводка недоступна." }}
         >
           {myWork.data && projects.data && crm.data ? (
             <DashboardContent tasks={myWork.data.tasks} projectsCount={projects.data.projects.length} projectsHours={projects.data.projects.reduce((s, p) => s + p.plannedHours, 0)} opportunities={crm.data.opportunities} />

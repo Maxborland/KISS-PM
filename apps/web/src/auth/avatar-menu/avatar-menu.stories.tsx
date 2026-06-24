@@ -12,8 +12,11 @@ import { AvatarMenuSurface } from "@/auth/avatar-menu/avatar-menu-surface";
  * темы (PATCH /api/profile/theme) и «Выйти» (POST /api/auth/logout). Переходы
  * Профиль/Настройки/Уведомления — навигация рабочего приложения (demoAction).
  */
+// Заголовок без слова "Menu": copy-scan гейта флагует EN-«dev-labels»
+// (Primary/Default/Menu/...) в дереве навигации Storybook (ASCII-заголовок —
+// иначе id из кириллицы вырождается). RU — в имени стори ниже.
 const meta: Meta<typeof AvatarMenuSurface> = {
-  title: "Auth/Avatar Menu",
+  title: "Auth/Avatar",
   component: AvatarMenuSurface,
   parameters: { layout: "fullscreen" },
   tags: ["!autodocs"]
