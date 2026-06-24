@@ -1,10 +1,6 @@
 @layer reset, tokens, base, components, utilities;
 
 @import "tailwindcss";
-/* Активируем enter/exit-утилиты (animate-in/out, fade/zoom/slide) для Radix-оверлеев.
-   Они уже размечены в components/ui/* (dialog/popover/dropdown/select/tooltip), но без
-   подключения плагина к Tailwind v4 не генерировали CSS — оверлеи появлялись резко. */
-@plugin "tailwindcss-animate";
 @import "../styles/tokens.css" layer(tokens);
 @import "../styles/tokens.planning.css" layer(tokens);
 @import "react-day-picker/dist/style.css" layer(components);
@@ -13,6 +9,13 @@
 @import "../styles/kiss-v4.css" layer(components);
 @import "../styles/widgets/resource-matrix.css" layer(components);
 @import "../styles/widgets/gantt.css" layer(components);
+
+/* Активируем enter/exit-утилиты (animate-in/out, fade/zoom/slide) для Radix-оверлеев.
+   Размечены в components/ui/* (dialog/popover/dropdown/select/tooltip), но без подключения
+   плагина к Tailwind v4 не генерировали CSS. ВАЖНО: @plugin ПОСЛЕ всех @import — иначе
+   @import-ы оказываются после не-@import-правила и игнорируются (ломается загрузка
+   tokens/bem/kiss-v4 → весь preview без стилей). */
+@plugin "tailwindcss-animate";
 
 @theme inline {
   --color-background: var(--canvas);
@@ -75,15 +78,11 @@
 
 /* ============================================================
    Motion-примитивы появления контента (design-v3).
-   Определены ЗДЕСЬ, в globals.css, а НЕ в @import-компонентном CSS
-   (bem-supplement): Storybook-preview подхватывает только то, что
-   Tailwind обрабатывает в этом entry-файле; @import «../styles/*.css»
-   там не резолвятся, поэтому классы из bem-supplement в Storybook не
-   применяются. Свои keyframes (не зависим от ds-fade-in из bem-supplement).
-   Применяются к ready-контенту (SurfaceState), инлайн-нотисам/алертам,
-   свопам вкладок. reduced-motion-гард ниже. Оверлеи (dialog/popover/
-   dropdown/select/tooltip) анимируются отдельно — через tailwindcss-animate
-   (@plugin выше), их разметка уже в components/ui/*.
+   Держим в globals.css (рядом с @theme), со своими keyframes — единое место
+   для motion, грузится и в Next, и в Storybook. Применяются к ready-контенту
+   (SurfaceState), инлайн-нотисам/алертам, свопам вкладок. reduced-motion-гард
+   ниже. Оверлеи (dialog/popover/dropdown/select/tooltip) анимируются отдельно —
+   через tailwindcss-animate (@plugin выше), их разметка уже в components/ui/*.
    ============================================================ */
 @keyframes ds-anim-fade {
   from { opacity: 0; }
