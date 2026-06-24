@@ -1,3 +1,4 @@
+import { evaluateStageTransition } from "@kiss-pm/domain";
 import type { TenantUser } from "@kiss-pm/domain";
 import { authorizeOpportunityStageChange } from "./authorization";
 import { isFinalOpportunityStatus } from "./opportunityStatus";
@@ -34,6 +35,44 @@ export async function changeOpportunityStage(
     return { ok: false, status: 404, error: "deal_stage_not_found" };
   }
 
+  // Мультиворонки: проверка правил перехода ВНУТРИ воронки сделки.
+  // Исходную воронку берём из текущей стадии сделки; если её нет (сделка без
+  // стадии, метод/правила не настроены) — переход разрешён (back-compat).
+  const currentStage = opportunity.stageId
+    ? await deps.dataSource.findDealStageById!(input.actor.tenantId, opportunity.stageId)
+    : undefined;
+  const sourcePipelineId = currentStage?.pipelineId ?? null;
+  const transitions =
+    sourcePipelineId && deps.dataSource.listStageTransitions
+      ? await deps.dataSource.listStageTransitions(input.actor.tenantId, sourcePipelineId)
+      : [];
+  const decision = evaluateStageTransition({
+    opportunity: {
+      finalized: false,
+      stageId: opportunity.stageId ?? null,
+      pipelineId: sourcePipelineId,
+      probability: opportunity.probability,
+      feasibilityStatus: opportunity.feasibilityStatus ?? null
+    },
+    targetStage: { id: stage.id, pipelineId: stage.pipelineId ?? null },
+    transitions: transitions.map((transition) => ({
+      fromStageId: transition.fromStageId,
+      toStageId: transition.toStageId,
+      requireFeasibilityOk: transition.requireFeasibilityOk,
+      minProbability: transition.minProbability
+    }))
+  });
+  if (!decision.allowed) {
+    // Условия перехода (вероятность/реализуемость) → 422; остальное (запрет
+    // перехода, кросс-воронка, финал) → 409.
+    const status =
+      decision.reason === "condition_probability" ||
+      decision.reason === "condition_feasibility"
+        ? 422
+        : 409;
+    return { ok: false, status, error: decision.reason };
+  }
+
   const opportunityAfterChange = await deps.runDataSourceTransaction(
     async (transactionDataSource) => {
       if (!transactionDataSource.updateOpportunityStage) {
@@ -43,7 +82,9 @@ export async function changeOpportunityStage(
       const updated = await transactionDataSource.updateOpportunityStage({
         tenantId: input.actor.tenantId,
         opportunityId: opportunity.id,
-        stageId: stage.id
+        stageId: stage.id,
+        // Мультиворонки: синхронизируем воронку сделки с воронкой целевой стадии.
+        pipelineId: stage.pipelineId ?? null
       });
       if (!updated) {
         return undefined;

@@ -257,6 +257,118 @@ export const crmProjectSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  Pipeline: {
+    type: "object",
+    required: [
+      "id",
+      "tenantId",
+      "name",
+      "description",
+      "isDefault",
+      "sortOrder",
+      "status",
+      "createdAt",
+      "updatedAt"
+    ],
+    properties: {
+      id: stringIdSchema,
+      tenantId: stringIdSchema,
+      name: { type: "string", minLength: 1, maxLength: 160 },
+      description: nullableStringSchema,
+      isDefault: { type: "boolean" },
+      sortOrder: { type: "integer", minimum: 1, maximum: 2147483647 },
+      status: crmStatusSchema,
+      createdAt: dateTimeSchema,
+      updatedAt: dateTimeSchema
+    },
+    additionalProperties: false
+  },
+  PipelineWriteRequest: {
+    type: "object",
+    required: ["name", "sortOrder"],
+    properties: {
+      id: stringIdSchema,
+      name: { type: "string", minLength: 1, maxLength: 160 },
+      description: nullableStringSchema,
+      isDefault: { type: "boolean", default: false },
+      sortOrder: { type: "integer", minimum: 1, maximum: 2147483647 },
+      status: crmStatusSchema
+    },
+    additionalProperties: false
+  },
+  PipelinesResponse: {
+    type: "object",
+    required: ["pipelines"],
+    properties: {
+      pipelines: { type: "array", items: schemaRef("Pipeline") }
+    },
+    additionalProperties: false
+  },
+  PipelineResponse: {
+    type: "object",
+    required: ["pipeline"],
+    properties: {
+      pipeline: schemaRef("Pipeline")
+    },
+    additionalProperties: false
+  },
+  StageTransition: {
+    type: "object",
+    required: [
+      "id",
+      "tenantId",
+      "pipelineId",
+      "fromStageId",
+      "toStageId",
+      "requireFeasibilityOk",
+      "minProbability",
+      "guardNote",
+      "createdAt",
+      "updatedAt"
+    ],
+    properties: {
+      id: stringIdSchema,
+      tenantId: stringIdSchema,
+      pipelineId: stringIdSchema,
+      fromStageId: stringIdSchema,
+      toStageId: stringIdSchema,
+      requireFeasibilityOk: { type: "boolean" },
+      minProbability: { type: ["integer", "null"], minimum: 0, maximum: 100 },
+      guardNote: nullableStringSchema,
+      createdAt: dateTimeSchema,
+      updatedAt: dateTimeSchema
+    },
+    additionalProperties: false
+  },
+  StageTransitionWriteRequest: {
+    type: "object",
+    required: ["fromStageId", "toStageId"],
+    properties: {
+      id: stringIdSchema,
+      fromStageId: stringIdSchema,
+      toStageId: stringIdSchema,
+      requireFeasibilityOk: { type: "boolean", default: false },
+      minProbability: { type: ["integer", "null"], minimum: 0, maximum: 100 },
+      guardNote: nullableStringSchema
+    },
+    additionalProperties: false
+  },
+  StageTransitionsResponse: {
+    type: "object",
+    required: ["stageTransitions"],
+    properties: {
+      stageTransitions: { type: "array", items: schemaRef("StageTransition") }
+    },
+    additionalProperties: false
+  },
+  StageTransitionResponse: {
+    type: "object",
+    required: ["stageTransition"],
+    properties: {
+      stageTransition: schemaRef("StageTransition")
+    },
+    additionalProperties: false
+  },
   PositionDemand: {
     type: "object",
     required: ["positionId", "requiredHours"],
@@ -326,6 +438,12 @@ export const crmProjectSchemas = openApiSchemaFragment({
     type: "object",
     required: ["stageId"],
     properties: { stageId: stringIdSchema },
+    additionalProperties: false
+  },
+  OpportunityPipelinePatchRequest: {
+    type: "object",
+    required: ["pipelineId", "stageId"],
+    properties: { pipelineId: stringIdSchema, stageId: stringIdSchema },
     additionalProperties: false
   },
   OpportunityFinalizeRequest: {

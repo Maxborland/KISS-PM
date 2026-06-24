@@ -37,6 +37,9 @@ export type OpportunityRecord = {
   ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
+  // Мультиворонки: воронка сделки. Управляется сервером (смена стадии/воронки),
+  // не задаётся напрямую в create-flow.
+  pipelineId: string | null;
   clientName: string;
   contactName: string;
   title: string;
@@ -67,6 +70,7 @@ export type OpportunityInput = Omit<
   | "feasibilityResult"
   | "feasibilityCheckedAt"
   | "ownerUserId"
+  | "pipelineId"
   | "customFieldValues"
 > & {
   ownerUserId?: string | null;
@@ -134,6 +138,15 @@ export type ProjectIntakeRepository = {
     tenantId: TenantId;
     opportunityId: string;
     stageId: string;
+    // Мультиворонки: воронка целевой стадии (проставляется одновременно со сменой стадии).
+    pipelineId?: string | null;
+  }): Promise<OpportunityRecord | undefined>;
+  // Мультиворонки: перенос сделки в другую воронку на её стадию.
+  updateOpportunityPipeline(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    stageId: string;
+    pipelineId: string;
   }): Promise<OpportunityRecord | undefined>;
   finalizeOpportunity(input: {
     tenantId: TenantId;
@@ -259,6 +272,8 @@ export function createProjectIntakeRepository(
             customFieldValues: input.customFieldValues ?? {},
             createdAt: new Date(),
             updatedAt: new Date()
+            // pipeline_id не задаётся в create-flow: воронка проставляется сервером
+            // при первой смене стадии/переносе между воронками.
           })
           .returning();
 
@@ -373,6 +388,36 @@ export function createProjectIntakeRepository(
         .update(opportunities)
         .set({
           stageId: input.stageId,
+          // Мультиворонки: при наличии pipelineId синхронизируем воронку сделки
+          // с воронкой целевой стадии. undefined → колонку не трогаем (back-compat).
+          ...(input.pipelineId !== undefined
+            ? { pipelineId: input.pipelineId }
+            : {}),
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(opportunities.tenantId, input.tenantId),
+            eq(opportunities.id, input.opportunityId),
+            notInArray(opportunities.status, finalOpportunityStatuses)
+          )
+        )
+        .returning();
+
+      if (!row) return undefined;
+      const demandByOpportunity = await listOpportunityDemand(input.tenantId, [
+        input.opportunityId
+      ]);
+
+      return mapOpportunityRecord(row, demandByOpportunity.get(row.id) ?? []);
+    },
+    async updateOpportunityPipeline(input) {
+      // Мультиворонки: транзакционный перенос сделки в другую воронку на её стадию.
+      const [row] = await db
+        .update(opportunities)
+        .set({
+          stageId: input.stageId,
+          pipelineId: input.pipelineId,
           updatedAt: new Date()
         })
         .where(
@@ -650,6 +695,7 @@ function mapOpportunityRecord(
     ownerUserId: row.ownerUserId,
     projectTypeId: row.projectTypeId,
     stageId: row.stageId,
+    pipelineId: row.pipelineId,
     clientName: row.clientName,
     contactName: row.contactName,
     title: row.title,

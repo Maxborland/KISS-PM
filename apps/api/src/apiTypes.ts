@@ -81,6 +81,10 @@ import type {
   ExternalReferenceRecord,
   FileAssetInput,
   FileAssetRecord,
+  PipelineInput,
+  PipelineRecord,
+  StageTransitionInput,
+  StageTransitionRecord,
   PersonalCalendarEventInput,
   ActionExecutionInput,
   ActionExecutionRecord,
@@ -199,6 +203,8 @@ export type ProjectTypeInput = Omit<ProjectTypeRecord, "createdAt" | "updatedAt"
 export type DealStageRecord = {
   id: string;
   tenantId: TenantId;
+  // Мультиворонки: воронка стадии (null — «бесхозная» стадия legacy-периода).
+  pipelineId: string | null;
   name: string;
   sortOrder: number;
   status: CrmEntityStatus;
@@ -258,6 +264,7 @@ export type OpportunityRecord = {
   ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
+  pipelineId: string | null;
   clientName: string;
   contactName: string;
   title: string;
@@ -288,6 +295,7 @@ export type OpportunityInput = Omit<
   | "feasibilityResult"
   | "feasibilityCheckedAt"
   | "ownerUserId"
+  | "pipelineId"
   | "customFieldValues"
 > & {
   ownerUserId?: string | null;
@@ -433,6 +441,23 @@ export type ApiTenantDataSource = {
   ): Promise<DealStageRecord | undefined>;
   createDealStage?(input: DealStageInput): Promise<DealStageRecord>;
   updateDealStage?(input: DealStageInput): Promise<DealStageRecord>;
+  listPipelines?(tenantId: TenantId): Promise<PipelineRecord[]>;
+  findPipelineById?(
+    tenantId: TenantId,
+    pipelineId: string
+  ): Promise<PipelineRecord | undefined>;
+  createPipeline?(input: PipelineInput): Promise<PipelineRecord>;
+  updatePipeline?(input: PipelineInput): Promise<PipelineRecord>;
+  listStageTransitions?(
+    tenantId: TenantId,
+    pipelineId?: string
+  ): Promise<StageTransitionRecord[]>;
+  findStageTransitionById?(
+    tenantId: TenantId,
+    transitionId: string
+  ): Promise<StageTransitionRecord | undefined>;
+  createStageTransition?(input: StageTransitionInput): Promise<StageTransitionRecord>;
+  deleteStageTransition?(tenantId: TenantId, transitionId: string): Promise<void>;
   listCustomFieldDefinitions?(
     tenantId: TenantId
   ): Promise<CustomFieldDefinitionRecord[]>;
@@ -467,6 +492,13 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     opportunityId: string;
     stageId: string;
+    pipelineId?: string | null;
+  }): Promise<OpportunityRecord | undefined>;
+  updateOpportunityPipeline?(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    stageId: string;
+    pipelineId: string;
   }): Promise<OpportunityRecord | undefined>;
   finalizeOpportunity?(input: {
     tenantId: TenantId;
