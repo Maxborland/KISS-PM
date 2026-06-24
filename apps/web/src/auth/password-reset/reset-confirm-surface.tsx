@@ -11,8 +11,8 @@ import { useAuth } from "@/auth/lib/use-auth";
 
 /* ============================================================
    ResetConfirmSurface — экран «Новый пароль» (подтверждение по токену).
-   GREENFIELD: боевого контракта password-reset/confirm нет — мок задаёт
-   предложенный (POST /api/auth/password-reset/confirm).
+   БОЕВОЙ контракт POST /api/auth/password-reset/confirm
+   (apps/api/src/authRegistrationRoutes.ts) — мок зеркалит.
 
    Поля: Токен (64-hex из письма/демо-показа) + Новый пароль (PasswordField).
    Реальный submit идёт в мок через useAuth().confirmPasswordReset
@@ -67,8 +67,8 @@ export function ResetConfirmSurface({ token: initialToken = "" }: ResetConfirmSu
           </a>
         }
       >
-        {/* GREENFIELD-плашка: боевого контракта пока нет (предложенный мок). */}
-        <GreenfieldNote />
+        {/* Плашка-прототип: contract-mock боевого контракта password-reset/confirm. */}
+        <PrototypeNote />
 
         {done ? (
           // Финальный экран: пароль изменён → войти.
@@ -131,17 +131,17 @@ export function ResetConfirmSurface({ token: initialToken = "" }: ResetConfirmSu
   );
 }
 
-// GREENFIELD-плашка: предложенный контракт (боевого API сброса пока нет).
-function GreenfieldNote() {
+// Плашка-прототип: contract-mock боевого контракта подтверждения сброса.
+function PrototypeNote() {
   return (
     <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
         Прототип
       </span>
       <span>
-        <strong className="font-semibold text-[var(--text-strong)]">GREENFIELD:</strong> предложенный контракт (боевого
-        API пока нет). POST /api/auth/password-reset/confirm — токен 64-hex, политика пароля ≥8. Транспорт —
-        contract-mock, переключение на боевой = смена apiOrigin; данные in-memory.
+        Contract-mock боевого POST /api/auth/password-reset/confirm — токен 64-hex, политика пароля ≥8.
+        Письма нет → токен показывается на шаге запроса (демо-замена). Переключение на боевой = смена
+        apiOrigin; данные in-memory.
       </span>
     </div>
   );

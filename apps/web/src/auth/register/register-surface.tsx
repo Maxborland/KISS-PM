@@ -10,17 +10,19 @@ import { AuthShell, AuthCard, FormError, PasswordField } from "@/auth/lib/auth-b
 import { useAuth } from "@/auth/lib/use-auth";
 
 /* ============================================================
-   Поверхность «Регистрация» (Auth/Register) — GREENFIELD-контракт.
+   Поверхность «Регистрация» (Auth/Register) — БОЕВОЙ контракт
+   POST /api/auth/register (самрегистрация нового тенанта).
 
    ЧЕСТНОСТЬ: реальный submit идёт в мок через useAuth().register
    (createAuthClient + in-memory fetchImpl, НЕ demoAction-заглушка).
+   Мок зеркалит боевой контракт (apps/api/src/authRegistrationRoutes.ts):
+   создаётся свежий тенант + роль-владелец + пользователь.
    Переключение на боевой = смена apiOrigin + удаление fetchImpl.
-   Боевого API регистрации ПОКА НЕТ — это предложенный контракт
-   (плашка GREENFIELD ниже). При ok бэк-мок делает авто-логин:
-   useAuth().refresh() → state="authenticated" + user (TenantUser),
-   поэтому показываем «Аккаунт создан, вы вошли как {name}».
+   При ok бэк делает авто-логин: useAuth().refresh() →
+   state="authenticated" + user (TenantUser), поэтому показываем
+   «Аккаунт создан, вы вошли как {name}».
 
-   Ошибки (FormError → authErr): invalid_register_payload /
+   Ошибки (FormError → authErr): invalid_registration_payload /
    weak_password / email_taken (для демо: регистрация admin@kiss-pm.local
    → email_taken, т.к. email уже в credentials мока).
    ============================================================ */
@@ -48,7 +50,7 @@ export function RegisterSurface() {
     // Реальный submit в мок (НЕ заглушка). При ok register сам рефетчит me → authenticated.
     const res = await register({ name: name.trim(), email: email.trim(), password });
     setBusy(false);
-    // authErr понимает invalid_register_payload/weak_password/email_taken; fallback на message.
+    // authErr понимает invalid_registration_payload/weak_password/email_taken; fallback на message.
     if (!res.ok) setErrorCode(res.code ?? res.message);
   };
 
@@ -66,7 +68,7 @@ export function RegisterSurface() {
               Сессия активна — рабочее пространство доступно.
             </p>
           </div>
-          <GreenfieldNote />
+          <PrototypeNote />
         </AuthCard>
       </AuthShell>
     );
@@ -134,22 +136,22 @@ export function RegisterSurface() {
           Создать аккаунт
         </Button>
 
-        <GreenfieldNote />
+        <PrototypeNote />
       </AuthCard>
     </AuthShell>
   );
 }
 
-// Плашка честности: контракт регистрации — предложенный, боевого API пока нет.
-function GreenfieldNote() {
+// Плашка честности: contract-mock боевого контракта регистрации (новый тенант + авто-логин).
+function PrototypeNote() {
   return (
     <div className="mt-1 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
-        GREENFIELD
+        Прототип
       </span>
       <span>
-        Предложенный контракт регистрации — боевого API пока нет. Прототип: contract-mock
-        (POST /api/auth/register, авто-логin), переключение на боевой = apiOrigin; данные in-memory.
+        Contract-mock боевого POST /api/auth/register (новый тенант + авто-логин);
+        переключение на боевой = apiOrigin; данные in-memory.
       </span>
     </div>
   );

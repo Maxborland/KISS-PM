@@ -155,16 +155,19 @@ describe("contract-mock Auth backend", () => {
     await expect(anon.updateTheme({ theme: "dark" })).rejects.toMatchObject({ status: 401, code: "session_required" });
   });
 
-  /* ===== register (GREENFIELD) ===== */
+  /* ===== register (БОЕВОЙ: самрегистрация нового тенанта) ===== */
 
-  it("registers a new user → 201 with auto-login", async () => {
+  it("registers a new user → 201 with a FRESH tenant and auto-login", async () => {
     const c = client();
     const res = await c.register({ email: "new@kiss-pm.local", password: "supersecret", name: "Новый Пользователь" });
-    expect(res.user.tenantId).toBe("tenant-alpha");
-    expect(res.workspace.id).toBe("tenant-alpha");
-    // авто-логин: me доступен сразу после регистрации.
+    // Самрегистрация создаёт СВЕЖИЙ тенант: workspace.id != фикс TENANT и != тенанта сид-админа.
+    expect(res.workspace.id).not.toBe("tenant-alpha");
+    expect(res.user.tenantId).toBe(res.workspace.id); // пользователь принадлежит новому тенанту
+    expect(res.workspace.id).toMatch(/^tenant-/); // формат боевого нового тенанта
+    // авто-логин: me доступен сразу после регистрации, в новом тенанте.
     const me = await c.me();
     expect(me.user.id).toBe(res.user.id);
+    expect(me.workspace.id).toBe(res.workspace.id);
   });
 
   it("rejects register for a taken email → 409 email_taken", async () => {
@@ -177,13 +180,13 @@ describe("contract-mock Auth backend", () => {
     await expect(c.register({ email: "weak@kiss-pm.local", password: "short", name: "Слабый" })).rejects.toMatchObject({ status: 400, code: "weak_password" });
   });
 
-  it("rejects register with an invalid payload → 400 invalid_register_payload", async () => {
+  it("rejects register with an invalid payload → 400 invalid_registration_payload", async () => {
     const c = client();
-    await expect(c.register({ email: "not-an-email", password: "supersecret", name: "Имя" })).rejects.toMatchObject({ status: 400, code: "invalid_register_payload" });
-    await expect(c.register({ email: "ok2@kiss-pm.local", password: "supersecret", name: "" })).rejects.toMatchObject({ status: 400, code: "invalid_register_payload" });
+    await expect(c.register({ email: "not-an-email", password: "supersecret", name: "Имя" })).rejects.toMatchObject({ status: 400, code: "invalid_registration_payload" });
+    await expect(c.register({ email: "ok2@kiss-pm.local", password: "supersecret", name: "" })).rejects.toMatchObject({ status: 400, code: "invalid_registration_payload" });
   });
 
-  /* ===== password-reset request (GREENFIELD, anti-enumeration) ===== */
+  /* ===== password-reset request (БОЕВОЙ, anti-enumeration) ===== */
 
   it("reset request always returns 202 ok, even for an unknown email (anti-enumeration)", async () => {
     const c = client();
@@ -198,7 +201,7 @@ describe("contract-mock Auth backend", () => {
     await expect(c.requestPasswordReset("not-an-email")).rejects.toMatchObject({ status: 400, code: "invalid_email" });
   });
 
-  /* ===== password-reset confirm (GREENFIELD) ===== */
+  /* ===== password-reset confirm (БОЕВОЙ) ===== */
 
   it("confirms a reset with the seeded valid token → 200 ok", async () => {
     const c = client();

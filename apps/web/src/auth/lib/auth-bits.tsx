@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
    AuthCard), мелкие UI-крошки (PasswordField, FormError).
    ============================================================ */
 
-/* ---- RU-маппинг ВСЕХ кодов ошибок (login/logout/me/profile + greenfield register/reset) ---- */
+/* ---- RU-маппинг ВСЕХ кодов ошибок (login/logout/me/profile + боевой register/reset) ---- */
 const ERR: Record<string, string> = {
   // login (БОЕВОЙ)
   invalid_login_payload: "Проверьте email и пароль",
@@ -29,11 +29,11 @@ const ERR: Record<string, string> = {
   invalid_theme: "Недопустимая тема", // PATCH /api/profile/theme
   invalid_accent_color: "Цвет в формате #RRGGBB", // PATCH /api/profile/theme
   persistence_not_configured: "Хранилище профиля недоступно",
-  // GREENFIELD: register
-  invalid_register_payload: "Проверьте имя, email и пароль",
+  // register (БОЕВОЙ, authRegistrationRoutes.ts)
+  invalid_registration_payload: "Проверьте имя, email и пароль",
   weak_password: "Пароль слишком простой — минимум 8 символов",
   email_taken: "Этот email уже зарегистрирован",
-  // GREENFIELD: password-reset
+  // password-reset (БОЕВОЙ, authRegistrationRoutes.ts)
   invalid_email: "Некорректный email",
   invalid_reset_confirm_payload: "Проверьте токен и пароль",
   invalid_reset_token: "Ссылка для сброса недействительна",

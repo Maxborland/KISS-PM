@@ -132,7 +132,7 @@ export function useAuth() {
     [client, refresh]
   );
 
-  // request возвращает данные: devToken для honest-показа (письма нет). GREENFIELD.
+  // request возвращает данные: devToken для honest-показа (письма нет). Боевой; devToken — демо-замена письма в моке.
   const requestPasswordReset = useCallback(
     (email: string): Promise<AuthDataResult<{ status: "ok"; devToken?: string }>> =>
       guardData(() => client.requestPasswordReset(email) as Promise<{ status: "ok"; devToken?: string }>),

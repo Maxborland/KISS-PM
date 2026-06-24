@@ -4,12 +4,13 @@ import { ResetRequestSurface } from "@/auth/password-reset/reset-request-surface
 import { ResetConfirmSurface } from "@/auth/password-reset/reset-confirm-surface";
 
 /**
- * Auth — поверхности «Сброс пароля» (GREENFIELD: боевого контракта нет, мок задаёт
- * предложенный). Обе работают через настоящий createAuthClient + in-memory mock
- * (переключение на боевой API = смена apiOrigin).
+ * Auth — поверхности «Сброс пароля» (БОЕВОЙ контракт password-reset/{request,confirm},
+ * apps/api/src/authRegistrationRoutes.ts; мок зеркалит). Обе работают через настоящий
+ * createAuthClient + in-memory mock (переключение на боевой API = смена apiOrigin).
  *
  * Запрос: anti-enumeration — всегда нейтральное «Если адрес зарегистрирован — мы
- * отправили инструкции». Письма нет → devToken честно показывается под плашкой «Демо».
+ * отправили инструкции». Письма нет → токен показывается под плашкой «Демо» (демо-замена;
+ * в боевом ответе только {status:"ok"}, токен уходит письмом через EmailProvider).
  * Подтверждение: токен 64-hex + новый пароль → POST /password-reset/confirm.
  * Демо-токены: валидный = "a"×64, истёкший = "b"×64, использованный = "c"×64.
  */

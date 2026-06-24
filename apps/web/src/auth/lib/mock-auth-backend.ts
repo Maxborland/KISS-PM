@@ -2,8 +2,8 @@
    Contract-grounded mock backend для Auth/Профиль (Storybook).
 
    ЧЕСТНОСТЬ: in-memory мок, реализующий реальный REST-контракт
-   /api/auth/{login,logout,me} (БОЕВОЙ) + правку профиля + GREENFIELD
-   register / password-reset/{request,confirm}. Компонент работает через
+   /api/auth/{login,logout,me} + правку профиля + register /
+   password-reset/{request,confirm} — ВСЕ боевые. Компонент работает через
    настоящий createAuthClient (с fetchImpl), поэтому переключение на боевой
    API = смена apiOrigin.
 
@@ -15,11 +15,14 @@
    переключаемым логин-состоянием. Каждый монтаж создаёт свой
    createMockAuthFetch() → изолированная сессия (как useCrm).
 
-   РАЗГРАНИЧЕНИЕ боевое/greenfield:
+   ВСЕ ручки зеркалят боевой контракт:
    - login/logout/me + правка профиля — зеркаль дословно коды/статусы/
      порядок из apps/api/src/authRoutes.ts (rawMaps area auth-login).
-   - register / password-reset/* — помечены блоком GREENFIELD: боевого
-     контракта нет, мок задаёт предложенный (как comms задавал звонки).
+   - register / password-reset/* — боевой контракт реализован
+     apps/api/src/authRegistrationRoutes.ts + packages/domain/src/auth;
+     мок зеркалит коды/статусы/порядок. Единственное упрощение —
+     письма нет: токен сброса отдаётся отдельным devToken-полем как
+     демо-замена письма (в боевом ответе только {status:"ok"}).
    ============================================================ */
 
 import type { TenantUser, WorkspaceUser } from "./auth-client";
@@ -32,9 +35,9 @@ const MAX_EMAIL = 254;
 const MAX_PASSWORD = 1024;
 const MIN_EMAIL = 3;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// Политика пароля для GREENFIELD register/reset (предложенная: ≥8, ≤1024, без control-chars).
+// Парольная политика register/reset — боевой контракт (PASSWORD_POLICY в packages/domain/src/auth: ≥8, ≤1024, без control-chars).
 const MIN_STRONG_PASSWORD = 8;
-const MAX_NAME = 160; // GREENFIELD register: имя single-line ≤160 (не профиль).
+const MAX_NAME = 160; // register: имя single-line 1..160 (боевой parseSingleLineName, packages/domain/src/auth).
 // Лимиты правки профиля — ДОСЛОВНО боевой parseProfileTextField (profileRoutes.ts:50-52).
 const MAX_PROFILE_NAME = 120;
 const MAX_PROFILE_PHONE = 64;
@@ -143,7 +146,7 @@ function parseLoginCredentials(body: Record<string, unknown>): { ok: true; email
   return { ok: true, email, password };
 }
 
-// GREENFIELD: единая политика пароля (≥8, ≤1024, без control-chars). Предложенная, боевого модуля нет.
+// Единая парольная политика (≥8, ≤1024, без control-chars) — боевой parsePassword (packages/domain/src/auth).
 const isWeakPassword = (v: unknown): boolean => typeof v !== "string" || v.length < MIN_STRONG_PASSWORD || v.length > MAX_PASSWORD || hasControlChar(v);
 
 /* ---- PROFILE: парсеры ДОСЛОВНО зеркалят боевой profileRoutes.ts/parseHelpers.ts ---- */
@@ -172,7 +175,7 @@ const getStringField = (body: Record<string, unknown>, key: string): string | un
 const isWorkspaceTheme = (value: string): value is WorkspaceUser["theme"] => value === "light" || value === "dark";
 // Зеркало isAccentColor (parseHelpers.ts:19): /^#[0-9a-fA-F]{6}$/.
 const isAccentColor = (value: string): boolean => /^#[0-9a-fA-F]{6}$/.test(value);
-// GREENFIELD: валидация email только по формату (для register/reset-request).
+// Валидация email только по формату (register/reset-request) — боевой parseEmailValue (packages/domain/src/auth).
 const isValidEmail = (v: unknown): v is string => typeof v === "string" && (() => { const e = v.trim().toLowerCase(); return e.length >= MIN_EMAIL && e.length <= MAX_EMAIL && !hasControlChar(e) && EMAIL_RE.test(e); })();
 
 export function createMockAuthFetch(): typeof fetch {
@@ -318,52 +321,62 @@ export function createMockAuthFetch(): typeof fetch {
     }
 
     /* ============================================================
-       GREENFIELD: предложенный контракт, боевого нет.
-       Помечено блоком; при появлении боевых слайсов (3B) мок зеркалит их.
+       БОЕВЫЕ ручки register / password-reset/* (реализованы
+       apps/api/src/authRegistrationRoutes.ts + packages/domain/src/auth).
+       Мок зеркалит коды/статусы/порядок. Упрощение — письма нет:
+       reset-токен отдаётся devToken-полем как демо-замена письма.
        ============================================================ */
 
-    // GREENFIELD: POST /api/auth/register {email,password,name}
-    //   400 invalid_register_payload → 400 weak_password → 409 email_taken → 201 (авто-логин).
+    // POST /api/auth/register {email,password,name} — САМРЕГИСТРАЦИЯ НОВОГО ТЕНАНТА.
+    //   400 invalid_registration_payload → 400 weak_password → 409 email_taken → 201 (авто-логин).
+    //   МОДЕЛЬ (боевой): создаётся свежий tenantId + роль-владелец + пользователь, ответ
+    //   workspace.id = новый tenantId. Боевой: tenant-${randomUUID()} / access-profile-${randomUUID()}.
     if (path === "/api/auth/register" && method === "POST") {
       const email = isValidEmail(body.email) ? str(body.email).toLowerCase() : null;
       const name = str(body.name);
-      // payload: email формат + name single-line 1..160 (по образцу login-валидации).
-      if (!email || !name || name.length > MAX_NAME || hasControlChar(name)) return err("invalid_register_payload", 400);
-      // weak_password ПОСЛЕ payload (порядок как в карте).
+      // payload: email формат + name single-line 1..160 (боевой parseRegistrationInput).
+      if (!email || !name || name.length > MAX_NAME || hasControlChar(name)) return err("invalid_registration_payload", 400);
+      // weak_password ПОСЛЕ payload (порядок как в боевом домене).
       if (isWeakPassword(body.password)) return err("weak_password", 400);
       // email занят глобально (по credentials; на боевом — findCredentialByEmail глобально уникален).
       if (credentials.has(email)) return err("email_taken", 409);
-      // Создать user в фикс демо-тенанте с дефолтной ролью + авто-логин.
-      const id = `u-${(SEQ += 1).toString(36)}-${Date.now().toString(36)}`;
+      // Самрегистрация: свежий tenantId + accessProfileId владельца + пользователь (зеркало боевого).
+      const suffix = `${(SEQ += 1).toString(36)}-${Date.now().toString(36)}`;
+      const tenantId = `tenant-${suffix}`;
+      const accessProfileId = `access-profile-${suffix}`;
+      const id = `user-${suffix}`;
       const user: WorkspaceUser = {
-        id, tenantId: TENANT, name, accessProfileId: ACCESS_PROFILE, email,
+        id, tenantId, name, accessProfileId, email,
         positionId: null, positionName: null, phone: null, telegram: null,
         status: "active", theme: "light", accentColor: "#0f766e"
       };
       users.push(user);
       credentials.set(email, { userId: id, password: body.password as string });
       const rawToken = startSession(id); // авто-логин
-      return json({ user: toPublicUser(user), workspace: { id: TENANT } }, 201, { "Set-Cookie": sessionCookie(rawToken) });
+      return json({ user: toPublicUser(user), workspace: { id: tenantId } }, 201, { "Set-Cookie": sessionCookie(rawToken) });
     }
 
-    // GREENFIELD: POST /api/auth/password-reset/request {email}
+    // POST /api/auth/password-reset/request {email}
     //   400 invalid_email (только формат) → ВСЕГДА 202 {status:"ok"} (anti-enumeration).
+    //   Боевой ответ — только {status:"ok"} (токен доставляется EmailProvider). Мок письма не имеет
+    //   → для зарегистрированного email отдаёт devToken отдельным полем как ДЕМО-ЗАМЕНУ ПИСЬМА
+    //   (НЕ часть боевого ответа; в проде токен уходит письмом).
     if (path === "/api/auth/password-reset/request" && method === "POST") {
       if (!isValidEmail(body.email)) return err("invalid_email", 400);
       const email = str(body.email).toLowerCase();
       const credential = credentials.get(email);
-      // Если email есть — создать reset-токен (доставки письма нет: токен честно показывается в UI).
+      // Если email есть — создать reset-токен (боевой шлёт письмо; здесь токен честно показывается в UI).
       if (credential) {
         const rawToken = genToken();
         resetTokens.set(rawToken, { userId: credential.userId, expiresAt: Date.now() + 60 * 60 * 1000, consumedAt: null });
-        // НЕ раскрываем существование email в статусе; токен возвращаем отдельным полем для honest-показа.
-        return json({ status: "ok", devToken: rawToken }, 202); // devToken — демо-показ (письма нет)
+        // НЕ раскрываем существование email в статусе; devToken — демо-замена письма (не часть боевого ответа).
+        return json({ status: "ok", devToken: rawToken }, 202);
       }
       // Несуществующий email → ВСЕ РАВНО 202 (НЕ раскрывать email_not_found).
       return json({ status: "ok" }, 202);
     }
 
-    // GREENFIELD: POST /api/auth/password-reset/confirm {token,password}
+    // POST /api/auth/password-reset/confirm {token,password}
     //   400 invalid_reset_confirm_payload → 400 weak_password → 400 invalid_reset_token
     //   → 400 token_expired → 400 reset_token_used → 200 {status:"ok"}.
     if (path === "/api/auth/password-reset/confirm" && method === "POST") {

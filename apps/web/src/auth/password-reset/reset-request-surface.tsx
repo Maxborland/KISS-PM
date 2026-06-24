@@ -12,16 +12,17 @@ import { useAuth } from "@/auth/lib/use-auth";
 
 /* ============================================================
    ResetRequestSurface — экран «Сброс пароля» (запрос инструкций).
-   GREENFIELD: боевого контракта password-reset/request нет — мок задаёт
-   предложенный (POST /api/auth/password-reset/request).
+   БОЕВОЙ контракт POST /api/auth/password-reset/request
+   (apps/api/src/authRegistrationRoutes.ts) — мок зеркалит.
 
    ЧЕСТНОСТЬ:
    - anti-enumeration: ВСЕГДА показываем единое нейтральное подтверждение
      «Если адрес зарегистрирован — мы отправили инструкции» (не раскрываем,
      существует ли email). Это зеркало боевого «всегда 202».
-   - письма нет: если ответ содержит data.devToken (мок отдаёт его для
-     зарегистрированного email), показываем токен под честной плашкой
-     «Демо: почтового провайдера нет» + ссылку «Перейти к подтверждению».
+   - письма нет: боевой шлёт токен через EmailProvider; у мока почты нет,
+     поэтому если ответ содержит data.devToken (для зарегистрированного email),
+     показываем токен под честной плашкой «Демо: почтового провайдера нет»
+     (демо-замена письма; не часть боевого ответа) + ссылку «Перейти к подтверждению».
    - реальный submit идёт в мок через useAuth().requestPasswordReset
      (НЕ demoAction-заглушка). invalid_email → FormError.
    ============================================================ */
@@ -70,8 +71,8 @@ export function ResetRequestSurface() {
           </a>
         }
       >
-        {/* GREENFIELD-плашка: боевого контракта пока нет (предложенный мок). */}
-        <GreenfieldNote />
+        {/* Плашка-прототип: contract-mock боевого контракта password-reset/request. */}
+        <PrototypeNote />
 
         <Field label="Email" required htmlFor="reset-email">
           <Input
@@ -112,17 +113,17 @@ export function ResetRequestSurface() {
   );
 }
 
-// GREENFIELD-плашка: предложенный контракт (боевого API сброса пока нет).
-function GreenfieldNote() {
+// Плашка-прототип: contract-mock боевого контракта сброса (письма нет → токен показывается).
+function PrototypeNote() {
   return (
     <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
         Прототип
       </span>
       <span>
-        <strong className="font-semibold text-[var(--text-strong)]">GREENFIELD:</strong> предложенный контракт (боевого
-        API пока нет). POST /api/auth/password-reset/request — anti-enumeration: всегда 202 {"{status:\"ok\"}"}. Транспорт
-        — contract-mock, переключение на боевой = смена apiOrigin; данные in-memory.
+        Contract-mock боевого POST /api/auth/password-reset/request — anti-enumeration: всегда 202{" "}
+        {"{status:\"ok\"}"}. Письма нет → токен показывается (демо-замена). Переключение на боевой = смена
+        apiOrigin; данные in-memory.
       </span>
     </div>
   );

@@ -1,7 +1,7 @@
 /* ============================================================
    Auth API client — тонкий типизированный клиент над REST-ручками
-   /api/auth/{login,logout,me} + profile (правка) + GREENFIELD
-   register / password-reset/{request,confirm}.
+   /api/auth/{login,logout,me} + profile (правка) + боевые
+   register / password-reset/{request,confirm} (apps/api/src/authRegistrationRoutes.ts).
 
    Зеркало createCrmClient / createCommsClient: тот же приём с инъекцией
    fetchImpl, теми же credentials. Переключение на боевой API = передать
@@ -79,10 +79,10 @@ export type ThemeUpdateInput = Partial<{
   accentColor: string;
 }>;
 
-/* GREENFIELD: контракта в боевом нет — типы проектируются в моке (см. mock-auth-backend.ts). */
-export type RegisterRequest = { email: string; password: string; name: string }; // GREENFIELD: контракта в боевом нет
-export type ResetRequestInput = { email: string }; // GREENFIELD: контракта в боевом нет
-export type ResetConfirmInput = { token: string; password: string }; // GREENFIELD: контракта в боевом нет
+/* Боевой контракт register/reset (apps/api/src/authRegistrationRoutes.ts + packages/domain/src/auth). */
+export type RegisterRequest = { email: string; password: string; name: string };
+export type ResetRequestInput = { email: string };
+export type ResetConfirmInput = { token: string; password: string };
 
 export function createAuthClient(options: AuthApiClientOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -141,17 +141,17 @@ export function createAuthClient(options: AuthApiClientOptions) {
       return requestJson<{ user: WorkspaceUser }>("/api/profile/theme", { method: "PATCH", body: JSON.stringify(input) });
     },
 
-    /* ---- GREENFIELD ручки (контракта в боевом нет, мок задаёт предложенный) ---- */
+    /* ---- БОЕВЫЕ ручки register/reset (мок зеркалит, authRegistrationRoutes.ts) ---- */
 
-    // POST /api/auth/register — авто-логин, 201 {user:TenantUser, workspace}. GREENFIELD.
+    // POST /api/auth/register — самрегистрация нового тенанта + авто-логин, 201 {user:TenantUser, workspace}.
     register(input: RegisterRequest) {
       return requestJson<AuthSessionResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(input) });
     },
-    // POST /api/auth/password-reset/request — anti-enumeration, всегда 202 {status:"ok"}. GREENFIELD.
+    // POST /api/auth/password-reset/request — anti-enumeration, всегда 202 {status:"ok"}.
     requestPasswordReset(email: string) {
       return requestJson<{ status: "ok" }>("/api/auth/password-reset/request", { method: "POST", body: JSON.stringify({ email } satisfies ResetRequestInput) });
     },
-    // POST /api/auth/password-reset/confirm — смена пароля по токену, 200 {status:"ok"}. GREENFIELD.
+    // POST /api/auth/password-reset/confirm — смена пароля по токену, 200 {status:"ok"}.
     confirmPasswordReset(token: string, password: string) {
       return requestJson<{ status: "ok" }>("/api/auth/password-reset/confirm", { method: "POST", body: JSON.stringify({ token, password } satisfies ResetConfirmInput) });
     }
