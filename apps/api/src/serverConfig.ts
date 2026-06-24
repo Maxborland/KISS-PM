@@ -15,6 +15,8 @@ export type ServerRuntimeConfig = {
   backgroundJobsEnabled: boolean;
   backgroundJobsPollMs: number;
   production: boolean;
+  videoProvider: string | undefined;
+  mediaReadinessUrl: string | undefined;
 };
 
 export function assertServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env) {
@@ -49,7 +51,9 @@ export function readServerRuntimeConfig(
     planningEventsRedisUrl: planningEventsRedisUrlFromEnv(env),
     backgroundJobsEnabled: env.KISS_PM_BACKGROUND_JOBS_ENABLED === "true",
     backgroundJobsPollMs: parseBackgroundJobsPollMs(env.KISS_PM_BACKGROUND_JOBS_POLL_MS),
-    production: env.NODE_ENV === "production"
+    production: env.NODE_ENV === "production",
+    videoProvider: env.KISS_PM_VIDEO_PROVIDER,
+    mediaReadinessUrl: env.KISS_PM_MEDIA_READINESS_URL
   };
 }
 

@@ -18,6 +18,9 @@ export function createServerReadinessChecks(input: {
   planningEventsBackend?: PlanningEventsBackend | undefined;
   storageProvider: StorageProvider;
   production: boolean;
+  videoProvider?: string | undefined;
+  mediaReadinessUrl?: string | undefined;
+  mediaReadinessTimeoutMs?: number | undefined;
 }): ReadinessChecks {
   const checks: ReadinessChecks = {
     storage: () => checkStorageProviderReadWrite(input.storageProvider)
@@ -48,6 +51,30 @@ export function createServerReadinessChecks(input: {
       const status = getPlanningRealtimeStatus();
       if (status.backend !== "redis" || !status.connected || !status.redisConfigured) {
         throw new Error("planning_realtime_not_ready");
+      }
+    };
+  }
+
+  // Self-hosted LiveKit media plane: cheap liveness probe of the SFU HTTP endpoint.
+  // Gated on the configured provider + an explicit probe URL; no secrets are ever sent.
+  if (input.videoProvider === "livekit" && input.mediaReadinessUrl) {
+    const mediaReadinessUrl = input.mediaReadinessUrl;
+    const timeoutMs = input.mediaReadinessTimeoutMs ?? 2000;
+    checks.media = async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(mediaReadinessUrl, {
+          method: "GET",
+          signal: controller.signal
+        });
+        // LiveKit's HTTP root returns 200 "OK"; twirp/api paths answer 404 on GET.
+        // Either proves the SFU process is listening; anything else is unhealthy.
+        if (!response.ok && response.status !== 404) {
+          throw new Error("media_not_ready");
+        }
+      } finally {
+        clearTimeout(timer);
       }
     };
   }

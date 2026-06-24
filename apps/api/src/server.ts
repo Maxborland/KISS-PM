@@ -34,7 +34,9 @@ const readinessChecks = createServerReadinessChecks({
   planningEventsBackend: runtimeConfig.planningEventsBackend,
   postgresClient,
   production: runtimeConfig.production,
-  storageProvider
+  storageProvider,
+  videoProvider: runtimeConfig.videoProvider,
+  mediaReadinessUrl: runtimeConfig.mediaReadinessUrl
 });
 
 const publisher = await bootstrapPlanningEventPublisher();

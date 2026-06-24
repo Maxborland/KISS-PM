@@ -1,0 +1,38 @@
+# Self-hosted LiveKit — KISS-PM media plane (SFU + signaling). DEV profile.
+#
+# This is the "своё решение без внешних интеграций": LiveKit OSS runs in OUR
+# docker-compose, no SaaS. The KISS-PM API only signs join JWTs locally
+# (apps/api/src/videoProvider.ts) using the SAME api_key/api_secret as the
+# `keys:` map below — it never calls LiveKit to mint tokens.
+#
+# Run (opt-in): docker compose --profile media up livekit
+# Prod overrides (wss/TLS, host networking, public IP, standalone coturn,
+# egress) are documented in docs/runbooks/self-hosted-deployment.md and the
+# epic plan docs/plans/communications-self-hosted-av-epic.md.
+
+port: 7880 # HTTP + WebSocket signaling + twirp API + health ("OK" on GET /)
+log_level: info
+
+rtc:
+  tcp_port: 7881 # ICE/TCP fallback — carries media when UDP is blocked
+  port_range_start: 50000 # dev: keep the published UDP range small (Docker Desktop)
+  port_range_end: 50019
+  use_external_ip: false # dev single-host; prod: true (advertise the public IP)
+  node_ip: 127.0.0.1 # dev: advertise loopback so the host browser reaches the
+  # published UDP ports through Docker. Prod: remove this and
+  # set use_external_ip: true.
+
+keys:
+  # <api_key>: <api_secret>
+  # These two values MUST equal KISS_PM_VIDEO_LIVEKIT_API_KEY / _API_SECRET that
+  # the API signs join tokens with. Dev placeholder — rotate for any real deploy.
+  devkey: devsecret_change_me_min_32_chars_0123456789
+
+redis:
+  address: redis:6379 # reuse the existing compose redis service
+  db: 1 # isolate LiveKit cluster keys from planning fan-out (which uses db 0)
+
+turn:
+  enabled: false # dev: a localhost 1:1 call needs no TURN relay.
+  # Prod uses a standalone coturn (infra/coturn/turnserver.conf) wired
+  # together with the short-lived TURN-credential endpoint in Phase 6.
