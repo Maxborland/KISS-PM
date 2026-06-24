@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,12 +24,6 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(source).not.toMatch(/welcome-hero__title/);
   });
 
-  it("deals funnel uses Badge not legacy .badge BEM", () => {
-    const source = read("src/views/blocks/deals-block.tsx");
-    expect(source).toContain("<Badge");
-    expect(source).not.toMatch(/badge badge--soft/);
-  });
-
   it("state screens use bare variant in catalog", () => {
     const source = read("src/views/catalog.ts");
     expect(source).toContain('"state-empty"');
@@ -44,14 +38,11 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(source).not.toMatch(/from "@\/components\/ui\/table"/);
   });
 
-  it("views blocks avoid fake segmented and noop onChange (batch 13g)", () => {
-    const blockFiles = [
-      "src/views/blocks/projects-list-block.tsx",
-      "src/views/blocks/deals-block.tsx",
-      "src/views/blocks/settings-block.tsx",
-      "src/views/blocks/gantt-slice-block.tsx",
-      "src/views/blocks/my-work-block.tsx"
-    ];
+  it("surviving views blocks avoid fake segmented and noop onChange (batch 13g)", () => {
+    // Прежде проверялись 5 блоков; 4 из них (projects-list/deals/gantt/my-work) удалены как
+    // дубли функциональных surface. settings-block остаётся честным прототипом (10 Настройки)
+    // до его перевода в функциональный — проверка fake-affordance сохраняется для него.
+    const blockFiles = ["src/views/blocks/settings-block.tsx"];
     for (const rel of blockFiles) {
       const source = read(rel);
       expect(source).not.toMatch(/<button[^>]*segmented__btn/);
@@ -66,7 +57,7 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(source).toMatch(/disabled title="Демо Storybook: создание сущности в продукте"/);
   });
 
-  it("views have no welcome-hero and blocks use PageIntro (batch 14)", () => {
+  it("views have no welcome-hero and surviving blocks use PageIntro (batch 14)", () => {
     const viewsDir = join(webRoot, "src/views");
     const walk = (dir: string): string[] => {
       const out: string[] = [];
@@ -82,23 +73,84 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       const source = readFileSync(file, "utf8");
       expect(source, rel).not.toMatch(/welcome-hero/);
     }
-    const blocks = [
-      "src/views/blocks/deals-block.tsx",
-      "src/views/blocks/projects-list-block.tsx",
-      "src/views/blocks/space-discipline-block.tsx"
-    ];
+    // Уцелевшие блоки-прототипы всё ещё используют общий PageIntro-заголовок.
+    const blocks = ["src/views/blocks/space-discipline-block.tsx", "src/views/blocks/dashboard-bento.tsx"];
     for (const rel of blocks) {
       const source = read(rel);
       expect(source).toContain("PageIntro");
       expect(source).not.toMatch(/welcome-hero__title/);
     }
     expect(read("src/views/blocks/space-discipline-block.tsx")).toContain('className="type-h3"');
-    expect(read("src/views/blocks/deals-block.tsx")).toMatch(/<h3 className="deal-card__title"/);
   });
 
-  it("deal-card title uses --text-h3 token (batch 14m)", () => {
-    const css = read("src/styles/bem-supplement.css");
-    expect(css).toMatch(/\.deal-card__title\s*\{[\s\S]*font-size:\s*var\(--text-h3\)/);
+  it("superseded static screens are deleted and screen-view no longer imports them", () => {
+    // Контракт «переделать или удалить»: статические блоки, у которых есть функциональный
+    // surface-аналог, удалены, а роутер screen-view.tsx больше их не импортирует. Это заменяет
+    // прежние текстовые пины на удаляемую разметку (deals/projects-list/my-work/…).
+    const deletedBlocks = [
+      "src/views/blocks/my-work-block.tsx",
+      "src/views/blocks/deals-block.tsx",
+      "src/views/blocks/projects-list-block.tsx",
+      "src/views/blocks/entities-block.tsx",
+      "src/views/blocks/entity-detail-block.tsx",
+      "src/views/blocks/admin-block.tsx",
+      "src/views/blocks/gantt-slice-block.tsx",
+      "src/views/blocks/project-resources-block.tsx",
+      "src/views/blocks/project-baseline-block.tsx",
+      "src/views/blocks/project-scenarios-block.tsx",
+      "src/views/blocks/project-audit-block.tsx",
+      "src/views/blocks/project-calendars-block.tsx",
+      "src/views/screens/login-screen-view.tsx"
+    ];
+    for (const rel of deletedBlocks) {
+      expect(existsSync(join(webRoot, rel)), `${rel} must be deleted`).toBe(false);
+    }
+    const screenView = read("src/views/screens/screen-view.tsx");
+    const forbiddenImports = [
+      "my-work-block",
+      "deals-block",
+      "projects-list-block",
+      "entities-block",
+      "entity-detail-block",
+      "admin-block",
+      "gantt-slice-block",
+      "project-resources-block",
+      "project-baseline-block",
+      "project-scenarios-block",
+      "project-audit-block",
+      "project-calendars-block",
+      "login-screen-view"
+    ];
+    for (const mod of forbiddenImports) {
+      expect(screenView, `screen-view must not import ${mod}`).not.toContain(mod);
+    }
+  });
+
+  it("each deleted static screen has a functional surface successor on disk", () => {
+    // Каждый удалённый статический экран заменён контракт-обоснованной поверхностью.
+    const successors = [
+      "src/workspace/my-work/my-work-surface.tsx",
+      "src/workspace/projects/projects-list-surface.tsx",
+      "src/workspace/project-detail/project-detail-surface.tsx",
+      "src/delivery/inspector/task-inspector-surface.tsx",
+      "src/crm/deals/deals-surface.tsx",
+      "src/crm/deals/deal-card-surface.tsx",
+      "src/crm/clients/clients-surface.tsx",
+      "src/crm/contacts/contacts-surface.tsx",
+      "src/crm/products/products-surface.tsx",
+      "src/admin/users/users-surface.tsx",
+      "src/admin/roles/roles-surface.tsx",
+      "src/delivery/schedule/schedule-surface.tsx",
+      "src/delivery/resources/resources-surface.tsx",
+      "src/delivery/baseline/baseline-surface.tsx",
+      "src/delivery/scenarios/scenarios-surface.tsx",
+      "src/delivery/commits/commits-surface.tsx",
+      "src/delivery/calendars/calendars-surface.tsx",
+      "src/auth/login/login-surface.tsx"
+    ];
+    for (const rel of successors) {
+      expect(existsSync(join(webRoot, rel)), `${rel} must exist`).toBe(true);
+    }
   });
 
   it("batch 15 build evidence records successful web build", () => {
