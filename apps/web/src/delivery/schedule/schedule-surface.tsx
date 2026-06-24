@@ -184,6 +184,25 @@ function optimisticPatch(rm: PlanningReadModel, command: PlanningCommand): Plann
       if (T) T.customFields = { ...(T.customFields ?? {}), resLabel: name };
       break;
     }
+    case "task.create": {
+      // Инлайн-создание: вставляем новую задачу сразу (мгновенный отклик).
+      // wbsCode — плейсхолдер «…»; авторитетную нумерацию вернёт бэк (mock task.create).
+      const p = cmd.payload;
+      const newId = String(p.id);
+      tasks.push({
+        id: newId,
+        parentTaskId: (p.parentTaskId as string | null) ?? null,
+        wbsCode: "…",
+        title: String(p.title ?? "Новая задача"),
+        schedulingMode: "auto",
+        durationMinutes: typeof p.durationMinutes === "number" ? p.durationMinutes : 5 * MIN_PER_DAY,
+        workMinutes: typeof p.workMinutes === "number" ? p.workMinutes : 40 * 60,
+        percentComplete: 0,
+        customFields: {}
+      });
+      calc.push({ id: newId, calculatedStart: "", calculatedFinish: "", totalSlackMinutes: null, isCritical: false });
+      break;
+    }
     default:
       return rm;
   }
@@ -267,6 +286,8 @@ export function ProjectSchedule() {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [edit, setEdit] = useState<{ id: string; field: "name" | "dur" | "work" | "pct" | "units" } | null>(null);
   const [draft, setDraft] = useState("");
+  // Excel-подобная инлайн-строка создания внизу WBS: имя → Enter создаёт + очищает для следующей.
+  const [newTask, setNewTask] = useState("");
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -592,6 +613,31 @@ export function ProjectSchedule() {
     void runBatch(cmds);
   }
 
+  // Инлайн-создание задачи из нижней строки WBS (Excel-подобный быстрый ввод).
+  // Только название; даты/ресурс/связи/длительность правятся в ячейках после создания.
+  // Дефолты как в openCreate (5 дн / 40 ч, авто-планирование). Идёт через applyCmd →
+  // task.create-команда (оптимистично + откат при reject), контракт уже боевой.
+  function createInline(title: string, parentId: string | null = null) {
+    const t = title.trim();
+    if (t.length < 3) { setNotice("Название задачи: минимум 3 символа"); return; } // домен: title 3–160
+    setNewTask("");
+    void applyCmd({
+      type: "task.create",
+      payload: {
+        id: genId("t"),
+        projectId: MOCK_PROJECT_ID,
+        parentTaskId: parentId,
+        title: t,
+        statusId: "todo",
+        plannedStart: null,
+        plannedFinish: null,
+        durationMinutes: 5 * MIN_PER_DAY,
+        workMinutes: 40 * 60,
+        assignments: []
+      }
+    } as PlanningCommand);
+  }
+
   function commitInline(r: Row) {
     const f = edit?.field;
     setEdit(null);
@@ -660,7 +706,7 @@ export function ProjectSchedule() {
 
       <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
         <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        Реальный контракт planning · каждая правка = коммит preview→apply через @kiss-pm/planning-client. Данные in-memory, не сохраняются. 2× клик — правка ячейки · ПКМ — меню · границы колонок — ширина · бар: тяни тело (сдвиг), края (длительность), точку справа — связь.
+        Реальный контракт planning · каждая правка = коммит preview→apply через @kiss-pm/planning-client. Данные in-memory, не сохраняются. Нижняя строка — создать задачу (Enter) · 2× клик — правка ячейки · ПКМ — меню · границы колонок — ширина · бар: тяни тело (сдвиг), края (длительность), точку справа — связь.
       </div>
 
       {errors.size > 0 ? (
@@ -759,6 +805,25 @@ export function ProjectSchedule() {
                       </tr>
                     </RowMenu>
                   ))}
+                  {/* Excel-подобная строка создания: имя → Enter создаёт задачу и очищает для следующей. */}
+                  <tr className="msgrid-newrow">
+                    <td className="num muted text-[length:var(--text-xs)]" aria-hidden>+</td>
+                    <td />
+                    <td />
+                    <td colSpan={COLS.length - 3}>
+                      <input
+                        value={newTask}
+                        onChange={(e) => setNewTask(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") { e.preventDefault(); createInline(newTask); }
+                          else if (e.key === "Escape") setNewTask("");
+                        }}
+                        placeholder="Новая задача — введите название и нажмите Enter"
+                        aria-label="Создать задачу (Enter)"
+                        className="w-full rounded-[var(--radius-xs)] border border-transparent bg-transparent px-1 text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--muted-soft)] focus:border-[var(--accent)]"
+                      />
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
