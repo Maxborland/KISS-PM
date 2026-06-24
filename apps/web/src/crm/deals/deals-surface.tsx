@@ -37,7 +37,6 @@ const ERR_RU: Record<string, string> = {
   client_not_found: "Клиент не найден или неактивен",
   contact_not_found: "Контакт не найден или не у этого клиента",
   project_type_not_found: "Тип проекта не найден",
-  deal_stage_not_found_create: "Стадия не найдена",
   // мультиворонки: причины блокировки перехода (домен evaluateStageTransition/evaluatePipelineChange)
   transition_not_allowed: "Переход между этими стадиями не разрешён в воронке",
   condition_probability: "Условие не выполнено: недостаточная вероятность",

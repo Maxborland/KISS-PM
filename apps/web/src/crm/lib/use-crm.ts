@@ -81,7 +81,7 @@ export function useCrm() {
   const patchOpp = (o: Opportunity) => setData((d) => (d ? { ...d, opportunities: d.opportunities.map((x) => (x.id === o.id ? o : x)) } : d));
 
   const moveStage = useCallback((id: string, stageId: string) => guard(async () => { const r = await client.moveOpportunityStage(id, stageId); patchOpp(r.opportunity); }), [client, guard]);
-  // Мультиворонки: перенос сделки в другую воронку на её стадию (cross-pipeline). 422/409 reason мапит guard.
+  // Мультиворонки: перенос сделки в другую воронку на её стадию (cross-pipeline) — отказ всегда 409 reason (guard мапит CrmApiError.code).
   const movePipeline = useCallback((id: string, pipelineId: string, stageId: string) => guard(async () => { const r = await client.moveOpportunityPipeline(id, { pipelineId, stageId }); patchOpp(r.opportunity); }), [client, guard]);
   const createPipeline = useCallback((input: { name: string; sortOrder: number; description?: string | null; isDefault?: boolean; status?: CrmStatus }) => guard(async () => { const r = await client.createPipeline(input); setData((d) => (d ? { ...d, pipelines: [...d.pipelines, r.pipeline] } : d)); }), [client, guard]);
   const createStageTransition = useCallback((pipelineId: string, input: { fromStageId: string; toStageId: string; requireFeasibilityOk?: boolean; minProbability?: number | null; guardNote?: string | null }) => guard(async () => { const r = await client.createStageTransition(pipelineId, input); setData((d) => (d ? { ...d, stageTransitions: [...d.stageTransitions, r.stageTransition] } : d)); }), [client, guard]);
