@@ -59,3 +59,4 @@ export * from "./retrospectives";
 export * from "./collaboration";
 export * from "./backgroundJobs";
 export * from "./knowledge";
+export * from "./auth";

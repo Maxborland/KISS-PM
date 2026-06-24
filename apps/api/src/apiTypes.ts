@@ -96,6 +96,7 @@ import type {
   TaskStatusRecord
 } from "@kiss-pm/persistence";
 import type { AuthRateLimiter } from "./authRateLimit";
+import type { EmailProvider } from "./emailProvider";
 import type { ReadinessChecks } from "./healthRoutes";
 import type { StorageProvider } from "./storageProvider";
 import type { VideoProvider } from "./videoProvider";
@@ -357,6 +358,17 @@ export type UserSessionRecord = {
   userId: UserId;
   tokenHash: string;
   expiresAt: Date;
+};
+
+export type PasswordResetTokenRecord = {
+  id: string;
+  tenantId: TenantId;
+  userId: UserId;
+  tokenHash: string;
+  expiresAt: Date;
+  consumedAt: Date | null;
+  requestedIp: string | null;
+  createdAt: Date;
 };
 
 export type ManagementAuditEventInput = {
@@ -677,12 +689,31 @@ export type ApiTenantDataSource = {
     userId: UserId,
     email: string
   ): Promise<void>;
+  updateCredentialPassword?(
+    tenantId: TenantId,
+    userId: UserId,
+    input: { passwordHash: string; passwordSalt: string }
+  ): Promise<void>;
+  createTenant?(input: { id: string; name: string }): Promise<void>;
   createSession?(input: UserSessionRecord): Promise<void>;
   findSessionByTokenHash?(
     tokenHash: string
   ): Promise<UserSessionRecord | undefined>;
   deleteSessionByTokenHash?(tokenHash: string): Promise<void>;
   deleteSessionsByUserId?(tenantId: TenantId, userId: UserId): Promise<void>;
+  createPasswordResetToken?(input: PasswordResetTokenRecord): Promise<void>;
+  findPasswordResetTokenByHash?(
+    tokenHash: string
+  ): Promise<PasswordResetTokenRecord | undefined>;
+  markPasswordResetTokenConsumed?(
+    tenantId: TenantId,
+    id: string,
+    consumedAt: Date
+  ): Promise<void>;
+  deletePasswordResetTokensByUserId?(
+    tenantId: TenantId,
+    userId: UserId
+  ): Promise<void>;
   withTransaction?<T>(
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
   ): Promise<T>;
@@ -1238,6 +1269,7 @@ export type CreateAppOptions = {
   storageProvider?: StorageProvider;
   videoProvider?: VideoProvider;
   authRateLimiter?: AuthRateLimiter;
+  emailProvider?: EmailProvider;
   readinessChecks?: ReadinessChecks;
   secureCookies?: boolean;
   trustedMutationOrigins?: string[];

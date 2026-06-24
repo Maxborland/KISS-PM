@@ -22,11 +22,13 @@ import type {
   ManagementAuditEventInput
 } from "./apiTypes";
 import { createApiCapabilities } from "./apiDataPorts";
+import { createInMemoryEmailProvider } from "./emailProvider";
 import { createInMemoryTenantDataSource } from "./inMemoryTenantDataSource";
 import { registerAccessRoleRoutes } from "./accessRoleRoutes";
 import { registerAttachmentRoutes } from "./attachmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
+import { registerAuthRegistrationRoutes } from "./authRegistrationRoutes";
 import { registerBackgroundJobRoutes } from "./backgroundJobRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
 import { registerCollaborationRoutes } from "./collaborationRoutes";
@@ -77,6 +79,7 @@ export function createApp(options: CreateAppOptions = {}) {
     options.trustedMutationOrigins ?? trustedMutationOriginsFromEnv();
   const storageProvider = options.storageProvider ?? createStorageProviderFromEnv();
   const videoProvider = options.videoProvider ?? createVideoProviderFromEnv();
+  const emailProvider = options.emailProvider ?? createInMemoryEmailProvider();
   const trustForwardedAuthHeaders =
     options.trustForwardedAuthHeaders ?? shouldTrustForwardedAuthHeaders();
   const enableDevTenantRoutes = options.enableDevTenantRoutes ?? false;
@@ -217,6 +220,7 @@ export function createApp(options: CreateAppOptions = {}) {
     authRateLimiter,
     capabilities,
     dataSource,
+    emailProvider,
     getActor,
     getActorProfile,
     getDevActorFromHeaders,
@@ -241,6 +245,7 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   registerAuthRoutes(app, routeDeps);
+  registerAuthRegistrationRoutes(app, routeDeps);
   registerBackgroundJobRoutes(app, routeDeps);
   if (enableDevTenantRoutes) {
     registerDevTenantRoutes(app, routeDeps);

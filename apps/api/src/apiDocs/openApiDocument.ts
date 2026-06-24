@@ -11,7 +11,7 @@ type RouteDoc = {
   response?: "json" | "file" | "event-stream";
   requestSchema?: string;
   successSchema?: string;
-  successStatus?: 200 | 201;
+  successStatus?: 200 | 201 | 202;
   queryParameters?: Array<Record<string, unknown>>;
   availability?: "always" | "test-hooks";
 };
@@ -26,6 +26,9 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/health/ready", tag: "Health", summary: "API readiness probe", auth: "public" },
   { method: "get", path: "/api/health/realtime", tag: "Health", summary: "Realtime planning readiness", auth: "public" },
   { method: "post", path: "/api/auth/login", tag: "Auth", summary: "Create browser session", auth: "public", requestSchema: "LoginRequest", successSchema: "AuthSessionResponse" },
+  { method: "post", path: "/api/auth/register", tag: "Auth", summary: "Register new tenant and owner", auth: "public", requestSchema: "RegisterRequest", successSchema: "AuthSessionResponse", successStatus: 201 },
+  { method: "post", path: "/api/auth/password-reset/request", tag: "Auth", summary: "Request password reset", auth: "public", requestSchema: "PasswordResetRequest", successSchema: "OkResponse", successStatus: 202 },
+  { method: "post", path: "/api/auth/password-reset/confirm", tag: "Auth", summary: "Confirm password reset", auth: "public", requestSchema: "PasswordResetConfirmRequest", successSchema: "OkResponse" },
   { method: "post", path: "/api/auth/logout", tag: "Auth", summary: "Delete browser session", successSchema: "OkResponse" },
   { method: "get", path: "/api/auth/me", tag: "Auth", summary: "Current authenticated user", successSchema: "AuthMeResponse" },
   { method: "get", path: "/api/session/dev-users", tag: "Dev session", summary: "List deterministic dev users", auth: "dev", successSchema: "DevUsersResponse" },
