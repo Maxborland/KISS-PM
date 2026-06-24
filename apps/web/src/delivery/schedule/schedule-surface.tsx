@@ -1,6 +1,6 @@
 "use client";
 
-import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Columns3, Filter, GitBranch, IndentDecrease, IndentIncrease, Layers, Plus, TriangleAlert, Undo2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -288,6 +288,10 @@ export function ProjectSchedule() {
   const [draft, setDraft] = useState("");
   // Excel-подобная инлайн-строка создания внизу WBS: имя → Enter создаёт + очищает для следующей.
   const [newTask, setNewTask] = useState("");
+  // Позиционированная инлайн-строка создания (из ПКМ-меню): рендерится после строки afterId.
+  // parentId — родитель создаваемой задачи (null=верхний уровень; r.id=подзадача r; r.parentId=рядом с r).
+  const [inlineNew, setInlineNew] = useState<{ parentId: string | null; afterId: string; draft: string } | null>(null);
+  const inlineRef = useRef<HTMLInputElement | null>(null);
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -401,6 +405,15 @@ export function ProjectSchedule() {
     return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [link !== null]);
+
+  // Фокус на позиционированную инлайн-строку (из ПКМ): autoFocus перехватывает Radix
+  // ContextMenu (возврат фокуса на строку при закрытии), поэтому фокусируем с задержкой.
+  useEffect(() => {
+    if (!inlineNew) return;
+    const t = window.setTimeout(() => inlineRef.current?.focus(), 40);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inlineNew?.afterId, inlineNew?.parentId]);
 
   async function applyStaged() {
     if (staged.length === 0) return;
@@ -613,14 +626,15 @@ export function ProjectSchedule() {
     void runBatch(cmds);
   }
 
-  // Инлайн-создание задачи из нижней строки WBS (Excel-подобный быстрый ввод).
+  // Инлайн-создание задачи (Excel-подобный быстрый ввод): из нижней строки WBS,
+  // из ПКМ-меню (задача рядом / подзадача), либо по Tab (подзадача предыдущей).
   // Только название; даты/ресурс/связи/длительность правятся в ячейках после создания.
   // Дефолты как в openCreate (5 дн / 40 ч, авто-планирование). Идёт через applyCmd →
   // task.create-команда (оптимистично + откат при reject), контракт уже боевой.
-  function createInline(title: string, parentId: string | null = null) {
+  // Возвращает true, если задача отправлена на создание (для очистки/закрытия строки).
+  function createInline(title: string, parentId: string | null = null): boolean {
     const t = title.trim();
-    if (t.length < 3) { setNotice("Название задачи: минимум 3 символа"); return; } // домен: title 3–160
-    setNewTask("");
+    if (t.length < 3) { setNotice("Название задачи: минимум 3 символа"); return false; } // домен: title 3–160
     void applyCmd({
       type: "task.create",
       payload: {
@@ -636,7 +650,34 @@ export function ProjectSchedule() {
         assignments: []
       }
     } as PlanningCommand);
+    return true;
   }
+
+  // Уровень вложенности создаваемой задачи (для отступа инлайн-строки): parent.level + 1.
+  const levelOf = (parentId: string | null) => { if (!parentId) return 0; const pr = rows.find((x) => x.id === parentId); return pr ? pr.level + 1 : 0; };
+
+  // Общая инлайн-ячейка ввода имени новой задачи (нижняя строка + позиционированная из ПКМ).
+  // Enter — создать; Tab — создать подзадачей (на уровень глубже); Esc — отмена.
+  const newTaskCell = (o: { value: string; onChange: (v: string) => void; onEnter: () => void; onTab: () => void; onEsc: () => void; level: number; autoFocus?: boolean; inputRef?: RefObject<HTMLInputElement | null>; placeholder: string }) => (
+    <span className="name-cell" style={{ paddingLeft: o.level * 14 }}>
+      <span className="w-3.5 shrink-0" />
+      <input
+        {...(o.autoFocus ? { autoFocus: true } : {})}
+        {...(o.inputRef ? { ref: o.inputRef } : {})}
+        value={o.value}
+        onClick={stop}
+        onChange={(e) => o.onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); o.onEnter(); }
+          else if (e.key === "Tab") { e.preventDefault(); o.onTab(); }
+          else if (e.key === "Escape") o.onEsc();
+        }}
+        placeholder={o.placeholder}
+        aria-label="Создать задачу (Enter; Tab — подзадачей)"
+        className="w-full rounded-[var(--radius-xs)] border border-transparent bg-transparent px-1 text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--muted-soft)] focus:border-[var(--accent)]"
+      />
+    </span>
+  );
 
   function commitInline(r: Row) {
     const f = edit?.field;
@@ -749,15 +790,15 @@ export function ProjectSchedule() {
                 </thead>
                 <tbody>
                   {visibleRows.map((r, i) => (
+                    <Fragment key={r.id}>
                     <RowMenu
-                      key={r.id}
                       isLeaf={r.kind !== "summary"}
                       canIndent={canIndent(r)}
                       canOutdent={canOutdent(r)}
                       onOpen={() => openRow(r.id)}
                       onEdit={() => openEdit(r)}
-                      onAddSub={() => openCreate(r.id)}
-                      onAddBelow={() => openCreate(r.parentId)}
+                      onAddSub={() => setInlineNew({ parentId: r.id, afterId: r.id, draft: "" })}
+                      onAddBelow={() => setInlineNew({ parentId: r.parentId, afterId: r.id, draft: "" })}
                       onIndent={() => indent(r)}
                       onOutdent={() => outdent(r)}
                       onMakeMilestone={() => makeMilestone(r)}
@@ -804,6 +845,27 @@ export function ProjectSchedule() {
                         </td>
                       </tr>
                     </RowMenu>
+                    {inlineNew && inlineNew.afterId === r.id ? (
+                      <tr className="msgrid-newrow">
+                        <td className="num muted text-[length:var(--text-xs)]" aria-hidden>+</td>
+                        <td />
+                        <td className="mono muted text-[length:var(--text-xs)]" aria-hidden>·</td>
+                        <td colSpan={COLS.length - 3}>
+                          {newTaskCell({
+                            value: inlineNew.draft,
+                            onChange: (v) => setInlineNew((s) => (s ? { ...s, draft: v } : s)),
+                            onEnter: () => { if (createInline(inlineNew.draft, inlineNew.parentId)) setInlineNew((s) => (s ? { ...s, draft: "" } : s)); },
+                            onTab: () => { if (createInline(inlineNew.draft, inlineNew.afterId)) setInlineNew((s) => (s ? { ...s, draft: "" } : s)); },
+                            onEsc: () => setInlineNew(null),
+                            level: levelOf(inlineNew.parentId),
+                            autoFocus: true,
+                            inputRef: inlineRef,
+                            placeholder: inlineNew.parentId === r.id ? "Подзадача — Enter (Esc — отмена)" : "Задача рядом — Enter (Tab — подзадачей)"
+                          })}
+                        </td>
+                      </tr>
+                    ) : null}
+                    </Fragment>
                   ))}
                   {/* Excel-подобная строка создания: имя → Enter создаёт задачу и очищает для следующей. */}
                   <tr className="msgrid-newrow">
@@ -811,17 +873,15 @@ export function ProjectSchedule() {
                     <td />
                     <td />
                     <td colSpan={COLS.length - 3}>
-                      <input
-                        value={newTask}
-                        onChange={(e) => setNewTask(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") { e.preventDefault(); createInline(newTask); }
-                          else if (e.key === "Escape") setNewTask("");
-                        }}
-                        placeholder="Новая задача — введите название и нажмите Enter"
-                        aria-label="Создать задачу (Enter)"
-                        className="w-full rounded-[var(--radius-xs)] border border-transparent bg-transparent px-1 text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--muted-soft)] focus:border-[var(--accent)]"
-                      />
+                      {newTaskCell({
+                        value: newTask,
+                        onChange: setNewTask,
+                        onEnter: () => { if (createInline(newTask)) setNewTask(""); },
+                        onTab: () => { const last = visibleRows[visibleRows.length - 1]; if (createInline(newTask, last ? last.id : null)) setNewTask(""); },
+                        onEsc: () => setNewTask(""),
+                        level: 0,
+                        placeholder: "Новая задача — Enter (Tab — подзадачей)"
+                      })}
                     </td>
                   </tr>
                 </tbody>

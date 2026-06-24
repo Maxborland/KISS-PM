@@ -193,7 +193,7 @@ export function ProjectDeals() {
                         draggable={!final && !busy}
                         onDragStart={() => setDragId(o.id)}
                         onDragEnd={() => { setDragId(null); setOverStage(null); }}
-                        className={cn("rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]", !final && !busy ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50")}
+                        className={cn("hover-lift rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]", !final && !busy ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50")}
                       >
                         <div className="mb-1 flex items-center justify-between gap-2">
                           <span className="v4-mono text-[10px] text-[var(--muted-soft)]">{o.id}</span>

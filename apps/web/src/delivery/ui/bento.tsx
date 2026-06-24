@@ -50,7 +50,7 @@ export function BentoCard({
   return (
     <section
       className={cn(
-        "flex min-w-0 flex-col rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]",
+        "hover-lift flex min-w-0 flex-col rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]",
         SPAN[span],
         className
       )}
@@ -107,7 +107,7 @@ export function StatTile({
     danger: "text-[var(--danger-text)]"
   }[tone];
   return (
-    <div className="v4-lift flex min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-4 shadow-[var(--shadow-card)]">
+    <div className="hover-lift flex min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-4 shadow-[var(--shadow-card)]">
       <span className="truncate text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.07em] text-[var(--muted-soft)]">
         {label}
       </span>

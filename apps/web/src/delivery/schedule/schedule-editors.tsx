@@ -203,7 +203,9 @@ export function RowMenu({
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={MENU}>
+        {/* Не возвращаем фокус на строку при закрытии — иначе перехватывается autoFocus
+            инлайн-строки создания (ПКМ → подзадача/задача рядом). */}
+        <ContextMenu.Content className={MENU} onCloseAutoFocus={(e) => e.preventDefault()}>
           <ContextMenu.Item className={ITEM} onSelect={onOpen}>Открыть инспектор</ContextMenu.Item>
           <ContextMenu.Item className={ITEM} onSelect={onEdit}>Редактировать…</ContextMenu.Item>
           <ContextMenu.Separator className="my-1 h-px bg-[var(--border)]" />

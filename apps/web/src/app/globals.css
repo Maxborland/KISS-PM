@@ -115,6 +115,16 @@
 .anim-stagger > *:nth-child(6) { animation-delay: 200ms; }
 .anim-stagger > *:nth-child(n + 7) { animation-delay: 240ms; }
 
+/* Hover-lift: карточка слегка приподнимается при наведении (subtle, 2px). */
+.hover-lift {
+  transition: transform var(--duration-fast, 120ms) var(--ease-out, cubic-bezier(0, 0, .2, 1)),
+              box-shadow var(--duration-fast, 120ms) var(--ease-out, cubic-bezier(0, 0, .2, 1));
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.16);
+}
+
 /* reduced-motion-гард. В Storybook-витрине ВСЕГДА показываем motion (data-force-motion
    ставится в .storybook/preview.tsx), даже если в ОС включён «reduce motion» — это
    витрина дизайна. В реальном Next-приложении атрибута нет → a11y соблюдается. */
@@ -124,5 +134,10 @@
   :root:not([data-force-motion]) .anim-rise-in-fast,
   :root:not([data-force-motion]) .anim-stagger > * {
     animation: none !important;
+  }
+  :root:not([data-force-motion]) .hover-lift,
+  :root:not([data-force-motion]) .hover-lift:hover {
+    transition: none !important;
+    transform: none !important;
   }
 }
