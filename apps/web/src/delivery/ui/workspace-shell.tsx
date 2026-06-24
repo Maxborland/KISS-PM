@@ -14,7 +14,9 @@ const NAV: { title: string; items: { label: string; badge?: string }[] }[] = [
       { label: "Ресурсы", badge: "42" }
     ]
   },
-  { title: "Аналитика", items: [{ label: "Загрузка" }, { label: "KPI" }] }
+  { title: "Аналитика", items: [{ label: "Загрузка" }, { label: "KPI" }] },
+  // Аддитивная nav-группа «Коммуникации» (handoff-каркас): не меняет существующие active/badge.
+  { title: "Коммуникации", items: [{ label: "Коммуникации" }] }
 ];
 
 /**
