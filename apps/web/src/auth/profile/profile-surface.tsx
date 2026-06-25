@@ -53,8 +53,6 @@ const THEME_LABEL: Record<WorkspaceUser["theme"], string> = {
 const DEMO_EMAIL = "admin@kiss-pm.local";
 const DEMO_PASSWORD = "kiss-pm-admin";
 
-const selCls =
-  "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
 export function ProfileSurface() {
@@ -369,14 +367,6 @@ function ProfileForm({
         <label className={labelCls}>
           Telegram
           <Input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@username" />
-        </label>
-
-        <label className={labelCls}>
-          Тема оформления
-          <select value={theme} onChange={(e) => setTheme(e.target.value as WorkspaceUser["theme"])} className={selCls}>
-            <option value="light">Светлая</option>
-            <option value="dark">Тёмная</option>
-          </select>
         </label>
 
         <label className={labelCls}>

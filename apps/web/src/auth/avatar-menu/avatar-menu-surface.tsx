@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, Check, ChevronDown, LogOut, Moon, Settings, ShieldCheck, Sun, TriangleAlert, User } from "lucide-react";
+import { Bell, Check, ChevronDown, LogOut, Settings, ShieldCheck, TriangleAlert, User } from "lucide-react";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
@@ -70,20 +70,6 @@ export function AvatarMenuSurface() {
   }, []);
 
   const profileUser: WorkspaceUser | null = user && "email" in user ? (user as WorkspaceUser) : null;
-
-  async function toggleTheme() {
-    if (!profileUser) return;
-    const next = profileUser.theme === "light" ? "dark" : "light";
-    setBusy(true);
-    setNotice(null);
-    const res = await updateTheme({ theme: next });
-    setBusy(false);
-    setNotice(
-      res.ok
-        ? { ok: true, text: `Тема сохранена: ${THEME_LABEL[next]}` }
-        : { ok: false, text: `Не удалось: ${authErr(res.code, res.message)}` }
-    );
-  }
 
   async function handleLogout() {
     setBusy(true);
@@ -179,18 +165,6 @@ export function AvatarMenuSurface() {
                     <DropdownMenuItem {...demoAction("переход в уведомления")}>
                       <Bell className="size-4" aria-hidden />
                       Уведомления
-                    </DropdownMenuItem>
-                    {/* Переключение темы — РЕАЛЬНОЕ (PATCH /api/profile/theme). preventDefault держит меню открытым. */}
-                    <DropdownMenuItem
-                      disabled={busy}
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        void toggleTheme();
-                      }}
-                    >
-                      {profileUser.theme === "light" ? <Moon className="size-4" aria-hidden /> : <Sun className="size-4" aria-hidden />}
-                      Тема: {THEME_LABEL[profileUser.theme]}
-                      <span className="ml-auto text-[length:var(--text-xs)] text-[var(--muted-soft)]">переключить</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem {...demoAction("переход в безопасность")}>
