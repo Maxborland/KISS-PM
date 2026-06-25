@@ -9,6 +9,7 @@ import {
 
 import { createApp } from "./app";
 import type { ApiTenantDataSource } from "./apiTypes";
+import { createDefaultBackgroundJobRegistry } from "./backgroundJobs/jobHandlers";
 import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
 import {
   communicationJsonHeaders as jsonHeaders,
@@ -676,5 +677,72 @@ describe("communications realtime API", () => {
     expect(retry.reconciled).toBe(true);
     const eventsAfter = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
     expect(eventsAfter.filter((event) => event.eventType === "recording_track_completed")).toHaveLength(1);
+  });
+
+  it("callRecordingJanitor fails stale in-progress recordings and logs recording_failed", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+
+    const room = await dataSource.createCallRoom({
+      id: "call-room-stale",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Запись",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-stale",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-stale",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    await dataSource.createCallRecording({
+      id: "call-recording-stale",
+      tenantId,
+      roomId: room.id,
+      sessionId: session.id,
+      recordingGroupId: "call-rec-group-stale",
+      attachmentId: null,
+      egressId: "egress-stale-1",
+      participantId: "user-alpha-admin",
+      trackId: "track-9",
+      kind: "video",
+      status: "recording",
+      durationSeconds: null,
+      endedAt: null,
+      title: "Запись · stale",
+      createdByUserId: "user-alpha-admin"
+    });
+
+    const janitor = createDefaultBackgroundJobRegistry()["calls.recording_janitor"];
+    expect(janitor).toBeDefined();
+    // context.now 10 min ahead makes the just-created row older than the 1-minute window.
+    const result = await janitor!(
+      { tenantId, payload: { staleAfterMinutes: 1 } } as unknown as Parameters<NonNullable<typeof janitor>>[0],
+      { dataSource, now: new Date(Date.now() + 10 * 60_000) }
+    );
+    expect(result).toMatchObject({ metadata: { failed: 1 } });
+
+    const recordings = await dataSource.listCallRecordingsByGroup({
+      tenantId,
+      recordingGroupId: "call-rec-group-stale"
+    });
+    expect(recordings[0]).toMatchObject({ status: "failed" });
+
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    const failedEvent = events.find((event) => event.eventType === "recording_failed");
+    expect(failedEvent).toBeDefined();
+    expect(failedEvent?.payload).toMatchObject({
+      recordingId: "call-recording-stale",
+      reason: "stale_egress"
+    });
   });
 });

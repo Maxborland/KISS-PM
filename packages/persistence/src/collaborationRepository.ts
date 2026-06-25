@@ -348,7 +348,7 @@ export type CollaborationRepository = {
   failStaleInProgressRecordings(input: {
     tenantId: TenantId;
     olderThan: Date;
-  }): Promise<number>;
+  }): Promise<CallRecording[]>;
 };
 
 export function createCollaborationRepository(db: KissPmDatabase): CollaborationRepository {
@@ -1521,8 +1521,8 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
             lt(callRecordings.createdAt, input.olderThan)
           )
         )
-        .returning({ id: callRecordings.id });
-      return rows.length;
+        .returning();
+      return rows.map(mapCallRecording);
     }
   };
 }
