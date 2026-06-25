@@ -303,6 +303,10 @@ export type CollaborationRepository = {
     roomId: string;
     sessionId: string;
   }): Promise<CallSession | undefined>;
+  findActiveCallSessionByRoom(input: {
+    tenantId: TenantId;
+    roomId: string;
+  }): Promise<CallSession | undefined>;
   endCallSession(input: {
     tenantId: TenantId;
     sessionId: string;
@@ -1360,6 +1364,22 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
           )
         )
         .for("update")
+        .limit(1);
+      return row ? mapCallSession(row) : undefined;
+    },
+    async findActiveCallSessionByRoom(input) {
+      // At most one active session per room (call_sessions_one_active_per_room_uidx), so this
+      // is the session a second participant joins instead of starting a new one.
+      const [row] = await db
+        .select()
+        .from(callSessions)
+        .where(
+          and(
+            eq(callSessions.tenantId, input.tenantId),
+            eq(callSessions.roomId, input.roomId),
+            eq(callSessions.status, "active")
+          )
+        )
         .limit(1);
       return row ? mapCallSession(row) : undefined;
     },

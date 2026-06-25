@@ -1032,4 +1032,18 @@ describe("communications realtime API", () => {
     expect(endRes.status).toBe(200);
     expect(stopped).toContain("egress-end-1");
   });
+
+  it("exposes the active session in the call room detail so a second participant can join", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+
+    const detail = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}`, {
+      headers: jsonHeaders(adminCookie)
+    });
+    expect(detail.status).toBe(200);
+    const body = (await detail.json()) as { activeSession: { id: string; status: string } | null };
+    expect(body.activeSession?.id).toBe(started.session.id);
+    expect(body.activeSession?.status).toBe("active");
+  });
 });

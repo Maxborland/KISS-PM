@@ -102,17 +102,30 @@ export async function persistCallMessage(conversationId: string, body: string): 
   });
 }
 
-/** POST .../sessions/:sessionId/end → close the backend session when leaving (best-effort). */
-export async function endCallSession(roomId: string, sessionId: string): Promise<void> {
+/** GET /call-rooms/:roomId → the room's active session, when one exists. */
+export async function fetchActiveSession(roomId: string): Promise<CallSessionRef | null> {
   try {
-    await apiFetch(
-      `/api/workspace/call-rooms/${encodeURIComponent(roomId)}/sessions/${encodeURIComponent(
-        sessionId
-      )}/end`,
-      { method: "POST" }
+    const result = await apiFetch<{ activeSession: CallSessionRef | null }>(
+      `/api/workspace/call-rooms/${encodeURIComponent(roomId)}`
     );
+    return result.activeSession ?? null;
   } catch {
-    // best-effort: a failed end is reconciled when the room is next started/ended
+    return null;
+  }
+}
+
+/**
+ * Start a session, or join the existing active one. A second participant (or a refresh)
+ * cannot start — the room already has an active session (manager) or the actor only has read
+ * access — so on any start failure we join the room's active session instead of failing.
+ */
+export async function joinOrStartCallSession(roomId: string): Promise<CallSessionRef> {
+  try {
+    return await startCallSession(roomId);
+  } catch (cause) {
+    const active = await fetchActiveSession(roomId);
+    if (active) return active;
+    throw cause;
   }
 }
 

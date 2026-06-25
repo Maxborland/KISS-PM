@@ -105,7 +105,7 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     if (!resolved.value.access.readDecision.allowed) {
       return context.json({ error: resolved.value.access.readDecision.reason }, 403);
     }
-    const [events, recordings] = await Promise.all([
+    const [events, recordings, activeSession] = await Promise.all([
       deps.dataSource.listCallEvents?.({
         tenantId: actor.tenantId,
         roomId: resolved.value.room.id,
@@ -114,10 +114,16 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
       deps.dataSource.listCallRecordings?.({
         tenantId: actor.tenantId,
         roomId: resolved.value.room.id
-      }) ?? []
+      }) ?? [],
+      deps.dataSource.findActiveCallSessionByRoom?.({
+        tenantId: actor.tenantId,
+        roomId: resolved.value.room.id
+      }) ?? undefined
     ]);
     return context.json({
       callRoom: serializeCallRoom(resolved.value.room),
+      // The active session a second participant joins instead of starting a new one.
+      activeSession: activeSession ? serializeCallSession(activeSession) : null,
       events: events.map(serializeCallEvent),
       recordings: recordings.map(serializeCallRecording)
     });

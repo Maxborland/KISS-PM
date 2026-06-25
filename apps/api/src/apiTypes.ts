@@ -1045,6 +1045,10 @@ export type ApiTenantDataSource = {
     roomId: string;
     sessionId: string;
   }): Promise<CallSession | undefined>;
+  findActiveCallSessionByRoom?(input: {
+    tenantId: TenantId;
+    roomId: string;
+  }): Promise<CallSession | undefined>;
   endCallSession?(input: {
     tenantId: TenantId;
     sessionId: string;

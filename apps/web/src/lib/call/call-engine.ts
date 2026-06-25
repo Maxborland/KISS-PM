@@ -15,14 +15,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MessageView } from "@/components/domain/message-bubble";
 import { CallBackgroundController, backgroundProcessorsSupported } from "@/lib/call/call-background";
 import {
-  endCallSession,
   fetchCallRoomEntity,
   fetchJoinToken,
   fetchTurnCredentials,
+  joinOrStartCallSession,
   persistCallMessage,
   postParticipantState,
-  resolveEntityConversationId,
-  startCallSession
+  resolveEntityConversationId
 } from "@/lib/call/call-client";
 import type {
   BackgroundMode,
@@ -273,7 +272,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
 
     void (async () => {
       try {
-        const session = await startCallSession(roomId);
+        const session = await joinOrStartCallSession(roomId);
         sessionIdRef.current = session.id;
         const [join, turn] = await Promise.all([
           fetchJoinToken(roomId, session.id),
@@ -367,10 +366,9 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
       onLeave: () => {
         const sessionId = sessionIdRef.current;
         if (sessionId) {
-          // Mark presence and close the backend session — otherwise the room stays active
-          // and call_room_already_active blocks the next call until something reconciles it.
+          // Record that this participant left. The session is NOT ended here — others may
+          // still be in it, and the next participant joins this same active session.
           void postParticipantState(roomId, sessionId, "left");
-          void endCallSession(roomId, sessionId);
           sessionIdRef.current = null;
         }
         void roomRef.current?.disconnect();
