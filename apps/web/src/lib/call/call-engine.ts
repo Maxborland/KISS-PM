@@ -7,17 +7,20 @@ import {
   Room,
   RoomEvent,
   Track,
-  type Participant
+  type Participant,
+  type RemoteTrack
 } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MessageView } from "@/components/domain/message-bubble";
 import { CallBackgroundController, backgroundProcessorsSupported } from "@/lib/call/call-background";
 import {
+  endCallSession,
   fetchCallRoomEntity,
   fetchJoinToken,
   fetchTurnCredentials,
   persistCallMessage,
+  postParticipantState,
   resolveEntityConversationId,
   startCallSession
 } from "@/lib/call/call-client";
@@ -154,6 +157,12 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
   const [background, setBackground] = useState<BackgroundMode>("none");
   const backgroundSupported = useMemo(() => backgroundProcessorsSupported(), []);
   const conversationIdRef = useRef<string | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  // Remote audio is attached to detached <audio> elements the engine owns (the tile only
+  // renders video); kept here so they are removed on teardown.
+  const audioElementsRef = useRef<HTMLMediaElement[]>([]);
+  // In-call messages sent before the durable conversation resolves are queued, then flushed.
+  const pendingMessagesRef = useRef<string[]>([]);
 
   const refresh = useCallback(() => {
     const room = roomRef.current;
@@ -242,9 +251,30 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
       .on(RoomEvent.LocalTrackPublished, bindBackground)
       .on(RoomEvent.LocalTrackUnpublished, bindBackground);
 
+    // Play remote audio: the participant tile renders only video, so subscribed audio tracks
+    // are attached to engine-owned hidden <audio> elements — without this, calls have no sound.
+    const onAudioSubscribed = (track: RemoteTrack) => {
+      if (disposed || track.kind !== Track.Kind.Audio) return;
+      const element = track.attach();
+      element.style.display = "none";
+      document.body.appendChild(element);
+      audioElementsRef.current.push(element);
+    };
+    const onAudioUnsubscribed = (track: RemoteTrack) => {
+      if (track.kind !== Track.Kind.Audio) return;
+      for (const element of track.detach()) {
+        audioElementsRef.current = audioElementsRef.current.filter((existing) => existing !== element);
+        element.remove();
+      }
+    };
+    room
+      .on(RoomEvent.TrackSubscribed, onAudioSubscribed)
+      .on(RoomEvent.TrackUnsubscribed, onAudioUnsubscribed);
+
     void (async () => {
       try {
         const session = await startCallSession(roomId);
+        sessionIdRef.current = session.id;
         const [join, turn] = await Promise.all([
           fetchJoinToken(roomId, session.id),
           fetchTurnCredentials(roomId, session.id)
@@ -265,7 +295,11 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
         if (disposed) return;
         await room.localParticipant.setMicrophoneEnabled(options?.micOn ?? true);
         await room.localParticipant.setCameraEnabled(options?.cameraOn ?? true);
+        // Unblock playback of subscribed remote audio (the lobby join is the user gesture).
+        void room.startAudio();
         refresh();
+        // Record presence so the call shows up in occupancy (the recipe is connect → state).
+        void postParticipantState(roomId, session.id, "joined");
         // Resolve the durable conversation for the room's parent entity (best-effort).
         const entity = await fetchCallRoomEntity(roomId);
         if (entity && !disposed) {
@@ -273,9 +307,21 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
             entity.entityType,
             entity.entityId
           );
+          // Flush any in-call messages queued before the conversation id resolved.
+          const conversationId = conversationIdRef.current;
+          if (conversationId && pendingMessagesRef.current.length > 0) {
+            const queued = pendingMessagesRef.current;
+            pendingMessagesRef.current = [];
+            for (const queuedBody of queued) {
+              void persistCallMessage(conversationId, queuedBody).catch(() => undefined);
+            }
+          }
         }
       } catch (cause) {
         if (disposed) return;
+        // Initial media setup failed (e.g. the camera publish rejected) — do not leave a
+        // connected room with a hot mic; disconnect before surfacing the error.
+        void room.disconnect();
         setError(cause instanceof Error ? cause.message : "call_failed");
         setStage((previous) => ({ ...previous, phase: "error" }));
       }
@@ -286,7 +332,11 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
       room.removeAllListeners();
       void room.disconnect();
       void backgroundRef.current?.dispose();
+      for (const element of audioElementsRef.current) element.remove();
+      audioElementsRef.current = [];
+      pendingMessagesRef.current = [];
       conversationIdRef.current = null;
+      sessionIdRef.current = null;
       roomRef.current = null;
     };
   }, [roomId, refresh, options]);
@@ -315,10 +365,18 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
           .then(refresh);
       },
       onLeave: () => {
+        const sessionId = sessionIdRef.current;
+        if (sessionId) {
+          // Mark presence and close the backend session — otherwise the room stays active
+          // and call_room_already_active blocks the next call until something reconciles it.
+          void postParticipantState(roomId, sessionId, "left");
+          void endCallSession(roomId, sessionId);
+          sessionIdRef.current = null;
+        }
         void roomRef.current?.disconnect();
       }
     }),
-    [refresh]
+    [refresh, roomId]
   );
 
   const sendChat = useCallback((text: string) => {
@@ -333,9 +391,12 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     ]);
     const packet = new TextEncoder().encode(JSON.stringify({ kind: "chat", clientId, body, time }));
     void room.localParticipant.publishData(packet, { reliable: true, topic: CHAT_TOPIC });
-    // Durable persistence to the entity conversation (best-effort; ephemeral path is authoritative for delivery).
+    // Durable persistence to the entity conversation (best-effort; ephemeral path is
+    // authoritative for delivery). Queue until the conversation id resolves so a message sent
+    // right after connect is not dropped from the durable transcript.
     const conversationId = conversationIdRef.current;
     if (conversationId) void persistCallMessage(conversationId, body).catch(() => undefined);
+    else pendingMessagesRef.current.push(body);
   }, []);
 
   const onCycleBackground = useCallback(() => {

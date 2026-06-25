@@ -101,3 +101,35 @@ export async function persistCallMessage(conversationId: string, body: string): 
     json: { body }
   });
 }
+
+/** POST .../sessions/:sessionId/end → close the backend session when leaving (best-effort). */
+export async function endCallSession(roomId: string, sessionId: string): Promise<void> {
+  try {
+    await apiFetch(
+      `/api/workspace/call-rooms/${encodeURIComponent(roomId)}/sessions/${encodeURIComponent(
+        sessionId
+      )}/end`,
+      { method: "POST" }
+    );
+  } catch {
+    // best-effort: a failed end is reconciled when the room is next started/ended
+  }
+}
+
+/** POST .../sessions/:sessionId/participant-state → record this participant's own state. */
+export async function postParticipantState(
+  roomId: string,
+  sessionId: string,
+  state: "joined" | "left"
+): Promise<void> {
+  try {
+    await apiFetch(
+      `/api/workspace/call-rooms/${encodeURIComponent(roomId)}/sessions/${encodeURIComponent(
+        sessionId
+      )}/participant-state`,
+      { method: "POST", json: { state } }
+    );
+  } catch {
+    // best-effort: presence is advisory for occupancy, not for media delivery
+  }
+}
