@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   doublePrecision,
   foreignKey,
@@ -1927,7 +1928,9 @@ export const fileAssets = pgTable(
     originalName: text("original_name").notNull(),
     safeDisplayName: text("safe_display_name").notNull(),
     mimeType: text("mime_type").notNull(),
-    sizeBytes: integer("size_bytes").notNull(),
+    // bigint: HD call recordings routinely exceed the 2GB PostgreSQL integer ceiling; mode
+    // "number" keeps the JS surface unchanged (sizes stay well under 2^53).
+    sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
     checksumSha256: text("checksum_sha256"),
     status: text("status").notNull(),
     createdByUserId: text("created_by_user_id").notNull(),
