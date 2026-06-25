@@ -1,0 +1,126 @@
+name: Release gate
+
+on:
+  push:
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "e2e/**"
+      - "scripts/**"
+      - "docs/beta/**"
+      - "docs/api/**"
+      - "docs/runbooks/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "playwright.config.ts"
+      - "vitest*.config.ts"
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "e2e/**"
+      - "scripts/**"
+      - "docs/beta/**"
+      - "docs/api/**"
+      - "docs/runbooks/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "playwright.config.ts"
+      - "vitest*.config.ts"
+      - ".github/workflows/**"
+
+concurrency:
+  group: release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: kiss_pm
+          POSTGRES_USER: kiss_pm
+          POSTGRES_PASSWORD: kiss_pm_dev_password
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U kiss_pm -d kiss_pm"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+
+    env:
+      CI: "true"
+      DATABASE_URL: postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm
+      E2E_API_PORT: "4100"
+      E2E_WEB_PORT: "3100"
+      STORYBOOK_PORT: "6006"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: DB migrate, idempotent seed, DB tests
+        run: pnpm db:migrate && pnpm db:seed:dev && pnpm db:seed:dev && pnpm test:db
+
+      - name: Security gates
+        run: pnpm security:check
+
+      - name: Runtime route smoke
+        run: pnpm qa:route-smoke
+
+      - name: Business smoke
+        run: pnpm test:e2e:smoke
+
+      - name: Visual smoke
+        run: pnpm qa:visual
+
+      - name: Accessibility smoke
+        run: pnpm qa:a11y
+
+      - name: Storybook contract
+        run: pnpm verify:storybook-contract
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gate-evidence
+          path: |
+            playwright-report/
+            test-results/
+            apps/web/storybook-static/
+          if-no-files-found: ignore

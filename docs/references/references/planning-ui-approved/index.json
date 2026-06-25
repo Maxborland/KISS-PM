@@ -1,0 +1,30 @@
+{
+  "title": "KISS PM Planning Workspace UI — approved mockups",
+  "generatedAt": "2026-05-23",
+  "screens": [
+    { "id": "01-overview", "title": "Обзор проекта", "file": "01-overview.html" },
+    { "id": "02-schedule-wbs-gantt", "title": "График: WBS + Gantt", "file": "02-schedule-wbs-gantt.html" },
+    { "id": "02b-schedule-task-selected", "title": "График: задача выделена + Inspector", "file": "02b-schedule-task-selected.html" },
+    { "id": "02c-schedule-preview-pending", "title": "График: превью изменений", "file": "02c-schedule-preview-pending.html" },
+    { "id": "03-task-inspector-detail", "title": "Task Inspector (полная страница)", "file": "03-task-inspector-detail.html" },
+    { "id": "04-resources", "title": "Ресурсы проекта", "file": "04-resources.html" },
+    { "id": "04b-resource-detail", "title": "Ресурс: детальная карточка", "file": "04b-resource-detail.html" },
+    { "id": "05-assignments", "title": "Назначения / Resource usage", "file": "05-assignments.html" },
+    { "id": "06-calendars", "title": "Календари", "file": "06-calendars.html" },
+    { "id": "07-scenarios", "title": "Сценарии", "file": "07-scenarios.html" },
+    { "id": "07b-scenario-compare", "title": "Сценарий: сравнение", "file": "07b-scenario-compare.html" },
+    { "id": "08-baseline", "title": "Baseline", "file": "08-baseline.html" },
+    { "id": "09-audit", "title": "Аудит", "file": "09-audit.html" },
+    { "id": "10-settings", "title": "Настройки проекта", "file": "10-settings.html" },
+    { "id": "state-empty", "title": "State: пустой план", "file": "state-empty.html" },
+    { "id": "state-loading", "title": "State: загрузка", "file": "state-loading.html" },
+    { "id": "state-error", "title": "State: ошибка расчёта", "file": "state-error.html" },
+    { "id": "state-forbidden", "title": "State: нет прав", "file": "state-forbidden.html" },
+    { "id": "state-narrow-fallback", "title": "State: mobile / narrow fallback", "file": "state-narrow-fallback.html" }
+  ],
+  "viewports": [
+    { "id": "desktop-1920", "width": 1920, "height": 1080, "label": "Desktop 1920×1080" },
+    { "id": "laptop-1440",  "width": 1440, "height": 900,  "label": "Laptop 1440×900" },
+    { "id": "narrow-390",   "width": 390,  "height": 844,  "label": "Narrow 390×844 (mobile)" }
+  ]
+}

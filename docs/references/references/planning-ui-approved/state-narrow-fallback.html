@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KISS PM — Mobile fallback</title>
+  <link rel="stylesheet" href="_partials.css" />
+  <style>
+    body { background: var(--canvas); }
+    .narrow-shell {
+      max-width: 480px;
+      margin: 0 auto;
+      background: var(--panel);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+    }
+    .narrow-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .narrow-tabs {
+      display: flex; overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+    }
+    .narrow-tab {
+      padding: 10px 14px; white-space: nowrap;
+      color: var(--muted-strong); border-bottom: 2px solid transparent;
+      font-size: 13px;
+    }
+    .narrow-tab.active {
+      color: var(--text); border-bottom-color: var(--accent); font-weight: 500;
+    }
+    .narrow-tab.disabled {
+      color: var(--muted); opacity: 0.6;
+    }
+    .narrow-content {
+      padding: 14px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .narrow-attention {
+      padding: 12px;
+      background: var(--warning-soft);
+      border-radius: var(--radius-md);
+      color: var(--warning);
+    }
+    .narrow-list {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .narrow-list .ev {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .narrow-list .ev:last-child { border-bottom: 0; }
+    .narrow-list .ev .when { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="narrow-shell">
+    <div class="narrow-topbar">
+      <div>
+        <div style="font-weight:600;">Производственный портал</div>
+        <div class="muted" style="font-size:11px;">Релиз 2 · план v17</div>
+      </div>
+      <div class="row" style="gap:6px;">
+        <button class="icon-btn">●</button>
+        <button class="icon-btn">И</button>
+      </div>
+    </div>
+    <div class="narrow-tabs">
+      <span class="narrow-tab active">Обзор</span>
+      <span class="narrow-tab disabled" title="Доступно на десктопе">График</span>
+      <span class="narrow-tab disabled" title="Доступно на десктопе">Ресурсы</span>
+      <span class="narrow-tab">Назначения</span>
+      <span class="narrow-tab disabled" title="Доступно на десктопе">Календари</span>
+      <span class="narrow-tab disabled" title="Доступно на десктопе">Сценарии</span>
+      <span class="narrow-tab disabled" title="Доступно на десктопе">Baseline</span>
+      <span class="narrow-tab">Аудит</span>
+      <span class="narrow-tab disabled" title="Доступно на десктопе">Настройки</span>
+    </div>
+    <div class="narrow-content">
+      <div class="narrow-attention">
+        <strong>Mobile / narrow fallback</strong>
+        <div style="margin-top:4px; font-size:12.5px;">
+          Полное редактирование MS-Project-class плана недоступно на узком экране. Доступны:
+          <strong>Обзор</strong>, <strong>Назначения</strong>, <strong>Аудит</strong> только на чтение.
+          Откройте на десктопе или ноутбуке для полной работы.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><div class="card__title">Обзор</div></div>
+        <div class="card__body col" style="gap:8px;">
+          <div class="row"><span class="muted grow">Финиш</span><span class="mono">14.06 (+2 дн)</span></div>
+          <div class="row"><span class="muted grow">Дедлайн</span><span class="mono">12.07</span></div>
+          <div class="row"><span class="muted grow">Выполнено</span><span class="mono">42% · 37/87</span></div>
+          <div class="row"><span class="muted grow">Перегруз</span><span class="chip chip--danger">2 ресурса</span></div>
+        </div>
+      </div>
+
+      <div class="narrow-list">
+        <div class="ev">
+          <div class="when">14.05 09:32</div>
+          <div><strong>Иван И.</strong> · WBS 2.1 «Анализ»</div>
+          <div class="muted" style="font-size:12px;">План.Финиш 14.06 → 17.06</div>
+        </div>
+        <div class="ev">
+          <div class="when">13.05 18:10</div>
+          <div><strong>Система</strong> · Baseline B2 зафиксирован</div>
+          <div class="muted" style="font-size:12px;">64 задачи</div>
+        </div>
+        <div class="ev">
+          <div class="when">13.05 16:22</div>
+          <div><strong>Анна П.</strong> · Сценарий «Балансированный» применён</div>
+          <div class="muted" style="font-size:12px;">8 задач изменено, финиш +2 дн</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

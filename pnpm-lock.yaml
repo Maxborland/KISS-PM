@@ -111,9 +111,6 @@ importers:
       '@kiss-pm/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@kiss-pm/planning-client':
-        specifier: workspace:*
-        version: link:../../packages/planning-client
       '@kiss-pm/tenant-org-structure':
         specifier: workspace:*
         version: link:../../packages/tenant-org-structure

@@ -1,0 +1,54 @@
+:root {
+  --canvas: #f6f7f9;
+  --panel: #ffffff;
+  --panel-subtle: #f9fafb;
+  --panel-strong: #f1f3f7;
+  --border: #e3e6eb;
+  --border-strong: #d4d9e2;
+  --text: #020617;
+  --muted: #667085;
+  --muted-strong: #475467;
+  --accent: #0f172a;
+  --accent-soft: #1d4ed8;
+  --success: #137a4f;
+  --success-soft: #e6f4ec;
+  --warning: #a15c07;
+  --warning-soft: #fdf2e0;
+  --danger: #b42318;
+  --danger-soft: #fde7e5;
+  --critical-stripe: #c0331e;
+  --info: #1d4ed8;
+  --info-soft: #e6edff;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --shadow-1: 0 1px 2px rgba(2, 6, 23, 0.06);
+  --shadow-2: 0 4px 14px rgba(2, 6, 23, 0.08);
+
+  --row-h: 36px;
+  --row-h-summary: 36px;
+  --gantt-bar-h: 18px;
+  --wbs-width: 720px;
+  --inspector-width: 360px;
+  --sidebar-width: 232px;
+  --topbar-height: 56px;
+  --tabs-height: 44px;
+  --bottom-bar-height: 56px;
+
+  --cell-day: 40px;
+  --cell-week: 140px;
+  --cell-month: 220px;
+
+  --mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --z-arrow: 3;
+  --z-bar: 4;
+  --z-sticky-col: 6;
+  --z-sticky-header: 7;
+  --z-sticky-corner: 8;
+  --z-bottom-bar: 20;
+  --z-drawer: 30;
+}
