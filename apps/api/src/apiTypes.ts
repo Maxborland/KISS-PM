@@ -1087,6 +1087,10 @@ export type ApiTenantDataSource = {
     durationSeconds?: number | null;
     endedAt?: Date | null;
   }): Promise<CallRecording | undefined>;
+  failStaleInProgressRecordings?(input: {
+    tenantId: TenantId;
+    olderThan: Date;
+  }): Promise<number>;
   createKnowledgeDocument?(input: Omit<
     KnowledgeDocument,
     "createdAt" | "updatedAt" | "archivedAt" | "currentVersionId"

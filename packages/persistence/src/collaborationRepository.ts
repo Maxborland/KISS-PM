@@ -345,6 +345,10 @@ export type CollaborationRepository = {
     durationSeconds?: number | null;
     endedAt?: Date | null;
   }): Promise<CallRecording | undefined>;
+  failStaleInProgressRecordings(input: {
+    tenantId: TenantId;
+    olderThan: Date;
+  }): Promise<number>;
 };
 
 export function createCollaborationRepository(db: KissPmDatabase): CollaborationRepository {
@@ -1503,6 +1507,20 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         )
         .returning();
       return row ? mapCallRecording(row) : undefined;
+    },
+    async failStaleInProgressRecordings(input) {
+      const rows = await db
+        .update(callRecordings)
+        .set({ status: "failed", endedAt: new Date() })
+        .where(
+          and(
+            eq(callRecordings.tenantId, input.tenantId),
+            eq(callRecordings.status, "recording"),
+            lt(callRecordings.createdAt, input.olderThan)
+          )
+        )
+        .returning({ id: callRecordings.id });
+      return rows.length;
     }
   };
 }

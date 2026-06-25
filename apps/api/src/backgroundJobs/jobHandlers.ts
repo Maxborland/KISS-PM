@@ -77,13 +77,40 @@ const capacityCacheWarmup: BackgroundJobHandler = async (job, context) => {
   };
 };
 
+// Reconciles per-track call recordings stuck in 'recording' (a lost egress_ended
+// webhook / orphaned egress) by failing them after a stale window.
+const callRecordingJanitor: BackgroundJobHandler = async (job, context) => {
+  if (!context.dataSource.failStaleInProgressRecordings) {
+    throw new Error("call_recording_janitor_not_configured");
+  }
+  const staleAfterMinutes = readPositiveInteger(job.payload.staleAfterMinutes, 360);
+  const olderThan = new Date(context.now.getTime() - staleAfterMinutes * 60_000);
+  const failed = await context.dataSource.failStaleInProgressRecordings({
+    tenantId: job.tenantId,
+    olderThan
+  });
+  return {
+    message: "Stale call recordings reconciled",
+    metadata: { failed, staleAfterMinutes }
+  };
+};
+
+// Deferred: mux the per-track recording files into a single MP4 (ffmpeg). v1 keeps
+// the per-track files; this is the registered boundary for the future compose step.
+const callRecordingCompose: BackgroundJobHandler = async () => ({
+  message: "Call recording compose boundary completed",
+  metadata: { composed: 0, note: "per-track files preserved; ffmpeg mux deferred" }
+});
+
 export function createDefaultBackgroundJobRegistry(): BackgroundJobRegistry {
   return {
     "storage.asset_cleanup": storageAssetCleanup,
     "notification.dispatch": notificationDispatch,
     "connector.sync": connectorSync,
     "search.projection_rebuild": searchProjectionRebuild,
-    "capacity.cache_warmup": capacityCacheWarmup
+    "capacity.cache_warmup": capacityCacheWarmup,
+    "calls.recording_janitor": callRecordingJanitor,
+    "calls.recording_compose": callRecordingCompose
   };
 }
 
@@ -92,7 +119,9 @@ export const defaultBackgroundJobKinds: BackgroundJobKind[] = [
   "notification.dispatch",
   "connector.sync",
   "search.projection_rebuild",
-  "capacity.cache_warmup"
+  "capacity.cache_warmup",
+  "calls.recording_janitor",
+  "calls.recording_compose"
 ];
 
 function readPositiveInteger(value: unknown, fallback: number): number {
