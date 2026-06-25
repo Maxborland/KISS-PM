@@ -2,6 +2,7 @@ import { backgroundJobKinds, type BackgroundJobKind, type BackgroundJobRun } fro
 import { randomUUID } from "node:crypto";
 
 import type { ApiTenantDataSource } from "../apiTypes";
+import type { LiveKitEgressProvider } from "../communications/recording/livekitEgressProvider";
 import type { StorageProvider } from "../storageProvider";
 
 export type BackgroundJobHandlerResult = {
@@ -17,6 +18,7 @@ export type BackgroundJobHandler = (
 export type BackgroundJobHandlerContext = {
   dataSource: ApiTenantDataSource;
   storageProvider?: StorageProvider;
+  egressProvider?: LiveKitEgressProvider | null;
   now: Date;
 };
 
@@ -35,6 +37,7 @@ export async function runBackgroundJobWorkerTick(input: {
   dataSource: ApiTenantDataSource;
   registry: BackgroundJobRegistry;
   storageProvider?: StorageProvider;
+  egressProvider?: LiveKitEgressProvider | null;
   workerId: string;
   now?: Date;
   clock?: () => Date;
@@ -82,6 +85,7 @@ export async function runBackgroundJobWorkerTick(input: {
       now
     };
     if (input.storageProvider) context.storageProvider = input.storageProvider;
+    if (input.egressProvider) context.egressProvider = input.egressProvider;
     const result = await handler(job, context);
     const completeInput: Parameters<NonNullable<ApiTenantDataSource["completeBackgroundJob"]>>[0] = {
       tenantId: job.tenantId,
@@ -110,6 +114,7 @@ export function createSerializedBackgroundJobPoller(input: {
   dataSource: ApiTenantDataSource;
   registry: BackgroundJobRegistry;
   storageProvider?: StorageProvider;
+  egressProvider?: LiveKitEgressProvider | null;
   workerId: string;
   onError?: (error: unknown) => void;
 }): () => Promise<"ran" | "skipped" | "failed"> {
@@ -123,6 +128,7 @@ export function createSerializedBackgroundJobPoller(input: {
         dataSource: input.dataSource,
         registry: input.registry,
         ...(input.storageProvider ? { storageProvider: input.storageProvider } : {}),
+        ...(input.egressProvider ? { egressProvider: input.egressProvider } : {}),
         workerId: input.workerId
       });
       return "ran";

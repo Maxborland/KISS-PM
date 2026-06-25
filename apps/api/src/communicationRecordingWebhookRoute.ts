@@ -26,12 +26,29 @@ export function registerCommunicationRecordingWebhookRoute(app: Hono, deps: ApiR
       return context.json({ error: "call_webhook_signature_invalid" }, 401);
     }
 
-    if (event.kind === "egress_ended" && event.egressId && event.file) {
-      await reconcile(deps, event.egressId, event.file);
+    if (event.kind === "egress_ended" && event.egressId) {
+      if (event.file) {
+        await reconcile(deps, event.egressId, event.file);
+      } else {
+        // Failed/empty egress: fail the recording now rather than leaving it "recording"
+        // until the stale-window janitor reaps it.
+        await failRecording(deps, event.egressId, event.storageKey);
+      }
     }
 
     return context.body(null, 204);
   });
+}
+
+async function failRecording(deps: ApiRouteDeps, egressId: string, storageKey: string): Promise<void> {
+  const tenantId = parseTenantFromStorageKey(storageKey);
+  if (!tenantId || !deps.egressProvider) return;
+  const recordingWorkspace = createCommunicationRecordingWorkspace({
+    dataSource: deps.dataSource,
+    egressProvider: deps.egressProvider,
+    appendManagementAuditEvent: deps.appendManagementAuditEvent
+  });
+  await recordingWorkspace.failRecordingByEgress({ tenantId, egressId });
 }
 
 async function reconcile(deps: ApiRouteDeps, egressId: string, file: EgressEndedFile): Promise<void> {

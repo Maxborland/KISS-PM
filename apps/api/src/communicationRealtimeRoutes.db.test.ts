@@ -725,12 +725,29 @@ describe("communications realtime API", () => {
 
     const janitor = createDefaultBackgroundJobRegistry()["calls.recording_janitor"];
     expect(janitor).toBeDefined();
+    const stoppedEgress: string[] = [];
+    const egress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [];
+      },
+      async startTrackEgress() {
+        return "x";
+      },
+      async stopEgress(id) {
+        stoppedEgress.push(id);
+      },
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
     // context.now 10 min ahead makes the just-created row older than the 1-minute window.
     const result = await janitor!(
       { tenantId, payload: { staleAfterMinutes: 1 } } as unknown as Parameters<NonNullable<typeof janitor>>[0],
-      { dataSource, now: new Date(Date.now() + 10 * 60_000) }
+      { dataSource, egressProvider: egress, now: new Date(Date.now() + 10 * 60_000) }
     );
-    expect(result).toMatchObject({ metadata: { failed: 1 } });
+    expect(result).toMatchObject({ metadata: { failed: 1, stoppedEgress: 1 } });
+    // Orphaned egress (lost webhook) is stopped, not just marked failed.
+    expect(stoppedEgress).toContain("egress-stale-1");
 
     const recordings = await dataSource.listCallRecordingsByGroup({
       tenantId,
@@ -1045,5 +1062,70 @@ describe("communications realtime API", () => {
     const body = (await detail.json()) as { activeSession: { id: string; status: string } | null };
     expect(body.activeSession?.id).toBe(started.session.id);
     expect(body.activeSession?.status).toBe("active");
+  });
+
+  it("failRecordingByEgress fails a recording from a failed egress callback and logs recording_failed", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-fail",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Звонок",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-fail",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-fail",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    await dataSource.createCallRecording({
+      id: "call-recording-fail",
+      tenantId,
+      roomId: room.id,
+      sessionId: session.id,
+      recordingGroupId: "call-rec-group-fail",
+      attachmentId: null,
+      egressId: "egress-fail-1",
+      participantId: "user-alpha-admin",
+      trackId: "track-f",
+      kind: "video",
+      status: "recording",
+      durationSeconds: null,
+      endedAt: null,
+      title: "Запись · fail",
+      createdByUserId: "user-alpha-admin"
+    });
+
+    const workspace = createCommunicationRecordingWorkspace({
+      dataSource,
+      egressProvider: null,
+      appendManagementAuditEvent: async () => "audit-id"
+    });
+    const result = await workspace.failRecordingByEgress({ tenantId, egressId: "egress-fail-1" });
+    expect(result.failed).toBe(true);
+
+    const recordings = await dataSource.listCallRecordingsByGroup({
+      tenantId,
+      recordingGroupId: "call-rec-group-fail"
+    });
+    expect(recordings[0]).toMatchObject({ status: "failed" });
+
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    const failedEvent = events.find((event) => event.eventType === "recording_failed");
+    expect(failedEvent).toBeDefined();
+    expect(failedEvent?.payload).toMatchObject({
+      recordingId: "call-recording-fail",
+      reason: "egress_failed"
+    });
   });
 });

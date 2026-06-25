@@ -92,11 +92,20 @@ const callRecordingJanitor: BackgroundJobHandler = async (job, context) => {
     tenantId: job.tenantId,
     olderThan
   });
-  // Close the timeline of each reaped track. ponytail: best-effort — the rows are
-  // already 'failed', so a crash mid-loop drops advisory recording_failed events for
-  // the rest (the next run won't re-fail them). Acceptable for a janitor; promote to a
-  // per-row update+event transaction only if the failure timeline must be gapless.
+  // Close the timeline of each reaped track AND stop its egress if it is still running
+  // (the row was failed because the egress_ended webhook was lost, so the egress can keep
+  // recording/billing). ponytail: best-effort — the rows are already 'failed', so a crash
+  // mid-loop drops advisory events/stops for the rest (the next run won't re-fail them).
+  let stoppedEgress = 0;
   for (const recording of failed) {
+    if (recording.egressId && context.egressProvider) {
+      try {
+        await context.egressProvider.stopEgress(recording.egressId);
+        stoppedEgress += 1;
+      } catch {
+        // best-effort; the egress may already be gone
+      }
+    }
     await dataSource.createCallEvent({
       id: `call-event-${randomUUID()}`,
       tenantId: recording.tenantId,
@@ -114,7 +123,7 @@ const callRecordingJanitor: BackgroundJobHandler = async (job, context) => {
   }
   return {
     message: "Stale call recordings reconciled",
-    metadata: { failed: failed.length, staleAfterMinutes }
+    metadata: { failed: failed.length, stoppedEgress, staleAfterMinutes }
   };
 };
 

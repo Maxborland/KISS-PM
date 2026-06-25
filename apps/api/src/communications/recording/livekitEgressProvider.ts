@@ -25,8 +25,10 @@ export type EgressEndedFile = {
 
 // Decoded webhook DTO. The SDK WebhookEvent, protobuf int64s, and nanosecond units
 // stay behind this seam so callers (the HTTP route) only ever see plain values.
+// storageKey is the egress output key WE set (recordings/{tenantId}/...), present even when
+// the egress produced no usable file, so the route can fail the recording (not just reconcile).
 export type EgressWebhookEvent =
-  | { kind: "egress_ended"; egressId: string; file: EgressEndedFile | null }
+  | { kind: "egress_ended"; egressId: string; storageKey: string; file: EgressEndedFile | null }
   | { kind: "other" };
 
 export type LiveKitEgressConfig = {
@@ -115,9 +117,10 @@ export function createLiveKitEgressProvider(config: LiveKitEgressConfig): LiveKi
       // FileInfo.size is a protobuf int64; FileInfo.duration is int64 NANOSECONDS.
       const sizeBytes = fileResult?.size ? Number(fileResult.size) : 0;
       const durationSeconds = fileResult?.duration ? Math.round(Number(fileResult.duration) / 1e9) : null;
-      // No usable artifact (failed/empty egress) → file:null so callers skip reconcile.
+      // No usable artifact (failed/empty egress) → file:null so callers fail the recording
+      // instead of reconciling, but storageKey is still returned for tenant resolution.
       const file = storageKey && sizeBytes > 0 ? { storageKey, sizeBytes, durationSeconds } : null;
-      return { kind: "egress_ended", egressId: event.egressInfo.egressId, file };
+      return { kind: "egress_ended", egressId: event.egressInfo.egressId, storageKey, file };
     }
   };
 }

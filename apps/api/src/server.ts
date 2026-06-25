@@ -9,6 +9,7 @@ import { createApp, type CreateAppOptions } from "./app";
 import { createAuthRateLimiterFromEnv } from "./authRateLimit";
 import { createDefaultBackgroundJobRegistry } from "./backgroundJobs/jobHandlers";
 import { createSerializedBackgroundJobPoller } from "./backgroundJobs/backgroundJobWorker";
+import { createLiveKitEgressProviderFromEnv } from "./communications/recording/livekitEgressProvider";
 import { bootstrapPlanningEventPublisher, setPlanningEventPublisher } from "./planningEventBus";
 import { readServerRuntimeConfig } from "./serverConfig";
 import { createServerReadinessChecks } from "./serverReadiness";
@@ -73,6 +74,7 @@ if (dataSource && runtimeConfig.backgroundJobsEnabled) {
   const workerId = `api-worker-${process.pid}`;
   const runBackgroundJobsPoll = createSerializedBackgroundJobPoller({
     dataSource,
+    egressProvider: createLiveKitEgressProviderFromEnv(),
     onError: (error) => {
       console.error("background_jobs_tick_failed", error);
     },

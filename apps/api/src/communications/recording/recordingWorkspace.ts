@@ -391,6 +391,47 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
         if (error instanceof RecordingRaceLost) return { reconciled: true };
         throw error;
       }
+    },
+
+    /**
+     * Mark a recording failed from a failed/empty egress_ended callback, so it does not sit in
+     * "recording" until the stale-window janitor reaps it. claim-once (attachment IS NULL) means
+     * a concurrent successful reconcile wins and is not overwritten with "failed".
+     */
+    async failRecordingByEgress(input: {
+      tenantId: string;
+      egressId: string;
+    }): Promise<{ failed: boolean }> {
+      if (!dataSource.withTransaction) return { failed: false };
+      return dataSource.withTransaction(async (tx) => {
+        const findRecording = requireFn(tx.findCallRecordingByEgressId);
+        const updateRecording = requireFn(tx.updateCallRecordingByEgress);
+        const createEvent = requireFn(tx.createCallEvent);
+        const recording = await findRecording({ tenantId: input.tenantId, egressId: input.egressId });
+        if (!recording || recording.status !== "recording") return { failed: false };
+        const updated = await updateRecording({
+          tenantId: input.tenantId,
+          egressId: input.egressId,
+          status: "failed",
+          endedAt: new Date()
+        });
+        if (!updated) return { failed: false };
+        await createEvent({
+          id: `call-event-${randomUUID()}`,
+          tenantId: recording.tenantId,
+          roomId: recording.roomId,
+          sessionId: recording.sessionId,
+          actorUserId: recording.createdByUserId,
+          eventType: "recording_failed",
+          payload: {
+            recordingGroupId: recording.recordingGroupId,
+            recordingId: recording.id,
+            trackId: recording.trackId,
+            reason: "egress_failed"
+          }
+        });
+        return { failed: true };
+      });
     }
   };
 }
