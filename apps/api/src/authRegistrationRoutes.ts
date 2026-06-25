@@ -218,7 +218,10 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
     const { email } = parsed.value;
 
     const rateLimitInput = {
-      email,
+      // reset-специфичный email-bucket: иначе recordFailure от reset-спама копится в ТОТ ЖЕ
+      // email-bucket, что и /api/auth/login, и легитимный юзер ловит too_many_login_attempts
+      // без единой попытки пароля. IP/global-лимиты остаются общими (через ip ниже).
+      email: `reset:${email}`,
       ip: getClientIp(context.req.raw.headers, {
         trustForwardedHeaders: trustForwardedAuthHeaders
       })

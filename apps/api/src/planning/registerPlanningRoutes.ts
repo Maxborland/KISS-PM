@@ -24,7 +24,7 @@ import {
 import { previewPlanningCommand, previewPlanningCommands } from "./planningCommandCore";
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { createPlanningReadModel } from "./planningReadModel";
-import { canReadPlanningReadModel, permissionForCommand } from "./planningRouteAuth";
+import { canReadPlanningReadModel, includeResourceExceptionsFor, permissionForCommand } from "./planningRouteAuth";
 import {
   appendPlanningAuditIfConfigured,
   auditActionForCommand,
@@ -142,8 +142,8 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     ];
     const hasBlockingValidationIssue = validationIssues.some(isBlockingValidationIssue);
     return context.json({
-      before: createPlanningReadModel(snapshot),
-      after: createPlanningReadModel(preview.nextSnapshot),
+      before: createPlanningReadModel(snapshot, { includeResourceExceptions: includeResourceExceptionsFor({ actor, profile }) }),
+      after: createPlanningReadModel(preview.nextSnapshot, { includeResourceExceptions: includeResourceExceptionsFor({ actor, profile }) }),
       planDelta: preview.planDelta,
       validationIssues,
       permissionPreview,
@@ -327,7 +327,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         applied: preview.planDelta,
         newPlanVersion,
         auditEventId,
-        readModel: createPlanningReadModel(appliedSnapshot)
+        readModel: createPlanningReadModel(appliedSnapshot, { includeResourceExceptions: includeResourceExceptionsFor({ actor, profile }) })
       };
       if (idempotencyKey && requestHash) {
         await transactionDataSource.createPlanningCommandIdempotency?.({
@@ -512,7 +512,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         applied: batchPreview.planDelta,
         newPlanVersion,
         auditEventId,
-        readModel: createPlanningReadModel(appliedSnapshot)
+        readModel: createPlanningReadModel(appliedSnapshot, { includeResourceExceptions: includeResourceExceptionsFor({ actor, profile }) })
       };
       if (idempotencyKey && requestHash) {
         await transactionDataSource.createPlanningCommandIdempotency?.({
@@ -623,7 +623,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       return context.json({ error: "plan_version_conflict", currentPlanVersion: snapshot.planVersion }, 409);
     }
 
-    const readModel = createPlanningReadModel(snapshot);
+    const readModel = createPlanningReadModel(snapshot, { includeResourceExceptions: includeResourceExceptionsFor({ actor, profile }) });
     const proposals = proposePlanningScenarios({
       snapshot,
       calculatedPlan: readModel.calculatedPlan,
@@ -892,7 +892,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
           scenarioRunId: scenarioRun.id,
           newPlanVersion,
           auditEventId,
-          readModel: createPlanningReadModel(appliedSnapshot)
+          readModel: createPlanningReadModel(appliedSnapshot, { includeResourceExceptions: includeResourceExceptionsFor({ actor, profile }) })
         }
       };
     });

@@ -54,7 +54,7 @@ type RMCalc = { id: string; calculatedStart: string; calculatedFinish: string; t
 type RMDep = { id: string; predecessorTaskId: string; successorTaskId: string; type: string; lagMinutes: number };
 type RMBaseTask = { taskId: string; baselineStart: string | null; baselineFinish: string | null };
 
-function mapRows(rm: PlanningReadModel): { rows: Row[]; deadlineDay: number; projectFinishDay: number } {
+function mapRows(rm: PlanningReadModel): { rows: Row[]; deadlineDay: number | null; projectFinishDay: number } {
   const authored = rm.authored as unknown as { tasks: RMTask[]; dependencies: RMDep[] };
   const calc = (rm.calculatedPlan as unknown as { tasks: RMCalc[] }).tasks;
   const baseCmp = (rm.baselineComparison as unknown as { tasks: RMBaseTask[] }).tasks ?? [];
@@ -139,7 +139,7 @@ function mapRows(rm: PlanningReadModel): { rows: Row[]; deadlineDay: number; pro
 
   return {
     rows,
-    deadlineDay: project.deadline ? isoToDay(project.deadline) : 0,
+    deadlineDay: project.deadline ? isoToDay(project.deadline) : null,
     projectFinishDay: project.plannedFinish ? isoToDay(project.plannedFinish) : 0
   };
 }
@@ -537,7 +537,7 @@ export function ProjectSchedule() {
 
   const projectMeta = deriveProjectMeta(readModel, PROJECT);
   const { rows, deadlineDay, projectFinishDay } = mapped;
-  const totalDays = Math.max(7, Math.ceil((Math.max(projectFinishDay, deadlineDay, ...rows.map((r) => r.dayStart + r.dayDur)) + 6) / 7) * 7);
+  const totalDays = Math.max(7, Math.ceil((Math.max(projectFinishDay, deadlineDay ?? 0, ...rows.map((r) => r.dayStart + r.dayDur)) + 6) / 7) * 7);
   const weeks = totalDays / 7;
   const timelineW = totalDays * dayW;
   const weekW = 7 * dayW;
@@ -1000,7 +1000,7 @@ export function ProjectSchedule() {
                 {Array.from({ length: weeks }, (_, i) => <span key={i} className="v4-num shrink-0 border-r border-[var(--border-subtle)] px-2 text-[length:var(--text-xs)] leading-9 text-[var(--muted)]" style={{ width: weekW }}>{weekLabel(i)}</span>)}
               </div>
               <span className="pointer-events-none absolute bottom-0 top-9 z-[1] w-px bg-[var(--accent)]" style={{ left: TODAY_DAY * dayW }} title="Сегодня" />
-              <span className="pointer-events-none absolute bottom-0 top-9 z-[1] w-px border-l border-dashed border-[var(--danger)]" style={{ left: deadlineDay * dayW }} title="Дедлайн 12.07" />
+              {deadlineDay !== null && <span className="pointer-events-none absolute bottom-0 top-9 z-[1] w-px border-l border-dashed border-[var(--danger)]" style={{ left: deadlineDay * dayW }} title="Дедлайн" />}
               {visibleRows.map((r) => {
                 const dragging = drag?.id === r.id;
                 const dMove = dragging && drag.mode === "move" ? drag.deltaDays : 0;

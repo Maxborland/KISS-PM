@@ -554,6 +554,11 @@ export function createCrmRepository(db: KissPmDatabase): CrmRepository {
         .update(crmPipelines)
         .set({
           name: input.name,
+          // Унификация: операционные поля воронки должны сохраняться (иначе reorder/смена дефолта
+          // принимаются с 200/аудитом, но БД не меняется).
+          description: input.description,
+          isDefault: input.isDefault,
+          sortOrder: input.sortOrder,
           status: input.status,
           lifecycleGraphMetadata: input.lifecycleGraphMetadata,
           updatedAt: new Date()

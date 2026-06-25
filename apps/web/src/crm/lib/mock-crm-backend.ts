@@ -640,7 +640,7 @@ export function createMockCrmFetch(): typeof fetch {
       const idx = db.stageTransitions.findIndex((tr) => tr.id === transitionId && tr.pipelineId === pipelineId);
       if (idx < 0) return err("stage_transition_not_found", 404);
       db.stageTransitions.splice(idx, 1);
-      return json({ ok: true });
+      return json({ status: "ok" }); // OkResponse-контракт { status: "ok" } (как боевой API)
     }
 
     /* ---- мультиворонки: кросс-пайплайн перенос сделки ---- */

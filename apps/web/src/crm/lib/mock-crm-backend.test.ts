@@ -244,7 +244,7 @@ describe("contract-mock CRM backend", () => {
     // Удаление через чужую воронку → not_found.
     await expect(c.deleteStageTransition("pipeline-partner", created.stageTransition.id)).rejects.toMatchObject({ status: 404, code: "stage_transition_not_found" });
     const ok = await c.deleteStageTransition("pipeline-main", created.stageTransition.id);
-    expect(ok.ok).toBe(true);
+    expect(ok.status).toBe("ok");
   });
 
   it("creates a pipeline and lists it", async () => {

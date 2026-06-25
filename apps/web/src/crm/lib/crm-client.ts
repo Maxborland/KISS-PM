@@ -178,7 +178,7 @@ export function createCrmClient(options: CrmApiClientOptions) {
     updatePipeline(pipelineId: string, input: { name: string; sortOrder: number; description?: string | null; isDefault?: boolean; status?: CrmStatus }) { return requestJson<{ pipeline: Pipeline }>(`/api/workspace/pipelines/${enc(pipelineId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     listStageTransitions(pipelineId: string) { return requestJson<{ stageTransitions: StageTransition[] }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`); },
     createStageTransition(pipelineId: string, input: { fromStageId: string; toStageId: string; requireFeasibilityOk?: boolean; minProbability?: number | null; guardNote?: string | null }) { return requestJson<{ stageTransition: StageTransition }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`, { method: "POST", body: JSON.stringify(input) }); },
-    deleteStageTransition(pipelineId: string, transitionId: string) { return requestJson<{ ok: true }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions/${enc(transitionId)}`, { method: "DELETE" }); },
+    deleteStageTransition(pipelineId: string, transitionId: string) { return requestJson<{ status: "ok" }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions/${enc(transitionId)}`, { method: "DELETE" }); },
     moveOpportunityPipeline(opportunityId: string, input: { pipelineId: string; stageId: string }) { return requestJson<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${enc(opportunityId)}/pipeline`, { method: "PATCH", body: JSON.stringify(input) }); },
 
     // Карточка сделки: полное обновление (full-replace, как боевой parseOpportunityUpdateBody).
