@@ -33,15 +33,20 @@ function QualityBars({ quality }: { quality: QualityLevel }) {
 // attach callback (camera or shared screen), otherwise the avatar fallback.
 export function ParticipantTile({ view }: { view: ParticipantTileView }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const attachRef = useRef(view.attachVideo);
+  attachRef.current = view.attachVideo;
   const showVideo = Boolean(view.attachVideo);
-  const attachVideo = view.attachVideo;
+  const videoKey = view.videoTrackId;
 
   useEffect(() => {
     const element = videoRef.current;
-    if (!attachVideo || !element || !showVideo) return;
-    attachVideo(element);
-    return () => attachVideo(null);
-  }, [attachVideo, showVideo]);
+    const attach = attachRef.current;
+    if (!attach || !element || !showVideo) return;
+    attach(element);
+    // Re-attach only when the underlying track changes (videoKey), NOT on every roster
+    // refresh (active-speaker / quality events) — otherwise the video flickers/restarts.
+    return () => attach(null);
+  }, [videoKey, showVideo]);
 
   return (
     <div className={cn("call-tile", view.speaking && "call-tile--speaking")}>

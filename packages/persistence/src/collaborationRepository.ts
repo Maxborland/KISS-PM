@@ -1502,7 +1502,9 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         .where(
           and(
             eq(callRecordings.tenantId, input.tenantId),
-            eq(callRecordings.egressId, input.egressId)
+            eq(callRecordings.egressId, input.egressId),
+            // Claim-once: a concurrent/retried reconcile that already attached matches 0 rows.
+            isNull(callRecordings.attachmentId)
           )
         )
         .returning();

@@ -130,7 +130,7 @@ export function MeetingDetailBlock() {
           </li>
         </ul>
       </CardPanel>
-      <CardPanel title="Задачи встречи" subtitle="Action items" className="u-mt-3">
+      <CardPanel title="Задачи встречи" subtitle="Поручения по итогам" className="u-mt-3">
         <ul className="link-list">
           <li>Подготовить план миграции — Пётр Алексеев</li>
           <li>Согласовать график обучения — Анна Кузнецова</li>

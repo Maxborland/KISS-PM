@@ -43,20 +43,31 @@ async function reconcile(
 ): Promise<void> {
   const egressId = egressInfo.egressId;
   const fileResult = egressInfo.fileResults?.[0];
+  const storageKey = fileResult?.filename ?? "";
   // Tenant is parsed from the egress output key (recordings/{tenantId}/...) that WE set,
   // never trusted from a free-form payload field.
-  const tenantId = parseTenantFromStorageKey(fileResult?.filename ?? "");
+  const tenantId = parseTenantFromStorageKey(storageKey);
   if (!tenantId || !egressId) return;
 
   const sizeBytes = fileResult?.size ? Number(fileResult.size) : 0;
-  const durationSeconds = fileResult?.duration ? Number(fileResult.duration) : null;
+  // Skip failed/empty egresses — the janitor reaps the stuck row instead of minting a 0-byte attachment.
+  if (sizeBytes <= 0) return;
+  // FileInfo.duration is reported in int64 NANOSECONDS — convert to whole seconds.
+  const durationSeconds = fileResult?.duration ? Math.round(Number(fileResult.duration) / 1e9) : null;
 
   const recordingWorkspace = createCommunicationRecordingWorkspace({
     dataSource: deps.dataSource,
     egressProvider,
     appendManagementAuditEvent: deps.appendManagementAuditEvent
   });
-  await recordingWorkspace.reconcileEgressEnded({ tenantId, egressId, sizeBytes, durationSeconds });
+  // storageKey is the authoritative codec-correct filename LiveKit reported.
+  await recordingWorkspace.reconcileEgressEnded({
+    tenantId,
+    egressId,
+    storageKey,
+    sizeBytes,
+    durationSeconds
+  });
 }
 
 function parseTenantFromStorageKey(key: string): string | null {

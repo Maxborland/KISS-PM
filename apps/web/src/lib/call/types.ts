@@ -34,6 +34,8 @@ export type ParticipantTileView = {
   sharingScreen?: boolean;
   quality?: QualityLevel;
   self?: boolean;
+  /** LiveKit track sid of the currently displayed track; drives stable re-attach. */
+  videoTrackId?: string | undefined;
   attachVideo?: VideoAttach;
 };
 

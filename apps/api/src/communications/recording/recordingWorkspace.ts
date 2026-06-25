@@ -22,6 +22,7 @@ export type CommunicationRecordingDataSource = Pick<
   | "listCallRecordingsByGroup"
   | "markFileAssetReady"
   | "updateCallRecordingByEgress"
+  | "withTransaction"
 >;
 
 export type CommunicationRecordingWorkspaceDeps = {
@@ -46,8 +47,27 @@ function recordingFilepath(parts: {
   trackId: string;
   kind: "audio" | "video";
 }): string {
-  const ext = parts.kind === "audio" ? "ogg" : "mp4";
+  // Track Egress applies the codec-correct container extension (Opus→.ogg, VP8/VP9→.webm,
+  // H264→.mp4); the requested suffix is only a hint. reconcile uses the authoritative
+  // filename from the egress_ended webhook, not this rebuilt path.
+  const ext = parts.kind === "audio" ? "ogg" : "webm";
   return `recordings/${parts.tenantId}/${parts.roomId}/${parts.sessionId ?? "no-session"}/${parts.recordingGroupId}/${parts.participantId}/${parts.trackId}.${ext}`;
+}
+
+class RecordingRaceLost extends Error {}
+
+function requireFn<T>(fn: T | undefined): T {
+  if (!fn) throw new Error("communications_not_configured");
+  return fn;
+}
+
+function mimeForStorageKey(key: string): string {
+  if (key.endsWith(".webm")) return "video/webm";
+  if (key.endsWith(".ogg") || key.endsWith(".opus")) return "audio/ogg";
+  if (key.endsWith(".mp4")) return "video/mp4";
+  if (key.endsWith(".h264")) return "video/h264";
+  if (key.endsWith(".ivf")) return "video/x-ivf";
+  return "application/octet-stream";
 }
 
 function recordingAudit(input: {
@@ -111,23 +131,34 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
           trackId: track.trackId,
           filepath
         });
-        const recording = await dataSource.createCallRecording({
-          id: recordingId,
-          tenantId: input.actor.tenantId,
-          roomId: input.room.id,
-          sessionId: input.session.id,
-          recordingGroupId,
-          attachmentId: null,
-          egressId,
-          participantId: track.participantIdentity,
-          trackId: track.trackId,
-          kind: track.kind,
-          status: "recording",
-          durationSeconds: null,
-          endedAt: null,
-          title: `Запись · ${track.participantIdentity}`,
-          createdByUserId: input.actor.id
-        });
+        let recording: CallRecording;
+        try {
+          recording = await dataSource.createCallRecording({
+            id: recordingId,
+            tenantId: input.actor.tenantId,
+            roomId: input.room.id,
+            sessionId: input.session.id,
+            recordingGroupId,
+            attachmentId: null,
+            egressId,
+            participantId: track.participantIdentity,
+            trackId: track.trackId,
+            kind: track.kind,
+            status: "recording",
+            durationSeconds: null,
+            endedAt: null,
+            title: `Запись · ${track.participantIdentity}`,
+            createdByUserId: input.actor.id
+          });
+        } catch (cause) {
+          // Never leave the just-started egress orphaned without a DB row to reap it.
+          try {
+            await egressProvider.stopEgress(egressId);
+          } catch {
+            // best-effort
+          }
+          throw cause;
+        }
         recordings.push(recording);
       }
 
@@ -190,85 +221,89 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
       return { ok: true, stopped };
     },
 
-    /** Reconcile an egress_ended webhook: link the per-track file as an attachment and mark ready. */
+    /**
+     * Reconcile an egress_ended webhook: link the per-track file as an attachment and
+     * mark the recording ready. The storageKey is the AUTHORITATIVE filename LiveKit
+     * reported (codec-correct extension), not a rebuilt guess. Runs in a transaction
+     * with a claim-once update so concurrent/retried webhook deliveries cannot create
+     * duplicate file assets/attachments.
+     */
     async reconcileEgressEnded(input: {
       tenantId: string;
       egressId: string;
+      storageKey: string;
       sizeBytes: number;
       durationSeconds: number | null;
     }): Promise<{ reconciled: boolean }> {
-      if (
-        !dataSource.findCallRecordingByEgressId ||
-        !dataSource.findCallRoom ||
-        !dataSource.createPendingFileAsset ||
-        !dataSource.markFileAssetReady ||
-        !dataSource.createEntityAttachment ||
-        !dataSource.updateCallRecordingByEgress
-      ) {
-        return { reconciled: false };
+      if (!dataSource.withTransaction) return { reconciled: false };
+      try {
+        return await dataSource.withTransaction(async (tx) => {
+          const findRecording = requireFn(tx.findCallRecordingByEgressId);
+          const findRoom = requireFn(tx.findCallRoom);
+          const createAsset = requireFn(tx.createPendingFileAsset);
+          const markReady = requireFn(tx.markFileAssetReady);
+          const createAttachment = requireFn(tx.createEntityAttachment);
+          const updateRecording = requireFn(tx.updateCallRecordingByEgress);
+
+          // Tenant was parsed by the webhook route from OUR egress output key
+          // (recordings/{tenantId}/...), not trusted from a free-form payload field.
+          const recording = await findRecording({
+            tenantId: input.tenantId,
+            egressId: input.egressId
+          });
+          if (!recording) return { reconciled: false };
+          if (recording.attachmentId) return { reconciled: true }; // already done
+
+          const room = await findRoom(recording.tenantId, recording.roomId);
+          if (!room) return { reconciled: false };
+
+          const displayName = input.storageKey.split("/").pop() || recording.title;
+          const asset = await createAsset({
+            id: `file-asset-${randomUUID()}`,
+            tenantId: recording.tenantId,
+            provider: "s3",
+            storageKey: input.storageKey,
+            originalName: displayName,
+            safeDisplayName: displayName,
+            mimeType: mimeForStorageKey(input.storageKey),
+            sizeBytes: input.sizeBytes,
+            createdByUserId: recording.createdByUserId
+          });
+          await markReady({
+            tenantId: recording.tenantId,
+            assetId: asset.id,
+            sizeBytes: input.sizeBytes,
+            checksumSha256: ""
+          });
+          const attachment = await createAttachment({
+            id: `entity-attachment-${randomUUID()}`,
+            tenantId: recording.tenantId,
+            entityType: room.entityType as AttachmentEntityType,
+            entityId: room.entityId,
+            assetId: asset.id,
+            externalReferenceId: null,
+            relationType: "call_recording",
+            sourceActivityType: null,
+            sourceActivityId: null,
+            createdByUserId: recording.createdByUserId
+          });
+          const updated = await updateRecording({
+            tenantId: recording.tenantId,
+            egressId: input.egressId,
+            status: "ready",
+            attachmentId: attachment.id,
+            durationSeconds: input.durationSeconds,
+            endedAt: new Date()
+          });
+          // updateCallRecordingByEgress matches only when attachment_id IS NULL, so a
+          // concurrent delivery that already attached yields no row — roll the txn back.
+          if (!updated) throw new RecordingRaceLost();
+          return { reconciled: true };
+        });
+      } catch (error) {
+        if (error instanceof RecordingRaceLost) return { reconciled: true };
+        throw error;
       }
-      // Tenant is parsed by the webhook route from the egress output path
-      // (recordings/{tenantId}/...), not trusted from any free-form payload field.
-      const recording = await dataSource.findCallRecordingByEgressId({
-        tenantId: input.tenantId,
-        egressId: input.egressId
-      });
-      if (!recording) return { reconciled: false };
-      if (recording.attachmentId) return { reconciled: true }; // idempotent
-
-      const room = await dataSource.findCallRoom(recording.tenantId, recording.roomId);
-      if (!room) return { reconciled: false };
-
-      const storageKey = recordingFilepath({
-        tenantId: recording.tenantId,
-        roomId: recording.roomId,
-        sessionId: recording.sessionId,
-        recordingGroupId: recording.recordingGroupId,
-        participantId: recording.participantId ?? "unknown",
-        trackId: recording.trackId ?? recording.id,
-        kind: recording.kind === "audio" ? "audio" : "video"
-      });
-      const mimeType = recording.kind === "audio" ? "audio/ogg" : "video/mp4";
-      const displayName = `${recording.title}.${recording.kind === "audio" ? "ogg" : "mp4"}`;
-
-      const asset = await dataSource.createPendingFileAsset({
-        id: `file-asset-${randomUUID()}`,
-        tenantId: recording.tenantId,
-        provider: "s3",
-        storageKey,
-        originalName: displayName,
-        safeDisplayName: displayName,
-        mimeType,
-        sizeBytes: input.sizeBytes,
-        createdByUserId: recording.createdByUserId
-      });
-      await dataSource.markFileAssetReady({
-        tenantId: recording.tenantId,
-        assetId: asset.id,
-        sizeBytes: input.sizeBytes,
-        checksumSha256: ""
-      });
-      const attachment = await dataSource.createEntityAttachment({
-        id: `entity-attachment-${randomUUID()}`,
-        tenantId: recording.tenantId,
-        entityType: room.entityType as AttachmentEntityType,
-        entityId: room.entityId,
-        assetId: asset.id,
-        externalReferenceId: null,
-        relationType: "call_recording",
-        sourceActivityType: null,
-        sourceActivityId: null,
-        createdByUserId: recording.createdByUserId
-      });
-      await dataSource.updateCallRecordingByEgress({
-        tenantId: recording.tenantId,
-        egressId: input.egressId,
-        status: "ready",
-        attachmentId: attachment.id,
-        durationSeconds: input.durationSeconds,
-        endedAt: new Date()
-      });
-      return { reconciled: true };
     }
   };
 }

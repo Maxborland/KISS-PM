@@ -112,6 +112,7 @@ function tileFor(participant: Participant, self: boolean, speakingIds: Set<strin
   };
 
   if (displayTrack) {
+    tile.videoTrackId = displayTrack.sid;
     tile.attachVideo = (element) => {
       if (element) displayTrack.attach(element);
       else displayTrack.detach();

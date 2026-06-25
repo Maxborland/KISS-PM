@@ -23,6 +23,8 @@ export type LobbyPreview = {
 export function useLobbyPreview(): LobbyPreview {
   const trackRef = useRef<LocalVideoTrack | null>(null);
   const elementRef = useRef<HTMLVideoElement | null>(null);
+  const epochRef = useRef(0);
+  const disposedRef = useRef(false);
   const [cameras, setCameras] = useState<LobbyDevice[]>([]);
   const [microphones, setMicrophones] = useState<LobbyDevice[]>([]);
   const [selection, setSelection] = useState<LobbySelection>({ micOn: true, cameraOn: true });
@@ -39,13 +41,22 @@ export function useLobbyPreview(): LobbyPreview {
 
   const startPreview = useCallback(
     async (deviceId?: string) => {
+      const epoch = (epochRef.current += 1);
       stopPreview();
       try {
         const track = await createLocalVideoTrack(deviceId ? { deviceId } : {});
+        // A newer startPreview began (rapid device switch) or the hook unmounted while we
+        // awaited getUserMedia — stop the just-created track instead of orphaning the camera.
+        if (disposedRef.current || epoch !== epochRef.current) {
+          track.stop();
+          track.detach();
+          return;
+        }
         trackRef.current = track;
         if (elementRef.current) track.attach(elementRef.current);
         setPermissionError(null);
       } catch (cause) {
+        if (disposedRef.current || epoch !== epochRef.current) return;
         const denied = cause instanceof Error && cause.name === "NotAllowedError";
         setPermissionError(denied ? "Доступ к камере запрещён" : "Камера недоступна");
       }
@@ -72,11 +83,15 @@ export function useLobbyPreview(): LobbyPreview {
   }, []);
 
   useEffect(() => {
+    disposedRef.current = false;
     void (async () => {
       await startPreview(undefined);
       await enumerate();
     })();
-    return () => stopPreview();
+    return () => {
+      disposedRef.current = true;
+      stopPreview();
+    };
   }, [startPreview, enumerate, stopPreview]);
 
   const attachPreview = useCallback<VideoAttach>((element) => {
