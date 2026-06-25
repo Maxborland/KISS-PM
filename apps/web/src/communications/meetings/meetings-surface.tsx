@@ -230,7 +230,7 @@ export function MeetingsSurface() {
       <div className="flex flex-col gap-3">
         {/* Честный баннер «Прототип» */}
         <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
           <span>
             Реальный контракт: /api/workspace/meetings (GET список, POST создать, PATCH статус, POST .../notes, .../external-links, .../action-items). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.
             {" "}В этом слайсе нет GET-ручки деталей митинга, поэтому участники/ноты/ссылки/action-items — демо-снимок плюс добавленные за сессию (приватные URL отклоняются 400; статус action-item всегда «open»).
@@ -242,7 +242,7 @@ export function MeetingsSurface() {
           <section className="flex flex-col gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-2 shadow-[var(--shadow-card)]">
             <div className="flex items-center justify-between gap-2 px-1 pt-1">
               <h2 className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Встречи</h2>
-              <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-strong)]">{meetings.length}</span>
+              <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{meetings.length}</span>
             </div>
             {meetings.length === 0 ? (
               <EmptyState title="Встреч пока нет" description="Создайте первую встречу кнопкой «Встреча»." />
@@ -356,7 +356,7 @@ function MeetingDetailPanel({
 
           <h3 className="mt-4 mb-2 flex items-center gap-1.5 text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">
             <Users className="size-4" aria-hidden /> Участники
-            <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-strong)]">{detail.participants.length}</span>
+            <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{detail.participants.length}</span>
           </h3>
           {detail.participants.length === 0 ? (
             <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Участники подтянутся с сервера в приложении.</p>
@@ -402,7 +402,7 @@ function NotesCard({ notes, busy, onAdd }: { notes: MeetingNote[]; busy: boolean
     <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
       <h3 className="mb-3 flex items-center gap-1.5 text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">
         <StickyNote className="size-4" aria-hidden /> Заметки
-        <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-strong)]">{notes.length}</span>
+        <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{notes.length}</span>
       </h3>
       <div className="mb-3 flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] p-2.5">
         <Textarea rows={2} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Добавить заметку к встрече…" />
@@ -422,7 +422,7 @@ function NotesCard({ notes, busy, onAdd }: { notes: MeetingNote[]; busy: boolean
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{author}</strong>
-                    <span className="text-[10px] text-[var(--muted-soft)]">{relTime(n.createdAt)}</span>
+                    <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{relTime(n.createdAt)}</span>
                   </div>
                   <p className="mt-0.5 whitespace-pre-wrap text-[length:var(--text-sm)] text-[var(--text)]">{n.body}</p>
                 </div>
@@ -450,7 +450,7 @@ function ExternalLinksCard({ links, busy, onAdd }: { links: MeetingExternalLink[
     <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
       <h3 className="mb-3 flex items-center gap-1.5 text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">
         <Link2 className="size-4" aria-hidden /> Внешние ссылки
-        <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-strong)]">{links.length}</span>
+        <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{links.length}</span>
       </h3>
       {links.length === 0 ? (
         <p className="mb-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Ссылок пока нет.</p>
@@ -474,7 +474,7 @@ function ExternalLinksCard({ links, busy, onAdd }: { links: MeetingExternalLink[
           <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Комната встречи" /></label>
         </div>
         <label className={labelCls}>URL<Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://zoom.us/j/…" /></label>
-        <p className="text-[10px] text-[var(--muted-soft)]">Приватные адреса (localhost/внутренняя сеть) отклоняются сервером — 400.</p>
+        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Приватные адреса (localhost/внутренняя сеть) отклоняются сервером — 400.</p>
         <div className="flex justify-end">
           <Button variant="default" size="sm" disabled={busy || !valid} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Добавить</Button>
         </div>
@@ -498,9 +498,9 @@ function ActionItemsCard({ items, busy, onAdd }: { items: MeetingActionItem[]; b
     <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
       <h3 className="mb-1 flex items-center gap-1.5 text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">
         <CheckSquare className="size-4" aria-hidden /> Action items
-        <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-strong)]">{items.length}</span>
+        <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{items.length}</span>
       </h3>
-      <p className="mb-3 text-[10px] text-[var(--muted-soft)]">Создаются со статусом «open»; изменение статуса появится в приложении (мутации статуса в этом слайсе нет).</p>
+      <p className="mb-3 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Создаются со статусом «open»; изменение статуса появится в приложении (мутации статуса в этом слайсе нет).</p>
       {items.length === 0 ? (
         <p className="mb-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Задач по итогам встречи пока нет.</p>
       ) : (
@@ -512,7 +512,7 @@ function ActionItemsCard({ items, busy, onAdd }: { items: MeetingActionItem[]; b
                 <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-[4px] border border-[var(--border-strong)] bg-[var(--panel)]" title="Статус «open» — переключение в приложении" aria-hidden />
                 <div className="min-w-0 flex-1">
                   <p className="text-[length:var(--text-sm)] text-[var(--text)]">{it.title}</p>
-                  <p className="text-[10px] text-[var(--muted-soft)]">
+                  <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
                     {owner}
                     {it.dueDate ? ` · срок ${it.dueDate}` : ""}
                   </p>
@@ -630,7 +630,7 @@ function CreateMeetingDialog({
               );
             })}
           </ul>
-          <p className="mt-2 text-[10px] text-[var(--muted-soft)]">Организатором становится текущий пользователь (accepted); выбранным уйдёт meeting_invite.</p>
+          <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Организатором становится текущий пользователь (accepted); выбранным уйдёт meeting_invite.</p>
         </div>
 
         <DialogFooter>

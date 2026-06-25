@@ -62,7 +62,7 @@ export function ResourceEditor({ onPick, children }: { onPick: (resourceId: stri
                 onClick={() => onPick(r.id)}
                 className="flex items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-left hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
               >
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[10px] font-semibold text-[var(--muted-strong)]">
+                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">
                   {r.name.slice(0, 1)}
                 </span>
                 {r.name}
@@ -105,7 +105,7 @@ export function DependencyEditor({
                 {preds.map((p) => (
                   <li key={p.depId} className="flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1">
                     <span className="mono text-[var(--muted)]">{p.predLabel}</span>
-                    <span className="rounded bg-[var(--panel-strong)] px-1 text-[10px] font-semibold text-[var(--muted-strong)]">{DEP_RU[p.type] ?? p.type}{p.lagDays ? ` +${p.lagDays}д` : ""}</span>
+                    <span className="rounded bg-[var(--panel-strong)] px-1 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{DEP_RU[p.type] ?? p.type}{p.lagDays ? ` +${p.lagDays}д` : ""}</span>
                     <button type="button" onClick={() => onRemove(p.depId)} className="ml-auto grid size-5 place-items-center rounded text-[var(--muted)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger-text)]" aria-label="Убрать зависимость"><X className="size-3.5" aria-hidden /></button>
                   </li>
                 ))}

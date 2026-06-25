@@ -115,11 +115,11 @@ export function ProjectSettings() {
             <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Настройки проекта</h2>
             <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Project-level параметры. Настройки рабочей области (labels, роли) — в Workspace.</p>
           </div>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--accent)]">Прототип · in-memory</span>
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-[var(--accent)]">Прототип · in-memory</span>
         </div>
 
         <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-          <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
           Дедлайн релиза редактируется через реальный контракт project.deadline.move (дата + причина → preview/apply, bump версии). Календарь и остальные поля — read-only из плана. Данные in-memory.
         </div>
 
@@ -203,7 +203,7 @@ export function ProjectSettings() {
                 <div key={it.name} className="flex flex-col rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel-subtle)] p-3">
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <span className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{it.name}</span>
-                    <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[10px] font-medium text-[var(--muted-strong)]">{it.tag}</span>
+                    <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-strong)]">{it.tag}</span>
                   </div>
                   <p className="text-[length:var(--text-xs)] text-[var(--muted)]">{it.desc}</p>
                   <Button variant="secondary" size="sm" className="mt-2.5 self-start" {...demoAction(it.what)}>{it.btn}</Button>

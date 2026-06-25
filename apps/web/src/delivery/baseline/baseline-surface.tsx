@@ -109,7 +109,7 @@ export function ProjectBaseline() {
       </div>
 
       <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         Реальный контракт: baselineComparison (per-task дельты сроков/труда) + команда baseline.capture (фиксация снимка, аудит planning.baseline.captured). Данные in-memory.
       </div>
 
@@ -125,7 +125,7 @@ export function ProjectBaseline() {
                   <GitCommitVertical className={cn("mt-0.5 size-4 shrink-0", active ? "text-[var(--info)]" : "text-[var(--muted-soft)]")} aria-hidden />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5"><span className="truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{b.label ?? "Снимок плана"}</span>
-                      <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold", active ? "bg-[var(--info-soft)] text-[var(--info)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{active ? "активный" : "архив"}</span>
+                      <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", active ? "bg-[var(--info-soft)] text-[var(--info)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{active ? "активный" : "архив"}</span>
                     </div>
                     <div className="mono mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{dt(b.capturedAt)} · {b.tasks.length} задач</div>
                   </div>
@@ -144,7 +144,7 @@ export function ProjectBaseline() {
               <div key={t.label} className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 shadow-[var(--shadow-card)]">
                 <div className="text-[length:var(--text-xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">{t.label}</div>
                 <div className={cn("v4-num text-[22px] font-extrabold leading-tight", t.tone)}>{t.value}</div>
-                <div className="mt-0.5 text-[10px] text-[var(--muted-soft)]">{t.sub}</div>
+                <div className="mt-0.5 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{t.sub}</div>
               </div>
             ))}
           </div>
@@ -175,7 +175,7 @@ export function ProjectBaseline() {
                     return (
                       <tr key={t.taskId} className="border-b border-[var(--border-subtle)] last:border-b-0">
                         <td className="mono px-2 py-1.5 text-[var(--muted)]">{task?.wbsCode ?? t.taskId}</td>
-                        <td className="px-2 py-1.5"><span className="flex items-center gap-1.5"><span className="truncate text-[var(--text)]">{task?.title ?? t.taskId}</span>{model.critical.has(t.taskId) ? <span className="shrink-0 rounded-full bg-[var(--danger-soft)] px-1.5 text-[10px] font-semibold text-[var(--danger-text)]">кр.путь</span> : null}{deleted ? <span className="shrink-0 rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-soft)]">удалена</span> : null}</span></td>
+                        <td className="px-2 py-1.5"><span className="flex items-center gap-1.5"><span className="truncate text-[var(--text)]">{task?.title ?? t.taskId}</span>{model.critical.has(t.taskId) ? <span className="shrink-0 rounded-full bg-[var(--danger-soft)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--danger-text)]">кр.путь</span> : null}{deleted ? <span className="shrink-0 rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-soft)]">удалена</span> : null}</span></td>
                         <td className="mono px-2 py-1.5 text-right text-[var(--muted-strong)]">{ddmm(t.baselineFinish)}</td>
                         <td className="mono px-2 py-1.5 text-right text-[var(--text)]">{ddmm(t.currentFinish)}</td>
                         <td className={cn("mono px-2 py-1.5 text-right font-semibold", deleted ? "text-[var(--muted-soft)]" : deltaCls(fd))}>{deleted ? "—" : signDays(fd)}</td>
@@ -195,7 +195,7 @@ export function ProjectBaseline() {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center gap-x-3 border-t border-[var(--border-subtle)] px-3 py-1.5 text-[10px] text-[var(--muted-soft)]">
+            <div className="flex items-center gap-x-3 border-t border-[var(--border-subtle)] px-3 py-1.5 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
               <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-[var(--muted-soft)]" /> базовый финиш</span>
               <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-[var(--warning)]" /> сдвиг вправо (отставание)</span>
               <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-[var(--success)]" /> раньше базового</span>

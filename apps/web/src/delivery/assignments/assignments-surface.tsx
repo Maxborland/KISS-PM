@@ -223,7 +223,7 @@ export function ProjectAssignments() {
       </div>
 
       <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         Реальный контракт: assignment.upsert / assignment.allocations.replace (сумма кривой = трудоёмкости) / assignment.delete. Кривая по дням редактируема; пресеты дают сбалансированную раскладку. Данные in-memory.
       </div>
 
@@ -255,8 +255,8 @@ export function ProjectAssignments() {
                       const isSel = sel === a.id;
                       return (
                         <button key={a.id} type="button" onMouseEnter={() => setHover({ key: `a:${a.id}`, col: -1 })} onClick={() => { setSel(a.id); setDraft(null); }} className={cn("flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-2 text-left outline-none hover:bg-[var(--panel-subtle)]", isSel ? "bg-[var(--accent-soft)]" : crosshair?.key === `a:${a.id}` && CROSS_SOFT)} style={{ height: ROW_H, width: LEFT_W, paddingLeft: 24 }}>
-                        <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[9px] font-semibold text-[var(--muted-strong)]">{r?.name.slice(0, 1)}</span>
-                        <span className="min-w-0 flex-1 truncate text-[length:var(--text-sm)] text-[var(--text)]">{r?.name}{m.hasExplicit ? <span className="ml-1 text-[10px] text-[var(--accent)]">кривая</span> : null}</span>
+                        <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{r?.name.slice(0, 1)}</span>
+                        <span className="min-w-0 flex-1 truncate text-[length:var(--text-sm)] text-[var(--text)]">{r?.name}{m.hasExplicit ? <span className="ml-1 text-[length:var(--text-2xs)] text-[var(--accent)]">кривая</span> : null}</span>
                         <span className="w-[120px] shrink-0 truncate text-right text-[length:var(--text-xs)] text-[var(--muted)]">{roleLabel(a.role)} · {Math.round(a.unitsPermille / 10)}% · {h1(a.workMinutes)} ч</span>
                         </button>
                       );
@@ -269,7 +269,7 @@ export function ProjectAssignments() {
             {/* scrolling: периоды */}
             <div className="relative min-w-0 flex-1">
               <div className="flex border-b border-[var(--border-strong)] bg-[var(--panel-subtle)]" style={{ height: HEADER_H }}>
-                {periods.map((p) => { const inCol = crosshair?.col === p.key; return <span key={p.key} className={cn("flex flex-col items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-xs)] leading-none", inCol && CROSS)} style={{ flex: `1 0 ${colW}px`, minWidth: colW, ...(p.weekend ? { background: WEEKEND_BG } : {}) }}><span className={cn("font-semibold", inCol ? "text-[var(--accent)]" : "text-[var(--muted-strong)]")}>{p.top}</span><span className="mt-0.5 text-[9px] text-[var(--muted-soft)]">{p.sub}</span></span>; })}
+                {periods.map((p) => { const inCol = crosshair?.col === p.key; return <span key={p.key} className={cn("flex flex-col items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-xs)] leading-none", inCol && CROSS)} style={{ flex: `1 0 ${colW}px`, minWidth: colW, ...(p.weekend ? { background: WEEKEND_BG } : {}) }}><span className={cn("font-semibold", inCol ? "text-[var(--accent)]" : "text-[var(--muted-strong)]")}>{p.top}</span><span className="mt-0.5 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{p.sub}</span></span>; })}
               </div>
               {model.leafTasks.map((t) => {
                 const asgs = model.asgByTask.get(t.id) ?? [];
@@ -277,7 +277,7 @@ export function ProjectAssignments() {
                 return (
                   <div key={t.id}>
                     <div onMouseEnter={() => setHover((h) => ({ key: `t:${t.id}`, col: h?.col ?? -1 }))} className="flex border-b border-[var(--border-subtle)] bg-[color-mix(in_oklab,var(--panel-strong)_22%,var(--panel))]" style={{ height: ROW_H }}>
-                      {periods.map((p) => { const tot = metas.reduce((s, m) => s + cellMin(m, p), 0); const inCross = crosshair?.col === p.key || crosshair?.key === `t:${t.id}`; const isFocal = crosshair?.col === p.key && crosshair?.key === `t:${t.id}`; return <span key={p.key} onMouseEnter={() => setHover({ key: `t:${t.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[10px] font-semibold tabular-nums text-[var(--muted-strong)]", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, ...(p.weekend ? { background: WEEKEND_BG } : {}) }}>{tot > 0 ? Math.round(tot / 60) : ""}</span>; })}
+                      {periods.map((p) => { const tot = metas.reduce((s, m) => s + cellMin(m, p), 0); const inCross = crosshair?.col === p.key || crosshair?.key === `t:${t.id}`; const isFocal = crosshair?.col === p.key && crosshair?.key === `t:${t.id}`; return <span key={p.key} onMouseEnter={() => setHover({ key: `t:${t.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] font-semibold tabular-nums text-[var(--muted-strong)]", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, ...(p.weekend ? { background: WEEKEND_BG } : {}) }}>{tot > 0 ? Math.round(tot / 60) : ""}</span>; })}
                     </div>
                     {asgs.length === 0 ? <div className="border-b border-[var(--border-subtle)]" style={{ height: ROW_H }} /> : metas.map((m) => (
                       <div key={m.asg.id} onMouseEnter={() => setHover((h) => ({ key: `a:${m.asg.id}`, col: h?.col ?? -1 }))} className={cn("flex border-b border-[var(--border-subtle)]", sel === m.asg.id && "bg-[var(--accent-soft)]")} style={{ height: ROW_H }}>
@@ -288,7 +288,7 @@ export function ProjectAssignments() {
                           const inCross = crosshair?.col === p.key || crosshair?.key === `a:${m.asg.id}`;
                           const isFocal = crosshair?.col === p.key && crosshair?.key === `a:${m.asg.id}`;
                           const bg = mm > 0 ? `color-mix(in oklab, var(--accent) ${Math.round(14 + intensity * 46)}%, var(--panel))` : p.weekend ? WEEKEND_BG : "transparent";
-                          return <span key={p.key} onMouseEnter={() => setHover({ key: `a:${m.asg.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[10px] tabular-nums", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: bg, color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resName(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? Math.round(hrs) : ""}</span>;
+                          return <span key={p.key} onMouseEnter={() => setHover({ key: `a:${m.asg.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] tabular-nums", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: bg, color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resName(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? Math.round(hrs) : ""}</span>;
                         })}
                       </div>
                     ))}
@@ -327,7 +327,7 @@ export function ProjectAssignments() {
                 </label>
                 <label className="col-span-2 block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Трудозатраты, ч</span>
                   <input key={`w-${selMeta.asg.id}-${selMeta.asg.workMinutes}`} type="number" defaultValue={Math.round(selMeta.asg.workMinutes / 60)} onBlur={(e) => { const v = Math.max(0, Math.round(Number(e.target.value))); if (v * 60 !== selMeta.asg.workMinutes) void upsert(selMeta.asg, { workMinutes: v * 60 }); }} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
-                  <span className="mt-0.5 block text-[10px] text-[var(--muted-soft)]">Изменение труда/единиц сбрасывает кривую к равномерной.</span>
+                  <span className="mt-0.5 block text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Изменение труда/единиц сбрасывает кривую к равномерной.</span>
                 </label>
               </div>
 
@@ -351,7 +351,7 @@ export function ProjectAssignments() {
                     <label key={d} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-1 last:border-b-0">
                       <span className="mono w-[78px] shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{String(dt.getUTCDate()).padStart(2, "0")}.{String(dt.getUTCMonth() + 1).padStart(2, "0")} {DOW[dt.getUTCDay()]}</span>
                       <input type="number" value={Math.round((cur / 60) * 10) / 10} step={0.5} min={0} onChange={(e) => { const map = new Map(curDraft(selMeta)); map.set(d, Math.max(0, Math.round(Number(e.target.value) * 60))); setDraft(map); }} className="h-7 flex-1 rounded border border-[var(--border)] bg-[var(--panel)] px-1 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
-                      <span className="text-[10px] text-[var(--muted-soft)]">ч</span>
+                      <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">ч</span>
                     </label>
                   );
                 })}
@@ -360,7 +360,7 @@ export function ProjectAssignments() {
                 <Button variant="default" size="sm" disabled={busy || selMeta.days.length === 0} onClick={() => applyCurve(selMeta, curDraft(selMeta))}>Применить кривую</Button>
                 {draft ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => { setDraft(null); setCurveErr(null); }}>Отмена</Button> : null}
               </div>
-              <p className="mt-2 text-[10px] text-[var(--muted-soft)]">Сумма по дням должна равняться трудоёмкости назначения — бэкенд отвергнет несбалансированную кривую (optimistic → validate → error).</p>
+              <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Сумма по дням должна равняться трудоёмкости назначения — бэкенд отвергнет несбалансированную кривую (optimistic → validate → error).</p>
 
               <div className="mt-4 border-t border-[var(--border)] pt-3">
                 <Button variant="ghost" size="sm" disabled={busy} onClick={() => removeAsg(selMeta.asg)} className="text-[var(--danger-text)] hover:bg-[var(--danger-soft)]"><Trash2 className="size-3.5" aria-hidden />Снять исполнителя</Button>

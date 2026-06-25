@@ -47,7 +47,7 @@ export function ProjectContacts() {
   return (
     <CrmFrame activeTab="Контакты" subtitle="Справочник контактов" actions={data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createContact} /> : null}>
       <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         Реальный контракт CRM: GET/POST/PATCH /api/workspace/contacts. Контакт создаётся только к активному клиенту; email приводится к нижнему регистру и валидируется. Данные in-memory.
       </div>
 
@@ -72,7 +72,7 @@ export function ProjectContacts() {
             <tbody>
               {(data?.contacts ?? []).map((c) => (
                 <tr key={c.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div><div className="v4-mono text-[10px] text-[var(--muted-soft)]">{c.id}</div></td>
+                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div><div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{c.id}</div></td>
                   <td className="px-3 py-2 text-[var(--muted-strong)]">{clientLabel(c.clientId)}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{c.role ?? "—"}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{c.email ?? "—"}</td>

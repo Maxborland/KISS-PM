@@ -130,7 +130,7 @@ export function ProjectDetailSurface() {
 function ProtoBanner() {
   return (
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
+      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">
         Прототип
       </span>
       <span>
@@ -267,7 +267,7 @@ function ProjectTasks({ tasks }: { tasks: TaskRecord[] }) {
             <tr key={t.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
               <td className="px-3 py-2">
                 <div className="font-medium text-[var(--text-strong)]">{t.title}</div>
-                <div className="v4-mono text-[10px] text-[var(--muted-soft)]">
+                <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
                   {t.id}
                   {t.requiresAcceptance ? " · требует приёмки" : ""}
                 </div>
@@ -360,7 +360,7 @@ function ProjectSummary({ project, tasks }: { project: ProjectRecord; tasks: Tas
               })}
             </ul>
           )}
-          <p className="mt-1 border-t border-[var(--border-subtle)] pt-2 text-[10px] text-[var(--muted-soft)]">
+          <p className="mt-1 border-t border-[var(--border-subtle)] pt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
             Спрос проекта (project.demand из GET /api/workspace/projects/:id) — потребность в часах по позициям.
           </p>
         </div>

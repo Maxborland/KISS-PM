@@ -177,7 +177,7 @@ export function MyWorkSurface() {
                   >
                     <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2">
                       <span className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{s.name}</span>
-                      <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-strong)]">{items.length}</span>
+                      <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{items.length}</span>
                     </div>
                     <div className="flex min-h-[120px] flex-col gap-2 p-2">
                       {items.map((t) => (
@@ -194,7 +194,7 @@ export function MyWorkSurface() {
                         />
                       ))}
                       {items.length === 0 ? (
-                        <div className="grid flex-1 place-items-center rounded-[var(--radius-sm)] border border-dashed border-[var(--border)] py-4 text-[10px] text-[var(--muted-soft)]">
+                        <div className="grid flex-1 place-items-center rounded-[var(--radius-sm)] border border-dashed border-[var(--border)] py-4 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
                           перетащите сюда
                         </div>
                       ) : null}
@@ -223,7 +223,7 @@ export function MyWorkSurface() {
                         <tr key={t.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
                           <td className="px-3 py-2">
                             <div className="font-medium text-[var(--text-strong)]">{t.title}</div>
-                            <div className="v4-mono text-[10px] text-[var(--muted-soft)]">{t.id}</div>
+                            <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{t.id}</div>
                           </td>
                           <td className="px-3 py-2 text-[var(--muted-strong)]">{t.projectId}</td>
                           <td className="px-3 py-2">
@@ -248,7 +248,7 @@ export function MyWorkSurface() {
                           </td>
                           <td className="px-3 py-2">
                             <span className={cn("v4-num text-[length:var(--text-xs)]", due.overdue ? "text-[var(--danger-text)]" : "text-[var(--muted-strong)]")}>{due.date}</span>
-                            <span className="ml-1.5 text-[10px] text-[var(--muted-soft)]">{due.rel}</span>
+                            <span className="ml-1.5 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{due.rel}</span>
                           </td>
                           <td className="px-3 py-2">
                             <span className="flex items-center gap-1.5">
@@ -278,7 +278,7 @@ export function MyWorkSurface() {
 function ProtoBanner() {
   return (
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
+      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">
         Прототип
       </span>
       <span>
@@ -327,12 +327,12 @@ function TaskCard({
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--panel-strong)]">
           <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.min(100, Math.max(0, task.progress))}%` }} />
         </div>
-        <span className="v4-num text-[10px] text-[var(--muted-soft)]">{task.progress}%</span>
+        <span className="v4-num text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{task.progress}%</span>
       </div>
 
       <div className="mt-1.5 flex items-center justify-between gap-2">
-        <span className={cn("v4-num text-[10px]", due.overdue ? "text-[var(--danger-text)]" : "text-[var(--muted-soft)]")}>{due.date}</span>
-        <span className="text-[10px] text-[var(--muted-soft)]">{due.rel}</span>
+        <span className={cn("v4-num text-[length:var(--text-2xs)]", due.overdue ? "text-[var(--danger-text)]" : "text-[var(--muted-soft)]")}>{due.date}</span>
+        <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{due.rel}</span>
       </div>
     </article>
   );

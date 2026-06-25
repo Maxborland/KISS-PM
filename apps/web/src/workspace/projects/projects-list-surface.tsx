@@ -140,7 +140,7 @@ export function ProjectsListSurface() {
 function ProtoBanner() {
   return (
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
+      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">
         Прототип
       </span>
       <span>
@@ -176,7 +176,7 @@ function ProjectsTable({ projects }: { projects: ProjectRecord[] }) {
             >
               <td className="px-3 py-2">
                 <div className="font-medium text-[var(--text-strong)]">{p.title}</div>
-                <div className="v4-mono text-[10px] text-[var(--muted-soft)]">{p.id}</div>
+                <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{p.id}</div>
               </td>
               <td className="px-3 py-2">
                 <span className="flex items-center gap-1.5">

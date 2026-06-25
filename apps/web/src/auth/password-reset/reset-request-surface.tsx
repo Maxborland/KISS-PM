@@ -117,7 +117,7 @@ export function ResetRequestSurface() {
 function PrototypeNote() {
   return (
     <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
+      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">
         Прототип
       </span>
       <span>
@@ -136,7 +136,7 @@ function DevTokenPanel({ token }: { token: string }) {
       <p className="text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">
         Демо: почтового провайдера нет — используйте токен ниже.
       </p>
-      <code className="v4-mono select-all break-all rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[10px] text-[var(--text)]">
+      <code className="v4-mono select-all break-all rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[length:var(--text-2xs)] text-[var(--text)]">
         {token}
       </code>
       {/* Ссылка в Storybook на стори «Подтверждение» + копия токена в URL-параметр для удобства. */}

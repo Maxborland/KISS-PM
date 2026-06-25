@@ -88,7 +88,7 @@ export function NotificationsSurface() {
       }
     >
       <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         <span>
           Реальный контракт: /api/workspace/{"{notifications, notification-preferences}"}. «Прочитать» — POST /notifications/:id/read (не идемпотентно); «Прочитать все» — отдельной ручки нет, поэтому честно шлём по одному POST на каждое непрочитанное. Настройки — PUT /notification-preferences (полный upsert). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.
         </span>
@@ -193,16 +193,16 @@ function NotificationsFeed() {
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className={cn("text-[length:var(--text-sm)]", isUnread ? "font-bold text-[var(--text-strong)]" : "font-semibold text-[var(--text)]")}>{n.title}</span>
                     <Chip>{NOTIF_TYPE_LABEL[n.notificationType]}</Chip>
-                    <span className="text-[10px] text-[var(--muted-soft)]">{relTime(n.createdAt)}</span>
-                    {isUnread ? <span className="text-[10px] font-semibold uppercase tracking-[0.03em] text-[var(--accent-text)]">Новое</span> : null}
+                    <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{relTime(n.createdAt)}</span>
+                    {isUnread ? <span className="text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.03em] text-[var(--accent-text)]">Новое</span> : null}
                   </div>
                   <p className={cn("mt-0.5 text-[length:var(--text-sm)]", isUnread ? "text-[var(--text)]" : "text-[var(--muted)]")}>{n.body}</p>
-                  <p className="mt-0.5 text-[10px] text-[var(--muted-soft)]">{n.route}</p>
+                  <p className="mt-0.5 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{n.route}</p>
                 </div>
                 {isUnread ? (
                   <Button variant="ghost" size="sm" disabled={busy} onClick={() => void readOne(n.id)} className="shrink-0">Прочитать</Button>
                 ) : (
-                  <span className="shrink-0 text-[10px] text-[var(--muted-soft)]">прочитано {n.readAt ? relTime(n.readAt) : ""}</span>
+                  <span className="shrink-0 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">прочитано {n.readAt ? relTime(n.readAt) : ""}</span>
                 )}
               </li>
             );
@@ -351,7 +351,7 @@ export function NotificationsPrefs() {
         </table>
       </div>
 
-      <p className="text-[10px] text-[var(--muted-soft)]">
+      <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
         PUT /notification-preferences — полный upsert: отправляются все {CHANNELS.length * NOTIF_TYPES.length} ячеек (channel × тип), сервер возвращает актуальный набор. Пустой набор → ранний выход (никаких изменений).
       </p>
 

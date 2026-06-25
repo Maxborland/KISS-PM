@@ -126,7 +126,7 @@ export function CallsSurface() {
     >
       {/* Честный баннер «Прототип» */}
       <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         <span>
           Реальный контракт: /api/workspace/call-rooms (комнаты, сессии, события, записи). Данные in-memory.
           Realtime-доставка появится в приложении; здесь обновление по действию (ре-фетч после мутации).
@@ -270,7 +270,7 @@ function RoomDetail({ roomId }: { roomId: string }) {
       {/* Честный inline-баннер с кодом отказа (напр. video_provider_misconfigured) */}
       {errCode ? (
         <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--danger-text)]">
-          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--danger)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">{errCode}</span>
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--danger)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">{errCode}</span>
           <span>
             {commsErr(errCode)}.
             {errCode === "video_provider_misconfigured"
@@ -326,7 +326,7 @@ function RoomDetail({ roomId }: { roomId: string }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{EVENT_LABEL[ev.eventType]}</strong>
-                    <span className="text-[10px] text-[var(--muted-soft)]">{relTime(ev.createdAt)}</span>
+                    <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{relTime(ev.createdAt)}</span>
                   </div>
                   <p className="text-[length:var(--text-xs)] text-[var(--muted)]">
                     {userName(ev.actorUserId)}
@@ -351,8 +351,8 @@ function RoomDetail({ roomId }: { roomId: string }) {
               <li key={rec.id} className="flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--text)]">
                 <CircleDot className="size-3.5 text-[var(--accent-text)]" aria-hidden />
                 <span className="font-medium">{rec.title}</span>
-                <span className="v4-mono text-[10px] text-[var(--muted-soft)]">{rec.attachmentId}</span>
-                <span className="ml-auto text-[10px] text-[var(--muted-soft)]">{relTime(rec.createdAt)}</span>
+                <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{rec.attachmentId}</span>
+                <span className="ml-auto text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{relTime(rec.createdAt)}</span>
               </li>
             ))}
           </ul>
@@ -470,7 +470,7 @@ function CreateRoomDialog({ busy, setBusy, setNotice, create, onCreated }: {
           </label>
           <label className={`col-span-2 ${labelCls}`}>ID комнаты провайдера (опц.)<Input value={providerRoomId} onChange={(e) => setProviderRoomId(e.target.value)} placeholder="portal-sync (уникален в тенанте)" /></label>
         </div>
-        <p className="text-[10px] text-[var(--muted-soft)]">
+        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
           POST /call-rooms — статус принудительно «Открыт». ID комнаты провайдера уникален (409 call_room_provider_room_conflict).
           join-token выдаётся только при совпадении провайдера с настроенным деплоем (jitsi); иначе 409 video_provider_misconfigured.
         </p>

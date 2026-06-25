@@ -178,7 +178,7 @@ export function ProjectCalendars() {
       </div>
 
       <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         Реальный контракт: PlanCalendar (5×8, рабочая неделя read-only) + calendar.exception.upsert (праздник для всех — resourceId=null, отсутствие — по ресурсу). Ёмкость пересчитывается. Данные in-memory.
       </div>
 
@@ -188,7 +188,7 @@ export function ProjectCalendars() {
           <div className="border-b border-[var(--border)] px-3 py-2 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Календари · ресурсы</div>
           <button type="button" onClick={() => setSelCal("project")} className={cn("flex w-full items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-2 text-left hover:bg-[var(--panel-subtle)]", !isResourceView && "bg-[var(--accent-soft)]")}>
             <span className="flex items-center gap-2"><CalendarDays className="size-4 text-[var(--accent)]" aria-hidden /><span className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Календарь проекта</span></span>
-            <span className="rounded-full bg-[var(--accent-soft)] px-1.5 text-[10px] font-semibold text-[var(--accent)]">проект</span>
+            <span className="rounded-full bg-[var(--accent-soft)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--accent)]">проект</span>
           </button>
           <div className="max-h-[520px] overflow-auto">
             {RESOURCES.map((r) => {
@@ -197,10 +197,10 @@ export function ProjectCalendars() {
               return (
                 <button key={r.id} type="button" onClick={() => setSelCal(r.id)} className={cn("flex w-full items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-1.5 text-left hover:bg-[var(--panel-subtle)]", active && "bg-[var(--accent-soft)]")}>
                   <span className="flex min-w-0 items-center gap-2">
-                    <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[9px] font-semibold text-[var(--muted-strong)]">{r.name.slice(0, 1)}</span>
-                    <span className="min-w-0"><span className="block truncate text-[length:var(--text-sm)] text-[var(--text)]">{r.name}</span><span className="block truncate text-[10px] text-[var(--muted-soft)]">{r.positionName}</span></span>
+                    <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{r.name.slice(0, 1)}</span>
+                    <span className="min-w-0"><span className="block truncate text-[length:var(--text-sm)] text-[var(--text)]">{r.name}</span><span className="block truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{r.positionName}</span></span>
                   </span>
-                  {cnt > 0 ? <span className="shrink-0 rounded-full bg-[var(--warning-soft)] px-1.5 text-[10px] font-semibold text-[var(--warning-text)]">правил · {cnt}</span> : <span className="shrink-0 rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-medium text-[var(--muted-soft)]">наследует</span>}
+                  {cnt > 0 ? <span className="shrink-0 rounded-full bg-[var(--warning-soft)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--warning-text)]">правил · {cnt}</span> : <span className="shrink-0 rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-soft)]">наследует</span>}
                 </button>
               );
             })}
@@ -217,8 +217,8 @@ export function ProjectCalendars() {
             </div>
             <span className="text-[length:var(--text-sm)] text-[var(--muted)]">{isResourceView && selRes ? `${selRes.name} · наследует календарь проекта` : "Календарь проекта · базовый"}</span>
             <span className="ml-auto flex items-center gap-1">
-              <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[10px] font-medium text-[var(--muted-strong)]">Пн–Пт</span>
-              <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[10px] font-medium text-[var(--muted-strong)]">8 ч/день</span>
+              <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-strong)]">Пн–Пт</span>
+              <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-strong)]">8 ч/день</span>
             </span>
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -231,12 +231,12 @@ export function ProjectCalendars() {
               return (
                 <button key={day} type="button" disabled={!clickable || busy} onClick={() => toggleDay(day)} title={st.holiday ? `${ddmm(dayToIso(day))} · ${st.holiday.reason || "Праздник"}` : st.absence ? `${ddmm(dayToIso(day))} · ${st.absence.reason || "Отсутствие"}` : st.weekend ? "Выходной" : "Рабочий день — клик: нерабочий"} style={{ background: dayTone.bg, color: dayTone.fg, borderColor: dayTone.border }} className={cn("relative flex h-[58px] flex-col rounded-[var(--radius-sm)] border p-1 text-left outline-none transition-colors", !st.inMonth && "opacity-35", clickable && "hover:ring-1 hover:ring-[var(--accent)]")}>
                   <span className="text-[length:var(--text-xs)] font-semibold tabular-nums">{dt.getUTCDate()}</span>
-                  <span className="mt-auto self-end text-[10px] font-medium">{st.holiday ? "праздник" : st.absence ? (st.absence.reason || "отсутствие").toLowerCase() : st.weekend ? "" : "8 ч"}</span>
+                  <span className="mt-auto self-end text-[length:var(--text-2xs)] font-medium">{st.holiday ? "праздник" : st.absence ? (st.absence.reason || "отсутствие").toLowerCase() : st.weekend ? "" : "8 ч"}</span>
                 </button>
               );
             })}
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[var(--muted-soft)]">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
             <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-[var(--panel-subtle)] ring-1 ring-[var(--border-subtle)]" /> рабочий 8 ч</span>
             <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: NON_WORKING_TONE.weekend.bg }} /> выходной</span>
             <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: NON_WORKING_TONE.holiday.bg, boxShadow: `inset 0 0 0 1px ${NON_WORKING_TONE.holiday.border}` }} /> праздник</span>
@@ -251,7 +251,7 @@ export function ProjectCalendars() {
             <div className="max-h-[300px] overflow-auto">
               {listExc.length === 0 ? <div className="px-3 py-4 text-center text-[length:var(--text-sm)] text-[var(--muted)]">Нет исключений.</div> : listExc.map((x) => (
                 <div key={x.id} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-1.5 last:border-b-0">
-                  <span className={cn("inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold", x.resourceId === null ? "bg-[var(--warning-soft)] text-[var(--warning-text)]" : "bg-[color-mix(in_oklab,var(--violet)_16%,var(--panel))] text-[var(--violet)]")}>{x.resourceId === null ? "праздник" : (x.reason || "отсутствие")}</span>
+                  <span className={cn("inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", x.resourceId === null ? "bg-[var(--warning-soft)] text-[var(--warning-text)]" : "bg-[color-mix(in_oklab,var(--violet)_16%,var(--panel))] text-[var(--violet)]")}>{x.resourceId === null ? "праздник" : (x.reason || "отсутствие")}</span>
                   <span className="mono min-w-0 flex-1 truncate text-[length:var(--text-xs)] text-[var(--muted-strong)]">{ddmm(x.date)}{x.resourceId && x.resourceId !== selCal ? ` · ${resOf(x.resourceId)?.name ?? ""}` : ""}</span>
                   <button type="button" onClick={() => removeExc(x)} disabled={busy} className="grid size-5 shrink-0 place-items-center rounded text-[var(--muted)] hover:bg-[var(--panel-strong)] hover:text-[var(--danger)]" title="Снять исключение"><X className="size-3.5" aria-hidden /></button>
                 </div>

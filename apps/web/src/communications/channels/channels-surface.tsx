@@ -127,7 +127,7 @@ export function ChannelsSurface() {
     >
       {/* Честный баннер «Прототип» */}
       <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         <span>
           Реальный контракт: /api/workspace/communication-channels (список/создание/правка, участники) и /:id/conversation (лента канала).
           Канал «Общий» — системный (workspace_general), не создаётся и не управляется. Данные in-memory; realtime-доставка появится в приложении —
@@ -140,7 +140,7 @@ export function ChannelsSurface() {
         <aside className="flex flex-col gap-1.5 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-2 shadow-[var(--shadow-card)]">
           <div className="flex items-center justify-between gap-2 px-1.5 pt-1 pb-1.5">
             <h2 className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Каналы</h2>
-            <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-strong)]">{channels.length}</span>
+            <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{channels.length}</span>
           </div>
           {channels.map((ch) => {
             const active = selected?.id === ch.id;
@@ -286,7 +286,7 @@ function ChannelDetail({ channelId, fallback }: { channelId: string; fallback: C
         <section className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Участники</h3>
-            <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-strong)]">{members.length}</span>
+            <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{members.length}</span>
           </div>
           {system ? (
             <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Системный канал «Общий» доступен всей рабочей области — список участников не управляется.</p>
@@ -322,7 +322,7 @@ function MemberRow({ member, canManage, busy, onRemove }: { member: ChannelMembe
       <BemAvatar initials={initials(name)} color={avatarColor(member.userId)} size="sm" title={name} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{name}</div>
-        <div className="v4-mono text-[10px] text-[var(--muted-soft)]">{member.userId}</div>
+        <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{member.userId}</div>
       </div>
       <RoleChip role={member.role} />
       {canManage && member.role !== "owner" ? (
@@ -447,7 +447,7 @@ function ChannelConversation({
     <section className="flex min-h-[280px] flex-col rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-2.5">
         <h3 className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Лента канала</h3>
-        <span className="text-[10px] text-[var(--muted-soft)]">GET /communication-channels/{channelId}/conversation</span>
+        <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">GET /communication-channels/{channelId}/conversation</span>
       </div>
 
       <div className="flex max-h-[360px] min-h-[160px] flex-1 flex-col gap-3 overflow-auto p-4">
@@ -466,8 +466,8 @@ function ChannelConversation({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{name}</strong>
-                    <span className="text-[10px] text-[var(--muted-soft)]">{relTime(m.createdAt)}</span>
-                    {m.editedAt ? <span className="text-[10px] text-[var(--muted-soft)]">(изменено)</span> : null}
+                    <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{relTime(m.createdAt)}</span>
+                    {m.editedAt ? <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">(изменено)</span> : null}
                   </div>
                   <p className="mt-0.5 whitespace-pre-wrap text-[length:var(--text-sm)] text-[var(--text)]">{m.body}</p>
                 </div>
@@ -565,16 +565,16 @@ function CreateChannelDialog({
               <select value={scopeEntityId} onChange={(e) => setScopeEntityId(e.target.value)} className={selCls}>
                 <option value={DEMO_PROJECT_ID}>Производственный портал ({DEMO_PROJECT_ID})</option>
               </select>
-              <span className="text-[10px] text-[var(--muted-soft)]">project_general → scopeEntityType=&quot;project&quot;; в демо известен только {DEMO_PROJECT_ID}.</span>
+              <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">project_general → scopeEntityType=&quot;project&quot;; в демо известен только {DEMO_PROJECT_ID}.</span>
             </label>
           ) : channelType === "team" ? (
             <label className={labelCls}>Подразделение (область)
               <Input value={scopeEntityId} onChange={(e) => setScopeEntityId(e.target.value)} placeholder="org-portal" />
-              <span className="text-[10px] text-[var(--muted-soft)]">team → scopeEntityType=&quot;org_unit&quot;.</span>
+              <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">team → scopeEntityType=&quot;org_unit&quot;.</span>
             </label>
           ) : null}
         </div>
-        <p className="text-[10px] text-[var(--muted-soft)]">
+        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
           POST /communication-channels — создатель становится владельцем (owner). Канал «Общий» (workspace_general) создать нельзя.
           Тип и область канала после создания не редактируются (только название/описание).
         </p>
@@ -633,7 +633,7 @@ function EditChannelDialog({
           <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} /></label>
           <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
         </div>
-        <p className="text-[10px] text-[var(--muted-soft)]">PATCH /communication-channels/:id — меняются только название и описание; тип и область не редактируемы.</p>
+        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">PATCH /communication-channels/:id — меняются только название и описание; тип и область не редактируемы.</p>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
           <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Save className="size-3.5" aria-hidden />Сохранить</Button>

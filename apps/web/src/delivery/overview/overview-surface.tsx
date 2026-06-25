@@ -122,7 +122,7 @@ export function ProjectOverview() {
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Обзор проекта</h2>
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Что горит, что готовится и какие действия доступны — сводка по реальному плану.</p>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--accent)]">Прототип · in-memory</span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-[var(--accent)]">Прототип · in-memory</span>
       </div>
 
       {/* KPI-полоса — всё из read-model */}

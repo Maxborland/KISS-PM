@@ -90,7 +90,7 @@ export function ChatSurface() {
 function PrototypeBanner() {
   return (
     <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
       <span>
         Реальный контракт: /api/workspace/conversations (беседы сущности + readState), .../messages (отправка, правка, удаление, реакции, закрепление), .../read-state (прочитано). Данные in-memory. Realtime-доставка появится в приложении; здесь лента обновляется по действию.
       </span>
@@ -133,7 +133,7 @@ function ConversationList({
                 <span className={cn("block truncate text-[length:var(--text-sm)] font-medium", active ? "text-[var(--accent-text)]" : "text-[var(--text-strong)]")}>
                   {c.title}
                 </span>
-                {c.archivedAt ? <span className="text-[10px] text-[var(--muted-soft)]">в архиве</span> : null}
+                {c.archivedAt ? <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">в архиве</span> : null}
               </span>
               <UnreadDot count={unread} />
             </button>
@@ -206,7 +206,7 @@ function ChatPane({
       <header className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
         <div className="mr-auto min-w-0">
           <h2 className="truncate text-[length:var(--text-sm)] font-bold text-[var(--text-strong)]">{conversation.title}</h2>
-          <p className="truncate text-[10px] text-[var(--muted-soft)]">{ordered.length} сообщ. · proj-portal</p>
+          <p className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{ordered.length} сообщ. · proj-portal</p>
         </div>
         <Button
           variant="ghost"
@@ -297,7 +297,7 @@ function MessageBubble({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">{userName(m.authorUserId)}</strong>
-            <span className="text-[10px] text-[var(--muted-soft)]">{relTime(m.createdAt)}</span>
+            <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{relTime(m.createdAt)}</span>
           </div>
           <p className="mt-0.5 text-[length:var(--text-sm)] italic text-[var(--muted-soft)]">сообщение удалено</p>
         </div>
@@ -314,8 +314,8 @@ function MessageBubble({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{userName(m.authorUserId)}</strong>
-          <span className="text-[10px] text-[var(--muted-soft)]">{relTime(m.createdAt)}</span>
-          {m.editedAt ? <span className="text-[10px] text-[var(--muted-soft)]">(изм.)</span> : null}
+          <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{relTime(m.createdAt)}</span>
+          {m.editedAt ? <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">(изм.)</span> : null}
           {m.pinnedAt ? <Pin className="size-3 text-[var(--accent)]" aria-hidden /> : null}
 
           {/* Hover-меню сообщения */}
@@ -495,7 +495,7 @@ function Composer({
             </div>
           </PopoverContent>
         </Popover>
-        <span className="text-[10px] text-[var(--muted-soft)]">Тело или стикер обязательны</span>
+        <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Тело или стикер обязательны</span>
         <Button variant="default" size="sm" className="ml-auto" disabled={busy || !canSend} onClick={submit}>
           <Send className="size-3.5" aria-hidden />Отправить
         </Button>

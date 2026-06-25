@@ -81,7 +81,7 @@ export function ProjectCommits() {
       </div>
 
       <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         История версий текущей сессии (auditEventId / planVersion реальны). Откат — через buildCompensatingCommands + apply-command-batch (обратимы правки задач/связей). Данные in-memory.
       </div>
 
@@ -99,15 +99,15 @@ export function ProjectCommits() {
                 <GitCommitVertical className="mt-0.5 size-4 shrink-0 text-[var(--muted-soft)]" aria-hidden />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
-                    <span className="mono shrink-0 rounded bg-[var(--panel-strong)] px-1 text-[10px] font-semibold text-[var(--muted-strong)]">v{c.version}</span>
+                    <span className="mono shrink-0 rounded bg-[var(--panel-strong)] px-1 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">v{c.version}</span>
                     <span className="truncate text-[length:var(--text-sm)] text-[var(--text)]">{c.summary}</span>
                   </span>
-                  <span className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--muted-soft)]">
+                  <span className="mt-0.5 flex items-center gap-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
                     {c.changedTaskIds.length > 0 ? <span>задач: {c.changedTaskIds.length}</span> : null}
                     {canRevert ? <span className={cn("inline-flex items-center gap-0.5 font-medium text-[var(--accent)]", busy ? "cursor-default opacity-50" : "cursor-pointer hover:underline")} onClick={(e) => { e.stopPropagation(); if (!busy) void onRevert(c); }}><RotateCcw className="size-3" aria-hidden />Откатить</span> : c.revertible ? <span className="text-[var(--muted-soft)]" title="Откат доступен только для последнего обратимого коммита сессии">обратимый</span> : null}
                   </span>
                 </span>
-                <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold", type.cls)}>{type.label}</span>
+                <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", type.cls)}>{type.label}</span>
               </button>
             );
           })}
@@ -144,7 +144,7 @@ export function ProjectCommits() {
 
               <details className="mt-3 rounded-[var(--radius-md)] border border-[var(--border)]">
                 <summary className="cursor-pointer px-2 py-1.5 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Показать raw payload</summary>
-                <pre className="mono overflow-auto rounded-b-[var(--radius-md)] bg-[var(--text-strong)] px-2 py-2 text-[10px] leading-relaxed text-[var(--panel)]">{JSON.stringify({ version: selected.version, actionType: selected.actionType, auditEventId: selected.auditEventId, changedTaskIds: selected.changedTaskIds, revertible: selected.revertible, at: selected.at }, null, 2)}</pre>
+                <pre className="mono overflow-auto rounded-b-[var(--radius-md)] bg-[var(--text-strong)] px-2 py-2 text-[length:var(--text-2xs)] leading-relaxed text-[var(--panel)]">{JSON.stringify({ version: selected.version, actionType: selected.actionType, auditEventId: selected.auditEventId, changedTaskIds: selected.changedTaskIds, revertible: selected.revertible, at: selected.at }, null, 2)}</pre>
               </details>
             </div>
           ) : <div className="px-3 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted)]">Выберите коммит из ленты.</div>}

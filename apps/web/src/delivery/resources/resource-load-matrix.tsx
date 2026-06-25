@@ -302,12 +302,12 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
       <div key={r.key} onMouseEnter={() => setHover({ key: r.key, date: "" })} className={cn("flex items-center gap-1.5 border-b px-2", opts?.totals ? "border-[var(--border-strong)] bg-[var(--panel-subtle)]" : "border-[var(--border-subtle)]", !opts?.totals && (r.depth === 0 ? "bg-[color-mix(in_oklab,var(--panel-strong)_55%,var(--panel))]" : r.depth === 1 && "bg-[color-mix(in_oklab,var(--panel-strong)_25%,var(--panel))]"), rowHover && CROSS_SOFT)} style={{ height: ROW_H, width: LEFT_W }}>
         <span className="flex min-w-0 flex-1 items-center gap-1.5" style={{ paddingLeft: r.depth * 16 }}>
           {opts?.totals ? <span className="text-[length:var(--text-sm)] font-bold text-[var(--text-strong)]">Итого</span> : r.isPerson ? (
-            <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[9px] font-semibold text-[var(--muted-strong)]">{r.label.slice(0, 1)}</span>
+            <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{r.label.slice(0, 1)}</span>
           ) : (
             <button type="button" onClick={() => toggle(r.key)} className="grid size-4 shrink-0 place-items-center rounded text-[var(--muted)] hover:bg-[var(--panel-strong)]" aria-label={collapsedHere ? "Развернуть" : "Свернуть"}>{collapsedHere ? <ChevronRight className="size-3.5" aria-hidden /> : <ChevronDown className="size-3.5" aria-hidden />}</button>
           )}
           {!opts?.totals ? <span className={cn("truncate", r.isPerson ? "text-[length:var(--text-sm)] text-[var(--text)]" : r.depth === 0 ? "text-[length:var(--text-sm)] font-bold text-[var(--text-strong)]" : "text-[length:var(--text-sm)] font-semibold text-[var(--text)]")}>{r.label}</span> : <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">{allVisibleIds.length} чел.</span>}
-          {!opts?.totals && !r.isPerson ? <span className="shrink-0 rounded-full bg-[var(--panel)] px-1.5 text-[10px] font-semibold text-[var(--muted-soft)] shadow-[inset_0_0_0_1px_var(--border)]">{r.sub}</span> : null}
+          {!opts?.totals && !r.isPerson ? <span className="shrink-0 rounded-full bg-[var(--panel)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-soft)] shadow-[inset_0_0_0_1px_var(--border)]">{r.sub}</span> : null}
         </span>
         <span className="w-[84px] shrink-0 text-right" title={`Поставлено ${h1(tot.committed)} ч из ${h1(tot.capacity)} ч · загрузка ${pct}% · свободно ${h1(Math.max(0, tot.capacity - tot.committed))} ч`}>
           <span className={cn("v4-num block text-[length:var(--text-xs)] font-semibold tabular-nums", pct > 100 ? "text-[var(--danger)]" : opts?.totals ? "text-[var(--text-strong)]" : "text-[var(--text)]")}>{Math.round(tot.committed / 60)}/{Math.round(tot.capacity / 60)} ч</span>
@@ -337,7 +337,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
                 type="button"
                 onMouseEnter={() => setHover({ key: r.key, date: d })}
                 onClick={() => (opts?.totals ? undefined : toggle(r.key))}
-                className={cn("relative flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[9px] font-semibold tabular-nums outline-none", opts?.totals ? "cursor-default" : "cursor-pointer", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")}
+                className={cn("relative flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] font-semibold tabular-nums outline-none", opts?.totals ? "cursor-default" : "cursor-pointer", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")}
                 style={{ flex: `1 0 ${colW}px`, minWidth: colW, color: over ? "var(--danger)" : "var(--muted-strong)" }}
                 title={`${r.label} · ${d}\nСвод ${c.pct}% · ${h1(c.committed)}/${h1(c.capacity)} ч${c.overload ? " · перегруз" : ""}`}
               >
@@ -360,7 +360,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
               type="button"
               onMouseEnter={() => setHover({ key: r.key, date: d })}
               onClick={() => (r.resourceId ? setSel({ resourceId: r.resourceId, date: d }) : undefined)}
-              className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[10px] font-semibold tabular-nums outline-none", isSel ? "ring-2 ring-inset ring-[var(--accent)]" : isFocal ? CROSS_FOCAL : inCross ? CROSS : "")}
+              className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] font-semibold tabular-nums outline-none", isSel ? "ring-2 ring-inset ring-[var(--accent)]" : isFocal ? CROSS_FOCAL : inCross ? CROSS : "")}
               style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: tone.bg, color: tone.fg }}
               title={c.bucket ? `${r.label} · ${d}\nЗагрузка ${c.pct}% · ${h1(c.committed)}/${h1(c.capacity)} ч${c.overload ? (c.accepted ? " · перегруз принят" : " · ПЕРЕГРУЗ") : ""}` : `${r.label} · ${d}`}
             >
@@ -418,7 +418,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
       </div>
 
       <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         {captureBanner}
       </div>
 
@@ -434,7 +434,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
           <div key={k.label} className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 shadow-[var(--shadow-card)]">
             <div className="text-[length:var(--text-xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">{k.label}</div>
             <div className={cn("v4-num text-[24px] font-extrabold leading-tight", k.tone)}>{k.value}</div>
-            <div className="mt-0.5 truncate text-[10px] text-[var(--muted-soft)]">{k.sub}</div>
+            <div className="mt-0.5 truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{k.sub}</div>
           </div>
         ))}
       </div>
@@ -454,7 +454,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
             {/* scrolling: периоды (flex-fill — без правого зазора) */}
             <div className="relative min-w-0 flex-1">
               <div className="flex border-b border-[var(--border-strong)] bg-[var(--panel-subtle)]" style={{ height: HEADER_H }}>
-                {periods.map((d) => { const pl = periodLabel(d, gran); const inCol = crosshair?.date === d; return <span key={d} className={cn("flex flex-col items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-xs)] leading-none", pl.weekend && "bg-[color-mix(in_oklab,var(--muted-soft)_18%,var(--panel))]", inCol && CROSS)} style={{ flex: `1 0 ${colW}px`, minWidth: colW }}><span className={cn("font-semibold", inCol ? "text-[var(--accent)]" : "text-[var(--muted-strong)]")}>{pl.top}</span><span className="mt-0.5 text-[9px] text-[var(--muted-soft)]">{pl.sub}</span></span>; })}
+                {periods.map((d) => { const pl = periodLabel(d, gran); const inCol = crosshair?.date === d; return <span key={d} className={cn("flex flex-col items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-xs)] leading-none", pl.weekend && "bg-[color-mix(in_oklab,var(--muted-soft)_18%,var(--panel))]", inCol && CROSS)} style={{ flex: `1 0 ${colW}px`, minWidth: colW }}><span className={cn("font-semibold", inCol ? "text-[var(--accent)]" : "text-[var(--muted-strong)]")}>{pl.top}</span><span className="mt-0.5 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{pl.sub}</span></span>; })}
               </div>
               {rows.map((r) => periodRow(r))}
               {rows.length ? periodRow({ key: "__totals", depth: 0, isPerson: false, label: "Итого", sub: "", memberIds: allVisibleIds, cells: totalsCells }, { totals: true }) : null}
@@ -498,19 +498,19 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
                           )}
                           {task?.projectName ? (
                             data.projects && task.projectId ? (
-                              <button type="button" onClick={() => { setProjectFilter(task.projectId!); setSel(null); }} className="mt-0.5 flex items-center gap-0.5 truncate text-[10px] text-[var(--accent)] hover:underline" title={`Открыть в проекте «${task.projectName}» (фильтр по проекту)`}><ArrowUpRight className="size-3 shrink-0" aria-hidden /><span className="truncate">{task.projectName}</span></button>
+                              <button type="button" onClick={() => { setProjectFilter(task.projectId!); setSel(null); }} className="mt-0.5 flex items-center gap-0.5 truncate text-[length:var(--text-2xs)] text-[var(--accent)] hover:underline" title={`Открыть в проекте «${task.projectName}» (фильтр по проекту)`}><ArrowUpRight className="size-3 shrink-0" aria-hidden /><span className="truncate">{task.projectName}</span></button>
                             ) : (
-                              <span className="mt-0.5 block truncate text-[10px] text-[var(--muted-soft)]">{task.projectName}</span>
+                              <span className="mt-0.5 block truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{task.projectName}</span>
                             )
                           ) : null}
                           {asg && onEditAssignmentHours ? (
                             edit === assignmentId ? (
-                              <span className="mt-0.5 flex items-center gap-1 text-[10px] text-[var(--muted-soft)]">всего <input autoFocus type="number" value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => { setEdit(null); onEditAssignmentHours(asg, Number(draft)); }} onKeyDown={(e) => { if (e.key === "Enter") { setEdit(null); onEditAssignmentHours(asg, Number(draft)); } if (e.key === "Escape") setEdit(null); }} className="w-14 rounded border border-[var(--accent)] bg-[var(--panel)] px-1 text-right tabular-nums outline-none" /> ч</span>
+                              <span className="mt-0.5 flex items-center gap-1 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">всего <input autoFocus type="number" value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => { setEdit(null); onEditAssignmentHours(asg, Number(draft)); }} onKeyDown={(e) => { if (e.key === "Enter") { setEdit(null); onEditAssignmentHours(asg, Number(draft)); } if (e.key === "Escape") setEdit(null); }} className="w-14 rounded border border-[var(--accent)] bg-[var(--panel)] px-1 text-right tabular-nums outline-none" /> ч</span>
                             ) : (
-                              <button type="button" onClick={() => { setEdit(assignmentId); setDraft(String(Math.round(asg.workMinutes / 60))); }} className="text-[10px] text-[var(--muted-soft)] hover:text-[var(--accent)]" title="Изменить трудозатраты по задаче (всего)">всего {h1(asg.workMinutes)} ч · изменить</button>
+                              <button type="button" onClick={() => { setEdit(assignmentId); setDraft(String(Math.round(asg.workMinutes / 60))); }} className="text-[length:var(--text-2xs)] text-[var(--muted-soft)] hover:text-[var(--accent)]" title="Изменить трудозатраты по задаче (всего)">всего {h1(asg.workMinutes)} ч · изменить</button>
                             )
                           ) : asg ? (
-                            <span className="text-[10px] text-[var(--muted-soft)]">всего {h1(asg.workMinutes)} ч</span>
+                            <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">всего {h1(asg.workMinutes)} ч</span>
                           ) : null}
                         </span>
                         <span className="shrink-0 font-semibold tabular-nums text-[var(--text-strong)]">{h1(info.minutes)} ч</span>

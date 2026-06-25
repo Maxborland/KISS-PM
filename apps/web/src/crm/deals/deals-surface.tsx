@@ -148,8 +148,8 @@ export function ProjectDeals() {
             )}
           >
             {p.name}
-            {p.isDefault ? <span className="rounded-full bg-[var(--panel-strong)] px-1 text-[9px] uppercase tracking-[0.03em] text-[var(--muted-soft)]">по умолч.</span> : null}
-            {p.status === "archived" ? <span className="text-[9px] uppercase text-[var(--danger-text)]">архив</span> : null}
+            {p.isDefault ? <span className="rounded-full bg-[var(--panel-strong)] px-1 text-[length:var(--text-2xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">по умолч.</span> : null}
+            {p.status === "archived" ? <span className="text-[length:var(--text-2xs)] uppercase text-[var(--danger-text)]">архив</span> : null}
           </button>
         ))}
       </div>
@@ -161,7 +161,7 @@ export function ProjectDeals() {
       </div>
 
       <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         <span>Реальный контракт CRM: /api/workspace/{"{pipelines, deal-stages, opportunities}"}. Перенос стадии — PATCH /opportunities/:id/stage (условия переходов воронки: 422 — условие не выполнено, 409 — переход запрещён); перенос между воронками — PATCH /opportunities/:id/pipeline. Без planVersion (плоский REST). Данные in-memory.</span>
       </div>
 
@@ -182,7 +182,7 @@ export function ProjectDeals() {
               >
                 <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2">
                   <span className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{s.name}</span>
-                  <span className="flex items-center gap-1.5"><span className="v4-num text-[10px] text-[var(--muted-soft)]">{money(sum)}</span><span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-strong)]">{items.length}</span></span>
+                  <span className="flex items-center gap-1.5"><span className="v4-num text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{money(sum)}</span><span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{items.length}</span></span>
                 </div>
                 <div className="flex min-h-[120px] flex-col gap-2 p-2">
                   {items.map((o) => {
@@ -196,30 +196,30 @@ export function ProjectDeals() {
                         className={cn("hover-lift rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]", !final && !busy ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50")}
                       >
                         <div className="mb-1 flex items-center justify-between gap-2">
-                          <span className="v4-mono text-[10px] text-[var(--muted-soft)]">{o.id}</span>
+                          <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</span>
                           <BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" title={ownerName(o.ownerUserId)} />
                         </div>
                         <h3 className="text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">{o.title}</h3>
                         <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{o.clientName}</p>
                         <div className="mt-1.5 flex items-center justify-between gap-2">
                           <span className="v4-num text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</span>
-                          {final ? <Chip variant={o.status === "won_closed" ? "success" : "danger"}>{STATUS_LABEL[o.status]}</Chip> : <span className="v4-num text-[10px] text-[var(--muted-soft)]">{o.probability}%</span>}
+                          {final ? <Chip variant={o.status === "won_closed" ? "success" : "danger"}>{STATUS_LABEL[o.status]}</Chip> : <span className="v4-num text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.probability}%</span>}
                         </div>
                       </article>
                     );
                   })}
-                  {items.length === 0 ? <div className="grid flex-1 place-items-center rounded-[var(--radius-sm)] border border-dashed border-[var(--border)] py-4 text-[10px] text-[var(--muted-soft)]">перетащите сюда</div> : null}
+                  {items.length === 0 ? <div className="grid flex-1 place-items-center rounded-[var(--radius-sm)] border border-dashed border-[var(--border)] py-4 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">перетащите сюда</div> : null}
                 </div>
               </div>
             );
           })}
           {model.unstaged.length ? (
             <div className="flex w-[260px] shrink-0 flex-col rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--panel-subtle)]">
-              <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2"><span className="text-[length:var(--text-sm)] font-semibold text-[var(--muted-strong)]">Без стадии</span><span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[10px] font-semibold text-[var(--muted-strong)]">{model.unstaged.length}</span></div>
+              <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2"><span className="text-[length:var(--text-sm)] font-semibold text-[var(--muted-strong)]">Без стадии</span><span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{model.unstaged.length}</span></div>
               <div className="flex flex-col gap-2 p-2">
                 {model.unstaged.map((o) => (
                   <article key={o.id} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]">
-                    <div className="mb-1 flex items-center justify-between gap-2"><span className="v4-mono text-[10px] text-[var(--muted-soft)]">{o.id}</span><BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" /></div>
+                    <div className="mb-1 flex items-center justify-between gap-2"><span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</span><BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" /></div>
                     <h3 className="text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">{o.title}</h3>
                     <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{o.clientName}</p>
                     <div className="v4-num mt-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</div>
@@ -238,7 +238,7 @@ export function ProjectDeals() {
             <tbody>
               {model.opps.map((o) => (
                 <tr key={o.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{o.title}</div><div className="v4-mono text-[10px] text-[var(--muted-soft)]">{o.id}</div></td>
+                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{o.title}</div><div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</div></td>
                   <td className="px-3 py-2 text-[var(--muted-strong)]">{o.clientName}</td>
                   <td className="px-3 py-2">
                     <select value={o.stageId ?? ""} disabled={busy || isFinal(o)} onChange={(e) => void doMove(o.id, e.target.value)} className="h-7 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-1.5 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60">
@@ -376,7 +376,7 @@ function MovePipelineDialog({ target, pipelines, allStages, currentPipelineId, b
             </select>
           </label>
         </div>
-        <p className="text-[10px] text-[var(--muted-soft)]">PATCH /opportunities/:id/pipeline — стадия и воронка сделки меняются на целевые. Финальные сделки и архивные воронки/стадии отклоняются (409).</p>
+        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">PATCH /opportunities/:id/pipeline — стадия и воронка сделки меняются на целевые. Финальные сделки и архивные воронки/стадии отклоняются (409).</p>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
           <Button variant="default" disabled={!valid || busy} onClick={() => { if (target && valid) onMove(target.id, targetPipelineId, targetStageId); }}><ArrowLeftRight className="size-3.5" aria-hidden />Перенести</Button>
@@ -442,7 +442,7 @@ function CreateDealDialog({ stages, data, busy, setBusy, setNotice, create }: {
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Старт<Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Финиш<Input type="date" value={finish} onChange={(e) => setFinish(e.target.value)} aria-invalid={finish < start} /></label>
         </div>
-        <p className="text-[10px] text-[var(--muted-soft)]">Трудоёмкость = сумма / ставка (POST /opportunities, статус «Новая»); строка спроса в прототипе фиксирована (позиция backend). Контакт валидируется как активный у выбранного клиента.</p>
+        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Трудоёмкость = сумма / ставка (POST /opportunities, статус «Новая»); строка спроса в прототипе фиксирована (позиция backend). Контакт валидируется как активный у выбранного клиента.</p>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
           <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>

@@ -135,8 +135,8 @@ export function ProjectScenarios() {
     else setScenarioErr(`Отклонено: ${res.message}`);
   };
 
-  const FinishChip = ({ d }: { d: number }) => <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold", d > 0 ? "bg-[var(--warning-soft)] text-[var(--warning-text)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{d > 0 ? `+${d} дн` : "+0 дн"}</span>;
-  const OverChip = ({ m }: { m: number }) => <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold", m < 0 ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{m < 0 ? `−${h(-m)} ч` : "0 ч"}</span>;
+  const FinishChip = ({ d }: { d: number }) => <span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", d > 0 ? "bg-[var(--warning-soft)] text-[var(--warning-text)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{d > 0 ? `+${d} дн` : "+0 дн"}</span>;
+  const OverChip = ({ m }: { m: number }) => <span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", m < 0 ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{m < 0 ? `−${h(-m)} ч` : "0 ч"}</span>;
 
   return (
     <DeliveryFrame project={projectMeta} activeTab="Сценарии">
@@ -149,7 +149,7 @@ export function ProjectScenarios() {
       </div>
 
       <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         Реальный контракт: previewScenarios(target) → 3 профиля (наборы PlanningCommand с пересчётом метрик) → applyScenario (permission + audit «planning.scenario.applied», bump версии). Агрессивный принимает перегруз — нужна причина риска. Данные in-memory.
       </div>
 
@@ -163,7 +163,7 @@ export function ProjectScenarios() {
           <div className="mb-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-3 shadow-[var(--shadow-card)]">
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Параметры запроса</span>
-              <span className="mono text-[10px] text-[var(--muted-soft)]">canPreviewPlanningScenarios</span>
+              <span className="mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">canPreviewPlanningScenarios</span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5 text-[length:var(--text-xs)]">
               <span className="inline-flex items-center rounded-full bg-[var(--info-soft)] px-2 py-0.5 font-medium text-[var(--info)]">Цель: снять перегруз</span>
@@ -192,21 +192,21 @@ export function ProjectScenarios() {
                       <div className="min-w-[200px] flex-1">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[length:var(--text-base)] font-bold text-[var(--text-strong)]">{meta.label}</span>
-                          {recommended ? <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--info-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--info)]"><Sparkles className="size-3" aria-hidden />рекомендуется</span> : null}
+                          {recommended ? <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--info-soft)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold text-[var(--info)]"><Sparkles className="size-3" aria-hidden />рекомендуется</span> : null}
                         </div>
                         <div className="mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{meta.desc}</div>
                       </div>
                       <div className="w-[120px]">
-                        <div className="text-[10px] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Финиш</div>
+                        <div className="text-[length:var(--text-2xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Финиш</div>
                         <div className="mt-0.5 flex items-center gap-1"><span className="mono text-[length:var(--text-sm)] text-[var(--text)]">{ddmm(p.explainability.finishDate)}</span><FinishChip d={finishDelta(p)} /></div>
                       </div>
                       <div className="w-[110px]">
-                        <div className="text-[10px] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Перегруз</div>
-                        <div className="mt-0.5 flex items-center gap-1"><span className="mono text-[length:var(--text-sm)] text-[var(--text)]">{h(p.explainability.overloadMinutes)} ч</span>{p.conflictEffect === "accepted" ? <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warning-text)]">принят</span> : <OverChip m={overloadDelta(p)} />}</div>
+                        <div className="text-[length:var(--text-2xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Перегруз</div>
+                        <div className="mt-0.5 flex items-center gap-1"><span className="mono text-[length:var(--text-sm)] text-[var(--text)]">{h(p.explainability.overloadMinutes)} ч</span>{p.conflictEffect === "accepted" ? <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold text-[var(--warning-text)]">принят</span> : <OverChip m={overloadDelta(p)} />}</div>
                       </div>
                       <div className="w-[120px]">
-                        <div className="text-[10px] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Изм. задач</div>
-                        <div className="mt-0.5 flex items-center gap-1"><span className="mono text-[length:var(--text-sm)] text-[var(--text)]">{p.explainability.changedTaskIds.length}</span><span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold", risk.cls)}>{risk.label}</span></div>
+                        <div className="text-[length:var(--text-2xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Изм. задач</div>
+                        <div className="mt-0.5 flex items-center gap-1"><span className="mono text-[length:var(--text-sm)] text-[var(--text)]">{p.explainability.changedTaskIds.length}</span><span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", risk.cls)}>{risk.label}</span></div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
                         <Button variant="secondary" size="sm" onClick={() => setCompareId(compareId === p.id ? null : p.id)}>{compareId === p.id ? "Скрыть" : "Сравнить"}</Button>
@@ -239,7 +239,7 @@ export function ProjectScenarios() {
                               <div className="grid grid-cols-2 gap-2">
                                 {col.kpi.map(([label, value, chip]) => (
                                   <div key={label} className="rounded-[var(--radius-sm)] bg-[var(--panel)] px-2 py-1.5">
-                                    <div className="text-[10px] uppercase tracking-[0.04em] text-[var(--muted-soft)]">{label}</div>
+                                    <div className="text-[length:var(--text-2xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">{label}</div>
                                     <div className="mt-0.5 flex items-center gap-1"><span className="mono text-[length:var(--text-sm)] tabular-nums text-[var(--text-strong)]">{value}</span>{chip}</div>
                                   </div>
                                 ))}

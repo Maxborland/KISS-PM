@@ -139,7 +139,7 @@ export function ProfileSurface() {
 
         {/* Честная плашка про авто-вход (демо). */}
         <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">
             Демо
           </span>
           <span>Выполнен вход админом ({DEMO_EMAIL}) — мок стартует анонимно, поэтому сессия открыта автоматически. GET /api/auth/me отдаёт профиль ниже.</span>
@@ -171,7 +171,7 @@ export function ProfileSurface() {
 function ProtoBanner() {
   return (
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">
+      <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">
         Прототип
       </span>
       <span>
@@ -253,7 +253,7 @@ function PermissionsList({ permissions }: { permissions: string[] }) {
   return (
     <ul className="flex flex-wrap gap-1">
       {permissions.map((p) => (
-        <li key={p} className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel-subtle)] px-1.5 py-0.5 v4-mono text-[10px] text-[var(--muted-strong)]">
+        <li key={p} className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel-subtle)] px-1.5 py-0.5 v4-mono text-[length:var(--text-2xs)] text-[var(--muted-strong)]">
           {p}
         </li>
       ))}
@@ -397,7 +397,7 @@ function ProfileForm({
               className="v4-mono"
             />
           </span>
-          {!accentValid ? <span className="text-[10px] text-[var(--danger-text)]">Формат: #RRGGBB</span> : null}
+          {!accentValid ? <span className="text-[length:var(--text-2xs)] text-[var(--danger-text)]">Формат: #RRGGBB</span> : null}
         </label>
       </div>
 

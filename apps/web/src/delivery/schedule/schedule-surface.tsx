@@ -270,7 +270,7 @@ const DEFAULT_COLW = COLS.map((c) => c.w);
 
 function ModeChip({ mode }: { mode: Mode }) {
   return (
-    <span className={cn("inline-flex items-center rounded-[var(--radius-xs)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.03em]", mode === "auto" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-[var(--warning-soft)] text-[var(--warning-text)]")} title={mode === "auto" ? "Авто — планирует движок" : "Ручной — даты заданы вручную"}>
+    <span className={cn("inline-flex items-center rounded-[var(--radius-xs)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.03em]", mode === "auto" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-[var(--warning-soft)] text-[var(--warning-text)]")} title={mode === "auto" ? "Авто — планирует движок" : "Ручной — даты заданы вручную"}>
       {mode === "auto" ? "Авто" : "Ручной"}
     </span>
   );
@@ -852,7 +852,7 @@ export function ProjectSchedule() {
       </div>
 
       <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         Реальный контракт planning · каждая правка = коммит preview→apply через @kiss-pm/planning-client. Данные in-memory, не сохраняются. Нижняя строка — создать задачу (Enter) · 2× клик — правка ячейки · ПКМ — меню · границы колонок — ширина · бар: тяни тело (сдвиг), края (длительность), точку справа — связь.
       </div>
 
@@ -1056,7 +1056,7 @@ export function ProjectSchedule() {
               {/* бейджи лага на связях выбранной задачи — клик редактирует тип/лаг/удаляет */}
               {links.filter((l) => l.accent).map((l) => (
                 <LinkLagEditor key={`badge-${l.key}`} type={l.type} lagDays={l.lagDays} onSave={(t, lag) => depUpsert(l.depId, l.predId, l.succId, t, lag)} onDelete={() => depRemove(l.depId)}>
-                  <button type="button" onClick={stop} className="absolute z-[4] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--accent)] bg-[var(--panel)] px-1 text-[9px] font-semibold leading-tight text-[var(--accent)] shadow-[var(--shadow-card)] hover:bg-[var(--accent-soft)]" style={{ left: l.mx, top: HEADER_H + l.my }} title="Изменить связь (тип/лаг)">
+                  <button type="button" onClick={stop} className="absolute z-[4] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--accent)] bg-[var(--panel)] px-1 text-[length:var(--text-2xs)] font-semibold leading-tight text-[var(--accent)] shadow-[var(--shadow-card)] hover:bg-[var(--accent-soft)]" style={{ left: l.mx, top: HEADER_H + l.my }} title="Изменить связь (тип/лаг)">
                     {DEP_RU[l.type]}{l.lagDays ? `+${l.lagDays}` : ""}
                   </button>
                 </LinkLagEditor>
@@ -1070,7 +1070,7 @@ export function ProjectSchedule() {
           <aside className="absolute right-0 top-0 z-30 flex h-full w-[340px] flex-col border-l border-[var(--border-strong)] bg-[var(--panel)] shadow-[var(--shadow-pop)]">
             <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--muted)]"><span className="mono">WBS {selected.wbs}</span>{selected.critical ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 text-[10px] font-semibold text-[var(--danger-text)]">критпуть</span> : null}</div>
+                <div className="flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--muted)]"><span className="mono">WBS {selected.wbs}</span>{selected.critical ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--danger-text)]">критпуть</span> : null}</div>
                 <h3 className="mt-0.5 truncate text-[length:var(--text-base)] font-bold text-[var(--text-strong)]">{selected.name}</h3>
               </div>
               <button type="button" onClick={() => setInspectorOpen(false)} className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)] hover:text-[var(--text)]" aria-label="Закрыть"><X className="size-4" aria-hidden /></button>
@@ -1095,7 +1095,7 @@ export function ProjectSchedule() {
                 <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Зависимости</div>
                 {selected.predList.length ? (
                   <ul className="space-y-1">
-                    {selected.predList.map((p) => { const pr = rows.find((x) => x.id === p.predId); return <li key={p.depId} className="flex items-center gap-2 text-[var(--text)]"><span className="mono text-[var(--muted)]">{pr?.wbs}</span><span className="truncate">{pr?.name}</span><span className="ml-auto rounded bg-[var(--panel-strong)] px-1 text-[10px] font-semibold text-[var(--muted-strong)]">{DEP_RU[p.type]}{p.lagDays ? ` +${p.lagDays}д` : ""}</span></li>; })}
+                    {selected.predList.map((p) => { const pr = rows.find((x) => x.id === p.predId); return <li key={p.depId} className="flex items-center gap-2 text-[var(--text)]"><span className="mono text-[var(--muted)]">{pr?.wbs}</span><span className="truncate">{pr?.name}</span><span className="ml-auto rounded bg-[var(--panel-strong)] px-1 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{DEP_RU[p.type]}{p.lagDays ? ` +${p.lagDays}д` : ""}</span></li>; })}
                   </ul>
                 ) : <span className="text-[var(--muted)]">нет</span>}
               </div>

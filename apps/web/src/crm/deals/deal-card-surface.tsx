@@ -191,7 +191,7 @@ function DealCardBody({ crm, data, opp }: { crm: ReturnType<typeof useCrm>; data
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         <span>Реальный контракт CRM: PATCH /opportunities/:id (правка, full-replace), POST /:id/feasibility (осуществимость), POST /:id/activate (создаёт проект, сделка → won_closed), /crm/opportunity/:id/activity (лента). Спрос/связи редактируются на отдельном экране — здесь шлются как есть. Данные in-memory.</span>
       </div>
 
@@ -294,7 +294,7 @@ function DealCardBody({ crm, data, opp }: { crm: ReturnType<typeof useCrm>; data
                   <Button variant="secondary" size="sm" className="flex-1" disabled={busy} onClick={() => void finalize("won_closed")}><Trophy className="size-3.5" aria-hidden />Выиграна</Button>
                   <Button variant="ghost" size="sm" className="flex-1" disabled={busy} onClick={() => void finalize("lost_rejected")}><XCircle className="size-3.5" aria-hidden />Проиграна</Button>
                 </div>
-                {opp.feasibilityStatus == null ? <p className="text-[10px] text-[var(--muted-soft)]">Активация требует пройденной проверки осуществимости (400 feasibility_required).</p> : null}
+                {opp.feasibilityStatus == null ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Активация требует пройденной проверки осуществимости (400 feasibility_required).</p> : null}
               </div>
             )}
             {projects.length ? (
@@ -338,7 +338,7 @@ function FeasibilityWidget({ a, checkedAt }: { a: FeasibilityAssessment; checked
           </table>
         </div>
       ) : null}
-      {checkedAt ? <p className="text-[10px] text-[var(--muted-soft)]">Проверено: {new Date(checkedAt).toLocaleString("ru-RU")}</p> : null}
+      {checkedAt ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Проверено: {new Date(checkedAt).toLocaleString("ru-RU")}</p> : null}
     </div>
   );
 }
@@ -352,7 +352,7 @@ function ActivityItem({ a, busy, onToggle }: { a: CrmActivity; busy: boolean; on
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{author}</strong>
-          <span className="text-[10px] text-[var(--muted-soft)]">{when}</span>
+          <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{when}</span>
           {a.type === "task" ? <Chip variant={a.status === "done" ? "success" : "info"}>{a.status === "done" ? "Выполнена" : "Задача"}</Chip> : null}
           {a.type === "file" ? <Chip variant="violet">Файл</Chip> : null}
         </div>
@@ -364,7 +364,7 @@ function ActivityItem({ a, busy, onToggle }: { a: CrmActivity; busy: boolean; on
             <div className="min-w-0">
               <p className={`text-[length:var(--text-sm)] ${a.status === "done" ? "text-[var(--muted-soft)] line-through" : "text-[var(--text)]"}`}>{a.title}</p>
               {a.body ? <p className="text-[length:var(--text-xs)] text-[var(--muted)]">{a.body}</p> : null}
-              {a.dueDate ? <p className="text-[10px] text-[var(--muted-soft)]">Срок: {a.dueDate}{a.assigneeUserId ? ` · ${ownerName(a.assigneeUserId)}` : ""}</p> : null}
+              {a.dueDate ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Срок: {a.dueDate}{a.assigneeUserId ? ` · ${ownerName(a.assigneeUserId)}` : ""}</p> : null}
             </div>
           </div>
         ) : a.type === "file" ? (
