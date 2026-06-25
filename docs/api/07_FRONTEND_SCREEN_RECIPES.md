@@ -143,10 +143,11 @@ Join token является backend control-plane объектом. Медиа-�
 4. `POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/turn-credentials` — short-lived TURN creds (только в ответе; при embedded TURN эндпойнт может вернуть `turn_credentials_unavailable`).
 5. Клиент: `livekit-client` `Room.connect(url, token, { iceServers: TURN })` — медиа идет напрямую в LiveKit.
 6. `POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/participant-state` — optimistic; **webhook = authoritative**.
-7. `POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/egress/track-start` — серверная запись по трекам (право `tenant.communications.manage`; gated на `storage=s3`).
-8. Сервер: `POST /api/internal/livekit/webhook` — signature-verified reconcile (system actor), вне `/api/workspace`.
-9. `GET /api/workspace/call-rooms/:roomId/recordings` — per-track записи после `egress_ended`.
-10. `POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/end` — завершает сессию и останавливает egress.
+7. `POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/recordings/start` — серверная запись по трекам (право `tenant.communications.manage`; gated на `provider=livekit` + `storage=s3`).
+8. `POST /api/workspace/call-rooms/:roomId/recordings/groups/:groupId/stop` — остановить активную группу записи.
+9. Сервер: `POST /integrations/livekit/webhook` — signature-verified reconcile (system actor), вне `/api/workspace`.
+10. `GET /api/workspace/call-rooms/:roomId/recordings` — per-track записи после `egress_ended`.
+11. `POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/end` — завершает сессию и останавливает egress.
 
 Caveat: медиа-трафик идет через provider/SFU, не через KISS PM API. Join token и TURN
 creds возвращаются только в ответе и никогда не кэшируются/логируются.
