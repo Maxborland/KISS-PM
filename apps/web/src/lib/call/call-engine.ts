@@ -16,6 +16,7 @@ import { CallBackgroundController, backgroundProcessorsSupported } from "@/lib/c
 import {
   fetchCallRoomEntity,
   fetchJoinToken,
+  fetchTurnCredentials,
   persistCallMessage,
   resolveEntityConversationId,
   startCallSession
@@ -243,12 +244,23 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     void (async () => {
       try {
         const session = await startCallSession(roomId);
-        const join = await fetchJoinToken(roomId, session.id);
+        const [join, turn] = await Promise.all([
+          fetchJoinToken(roomId, session.id),
+          fetchTurnCredentials(roomId, session.id)
+        ]);
         if (join.provider !== "livekit" || !join.token) {
           throw new Error("video_provider_unavailable");
         }
         if (disposed) return;
-        await room.connect(join.joinUrl, join.token);
+        // TURN relay for symmetric-NAT / restrictive networks; falls back to STUN/host.
+        const iceServers = turn
+          ? [{ urls: turn.urls, username: turn.username, credential: turn.credential }]
+          : undefined;
+        await room.connect(
+          join.joinUrl,
+          join.token,
+          iceServers ? { rtcConfig: { iceServers } } : undefined
+        );
         if (disposed) return;
         await room.localParticipant.setMicrophoneEnabled(options?.micOn ?? true);
         await room.localParticipant.setCameraEnabled(options?.cameraOn ?? true);

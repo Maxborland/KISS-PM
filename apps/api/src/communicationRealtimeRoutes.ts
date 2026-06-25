@@ -28,6 +28,7 @@ import {
 import { readLimitedJsonBody } from "./jsonBody";
 import { createLiveKitEgressProviderFromEnv } from "./communications/recording/livekitEgressProvider";
 import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
+import { createTurnConfigFromEnv, issueTurnCredentials } from "./turnCredentials";
 import type { ApiRouteDeps } from "./routeTypes";
 
 type ResolvedCallRoom = {
@@ -42,6 +43,7 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     egressProvider: createLiveKitEgressProviderFromEnv(),
     appendManagementAuditEvent: deps.appendManagementAuditEvent
   });
+  const turnConfig = createTurnConfigFromEnv();
 
   app.get("/api/workspace/call-rooms", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
@@ -178,6 +180,30 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
       },
       event: serializeCallEvent(result.event)
     });
+  });
+
+  app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/turn-credentials", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const resolved = await resolveCallRoomAndSession(
+      context.req.param("roomId"),
+      context.req.param("sessionId"),
+      actor,
+      deps
+    );
+    if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
+    if (!resolved.value.access.readDecision.allowed) {
+      return context.json({ error: resolved.value.access.readDecision.reason }, 403);
+    }
+    if (resolved.value.session.status !== "active") {
+      return context.json({ error: "call_session_not_active" }, 409);
+    }
+    if (!turnConfig) {
+      // No TURN configured — the client falls back to STUN/host candidates.
+      return context.json({ turn: null });
+    }
+    const credentials = issueTurnCredentials(turnConfig, actor.id, Math.floor(Date.now() / 1000));
+    return context.json({ turn: credentials });
   });
 
   app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/participant-state", async (context) => {

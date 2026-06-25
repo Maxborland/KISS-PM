@@ -37,6 +37,32 @@ export async function fetchJoinToken(roomId: string, sessionId: string): Promise
   return result.join;
 }
 
+export type TurnCredentials = {
+  urls: string[];
+  username: string;
+  credential: string;
+  ttlSeconds: number;
+  expiresAt: string;
+};
+
+/** POST .../sessions/:sessionId/turn-credentials → short-lived TURN creds (response-only). */
+export async function fetchTurnCredentials(
+  roomId: string,
+  sessionId: string
+): Promise<TurnCredentials | null> {
+  try {
+    const result = await apiFetch<{ turn: TurnCredentials | null }>(
+      `/api/workspace/call-rooms/${encodeURIComponent(roomId)}/sessions/${encodeURIComponent(
+        sessionId
+      )}/turn-credentials`,
+      { method: "POST" }
+    );
+    return result.turn;
+  } catch {
+    return null;
+  }
+}
+
 export type CallRoomEntity = { entityType: string; entityId: string };
 
 /** GET /call-rooms/:roomId → the room's parent entity (for the durable chat). */

@@ -197,6 +197,24 @@
   background: var(--accent-soft);
 }
 
+/* Narrow viewport (≈390px phones): single-column grid, compact icon-only controls.
+   aria-label stays on each button, so screen readers and keyboard nav are unaffected. */
+@media (max-width: 480px) {
+  .call-grid--multi {
+    grid-template-columns: 1fr;
+  }
+  .call-controls {
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .call-controls__btn {
+    padding: 0.5rem;
+  }
+  .call-controls__btn span {
+    display: none;
+  }
+}
+
 .call-controls__btn--leave {
   border-color: var(--danger);
   color: var(--danger);
