@@ -128,7 +128,10 @@ export function createVideoProvider(config: VideoProviderConfig): VideoProvider 
             room: input.providerRoomId,
             roomJoin: true,
             canPublish: true,
-            canSubscribe: true
+            canSubscribe: true,
+            // In-call chat rides LiveKit data packets, which need a distinct grant from
+            // canPublish; without it composer messages never reach other participants.
+            canPublishData: true
           }
         },
         config.apiSecret
