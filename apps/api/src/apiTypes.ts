@@ -1071,6 +1071,22 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     roomId: string;
   }): Promise<CallRecording[]>;
+  findCallRecordingByEgressId?(input: {
+    tenantId: TenantId;
+    egressId: string;
+  }): Promise<CallRecording | undefined>;
+  listCallRecordingsByGroup?(input: {
+    tenantId: TenantId;
+    recordingGroupId: string;
+  }): Promise<CallRecording[]>;
+  updateCallRecordingByEgress?(input: {
+    tenantId: TenantId;
+    egressId: string;
+    status: CallRecording["status"];
+    attachmentId?: string | null;
+    durationSeconds?: number | null;
+    endedAt?: Date | null;
+  }): Promise<CallRecording | undefined>;
   createKnowledgeDocument?(input: Omit<
     KnowledgeDocument,
     "createdAt" | "updatedAt" | "archivedAt" | "currentVersionId"

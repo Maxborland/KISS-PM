@@ -329,6 +329,22 @@ export type CollaborationRepository = {
     tenantId: TenantId;
     roomId: string;
   }): Promise<CallRecording[]>;
+  findCallRecordingByEgressId(input: {
+    tenantId: TenantId;
+    egressId: string;
+  }): Promise<CallRecording | undefined>;
+  listCallRecordingsByGroup(input: {
+    tenantId: TenantId;
+    recordingGroupId: string;
+  }): Promise<CallRecording[]>;
+  updateCallRecordingByEgress(input: {
+    tenantId: TenantId;
+    egressId: string;
+    status: CallRecording["status"];
+    attachmentId?: string | null;
+    durationSeconds?: number | null;
+    endedAt?: Date | null;
+  }): Promise<CallRecording | undefined>;
 };
 
 export function createCollaborationRepository(db: KissPmDatabase): CollaborationRepository {
@@ -1444,6 +1460,49 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         )
         .orderBy(desc(callRecordings.createdAt), desc(callRecordings.id));
       return rows.map(mapCallRecording);
+    },
+    async findCallRecordingByEgressId(input) {
+      const [row] = await db
+        .select()
+        .from(callRecordings)
+        .where(
+          and(
+            eq(callRecordings.tenantId, input.tenantId),
+            eq(callRecordings.egressId, input.egressId)
+          )
+        )
+        .limit(1);
+      return row ? mapCallRecording(row) : undefined;
+    },
+    async listCallRecordingsByGroup(input) {
+      const rows = await db
+        .select()
+        .from(callRecordings)
+        .where(
+          and(
+            eq(callRecordings.tenantId, input.tenantId),
+            eq(callRecordings.recordingGroupId, input.recordingGroupId)
+          )
+        )
+        .orderBy(desc(callRecordings.createdAt), desc(callRecordings.id));
+      return rows.map(mapCallRecording);
+    },
+    async updateCallRecordingByEgress(input) {
+      const patch: Partial<typeof callRecordings.$inferInsert> = { status: input.status };
+      if (input.attachmentId !== undefined) patch.attachmentId = input.attachmentId;
+      if (input.durationSeconds !== undefined) patch.durationSeconds = input.durationSeconds;
+      if (input.endedAt !== undefined) patch.endedAt = input.endedAt;
+      const [row] = await db
+        .update(callRecordings)
+        .set(patch)
+        .where(
+          and(
+            eq(callRecordings.tenantId, input.tenantId),
+            eq(callRecordings.egressId, input.egressId)
+          )
+        )
+        .returning();
+      return row ? mapCallRecording(row) : undefined;
     }
   };
 }
@@ -1771,10 +1830,18 @@ function mapCallRecording(row: typeof callRecordings.$inferSelect): CallRecordin
     tenantId: row.tenantId,
     roomId: row.roomId,
     sessionId: row.sessionId,
+    recordingGroupId: row.recordingGroupId,
     attachmentId: row.attachmentId,
+    egressId: row.egressId,
+    participantId: row.participantId,
+    trackId: row.trackId,
+    kind: row.kind as CallRecording["kind"],
+    status: row.status as CallRecording["status"],
+    durationSeconds: row.durationSeconds,
     title: row.title,
     createdByUserId: row.createdByUserId,
     createdAt: row.createdAt,
+    endedAt: row.endedAt,
     archivedAt: row.archivedAt
   };
 }
