@@ -669,6 +669,10 @@ export function createCrmRepository(db: KissPmDatabase): CrmRepository {
           requiredPermission: input.requiredPermission,
           requiredFields: input.requiredFields,
           requireReason: input.requireReason,
+          // Унификация: runtime-гварды должны сохраняться на update (иначе сбрасывались бы в дефолты).
+          requireFeasibilityOk: input.requireFeasibilityOk,
+          minProbability: input.minProbability,
+          guardNote: input.guardNote,
           status: input.status,
           updatedAt: new Date()
         })

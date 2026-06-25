@@ -126,7 +126,7 @@ ALTER TABLE "crm_pipelines" ADD COLUMN IF NOT EXISTS "description" text;
 ALTER TABLE "crm_pipelines" ADD COLUMN IF NOT EXISTS "is_default" boolean NOT NULL DEFAULT false;
 ALTER TABLE "crm_pipelines" ADD COLUMN IF NOT EXISTS "sort_order" integer NOT NULL DEFAULT 1;
 
-CREATE UNIQUE INDEX IF NOT EXISTS "crm_pipelines_tenant_id_sort_order_uidx"
+CREATE INDEX IF NOT EXISTS "crm_pipelines_tenant_id_sort_order_idx"
   ON "crm_pipelines" ("tenant_id", "sort_order");
 
 ALTER TABLE "crm_pipeline_transition_rules" ADD COLUMN IF NOT EXISTS "require_feasibility_ok" boolean NOT NULL DEFAULT false;

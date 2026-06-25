@@ -255,7 +255,9 @@ export const crmPipelines = pgTable(
     }),
     index("crm_pipelines_tenant_id_idx").on(table.tenantId),
     uniqueIndex("crm_pipelines_tenant_id_name_uidx").on(table.tenantId, table.name),
-    uniqueIndex("crm_pipelines_tenant_id_sort_order_uidx").on(
+    // sort_order — порядок отображения воронок, НЕ уникальный (две воронки могут делить позицию;
+    // unique тут давал бы 500 при создании второй воронки с дефолтным sort_order).
+    index("crm_pipelines_tenant_id_sort_order_idx").on(
       table.tenantId,
       table.sortOrder
     ),
