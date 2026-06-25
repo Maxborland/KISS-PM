@@ -1,9 +1,6 @@
 import type { Hono } from "hono";
 
-import {
-  createLiveKitEgressProviderFromEnv,
-  type LiveKitEgressProvider
-} from "./communications/recording/livekitEgressProvider";
+import type { EgressEndedFile } from "./communications/recording/livekitEgressProvider";
 import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
 import type { ApiRouteDeps } from "./routeTypes";
 
@@ -12,7 +9,7 @@ import type { ApiRouteDeps } from "./routeTypes";
 // authenticity is established by the mandatory LiveKit webhook signature instead.
 export function registerCommunicationRecordingWebhookRoute(app: Hono, deps: ApiRouteDeps) {
   app.post("/integrations/livekit/webhook", async (context) => {
-    const egressProvider = createLiveKitEgressProviderFromEnv();
+    const egressProvider = deps.egressProvider;
     if (!egressProvider) {
       // Recording disabled: nothing to reconcile and no key/secret to verify against.
       return context.body(null, 204);
@@ -22,51 +19,39 @@ export function registerCommunicationRecordingWebhookRoute(app: Hono, deps: ApiR
     const authHeader = context.req.header("Authorization");
     let event;
     try {
-      // Verifies the LiveKit signature; throws on a forged/missing signature (fail-closed).
+      // receiveWebhook verifies the LiveKit signature (fail-closed) and returns a decoded
+      // DTO — no SDK type, protobuf int64, or nanosecond unit reaches this handler.
       event = await egressProvider.receiveWebhook(rawBody, authHeader);
     } catch {
       return context.json({ error: "call_webhook_signature_invalid" }, 401);
     }
 
-    if (event.event === "egress_ended" && event.egressInfo) {
-      await reconcile(deps, egressProvider, event.egressInfo);
+    if (event.kind === "egress_ended" && event.egressId && event.file) {
+      await reconcile(deps, event.egressId, event.file);
     }
 
     return context.body(null, 204);
   });
 }
 
-async function reconcile(
-  deps: ApiRouteDeps,
-  egressProvider: LiveKitEgressProvider,
-  egressInfo: { egressId: string; fileResults?: { filename?: string; size?: bigint; duration?: bigint }[] }
-): Promise<void> {
-  const egressId = egressInfo.egressId;
-  const fileResult = egressInfo.fileResults?.[0];
-  const storageKey = fileResult?.filename ?? "";
+async function reconcile(deps: ApiRouteDeps, egressId: string, file: EgressEndedFile): Promise<void> {
   // Tenant is parsed from the egress output key (recordings/{tenantId}/...) that WE set,
   // never trusted from a free-form payload field.
-  const tenantId = parseTenantFromStorageKey(storageKey);
-  if (!tenantId || !egressId) return;
-
-  const sizeBytes = fileResult?.size ? Number(fileResult.size) : 0;
-  // Skip failed/empty egresses — the janitor reaps the stuck row instead of minting a 0-byte attachment.
-  if (sizeBytes <= 0) return;
-  // FileInfo.duration is reported in int64 NANOSECONDS — convert to whole seconds.
-  const durationSeconds = fileResult?.duration ? Math.round(Number(fileResult.duration) / 1e9) : null;
+  const tenantId = parseTenantFromStorageKey(file.storageKey);
+  if (!tenantId) return;
 
   const recordingWorkspace = createCommunicationRecordingWorkspace({
     dataSource: deps.dataSource,
-    egressProvider,
+    egressProvider: deps.egressProvider,
     appendManagementAuditEvent: deps.appendManagementAuditEvent
   });
   // storageKey is the authoritative codec-correct filename LiveKit reported.
   await recordingWorkspace.reconcileEgressEnded({
     tenantId,
     egressId,
-    storageKey,
-    sizeBytes,
-    durationSeconds
+    storageKey: file.storageKey,
+    sizeBytes: file.sizeBytes,
+    durationSeconds: file.durationSeconds
   });
 }
 

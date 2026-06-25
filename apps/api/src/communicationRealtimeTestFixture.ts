@@ -7,6 +7,7 @@ import {
 } from "@kiss-pm/persistence";
 
 import { createApp } from "./app";
+import type { LiveKitEgressProvider } from "./communications/recording/livekitEgressProvider";
 import { createVideoProvider, type VideoProvider } from "./videoProvider";
 
 type TestApp = ReturnType<typeof createApp>;
@@ -94,11 +95,13 @@ export function createCommunicationRealtimeTestApp(
     apiKey: "livekit-key",
     apiSecret: "livekit-secret",
     tokenTtlSeconds: 120
-  })
+  }),
+  egressProvider: LiveKitEgressProvider | null = null
 ): TestApp {
   return createApp({
     dataSource: createPostgresTenantDataSource(createDatabase(client)),
-    videoProvider
+    videoProvider,
+    egressProvider
   });
 }
 

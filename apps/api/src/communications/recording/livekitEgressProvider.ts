@@ -4,8 +4,7 @@ import {
   RoomServiceClient,
   S3Upload,
   TrackType,
-  WebhookReceiver,
-  type WebhookEvent
+  WebhookReceiver
 } from "livekit-server-sdk";
 
 // Thin LiveKit Egress wrapper for per-track server recording. Confines the
@@ -17,6 +16,18 @@ export type EgressTrack = {
   kind: "audio" | "video";
   participantIdentity: string;
 };
+
+export type EgressEndedFile = {
+  storageKey: string;
+  sizeBytes: number;
+  durationSeconds: number | null;
+};
+
+// Decoded webhook DTO. The SDK WebhookEvent, protobuf int64s, and nanosecond units
+// stay behind this seam so callers (the HTTP route) only ever see plain values.
+export type EgressWebhookEvent =
+  | { kind: "egress_ended"; egressId: string; file: EgressEndedFile | null }
+  | { kind: "other" };
 
 export type LiveKitEgressConfig = {
   httpUrl: string;
@@ -36,7 +47,7 @@ export type LiveKitEgressProvider = {
   listRoomTracks(providerRoomId: string): Promise<EgressTrack[]>;
   startTrackEgress(input: { providerRoomId: string; trackId: string; filepath: string }): Promise<string>;
   stopEgress(egressId: string): Promise<void>;
-  receiveWebhook(body: string, authHeader: string | undefined): Promise<WebhookEvent>;
+  receiveWebhook(body: string, authHeader: string | undefined): Promise<EgressWebhookEvent>;
 };
 
 function toHttpUrl(wsUrl: string): string {
@@ -94,7 +105,19 @@ export function createLiveKitEgressProvider(config: LiveKitEgressConfig): LiveKi
       await egressClient.stopEgress(egressId);
     },
     async receiveWebhook(body, authHeader) {
-      return webhookReceiver.receive(body, authHeader);
+      // Verifies the LiveKit signature (throws on forged/missing — fail-closed), then
+      // decodes the SDK envelope into a plain DTO so callers never touch WebhookEvent,
+      // protobuf int64, or nanosecond units.
+      const event = await webhookReceiver.receive(body, authHeader);
+      if (event.event !== "egress_ended" || !event.egressInfo) return { kind: "other" };
+      const fileResult = event.egressInfo.fileResults?.[0];
+      const storageKey = fileResult?.filename ?? "";
+      // FileInfo.size is a protobuf int64; FileInfo.duration is int64 NANOSECONDS.
+      const sizeBytes = fileResult?.size ? Number(fileResult.size) : 0;
+      const durationSeconds = fileResult?.duration ? Math.round(Number(fileResult.duration) / 1e9) : null;
+      // No usable artifact (failed/empty egress) → file:null so callers skip reconcile.
+      const file = storageKey && sizeBytes > 0 ? { storageKey, sizeBytes, durationSeconds } : null;
+      return { kind: "egress_ended", egressId: event.egressInfo.egressId, file };
     }
   };
 }

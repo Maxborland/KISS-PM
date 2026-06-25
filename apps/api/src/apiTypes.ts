@@ -92,6 +92,7 @@ import type {
   TaskStatusRecord
 } from "@kiss-pm/persistence";
 import type { AuthRateLimiter } from "./authRateLimit";
+import type { LiveKitEgressProvider } from "./communications/recording/livekitEgressProvider";
 import type { ReadinessChecks } from "./healthRoutes";
 import type { StorageProvider } from "./storageProvider";
 import type { VideoProvider } from "./videoProvider";
@@ -1225,6 +1226,7 @@ export type CreateAppOptions = {
   dataSource?: ApiTenantDataSource;
   storageProvider?: StorageProvider;
   videoProvider?: VideoProvider;
+  egressProvider?: LiveKitEgressProvider | null;
   authRateLimiter?: AuthRateLimiter;
   readinessChecks?: ReadinessChecks;
   secureCookies?: boolean;

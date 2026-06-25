@@ -26,7 +26,6 @@ import {
   type CommunicationEntityAccessContext
 } from "./communications/entityAccess";
 import { readLimitedJsonBody } from "./jsonBody";
-import { createLiveKitEgressProviderFromEnv } from "./communications/recording/livekitEgressProvider";
 import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
 import { createTurnConfigFromEnv, issueTurnCredentials } from "./turnCredentials";
 import type { ApiRouteDeps } from "./routeTypes";
@@ -40,7 +39,7 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   const callWorkspace = createCommunicationCallWorkspace(deps);
   const recordingWorkspace = createCommunicationRecordingWorkspace({
     dataSource: deps.dataSource,
-    egressProvider: createLiveKitEgressProviderFromEnv(),
+    egressProvider: deps.egressProvider,
     appendManagementAuditEvent: deps.appendManagementAuditEvent
   });
   const turnConfig = createTurnConfigFromEnv();

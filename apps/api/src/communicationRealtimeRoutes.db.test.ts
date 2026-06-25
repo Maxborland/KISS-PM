@@ -10,6 +10,7 @@ import {
 import { createApp } from "./app";
 import type { ApiTenantDataSource } from "./apiTypes";
 import { createDefaultBackgroundJobRegistry } from "./backgroundJobs/jobHandlers";
+import type { LiveKitEgressProvider } from "./communications/recording/livekitEgressProvider";
 import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
 import {
   communicationJsonHeaders as jsonHeaders,
@@ -744,5 +745,66 @@ describe("communications realtime API", () => {
       recordingId: "call-recording-stale",
       reason: "stale_egress"
     });
+  });
+
+  it("startRecording starts egress per track and logs recording_started (injected egress provider)", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-start",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Запись",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-start",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-start",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+
+    const startedTracks: string[] = [];
+    const fakeEgress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [{ trackId: "track-a", kind: "video", participantIdentity: "user-alpha-admin" }];
+      },
+      async startTrackEgress(input) {
+        startedTracks.push(input.trackId);
+        return "egress-start-1";
+      },
+      async stopEgress() {},
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    // The recording happy-path was previously unreachable by tests because the egress
+    // provider was built from env inside the route; it is now injected via deps.
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, fakeEgress);
+    const adminCookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+
+    const response = await recApp.request(
+      `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/recordings/start`,
+      { method: "POST", headers: jsonHeaders(adminCookie) }
+    );
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as {
+      recordingGroupId: string;
+      recordings: { trackId: string; status: string }[];
+    };
+    expect(body.recordings).toHaveLength(1);
+    expect(body.recordings[0]).toMatchObject({ trackId: "track-a", status: "recording" });
+    expect(startedTracks).toEqual(["track-a"]);
+
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    expect(events.some((event) => event.eventType === "recording_started")).toBe(true);
   });
 });

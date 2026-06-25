@@ -33,6 +33,7 @@ import { registerCollaborationRoutes } from "./collaborationRoutes";
 import { registerCommunicationUpgradeRoutes } from "./communicationUpgradeRoutes";
 import { registerCommunicationRealtimeRoutes } from "./communicationRealtimeRoutes";
 import { registerCommunicationRecordingWebhookRoute } from "./communicationRecordingWebhookRoute";
+import { createLiveKitEgressProviderFromEnv } from "./communications/recording/livekitEgressProvider";
 import { registerControlRoutes } from "./controlRoutes";
 import { registerControlSurfaceRoutes } from "./controlSurfaceRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
@@ -218,6 +219,12 @@ export function createApp(options: CreateAppOptions = {}) {
     authRateLimiter,
     capabilities,
     dataSource,
+    // Injectable for tests; falls back to env config. `null` (explicitly disabled) is
+    // honoured — only an absent option triggers the env default.
+    egressProvider:
+      options.egressProvider !== undefined
+        ? options.egressProvider
+        : createLiveKitEgressProviderFromEnv(),
     getActor,
     getActorProfile,
     getDevActorFromHeaders,
