@@ -5,6 +5,9 @@ import {
   canManageClients,
   canManageContacts,
   canManageDealStages,
+  canManageCrmPipelineAutomations,
+  canManageCrmPipelineRules,
+  canManageCrmPipelines,
   canManageOpportunities,
   canManagePositions,
   canManageProjectBaselines,
@@ -34,6 +37,7 @@ import {
   canReadClients,
   canReadContacts,
   canReadDealStages,
+  canReadCrmPipelines,
   canReadOpportunities,
   canReadProducts,
   canReadProjectPlan,
@@ -77,6 +81,10 @@ describe("access-control tenant policy", () => {
       "tenant.project_types.manage",
       "tenant.deal_stages.read",
       "tenant.deal_stages.manage",
+      "tenant.crm_pipelines.read",
+      "tenant.crm_pipelines.manage",
+      "tenant.crm_pipeline_rules.manage",
+      "tenant.crm_pipeline_automations.manage",
       "tenant.opportunities.read",
       "tenant.opportunities.manage",
       "tenant.projects.read",
@@ -526,6 +534,71 @@ describe("access-control tenant policy", () => {
       allowed: false,
       reason: "cross_tenant_denied"
     });
+  });
+
+  it("allows CRM pipeline management only with explicit pipeline permissions", () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Pipeline Admin",
+      accessProfileId: adminProfile.id
+    });
+    const pipelineReader = createAccessProfile({
+      id: "pipeline-reader",
+      permissions: ["tenant.crm_pipelines.read"]
+    });
+    const pipelineManager = createAccessProfile({
+      id: "pipeline-manager",
+      permissions: [
+        "tenant.crm_pipelines.read",
+        "tenant.crm_pipelines.manage",
+        "tenant.crm_pipeline_rules.manage",
+        "tenant.crm_pipeline_automations.manage"
+      ]
+    });
+
+    expect(
+      canReadCrmPipelines({
+        actor,
+        profile: pipelineReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({ allowed: true, reason: "same_tenant_permission_granted" });
+    expect(
+      canManageCrmPipelines({
+        actor,
+        profile: pipelineReader,
+        targetTenantId: "tenant-alpha"
+      })
+    ).toEqual({ allowed: false, reason: "permission_missing" });
+    expect(
+      canManageCrmPipelines({
+        actor,
+        profile: pipelineManager,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageCrmPipelineRules({
+        actor,
+        profile: pipelineManager,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canManageCrmPipelineAutomations({
+        actor,
+        profile: pipelineManager,
+        targetTenantId: "tenant-alpha"
+      }).allowed
+    ).toBe(true);
+    expect(
+      canReadCrmPipelines({
+        actor,
+        profile: pipelineManager,
+        targetTenantId: "tenant-beta"
+      })
+    ).toEqual({ allowed: false, reason: "cross_tenant_denied" });
   });
 
   it("allows Phase 4.2 task actions only with explicit permissions", () => {

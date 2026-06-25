@@ -40,6 +40,7 @@ export function listTenantUsers(
 export * from "./workspaceConfig";
 export * from "./projectIntake";
 export * from "./pipelineTransitions";
+export * from "./crmPipeline";
 export * from "./planning/types";
 export * from "./planning/planningCommands";
 export * from "./planning/commandReducer";

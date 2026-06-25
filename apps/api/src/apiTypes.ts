@@ -1,6 +1,10 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type {
   PlanningCommand,
+  CrmPipeline,
+  CrmPipelineStage,
+  CrmPipelineStageAutomationDefinition,
+  CrmPipelineTransitionRule,
   BackgroundJobEvent,
   BackgroundJobKind,
   BackgroundJobRun,
@@ -214,6 +218,17 @@ export type DealStageRecord = {
 };
 
 export type DealStageInput = Omit<DealStageRecord, "createdAt" | "updatedAt">;
+
+export type CrmPipelineInput = Omit<CrmPipeline, "createdAt" | "updatedAt">;
+export type CrmPipelineStageInput = Omit<CrmPipelineStage, "createdAt" | "updatedAt">;
+export type CrmPipelineTransitionRuleInput = Omit<
+  CrmPipelineTransitionRule,
+  "createdAt" | "updatedAt"
+>;
+export type CrmPipelineStageAutomationDefinitionInput = Omit<
+  CrmPipelineStageAutomationDefinition,
+  "createdAt" | "updatedAt"
+>;
 
 export type CustomFieldDefinitionRecord = {
   id: string;
@@ -470,6 +485,52 @@ export type ApiTenantDataSource = {
   ): Promise<StageTransitionRecord | undefined>;
   createStageTransition?(input: StageTransitionInput): Promise<StageTransitionRecord>;
   deleteStageTransition?(tenantId: TenantId, transitionId: string): Promise<void>;
+  listCrmPipelines?(tenantId: TenantId): Promise<CrmPipeline[]>;
+  findCrmPipelineById?(tenantId: TenantId, pipelineId: string): Promise<CrmPipeline | undefined>;
+  createCrmPipeline?(input: CrmPipelineInput): Promise<CrmPipeline>;
+  updateCrmPipeline?(input: CrmPipelineInput): Promise<CrmPipeline>;
+  refreshCrmPipelineLifecycleGraph?(
+    tenantId: TenantId,
+    pipelineId: string
+  ): Promise<CrmPipeline | undefined>;
+  listCrmPipelineStages?(tenantId: TenantId, pipelineId?: string): Promise<CrmPipelineStage[]>;
+  findCrmPipelineStageById?(
+    tenantId: TenantId,
+    pipelineId: string,
+    stageId: string
+  ): Promise<CrmPipelineStage | undefined>;
+  createCrmPipelineStage?(input: CrmPipelineStageInput): Promise<CrmPipelineStage>;
+  updateCrmPipelineStage?(input: CrmPipelineStageInput): Promise<CrmPipelineStage>;
+  listCrmPipelineTransitionRules?(
+    tenantId: TenantId,
+    pipelineId: string
+  ): Promise<CrmPipelineTransitionRule[]>;
+  findCrmPipelineTransitionRuleById?(
+    tenantId: TenantId,
+    pipelineId: string,
+    ruleId: string
+  ): Promise<CrmPipelineTransitionRule | undefined>;
+  createCrmPipelineTransitionRule?(
+    input: CrmPipelineTransitionRuleInput
+  ): Promise<CrmPipelineTransitionRule>;
+  updateCrmPipelineTransitionRule?(
+    input: CrmPipelineTransitionRuleInput
+  ): Promise<CrmPipelineTransitionRule>;
+  listCrmPipelineStageAutomationDefinitions?(
+    tenantId: TenantId,
+    pipelineId: string
+  ): Promise<CrmPipelineStageAutomationDefinition[]>;
+  findCrmPipelineStageAutomationDefinitionById?(
+    tenantId: TenantId,
+    pipelineId: string,
+    automationId: string
+  ): Promise<CrmPipelineStageAutomationDefinition | undefined>;
+  createCrmPipelineStageAutomationDefinition?(
+    input: CrmPipelineStageAutomationDefinitionInput
+  ): Promise<CrmPipelineStageAutomationDefinition>;
+  updateCrmPipelineStageAutomationDefinition?(
+    input: CrmPipelineStageAutomationDefinitionInput
+  ): Promise<CrmPipelineStageAutomationDefinition>;
   listCustomFieldDefinitions?(
     tenantId: TenantId
   ): Promise<CustomFieldDefinitionRecord[]>;

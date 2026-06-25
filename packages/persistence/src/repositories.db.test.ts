@@ -295,10 +295,26 @@ describe("PostgreSQL tenant data source", () => {
       description: null,
       status: "active"
     });
+    const defaultPipeline = await dataSource.createCrmPipeline({
+      id: "pipeline-default",
+      tenantId: "tenant-alpha",
+      name: "Основная воронка",
+      description: null,
+      isDefault: true,
+      sortOrder: 1,
+      status: "active",
+      lifecycleGraphMetadata: {
+        pipelineId: "pipeline-default",
+        initialStageId: null,
+        finalStageIds: [],
+        stages: [],
+        transitions: []
+      }
+    });
     const stage = await dataSource.createDealStage({
       id: "deal-stage-new",
       tenantId: "tenant-alpha",
-      pipelineId: null,
+      pipelineId: defaultPipeline.id,
       name: "Новая",
       sortOrder: 10,
       status: "active"

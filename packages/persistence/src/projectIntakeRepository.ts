@@ -4,7 +4,7 @@ import type { TenantId } from "@kiss-pm/domain";
 
 import type { KissPmDatabase } from "./connection";
 import {
-  dealStages,
+  crmPipelineStages,
   opportunities,
   opportunityDemands,
   projectPositionDemands,
@@ -712,9 +712,9 @@ async function resolveStagePipelineId(
 ): Promise<string | null> {
   if (!stageId) return null;
   const [stage] = await transaction
-    .select({ pipelineId: dealStages.pipelineId })
-    .from(dealStages)
-    .where(and(eq(dealStages.tenantId, tenantId), eq(dealStages.id, stageId)))
+    .select({ pipelineId: crmPipelineStages.pipelineId })
+    .from(crmPipelineStages)
+    .where(and(eq(crmPipelineStages.tenantId, tenantId), eq(crmPipelineStages.id, stageId)))
     .limit(1);
   return stage?.pipelineId ?? null;
 }

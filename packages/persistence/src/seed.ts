@@ -9,12 +9,12 @@ import {
   accessProfiles,
   clients,
   contacts,
-  dealStages,
-  pipelines,
+  crmPipelineStages,
+  crmPipelineTransitionRules,
+  crmPipelines,
   positions,
   products,
   projectTypes,
-  stageTransitions,
   taskStatuses,
   tenantUsers,
   tenants,
@@ -292,7 +292,7 @@ export async function seedTenantDataset(
       const pipelineId = `${tenantId}-pipeline-default`;
 
       await transaction
-        .insert(pipelines)
+        .insert(crmPipelines)
         .values({
           id: pipelineId,
           tenantId,
@@ -301,11 +301,19 @@ export async function seedTenantDataset(
           isDefault: true,
           sortOrder: 1,
           status: "active",
+          // Derived lifecycle-граф; на сиде — пустой (пересобирается командами управления стадиями/правилами).
+          lifecycleGraphMetadata: {
+            pipelineId,
+            initialStageId: null,
+            finalStageIds: [],
+            stages: [],
+            transitions: []
+          },
           createdAt,
           updatedAt: createdAt
         })
         .onConflictDoUpdate({
-          target: [pipelines.tenantId, pipelines.id],
+          target: [crmPipelines.tenantId, crmPipelines.id],
           set: {
             name: sql`excluded.name`,
             description: sql`excluded.description`,
@@ -323,7 +331,7 @@ export async function seedTenantDataset(
 
       for (const stage of orderedStages) {
         await transaction
-          .insert(dealStages)
+          .insert(crmPipelineStages)
           .values({
             id: stage.id,
             tenantId: stage.tenantId,
@@ -331,11 +339,12 @@ export async function seedTenantDataset(
             name: stage.name,
             sortOrder: stage.sortOrder,
             status: stage.status ?? "active",
+            // lifecycleState/isFinal — дефолты схемы (open / false): сид-стадии не финальные.
             createdAt,
             updatedAt: createdAt
           })
           .onConflictDoUpdate({
-            target: [dealStages.tenantId, dealStages.id],
+            target: [crmPipelineStages.tenantId, crmPipelineStages.id],
             set: {
               pipelineId: sql`excluded.pipeline_id`,
               name: sql`excluded.name`,
@@ -356,14 +365,18 @@ export async function seedTenantDataset(
         const isFinalTransition = index === orderedStages.length - 2;
 
         await transaction
-          .insert(stageTransitions)
+          .insert(crmPipelineTransitionRules)
           .values({
             id: `${pipelineId}-transition-${fromStage.id}-to-${toStage.id}`,
             tenantId,
             pipelineId,
             fromStageId: fromStage.id,
             toStageId: toStage.id,
-            // Финальный переход (в выигрышную/последнюю стадию) защищён гвардом.
+            // Governance-поля базы дефолтятся для сид-правил.
+            requiredPermission: null,
+            requiredFields: [],
+            requireReason: false,
+            // Финальный переход (в выигрышную/последнюю стадию) защищён runtime-гвардом.
             requireFeasibilityOk: isFinalTransition,
             minProbability: isFinalTransition ? 50 : null,
             guardNote: isFinalTransition
@@ -373,7 +386,7 @@ export async function seedTenantDataset(
             updatedAt: createdAt
           })
           .onConflictDoUpdate({
-            target: [stageTransitions.tenantId, stageTransitions.id],
+            target: [crmPipelineTransitionRules.tenantId, crmPipelineTransitionRules.id],
             set: {
               pipelineId: sql`excluded.pipeline_id`,
               fromStageId: sql`excluded.from_stage_id`,
