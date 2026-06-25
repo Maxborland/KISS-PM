@@ -1,0 +1,28 @@
+# LiveKit Egress — KISS-PM per-track server recording (Phase 5).
+#
+# Records each published track to OUR object storage (S3/R2/MinIO) — no compositing
+# in v1. Opt-in: only started for sessions whose manager requests recording, and
+# only when KISS_PM_VIDEO_EGRESS_ENABLED=true AND KISS_PM_STORAGE_PROVIDER=s3
+# (LiveKit Egress cannot write to the local storage provider).
+#
+# Run with the media profile: docker compose --profile media up egress
+
+redis:
+  address: redis:6379 # MUST be the same redis as livekit-server
+  db: 1 # same logical db as livekit (they coordinate egress jobs over redis)
+
+api_key: ${KISS_PM_LIVEKIT_API_KEY}
+api_secret: ${KISS_PM_LIVEKIT_API_SECRET}
+ws_url: ws://livekit:7880 # egress connects to livekit as a participant; prod = wss://
+insecure: true # dev only (ws://, no TLS); remove in prod
+
+# Per-track output uploaded directly to OUR storage. These mirror the API's
+# KISS_PM_STORAGE_S3_* so recordings land in the same bucket the StorageProvider
+# reads, enabling fileAsset/entityAttachment/callRecording linking.
+s3:
+  access_key: ${KISS_PM_STORAGE_S3_ACCESS_KEY_ID}
+  secret: ${KISS_PM_STORAGE_S3_SECRET_ACCESS_KEY}
+  region: ${KISS_PM_STORAGE_S3_REGION}
+  bucket: ${KISS_PM_STORAGE_S3_BUCKET}
+  endpoint: ${KISS_PM_STORAGE_S3_ENDPOINT} # R2/MinIO custom endpoint
+  force_path_style: true # required for MinIO and most R2 setups

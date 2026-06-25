@@ -150,6 +150,26 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # LiveKit Egress — per-track server recording (Phase 5). Opt-in via the media
+  # profile; only records when KISS_PM_VIDEO_EGRESS_ENABLED=true and storage=s3.
+  # NOTE: infra/egress/egress.yaml uses ${...} placeholders the operator must
+  # render (e.g. envsubst or EGRESS_CONFIG_BODY) with real LiveKit + S3 values.
+  egress:
+    image: livekit/egress:v1.9
+    profiles: ["media"]
+    environment:
+      EGRESS_CONFIG_FILE: /etc/egress.yaml
+    cap_add:
+      - SYS_ADMIN # required by the egress chrome sandbox
+    volumes:
+      - ./infra/egress/egress.yaml:/etc/egress.yaml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   kiss_pm_postgres_data:
   kiss_pm_pnpm_store:
