@@ -52,3 +52,12 @@ export type CallControlHandlers = {
   onToggleScreenShare: () => void;
   onLeave: () => void;
 };
+
+export type LobbyDevice = { deviceId: string; label: string };
+
+export type LobbySelection = {
+  audioDeviceId?: string | undefined;
+  videoDeviceId?: string | undefined;
+  micOn: boolean;
+  cameraOn: boolean;
+};

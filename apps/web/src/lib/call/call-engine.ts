@@ -17,6 +17,7 @@ import type {
   CallLocalControls,
   CallPhase,
   CallStageView,
+  LobbySelection,
   ParticipantTileView,
   QualityLevel
 } from "@/lib/call/types";
@@ -129,7 +130,7 @@ export type CallEngineState = {
   sendChat: (text: string) => void;
 };
 
-export function useCallEngine(roomId: string): CallEngineState {
+export function useCallEngine(roomId: string, options?: LobbySelection | null): CallEngineState {
   const roomRef = useRef<Room | null>(null);
   const [stage, setStage] = useState<CallStageView>({ phase: "idle", participants: [] });
   const [controls, setControls] = useState<CallLocalControls>({ micOn: false, cameraOn: false });
@@ -149,7 +150,12 @@ export function useCallEngine(roomId: string): CallEngineState {
 
   useEffect(() => {
     let disposed = false;
-    const room = new Room({ adaptiveStream: true, dynacast: true });
+    const room = new Room({
+      adaptiveStream: true,
+      dynacast: true,
+      ...(options?.videoDeviceId ? { videoCaptureDefaults: { deviceId: options.videoDeviceId } } : {}),
+      ...(options?.audioDeviceId ? { audioCaptureDefaults: { deviceId: options.audioDeviceId } } : {})
+    });
     roomRef.current = room;
 
     const onChange = () => {
@@ -207,7 +213,8 @@ export function useCallEngine(roomId: string): CallEngineState {
         if (disposed) return;
         await room.connect(join.joinUrl, join.token);
         if (disposed) return;
-        await room.localParticipant.enableCameraAndMicrophone();
+        await room.localParticipant.setMicrophoneEnabled(options?.micOn ?? true);
+        await room.localParticipant.setCameraEnabled(options?.cameraOn ?? true);
         refresh();
       } catch (cause) {
         if (disposed) return;
@@ -222,7 +229,7 @@ export function useCallEngine(roomId: string): CallEngineState {
       void room.disconnect();
       roomRef.current = null;
     };
-  }, [roomId, refresh]);
+  }, [roomId, refresh, options]);
 
   const handlers = useMemo<CallControlHandlers>(
     () => ({
