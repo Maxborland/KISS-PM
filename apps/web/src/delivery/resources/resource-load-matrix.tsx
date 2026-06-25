@@ -433,7 +433,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
         ].map((k) => (
           <div key={k.label} className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 shadow-[var(--shadow-card)]">
             <div className="text-[length:var(--text-xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">{k.label}</div>
-            <div className={cn("v4-num text-[24px] font-extrabold leading-tight", k.tone)}>{k.value}</div>
+            <div className={cn("v4-num text-[length:var(--text-h2)] font-extrabold leading-tight", k.tone)}>{k.value}</div>
             <div className="mt-0.5 truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{k.sub}</div>
           </div>
         ))}

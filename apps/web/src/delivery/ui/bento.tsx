@@ -59,7 +59,7 @@ export function BentoCard({
         <header className="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
           <div className="min-w-0">
             {title ? (
-              <h3 className="truncate font-[family-name:var(--font-display)] text-[15px] font-bold leading-tight tracking-[-0.015em] text-[var(--text-strong)]">
+              <h3 className="truncate font-[family-name:var(--font-display)] text-[length:var(--text-15)] font-bold leading-tight tracking-[-0.015em] text-[var(--text-strong)]">
                 {title}
               </h3>
             ) : null}
@@ -113,7 +113,7 @@ export function StatTile({
       </span>
       <span
         className={cn(
-          "v4-num font-[family-name:var(--font-display)] text-[32px] font-extrabold leading-none tracking-[-0.025em]",
+          "v4-num font-[family-name:var(--font-display)] text-[length:var(--text-h1)] font-extrabold leading-none tracking-[-0.025em]",
           valueTone
         )}
       >

@@ -31,7 +31,7 @@ export function AdminFrame({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--border)] bg-[var(--panel)] px-4 pt-3 pb-3 md:px-6">
         <span className="grid size-8 place-items-center rounded-[var(--radius-md)] bg-[var(--panel-strong)] text-[length:var(--text-xs)] font-bold uppercase tracking-[0.04em] text-[var(--muted-strong)]">Admin</span>
         <div className="mr-auto min-w-0">
-          <h1 className="truncate font-[family-name:var(--font-display)] text-[22px] font-extrabold leading-tight tracking-[-0.025em] text-[var(--text-strong)]">{title ?? "Администрирование"}</h1>
+          <h1 className="truncate font-[family-name:var(--font-display)] text-[length:var(--text-22)] font-extrabold leading-tight tracking-[-0.025em] text-[var(--text-strong)]">{title ?? "Администрирование"}</h1>
           {subtitle ? <p className="truncate text-[length:var(--text-sm)] text-[var(--muted)]">{subtitle}</p> : null}
         </div>
         {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}

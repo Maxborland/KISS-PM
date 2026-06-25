@@ -143,7 +143,7 @@ export function ProjectBaseline() {
             {tiles.map((t) => (
               <div key={t.label} className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 shadow-[var(--shadow-card)]">
                 <div className="text-[length:var(--text-xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">{t.label}</div>
-                <div className={cn("v4-num text-[22px] font-extrabold leading-tight", t.tone)}>{t.value}</div>
+                <div className={cn("v4-num text-[length:var(--text-22)] font-extrabold leading-tight", t.tone)}>{t.value}</div>
                 <div className="mt-0.5 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{t.sub}</div>
               </div>
             ))}

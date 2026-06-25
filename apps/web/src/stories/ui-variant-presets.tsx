@@ -80,7 +80,7 @@ export const UI_VARIANT_ITEMS = {
   ),
   avatar: items(
     { label: "Инициалы", node: <Avatar><AvatarFallback>ИП</AvatarFallback></Avatar> },
-    { label: "Второй цвет", node: <Avatar><AvatarFallback className="bg-[var(--violet-soft)] text-[#6d28d9]">АП</AvatarFallback></Avatar> }
+    { label: "Второй цвет", node: <Avatar><AvatarFallback className="bg-[var(--violet-soft)] text-[color-mix(in_oklab,var(--violet),black_24%)]">АП</AvatarFallback></Avatar> }
   ),
   badge: items(
     { label: "По умолчанию", node: <Badge>По умолчанию</Badge> },

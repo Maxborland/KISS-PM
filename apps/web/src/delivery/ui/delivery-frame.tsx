@@ -78,7 +78,7 @@ export function DeliveryFrame({
           <span className="grid size-8 place-items-center rounded-[var(--radius-md)] bg-[var(--panel-strong)] text-[length:var(--text-sm)] font-bold text-[var(--muted-strong)]">
             {project.code.slice(0, 2)}
           </span>
-          <h1 className="font-[family-name:var(--font-display)] text-[22px] font-extrabold leading-tight tracking-[-0.025em] text-[var(--text-strong)]">
+          <h1 className="font-[family-name:var(--font-display)] text-[length:var(--text-22)] font-extrabold leading-tight tracking-[-0.025em] text-[var(--text-strong)]">
             {project.name}
           </h1>
           <Pill tone={project.statusTone ?? "info"}>{project.status}</Pill>

@@ -28,7 +28,7 @@ const calLabel = (c: CalRaw) => { const days = c.workingWeekdays.map((d) => DOW_
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
-      <h3 className="font-[family-name:var(--font-display)] text-[15px] font-bold leading-tight tracking-[-0.015em] text-[var(--text-strong)]">{title}</h3>
+      <h3 className="font-[family-name:var(--font-display)] text-[length:var(--text-15)] font-bold leading-tight tracking-[-0.015em] text-[var(--text-strong)]">{title}</h3>
       {hint ? <p className="mt-0.5 mb-3 text-[length:var(--text-sm)] text-[var(--muted-soft)]">{hint}</p> : <div className="mb-3" />}
       {children}
     </section>

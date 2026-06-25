@@ -165,7 +165,7 @@ export function TaskInspector() {
           <ArrowLeft className="size-3.5" aria-hidden />
           График
         </button>
-        <h2 className="font-[family-name:var(--font-display)] text-[19px] font-extrabold tracking-[-0.02em] text-[var(--text-strong)]">{task.title}</h2>
+        <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-19)] font-extrabold tracking-[-0.02em] text-[var(--text-strong)]">{task.title}</h2>
         <span className="v4-mono text-[length:var(--text-sm)] text-[var(--muted)]">WBS {task.wbsCode} · {project.planVersion}</span>
         {isCritical ? (
           <span className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--danger-soft)] px-2 py-0.5 text-[length:var(--text-sm)] font-medium text-[var(--danger-text)]">
@@ -565,7 +565,7 @@ function ReactionPicker({ busy, onPick }: { busy: boolean; onPick: (emoji: strin
               type="button"
               disabled={busy}
               onClick={() => onPick(e)}
-              className="grid size-7 place-items-center rounded-[var(--radius-sm)] text-[16px] hover:bg-[var(--panel-strong)] disabled:opacity-60"
+              className="grid size-7 place-items-center rounded-[var(--radius-sm)] text-[length:var(--text-lg)] hover:bg-[var(--panel-strong)] disabled:opacity-60"
             >
               {e}
             </button>

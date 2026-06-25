@@ -93,6 +93,12 @@
   --text-2xl: var(--text-h2);
   --text-3xl: var(--text-h1);
   --text-4xl: 40px;
+  /* Display/heading-точные размеры (фрейм-заголовки, bento-числа, инспектор) —
+     токенизированы 1:1 (16/24/32 покрыты lg/h2/h1; 15/19/22/28 — здесь). */
+  --text-15: 15px;
+  --text-19: 19px;
+  --text-22: 22px;
+  --text-28: 28px;
 
   --lh-2xs: 14px;
   --lh-xs: 16px;

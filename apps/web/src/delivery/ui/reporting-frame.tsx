@@ -29,7 +29,7 @@ export function ReportingFrame({
             Аналитика <ChevronRight className="size-3" aria-hidden /> Загрузка
           </div>
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <h1 className="font-[family-name:var(--font-display)] text-[22px] font-extrabold leading-tight tracking-[-0.025em] text-[var(--text-strong)]">{title}</h1>
+            <h1 className="font-[family-name:var(--font-display)] text-[length:var(--text-22)] font-extrabold leading-tight tracking-[-0.025em] text-[var(--text-strong)]">{title}</h1>
             {subtitle ? <span className="text-[length:var(--text-sm)] text-[var(--muted)]">{subtitle}</span> : null}
           </div>
         </div>

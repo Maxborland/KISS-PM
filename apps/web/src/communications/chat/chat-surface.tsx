@@ -349,7 +349,7 @@ function MessageBubble({
           <>
             {m.body ? <p className="mt-0.5 whitespace-pre-wrap text-[length:var(--text-sm)] text-[var(--text)]">{m.body}</p> : null}
             {m.stickers.map((s) => (
-              <div key={s.stickerAssetId} className="mt-0.5 text-[28px] leading-none" title="Стикер">{stickerEmoji(s.stickerAssetId)}</div>
+              <div key={s.stickerAssetId} className="mt-0.5 text-[length:var(--text-28)] leading-none" title="Стикер">{stickerEmoji(s.stickerAssetId)}</div>
             ))}
           </>
         )}
@@ -411,7 +411,7 @@ function ReactionPicker({ busy, onPick }: { busy: boolean; onPick: (emoji: strin
               type="button"
               disabled={busy}
               onClick={() => onPick(e)}
-              className="grid size-7 place-items-center rounded-[var(--radius-sm)] text-[16px] hover:bg-[var(--panel-strong)] disabled:opacity-60"
+              className="grid size-7 place-items-center rounded-[var(--radius-sm)] text-[length:var(--text-lg)] hover:bg-[var(--panel-strong)] disabled:opacity-60"
             >
               {e}
             </button>
@@ -487,7 +487,7 @@ function Composer({
                   disabled={busy}
                   onClick={() => onSticker(s.id)}
                   title={s.title}
-                  className="grid size-10 place-items-center rounded-[var(--radius-md)] text-[24px] hover:bg-[var(--panel-strong)] disabled:opacity-60"
+                  className="grid size-10 place-items-center rounded-[var(--radius-md)] text-[length:var(--text-h2)] hover:bg-[var(--panel-strong)] disabled:opacity-60"
                 >
                   {s.emoji}
                 </button>
