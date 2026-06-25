@@ -14,6 +14,8 @@ export type MediaState = "on" | "off";
 
 export type QualityLevel = "excellent" | "good" | "poor" | "lost" | "unknown";
 
+export type BackgroundMode = "none" | "blur" | "image";
+
 /**
  * Attach/detach callback supplied by the engine for a live video track. The
  * widget only renders a <video> and hands its element here; it never imports the
@@ -44,12 +46,15 @@ export type CallLocalControls = {
   micOn: boolean;
   cameraOn: boolean;
   screenShareOn?: boolean;
+  background?: BackgroundMode | undefined;
+  backgroundSupported?: boolean | undefined;
 };
 
 export type CallControlHandlers = {
   onToggleMic: () => void;
   onToggleCamera: () => void;
   onToggleScreenShare: () => void;
+  onCycleBackground?: () => void;
   onLeave: () => void;
 };
 

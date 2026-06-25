@@ -1,6 +1,15 @@
 "use client";
 
-import { Mic, MicOff, PhoneOff, ScreenShare, ScreenShareOff, Video, VideoOff } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  PhoneOff,
+  ScreenShare,
+  ScreenShareOff,
+  Sparkles,
+  Video,
+  VideoOff
+} from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import type {
@@ -91,6 +100,24 @@ export function CallStage({ view, controls, handlers, disabled }: CallStageProps
           )}
           <span>Экран</span>
         </button>
+
+        {controls.backgroundSupported ? (
+          <button
+            type="button"
+            className={cn(
+              "call-controls__btn",
+              (controls.background ?? "none") !== "none" && "call-controls__btn--active"
+            )}
+            aria-pressed={(controls.background ?? "none") !== "none"}
+            aria-label="Сменить фон"
+            disabled={disabled}
+            title={disabled ? "Демо Storybook: подключение медиа отключено" : undefined}
+            onClick={handlers?.onCycleBackground}
+          >
+            <Sparkles aria-hidden size={18} />
+            <span>Фон</span>
+          </button>
+        ) : null}
 
         <button
           type="button"

@@ -3,6 +3,7 @@
 import {
   ConnectionQuality,
   ConnectionState,
+  LocalVideoTrack,
   Room,
   RoomEvent,
   Track,
@@ -11,8 +12,10 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MessageView } from "@/components/domain/message-bubble";
+import { CallBackgroundController, backgroundProcessorsSupported } from "@/lib/call/call-background";
 import { fetchJoinToken, startCallSession } from "@/lib/call/call-client";
 import type {
+  BackgroundMode,
   CallControlHandlers,
   CallLocalControls,
   CallPhase,
@@ -136,6 +139,12 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
   const [controls, setControls] = useState<CallLocalControls>({ micOn: false, cameraOn: false });
   const [error, setError] = useState<string | null>(null);
   const [chat, setChat] = useState<MessageView[]>([]);
+  const backgroundRef = useRef<CallBackgroundController | null>(null);
+  if (!backgroundRef.current) {
+    backgroundRef.current = new CallBackgroundController();
+  }
+  const [background, setBackground] = useState<BackgroundMode>("none");
+  const backgroundSupported = useMemo(() => backgroundProcessorsSupported(), []);
 
   const refresh = useCallback(() => {
     const room = roomRef.current;
@@ -203,6 +212,17 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
       }
     });
 
+    const bindBackground = () => {
+      if (disposed) return;
+      const cameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+      void backgroundRef.current?.bind(
+        cameraTrack instanceof LocalVideoTrack ? cameraTrack : null
+      );
+    };
+    room
+      .on(RoomEvent.LocalTrackPublished, bindBackground)
+      .on(RoomEvent.LocalTrackUnpublished, bindBackground);
+
     void (async () => {
       try {
         const session = await startCallSession(roomId);
@@ -227,6 +247,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
       disposed = true;
       room.removeAllListeners();
       void room.disconnect();
+      void backgroundRef.current?.dispose();
       roomRef.current = null;
     };
   }, [roomId, refresh, options]);
@@ -275,5 +296,21 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     void room.localParticipant.publishData(packet, { reliable: true, topic: CHAT_TOPIC });
   }, []);
 
-  return { stage, controls, handlers, error, chat, sendChat };
+  const onCycleBackground = useCallback(() => {
+    const order: BackgroundMode[] = ["none", "blur", "image"];
+    const next = order[(order.indexOf(background) + 1) % order.length] ?? "none";
+    setBackground(next);
+    void backgroundRef.current?.setMode(next).then((applied) => {
+      if (applied !== next) setBackground(applied);
+    });
+  }, [background]);
+
+  return {
+    stage,
+    controls: { ...controls, background, backgroundSupported },
+    handlers: { ...handlers, onCycleBackground },
+    error,
+    chat,
+    sendChat
+  };
 }

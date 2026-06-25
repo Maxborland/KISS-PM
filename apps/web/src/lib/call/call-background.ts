@@ -1,0 +1,106 @@
+"use client";
+
+import {
+  BackgroundProcessor,
+  type BackgroundProcessorWrapper,
+  type SwitchBackgroundProcessorOptions,
+  supportsBackgroundProcessors
+} from "@livekit/track-processors";
+import type { LocalVideoTrack } from "livekit-client";
+
+import type { BackgroundMode } from "@/lib/call/types";
+
+// Self-hosted MediaPipe assets (no external CDN). Run `pnpm livekit:assets` to
+// populate public/livekit/ — see public/livekit/README.md.
+const ASSET_PATHS = {
+  tasksVisionFileSet: "/livekit/wasm",
+  modelAssetPath: "/livekit/selfie_segmenter.tflite"
+} as const;
+const DEFAULT_BACKGROUND_IMAGE = "/livekit/backgrounds/studio.svg";
+const BLUR_RADIUS = 12;
+
+export function backgroundProcessorsSupported(): boolean {
+  try {
+    return supportsBackgroundProcessors();
+  } catch {
+    return false;
+  }
+}
+
+function optionsFor(mode: BackgroundMode): SwitchBackgroundProcessorOptions {
+  if (mode === "blur") return { mode: "background-blur", blurRadius: BLUR_RADIUS };
+  if (mode === "image") return { mode: "virtual-background", imagePath: DEFAULT_BACKGROUND_IMAGE };
+  return { mode: "disabled" };
+}
+
+/**
+ * A single background processor applied to the local camera track. All failures
+ * (assets missing, weak pipeline) degrade gracefully to "none" — never a broken
+ * effect. The media SDK is confined here under lib/call/*.
+ */
+export class CallBackgroundController {
+  private processor: BackgroundProcessorWrapper | null = null;
+  private track: LocalVideoTrack | null = null;
+  private mode: BackgroundMode = "none";
+
+  getMode(): BackgroundMode {
+    return this.mode;
+  }
+
+  /** Re-apply the active effect when the camera track is (re)published. */
+  async bind(track: LocalVideoTrack | null): Promise<void> {
+    this.track = track;
+    if (track && this.processor && this.mode !== "none") {
+      try {
+        await track.setProcessor(this.processor);
+      } catch {
+        this.mode = "none";
+      }
+    }
+  }
+
+  /** Apply a background mode; returns the mode actually applied (reverts on failure). */
+  async setMode(mode: BackgroundMode): Promise<BackgroundMode> {
+    const track = this.track;
+    if (!track) {
+      this.mode = mode;
+      return mode;
+    }
+    try {
+      if (mode === "none") {
+        if (this.processor) await this.processor.switchTo({ mode: "disabled" });
+        this.mode = "none";
+        return "none";
+      }
+      if (!this.processor) {
+        this.processor = BackgroundProcessor({ ...optionsFor(mode), assetPaths: { ...ASSET_PATHS } });
+        await track.setProcessor(this.processor);
+      } else {
+        await this.processor.switchTo(optionsFor(mode));
+      }
+      this.mode = mode;
+      return mode;
+    } catch {
+      this.mode = "none";
+      try {
+        if (this.processor) await track.stopProcessor();
+      } catch {
+        // ignore
+      }
+      return "none";
+    }
+  }
+
+  async dispose(): Promise<void> {
+    if (this.track && this.processor) {
+      try {
+        await this.track.stopProcessor();
+      } catch {
+        // ignore
+      }
+    }
+    this.processor = null;
+    this.track = null;
+    this.mode = "none";
+  }
+}
