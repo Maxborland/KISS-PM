@@ -244,6 +244,7 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
           const markReady = requireFn(tx.markFileAssetReady);
           const createAttachment = requireFn(tx.createEntityAttachment);
           const updateRecording = requireFn(tx.updateCallRecordingByEgress);
+          const createEvent = requireFn(tx.createCallEvent);
 
           // Tenant was parsed by the webhook route from OUR egress output key
           // (recordings/{tenantId}/...), not trusted from a free-form payload field.
@@ -298,6 +299,24 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
           // updateCallRecordingByEgress matches only when attachment_id IS NULL, so a
           // concurrent delivery that already attached yields no row — roll the txn back.
           if (!updated) throw new RecordingRaceLost();
+          // Close the per-track recording timeline. The claim-once update above fires
+          // exactly once per track, so this event is emitted exactly once — no group-level
+          // completion event is needed (consumers derive it from track_completed count vs
+          // the recording_started payload's trackCount).
+          await createEvent({
+            id: `call-event-${randomUUID()}`,
+            tenantId: recording.tenantId,
+            roomId: recording.roomId,
+            sessionId: recording.sessionId,
+            actorUserId: recording.createdByUserId,
+            eventType: "recording_track_completed",
+            payload: {
+              recordingGroupId: recording.recordingGroupId,
+              recordingId: recording.id,
+              trackId: recording.trackId,
+              durationSeconds: input.durationSeconds
+            }
+          });
           return { reconciled: true };
         });
       } catch (error) {

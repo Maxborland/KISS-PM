@@ -9,6 +9,7 @@ import {
 
 import { createApp } from "./app";
 import type { ApiTenantDataSource } from "./apiTypes";
+import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
 import {
   communicationJsonHeaders as jsonHeaders,
   communicationRealtimeDatabaseUrl,
@@ -588,4 +589,92 @@ describe("communications realtime API", () => {
         AND id = ${sessionId}
     `;
   }
+
+  it("reconcileEgressEnded marks the track ready and logs recording_track_completed", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+
+    const room = await dataSource.createCallRoom({
+      id: "call-room-rec",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Запись",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-rec",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-rec",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    await dataSource.createCallRecording({
+      id: "call-recording-rec",
+      tenantId,
+      roomId: room.id,
+      sessionId: session.id,
+      recordingGroupId: "call-rec-group-rec",
+      attachmentId: null,
+      egressId: "egress-rec-1",
+      participantId: "user-alpha-admin",
+      trackId: "track-1",
+      kind: "video",
+      status: "recording",
+      durationSeconds: null,
+      endedAt: null,
+      title: "Запись · user-alpha-admin",
+      createdByUserId: "user-alpha-admin"
+    });
+
+    const workspace = createCommunicationRecordingWorkspace({
+      dataSource,
+      egressProvider: null,
+      appendManagementAuditEvent: async () => "audit-id"
+    });
+
+    const result = await workspace.reconcileEgressEnded({
+      tenantId,
+      egressId: "egress-rec-1",
+      storageKey: `recordings/${tenantId}/${room.id}/${session.id}/call-rec-group-rec/user-alpha-admin/track-1.webm`,
+      sizeBytes: 2048,
+      durationSeconds: 42
+    });
+    expect(result.reconciled).toBe(true);
+
+    const recordings = await dataSource.listCallRecordingsByGroup({
+      tenantId,
+      recordingGroupId: "call-rec-group-rec"
+    });
+    expect(recordings).toHaveLength(1);
+    expect(recordings[0]).toMatchObject({ status: "ready", durationSeconds: 42 });
+    expect(recordings[0]?.attachmentId).toBeTruthy();
+
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    const completed = events.find((event) => event.eventType === "recording_track_completed");
+    expect(completed).toBeDefined();
+    expect(completed?.payload).toMatchObject({
+      recordingId: "call-recording-rec",
+      trackId: "track-1",
+      durationSeconds: 42
+    });
+
+    // Idempotent: a retried webhook delivery must not emit a second completion event.
+    const retry = await workspace.reconcileEgressEnded({
+      tenantId,
+      egressId: "egress-rec-1",
+      storageKey: `recordings/${tenantId}/${room.id}/${session.id}/call-rec-group-rec/user-alpha-admin/track-1.webm`,
+      sizeBytes: 2048,
+      durationSeconds: 42
+    });
+    expect(retry.reconciled).toBe(true);
+    const eventsAfter = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    expect(eventsAfter.filter((event) => event.eventType === "recording_track_completed")).toHaveLength(1);
+  });
 });
