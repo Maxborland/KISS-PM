@@ -36,3 +36,42 @@ export async function fetchJoinToken(roomId: string, sessionId: string): Promise
   );
   return result.join;
 }
+
+export type CallRoomEntity = { entityType: string; entityId: string };
+
+/** GET /call-rooms/:roomId → the room's parent entity (for the durable chat). */
+export async function fetchCallRoomEntity(roomId: string): Promise<CallRoomEntity | null> {
+  try {
+    const result = await apiFetch<{ callRoom: { entityType: string; entityId: string } }>(
+      `/api/workspace/call-rooms/${encodeURIComponent(roomId)}`
+    );
+    return { entityType: result.callRoom.entityType, entityId: result.callRoom.entityId };
+  } catch {
+    return null;
+  }
+}
+
+/** GET /conversations?entityType&entityId → the default conversation id (find-or-create on the server). */
+export async function resolveEntityConversationId(
+  entityType: string,
+  entityId: string
+): Promise<string | null> {
+  try {
+    const result = await apiFetch<{ conversations: { id: string }[] }>(
+      `/api/workspace/conversations?entityType=${encodeURIComponent(entityType)}&entityId=${encodeURIComponent(
+        entityId
+      )}`
+    );
+    return result.conversations[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** POST /conversations/:id/messages → durable persistence of an in-call message. */
+export async function persistCallMessage(conversationId: string, body: string): Promise<void> {
+  await apiFetch(`/api/workspace/conversations/${encodeURIComponent(conversationId)}/messages`, {
+    method: "POST",
+    json: { body }
+  });
+}

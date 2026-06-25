@@ -13,7 +13,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MessageView } from "@/components/domain/message-bubble";
 import { CallBackgroundController, backgroundProcessorsSupported } from "@/lib/call/call-background";
-import { fetchJoinToken, startCallSession } from "@/lib/call/call-client";
+import {
+  fetchCallRoomEntity,
+  fetchJoinToken,
+  persistCallMessage,
+  resolveEntityConversationId,
+  startCallSession
+} from "@/lib/call/call-client";
 import type {
   BackgroundMode,
   CallControlHandlers,
@@ -145,6 +151,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
   }
   const [background, setBackground] = useState<BackgroundMode>("none");
   const backgroundSupported = useMemo(() => backgroundProcessorsSupported(), []);
+  const conversationIdRef = useRef<string | null>(null);
 
   const refresh = useCallback(() => {
     const room = roomRef.current;
@@ -162,6 +169,16 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     const room = new Room({
       adaptiveStream: true,
       dynacast: true,
+      // Publishing optimization: VP9 SVC with a VP8 backup for older browsers,
+      // simulcast layers for adaptiveStream/dynacast, DTX + RED for resilient audio.
+      // (AV1 stays opt-in behind a future flag — higher encode cost.)
+      publishDefaults: {
+        simulcast: true,
+        videoCodec: "vp9",
+        backupCodec: { codec: "vp8" },
+        dtx: true,
+        red: true
+      },
       ...(options?.videoDeviceId ? { videoCaptureDefaults: { deviceId: options.videoDeviceId } } : {}),
       ...(options?.audioDeviceId ? { audioCaptureDefaults: { deviceId: options.audioDeviceId } } : {})
     });
@@ -236,6 +253,14 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
         await room.localParticipant.setMicrophoneEnabled(options?.micOn ?? true);
         await room.localParticipant.setCameraEnabled(options?.cameraOn ?? true);
         refresh();
+        // Resolve the durable conversation for the room's parent entity (best-effort).
+        const entity = await fetchCallRoomEntity(roomId);
+        if (entity && !disposed) {
+          conversationIdRef.current = await resolveEntityConversationId(
+            entity.entityType,
+            entity.entityId
+          );
+        }
       } catch (cause) {
         if (disposed) return;
         setError(cause instanceof Error ? cause.message : "call_failed");
@@ -248,6 +273,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
       room.removeAllListeners();
       void room.disconnect();
       void backgroundRef.current?.dispose();
+      conversationIdRef.current = null;
       roomRef.current = null;
     };
   }, [roomId, refresh, options]);
@@ -294,6 +320,9 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     ]);
     const packet = new TextEncoder().encode(JSON.stringify({ kind: "chat", clientId, body, time }));
     void room.localParticipant.publishData(packet, { reliable: true, topic: CHAT_TOPIC });
+    // Durable persistence to the entity conversation (best-effort; ephemeral path is authoritative for delivery).
+    const conversationId = conversationIdRef.current;
+    if (conversationId) void persistCallMessage(conversationId, body).catch(() => undefined);
   }, []);
 
   const onCycleBackground = useCallback(() => {
