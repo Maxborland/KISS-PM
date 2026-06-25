@@ -26,6 +26,8 @@ import {
   type CommunicationEntityAccessContext
 } from "./communications/entityAccess";
 import { readLimitedJsonBody } from "./jsonBody";
+import { createLiveKitEgressProviderFromEnv } from "./communications/recording/livekitEgressProvider";
+import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
 import type { ApiRouteDeps } from "./routeTypes";
 
 type ResolvedCallRoom = {
@@ -35,6 +37,11 @@ type ResolvedCallRoom = {
 
 export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDeps) {
   const callWorkspace = createCommunicationCallWorkspace(deps);
+  const recordingWorkspace = createCommunicationRecordingWorkspace({
+    dataSource: deps.dataSource,
+    egressProvider: createLiveKitEgressProviderFromEnv(),
+    appendManagementAuditEvent: deps.appendManagementAuditEvent
+  });
 
   app.get("/api/workspace/call-rooms", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
@@ -286,6 +293,67 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
       event: serializeCallEvent(result.event),
       recording: serializeCallRecording(result.recording)
     }, 201);
+  });
+
+  app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/recordings/start", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const resolved = await resolveCallRoomAndSession(
+      context.req.param("roomId"),
+      context.req.param("sessionId"),
+      actor,
+      deps
+    );
+    if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
+    if (!resolved.value.access.manageDecision.allowed) {
+      await callWorkspace.appendDeniedAudit({
+        actionType: "communications.denied",
+        actor,
+        commandInput: { action: "recording.start", roomId: context.req.param("roomId") },
+        permissionResult: resolved.value.access.manageDecision,
+        sourceEntity: resolved.value.access.sourceEntity
+      });
+      return context.json({ error: resolved.value.access.manageDecision.reason }, 403);
+    }
+    const result = await recordingWorkspace.startRecording({
+      access: resolved.value.access,
+      actor,
+      room: resolved.value.room,
+      session: resolved.value.session
+    });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
+    return context.json(
+      {
+        recordingGroupId: result.recordingGroupId,
+        recordings: result.recordings.map(serializeCallRecording)
+      },
+      201
+    );
+  });
+
+  app.post("/api/workspace/call-rooms/:roomId/recordings/groups/:groupId/stop", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const resolved = await resolveCallRoomForActor(context.req.param("roomId"), actor, deps);
+    if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
+    if (!resolved.value.access.manageDecision.allowed) {
+      await callWorkspace.appendDeniedAudit({
+        actionType: "communications.denied",
+        actor,
+        commandInput: { action: "recording.stop", roomId: context.req.param("roomId") },
+        permissionResult: resolved.value.access.manageDecision,
+        sourceEntity: resolved.value.access.sourceEntity
+      });
+      return context.json({ error: resolved.value.access.manageDecision.reason }, 403);
+    }
+    const result = await recordingWorkspace.stopRecording({
+      access: resolved.value.access,
+      actor,
+      room: resolved.value.room,
+      recordingGroupId: context.req.param("groupId")
+    });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
+    return context.json({ stopped: result.stopped });
   });
 
   app.get("/api/workspace/call-rooms/:roomId/events", async (context) => {

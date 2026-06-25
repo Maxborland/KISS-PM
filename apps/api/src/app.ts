@@ -32,6 +32,7 @@ import { registerCrmRoutes } from "./crmRoutes";
 import { registerCollaborationRoutes } from "./collaborationRoutes";
 import { registerCommunicationUpgradeRoutes } from "./communicationUpgradeRoutes";
 import { registerCommunicationRealtimeRoutes } from "./communicationRealtimeRoutes";
+import { registerCommunicationRecordingWebhookRoute } from "./communicationRecordingWebhookRoute";
 import { registerControlRoutes } from "./controlRoutes";
 import { registerControlSurfaceRoutes } from "./controlSurfaceRoutes";
 import { registerDevTenantRoutes } from "./devTenantRoutes";
@@ -252,6 +253,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerCollaborationRoutes(app, routeDeps);
   registerCommunicationUpgradeRoutes(app, routeDeps);
   registerCommunicationRealtimeRoutes(app, routeDeps);
+  registerCommunicationRecordingWebhookRoute(app, routeDeps);
   registerKnowledgeRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
