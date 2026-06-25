@@ -694,16 +694,33 @@ export function createMockCrmFetch(): typeof fetch {
       if (!ptype || ptype.status !== "active") return err("project_type_not_found", 404);
       const stage = db.dealStages.find((x) => x.id === parsed.stageId);
       if (!stage || stage.status !== "active") return err("deal_stage_not_found", 404);
-      // 6) server-managed запись: статус СОХРАНЯЕТСЯ, pipelineId НЕ трогается, feasibility* НЕ трогаются,
-      // stageId пишется БЕЗ guard-переходов, plannedHours пересчитывается доменом, customFieldValues всегда {}
-      // (вход customFieldValues сознательно игнорируем — упрощение мока, см. заметки).
+      // Полное сохранение ЗЕРКАЛИТ прод (updateOpportunityCommand + repo.updateOpportunity):
+      // при смене стадии применяем guard перехода воронки (как /stage), pipelineId выводим из целевой
+      // стадии, feasibility сбрасываем. Иначе мок «разрешал» бы guarded-переход, который прод отклоняет.
+      if (parsed.stageId !== o.stageId) {
+        const currentStage = o.stageId ? db.dealStages.find((x) => x.id === o.stageId) : undefined;
+        const sourcePipelineId = currentStage?.pipelineId ?? null;
+        const transitions = sourcePipelineId ? db.stageTransitions.filter((tr) => tr.pipelineId === sourcePipelineId) : [];
+        const decision = evaluateStageTransition({
+          opportunity: { finalized: false, stageId: o.stageId, pipelineId: sourcePipelineId, probability: o.probability, feasibilityStatus: o.feasibilityStatus },
+          targetStage: { id: stage.id, pipelineId: stage.pipelineId },
+          transitions: transitions.map((tr) => ({ fromStageId: tr.fromStageId, toStageId: tr.toStageId, requireFeasibilityOk: tr.requireFeasibilityOk, minProbability: tr.minProbability }))
+        });
+        if (!decision.allowed) {
+          const status = decision.reason === "condition_probability" || decision.reason === "condition_feasibility" ? 422 : 409;
+          return err(decision.reason, status);
+        }
+      }
+      // server-managed: статус СОХРАНЯЕТСЯ; pipelineId выводится из целевой стадии; feasibility сбрасывается;
+      // plannedHours пересчитывается доменом; customFieldValues всегда {} (вход сознательно игнорируем).
       o.clientId = parsed.clientId; o.primaryContactId = parsed.primaryContactId; o.projectTypeId = parsed.projectTypeId;
-      o.stageId = parsed.stageId; o.ownerUserId = ownerUserId; o.title = parsed.title; o.description = parsed.description;
+      o.stageId = parsed.stageId; o.pipelineId = stage.pipelineId; o.ownerUserId = ownerUserId; o.title = parsed.title; o.description = parsed.description;
       o.clientName = client.name; o.contactName = contact.name; o.projectType = ptype.name;
       o.plannedStart = parsed.plannedStart; o.plannedFinish = parsed.plannedFinish;
       o.contractValue = parsed.contractValue; o.plannedHourlyRate = parsed.plannedHourlyRate;
       o.plannedHours = calculatePlannedHours(parsed.contractValue, parsed.plannedHourlyRate);
       o.probability = parsed.probability; o.templateId = parsed.templateId; o.customFieldValues = {};
+      o.feasibilityStatus = null; o.feasibilityResult = null; o.feasibilityCheckedAt = null;
       o.updatedAt = nowIso();
       return json({ opportunity: o });
     }

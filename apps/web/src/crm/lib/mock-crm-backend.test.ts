@@ -258,19 +258,33 @@ describe("contract-mock CRM backend", () => {
   // ===== Карточка сделки: full-replace update =====
   const updateInput = (over: Partial<OpportunityCreateInput> = {}) => ({ ...baseInput(over) });
 
-  it("updates an opportunity (full-replace): recomputes plannedHours, preserves status, does not touch pipelineId", async () => {
+  it("updates an opportunity (full-replace): recomputes plannedHours, preserves status, derives pipelineId, resets feasibility", async () => {
     const c = client();
     const before = (await c.getOpportunity("opp-2207")).opportunity;
+    // та же стадия (stage-contract) → guard перехода не срабатывает; проверяем server-managed поля
     const { opportunity } = await c.updateOpportunity("opp-2207", updateInput({
-      clientId: "client-romashka", primaryContactId: "ctc-romashka", projectTypeId: "pt-impl", stageId: "stage-proposal",
+      clientId: "client-romashka", primaryContactId: "ctc-romashka", projectTypeId: "pt-impl", stageId: "stage-contract",
       title: "Производственный портал · Релиз 2 (обновлён)", contractValue: 6_000_000, plannedHourlyRate: 5000,
       plannedStart: "2026-03-02", plannedFinish: "2026-07-12", probability: 70, demand: [{ positionId: "backend", requiredHours: 900 }]
     }));
     expect(opportunity.plannedHours).toBe(Math.floor(6_000_000 / 5000)); // 1200, пересчитан доменом
     expect(opportunity.status).toBe(before.status); // статус СОХРАНЁН (PATCH не меняет статус)
-    expect(opportunity.pipelineId).toBe(before.pipelineId); // pipelineId НЕ тронут
-    expect(opportunity.stageId).toBe("stage-proposal"); // stageId записан без guard-проверок
+    expect(opportunity.pipelineId).toBe(before.pipelineId); // pipelineId выведен из целевой стадии (та же — не меняется)
+    expect(opportunity.stageId).toBe("stage-contract");
+    expect(opportunity.feasibilityStatus).toBeNull(); // feasibility сброшен (как боевой repo.updateOpportunity)
     expect(opportunity.title).toBe("Производственный портал · Релиз 2 (обновлён)");
+  });
+
+  it("full-replace update enforces stage transition guards (как боевой updateOpportunityCommand)", async () => {
+    const c = client();
+    // обратный переход stage-contract → stage-proposal не описан правилом → отклоняется (как /stage)
+    await expect(
+      c.updateOpportunity("opp-2207", updateInput({
+        clientId: "client-romashka", primaryContactId: "ctc-romashka", projectTypeId: "pt-impl", stageId: "stage-proposal",
+        title: "Назад в proposal", contractValue: 6_000_000, plannedHourlyRate: 5000,
+        plannedStart: "2026-03-02", plannedFinish: "2026-07-12", probability: 70, demand: [{ positionId: "backend", requiredHours: 900 }]
+      }))
+    ).rejects.toMatchObject({ status: 409, code: "transition_not_allowed" });
   });
 
   it("rejects updating a finalized opportunity (409 opportunity_update_locked)", async () => {

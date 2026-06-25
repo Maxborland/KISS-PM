@@ -49,8 +49,14 @@ export function ProjectScenarios() {
 
   const model = useMemo(() => {
     if (!readModel) return null;
+    // Уже принятые перегрузки исключаем из целей сценария (каноничный ключ `resourceId:dateIso`),
+    // иначе после применения сценария только что принятый день остаётся целью по умолчанию и снова предлагается.
+    const accepted = new Set(
+      (readModel.resourceLoad as unknown as { acceptedOverloads?: string[] }).acceptedOverloads ?? []
+    );
     const overloads = ((readModel.resourceLoad as unknown as { overloads: Array<{ resourceId: string; date: string; granularity?: string; overloadMinutes: number; taskIds: string[] }> }).overloads ?? [])
       .filter((o) => o.granularity === undefined || o.granularity === "day")
+      .filter((o) => !accepted.has(`${o.resourceId}:${o.date}`))
       .map((o) => ({ resourceId: o.resourceId, date: o.date, overloadMinutes: o.overloadMinutes, taskIds: o.taskIds }))
       .sort((a, b) => b.overloadMinutes - a.overloadMinutes) as Overload[];
     const deadline = (readModel.project as unknown as { deadline: string }).deadline;

@@ -18,9 +18,10 @@ export function createPlanningReadModel(
   snapshot: PlanSnapshot,
   options: PlanningReadModelOptions = {}
 ) {
-  // По умолчанию отдаём все исключения (контексты apply/preview под право на ресурсы);
-  // read-model-роут передаёт флаг по фактическому праву актора на ресурсы.
-  const includeResourceExceptions = options.includeResourceExceptions ?? true;
+  // Fail-closed: по умолчанию НЕ раскрываем персональные ресурсные исключения (чужие отсутствия).
+  // Актор-фейсинг роуты (read-model/preview/apply) передают флаг по фактическому праву на ресурсы;
+  // матрица загрузки ниже всё равно считается по полному snapshot.calendarExceptions (ёмкость не зависит от права).
+  const includeResourceExceptions = options.includeResourceExceptions ?? false;
   const calculatedPlan = calculatePlan(snapshot, {
     calculatedAt: snapshot.capturedAt,
     engineVersion: PLANNING_ENGINE_VERSION

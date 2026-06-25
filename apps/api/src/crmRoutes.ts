@@ -767,10 +767,11 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     if (!body.ok) return context.json({ error: body.error }, body.status);
     if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
     // Мультиворонки: сохраняем существующую воронку стадии (тело её не несёт).
-    // pipelineId ставится ПОСЛЕ спреда тела, чтобы случайный/постороний pipelineId
-    // в body не смог переместить стадию в другую воронку мимо контракта.
+    // pipelineId/status ставятся ПОСЛЕ спреда тела: случайный pipelineId в body не сможет
+    // переместить стадию в другую воронку, а отсутствие status в частичном PATCH не
+    // реактивирует архивную стадию (parser дефолтит status в 'active').
     const parsed = parseDealStageBody(
-      { ...body.value, pipelineId: beforeState.pipelineId, id: stageId },
+      { ...body.value, pipelineId: beforeState.pipelineId, status: beforeState.status, id: stageId },
       actor.tenantId
     );
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);

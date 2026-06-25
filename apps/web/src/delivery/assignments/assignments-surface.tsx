@@ -104,8 +104,9 @@ export function ProjectAssignments() {
       for (let d = es; d < Math.max(ef, es + 1); d++) if (isWorkingFor(a.resourceId, d)) days.push(d);
       const explicit = allocByAsg.get(a.id) ?? new Map<number, number>();
       const span = Math.max(1, ef - es);
-      // flatPer как у движка загрузки (work*units/calendar-days), чтобы грид совпадал с экраном «Ресурсы»
-      metaByAsg.set(a.id, { asg: a, days, scheduledSet: new Set(days), flatPer: Math.round((a.workMinutes * (a.unitsPermille / 1000)) / span), explicit, hasExplicit: explicit.size > 0 });
+      // flatPer как у движка загрузки (явный workMinutes — абсолютная работа, без масштаба units),
+      // чтобы грид совпадал с экраном «Ресурсы» и с продовым resolveAssignmentWork
+      metaByAsg.set(a.id, { asg: a, days, scheduledSet: new Set(days), flatPer: Math.round(a.workMinutes / span), explicit, hasExplicit: explicit.size > 0 });
     }
     // диапазон дней для окна
     let minDay = 9999, maxDay = 0;

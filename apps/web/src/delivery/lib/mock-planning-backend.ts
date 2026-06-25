@@ -399,7 +399,9 @@ function buildResourceLoad(a: Authored, calc: Map<string, Calc>, projectId: stri
     if (!c) continue;
     let workingDays = 0;
     for (let day = c.es; day < c.ef; day++) if (capacityOf(asg.resourceId, day) > 0) workingDays += 1;
-    const work = asg.workMinutes * (asg.unitsPermille / 1000);
+    // Явный workMinutes — абсолютная величина работы (как resolveAssignmentWork в проде):
+    // дневная нагрузка = work / рабочие дни, без повторного масштабирования на units.
+    const work = asg.workMinutes;
     asgPerDay.set(asg.id, { es: c.es, ef: c.ef, taskId: asg.taskId, resourceId: asg.resourceId, per: Math.round(work / Math.max(1, workingDays)) });
   }
   // явная дневная кривая: assignmentId → (day → минуты). Если у назначения она есть — берём её, иначе ровное per.

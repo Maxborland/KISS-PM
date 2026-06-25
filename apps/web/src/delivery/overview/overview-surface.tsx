@@ -54,7 +54,7 @@ export function ProjectOverview() {
     const overloads = ((readModel.resourceLoad as unknown as { overloads: Array<{ resourceId: string; date: string; granularity?: string }> }).overloads ?? []).filter((o) => o.granularity === undefined || o.granularity === "day");
     const bc = (readModel.baselineComparison as unknown as { tasks: BcTask[] }).tasks ?? [];
     const issues = (readModel.validationIssues as unknown as unknown[]) ?? [];
-    const deadline = (readModel.project as unknown as { deadline: string }).deadline;
+    const deadline = (readModel.project as unknown as { deadline: string | null }).deadline;
     return { authored, leaves, milestones, calcById, projectFinish: cp.projectFinish, criticalIds: new Set(cp.criticalPathTaskIds), overloads, bc, issues, deadline };
   }, [readModel]);
 
@@ -77,8 +77,9 @@ export function ProjectOverview() {
   const doneCount = model.leaves.filter((t) => t.statusId === "done").length;
   const inProgress = model.leaves.filter((t) => t.statusId === "in_progress").length;
   const finishDay = isoToDay(model.projectFinish);
-  const deadlineDay = isoToDay(model.deadline);
-  const reserveDays = deadlineDay - finishDay;
+  // дедлайн в домене nullable — без него считать резерв/«за дедлайном» нельзя (иначе NaN в шапке/сигналах)
+  const deadlineDay = model.deadline ? isoToDay(model.deadline) : null;
+  const reserveDays = deadlineDay != null ? deadlineDay - finishDay : null;
   const baseFinishDay = model.bc.filter((t) => t.baselineFinish).length ? Math.max(...model.bc.filter((t) => t.baselineFinish).map((t) => isoToDay(t.baselineFinish!))) : 0;
   const projDelta = baseFinishDay ? finishDay - baseFinishDay : 0;
   const overloadResources = [...new Set(model.overloads.map((o) => o.resourceId))];
@@ -87,7 +88,7 @@ export function ProjectOverview() {
 
   const signals: Array<{ tone: "danger" | "warning" | "info"; icon: typeof Zap; title: string; detail: string; action: string }> = [];
   // срыв дедлайна — самый критичный выводимый из плана факт, ведёт список
-  if (reserveDays < 0) signals.push({ tone: "danger", icon: AlertTriangle, title: `Финиш за дедлайном: +${-reserveDays} дн.`, detail: `расчётный ${ddmmyyyy(model.projectFinish)} · дедлайн ${ddmmyyyy(model.deadline)}`, action: "Открыть График" });
+  if (reserveDays != null && reserveDays < 0) signals.push({ tone: "danger", icon: AlertTriangle, title: `Финиш за дедлайном: +${-reserveDays} дн.`, detail: `расчётный ${ddmmyyyy(model.projectFinish)} · дедлайн ${ddmmyyyy(model.deadline ?? "")}`, action: "Открыть График" });
   if (overloadResources.length > 0) signals.push({ tone: "danger", icon: Zap, title: `Перегруз ресурсов: ${overloadResources.length}`, detail: `${overloadResources.map(resName).join(", ")} · ${model.overloads.length} дн с превышением`, action: "Открыть Сценарии" });
   if (projDelta > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Финиш сдвинут +${projDelta} дн от базового плана`, detail: `текущий ${ddmm(model.projectFinish)} · базовый ${ddmm(baseFinishDay ? model.bc.find((t) => t.baselineFinish && isoToDay(t.baselineFinish) === baseFinishDay)?.baselineFinish ?? null : null)}`, action: "Открыть Baseline" });
   if (overdue.length > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Просрочено задач: ${overdue.length}`, detail: `срок раньше ${ddmmyyyy(TODAY)}, не закрыты`, action: "Открыть График" });
@@ -96,7 +97,7 @@ export function ProjectOverview() {
   // вехи: milestone-задачи + внешний дедлайн, по дате
   const milestoneRows = [
     ...model.milestones.map((m) => { const c = model.calcById.get(m.id); const iso = c?.calculatedFinish ?? m.plannedFinish; return { key: m.id, day: isoToDay(iso), date: ddmmyyyy(iso), name: m.title, wbs: m.wbsCode, done: m.percentComplete >= 100 }; }),
-    { key: "deadline", day: deadlineDay, date: ddmmyyyy(model.deadline), name: "Дедлайн релиза", wbs: "—", done: false }
+    ...(model.deadline ? [{ key: "deadline", day: deadlineDay ?? Infinity, date: ddmmyyyy(model.deadline), name: "Дедлайн релиза", wbs: "—", done: false }] : [])
   ].sort((a, b) => a.day - b.day);
 
   // ключевые задачи: критпуть и ближайшие сроки (критические вперёд, затем по финишу), top-5;
@@ -110,8 +111,8 @@ export function ProjectOverview() {
   // шапка из РЕАЛЬНЫХ данных (финиш/variance), не из статической заглушки — чтобы не противоречить KPI
   const projectMeta: ProjectMeta = {
     name: PROJECT.name, code: PROJECT.code, status: PROJECT.status, statusTone: PROJECT.statusTone ?? "info",
-    planVersion: `v${readModel.planVersion}`, deadline: ddmmyyyy(model.deadline), finish: ddmmyyyy(model.projectFinish),
-    ...(projDelta > 0 ? { variance: { label: `+${projDelta} дн. к базовому плану`, tone: "warning" as const } } : reserveDays < 0 ? { variance: { label: `+${-reserveDays} дн. к дедлайну`, tone: "danger" as const } } : {})
+    planVersion: `v${readModel.planVersion}`, deadline: model.deadline ? ddmmyyyy(model.deadline) : "—", finish: ddmmyyyy(model.projectFinish),
+    ...(projDelta > 0 ? { variance: { label: `+${projDelta} дн. к базовому плану`, tone: "warning" as const } } : reserveDays != null && reserveDays < 0 ? { variance: { label: `+${-reserveDays} дн. к дедлайну`, tone: "danger" as const } } : {})
   };
 
   return (
@@ -127,7 +128,7 @@ export function ProjectOverview() {
       {/* KPI-полоса — всё из read-model */}
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
         <StatTile label="Прогресс" value={`${progress}%`} delta={`${doneCount} закрыто · ${inProgress} в работе`} tone="success" />
-        <StatTile label="Финиш (расчёт)" value={ddmm(model.projectFinish)} delta={reserveDays >= 0 ? `резерв ${reserveDays} дн до дедлайна` : `${-reserveDays} дн за дедлайном`} {...(reserveDays < 0 ? { tone: "danger" as const } : {})} />
+        <StatTile label="Финиш (расчёт)" value={ddmm(model.projectFinish)} delta={reserveDays == null ? "дедлайн не задан" : reserveDays >= 0 ? `резерв ${reserveDays} дн до дедлайна` : `${-reserveDays} дн за дедлайном`} {...(reserveDays != null && reserveDays < 0 ? { tone: "danger" as const } : {})} />
         <StatTile label="К базовому плану" value={projDelta === 0 ? "0 дн" : `${projDelta > 0 ? "+" : "−"}${Math.abs(projDelta)} дн`} delta={projDelta > 0 ? "отставание" : projDelta < 0 ? "опережение" : "в графике"} {...(projDelta > 0 ? { tone: "warning" as const } : projDelta < 0 ? { tone: "success" as const } : {})} />
         <StatTile label="Перегрузы" value={`${overloadResources.length}`} delta="ресурсов с превышением" {...(overloadResources.length > 0 ? { tone: "danger" as const } : {})} />
         <StatTile label="Риски плана" value={`${model.issues.length}`} delta="ручной режим / валидация" {...(model.issues.length > 0 ? { tone: "warning" as const } : {})} />
