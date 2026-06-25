@@ -120,11 +120,17 @@ export async function fetchActiveSession(roomId: string): Promise<CallSessionRef
  * access — so on any start failure we join the room's active session instead of failing.
  */
 export async function joinOrStartCallSession(roomId: string): Promise<CallSessionRef> {
+  // Join an existing active session WITHOUT attempting start first: a read-only participant
+  // would get a 403 on sessions/start that the backend records as a communications.denied
+  // audit event, polluting the log on every normal join.
+  const active = await fetchActiveSession(roomId);
+  if (active) return active;
   try {
     return await startCallSession(roomId);
   } catch (cause) {
-    const active = await fetchActiveSession(roomId);
-    if (active) return active;
+    // Lost the race (someone started between the lookup and our start) — join theirs.
+    const raced = await fetchActiveSession(roomId);
+    if (raced) return raced;
     throw cause;
   }
 }
