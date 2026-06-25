@@ -47,15 +47,23 @@ export class CallBackgroundController {
     return this.mode;
   }
 
-  /** Re-apply the active effect when the camera track is (re)published. */
+  /**
+   * Apply the active effect to a (re)published camera track. Handles the deferred case —
+   * a mode chosen while the camera was off, so no processor existed yet — by creating it
+   * here, and re-syncs an existing processor whose mode changed while it was detached.
+   */
   async bind(track: LocalVideoTrack | null): Promise<void> {
     this.track = track;
-    if (track && this.processor && this.mode !== "none") {
-      try {
-        await track.setProcessor(this.processor);
-      } catch {
-        this.mode = "none";
+    if (!track || this.mode === "none") return;
+    try {
+      if (!this.processor) {
+        this.processor = BackgroundProcessor({ ...optionsFor(this.mode), assetPaths: { ...ASSET_PATHS } });
+      } else {
+        await this.processor.switchTo(optionsFor(this.mode));
       }
+      await track.setProcessor(this.processor);
+    } catch {
+      this.mode = "none";
     }
   }
 

@@ -115,7 +115,13 @@ export function useLobbyPreview(): LobbyPreview {
     const next = !selection.cameraOn;
     setSelection((previous) => ({ ...previous, cameraOn: next }));
     if (next) void startPreview(selection.videoDeviceId);
-    else stopPreview();
+    else {
+      // Invalidate any in-flight startPreview: a getUserMedia that resolves after the user
+      // turned the camera off would otherwise pass its epoch check and store a live track,
+      // leaving the camera/LED on while the preview is hidden.
+      epochRef.current += 1;
+      stopPreview();
+    }
   }, [selection.cameraOn, selection.videoDeviceId, startPreview, stopPreview]);
 
   const toggleMicrophone = useCallback(() => {
