@@ -73,6 +73,9 @@ services:
       # .env and start the media profile: docker compose --profile media up
       KISS_PM_VIDEO_PROVIDER: ${KISS_PM_VIDEO_PROVIDER:-disabled}
       KISS_PM_VIDEO_LIVEKIT_URL: ${KISS_PM_VIDEO_LIVEKIT_URL:-}
+      # Server-reachable LiveKit URL for egress (the ws://localhost browser URL would resolve
+      # to the API container). Compose DNS reaches the livekit service at http://livekit:7880.
+      KISS_PM_VIDEO_LIVEKIT_HTTP_URL: ${KISS_PM_VIDEO_LIVEKIT_HTTP_URL:-http://livekit:7880}
       KISS_PM_VIDEO_LIVEKIT_API_KEY: ${KISS_PM_VIDEO_LIVEKIT_API_KEY:-}
       KISS_PM_VIDEO_LIVEKIT_API_SECRET: ${KISS_PM_VIDEO_LIVEKIT_API_SECRET:-}
       KISS_PM_VIDEO_TOKEN_TTL_SECONDS: ${KISS_PM_VIDEO_TOKEN_TTL_SECONDS:-600}
@@ -150,13 +153,16 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # LiveKit Egress — per-track server recording (Phase 5). Opt-in via the media
-  # profile; only records when KISS_PM_VIDEO_EGRESS_ENABLED=true and storage=s3.
-  # NOTE: infra/egress/egress.yaml uses ${...} placeholders the operator must
-  # render (e.g. envsubst or EGRESS_CONFIG_BODY) with real LiveKit + S3 values.
+  # LiveKit Egress — per-track server recording (Phase 5). Separate "recording"
+  # profile (NOT "media"), because infra/egress/egress.yaml uses ${...} placeholders
+  # the operator must render (envsubst / EGRESS_CONFIG_BODY) with real LiveKit + S3
+  # values; keeping it out of "media" means `docker compose --profile media up` (the
+  # dev A/V stack) does not start a broken egress. Full recording stack:
+  #   docker compose --profile media --profile recording up
+  # Records only when KISS_PM_VIDEO_EGRESS_ENABLED=true and storage=s3.
   egress:
     image: livekit/egress:v1.9
-    profiles: ["media"]
+    profiles: ["recording"]
     environment:
       EGRESS_CONFIG_FILE: /etc/egress.yaml
     cap_add:
