@@ -3,9 +3,10 @@
    Сильная shadcn+TW+bento база. Современный Linear/Attio-grade бар:
    мягкие границы + тонкая elevation вместо «коробок», аккуратный
    indigo-акцент, чистая семантика, уверенная типографическая иерархия,
-   planning layout-токены. Scoped под `.kiss-v4` (migration-safe).
+   planning layout-токены. Унификация: промоутнут в глобальный :root —
+   единый канонический индиго-look для всех поверхностей (BEM-слой ретайрится).
    ============================================================ */
-.kiss-v4 {
+:root {
   /* Surfaces — холодный светлый фон, чистые карточки */
   --canvas: #f7f8fa;
   --canvas-tint: #fbfbfc;
@@ -77,12 +78,12 @@
 }
 
 /* Числа/коды/даты — табличные цифры */
-.kiss-v4 .v4-mono {
+.v4-mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
-.kiss-v4 .v4-num {
+.v4-num {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
@@ -90,42 +91,42 @@
 /* ---- Микроинтеракции / «приятность» ---- */
 
 /* Современный hover для строк списков/таблиц */
-.kiss-v4 .v4-row {
+.v4-row {
   transition: background-color var(--duration-fast, 120ms) var(--ease-out, ease-out);
 }
-.kiss-v4 .v4-row:hover {
+.v4-row:hover {
   background: var(--panel-subtle);
 }
 
 /* Лёгкий подъём карточек/плиток при наведении */
-.kiss-v4 .v4-lift {
+.v4-lift {
   transition:
     box-shadow var(--duration-base, 200ms) var(--ease-out, ease-out),
     transform var(--duration-base, 200ms) var(--ease-out, ease-out),
     border-color var(--duration-base, 200ms) var(--ease-out, ease-out);
 }
-.kiss-v4 .v4-lift:hover {
+.v4-lift:hover {
   box-shadow: var(--shadow-raise);
   transform: translateY(-2px);
   border-color: var(--border-strong);
 }
 
 /* Стрелка «уезжает» вправо при наведении на строку */
-.kiss-v4 .v4-arrow {
+.v4-arrow {
   transition: transform var(--duration-base, 200ms) var(--ease-out, ease-out);
 }
-.kiss-v4 .group:hover .v4-arrow {
+.group:hover .v4-arrow {
   transform: translateX(3px);
 }
 
 /* Кнопка отката: мягко увеличивается */
-.kiss-v4 .v4-pop {
+.v4-pop {
   transition:
     transform var(--duration-fast, 120ms) var(--ease-out, ease-out),
     color var(--duration-fast, 120ms) var(--ease-out, ease-out),
     opacity var(--duration-base, 200ms) var(--ease-out, ease-out);
 }
-.kiss-v4 .v4-pop:hover {
+.v4-pop:hover {
   transform: scale(1.12);
   color: var(--accent);
 }
@@ -142,49 +143,49 @@
     transform: scale(0.78);
   }
 }
-.kiss-v4 .v4-pulse {
+.v4-pulse {
   animation: v4-pulse 2.6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .kiss-v4 .v4-lift,
-  .kiss-v4 .v4-arrow,
-  .kiss-v4 .v4-pop {
+  .v4-lift,
+  .v4-arrow,
+  .v4-pop {
     transition: none;
   }
-  .kiss-v4 .v4-lift:hover,
-  .kiss-v4 .group:hover .v4-arrow,
-  .kiss-v4 .v4-pop:hover {
+  .v4-lift:hover,
+  .group:hover .v4-arrow,
+  .v4-pop:hover {
     transform: none;
   }
-  .kiss-v4 .v4-pulse {
+  .v4-pulse {
     animation: none;
   }
 }
 
 /* ---- Gantt bars (цвета через color-mix — надёжнее в CSS, чем в TW arbitrary) ---- */
-.kiss-v4 .gantt-bar {
+.gantt-bar {
   background: color-mix(in oklab, var(--success) 22%, #ffffff);
 }
-.kiss-v4 .gantt-bar-fill {
+.gantt-bar-fill {
   background: var(--success);
 }
-.kiss-v4 .gantt-bar--crit {
+.gantt-bar--crit {
   background: color-mix(in oklab, var(--critical-stripe) 20%, #ffffff);
 }
-.kiss-v4 .gantt-bar-fill--crit {
+.gantt-bar-fill--crit {
   background: var(--critical-stripe);
 }
 
 /* ---- MS Project-подобная сетка задач: ячеистость, sticky header, выбор строки ----
    Excel-like grid: видимые границы ячеек, sticky-шапка, hover/selected, без переносов. */
-.kiss-v4 .msgrid {
+.msgrid {
   border-collapse: collapse;
   width: max-content;
   table-layout: fixed;
 }
-.kiss-v4 .msgrid th,
-.kiss-v4 .msgrid td {
+.msgrid th,
+.msgrid td {
   height: var(--row-h);
   padding: 0 8px;
   border-right: 1px solid var(--border-subtle);
@@ -196,7 +197,7 @@
   font-size: 12px;
   color: var(--text);
 }
-.kiss-v4 .msgrid thead th {
+.msgrid thead th {
   position: sticky;
   top: 0;
   z-index: 3;
@@ -210,35 +211,35 @@
   color: var(--muted-soft);
   user-select: none;
 }
-.kiss-v4 .msgrid th.num,
-.kiss-v4 .msgrid td.num {
+.msgrid th.num,
+.msgrid td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.kiss-v4 .msgrid td.mono {
+.msgrid td.mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
-.kiss-v4 .msgrid td.muted {
+.msgrid td.muted {
   color: var(--muted);
 }
-.kiss-v4 .msgrid tbody tr {
+.msgrid tbody tr {
   cursor: pointer;
   transition: background-color var(--duration-fast, 120ms) var(--ease-out, ease-out);
 }
-.kiss-v4 .msgrid tbody tr:hover > td {
+.msgrid tbody tr:hover > td {
   background: var(--panel-subtle);
 }
-.kiss-v4 .msgrid tbody tr.is-summary > td {
+.msgrid tbody tr.is-summary > td {
   background: color-mix(in oklab, var(--panel-strong) 60%, var(--panel));
 }
-.kiss-v4 .msgrid tbody tr.is-selected > td {
+.msgrid tbody tr.is-selected > td {
   background: var(--accent-soft);
 }
-.kiss-v4 .msgrid tbody tr.is-selected > td:first-child {
+.msgrid tbody tr.is-selected > td:first-child {
   box-shadow: inset 2px 0 0 0 var(--accent);
 }
-.kiss-v4 .msgrid .name-cell {
+.msgrid .name-cell {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -246,16 +247,16 @@
 
 /* Двухколоночная раскладка инспектора — детерминированно, без зависимости от
    генерации TW-variant (lg:) для новых файлов. */
-.kiss-v4 .v4-split {
+.v4-split {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 @media (min-width: 1024px) {
-  .kiss-v4 .v4-split {
+  .v4-split {
     flex-direction: row;
   }
-  .kiss-v4 .v4-split > .v4-split__aside {
+  .v4-split > .v4-split__aside {
     width: var(--inspector-width);
     flex-shrink: 0;
   }

@@ -30,7 +30,7 @@ const NAV: { title: string; items: { label: string; badge?: string }[] }[] = [
  */
 export function WorkspaceShell({ activeNav, children }: { activeNav: string; children: ReactNode }) {
   return (
-    <div className="kiss-v4 flex min-h-screen w-full text-[length:var(--text-md)]">
+    <div className="flex min-h-screen w-full bg-[var(--canvas)] text-[length:var(--text-md)]">
       <aside className="hidden w-[232px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--panel)] md:flex">
         <div className="flex items-center gap-2.5 px-4 py-3.5">
           <span className="grid size-7 place-items-center rounded-[var(--radius-md)] bg-[var(--text-strong)] text-[length:var(--text-sm)] font-bold text-white">К</span>

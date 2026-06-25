@@ -79,7 +79,8 @@
   --font-display: var(--next-font-display, "Plus Jakarta Sans"), "Inter", system-ui, sans-serif;
   --font-mono: var(--next-font-mono, "JetBrains Mono"), ui-monospace, Menlo, Consolas, monospace;
 
-  /* Type scale: body 14 · h3 18 · h2 24 · h1 32 */
+  /* Type scale: micro 10 · xs 11 · body 14 · h3 18 · h2 24 · h1 32 */
+  --text-2xs: 10px;
   --text-xs: 11px;
   --text-sm: 12px;
   --text-base: 14px;
@@ -93,6 +94,7 @@
   --text-3xl: var(--text-h1);
   --text-4xl: 40px;
 
+  --lh-2xs: 14px;
   --lh-xs: 16px;
   --lh-sm: 18px;
   --lh-base: 22px;
