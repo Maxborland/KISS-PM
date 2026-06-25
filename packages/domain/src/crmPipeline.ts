@@ -29,6 +29,10 @@ export type CrmPipeline = {
   id: string;
   tenantId: TenantId;
   name: string;
+  // Операционные поля мультиворонок (для канбана/выбора воронки по умолчанию).
+  description: string | null;
+  isDefault: boolean;
+  sortOrder: number;
   status: CrmPipelineStatus;
   lifecycleGraphMetadata: CrmPipelineLifecycleGraph;
   createdAt: Date;
@@ -57,6 +61,10 @@ export type CrmPipelineTransitionRule = {
   requiredPermission: string | null;
   requiredFields: string[];
   requireReason: boolean;
+  // Runtime-гварды перехода сделки (мультиворонки): применяются при /opportunities/:id/stage.
+  requireFeasibilityOk: boolean;
+  minProbability: number | null;
+  guardNote: string | null;
   status: CrmPipelineStatus;
   createdAt: Date;
   updatedAt: Date;

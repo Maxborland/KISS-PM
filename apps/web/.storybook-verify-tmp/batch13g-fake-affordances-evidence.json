@@ -1,9 +1,0 @@
-{
-  "batch": "13g",
-  "date": "2026-05-24",
-  "fix": "Segmented with useState; disabled WorkspaceChrome export/create; no raw segmented buttons",
-  "filesScanned": 25,
-  "violations": [],
-  "workspaceChromeTopbarDisabled": true,
-  "pass": true
-}

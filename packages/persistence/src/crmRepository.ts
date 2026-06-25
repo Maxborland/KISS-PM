@@ -17,7 +17,6 @@ import {
   crmPipelineStages,
   crmPipelineTransitionRules,
   crmPipelines,
-  dealStages,
   products,
   projectTypes
 } from "./schema";
@@ -82,9 +81,12 @@ export type ProjectTypeRecord = {
 
 export type ProjectTypeInput = Omit<ProjectTypeRecord, "createdAt" | "updatedAt">;
 
+// DealStageRecord — веб-/legacy-проекция стадии поверх канонической crm_pipeline_stages
+// (мультиворонки: стадия всегда принадлежит воронке, pipelineId не nullable).
 export type DealStageRecord = {
   id: string;
   tenantId: TenantId;
+  pipelineId: string;
   name: string;
   sortOrder: number;
   status: CrmEntityStatus;
@@ -93,6 +95,37 @@ export type DealStageRecord = {
 };
 
 export type DealStageInput = Omit<DealStageRecord, "createdAt" | "updatedAt">;
+
+// PipelineRecord — операционная проекция воронки поверх crm_pipelines (без derived lifecycle-графа).
+export type PipelineRecord = {
+  id: string;
+  tenantId: TenantId;
+  name: string;
+  description: string | null;
+  isDefault: boolean;
+  sortOrder: number;
+  status: CrmEntityStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type PipelineInput = Omit<PipelineRecord, "createdAt" | "updatedAt">;
+
+// StageTransitionRecord — runtime-гвард-проекция поверх crm_pipeline_transition_rules.
+export type StageTransitionRecord = {
+  id: string;
+  tenantId: TenantId;
+  pipelineId: string;
+  fromStageId: string;
+  toStageId: string;
+  requireFeasibilityOk: boolean;
+  minProbability: number | null;
+  guardNote: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type StageTransitionInput = Omit<StageTransitionRecord, "createdAt" | "updatedAt">;
 
 export type CrmPipelineInput = Omit<CrmPipeline, "createdAt" | "updatedAt">;
 export type CrmPipelineStageInput = Omit<CrmPipelineStage, "createdAt" | "updatedAt">;
@@ -138,12 +171,29 @@ export type CrmRepository = {
   ): Promise<DealStageRecord | undefined>;
   createDealStage(input: DealStageInput): Promise<DealStageRecord>;
   updateDealStage(input: DealStageInput): Promise<DealStageRecord>;
+  listPipelines(tenantId: TenantId): Promise<PipelineRecord[]>;
+  findPipelineById(
+    tenantId: TenantId,
+    pipelineId: string
+  ): Promise<PipelineRecord | undefined>;
+  createPipeline(input: PipelineInput): Promise<PipelineRecord>;
+  updatePipeline(input: PipelineInput): Promise<PipelineRecord>;
+  listStageTransitions(
+    tenantId: TenantId,
+    pipelineId?: string
+  ): Promise<StageTransitionRecord[]>;
+  findStageTransitionById(
+    tenantId: TenantId,
+    transitionId: string
+  ): Promise<StageTransitionRecord | undefined>;
+  createStageTransition(input: StageTransitionInput): Promise<StageTransitionRecord>;
+  deleteStageTransition(tenantId: TenantId, transitionId: string): Promise<void>;
   listCrmPipelines(tenantId: TenantId): Promise<CrmPipeline[]>;
   findCrmPipelineById(tenantId: TenantId, pipelineId: string): Promise<CrmPipeline | undefined>;
   createCrmPipeline(input: CrmPipelineInput): Promise<CrmPipeline>;
   updateCrmPipeline(input: CrmPipelineInput): Promise<CrmPipeline>;
   refreshCrmPipelineLifecycleGraph(tenantId: TenantId, pipelineId: string): Promise<CrmPipeline | undefined>;
-  listCrmPipelineStages(tenantId: TenantId, pipelineId: string): Promise<CrmPipelineStage[]>;
+  listCrmPipelineStages(tenantId: TenantId, pipelineId?: string): Promise<CrmPipelineStage[]>;
   findCrmPipelineStageById(tenantId: TenantId, pipelineId: string, stageId: string): Promise<CrmPipelineStage | undefined>;
   createCrmPipelineStage(input: CrmPipelineStageInput): Promise<CrmPipelineStage>;
   updateCrmPipelineStage(input: CrmPipelineStageInput): Promise<CrmPipelineStage>;
@@ -330,23 +380,23 @@ export function createCrmRepository(db: KissPmDatabase): CrmRepository {
     async listDealStages(tenantId) {
       const rows = await db
         .select()
-        .from(dealStages)
-        .where(eq(dealStages.tenantId, tenantId))
-        .orderBy(asc(dealStages.sortOrder), asc(dealStages.name));
+        .from(crmPipelineStages)
+        .where(eq(crmPipelineStages.tenantId, tenantId))
+        .orderBy(asc(crmPipelineStages.sortOrder), asc(crmPipelineStages.name));
       return rows.map(mapDealStageRecord);
     },
     async findDealStageById(tenantId, stageId) {
       const [row] = await db
         .select()
-        .from(dealStages)
-        .where(and(eq(dealStages.tenantId, tenantId), eq(dealStages.id, stageId)))
+        .from(crmPipelineStages)
+        .where(and(eq(crmPipelineStages.tenantId, tenantId), eq(crmPipelineStages.id, stageId)))
         .limit(1);
       return row ? mapDealStageRecord(row) : undefined;
     },
     async createDealStage(input) {
       const now = new Date();
       const [row] = await db
-        .insert(dealStages)
+        .insert(crmPipelineStages)
         .values({ ...input, createdAt: now, updatedAt: now })
         .returning();
       if (!row) throw new Error("Deal stage insert returned no row");
@@ -354,19 +404,126 @@ export function createCrmRepository(db: KissPmDatabase): CrmRepository {
     },
     async updateDealStage(input) {
       const [row] = await db
-        .update(dealStages)
+        .update(crmPipelineStages)
         .set({
+          pipelineId: input.pipelineId,
           name: input.name,
           sortOrder: input.sortOrder,
           status: input.status,
           updatedAt: new Date()
         })
-        .where(and(eq(dealStages.tenantId, input.tenantId), eq(dealStages.id, input.id)))
+        .where(and(eq(crmPipelineStages.tenantId, input.tenantId), eq(crmPipelineStages.id, input.id)))
         .returning();
       if (!row) throw new Error("Deal stage update returned no row");
       return mapDealStageRecord(row);
     },
-
+    async listPipelines(tenantId) {
+      const rows = await db
+        .select()
+        .from(crmPipelines)
+        .where(eq(crmPipelines.tenantId, tenantId))
+        .orderBy(asc(crmPipelines.sortOrder));
+      return rows.map(mapPipelineRecord);
+    },
+    async findPipelineById(tenantId, pipelineId) {
+      const [row] = await db
+        .select()
+        .from(crmPipelines)
+        .where(and(eq(crmPipelines.tenantId, tenantId), eq(crmPipelines.id, pipelineId)))
+        .limit(1);
+      return row ? mapPipelineRecord(row) : undefined;
+    },
+    async createPipeline(input) {
+      const now = new Date();
+      const [row] = await db
+        .insert(crmPipelines)
+        .values({
+          ...input,
+          // Пустой derived-граф при создании; пересобирается на изменениях стадий/правил.
+          lifecycleGraphMetadata: {
+            pipelineId: input.id,
+            initialStageId: null,
+            finalStageIds: [],
+            stages: [],
+            transitions: []
+          },
+          createdAt: now,
+          updatedAt: now
+        })
+        .returning();
+      if (!row) throw new Error("Pipeline insert returned no row");
+      return mapPipelineRecord(row);
+    },
+    async updatePipeline(input) {
+      const [row] = await db
+        .update(crmPipelines)
+        .set({
+          name: input.name,
+          description: input.description,
+          isDefault: input.isDefault,
+          sortOrder: input.sortOrder,
+          status: input.status,
+          updatedAt: new Date()
+        })
+        .where(and(eq(crmPipelines.tenantId, input.tenantId), eq(crmPipelines.id, input.id)))
+        .returning();
+      if (!row) throw new Error("Pipeline update returned no row");
+      return mapPipelineRecord(row);
+    },
+    async listStageTransitions(tenantId, pipelineId) {
+      const where = pipelineId
+        ? and(
+            eq(crmPipelineTransitionRules.tenantId, tenantId),
+            eq(crmPipelineTransitionRules.pipelineId, pipelineId)
+          )
+        : eq(crmPipelineTransitionRules.tenantId, tenantId);
+      const rows = await db
+        .select()
+        .from(crmPipelineTransitionRules)
+        .where(where)
+        .orderBy(asc(crmPipelineTransitionRules.createdAt));
+      return rows.map(mapStageTransitionRecord);
+    },
+    async findStageTransitionById(tenantId, transitionId) {
+      const [row] = await db
+        .select()
+        .from(crmPipelineTransitionRules)
+        .where(
+          and(
+            eq(crmPipelineTransitionRules.tenantId, tenantId),
+            eq(crmPipelineTransitionRules.id, transitionId)
+          )
+        )
+        .limit(1);
+      return row ? mapStageTransitionRecord(row) : undefined;
+    },
+    async createStageTransition(input) {
+      const now = new Date();
+      const [row] = await db
+        .insert(crmPipelineTransitionRules)
+        .values({
+          ...input,
+          // Governance-поля базы дефолтятся: runtime-гвард-правило не задаёт permission/required-fields/reason.
+          requiredPermission: null,
+          requiredFields: [],
+          requireReason: false,
+          createdAt: now,
+          updatedAt: now
+        })
+        .returning();
+      if (!row) throw new Error("Stage transition insert returned no row");
+      return mapStageTransitionRecord(row);
+    },
+    async deleteStageTransition(tenantId, transitionId) {
+      await db
+        .delete(crmPipelineTransitionRules)
+        .where(
+          and(
+            eq(crmPipelineTransitionRules.tenantId, tenantId),
+            eq(crmPipelineTransitionRules.id, transitionId)
+          )
+        );
+    },
     async listCrmPipelines(tenantId) {
       const rows = await db
         .select()
@@ -397,6 +554,11 @@ export function createCrmRepository(db: KissPmDatabase): CrmRepository {
         .update(crmPipelines)
         .set({
           name: input.name,
+          // Унификация: операционные поля воронки должны сохраняться (иначе reorder/смена дефолта
+          // принимаются с 200/аудитом, но БД не меняется).
+          description: input.description,
+          isDefault: input.isDefault,
+          sortOrder: input.sortOrder,
           status: input.status,
           lifecycleGraphMetadata: input.lifecycleGraphMetadata,
           updatedAt: new Date()
@@ -434,10 +596,14 @@ export function createCrmRepository(db: KissPmDatabase): CrmRepository {
       return row ? mapCrmPipelineRecord(row) : undefined;
     },
     async listCrmPipelineStages(tenantId, pipelineId) {
+      // pipelineId опционален: без него — все стадии тенанта (нужно вебу /deal-stages для канбана по воронкам).
+      const where = pipelineId
+        ? and(eq(crmPipelineStages.tenantId, tenantId), eq(crmPipelineStages.pipelineId, pipelineId))
+        : eq(crmPipelineStages.tenantId, tenantId);
       const rows = await db
         .select()
         .from(crmPipelineStages)
-        .where(and(eq(crmPipelineStages.tenantId, tenantId), eq(crmPipelineStages.pipelineId, pipelineId)))
+        .where(where)
         .orderBy(asc(crmPipelineStages.sortOrder), asc(crmPipelineStages.name));
       return rows.map(mapCrmPipelineStageRecord);
     },
@@ -508,6 +674,10 @@ export function createCrmRepository(db: KissPmDatabase): CrmRepository {
           requiredPermission: input.requiredPermission,
           requiredFields: input.requiredFields,
           requireReason: input.requireReason,
+          // Унификация: runtime-гварды должны сохраняться на update (иначе сбрасывались бы в дефолты).
+          requireFeasibilityOk: input.requireFeasibilityOk,
+          minProbability: input.minProbability,
+          guardNote: input.guardNote,
           status: input.status,
           updatedAt: new Date()
         })
@@ -616,10 +786,11 @@ function mapProjectTypeRecord(row: typeof projectTypes.$inferSelect): ProjectTyp
   };
 }
 
-function mapDealStageRecord(row: typeof dealStages.$inferSelect): DealStageRecord {
+function mapDealStageRecord(row: typeof crmPipelineStages.$inferSelect): DealStageRecord {
   return {
     id: row.id,
     tenantId: row.tenantId,
+    pipelineId: row.pipelineId,
     name: row.name,
     sortOrder: row.sortOrder,
     status: row.status as CrmEntityStatus,
@@ -628,14 +799,47 @@ function mapDealStageRecord(row: typeof dealStages.$inferSelect): DealStageRecor
   };
 }
 
+function mapPipelineRecord(row: typeof crmPipelines.$inferSelect): PipelineRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    name: row.name,
+    description: row.description,
+    isDefault: row.isDefault,
+    sortOrder: row.sortOrder,
+    status: row.status as CrmEntityStatus,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  };
+}
 
 function mapCrmPipelineRecord(row: typeof crmPipelines.$inferSelect): CrmPipeline {
   return {
     id: row.id,
     tenantId: row.tenantId,
     name: row.name,
+    description: row.description,
+    isDefault: row.isDefault,
+    sortOrder: row.sortOrder,
     status: row.status as CrmPipeline["status"],
     lifecycleGraphMetadata: row.lifecycleGraphMetadata as CrmPipeline["lifecycleGraphMetadata"],
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  };
+}
+
+function mapStageTransitionRecord(
+  row: typeof crmPipelineTransitionRules.$inferSelect
+): StageTransitionRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    pipelineId: row.pipelineId,
+    fromStageId: row.fromStageId,
+    toStageId: row.toStageId,
+    requireFeasibilityOk: row.requireFeasibilityOk,
+    minProbability: row.minProbability,
+    guardNote: row.guardNote,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   };
@@ -668,6 +872,9 @@ function mapCrmPipelineTransitionRuleRecord(
     requiredPermission: row.requiredPermission,
     requiredFields: row.requiredFields,
     requireReason: row.requireReason,
+    requireFeasibilityOk: row.requireFeasibilityOk,
+    minProbability: row.minProbability,
+    guardNote: row.guardNote,
     status: row.status as CrmPipelineTransitionRule["status"],
     createdAt: row.createdAt,
     updatedAt: row.updatedAt

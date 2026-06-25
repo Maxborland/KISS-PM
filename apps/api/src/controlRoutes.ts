@@ -40,7 +40,7 @@ import { notifyPlanVersionChanged } from "./planningEventBus";
 import { previewPlanningCommands } from "./planning/planningCommandCore";
 import { PLANNING_ENGINE_VERSION } from "./planning/planningConstants";
 import { createPlanningReadModel } from "./planning/planningReadModel";
-import { permissionForCommand } from "./planning/planningRouteAuth";
+import { includeResourceExceptionsFor, permissionForCommand } from "./planning/planningRouteAuth";
 import { summarizeSnapshot } from "./planning/planningRouteHelpers";
 import {
   parseControlSignalIdParam,
@@ -714,7 +714,7 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
             newPlanVersion,
             auditEventId,
             actionExecution: execution,
-            readModel: createPlanningReadModel(appliedSnapshot)
+            readModel: createPlanningReadModel(appliedSnapshot, { includeResourceExceptions: includeResourceExceptionsFor({ actor, profile }) })
           }
         };
       });

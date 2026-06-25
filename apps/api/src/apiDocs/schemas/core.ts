@@ -106,6 +106,33 @@ export const coreSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  RegisterRequest: {
+    type: "object",
+    required: ["email", "password", "name"],
+    properties: {
+      email: { type: "string", format: "email", minLength: 3, maxLength: 254 },
+      password: { type: "string", minLength: 8, maxLength: 1024 },
+      name: { type: "string", minLength: 1, maxLength: 160 }
+    },
+    additionalProperties: false
+  },
+  PasswordResetRequest: {
+    type: "object",
+    required: ["email"],
+    properties: {
+      email: { type: "string", format: "email", minLength: 3, maxLength: 254 }
+    },
+    additionalProperties: false
+  },
+  PasswordResetConfirmRequest: {
+    type: "object",
+    required: ["token", "password"],
+    properties: {
+      token: { type: "string", minLength: 1, maxLength: 256 },
+      password: { type: "string", minLength: 8, maxLength: 1024 }
+    },
+    additionalProperties: false
+  },
   AuthSessionResponse: {
     type: "object",
     required: ["user", "workspace"],

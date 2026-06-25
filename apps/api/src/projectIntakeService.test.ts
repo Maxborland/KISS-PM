@@ -110,6 +110,7 @@ describe("project intake application service", () => {
         return {
           id: "deal-stage-alpha",
           tenantId: "tenant-alpha",
+          pipelineId: null,
           name: "Квалификация",
           sortOrder: 10,
           status: "active",
@@ -122,6 +123,7 @@ describe("project intake application service", () => {
         return {
           ...input,
           ownerUserId: input.ownerUserId ?? null,
+          pipelineId: null,
           customFieldValues: input.customFieldValues ?? {},
           feasibilityStatus: null,
           feasibilityResult: null,
@@ -196,6 +198,7 @@ describe("project intake application service", () => {
     const existingOpportunity = {
       ...opportunityInput,
       ownerUserId: opportunityInput.ownerUserId ?? null,
+      pipelineId: null,
       customFieldValues: {},
       status: "ready_to_activate",
       feasibilityStatus: "ok",
@@ -265,6 +268,7 @@ describe("project intake application service", () => {
         return {
           id: "deal-stage-alpha",
           tenantId: "tenant-alpha",
+          pipelineId: null,
           name: "Квалификация",
           sortOrder: 10,
           status: "active",
@@ -277,6 +281,7 @@ describe("project intake application service", () => {
         return {
           ...input,
           ownerUserId: input.ownerUserId ?? null,
+          pipelineId: null,
           customFieldValues: input.customFieldValues ?? {},
           feasibilityStatus: null,
           feasibilityResult: null,
@@ -361,6 +366,7 @@ describe("project intake application service", () => {
     const existingOpportunity = {
       ...opportunityInput,
       ownerUserId: opportunityInput.ownerUserId ?? null,
+      pipelineId: null,
       customFieldValues: {},
       feasibilityStatus: null,
       feasibilityResult: null,
@@ -425,6 +431,7 @@ describe("project intake application service", () => {
         return {
           id: "deal-stage-alpha",
           tenantId: "tenant-alpha",
+          pipelineId: null,
           name: "Квалификация",
           sortOrder: 10,
           status: "active",
@@ -471,6 +478,7 @@ describe("project intake application service", () => {
     const existingOpportunity = {
       ...opportunityInput,
       ownerUserId: opportunityInput.ownerUserId ?? null,
+      pipelineId: null,
       customFieldValues: {},
       feasibilityStatus: null,
       feasibilityResult: null,
@@ -498,6 +506,7 @@ describe("project intake application service", () => {
         return {
           id: "deal-stage-next",
           tenantId: "tenant-alpha",
+          pipelineId: null,
           name: "Следующий этап",
           sortOrder: 20,
           status: "active",
@@ -544,6 +553,7 @@ describe("project intake application service", () => {
     const existingOpportunity = {
       ...opportunityInput,
       ownerUserId: opportunityInput.ownerUserId ?? null,
+      pipelineId: null,
       customFieldValues: {},
       feasibilityStatus: null,
       feasibilityResult: null,
@@ -609,6 +619,101 @@ describe("project intake application service", () => {
     expect(audits).toEqual([]);
   });
 
+  it("blocks a stage transition with 422 when the probability guard is not met", async () => {
+    const audits: ManagementAuditEventInput[] = [];
+    let stageUpdateCalled = false;
+    const existingOpportunity = {
+      ...opportunityInput,
+      ownerUserId: opportunityInput.ownerUserId ?? null,
+      pipelineId: "pipeline-sales",
+      customFieldValues: {},
+      probability: 30,
+      feasibilityStatus: null,
+      feasibilityResult: null,
+      feasibilityCheckedAt: null,
+      createdAt: new Date("2026-05-18T00:00:00.000Z"),
+      updatedAt: new Date("2026-05-19T00:00:00.000Z")
+    };
+    const dataSource: ApiTenantDataSource = {
+      async listDevUsers() {
+        return [];
+      },
+      async findUserById(userId) {
+        return userId === actor.id ? actor : undefined;
+      },
+      async findTenantById() {
+        return undefined;
+      },
+      async listUsersByTenantId() {
+        return [];
+      },
+      async findOpportunityById() {
+        return existingOpportunity;
+      },
+      async findDealStageById(_tenantId, stageId) {
+        return {
+          id: stageId,
+          tenantId: "tenant-alpha",
+          pipelineId: "pipeline-sales",
+          name: stageId === "deal-stage-alpha" ? "Квалификация" : "Согласование",
+          sortOrder: stageId === "deal-stage-alpha" ? 10 : 20,
+          status: "active" as const,
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-05-01T00:00:00.000Z")
+        };
+      },
+      async listStageTransitions() {
+        return [
+          {
+            id: "stage-transition-approve",
+            tenantId: "tenant-alpha",
+            pipelineId: "pipeline-sales",
+            fromStageId: "deal-stage-alpha",
+            toStageId: "deal-stage-approve",
+            requireFeasibilityOk: false,
+            minProbability: 70,
+            guardNote: null,
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-05-01T00:00:00.000Z")
+          }
+        ];
+      },
+      async updateOpportunityStage() {
+        stageUpdateCalled = true;
+        return undefined;
+      },
+      async withTransaction(operation) {
+        return operation(dataSource);
+      },
+      async appendAuditEvent() {
+        throw new Error("service test uses appendManagementAuditEvent dependency");
+      }
+    };
+    const service = createProjectIntakeService({
+      dataSource,
+      getActorProfile: async () => tenantAdminProfile,
+      runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
+      appendManagementAuditEvent: async (input) => {
+        audits.push(input);
+        return `audit-test-${audits.length}`;
+      }
+    });
+
+    const result = await service.changeOpportunityStage({
+      actor,
+      opportunityId: opportunityInput.id,
+      stageId: "deal-stage-approve"
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 422,
+      error: "condition_probability"
+    });
+    expect(stageUpdateCalled).toBe(false);
+    expect(audits).toEqual([]);
+  });
+
   it("finalizes an opportunity through a governed close/reject action and records management audit", async () => {
     const audits: ManagementAuditEventInput[] = [];
     let finalizedInput: { tenantId: string; opportunityId: string; status: string } | null =
@@ -616,6 +721,7 @@ describe("project intake application service", () => {
     const existingOpportunity = {
       ...opportunityInput,
       ownerUserId: opportunityInput.ownerUserId ?? null,
+      pipelineId: null,
       customFieldValues: {},
       status: "feasibility",
       feasibilityStatus: null,

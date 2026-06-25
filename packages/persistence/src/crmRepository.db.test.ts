@@ -21,7 +21,7 @@ describe("Phase 3.1 CRM persistence", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, crm_pipeline_stage_automation_definitions, crm_pipeline_transition_rules, crm_pipeline_stages, crm_pipelines, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, crm_pipeline_stage_automation_definitions, crm_pipeline_transition_rules, crm_pipeline_stages, crm_pipelines, products, contacts, clients, project_types, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client`
       INSERT INTO tenants (id, name, created_at)
       VALUES
@@ -35,7 +35,7 @@ describe("Phase 3.1 CRM persistence", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, crm_pipeline_stage_automation_definitions, crm_pipeline_transition_rules, crm_pipeline_stages, crm_pipelines, products, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE audit_events, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, crm_pipeline_stage_automation_definitions, crm_pipeline_transition_rules, crm_pipeline_stages, crm_pipelines, products, contacts, clients, project_types, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -65,9 +65,26 @@ describe("Phase 3.1 CRM persistence", () => {
       description: "Проект внедрения",
       status: "active"
     });
+    const defaultPipeline = await dataSource.createCrmPipeline({
+      id: "pipeline-default",
+      tenantId: "tenant-alpha",
+      name: "Основная воронка",
+      description: null,
+      isDefault: true,
+      sortOrder: 1,
+      status: "active",
+      lifecycleGraphMetadata: {
+        pipelineId: "pipeline-default",
+        initialStageId: null,
+        finalStageIds: [],
+        stages: [],
+        transitions: []
+      }
+    });
     const stage = await dataSource.createDealStage({
       id: "deal-stage-new",
       tenantId: "tenant-alpha",
+      pipelineId: defaultPipeline.id,
       name: "Новая",
       sortOrder: 10,
       status: "active"
@@ -148,6 +165,7 @@ describe("Phase 3.1 CRM persistence", () => {
     const nextStage = await dataSource.createDealStage({
       id: "deal-stage-qualified",
       tenantId: "tenant-alpha",
+      pipelineId: defaultPipeline.id,
       name: "Квалификация",
       sortOrder: 20,
       status: "active"
@@ -224,6 +242,9 @@ describe("Phase 3.1 CRM persistence", () => {
       id: "pipeline-architecture-sales",
       tenantId: "tenant-alpha",
       name: "Architecture sales",
+      description: null,
+      isDefault: false,
+      sortOrder: 1,
       status: "active",
       lifecycleGraphMetadata: {
         pipelineId: "pipeline-architecture-sales",
@@ -263,6 +284,9 @@ describe("Phase 3.1 CRM persistence", () => {
       requiredPermission: "tenant.opportunities.manage",
       requiredFields: ["contractValue", "plannedFinish"],
       requireReason: true,
+      requireFeasibilityOk: true,
+      minProbability: 50,
+      guardNote: null,
       status: "active"
     });
     const automation = await dataSource.createCrmPipelineStageAutomationDefinition({

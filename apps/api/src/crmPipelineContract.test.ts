@@ -11,6 +11,9 @@ describe("CRM pipeline API contract schemas", () => {
       "id",
       "tenantId",
       "name",
+      "description",
+      "isDefault",
+      "sortOrder",
       "status",
       "lifecycleGraphMetadata",
       "createdAt",
@@ -37,6 +40,9 @@ describe("CRM pipeline API contract schemas", () => {
       "requiredPermission",
       "requiredFields",
       "requireReason",
+      "requireFeasibilityOk",
+      "minProbability",
+      "guardNote",
       "status",
       "createdAt",
       "updatedAt"
@@ -55,7 +61,7 @@ describe("CRM pipeline API contract schemas", () => {
     ]);
   });
 
-  it("documents lifecycle graph metadata separate from legacy flat deal stages", () => {
+  it("documents lifecycle graph metadata and pipeline-aware deal stages (unified multi-funnel)", () => {
     const document = createKissPmOpenApiDocument();
     const schemas = document.components.schemas;
 
@@ -66,9 +72,11 @@ describe("CRM pipeline API contract schemas", () => {
       "stages",
       "transitions"
     ]);
+    // Унификация: deal-stage — проекция стадии поверх crm_pipeline_stages, всегда несёт pipelineId.
     expect(schemas.DealStage.required).toEqual([
       "id",
       "tenantId",
+      "pipelineId",
       "name",
       "sortOrder",
       "status",

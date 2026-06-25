@@ -8,6 +8,7 @@ import type {
 } from "./apiTypes";
 import type { ApiCapabilities } from "./apiDataPorts";
 import type { AuthRateLimiter } from "./authRateLimit";
+import type { EmailProvider } from "./emailProvider";
 import type { StorageProvider } from "./storageProvider";
 import type { VideoProvider } from "./videoProvider";
 
@@ -15,6 +16,7 @@ export type ApiRouteDeps = {
   dataSource: ApiTenantDataSource;
   capabilities: ApiCapabilities;
   authRateLimiter: AuthRateLimiter;
+  emailProvider: EmailProvider;
   secureCookies: boolean;
   storageProvider: StorageProvider;
   videoProvider: VideoProvider;

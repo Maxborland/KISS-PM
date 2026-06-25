@@ -50,7 +50,9 @@ function createTestDataSource() {
         userId: admin.id,
         tokenHash,
         createdAt: new Date("2026-05-26T00:00:00.000Z"),
-        expiresAt: new Date("2026-06-01T00:00:00.000Z")
+        // Заведомо-будущий срок: иначе тест-сессия истекает по календарю (app.ts:130
+        // отклоняет expiresAt <= Date.now()) и все запросы получают 401.
+        expiresAt: new Date("2099-01-01T00:00:00.000Z")
       };
     },
     async findUserById(userId) {

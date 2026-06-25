@@ -1,9 +1,9 @@
 {
   "batch": "15c",
   "date": "2026-05-24",
-  "storiesChecked": 106,
+  "storiesChecked": 127,
   "enDevPattern": "\\b(Primary|Secondary|Outline|Ghost|Destructive|Default|Success|Warning|Danger|Dialog|Sheet|Popover|Menu|Toast)\\b",
-  "passCount": 106,
+  "passCount": 127,
   "failures": [],
   "pass": true
 }

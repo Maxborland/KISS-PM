@@ -40,3 +40,12 @@ export function hashSessionToken(token: string): string {
     .update(token)
     .digest("hex")}`;
 }
+
+// Хэш токена сброса пароля с отдельным namespace-префиксом, чтобы хэши токенов
+// сессий и токенов сброса не пересекались даже при совпадении сырого значения.
+export function hashResetToken(rawToken: string): string {
+  return `sha256:${createHash("sha256")
+    .update("kiss-pm-reset-token\0")
+    .update(rawToken)
+    .digest("hex")}`;
+}

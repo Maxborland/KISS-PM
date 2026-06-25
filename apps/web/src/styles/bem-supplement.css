@@ -59,6 +59,23 @@
   gap: var(--space-2);
 }
 
+/* Компактный fallback состояний для узких экранов (SurfaceState narrow): без иллюстрации, плотнее. */
+.state-narrow .state-illu__art {
+  display: none;
+}
+.state-narrow .state-illu {
+  border: 0;
+  padding: var(--space-4) var(--space-3);
+  margin: 0 auto;
+}
+.state-narrow .skeleton-page {
+  padding: var(--space-3);
+}
+.state-narrow .state-illu__title {
+  font-size: var(--text-md);
+  line-height: var(--lh-md);
+}
+
 .state-empty__actions {
   display: flex;
   justify-content: center;
@@ -1339,4 +1356,12 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-5);
   }
+}
+
+/* Воронка продаж на узких экранах — одна колонка.
+   Канонический `.funnel` (repeat(5,1fr)) определён выше в этом же файле,
+   который импортируется после bem.css, поэтому override живёт здесь.
+   Аудит-источник: docs/design-v3/STORYBOOK-INTERFACE-AUDIT-2026-06-22.md (P0-2). */
+@media (max-width: 720px) {
+  .funnel { grid-template-columns: 1fr; }
 }

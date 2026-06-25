@@ -776,6 +776,29 @@ export const planningSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  PlanningCalendar: {
+    type: "object",
+    required: ["id", "workingWeekdays", "workingMinutesPerDay"],
+    properties: {
+      id: { type: "string", minLength: 1 },
+      workingWeekdays: { type: "array", items: { type: "integer", minimum: 0, maximum: 6 } },
+      workingMinutesPerDay: { type: "integer", minimum: 0 }
+    },
+    additionalProperties: false
+  },
+  PlanningCalendarException: {
+    type: "object",
+    required: ["id", "calendarId", "resourceId", "date", "workingMinutes", "reason"],
+    properties: {
+      id: { type: "string", minLength: 1 },
+      calendarId: { type: "string", minLength: 1 },
+      resourceId: nullableStringSchema,
+      date: { type: "string", format: "date" },
+      workingMinutes: { type: "integer", minimum: 0 },
+      reason: nullableStringSchema
+    },
+    additionalProperties: false
+  },
   PlanningReadModelResponse: {
     type: "object",
     required: [
@@ -784,6 +807,8 @@ export const planningSchemas = openApiSchemaFragment({
       "calculatedPlan",
       "baselineComparison",
       "resourceLoad",
+      "calendars",
+      "calendarExceptions",
       "validationIssues",
       "planVersion",
       "engineVersion"
@@ -805,6 +830,8 @@ export const planningSchemas = openApiSchemaFragment({
       calculatedPlan: schemaRef("PlanningCalculatedPlan"),
       baselineComparison: schemaRef("PlanningBaselineComparison"),
       resourceLoad: schemaRef("PlanningResourceLoadMatrix"),
+      calendars: { type: "array", items: schemaRef("PlanningCalendar") },
+      calendarExceptions: { type: "array", items: schemaRef("PlanningCalendarException") },
       validationIssues: { type: "array", items: schemaRef("PlanningValidationIssue") },
       planVersion: { type: "integer", minimum: 1 },
       engineVersion: { type: "string", minLength: 1 }

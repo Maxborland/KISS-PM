@@ -22,16 +22,20 @@ import {
   parseClientBody,
   parseContactBody,
   parseDealStageBody,
+  parsePipelineBody,
   parseProductBody,
-  parseProjectTypeBody
+  parseProjectTypeBody,
+  parseStageTransitionBody
 } from "./crmParsers";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
   parseClientIdParam,
   parseContactIdParam,
   parseDealStageIdParam,
+  parsePipelineIdParam,
   parseProductIdParam,
-  parseProjectTypeIdParam
+  parseProjectTypeIdParam,
+  parseStageTransitionIdParam
 } from "./routeParamParsers";
 
 type CrmRouteDeps = {
@@ -676,17 +680,40 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseDealStageBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
+    // Мультиворонки: новая стадия должна попасть в реальную воронку, иначе она
+    // выпадает из всех колонок Deals (фильтр по pipelineId). Если pipelineId передан
+    // явно — он должен ссылаться на существующую воронку; если опущен (контрактный
+    // клиент его прислать не может) — берём дефолтную воронку тенанта.
+    let resolvedPipelineId = parsed.value.pipelineId;
+    if (resolvedPipelineId !== null) {
+      if (!dataSource.findPipelineById) {
+        return context.json({ error: "persistence_not_configured" }, 501);
+      }
+      const pipeline = await dataSource.findPipelineById(actor.tenantId, resolvedPipelineId);
+      if (!pipeline) return context.json({ error: "pipeline_not_found" }, 404);
+    } else {
+      if (!dataSource.listPipelines) {
+        return context.json({ error: "persistence_not_configured" }, 501);
+      }
+      const pipelines = await dataSource.listPipelines(actor.tenantId);
+      const defaultPipeline =
+        pipelines.find((pipeline) => pipeline.isDefault) ?? pipelines[0];
+      if (!defaultPipeline) return context.json({ error: "pipeline_not_found" }, 404);
+      resolvedPipelineId = defaultPipeline.id;
+    }
+    const stageInput = { ...parsed.value, pipelineId: resolvedPipelineId };
+
     const dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.createDealStage) {
         throw new Error("transactional_deal_stage_create_not_configured");
       }
-      const created = await transactionDataSource.createDealStage(parsed.value);
+      const created = await transactionDataSource.createDealStage(stageInput);
       await appendManagementAuditEvent(
         auditInput({
           actor,
           actionType: "deal_stage.created",
           sourceEntity: { type: "DealStage", id: created.id },
-          commandInput: parsed.value,
+          commandInput: stageInput,
           beforeState: null,
           afterState: created,
           permissionResult: decision
@@ -739,7 +766,14 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
-    const parsed = parseDealStageBody({ ...body.value, id: stageId }, actor.tenantId);
+    // Мультиворонки: сохраняем существующую воронку стадии (тело её не несёт).
+    // pipelineId/status ставятся ПОСЛЕ спреда тела: случайный pipelineId в body не сможет
+    // переместить стадию в другую воронку, а отсутствие status в частичном PATCH не
+    // реактивирует архивную стадию (parser дефолтит status в 'active').
+    const parsed = parseDealStageBody(
+      { ...body.value, pipelineId: beforeState.pipelineId, status: beforeState.status, id: stageId },
+      actor.tenantId
+    );
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
@@ -764,6 +798,365 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
 
     return context.json({ dealStage });
   });
+
+  // Мультиворонки: список воронок (право чтения стадий).
+  app.get("/api/workspace/pipelines", async (context) => {
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!dataSource.listPipelines) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canReadDealStages({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+
+    return context.json({ pipelines: await dataSource.listPipelines(actor.tenantId) });
+  });
+
+  // Мультиворонки: создание воронки (право управления стадиями).
+  app.post("/api/workspace/pipelines", async (context) => {
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.createPipeline ||
+      !dataSource.appendAuditEvent ||
+      !dataSource.withTransaction
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canManageDealStages({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) {
+      await appendDeniedAudit({
+        actor,
+        actionType: "pipeline.create_denied",
+        sourceEntity: { type: "Pipeline", id: "unknown" },
+        commandInput: { endpoint: "createPipeline" },
+        permissionResult: decision,
+        error: decision.reason
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parsePipelineBody(body.value, actor.tenantId);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const pipeline = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.createPipeline) {
+        throw new Error("transactional_pipeline_create_not_configured");
+      }
+      const created = await transactionDataSource.createPipeline(parsed.value);
+      await appendManagementAuditEvent(
+        auditInput({
+          actor,
+          actionType: "pipeline.created",
+          sourceEntity: { type: "Pipeline", id: created.id },
+          commandInput: parsed.value,
+          beforeState: null,
+          afterState: created,
+          permissionResult: decision
+        }),
+        transactionDataSource
+      );
+      return created;
+    });
+
+    return context.json({ pipeline }, 201);
+  });
+
+  // Мультиворонки: full-replace воронки (404 если не найдена).
+  app.patch("/api/workspace/pipelines/:pipelineId", async (context) => {
+    const parsedPipelineId = parsePipelineIdParam(context.req.param("pipelineId"));
+    if (!parsedPipelineId.ok) {
+      return context.json({ error: parsedPipelineId.error }, 400);
+    }
+
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.findPipelineById ||
+      !dataSource.updatePipeline ||
+      !dataSource.appendAuditEvent ||
+      !dataSource.withTransaction
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canManageDealStages({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    const pipelineId = parsedPipelineId.value;
+    if (!decision.allowed) {
+      await appendDeniedAudit({
+        actor,
+        actionType: "pipeline.update_denied",
+        sourceEntity: { type: "Pipeline", id: pipelineId },
+        commandInput: { endpoint: "updatePipeline", pipelineId },
+        permissionResult: decision,
+        error: decision.reason
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const beforeState = await dataSource.findPipelineById(actor.tenantId, pipelineId);
+    if (!beforeState) return context.json({ error: "pipeline_not_found" }, 404);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
+    // Мультиворонки: isDefault/status опциональны в контракте, а парсер дефолтит их
+    // (false / "active"). Подмешиваем before-state ДО спреда тела, чтобы частичное
+    // обновление (rename/reorder) не сбрасывало флаг дефолта и не реактивировало
+    // архивную воронку; явно присланные поля тела по-прежнему перекрывают before-state.
+    const parsed = parsePipelineBody(
+      {
+        isDefault: beforeState.isDefault,
+        status: beforeState.status,
+        ...body.value,
+        id: pipelineId
+      },
+      actor.tenantId
+    );
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const pipeline = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.updatePipeline) {
+        throw new Error("transactional_pipeline_update_not_configured");
+      }
+      const updated = await transactionDataSource.updatePipeline(parsed.value);
+      await appendManagementAuditEvent(
+        auditInput({
+          actor,
+          actionType: "pipeline.updated",
+          sourceEntity: { type: "Pipeline", id: updated.id },
+          commandInput: parsed.value,
+          beforeState,
+          afterState: updated,
+          permissionResult: decision
+        }),
+        transactionDataSource
+      );
+      return updated;
+    });
+
+    return context.json({ pipeline });
+  });
+
+  // Мультиворонки: список правил перехода воронки (404 если воронки нет).
+  app.get("/api/workspace/pipelines/:pipelineId/stage-transitions", async (context) => {
+    const parsedPipelineId = parsePipelineIdParam(context.req.param("pipelineId"));
+    if (!parsedPipelineId.ok) {
+      return context.json({ error: parsedPipelineId.error }, 400);
+    }
+
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!dataSource.findPipelineById || !dataSource.listStageTransitions) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canReadDealStages({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+
+    const pipelineId = parsedPipelineId.value;
+    const pipeline = await dataSource.findPipelineById(actor.tenantId, pipelineId);
+    if (!pipeline) return context.json({ error: "pipeline_not_found" }, 404);
+
+    return context.json({
+      stageTransitions: await dataSource.listStageTransitions(actor.tenantId, pipelineId)
+    });
+  });
+
+  // Мультиворонки: создание правила перехода в воронке.
+  app.post("/api/workspace/pipelines/:pipelineId/stage-transitions", async (context) => {
+    const parsedPipelineId = parsePipelineIdParam(context.req.param("pipelineId"));
+    if (!parsedPipelineId.ok) {
+      return context.json({ error: parsedPipelineId.error }, 400);
+    }
+
+    const actor = await getActor(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.findPipelineById ||
+      !dataSource.findDealStageById ||
+      !dataSource.listStageTransitions ||
+      !dataSource.createStageTransition ||
+      !dataSource.appendAuditEvent ||
+      !dataSource.withTransaction
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canManageDealStages({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    const pipelineId = parsedPipelineId.value;
+    if (!decision.allowed) {
+      await appendDeniedAudit({
+        actor,
+        actionType: "stage_transition.create_denied",
+        sourceEntity: { type: "StageTransition", id: "unknown" },
+        commandInput: { endpoint: "createStageTransition", pipelineId },
+        permissionResult: decision,
+        error: decision.reason
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const pipeline = await dataSource.findPipelineById(actor.tenantId, pipelineId);
+    if (!pipeline) return context.json({ error: "pipeline_not_found" }, 404);
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseStageTransitionBody(body.value, actor.tenantId, pipelineId);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    // Обе стадии должны существовать и принадлежать этой воронке.
+    const fromStage = await dataSource.findDealStageById(
+      actor.tenantId,
+      parsed.value.fromStageId
+    );
+    if (!fromStage) return context.json({ error: "deal_stage_not_found" }, 404);
+    if (fromStage.pipelineId !== pipelineId) {
+      return context.json({ error: "stage_not_in_pipeline" }, 400);
+    }
+    const toStage = await dataSource.findDealStageById(
+      actor.tenantId,
+      parsed.value.toStageId
+    );
+    if (!toStage) return context.json({ error: "deal_stage_not_found" }, 404);
+    if (toStage.pipelineId !== pipelineId) {
+      return context.json({ error: "stage_not_in_pipeline" }, 400);
+    }
+
+    // Дубль пары (from,to) в воронке → 409.
+    const existing = await dataSource.listStageTransitions(actor.tenantId, pipelineId);
+    const hasDuplicate = existing.some(
+      (transition) =>
+        transition.fromStageId === parsed.value.fromStageId &&
+        transition.toStageId === parsed.value.toStageId
+    );
+    if (hasDuplicate) {
+      return context.json({ error: "stage_transition_conflict" }, 409);
+    }
+
+    const stageTransition = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.createStageTransition) {
+        throw new Error("transactional_stage_transition_create_not_configured");
+      }
+      const created = await transactionDataSource.createStageTransition(parsed.value);
+      await appendManagementAuditEvent(
+        auditInput({
+          actor,
+          actionType: "stage_transition.created",
+          sourceEntity: { type: "StageTransition", id: created.id },
+          commandInput: parsed.value,
+          beforeState: null,
+          afterState: created,
+          permissionResult: decision
+        }),
+        transactionDataSource
+      );
+      return created;
+    });
+
+    return context.json({ stageTransition }, 201);
+  });
+
+  // Мультиворонки: удаление правила перехода (404 если правила нет).
+  app.delete(
+    "/api/workspace/pipelines/:pipelineId/stage-transitions/:transitionId",
+    async (context) => {
+      const parsedPipelineId = parsePipelineIdParam(context.req.param("pipelineId"));
+      if (!parsedPipelineId.ok) {
+        return context.json({ error: parsedPipelineId.error }, 400);
+      }
+      const parsedTransitionId = parseStageTransitionIdParam(
+        context.req.param("transitionId")
+      );
+      if (!parsedTransitionId.ok) {
+        return context.json({ error: parsedTransitionId.error }, 400);
+      }
+
+      const actor = await getActor(context.req.header("cookie") ?? null);
+      if (!actor) return context.json({ error: "session_required" }, 401);
+      if (
+        !dataSource.findStageTransitionById ||
+        !dataSource.deleteStageTransition ||
+        !dataSource.appendAuditEvent ||
+        !dataSource.withTransaction
+      ) {
+        return context.json({ error: "persistence_not_configured" }, 501);
+      }
+
+      const decision = canManageDealStages({
+        actor,
+        profile: await getActorProfile(actor),
+        targetTenantId: actor.tenantId
+      });
+      const pipelineId = parsedPipelineId.value;
+      const transitionId = parsedTransitionId.value;
+      if (!decision.allowed) {
+        await appendDeniedAudit({
+          actor,
+          actionType: "stage_transition.delete_denied",
+          sourceEntity: { type: "StageTransition", id: transitionId },
+          commandInput: { endpoint: "deleteStageTransition", pipelineId, transitionId },
+          permissionResult: decision,
+          error: decision.reason
+        });
+        return context.json({ error: decision.reason }, 403);
+      }
+
+      const beforeState = await dataSource.findStageTransitionById(
+        actor.tenantId,
+        transitionId
+      );
+      // Правило должно существовать и принадлежать указанной воронке.
+      if (!beforeState || beforeState.pipelineId !== pipelineId) {
+        return context.json({ error: "stage_transition_not_found" }, 404);
+      }
+
+      await runDataSourceTransaction(async (transactionDataSource) => {
+        if (!transactionDataSource.deleteStageTransition) {
+          throw new Error("transactional_stage_transition_delete_not_configured");
+        }
+        await transactionDataSource.deleteStageTransition(actor.tenantId, transitionId);
+        await appendManagementAuditEvent(
+          auditInput({
+            actor,
+            actionType: "stage_transition.deleted",
+            sourceEntity: { type: "StageTransition", id: transitionId },
+            commandInput: { pipelineId, transitionId },
+            beforeState,
+            afterState: null,
+            permissionResult: decision
+          }),
+          transactionDataSource
+        );
+      });
+
+      // OkResponse-контракт: { status: "ok" } (как logout/saved-views delete).
+      return context.json({ status: "ok" });
+    }
+  );
 
   async function getActor(cookie: string | null): Promise<TenantUser | undefined> {
     return getSessionActorFromHeaders(cookie);

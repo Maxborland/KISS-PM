@@ -3,6 +3,7 @@
 import { ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/cn";
+import { demoAction } from "@/views/lib/demo";
 import { DayHeadCell, DayValueCell } from "./cells";
 import type { MatrixPercent, MatrixRow, ResourceMatrixData } from "./types";
 
@@ -32,6 +33,7 @@ function NameCell({ row }: { row: MatrixRow }) {
           type="button"
           className="rmatrix__toggle"
           aria-label={`Свернуть ${row.name}`}
+          {...demoAction("сворачивание группы")}
         >
           <ChevronRight className="size-3" aria-hidden />
         </button>

@@ -10,6 +10,12 @@ const config: StorybookConfig = {
   stories: [
     "../src/components/**/*.stories.@(ts|tsx)",
     "../src/views/**/*.stories.@(ts|tsx)",
+    "../src/delivery/**/*.stories.@(ts|tsx)",
+    "../src/crm/**/*.stories.@(ts|tsx)",
+    "../src/communications/**/*.stories.@(ts|tsx)",
+    "../src/auth/**/*.stories.@(ts|tsx)",
+    "../src/workspace/**/*.stories.@(ts|tsx)",
+    "../src/admin/**/*.stories.@(ts|tsx)",
     "../src/stories/foundations/**/*.stories.@(ts|tsx)",
     "../src/stories/catalog/**/*.stories.@(ts|tsx)"
   ],

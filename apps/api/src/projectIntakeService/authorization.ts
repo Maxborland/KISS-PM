@@ -88,6 +88,49 @@ export async function authorizeOpportunityStageChange(
   return { ok: true, decision };
 }
 
+// Мультиворонки: авторизация переноса сделки между воронками.
+// Переиспользует право canManageOpportunities (как и смена стадии).
+export async function authorizeOpportunityPipelineChange(
+  deps: ProjectIntakeServiceDeps,
+  input: {
+    actor: TenantUser;
+    opportunityId: string;
+  }
+): Promise<AuthorizedResult> {
+  if (
+    !deps.dataSource.findOpportunityById ||
+    !deps.dataSource.findPipelineById ||
+    !deps.dataSource.findDealStageById ||
+    !deps.dataSource.updateOpportunityPipeline ||
+    !deps.dataSource.withTransaction ||
+    !deps.dataSource.appendAuditEvent
+  ) {
+    return { ok: false, status: 501, error: "persistence_not_configured" };
+  }
+
+  const decision = canManageOpportunities({
+    actor: input.actor,
+    profile: await deps.getActorProfile(input.actor),
+    targetTenantId: input.actor.tenantId
+  });
+  if (!decision.allowed) {
+    await appendDeniedAudit(deps, {
+      actor: input.actor,
+      actionType: "opportunity.pipeline_update_denied",
+      sourceEntity: {
+        type: "Opportunity",
+        id: input.opportunityId
+      },
+      commandInput: { opportunityId: input.opportunityId },
+      permissionResult: decision,
+      error: decision.reason
+    });
+    return { ok: false, status: 403, error: decision.reason };
+  }
+
+  return { ok: true, decision };
+}
+
 export async function authorizeOpportunityFeasibility(
   deps: ProjectIntakeServiceDeps,
   input: {

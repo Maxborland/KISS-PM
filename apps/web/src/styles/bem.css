@@ -2217,3 +2217,124 @@ a:hover { color: var(--accent-hover); }
 .gantt-stats__bar-fill--w-82 { width: 82%; }
 
 /* --- Gantt pane --- */
+
+/* ============================================================
+   Адаптив каркаса (design-v3): shell + сетки на узких экранах.
+   Аудит-источник: docs/design-v3/STORYBOOK-INTERFACE-AUDIT-2026-06-22.md (P0-1/P0-2).
+   Desktop-вид не меняется; правила активны только на mobile-брейкпоинтах.
+   ============================================================ */
+
+/* Мобильный бар (бургер + бренд) и затемнение — скрыты на desktop */
+.app-mobilebar { display: none; }
+.app-scrim { display: none; }
+
+.app-mobilebar__brand {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+@media (max-width: 860px) {
+  /* Полноэкранная раскладка вместо «парящей» панели */
+  .app-canvas { padding: 0; }
+  .app-canvas__panel {
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    min-height: 100vh;
+  }
+
+  /* Сайдбар → off-canvas drawer (управляется бургером в AppShell) */
+  .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    height: 100vh;
+    z-index: 60;
+    transform: translateX(-100%);
+    transition: transform var(--duration-base, 200ms) var(--ease-out, ease-out);
+    box-shadow: var(--shadow-panel);
+    overflow-y: auto;
+  }
+  .app-canvas__panel--menu-open .app-sidebar { transform: none; }
+
+  /* Затемнение под выехавшим сайдбаром */
+  .app-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    background: rgba(15, 23, 42, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    cursor: pointer;
+    transition: opacity var(--duration-base, 200ms) var(--ease-out, ease-out);
+  }
+  .app-canvas__panel--menu-open .app-scrim { opacity: 1; pointer-events: auto; }
+
+  /* Мобильный бар вместо плотного desktop-topbar */
+  .app-mobilebar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 52px;
+    flex-shrink: 0;
+    padding: 0 var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--panel);
+  }
+  .app-topbar { display: none; }
+
+  /* Контент во всю ширину; широкие таблицы скроллятся, а не обрезаются */
+  .app-content { padding: var(--space-4); }
+  .table-wrap { overflow-x: auto; }
+}
+
+/* Внутренние сетки сворачиваются в одну колонку на узких экранах */
+@media (max-width: 720px) {
+  .bento { grid-template-columns: 1fr; }
+  .bento__cell,
+  .bento__cell--4,
+  .bento__cell--6,
+  .bento__cell--8,
+  .bento__cell--12 { grid-column: auto; }
+}
+/* .funnel mobile-collapse → bem-supplement.css (канонический `.funnel` там). */
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar,
+  .app-scrim { transition: none; }
+}
+
+/* Маркер прототипа в сайдбаре */
+.app-sidebar__proto {
+  align-self: flex-start;
+  margin: calc(-1 * var(--space-3)) 0 0 var(--space-2);
+}
+
+/* Честная навигация прототипа: пункт неинтерактивен (не fake-ссылка). */
+.app-sidebar__item--demo { cursor: default; }
+.app-sidebar__item--demo:not(.is-active):hover {
+  background: transparent;
+  color: var(--muted-strong);
+}
+
+/* Пометка прототипа внутри create-модалки */
+.proto-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--warning-text);
+  background: var(--warning-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* Хлебная крошка-родитель в прототипе (нелинк, текст пути) */
+.crumb-parent { color: var(--muted); }

@@ -11,7 +11,7 @@ type RouteDoc = {
   response?: "json" | "file" | "event-stream";
   requestSchema?: string;
   successSchema?: string;
-  successStatus?: 200 | 201;
+  successStatus?: 200 | 201 | 202;
   queryParameters?: Array<Record<string, unknown>>;
   availability?: "always" | "test-hooks";
 };
@@ -26,6 +26,9 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/health/ready", tag: "Health", summary: "API readiness probe", auth: "public" },
   { method: "get", path: "/api/health/realtime", tag: "Health", summary: "Realtime planning readiness", auth: "public" },
   { method: "post", path: "/api/auth/login", tag: "Auth", summary: "Create browser session", auth: "public", requestSchema: "LoginRequest", successSchema: "AuthSessionResponse" },
+  { method: "post", path: "/api/auth/register", tag: "Auth", summary: "Register new tenant and owner", auth: "public", requestSchema: "RegisterRequest", successSchema: "AuthSessionResponse", successStatus: 201 },
+  { method: "post", path: "/api/auth/password-reset/request", tag: "Auth", summary: "Request password reset", auth: "public", requestSchema: "PasswordResetRequest", successSchema: "OkResponse", successStatus: 202 },
+  { method: "post", path: "/api/auth/password-reset/confirm", tag: "Auth", summary: "Confirm password reset", auth: "public", requestSchema: "PasswordResetConfirmRequest", successSchema: "OkResponse" },
   { method: "post", path: "/api/auth/logout", tag: "Auth", summary: "Delete browser session", successSchema: "OkResponse" },
   { method: "get", path: "/api/auth/me", tag: "Auth", summary: "Current authenticated user", successSchema: "AuthMeResponse" },
   { method: "get", path: "/api/session/dev-users", tag: "Dev session", summary: "List deterministic dev users", auth: "dev", successSchema: "DevUsersResponse" },
@@ -71,6 +74,12 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/deal-stages", tag: "CRM", summary: "List deal stages", successSchema: "DealStagesResponse" },
   { method: "post", path: "/api/workspace/deal-stages", tag: "CRM", summary: "Create deal stage", requestSchema: "DealStageWriteRequest", successSchema: "DealStageResponse", successStatus: 201 },
   { method: "patch", path: "/api/workspace/deal-stages/:stageId", tag: "CRM", summary: "Update deal stage", requestSchema: "DealStageWriteRequest", successSchema: "DealStageResponse" },
+  { method: "get", path: "/api/workspace/pipelines", tag: "CRM", summary: "List pipelines", successSchema: "PipelinesResponse" },
+  { method: "post", path: "/api/workspace/pipelines", tag: "CRM", summary: "Create pipeline", requestSchema: "PipelineWriteRequest", successSchema: "PipelineResponse", successStatus: 201 },
+  { method: "patch", path: "/api/workspace/pipelines/:pipelineId", tag: "CRM", summary: "Update pipeline", requestSchema: "PipelineWriteRequest", successSchema: "PipelineResponse" },
+  { method: "get", path: "/api/workspace/pipelines/:pipelineId/stage-transitions", tag: "CRM", summary: "List pipeline stage transitions", successSchema: "StageTransitionsResponse" },
+  { method: "post", path: "/api/workspace/pipelines/:pipelineId/stage-transitions", tag: "CRM", summary: "Create pipeline stage transition", requestSchema: "StageTransitionWriteRequest", successSchema: "StageTransitionResponse", successStatus: 201 },
+  { method: "delete", path: "/api/workspace/pipelines/:pipelineId/stage-transitions/:transitionId", tag: "CRM", summary: "Delete pipeline stage transition", body: "none", successSchema: "OkResponse" },
   { method: "get", path: "/api/workspace/crm/pipelines", tag: "CRM", summary: "List CRM pipelines", successSchema: "CrmPipelinesResponse" },
   { method: "post", path: "/api/workspace/crm/pipelines", tag: "CRM", summary: "Create CRM pipeline", requestSchema: "CrmPipelineWriteRequest", successSchema: "CrmPipelineResponse", successStatus: 201 },
   { method: "patch", path: "/api/workspace/crm/pipelines/:pipelineId", tag: "CRM", summary: "Update CRM pipeline", requestSchema: "CrmPipelinePatchRequest", successSchema: "CrmPipelineResponse" },
@@ -88,6 +97,7 @@ const routeDocs: RouteDoc[] = [
   { method: "post", path: "/api/workspace/opportunities", tag: "Project intake", summary: "Create opportunity", requestSchema: "OpportunityWriteRequest", successSchema: "OpportunityResponse", successStatus: 201 },
   { method: "patch", path: "/api/workspace/opportunities/:opportunityId", tag: "Project intake", summary: "Update opportunity", requestSchema: "OpportunityWriteRequest", successSchema: "OpportunityResponse" },
   { method: "patch", path: "/api/workspace/opportunities/:opportunityId/stage", tag: "Project intake", summary: "Move opportunity stage", requestSchema: "OpportunityStagePatchRequest", successSchema: "OpportunityResponse" },
+  { method: "patch", path: "/api/workspace/opportunities/:opportunityId/pipeline", tag: "Project intake", summary: "Move opportunity to another pipeline", requestSchema: "OpportunityPipelinePatchRequest", successSchema: "OpportunityResponse" },
   { method: "patch", path: "/api/workspace/opportunities/:opportunityId/finalize", tag: "Project intake", summary: "Finalize opportunity", requestSchema: "OpportunityFinalizeRequest", successSchema: "OpportunityResponse" },
   { method: "post", path: "/api/workspace/opportunities/:opportunityId/feasibility", tag: "Project intake", summary: "Preview resource feasibility", successSchema: "OpportunityFeasibilityResponse" },
   { method: "post", path: "/api/workspace/opportunities/:opportunityId/activate", tag: "Project intake", summary: "Activate project from opportunity", requestSchema: "ProjectActivationRequest", successSchema: "ProjectActivationResponse", successStatus: 201 },
