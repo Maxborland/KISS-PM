@@ -8,10 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 
 export function MessageComposer({
   onSend,
-  disabled
+  disabled,
+  showExtras = true
 }: {
   onSend?: ((text: string) => void) | undefined;
   disabled?: boolean | undefined;
+  showExtras?: boolean | undefined;
 }) {
   return (
     <form
@@ -34,15 +36,19 @@ export function MessageComposer({
         disabled={disabled}
       />
       <div className="chat-composer__actions">
-        <IconButton label="Упомянуть" variant="ghost" disabled={disabled}>
-          <AtSign />
-        </IconButton>
-        <IconButton label="Стикеры" variant="ghost" disabled={disabled}>
-          <Smile />
-        </IconButton>
-        <IconButton label="Прикрепить" variant="ghost" disabled={disabled}>
-          <Paperclip />
-        </IconButton>
+        {showExtras ? (
+          <>
+            <IconButton label="Упомянуть" variant="ghost" disabled={disabled}>
+              <AtSign />
+            </IconButton>
+            <IconButton label="Стикеры" variant="ghost" disabled={disabled}>
+              <Smile />
+            </IconButton>
+            <IconButton label="Прикрепить" variant="ghost" disabled={disabled}>
+              <Paperclip />
+            </IconButton>
+          </>
+        ) : null}
         <Button variant="primary" size="sm" type="submit" disabled={disabled}>
           <Send className="size-4" aria-hidden />
           Отправить

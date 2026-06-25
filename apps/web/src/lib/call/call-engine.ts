@@ -10,6 +10,7 @@ import {
 } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { MessageView } from "@/components/domain/message-bubble";
 import { fetchJoinToken, startCallSession } from "@/lib/call/call-client";
 import type {
   CallControlHandlers,
@@ -23,6 +24,8 @@ import type {
 // The ONLY module that imports `livekit-client`. It maps the imperative Room state
 // into the serialisable view-model the pure widgets render. The route loads this
 // via next/dynamic({ ssr: false }) so the SDK never reaches SSR or Storybook.
+
+const CHAT_TOPIC = "kiss-pm.call.chat";
 
 const TILE_COLORS: ParticipantTileView["color"][] = ["c1", "c2", "c3", "c4", "c5"];
 
@@ -122,6 +125,8 @@ export type CallEngineState = {
   controls: CallLocalControls;
   handlers: CallControlHandlers;
   error: string | null;
+  chat: MessageView[];
+  sendChat: (text: string) => void;
 };
 
 export function useCallEngine(roomId: string): CallEngineState {
@@ -129,6 +134,7 @@ export function useCallEngine(roomId: string): CallEngineState {
   const [stage, setStage] = useState<CallStageView>({ phase: "idle", participants: [] });
   const [controls, setControls] = useState<CallLocalControls>({ micOn: false, cameraOn: false });
   const [error, setError] = useState<string | null>(null);
+  const [chat, setChat] = useState<MessageView[]>([]);
 
   const refresh = useCallback(() => {
     const room = roomRef.current;
@@ -162,6 +168,34 @@ export function useCallEngine(roomId: string): CallEngineState {
       .on(RoomEvent.ConnectionQualityChanged, onChange)
       .on(RoomEvent.ConnectionStateChanged, onChange)
       .on(RoomEvent.Disconnected, onChange);
+
+    room.on(RoomEvent.DataReceived, (payload, participant, _kind, topic) => {
+      if (disposed || topic !== CHAT_TOPIC) return;
+      try {
+        const data = JSON.parse(new TextDecoder().decode(payload)) as {
+          kind?: string;
+          clientId?: string;
+          body?: string;
+          time?: string;
+        };
+        if (data.kind !== "chat") return;
+        const identity = participant?.identity ?? "remote";
+        const name = participant?.name || identity;
+        setChat((previous) => [
+          ...previous,
+          {
+            id: data.clientId ?? `${identity}-${previous.length}`,
+            authorName: name,
+            authorInitials: initialsFor(name),
+            authorColor: colorFor(identity),
+            time: data.time ?? "",
+            text: String(data.body ?? "")
+          }
+        ]);
+      } catch {
+        // ignore malformed chat packets
+      }
+    });
 
     void (async () => {
       try {
@@ -220,5 +254,19 @@ export function useCallEngine(roomId: string): CallEngineState {
     [refresh]
   );
 
-  return { stage, controls, handlers, error };
+  const sendChat = useCallback((text: string) => {
+    const room = roomRef.current;
+    const body = text.trim();
+    if (!room || !body) return;
+    const clientId = crypto.randomUUID();
+    const time = new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    setChat((previous) => [
+      ...previous,
+      { id: clientId, authorName: "Вы", authorInitials: "Я", authorColor: "c5", time, text: body, own: true }
+    ]);
+    const packet = new TextEncoder().encode(JSON.stringify({ kind: "chat", clientId, body, time }));
+    void room.localParticipant.publishData(packet, { reliable: true, topic: CHAT_TOPIC });
+  }, []);
+
+  return { stage, controls, handlers, error, chat, sendChat };
 }
