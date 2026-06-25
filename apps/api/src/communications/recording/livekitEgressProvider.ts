@@ -129,21 +129,29 @@ export function createLiveKitEgressProviderFromEnv(
   if (env.KISS_PM_VIDEO_EGRESS_ENABLED !== "true") return null;
   if (env.KISS_PM_STORAGE_PROVIDER !== "s3") return null;
 
-  const wsUrl = env.KISS_PM_VIDEO_LIVEKIT_URL;
   const apiKey = env.KISS_PM_VIDEO_LIVEKIT_API_KEY;
   const apiSecret = env.KISS_PM_VIDEO_LIVEKIT_API_SECRET;
   const bucket = env.KISS_PM_STORAGE_S3_BUCKET;
-  const region = env.KISS_PM_STORAGE_S3_REGION;
-  if (!wsUrl || !apiKey || !apiSecret || !bucket || !region) return null;
+  // Egress is server-to-server: prefer an explicit internal/Twirp URL (the browser-facing
+  // KISS_PM_VIDEO_LIVEKIT_URL like ws://localhost:7880 resolves to the API container, not the
+  // livekit service, under docker compose). Fall back to deriving http(s) from the ws URL.
+  const httpUrl = env.KISS_PM_VIDEO_LIVEKIT_HTTP_URL
+    ? env.KISS_PM_VIDEO_LIVEKIT_HTTP_URL
+    : env.KISS_PM_VIDEO_LIVEKIT_URL
+      ? toHttpUrl(env.KISS_PM_VIDEO_LIVEKIT_URL)
+      : undefined;
+  if (!httpUrl || !apiKey || !apiSecret || !bucket) return null;
 
   return createLiveKitEgressProvider({
-    httpUrl: toHttpUrl(wsUrl),
+    httpUrl,
     apiKey,
     apiSecret,
     s3: {
       accessKey: env.KISS_PM_STORAGE_S3_ACCESS_KEY_ID ?? "",
       secret: env.KISS_PM_STORAGE_S3_SECRET_ACCESS_KEY ?? "",
-      region,
+      // Match the main storage provider, which defaults a missing region to us-east-1 rather
+      // than disabling itself, so valid S3 storage config does not silently disable egress.
+      region: env.KISS_PM_STORAGE_S3_REGION ?? "us-east-1",
       endpoint: env.KISS_PM_STORAGE_S3_ENDPOINT ?? "",
       bucket,
       forcePathStyle: true

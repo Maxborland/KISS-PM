@@ -279,6 +279,12 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     if (!result.ok) {
       return context.json({ error: result.error }, result.status);
     }
+    // Ending the session must not leave egress recording the (now-ended) call.
+    await recordingWorkspace.stopActiveEgressForSession({
+      tenantId: actor.tenantId,
+      roomId: resolved.value.room.id,
+      sessionId: resolved.value.session.id
+    });
     return context.json({
       callRoom: serializeCallRoom(result.room),
       session: serializeCallSession(result.session),
@@ -378,7 +384,7 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
       recordingGroupId: context.req.param("groupId")
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);
-    return context.json({ stopped: result.stopped });
+    return context.json({ stopped: result.stopped, failed: result.failed });
   });
 
   app.get("/api/workspace/call-rooms/:roomId/events", async (context) => {

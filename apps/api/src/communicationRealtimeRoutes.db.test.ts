@@ -807,4 +807,229 @@ describe("communications realtime API", () => {
     const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
     expect(events.some((event) => event.eventType === "recording_started")).toBe(true);
   });
+
+  it("rejects recording start for non-LiveKit rooms", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-manual",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Звонок",
+      mediaKind: "video",
+      provider: "manual",
+      providerRoomId: "provider-room-manual",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-manual",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    const egress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [{ trackId: "t", kind: "video", participantIdentity: "user-alpha-admin" }];
+      },
+      async startTrackEgress() {
+        return "egress-x";
+      },
+      async stopEgress() {},
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, egress);
+    const cookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+    const res = await recApp.request(
+      `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/recordings/start`,
+      { method: "POST", headers: jsonHeaders(cookie) }
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe("call_recording_provider_unsupported");
+  });
+
+  it("rejects recording start when no tracks are published", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-empty",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Звонок",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-empty",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-empty",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    const egress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [];
+      },
+      async startTrackEgress() {
+        return "egress-x";
+      },
+      async stopEgress() {},
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, egress);
+    const cookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+    const res = await recApp.request(
+      `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/recordings/start`,
+      { method: "POST", headers: jsonHeaders(cookie) }
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe("call_recording_no_tracks");
+  });
+
+  it("does not stop a recording group that belongs to a different room", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const roomA = await dataSource.createCallRoom({
+      id: "call-room-a",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "A",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-a",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const roomB = await dataSource.createCallRoom({
+      id: "call-room-b",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "B",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-b",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const sessionB = await dataSource.createCallSession({
+      id: "call-session-b",
+      tenantId,
+      roomId: roomB.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    await dataSource.createCallRecording({
+      id: "call-recording-b",
+      tenantId,
+      roomId: roomB.id,
+      sessionId: sessionB.id,
+      recordingGroupId: "call-rec-group-b",
+      attachmentId: null,
+      egressId: "egress-b-1",
+      participantId: "user-alpha-admin",
+      trackId: "track-b",
+      kind: "video",
+      status: "recording",
+      durationSeconds: null,
+      endedAt: null,
+      title: "B",
+      createdByUserId: "user-alpha-admin"
+    });
+    const stopped: string[] = [];
+    const egress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [];
+      },
+      async startTrackEgress() {
+        return "egress-x";
+      },
+      async stopEgress(id) {
+        stopped.push(id);
+      },
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, egress);
+    const cookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+    // Stop room B's group through room A, which the same admin also manages.
+    const res = await recApp.request(
+      `/api/workspace/call-rooms/${roomA.id}/recordings/groups/call-rec-group-b/stop`,
+      { method: "POST", headers: jsonHeaders(cookie) }
+    );
+    expect(res.status).toBe(404);
+    expect(stopped).toEqual([]);
+  });
+
+  it("stops active recording egress when the session ends", async () => {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-end",
+      tenantId: "tenant-alpha",
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Звонок",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-end",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-end",
+      tenantId: "tenant-alpha",
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    const stopped: string[] = [];
+    const egress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [{ trackId: "track-end", kind: "video", participantIdentity: "user-alpha-admin" }];
+      },
+      async startTrackEgress() {
+        return "egress-end-1";
+      },
+      async stopEgress(id) {
+        stopped.push(id);
+      },
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, egress);
+    const cookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+    const startRes = await recApp.request(
+      `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/recordings/start`,
+      { method: "POST", headers: jsonHeaders(cookie) }
+    );
+    expect(startRes.status).toBe(201);
+    const endRes = await recApp.request(
+      `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/end`,
+      { method: "POST", headers: jsonHeaders(cookie) }
+    );
+    expect(endRes.status).toBe(200);
+    expect(stopped).toContain("egress-end-1");
+  });
 });

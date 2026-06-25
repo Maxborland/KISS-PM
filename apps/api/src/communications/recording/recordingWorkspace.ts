@@ -19,6 +19,7 @@ export type CommunicationRecordingDataSource = Pick<
   | "createPendingFileAsset"
   | "findCallRoom"
   | "findCallRecordingByEgressId"
+  | "listCallRecordings"
   | "listCallRecordingsByGroup"
   | "markFileAssetReady"
   | "updateCallRecordingByEgress"
@@ -104,36 +105,58 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
       if (!egressProvider) {
         return { ok: false, status: 501, error: "recording_storage_unsupported" };
       }
-      if (!dataSource.createCallRecording || !dataSource.createCallEvent) {
+      if (!dataSource.createCallRecording || !dataSource.createCallEvent || !dataSource.listCallRecordings) {
         return { ok: false, status: 501, error: "communications_not_configured" };
       }
       if (input.session.status !== "active") {
         return { ok: false, status: 409, error: "call_session_not_active" };
       }
+      // Egress only targets LiveKit rooms. Provider-room ids are caller-supplied and unique
+      // per provider, so a manual/jitsi room could reuse an active LiveKit room name; reject
+      // non-LiveKit rooms so their manager cannot drive egress for the matching LiveKit room.
+      if (input.room.provider !== "livekit") {
+        return { ok: false, status: 409, error: "call_recording_provider_unsupported" };
+      }
+      // Reject a second concurrent start for the same session — otherwise each click spins up
+      // duplicate Track Egress jobs writing duplicate files and billing until each is stopped.
+      const active = await dataSource.listCallRecordings({
+        tenantId: input.actor.tenantId,
+        roomId: input.room.id
+      });
+      if (active.some((rec) => rec.sessionId === input.session.id && rec.status === "recording")) {
+        return { ok: false, status: 409, error: "call_recording_already_active" };
+      }
 
       const tracks = await egressProvider.listRoomTracks(input.room.providerRoomId);
+      // A snapshot with no published media would silently succeed with zero recordings; reject
+      // so the manager retries once participants are publishing instead of recording nothing.
+      if (tracks.length === 0) {
+        return { ok: false, status: 409, error: "call_recording_no_tracks" };
+      }
+
       const recordingGroupId = `call-rec-group-${randomUUID()}`;
       const recordings: CallRecording[] = [];
+      const startedEgressIds: string[] = [];
 
-      for (const track of tracks) {
-        const recordingId = `call-recording-${randomUUID()}`;
-        const filepath = recordingFilepath({
-          tenantId: input.actor.tenantId,
-          roomId: input.room.id,
-          sessionId: input.session.id,
-          recordingGroupId,
-          participantId: track.participantIdentity,
-          trackId: track.trackId,
-          kind: track.kind
-        });
-        const egressId = await egressProvider.startTrackEgress({
-          providerRoomId: input.room.providerRoomId,
-          trackId: track.trackId,
-          filepath
-        });
-        let recording: CallRecording;
-        try {
-          recording = await dataSource.createCallRecording({
+      try {
+        for (const track of tracks) {
+          const recordingId = `call-recording-${randomUUID()}`;
+          const filepath = recordingFilepath({
+            tenantId: input.actor.tenantId,
+            roomId: input.room.id,
+            sessionId: input.session.id,
+            recordingGroupId,
+            participantId: track.participantIdentity,
+            trackId: track.trackId,
+            kind: track.kind
+          });
+          const egressId = await egressProvider.startTrackEgress({
+            providerRoomId: input.room.providerRoomId,
+            trackId: track.trackId,
+            filepath
+          });
+          startedEgressIds.push(egressId);
+          const recording = await dataSource.createCallRecording({
             id: recordingId,
             tenantId: input.actor.tenantId,
             roomId: input.room.id,
@@ -150,47 +173,51 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
             title: `Запись · ${track.participantIdentity}`,
             createdByUserId: input.actor.id
           });
-        } catch (cause) {
-          // Never leave the just-started egress orphaned without a DB row to reap it.
+          recordings.push(recording);
+        }
+
+        await dataSource.createCallEvent({
+          id: `call-event-${randomUUID()}`,
+          tenantId: input.actor.tenantId,
+          roomId: input.room.id,
+          sessionId: input.session.id,
+          actorUserId: input.actor.id,
+          eventType: "recording_started",
+          payload: { recordingGroupId, trackCount: recordings.length }
+        });
+        await deps.appendManagementAuditEvent(
+          recordingAudit({
+            actionType: "communications.call_recording_started",
+            actor: input.actor,
+            access: input.access,
+            afterState: { recordingGroupId, trackCount: recordings.length },
+            commandInput: { roomId: input.room.id, sessionId: input.session.id }
+          })
+        );
+      } catch (cause) {
+        // Any failure after one or more egresses started (a later startTrackEgress, the DB
+        // insert, or the event/audit) leaves the caller without a group id to stop. Stop every
+        // egress started in this attempt so none keep recording/billing; the janitor reaps rows.
+        for (const egressId of startedEgressIds) {
           try {
             await egressProvider.stopEgress(egressId);
           } catch {
             // best-effort
           }
-          throw cause;
         }
-        recordings.push(recording);
+        throw cause;
       }
-
-      await dataSource.createCallEvent({
-        id: `call-event-${randomUUID()}`,
-        tenantId: input.actor.tenantId,
-        roomId: input.room.id,
-        sessionId: input.session.id,
-        actorUserId: input.actor.id,
-        eventType: "recording_started",
-        payload: { recordingGroupId, trackCount: recordings.length }
-      });
-      await deps.appendManagementAuditEvent(
-        recordingAudit({
-          actionType: "communications.call_recording_started",
-          actor: input.actor,
-          access: input.access,
-          afterState: { recordingGroupId, trackCount: recordings.length },
-          commandInput: { roomId: input.room.id, sessionId: input.session.id }
-        })
-      );
 
       return { ok: true, recordingGroupId, recordings };
     },
 
-    /** Stop all active egresses in a recording group. */
+    /** Stop all active egresses in a recording group scoped to the resolved room. */
     async stopRecording(input: {
       access: CommunicationCallAccess;
       actor: TenantUser;
       room: CallRoom;
       recordingGroupId: string;
-    }): Promise<RecordingResult<{ stopped: number }>> {
+    }): Promise<RecordingResult<{ stopped: number; failed: number }>> {
       if (!egressProvider || !dataSource.listCallRecordingsByGroup) {
         return { ok: false, status: 501, error: "recording_storage_unsupported" };
       }
@@ -198,14 +225,22 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
         tenantId: input.actor.tenantId,
         recordingGroupId: input.recordingGroupId
       });
+      // Scope to the resolved room: a group id read from room B's detail must not stop B's
+      // egress through room A just because the actor can manage A (within-tenant IDOR).
+      if (recordings.length === 0 || recordings.some((rec) => rec.roomId !== input.room.id)) {
+        return { ok: false, status: 404, error: "call_recording_group_not_found" };
+      }
       let stopped = 0;
+      let failed = 0;
       for (const recording of recordings) {
         if (recording.status === "recording" && recording.egressId) {
           try {
             await egressProvider.stopEgress(recording.egressId);
             stopped += 1;
           } catch {
-            // egress may already be stopping; the webhook reconciles the final state.
+            // The LiveKit API may be down/timing out, not just idempotently already-stopping.
+            // Count it so the caller learns some egresses may still be running and can retry.
+            failed += 1;
           }
         }
       }
@@ -214,11 +249,44 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
           actionType: "communications.call_recording_stopped",
           actor: input.actor,
           access: input.access,
-          afterState: { recordingGroupId: input.recordingGroupId, stopped },
+          afterState: { recordingGroupId: input.recordingGroupId, stopped, failed },
           commandInput: { roomId: input.room.id, recordingGroupId: input.recordingGroupId }
         })
       );
-      return { ok: true, stopped };
+      return { ok: true, stopped, failed };
+    },
+
+    /**
+     * Best-effort: stop any still-running egresses for a session that is being ended, so a
+     * normal "end call" does not leave LiveKit Egress recording (privacy/cost) until tracks
+     * disappear. The webhook/janitor reconciles the final row state.
+     */
+    async stopActiveEgressForSession(input: {
+      tenantId: string;
+      roomId: string;
+      sessionId: string;
+    }): Promise<{ stopped: number }> {
+      if (!egressProvider || !dataSource.listCallRecordings) return { stopped: 0 };
+      const recordings = await dataSource.listCallRecordings({
+        tenantId: input.tenantId,
+        roomId: input.roomId
+      });
+      let stopped = 0;
+      for (const recording of recordings) {
+        if (
+          recording.sessionId === input.sessionId &&
+          recording.status === "recording" &&
+          recording.egressId
+        ) {
+          try {
+            await egressProvider.stopEgress(recording.egressId);
+            stopped += 1;
+          } catch {
+            // best-effort; the janitor reaps anything left running
+          }
+        }
+      }
+      return { stopped };
     },
 
     /**
