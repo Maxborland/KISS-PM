@@ -89,7 +89,7 @@ function TableHead({
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-[var(--space-2)] align-middle text-[var(--text-xs)] font-semibold uppercase tracking-[0.04em] whitespace-nowrap text-[var(--muted-strong)] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "h-11 px-[var(--space-3)] align-middle text-[var(--text-xs)] font-semibold uppercase tracking-[0.04em] whitespace-nowrap text-[var(--muted-strong)] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         alignClass(align, numeric) || "text-left",
         className
       )}
@@ -109,7 +109,7 @@ function TableCell({
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "px-[var(--space-3)] py-[var(--space-3)] align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         truncate ? "max-w-[var(--col-max,16rem)] truncate" : "whitespace-nowrap",
         alignClass(align, numeric),
         className
