@@ -18,12 +18,20 @@
   --muted-strong: #475569;
   --muted-soft: #94a3b8;
 
-  /* Brand & accents */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-soft: #eef4ff;
-  --accent-muted: #dbeafe;
-  --accent-ring: rgba(37, 99, 235, 0.18);
+  /* Brand & accent — TENANT-CONFIGURABLE.
+     A tenant picks --accent (+ optionally --accent-2 for the gradient's 2nd stop);
+     hover/soft/muted/ring and the gradients all derive from it via color-mix.
+     Inject per tenant as an inline custom property on <html>, e.g. style="--accent:#e0556b".
+     This does NOT affect the semantic status palette below (success/warning/danger/info стандартны). */
+  --accent: #6d5ef0;
+  --accent-2: #8b5cf6;
+  --accent-hover: color-mix(in srgb, var(--accent) 86%, #000);
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, #fff);
+  --accent-muted: color-mix(in srgb, var(--accent) 22%, #fff);
+  --accent-ring: color-mix(in srgb, var(--accent) 30%, transparent);
+  /* accent gradients (blocks/KPI accent surfaces) — derived from the tenant accent */
+  --accent-grad: linear-gradient(135deg, var(--accent), var(--accent-2));
+  --accent-grad-soft: linear-gradient(160deg, color-mix(in srgb, var(--accent) 7%, #fff), color-mix(in srgb, var(--accent) 15%, #fff));
 
   /* Semantic */
   --success: #10b981;
@@ -79,7 +87,7 @@
   --font-display: var(--next-font-display, "Plus Jakarta Sans"), "Inter", system-ui, sans-serif;
   --font-mono: var(--next-font-mono, "JetBrains Mono"), ui-monospace, Menlo, Consolas, monospace;
 
-  /* Type scale: body 14 · h3 18 · h2 24 · h1 32 */
+  /* Type scale: body 14 · h3 18 · h2 24 · h1 48 (выдающийся дисплей) */
   --text-xs: 11px;
   --text-sm: 12px;
   --text-base: 14px;
@@ -87,11 +95,11 @@
   --text-lg: 16px;
   --text-h3: 18px;
   --text-h2: 24px;
-  --text-h1: 32px;
+  --text-h1: 48px;
   --text-xl: var(--text-h3);
   --text-2xl: var(--text-h2);
   --text-3xl: var(--text-h1);
-  --text-4xl: 40px;
+  --text-4xl: 60px;
 
   --lh-xs: 16px;
   --lh-sm: 18px;
@@ -100,11 +108,11 @@
   --lh-lg: 24px;
   --lh-h3: 24px;
   --lh-h2: 32px;
-  --lh-h1: 38px;
+  --lh-h1: 52px;
   --lh-xl: var(--lh-h3);
   --lh-2xl: var(--lh-h2);
   --lh-3xl: var(--lh-h1);
-  --lh-4xl: 44px;
+  --lh-4xl: 64px;
 
   /* Radii */
   --radius-xs: 4px;
