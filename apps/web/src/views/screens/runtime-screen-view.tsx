@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, Folder, MoreHorizontal } from "lucide-react";
+import { Ban, Calendar, Clock, Folder, Inbox, MoreHorizontal, Users } from "lucide-react";
 import { FormEvent, ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -13,9 +13,14 @@ import { CellStack } from "@/components/domain/cell-stack";
 import { DataTable } from "@/components/domain/data-table";
 import { Field } from "@/components/domain/form-layout";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Chip } from "@/components/ui/chip";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AppPreloader, FeedSkeleton, TableSkeleton } from "@/components/ui/loaders";
+import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
+import { cn } from "@/lib/cn";
 import { ApiError, apiFetch } from "@/lib/api";
 import { KanbanBoard, KanbanColumn } from "@/widgets/kanban/kanban-board";
 import { KanbanCard } from "@/widgets/kanban/kanban-card";
@@ -83,7 +88,7 @@ type CapacitySummary = { overloadUserCount?: number; overloadedEmployeeCount?: n
 type CapacityDay = { date: string; workMinutes: number; capacityMinutes: number; freeMinutes: number; overloadMinutes: number; heat: string };
 type CapacityTreeNode = { id: string; type: string; name: string; days: CapacityDay[]; children?: CapacityTreeNode[] };
 
-type QueryState<T> = { data: T | undefined; isLoading: boolean; error: Error | null };
+type QueryState<T> = { data: T | undefined; isLoading: boolean; error: Error | null; refetch?: () => unknown };
 
 const PERMISSIONS = {
   manageOpportunities: "tenant.opportunities.manage",
@@ -100,7 +105,7 @@ type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 export function RuntimeScreenView({ id, entityId }: { id: RuntimeScreenId; entityId?: string }) {
   const me = useQuery({ queryKey: ["auth", "me"], queryFn: () => apiFetch<AuthMe>("/api/auth/me"), retry: false });
 
-  if (me.isLoading) return <ChromeState title="Проверяем сессию" lead="Загружаем профиль и права рабочего пространства." />;
+  if (me.isLoading) return <AppPreloader />;
   if (isUnauthorized(me.error)) return <RuntimeLogin />;
   if (me.error || !me.data) return <ChromeState title="Не удалось открыть рабочую область" lead={errorMessage(me.error)} />;
 
@@ -158,20 +163,20 @@ function DashboardRuntime({ me }: { me: AuthMe }) {
         actions={<BemAvatar initials={initials(me.user.name)} color="c4" size="xl" />}
       />
       <div className="bento">
-        <MetricTile label="Активные проекты" value={activeProjects.length} sub="в работе" />
-        <MetricTile label="Просрочено" value={overdueTasks.length} sub="задач требуют решения" danger={overdueTasks.length > 0} />
-        <MetricTile label="Блокеры" value={blockedTasks.length} sub="задач в ожидании" danger={blockedTasks.length > 0} />
-        <MetricTile label="Перегрузка" value={capacityCount(capacity.data)} sub="людей в зоне риска" danger={capacityCount(capacity.data) > 0} />
+        <MetricTile label="Активные проекты" value={activeProjects.length} sub="в работе" feature icon={<Folder />} href="/projects" />
+        <MetricTile label="Просрочено" value={overdueTasks.length} sub="задач требуют решения" danger={overdueTasks.length > 0} icon={<Clock />} href="/my-work" />
+        <MetricTile label="Блокеры" value={blockedTasks.length} sub="задач в ожидании" danger={blockedTasks.length > 0} icon={<Ban />} href="/my-work" />
+        <MetricTile label="Перегрузка" value={capacityCount(capacity.data)} sub="людей в зоне риска" danger={capacityCount(capacity.data) > 0} icon={<Users />} href="/projects" />
         <div className="bento__cell bento__cell--8">
           <CardPanel title="Требует внимания" subtitle="Просрочки и блокеры из текущих задач" flush>
-            <StateGate state={myWork} empty="Срочных задач нет.">
+            <StateGate state={myWork} empty="Срочных задач нет." skeleton={<TableSkeleton columns={4} rows={4} />}>
               {attentionTasks.length > 0 ? <TaskTable tasks={attentionTasks} statuses={statuses.data?.taskStatuses ?? []} auth={me} compactActions /> : <p className="u-text-sm u-text-muted">Сейчас нет просрочек или блокеров.</p>}
             </StateGate>
           </CardPanel>
         </div>
         <div className="bento__cell bento__cell--4">
           <CardPanel title="Следующее управленческое действие" subtitle="Не декоративная кнопка — переход в рабочий контур">
-            <div className="u-stack-3">
+            <div className="flex flex-col items-start gap-[var(--space-3)]">
               {attentionTasks[0] ? (
                 <>
                   <p className="u-text-body u-text-strong">{attentionTasks[0].title}</p>
@@ -206,7 +211,7 @@ function MyWorkRuntime({ me }: { me: AuthMe }) {
     <>
       <PageIntro title="Моя работа" lead="Канбан и список задач в одном рабочем контуре. Статус, комментарий и блокер сохраняются после действия." />
       <div className="view-toolbar"><Segmented name="my-work-mode" value={mode} onChange={setMode} options={[{ value: "kanban", label: "Канбан" }, { value: "list", label: "Список" }]} /></div>
-      <StateGate state={myWork} empty="Назначенных задач нет.">
+      <StateGate state={myWork} empty="Назначенных задач нет." skeleton={<TableSkeleton columns={5} rows={6} />} isEmpty={(d) => d.tasks.length === 0}>
         {mode === "list" ? (
           <TaskTable tasks={tasks} statuses={statuses.data?.taskStatuses ?? []} actorId={me.user.id} auth={me} />
         ) : (
@@ -292,7 +297,7 @@ function DealsRuntime({ me }: { me: AuthMe }) {
       <div className="view-toolbar">
         <Segmented name="deals-mode" value={mode} onChange={setMode} options={[{ value: "kanban", label: "Канбан" }, { value: "list", label: "Список" }, { value: "forecast", label: "Прогноз" }]} />
       </div>
-      <StateGate state={deals} empty="Сделок пока нет.">
+      <StateGate state={deals} empty="Сделок пока нет." skeleton={<TableSkeleton columns={5} rows={6} />} isEmpty={(d) => d.opportunities.length === 0}>
         {mode === "kanban" ? <DealsFunnel deals={items} stages={stageItems} /> : mode === "forecast" ? <ForecastPanel deals={items} /> : null}
         {mode !== "forecast" ? <DealsTable deals={items} stages={stageItems} auth={me} /> : null}
       </StateGate>
@@ -347,7 +352,7 @@ function ProjectsRuntime() {
   return (
     <>
       <PageIntro title="Проекты" lead={`${projects.data?.projects.length ?? 0} активных проектов в работе.`} />
-      <StateGate state={projects} empty="Активных проектов пока нет.">
+      <StateGate state={projects} empty="Активных проектов пока нет." skeleton={<TableSkeleton columns={5} rows={6} />} isEmpty={(d) => d.projects.length === 0}>
         <ProjectsTable projects={projects.data?.projects ?? []} />
       </StateGate>
     </>
@@ -542,8 +547,53 @@ function RuntimeLogin() {
 }
 
 function ChromeState({ title, lead }: { title: string; lead: string }) { return <WorkspaceChrome meta={{ breadcrumb: [{ label: title, current: true }], activeNav: "Дашборд" }}><PageIntro title={title} lead={lead} /></WorkspaceChrome>; }
-function StateGate<T>({ state, empty, children }: { state: QueryState<T>; empty: string; children: ReactNode }) { if (state.isLoading) return <p className="u-text-sm u-text-muted">Загрузка данных…</p>; if (state.error) return <p className="u-text-sm u-text-muted">{errorMessage(state.error)}</p>; if (!state.data) return <p className="u-text-sm u-text-muted">{empty}</p>; return <>{children}</>; }
-function MetricTile({ label, value, sub, danger }: { label: string; value: number | string; sub: string; danger?: boolean }) { return <div className="bento__cell tile"><div className="tile__head"><span className="tile__label">{label}</span><span className={danger ? "tile__icon tile__icon--danger" : "tile__icon tile__icon--accent"} /></div><div className="tile__value">{value}</div><div className="tile__sub">{sub}</div></div>; }
+function StateGate<T>({ state, empty, skeleton, isEmpty, children }: { state: QueryState<T>; empty: string; skeleton?: ReactNode; isEmpty?: (data: T) => boolean; children: ReactNode }) { if (state.isLoading) return <>{skeleton ?? <TableSkeleton />}</>; if (state.error) return <ErrorState title="Не удалось загрузить данные" description={errorMessage(state.error)} {...(state.refetch ? { onRetry: state.refetch } : {})} />; if (!state.data || isEmpty?.(state.data)) return <div className="state-illu"><div className="state-illu__art" aria-hidden><Inbox className="size-8 text-[var(--muted)]" strokeWidth={1.75} /></div><p className="state-illu__title">{empty}</p></div>; return <>{children}</>; }
+function MetricTile({ label, value, sub, danger, feature, icon, href }: { label: string; value: number | string; sub: string; danger?: boolean; feature?: boolean; icon?: ReactNode; href?: string }) {
+  const className = cn(
+    "bento__cell flex flex-col rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--panel)] p-[var(--space-5)] shadow-[var(--shadow-sm)]",
+    feature && "border-transparent [background-image:var(--accent-grad-soft)]",
+    href &&
+      "cursor-pointer transition-[box-shadow,transform] duration-[var(--duration-base)] ease-[var(--ease-out)] hover:shadow-[var(--shadow-lg)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]"
+  );
+  const content = (
+    <>
+      <div className="flex items-center justify-between">
+        <span className="text-[length:var(--text-sm)] font-medium text-[var(--muted)]">{label}</span>
+        {icon ? (
+          <span
+            aria-hidden
+            className={cn(
+              "inline-flex size-8 items-center justify-center rounded-[var(--radius-md)] [&>svg]:size-4",
+              danger
+                ? "bg-[var(--danger-soft)] text-[var(--danger)]"
+                : feature
+                  ? "bg-[var(--accent)] text-white"
+                  : "bg-[var(--panel-strong)] text-[var(--muted)]"
+            )}
+          >
+            {icon}
+          </span>
+        ) : null}
+      </div>
+      <div
+        className={cn(
+          "mt-[var(--space-3)] text-[2rem] font-extrabold leading-none tracking-[-0.03em] [font-variant-numeric:tabular-nums]",
+          danger ? "text-[var(--danger)]" : feature ? "text-[var(--accent)]" : "text-[var(--text)]"
+        )}
+      >
+        {value}
+      </div>
+      <div className="mt-[var(--space-2)] text-[length:var(--text-sm)] text-[var(--muted)]">{sub}</div>
+    </>
+  );
+  return href ? (
+    <Link href={href} className={className}>
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
+  );
+}
 
 function TaskKanban({ tasks, statuses, auth }: { tasks: Task[]; statuses: TaskStatus[]; auth: AuthMe }) {
   const groups = [["new", "Бэклог"], ["in_progress", "В работе"], ["review", "Проверка"], ["done", "Готово"]] as const;
@@ -552,25 +602,48 @@ function TaskKanban({ tasks, statuses, auth }: { tasks: Task[]; statuses: TaskSt
     return <KanbanColumn key={category} title={title} count={items.length}>{items.length === 0 ? <p className="u-text-xs u-text-muted">Нет задач</p> : items.map((task, index) => <KanbanCard key={task.id} id={`Задача ${index + 1}`} title={task.title} priority={priorityLevel(task.priority)} priorityLabel={businessStatus(task.priority)} meta={[{ label: `Срок: ${formatDate(task.plannedFinish)}` }, { label: task.statusName }]} assignees={[{ initials: "ИИ", color: "c1" }]} date={formatDate(task.plannedFinish)} foot={<TaskAdvanceButton task={task} statuses={statuses} auth={auth} />}/>)}</KanbanColumn>;
   })}</KanbanBoard>;
 }
+// Semantic enum→badge mapping for task status (neutral default; color only when the value carries meaning).
+function taskStatusTone(category: string): React.ComponentProps<typeof Badge>["variant"] {
+  if (category === "done") return "success";
+  if (category === "waiting") return "warning";
+  if (category === "review" || category === "in_progress") return "info";
+  return "secondary";
+}
 function TaskTable({ tasks, statuses, actorId, auth, compactActions = false }: { tasks: Task[]; statuses: TaskStatus[]; actorId?: string | undefined; auth: AuthMe; compactActions?: boolean }) {
   return (
-    <DataTable>
-      <thead><tr><th>Задача</th><th>Срок</th><th>Статус</th><th>Прогресс</th><th>Действие</th></tr></thead>
-      <tbody>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Задача</TableHead>
+          <TableHead numeric>Срок</TableHead>
+          <TableHead>Статус</TableHead>
+          {compactActions ? null : <TableHead numeric>Прогресс</TableHead>}
+          <TableHead>
+            <span className="sr-only">Действие</span>
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {tasks.map((task) => (
-          <tr key={task.id}>
-            <td><CellStack title={task.title} subtitle={task.description ?? "Без описания"} /></td>
-            <td className="mono cell-muted">{formatDate(task.plannedFinish)}</td>
-            <td><Chip variant={task.statusCategory === "waiting" ? "warning" : "info"}>{task.statusName}</Chip></td>
-            <td className="mono">{task.progress}%</td>
-            <td className="cell-actions">
-              <TaskAdvanceButton task={task} statuses={statuses} auth={auth} />
-              {compactActions ? null : <TaskCommentForm task={task} actorId={actorId} statuses={statuses} auth={auth} />}
-            </td>
-          </tr>
+          <TableRow key={task.id}>
+            <TableCell className="max-w-[20rem]">
+              <CellStack title={task.title} subtitle={task.description ?? "Без описания"} truncate />
+            </TableCell>
+            <TableCell numeric className="whitespace-nowrap text-[var(--muted)]">{formatDate(task.plannedFinish)}</TableCell>
+            <TableCell>
+              <Badge variant={taskStatusTone(task.statusCategory)}>{task.statusName}</Badge>
+            </TableCell>
+            {compactActions ? null : <TableCell numeric>{task.progress}%</TableCell>}
+            <TableCell align="right">
+              <div className="flex items-center justify-end gap-2">
+                <TaskAdvanceButton task={task} statuses={statuses} auth={auth} />
+                {compactActions ? null : <TaskCommentForm task={task} actorId={actorId} statuses={statuses} auth={auth} />}
+              </div>
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </DataTable>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -589,7 +662,7 @@ function TaskAdvanceButton({ task, statuses, auth }: { task: Task; statuses: Tas
       await queryClient.invalidateQueries();
     }
   });
-  return <span><Button variant="secondary" size="sm" disabled={Boolean(reason) || !next || mutation.isPending} title={reason ?? undefined} onClick={() => mutation.mutate()}>{next ? `В ${next.name}` : "Финал"}</Button><DisabledReason reason={reason} /></span>;
+  return <span><Button variant="secondary" size="sm" className="min-w-[8rem] justify-center" disabled={Boolean(reason) || !next || mutation.isPending} title={reason ?? undefined} onClick={() => mutation.mutate()}>{next ? `→ ${next.name}` : "Финал"}</Button><DisabledReason reason={reason} /></span>;
 }
 
 function TaskCommentForm({ task, actorId, statuses, auth }: { task: Task; actorId?: string | undefined; statuses: TaskStatus[]; auth: AuthMe }) {
@@ -671,20 +744,130 @@ function CreateTaskPanel({ projectId, actorId, defaultStatusId, auth }: { projec
 }
 
 function DealsFunnel({ deals, stages }: { deals: Opportunity[]; stages: DealStage[] }) { return <div className="funnel">{stages.map((stage) => <div key={stage.id} className="funnel__col"><div className="funnel__head"><span className="funnel__title">{stage.name}</span><span className="badge badge--secondary">{deals.filter((deal) => deal.stageId === stage.id).length}</span></div><div className="funnel__body">{deals.filter((deal) => deal.stageId === stage.id).map((deal) => <article key={deal.id} className="deal-card"><div className="deal-card__head"><span className="deal-card__id mono">{stage.name}</span><BemAvatar initials="ИИ" color="c1" size="sm" /></div><h3 className="deal-card__title"><Link href={`/deals/${deal.id}`}>{deal.title}</Link></h3><p className="deal-card__client">{deal.clientName}</p><div className="deal-card__foot"><Chip variant="info">{stage.name}</Chip><span className="mono u-text-xs u-text-strong">{money(deal.contractValue)}</span></div></article>)}</div></div>)}</div>; }
-function DealsTable({ deals, stages, auth }: { deals: Opportunity[]; stages: DealStage[]; auth: AuthMe }) { return <DataTable className="u-mt-4"><thead><tr><th>Сделка</th><th>Клиент</th><th>Стадия</th><th>Сумма</th><th>Действие</th></tr></thead><tbody>{deals.map((deal) => <tr key={deal.id}><td><CellStack title={deal.title} subtitle={deal.contactName ?? "Контакт не указан"} /></td><td>{deal.clientName}</td><td><Chip variant="info">{stageName(stages, deal.stageId)}</Chip></td><td className="mono">{money(deal.contractValue)}</td><td><DealAdvanceButton deal={deal} stages={stages} auth={auth} /></td></tr>)}</tbody></DataTable>; }
-function DealAdvanceButton({ deal, stages, auth }: { deal: Opportunity; stages: DealStage[]; auth: AuthMe }) { const queryClient = useQueryClient(); const next = nextStage(stages, deal.stageId); const reason = disabledReason(auth, PERMISSIONS.manageOpportunities); const mutation = useMutation({ mutationFn: () => { if (reason) throw new Error(reason); return apiFetch(`/api/workspace/opportunities/${deal.id}/stage`, { method: "PATCH", json: { stageId: next?.id } }); }, onSuccess: async () => { toast.success("Стадия сделки сохранена"); await queryClient.invalidateQueries(); } }); return <span><Button variant="secondary" size="sm" disabled={Boolean(reason) || !next || mutation.isPending} title={reason ?? undefined} onClick={() => mutation.mutate()}>{next ? `В ${next.name}` : "Финал"}</Button><DisabledReason reason={reason} /></span>; }
+function DealsTable({ deals, stages, auth }: { deals: Opportunity[]; stages: DealStage[]; auth: AuthMe }) {
+  return (
+    <Table className="mt-4">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Сделка</TableHead>
+          <TableHead>Клиент</TableHead>
+          <TableHead>Стадия</TableHead>
+          <TableHead numeric>Сумма</TableHead>
+          <TableHead>
+            <span className="sr-only">Действие</span>
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {deals.map((deal) => (
+          <TableRow key={deal.id}>
+            <TableCell className="max-w-[20rem]">
+              <CellStack title={deal.title} subtitle={deal.contactName ?? "Контакт не указан"} truncate />
+            </TableCell>
+            <TableCell truncate className="text-[var(--muted)]">{deal.clientName}</TableCell>
+            <TableCell>
+              <Badge variant="secondary">{stageName(stages, deal.stageId)}</Badge>
+            </TableCell>
+            <TableCell numeric className="whitespace-nowrap">{money(deal.contractValue)}</TableCell>
+            <TableCell align="right">
+              <DealAdvanceButton deal={deal} stages={stages} auth={auth} />
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+function DealAdvanceButton({ deal, stages, auth }: { deal: Opportunity; stages: DealStage[]; auth: AuthMe }) { const queryClient = useQueryClient(); const next = nextStage(stages, deal.stageId); const reason = disabledReason(auth, PERMISSIONS.manageOpportunities); const mutation = useMutation({ mutationFn: () => { if (reason) throw new Error(reason); return apiFetch(`/api/workspace/opportunities/${deal.id}/stage`, { method: "PATCH", json: { stageId: next?.id } }); }, onSuccess: async () => { toast.success("Стадия сделки сохранена"); await queryClient.invalidateQueries(); } }); return <span><Button variant="secondary" size="sm" className="min-w-[8rem] justify-center" disabled={Boolean(reason) || !next || mutation.isPending} title={reason ?? undefined} onClick={() => mutation.mutate()}>{next ? `→ ${next.name}` : "Финал"}</Button><DisabledReason reason={reason} /></span>; }
 function ForecastPanel({ deals }: { deals: Opportunity[] }) { const total = deals.reduce((sum, deal) => sum + deal.contractValue * (deal.probability / 100), 0); return <CardPanel title="Прогноз продаж" subtitle="Расчёт по вероятности сделок"><div className="tile__value">{money(total)}</div><p className="u-text-sm u-text-muted">Прогноз считается из текущей воронки.</p></CardPanel>; }
 
-function ProjectsTable({ projects }: { projects: Project[] }) { return <DataTable><thead><tr><th>Название</th><th>Клиент</th><th>Ответственный</th><th>Статус</th><th>Срок</th><th /></tr></thead><tbody>{projects.map((project, index) => <tr key={project.id} className={index === 0 ? "is-selected" : undefined}><td><CellStack title={project.title} subtitle={dateRange(project.plannedStart, project.plannedFinish)} icon={<Folder className="size-4" aria-hidden />} /></td><td>{project.clientName}</td><td><BemAvatar initials="ИИ" color="c1" /> Иванова М.</td><td><Chip variant="info">{businessStatus(project.status)}</Chip></td><td className="mono cell-muted">{formatDate(project.plannedFinish)}</td><td className="cell-actions"><Button variant="ghost" size="icon-sm" aria-label="Открыть проект" asChild><Link href={`/projects/${project.id}`}><MoreHorizontal className="size-4" /></Link></Button></td></tr>)}</tbody></DataTable>; }
+function ProjectsTable({ projects }: { projects: Project[] }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Название</TableHead>
+          <TableHead>Клиент</TableHead>
+          <TableHead>Статус</TableHead>
+          <TableHead numeric>Срок</TableHead>
+          <TableHead>
+            <span className="sr-only">Действия</span>
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {projects.map((project) => (
+          <TableRow key={project.id} className="group">
+            <TableCell className="max-w-[22rem]">
+              <CellStack
+                title={project.title}
+                subtitle={dateRange(project.plannedStart, project.plannedFinish)}
+                truncate
+                icon={<Folder className="size-4" aria-hidden />}
+              />
+            </TableCell>
+            <TableCell truncate className="text-[var(--muted)]">{project.clientName}</TableCell>
+            <TableCell>
+              <Badge variant="secondary">{businessStatus(project.status)}</Badge>
+            </TableCell>
+            <TableCell numeric className="whitespace-nowrap text-[var(--muted)]">{formatDate(project.plannedFinish)}</TableCell>
+            <TableCell align="right">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Открыть проект"
+                className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                asChild
+              >
+                <Link href={`/projects/${project.id}`}>
+                  <MoreHorizontal className="size-4" />
+                </Link>
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
 function TasksPanel({ state, tasks, statuses, auth }: { state: QueryState<{ tasks: Task[] }>; tasks: Task[]; statuses: TaskStatus[]; auth: AuthMe }) {
   return <CardPanel title="Ближайшие задачи" subtitle={`${tasks.length} задач`} flush actions={<Button variant="ghost" size="sm" asChild><Link href="/my-work">Вся работа</Link></Button>}><StateGate state={state} empty="Задач нет."><TaskTable tasks={tasks} statuses={statuses} auth={auth} compactActions /></StateGate></CardPanel>;
 }
 function AuditPanel({ state }: { state: QueryState<{ auditEvents: AuditEvent[] }> }) {
-  return <CardPanel title="Журнал" subtitle="Последние события" flush><StateGate state={state} empty="Событий нет."><ul className="feed">{(state.data?.auditEvents ?? []).map((event) => <li key={event.id} className="feed__item"><BemAvatar initials="А" color="c4" size="sm" /><div><div className="feed__head"><strong className="u-text-body u-text-strong">{businessStatus(event.actionType)}</strong><span className="u-text-xs u-text-muted">{formatDate(event.createdAt)}</span></div><p className="u-text-body">{auditResultLabel(event)}</p></div></li>)}</ul></StateGate></CardPanel>;
+  return <CardPanel title="Журнал" subtitle="Последние события" flush><StateGate state={state} empty="Событий нет." skeleton={<FeedSkeleton />} isEmpty={(d) => d.auditEvents.length === 0}><ul className="feed">{(state.data?.auditEvents ?? []).map((event) => <li key={event.id} className="feed__item"><BemAvatar initials="А" color="c4" size="sm" /><div><div className="feed__head"><strong className="u-text-body u-text-strong">{businessStatus(event.actionType)}</strong><span className="u-text-xs u-text-muted">{formatDate(event.createdAt)}</span></div><p className="u-text-body">{auditResultLabel(event)}</p></div></li>)}</ul></StateGate></CardPanel>;
 }
 function EntityCards({ title, description, aside }: { title: string; description: string; aside: ReactNode }) { return <div className="entity-grid"><div className="entity-grid__main"><CardPanel title={title} subtitle="Контекст для команды"><p className="u-text-body">{description}</p></CardPanel></div><aside className="entity-grid__aside"><CardPanel title="Параметры" subtitle="Свойства сущности">{aside}</CardPanel></aside></div>; }
 function FactList({ facts }: { facts: Array<[string, string]> }) { return <dl className="u-stack-2">{facts.map(([label, value]) => <div key={label}><dt className="u-text-xs u-text-muted">{label}</dt><dd className="u-text-body u-text-strong">{value}</dd></div>)}</dl>; }
-function UsersTable({ state }: { state: QueryState<{ users: RuntimeUser[] }> }) { return <CardPanel title="Пользователи" subtitle="Команда рабочей области" flush><StateGate state={state} empty="Пользователей нет."><DataTable><thead><tr><th>Имя</th><th>Email</th><th>Должность</th><th>Статус</th></tr></thead><tbody>{(state.data?.users ?? []).map((user) => <tr key={user.id}><td>{user.name}</td><td>{user.email ?? "—"}</td><td>{user.positionName ?? "—"}</td><td><Chip variant="info">{businessStatus(user.status ?? "active")}</Chip></td></tr>)}</tbody></DataTable></StateGate></CardPanel>; }
+function UsersTable({ state }: { state: QueryState<{ users: RuntimeUser[] }> }) {
+  return (
+    <CardPanel title="Пользователи" subtitle="Команда рабочей области" flush>
+      <StateGate state={state} empty="Пользователей нет." isEmpty={(d) => d.users.length === 0}>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Имя</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Должность</TableHead>
+              <TableHead>Статус</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(state.data?.users ?? []).map((user) => (
+              <TableRow key={user.id}>
+                <TableCell className="font-medium">{user.name}</TableCell>
+                <TableCell truncate className="text-[var(--muted)]">{user.email ?? "—"}</TableCell>
+                <TableCell className="text-[var(--muted)]">{user.positionName ?? "—"}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{businessStatus(user.status ?? "active")}</Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </StateGate>
+    </CardPanel>
+  );
+}
 function RolesPanel({ state }: { state: QueryState<{ accessProfiles: AccessProfile[] }> }) { return <CardPanel title="Роли" subtitle="Профили доступа"><StateGate state={state} empty="Ролей нет."><ul className="link-list">{(state.data?.accessProfiles ?? []).map((role) => <li key={role.id}>{role.name} · {role.permissions.length} прав</li>)}</ul></StateGate></CardPanel>; }
 function MutationMessage({ error }: { error: Error | null }) { return error ? <p className="u-text-sm u-text-muted u-mt-3">{errorMessage(error)}</p> : null; }
 function can(auth: AuthMe, permission: Permission) { return auth.permissions.includes(permission); }
