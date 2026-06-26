@@ -14,7 +14,7 @@ export default meta;
 type Story = StoryObj<typeof ScreenView>;
 
 export const SpaceDiscipline: Story = { name: "00 Дисциплина отступов", args: { id: "00-space-discipline" } };
-export const Dashboard: Story = { name: "01 Дашборд", args: { id: "01-dashboard" } };
+// 01 Дашборд — мок удалён; продакшн-дашборд живёт в RuntimeScreenView (app/dashboard).
 export const MyWork: Story = { name: "02 Моя работа", args: { id: "02-my-work" } };
 export const TaskCard: Story = { name: "03 Карточка задачи", args: { id: "03-task-card" } };
 export const CreateTaskModal: Story = { name: "04 Модалка создания задачи", args: { id: "04-create-task-modal" } };

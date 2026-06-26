@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 import { AdminBlock } from "@/views/blocks/admin-block";
 import { AvatarMenuBlock } from "@/views/blocks/avatar-menu-block";
-import { DashboardBento } from "@/views/blocks/dashboard-bento";
 import { DealsBlock } from "@/views/blocks/deals-block";
 import { EntitiesBlock } from "@/views/blocks/entities-block";
 import { EntityDetailBlock } from "@/views/blocks/entity-detail-block";
@@ -42,9 +41,10 @@ import { LoginScreenView } from "@/views/screens/login-screen-view";
 import { MOCK_PROJECT_CRM, mockTaskProjectRef, type ScreenId, SCREEN_META } from "@/views/catalog";
 import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
 
-const BLOCK_BY_ID: Record<ScreenId, () => ReactNode> = {
+// Storybook design-gallery blocks (mock data). Production screens render via RuntimeScreenView.
+// Partial: ids without a mock block fall back to ScreenPlaceholderBlock (see below).
+const BLOCK_BY_ID: Partial<Record<ScreenId, () => ReactNode>> = {
   "00-space-discipline": () => <SpaceDisciplineBlock />,
-  "01-dashboard": () => <DashboardBento />,
   "02-my-work": () => <MyWorkBlock />,
   "03-task-card": () => (
     <EntityDetailBlock
