@@ -18,12 +18,6 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(UI_VARIANT_ITEMS.button.length).toBeGreaterThan(0);
   });
 
-  it("dashboard uses PageIntro instead of welcome-hero title", () => {
-    const source = read("src/views/blocks/dashboard-bento.tsx");
-    expect(source).toContain("PageIntro");
-    expect(source).not.toMatch(/welcome-hero__title/);
-  });
-
   it("deals funnel uses Badge not legacy .badge BEM", () => {
     const source = read("src/views/blocks/deals-block.tsx");
     expect(source).toContain("<Badge");

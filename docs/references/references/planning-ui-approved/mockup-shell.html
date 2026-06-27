@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KISS PM — Planning Workspace shell</title>
+  <link rel="stylesheet" href="mockup.css" />
+</head>
+<body>
+  <div class="mockup-shell">
+    <aside class="sidebar">
+      <div class="sidebar__brand">
+        <span class="sidebar__brand-mark"></span>
+        KISS PM
+      </div>
+      <div class="sidebar__group">Работа</div>
+      <div class="sidebar__item"><span>Мои задачи</span><span class="sidebar__item-badge">12</span></div>
+      <div class="sidebar__item sidebar__item--active"><span>Проекты</span><span class="sidebar__item-badge">8</span></div>
+      <div class="sidebar__item"><span>Сделки</span><span class="sidebar__item-badge">37</span></div>
+      <div class="sidebar__item"><span>Ресурсы</span><span class="sidebar__item-badge">42</span></div>
+      <div class="sidebar__group">Аналитика</div>
+      <div class="sidebar__item"><span>Загрузка</span></div>
+      <div class="sidebar__item"><span>KPI</span></div>
+      <div class="sidebar__group">Аудит</div>
+      <div class="sidebar__item"><span>События</span></div>
+      <div class="sidebar__footer">v0.1 dev · 23.05.2026</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar__project">
+          <div class="topbar__icon">ПР</div>
+          <div>
+            <div class="topbar__title">Производственный портал · Релиз 2</div>
+            <div class="topbar__meta">
+              <span class="chip chip--info">В работе</span>
+              <span>план v17</span>
+              <span>Дедлайн 12.07.2026</span>
+              <span>Финиш 14.06.2026</span>
+            </div>
+          </div>
+        </div>
+        <label class="topbar__search">
+          <span class="muted">⌕</span>
+          <input type="text" placeholder="Найти задачу или ресурс" />
+        </label>
+        <div class="topbar__actions">
+          <button class="icon-btn" title="Уведомления (3)">●</button>
+          <button class="icon-btn" title="Профиль">И</button>
+        </div>
+      </header>
+
+      <nav class="tabs">
+        <span class="tabs__item">Обзор</span>
+        <span class="tabs__item tabs__item--active">График</span>
+        <span class="tabs__item">Ресурсы</span>
+        <span class="tabs__item">Назначения</span>
+        <span class="tabs__item">Календари</span>
+        <span class="tabs__item">Сценарии</span>
+        <span class="tabs__item">Baseline</span>
+        <span class="tabs__item">Аудит</span>
+        <span class="tabs__item">Настройки</span>
+        <span class="tabs__status">
+          <span class="tabs__status-dot"></span>
+          Сохранено
+        </span>
+      </nav>
+
+      <section class="content">
+        <div class="card">
+          <div class="card__head">
+            <div class="card__title">Shell-каркас (reference)</div>
+            <span class="muted">это базовый layout, на котором собираются все экраны</span>
+          </div>
+          <div class="card__body">
+            <p class="muted">
+              Каждый экран Planning Workspace использует одинаковую структуру:
+              sidebar, project header, tabs, content и preview/apply bar внизу.
+              Конкретное содержимое раскрыто в отдельных файлах: <code>01-overview.html</code>,
+              <code>02-schedule-wbs-gantt.html</code> и так далее.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="bottom-bar bottom-bar--hidden">
+        <div class="bottom-bar__summary">
+          <span>Идёт расчёт превью…</span>
+        </div>
+        <div class="bottom-bar__actions">
+          <button class="btn btn--ghost">Отмена</button>
+        </div>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KISS PM — График · превью изменений</title>
+  <link rel="stylesheet" href="schedule.css" />
+  <style>
+    .schedule {
+      height: calc(100vh - var(--topbar-height) - var(--tabs-height) - var(--bottom-bar-height) - 100px);
+    }
+    .schedule__body {
+      display: flex; flex: 1; min-height: 0; overflow: auto;
+    }
+    .schedule__wbs-pane {
+      flex: 0 0 var(--wbs-width); background: var(--panel);
+      border-right: 1px solid var(--border);
+      position: sticky; left: 0; z-index: var(--z-sticky-col);
+    }
+    .schedule__gantt-pane {
+      flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; position: relative;
+    }
+    .head-row {
+      height: var(--row-h);
+      display: grid;
+      grid-template-columns: 40px 1fr 56px 96px 130px 130px 28px;
+      align-items: center; gap: 6px; padding: 0 10px;
+      background: var(--panel-strong); color: var(--muted-strong);
+      font-size: 12px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: var(--z-sticky-header);
+    }
+    .gantt-head-row {
+      height: var(--row-h);
+      display: grid; grid-auto-flow: column; grid-auto-columns: var(--cell-week);
+      width: 1960px;
+      background: var(--panel-strong); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: var(--z-sticky-header);
+    }
+    .gantt-head-cell {
+      display: flex; align-items: center; padding: 0 10px;
+      border-right: 1px solid var(--border);
+      font-size: 11px; color: var(--muted-strong);
+    }
+    .gantt-head-cell .month { font-weight: 600; color: var(--text); margin-right: 6px; }
+    .gantt-rows { position: relative; width: 1960px; height: calc(var(--row-h) * 8); }
+    .gantt-row-bg {
+      position: absolute; left: 0; right: 0; height: var(--row-h);
+      border-bottom: 1px solid var(--border);
+      background-image: linear-gradient(to right, transparent 0 139px, var(--panel-subtle) 139px 140px);
+      background-size: var(--cell-week) var(--row-h);
+    }
+    .gantt-row-bg.alt { background-color: rgba(2,6,23,0.012); }
+    .gantt-row-bg.preview { background-color: #fff7d6; }
+    .wbs-cell.preview { background: #fff7d6; }
+    .gantt-bar {
+      position: absolute;
+      top: calc((var(--row-h) - var(--gantt-bar-h)) / 2);
+      height: var(--gantt-bar-h);
+      border-radius: var(--radius-xs);
+      background: #cbd5e1; border: 1px solid #94a3b8;
+      box-shadow: var(--shadow-1);
+    }
+    .gantt-bar .progress {
+      height: 100%;
+      background: repeating-linear-gradient(45deg, #475467 0 4px, #64748b 4px 8px);
+      border-radius: var(--radius-xs) 0 0 var(--radius-xs);
+      opacity: 0.45;
+    }
+    .gantt-bar.critical { border-left: 3px solid var(--critical-stripe); }
+    .gantt-bar.summary-bar {
+      height: 8px; top: calc((var(--row-h) - 8px) / 2);
+      background: var(--text); border-radius: 1px; border: 0;
+    }
+    .gantt-bar.preview-bar {
+      outline: 2px dashed var(--warning);
+      outline-offset: 2px;
+    }
+    .gantt-bar.preview-ghost {
+      border: 1px dashed var(--warning);
+      background: repeating-linear-gradient(135deg, #fff7d6 0 6px, #fdf2e0 6px 12px);
+    }
+    .gantt-milestone {
+      position: absolute; width: 14px; height: 14px;
+      transform: translate(-7px,0) rotate(45deg);
+      top: calc((var(--row-h) - 14px) / 2);
+      background: var(--accent);
+    }
+    .gantt-baseline {
+      position: absolute; height: 4px;
+      background: var(--muted); opacity: 0.7; border-radius: 2px;
+    }
+    .gantt-today {
+      position: absolute; top: 0; bottom: 0; width: 0;
+      border-left: 1px dashed var(--info); z-index: 5;
+    }
+    .gantt-today-label {
+      position: absolute; top: 2px; background: var(--info); color: #fff;
+      font-size: 10px; padding: 1px 6px; border-radius: 2px;
+      transform: translateX(-50%); z-index: 5;
+    }
+
+    .preview-bar-banner {
+      background: #fdf2e0;
+      border-left: 3px solid var(--warning);
+      color: var(--warning);
+      padding: 8px 12px;
+      font-size: 12.5px;
+      margin: 8px 0 0;
+      border-radius: var(--radius-sm);
+    }
+  </style>
+</head>
+<body>
+  <div class="mockup-shell">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><span class="sidebar__brand-mark"></span> KISS PM</div>
+      <div class="sidebar__group">Работа</div>
+      <div class="sidebar__item"><span>Мои задачи</span><span class="sidebar__item-badge">12</span></div>
+      <div class="sidebar__item sidebar__item--active"><span>Проекты</span><span class="sidebar__item-badge">8</span></div>
+      <div class="sidebar__item"><span>Сделки</span><span class="sidebar__item-badge">37</span></div>
+      <div class="sidebar__item"><span>Ресурсы</span><span class="sidebar__item-badge">42</span></div>
+      <div class="sidebar__footer">v0.1 dev</div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar__project">
+          <div class="topbar__icon">ПР</div>
+          <div>
+            <div class="topbar__title">Производственный портал · Релиз 2</div>
+            <div class="topbar__meta">
+              <span class="chip chip--info">В работе</span>
+              <span>план v17 → v18 (превью)</span>
+              <span>Дедлайн 12.07.2026</span>
+            </div>
+          </div>
+        </div>
+        <label class="topbar__search">
+          <span class="muted">⌕</span>
+          <input type="text" placeholder="Найти задачу" />
+        </label>
+        <div class="topbar__actions">
+          <button class="icon-btn">●</button>
+          <button class="icon-btn">И</button>
+        </div>
+      </header>
+      <nav class="tabs">
+        <span class="tabs__item">Обзор</span>
+        <span class="tabs__item tabs__item--active">График</span>
+        <span class="tabs__item">Ресурсы</span>
+        <span class="tabs__item">Назначения</span>
+        <span class="tabs__item">Календари</span>
+        <span class="tabs__item">Сценарии</span>
+        <span class="tabs__item">Baseline</span>
+        <span class="tabs__item">Аудит</span>
+        <span class="tabs__item">Настройки</span>
+        <span class="tabs__status">
+          <span class="tabs__status-dot tabs__status-dot--pending"></span> Есть превью изменений
+        </span>
+      </nav>
+
+      <section class="content" style="padding:12px 16px 0;">
+        <div class="preview-bar-banner">
+          Превью команды <span class="mono">task.update_schedule</span>: PM сдвинул финиш «Inspector задачи» с 22.05 на 29.05. Каскадно изменяются 2 другие задачи. Применить или отменить?
+        </div>
+        <div class="schedule">
+          <div class="schedule__toolbar">
+            <button class="btn btn--sm" disabled title="Доступно после применения превью">+ Задача</button>
+            <button class="btn btn--sm" disabled title="Доступно после применения превью">+ Подзадача</button>
+            <span class="schedule__toolbar-divider"></span>
+            <button class="btn btn--sm" disabled title="Доступно после применения превью">← Outdent</button>
+            <button class="btn btn--sm" disabled title="Доступно после применения превью">→ Indent</button>
+            <span class="schedule__toolbar-divider"></span>
+            <button class="btn btn--sm" disabled title="Доступно после применения превью">Зависимость</button>
+            <button class="btn btn--sm" disabled title="Доступно после применения превью">Baseline</button>
+            <span class="schedule__toolbar-divider"></span>
+            <div class="schedule__toolbar-zoom">
+              <button>День</button>
+              <button class="active">Неделя</button>
+              <button>Месяц</button>
+            </div>
+            <span class="space"></span>
+            <span class="chip chip--warning">3 задачи затронуто</span>
+          </div>
+
+          <div class="schedule__body">
+            <div class="schedule__wbs-pane">
+              <div class="head-row">
+                <div>#</div><div>Название</div><div>Длит</div><div>Финиш</div>
+                <div>Прогресс</div><div>Назначения</div><div>!</div>
+              </div>
+              <div>
+                <div class="wbs-cell summary depth-1"><span class="num">3</span><span class="title"><span class="caret">▾</span>Реализация</span><span class="duration">55 дн</span><span class="finish">29.05.2026</span><span class="progress"><span class="progress-bar"><span style="width:54%"></span></span>54%</span><span class="assignees"><span class="avatar">+5</span></span><span class="issue empty"></span></div>
+                <div class="wbs-cell summary depth-2"><span class="num">3.1</span><span class="title"><span class="caret">▾</span>Backend</span><span class="duration">55 дн</span><span class="finish">22.05.2026</span><span class="progress"><span class="progress-bar"><span style="width:64%"></span></span>64%</span><span class="assignees"><span class="avatar">+3</span></span><span class="issue empty"></span></div>
+                <div class="wbs-cell depth-3"><span class="num">3.1.1</span><span class="title">Планировочный движок</span><span class="duration">39 дн</span><span class="finish">08.05.2026</span><span class="progress"><span class="progress-bar"><span style="width:92%"></span></span>92%</span><span class="assignees"><span class="avatar">СП</span></span><span class="issue empty"></span></div>
+                <div class="wbs-cell depth-3"><span class="num">3.1.2</span><span class="title">Аудит и права</span><span class="duration">39 дн</span><span class="finish">22.05.2026</span><span class="progress"><span class="progress-bar"><span style="width:48%"></span></span>48%</span><span class="assignees"><span class="avatar">ДК</span></span><span class="issue empty"></span></div>
+                <div class="wbs-cell summary depth-2 preview"><span class="num">3.2</span><span class="title"><span class="caret">▾</span>Frontend</span><span class="duration">53 → 60 дн</span><span class="finish">05.06 → 12.06</span><span class="progress"><span class="progress-bar"><span style="width:42%"></span></span>42%</span><span class="assignees"><span class="avatar">+2</span></span><span class="issue empty"></span></div>
+                <div class="wbs-cell depth-3"><span class="num">3.2.1</span><span class="title">WBS + Gantt</span><span class="duration">46 дн</span><span class="finish">29.05.2026</span><span class="progress"><span class="progress-bar"><span style="width:38%"></span></span>38%</span><span class="assignees"><span class="avatar">МК</span></span><span class="issue empty"></span></div>
+                <div class="wbs-cell depth-3 preview"><span class="num">3.2.2</span><span class="title">Inspector задачи</span><span class="duration">25 → 30 дн</span><span class="finish">22.05 → 29.05</span><span class="progress"><span class="progress-bar"><span style="width:14%"></span></span>14%</span><span class="assignees"><span class="avatar">МК</span></span><span class="issue empty"></span></div>
+                <div class="wbs-cell depth-3 preview"><span class="num">3.2.3</span><span class="title">Сценарии</span><span class="duration">25 дн</span><span class="finish">05.06 → 12.06</span><span class="progress"><span class="progress-bar"><span style="width:0%"></span></span>0%</span><span class="assignees"><span class="avatar">ЕЛ</span></span><span class="issue empty"></span></div>
+              </div>
+            </div>
+
+            <div class="schedule__gantt-pane">
+              <div class="gantt-head-row">
+                <div class="gantt-head-cell"><span class="month">Мар</span>30</div>
+                <div class="gantt-head-cell"><span class="month">Апр</span>06</div>
+                <div class="gantt-head-cell">13</div>
+                <div class="gantt-head-cell">20</div>
+                <div class="gantt-head-cell">27</div>
+                <div class="gantt-head-cell"><span class="month">Май</span>04</div>
+                <div class="gantt-head-cell">11</div>
+                <div class="gantt-head-cell">18</div>
+                <div class="gantt-head-cell">25</div>
+                <div class="gantt-head-cell"><span class="month">Июн</span>01</div>
+                <div class="gantt-head-cell">08</div>
+                <div class="gantt-head-cell">15</div>
+                <div class="gantt-head-cell">22</div>
+                <div class="gantt-head-cell">29</div>
+              </div>
+              <div class="gantt-rows">
+                <div class="gantt-row-bg" style="top:0px"></div>
+                <div class="gantt-row-bg alt" style="top:36px"></div>
+                <div class="gantt-row-bg" style="top:72px"></div>
+                <div class="gantt-row-bg alt" style="top:108px"></div>
+                <div class="gantt-row-bg preview" style="top:144px"></div>
+                <div class="gantt-row-bg" style="top:180px"></div>
+                <div class="gantt-row-bg alt preview" style="top:216px"></div>
+                <div class="gantt-row-bg preview" style="top:252px"></div>
+
+                <div class="gantt-today" style="left:1120px"></div>
+                <div class="gantt-today-label" style="left:1120px">Сегодня</div>
+
+                <!-- 3 summary row 0 -->
+                <div class="gantt-bar summary-bar" style="top:14px;left:0px;width:1400px"></div>
+                <!-- 3.1 summary row 1 -->
+                <div class="gantt-bar summary-bar" style="top:50px;left:0px;width:1240px"></div>
+                <!-- 3.1.1 row 2 critical -->
+                <div class="gantt-bar critical" style="top:81px;left:0px;width:780px">
+                  <span class="progress" style="width:92%"></span>
+                </div>
+                <!-- 3.1.2 row 3 -->
+                <div class="gantt-bar" style="top:117px;left:280px;width:780px">
+                  <span class="progress" style="width:48%"></span>
+                </div>
+                <!-- 3.2 summary row 4 — preview-extended -->
+                <div class="gantt-bar summary-bar preview-bar" style="top:158px;left:280px;width:1200px"></div>
+                <!-- 3.2.1 row 5 critical -->
+                <div class="gantt-bar critical" style="top:189px;left:280px;width:920px">
+                  <span class="progress" style="width:38%"></span>
+                </div>
+                <!-- 3.2.2 row 6 — touched (current solid + ghost shift) -->
+                <div class="gantt-bar" style="top:225px;left:560px;width:500px">
+                  <span class="progress" style="width:14%"></span>
+                </div>
+                <div class="gantt-bar preview-ghost" style="top:225px;left:1060px;width:140px"></div>
+                <!-- 3.2.3 row 7 — touched (current solid + ghost shift) -->
+                <div class="gantt-bar" style="top:261px;left:840px;width:500px">
+                  <span class="progress" style="width:0%"></span>
+                </div>
+                <div class="gantt-bar preview-ghost" style="top:261px;left:1340px;width:140px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="bottom-bar">
+        <div class="bottom-bar__summary">
+          <span class="chip chip--warning mono">Превью v18</span>
+          <span class="bottom-bar__metric">Изменится задач <strong>3</strong></span>
+          <span class="bottom-bar__metric">Финиш проекта <strong>+7 дн</strong></span>
+          <span class="bottom-bar__metric">Предупреждений <strong>1</strong></span>
+          <span class="muted">Зависимости FS пересчитаны</span>
+        </div>
+        <div class="bottom-bar__actions">
+          <button class="btn">Сравнить</button>
+          <button class="btn btn--ghost">Отмена</button>
+          <button class="btn btn--primary">Применить</button>
+        </div>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

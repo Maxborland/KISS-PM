@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KISS PM — Planning Workspace UI · approved mockups</title>
+  <link rel="stylesheet" href="_partials.css" />
+  <style>
+    .wrap { max-width: 980px; margin: 0 auto; padding: 32px 24px; }
+    .wrap h1 { margin: 0 0 6px; }
+    .wrap p { color: var(--muted-strong); max-width: 720px; }
+    .screen-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .screen-card {
+      display: block;
+      padding: 14px 16px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      color: var(--text);
+    }
+    .screen-card:hover { background: var(--panel-subtle); }
+    .screen-card .id { color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
+    .screen-card .name { font-weight: 500; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>KISS PM — Planning Workspace UI · approved mockups</h1>
+    <p>
+      Утверждённый визуальный baseline для реализации Phase B/C. Документ
+      <a href="../../31_PLANNING_WORKSPACE_UI_DESIGN.md">31_PLANNING_WORKSPACE_UI_DESIGN.md</a> описывает
+      все user stories, contracts с backend и acceptance criteria.
+    </p>
+    <div class="screen-grid">
+      <a class="screen-card" href="01-overview.html"><div class="id">01-overview</div><div class="name">Обзор проекта</div></a>
+      <a class="screen-card" href="02-schedule-wbs-gantt.html"><div class="id">02-schedule-wbs-gantt</div><div class="name">График: WBS + Gantt</div></a>
+      <a class="screen-card" href="02b-schedule-task-selected.html"><div class="id">02b-schedule-task-selected</div><div class="name">График: задача выделена + Inspector</div></a>
+      <a class="screen-card" href="02c-schedule-preview-pending.html"><div class="id">02c-schedule-preview-pending</div><div class="name">График: превью изменений</div></a>
+      <a class="screen-card" href="03-task-inspector-detail.html"><div class="id">03-task-inspector-detail</div><div class="name">Task Inspector (полная страница)</div></a>
+      <a class="screen-card" href="04-resources.html"><div class="id">04-resources</div><div class="name">Ресурсы проекта</div></a>
+      <a class="screen-card" href="04b-resource-detail.html"><div class="id">04b-resource-detail</div><div class="name">Ресурс: детальная карточка</div></a>
+      <a class="screen-card" href="05-assignments.html"><div class="id">05-assignments</div><div class="name">Назначения / Resource usage</div></a>
+      <a class="screen-card" href="06-calendars.html"><div class="id">06-calendars</div><div class="name">Календари</div></a>
+      <a class="screen-card" href="07-scenarios.html"><div class="id">07-scenarios</div><div class="name">Сценарии</div></a>
+      <a class="screen-card" href="07b-scenario-compare.html"><div class="id">07b-scenario-compare</div><div class="name">Сценарий: сравнение</div></a>
+      <a class="screen-card" href="08-baseline.html"><div class="id">08-baseline</div><div class="name">Baseline</div></a>
+      <a class="screen-card" href="09-audit.html"><div class="id">09-audit</div><div class="name">Аудит</div></a>
+      <a class="screen-card" href="10-settings.html"><div class="id">10-settings</div><div class="name">Настройки проекта</div></a>
+      <a class="screen-card" href="state-empty.html"><div class="id">state-empty</div><div class="name">State: пустой план</div></a>
+      <a class="screen-card" href="state-loading.html"><div class="id">state-loading</div><div class="name">State: загрузка</div></a>
+      <a class="screen-card" href="state-error.html"><div class="id">state-error</div><div class="name">State: ошибка расчёта</div></a>
+      <a class="screen-card" href="state-forbidden.html"><div class="id">state-forbidden</div><div class="name">State: нет прав</div></a>
+      <a class="screen-card" href="state-narrow-fallback.html"><div class="id">state-narrow-fallback</div><div class="name">State: mobile / narrow fallback</div></a>
+    </div>
+  </div>
+</body>
+</html>
