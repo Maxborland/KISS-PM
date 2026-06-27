@@ -14,7 +14,7 @@ export default meta;
 type Story = StoryObj<typeof ScreenView>;
 
 export const SpaceDiscipline: Story = { name: "00 Дисциплина отступов", args: { id: "00-space-discipline" } };
-export const Dashboard: Story = { name: "01 Дашборд", args: { id: "01-dashboard" } };
+// 01 Дашборд — мок удалён; продакшн-дашборд живёт в RuntimeScreenView (app/dashboard).
 export const MyWork: Story = { name: "02 Моя работа", args: { id: "02-my-work" } };
 export const TaskCard: Story = { name: "03 Карточка задачи", args: { id: "03-task-card" } };
 export const CreateTaskModal: Story = { name: "04 Модалка создания задачи", args: { id: "04-create-task-modal" } };
@@ -40,3 +40,15 @@ export const StateEmpty: Story = { name: "Состояние · пусто", arg
 export const StateError: Story = { name: "Состояние · ошибка", args: { id: "state-error" } };
 export const StateForbidden: Story = { name: "Состояние · нет доступа", args: { id: "state-forbidden" } };
 export const StateLoading: Story = { name: "Состояние · загрузка", args: { id: "state-loading" } };
+export const CommsChannels: Story = { name: "20 Чаты", args: { id: "comms-channels" } };
+export const CommsThread: Story = { name: "21 Тред", args: { id: "comms-thread" } };
+export const CommsComposer: Story = { name: "22 Поле сообщения", args: { id: "comms-composer" } };
+export const CommsNotifications: Story = { name: "23 Уведомления", args: { id: "comms-notifications" } };
+export const CommsMeetings: Story = { name: "24 Встречи", args: { id: "comms-meetings" } };
+export const CommsMeetingDetail: Story = { name: "25 Карточка встречи", args: { id: "comms-meeting-detail" } };
+export const CallLobby: Story = { name: "26 Лобби звонка", args: { id: "call-lobby" } };
+export const CallActive: Story = { name: "27 Активный звонок", args: { id: "call-active" } };
+export const CallScreenShare: Story = { name: "28 Демонстрация экрана", args: { id: "call-screen-share" } };
+export const CallInChat: Story = { name: "29 Чат звонка", args: { id: "call-in-chat" } };
+export const CallDeviceSettings: Story = { name: "30 Настройки устройств", args: { id: "call-device-settings" } };
+export const CallReconnecting: Story = { name: "31 Переподключение", args: { id: "call-reconnecting" } };

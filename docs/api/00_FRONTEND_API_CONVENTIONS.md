@@ -35,6 +35,20 @@ Backend также проверяет trusted origin / fetch metadata. Если 
 
 Фронт должен добавлять этот header ко всем `POST`, `PUT`, `PATCH`, `DELETE`.
 
+Исключение: internal LiveKit webhook `POST /api/internal/livekit/webhook` (см.
+`docs/46`) — единственный документированный мутирующий эндпойнт вне правила
+`x-kiss-pm-action` same-origin. Это machine-to-machine вызов от LiveKit, и он
+защищен **обязательной проверкой подписи (fail-closed)**, а не same-origin guard.
+Этот эндпойнт находится вне `/api/workspace/*` и недоступен из browser-mutation-пути.
+
+## Ephemeral response-only secrets
+
+TURN credentials и LiveKit join tokens — это **response-only эфемерные секреты**
+(`docs/43`/`docs/46`): возвращаются только в ответе соответствующего эндпойнта,
+короткоживущие, и фронт **не должен** их кэшировать в TanStack Query, `localStorage`,
+`sessionStorage` или логировать. Их пересоздают новым запросом, а не переиспользуют
+из кеша.
+
 ## Error Shape
 
 Стабильная форма ошибки:

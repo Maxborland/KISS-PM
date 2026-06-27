@@ -65,12 +65,32 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   )
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+type CellAlign = "left" | "right" | "center"
+
+// numeric ⇒ right-aligned + tabular figures so digit places line up (Principle 1).
+// Pass `align` to override; default is left (cells) / left (heads).
+const alignClass = (align: CellAlign | undefined, numeric: boolean | undefined) => {
+  const resolved = align ?? (numeric ? "right" : undefined)
+  return cn(
+    resolved === "right" && "text-right",
+    resolved === "center" && "text-center",
+    resolved === "left" && "text-left",
+    numeric && "[font-variant-numeric:tabular-nums]"
+  )
+}
+
+function TableHead({
+  className,
+  align,
+  numeric,
+  ...props
+}: React.ComponentProps<"th"> & { align?: CellAlign; numeric?: boolean }) {
   return (
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-[var(--space-2)] text-left align-middle text-[var(--text-xs)] font-semibold uppercase tracking-[0.04em] whitespace-nowrap text-[var(--muted-strong)] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "h-11 px-[var(--space-3)] align-middle text-[var(--text-xs)] font-semibold uppercase tracking-[0.04em] whitespace-nowrap text-[var(--muted-strong)] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        alignClass(align, numeric) || "text-left",
         className
       )}
       {...props}
@@ -78,12 +98,20 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   )
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({
+  className,
+  align,
+  numeric,
+  truncate,
+  ...props
+}: React.ComponentProps<"td"> & { align?: CellAlign; numeric?: boolean; truncate?: boolean }) {
   return (
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "px-[var(--space-3)] py-[var(--space-3)] align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        truncate ? "max-w-[var(--col-max,16rem)] truncate" : "whitespace-nowrap",
+        alignClass(align, numeric),
         className
       )}
       {...props}

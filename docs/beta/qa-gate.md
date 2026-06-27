@@ -55,6 +55,16 @@ Required for screens/widgets marked beta-ready:
 - No dead enabled controls.
 - Reusable components are classified through `component-readiness.md`.
 
+### P5: Call/Media Gate
+
+Required before the communications self-hosted A/V epic (Phase G.4/G.5, `docs/46`/`docs/47`) is allowed near strict-production:
+
+- Join token and TURN credentials are never persisted to DB/audit/log and never cached in the client (response-only ephemeral secrets).
+- Internal LiveKit webhook rejects a forged-signature request (fail-closed) with no DB mutation; a test proves rejection.
+- Per-track recording attachments are readable only by users with parent-entity/room read; isolation test proves a non-reader cannot read a recording.
+- Provider-disabled and reconnecting states render without dead controls (recording/TURN/screen-share controls are hidden or disabled with a real reason, never fake-enabled).
+- Call route passes axe with no critical violations; mute/leave reachable by keyboard.
+
 ## Recommended Commands
 
 The exact command names should follow the repo scripts. The intended gate shape is:
@@ -107,6 +117,7 @@ CI should fail on:
 - Missing screenshots/artifacts for visual smoke where required.
 - Storybook contract drift for approved components.
 - Agent mutation without confirmation.
+- A call join token or TURN/egress credential serialized into client cache, log or audit (P5 Call/Media Gate).
 
 CI may allow as warning during early beta:
 

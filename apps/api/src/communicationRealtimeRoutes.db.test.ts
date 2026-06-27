@@ -9,6 +9,9 @@ import {
 
 import { createApp } from "./app";
 import type { ApiTenantDataSource } from "./apiTypes";
+import { createDefaultBackgroundJobRegistry } from "./backgroundJobs/jobHandlers";
+import type { LiveKitEgressProvider } from "./communications/recording/livekitEgressProvider";
+import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
 import {
   communicationJsonHeaders as jsonHeaders,
   communicationRealtimeDatabaseUrl,
@@ -588,4 +591,541 @@ describe("communications realtime API", () => {
         AND id = ${sessionId}
     `;
   }
+
+  it("reconcileEgressEnded marks the track ready and logs recording_track_completed", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+
+    const room = await dataSource.createCallRoom({
+      id: "call-room-rec",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Запись",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-rec",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-rec",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    await dataSource.createCallRecording({
+      id: "call-recording-rec",
+      tenantId,
+      roomId: room.id,
+      sessionId: session.id,
+      recordingGroupId: "call-rec-group-rec",
+      attachmentId: null,
+      egressId: "egress-rec-1",
+      participantId: "user-alpha-admin",
+      trackId: "track-1",
+      kind: "video",
+      status: "recording",
+      durationSeconds: null,
+      endedAt: null,
+      title: "Запись · user-alpha-admin",
+      createdByUserId: "user-alpha-admin"
+    });
+
+    const workspace = createCommunicationRecordingWorkspace({
+      dataSource,
+      egressProvider: null,
+      appendManagementAuditEvent: async () => "audit-id"
+    });
+
+    const result = await workspace.reconcileEgressEnded({
+      tenantId,
+      egressId: "egress-rec-1",
+      storageKey: `recordings/${tenantId}/${room.id}/${session.id}/call-rec-group-rec/user-alpha-admin/track-1.webm`,
+      sizeBytes: 2048,
+      durationSeconds: 42
+    });
+    expect(result.reconciled).toBe(true);
+
+    const recordings = await dataSource.listCallRecordingsByGroup({
+      tenantId,
+      recordingGroupId: "call-rec-group-rec"
+    });
+    expect(recordings).toHaveLength(1);
+    expect(recordings[0]).toMatchObject({ status: "ready", durationSeconds: 42 });
+    expect(recordings[0]?.attachmentId).toBeTruthy();
+
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    const completed = events.find((event) => event.eventType === "recording_track_completed");
+    expect(completed).toBeDefined();
+    expect(completed?.payload).toMatchObject({
+      recordingId: "call-recording-rec",
+      trackId: "track-1",
+      durationSeconds: 42
+    });
+
+    // Idempotent: a retried webhook delivery must not emit a second completion event.
+    const retry = await workspace.reconcileEgressEnded({
+      tenantId,
+      egressId: "egress-rec-1",
+      storageKey: `recordings/${tenantId}/${room.id}/${session.id}/call-rec-group-rec/user-alpha-admin/track-1.webm`,
+      sizeBytes: 2048,
+      durationSeconds: 42
+    });
+    expect(retry.reconciled).toBe(true);
+    const eventsAfter = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    expect(eventsAfter.filter((event) => event.eventType === "recording_track_completed")).toHaveLength(1);
+  });
+
+  it("callRecordingJanitor fails stale in-progress recordings and logs recording_failed", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+
+    const room = await dataSource.createCallRoom({
+      id: "call-room-stale",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Запись",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-stale",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-stale",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    await dataSource.createCallRecording({
+      id: "call-recording-stale",
+      tenantId,
+      roomId: room.id,
+      sessionId: session.id,
+      recordingGroupId: "call-rec-group-stale",
+      attachmentId: null,
+      egressId: "egress-stale-1",
+      participantId: "user-alpha-admin",
+      trackId: "track-9",
+      kind: "video",
+      status: "recording",
+      durationSeconds: null,
+      endedAt: null,
+      title: "Запись · stale",
+      createdByUserId: "user-alpha-admin"
+    });
+
+    const janitor = createDefaultBackgroundJobRegistry()["calls.recording_janitor"];
+    expect(janitor).toBeDefined();
+    const stoppedEgress: string[] = [];
+    const egress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [];
+      },
+      async startTrackEgress() {
+        return "x";
+      },
+      async stopEgress(id) {
+        stoppedEgress.push(id);
+      },
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    // context.now 10 min ahead makes the just-created row older than the 1-minute window.
+    const result = await janitor!(
+      { tenantId, payload: { staleAfterMinutes: 1 } } as unknown as Parameters<NonNullable<typeof janitor>>[0],
+      { dataSource, egressProvider: egress, now: new Date(Date.now() + 10 * 60_000) }
+    );
+    expect(result).toMatchObject({ metadata: { failed: 1, stoppedEgress: 1 } });
+    // Orphaned egress (lost webhook) is stopped, not just marked failed.
+    expect(stoppedEgress).toContain("egress-stale-1");
+
+    const recordings = await dataSource.listCallRecordingsByGroup({
+      tenantId,
+      recordingGroupId: "call-rec-group-stale"
+    });
+    expect(recordings[0]).toMatchObject({ status: "failed" });
+
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    const failedEvent = events.find((event) => event.eventType === "recording_failed");
+    expect(failedEvent).toBeDefined();
+    expect(failedEvent?.payload).toMatchObject({
+      recordingId: "call-recording-stale",
+      reason: "stale_egress"
+    });
+  });
+
+  it("startRecording starts egress per track and logs recording_started (injected egress provider)", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-start",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Запись",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-start",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-start",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+
+    const startedTracks: string[] = [];
+    const fakeEgress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [{ trackId: "track-a", kind: "video", participantIdentity: "user-alpha-admin" }];
+      },
+      async startTrackEgress(input) {
+        startedTracks.push(input.trackId);
+        return "egress-start-1";
+      },
+      async stopEgress() {},
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    // The recording happy-path was previously unreachable by tests because the egress
+    // provider was built from env inside the route; it is now injected via deps.
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, fakeEgress);
+    const adminCookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+
+    const response = await recApp.request(
+      `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/recordings/start`,
+      { method: "POST", headers: jsonHeaders(adminCookie) }
+    );
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as {
+      recordingGroupId: string;
+      recordings: { trackId: string; status: string }[];
+    };
+    expect(body.recordings).toHaveLength(1);
+    expect(body.recordings[0]).toMatchObject({ trackId: "track-a", status: "recording" });
+    expect(startedTracks).toEqual(["track-a"]);
+
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    expect(events.some((event) => event.eventType === "recording_started")).toBe(true);
+  });
+
+  it("rejects recording start for non-LiveKit rooms", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-manual",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Звонок",
+      mediaKind: "video",
+      provider: "manual",
+      providerRoomId: "provider-room-manual",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-manual",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    const egress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [{ trackId: "t", kind: "video", participantIdentity: "user-alpha-admin" }];
+      },
+      async startTrackEgress() {
+        return "egress-x";
+      },
+      async stopEgress() {},
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, egress);
+    const cookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+    const res = await recApp.request(
+      `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/recordings/start`,
+      { method: "POST", headers: jsonHeaders(cookie) }
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe("call_recording_provider_unsupported");
+  });
+
+  it("rejects recording start when no tracks are published", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-empty",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Звонок",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-empty",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-empty",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    const egress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [];
+      },
+      async startTrackEgress() {
+        return "egress-x";
+      },
+      async stopEgress() {},
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, egress);
+    const cookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+    const res = await recApp.request(
+      `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/recordings/start`,
+      { method: "POST", headers: jsonHeaders(cookie) }
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe("call_recording_no_tracks");
+  });
+
+  it("does not stop a recording group that belongs to a different room", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const roomA = await dataSource.createCallRoom({
+      id: "call-room-a",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "A",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-a",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const roomB = await dataSource.createCallRoom({
+      id: "call-room-b",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "B",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-b",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const sessionB = await dataSource.createCallSession({
+      id: "call-session-b",
+      tenantId,
+      roomId: roomB.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    await dataSource.createCallRecording({
+      id: "call-recording-b",
+      tenantId,
+      roomId: roomB.id,
+      sessionId: sessionB.id,
+      recordingGroupId: "call-rec-group-b",
+      attachmentId: null,
+      egressId: "egress-b-1",
+      participantId: "user-alpha-admin",
+      trackId: "track-b",
+      kind: "video",
+      status: "recording",
+      durationSeconds: null,
+      endedAt: null,
+      title: "B",
+      createdByUserId: "user-alpha-admin"
+    });
+    const stopped: string[] = [];
+    const egress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [];
+      },
+      async startTrackEgress() {
+        return "egress-x";
+      },
+      async stopEgress(id) {
+        stopped.push(id);
+      },
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, egress);
+    const cookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+    // Stop room B's group through room A, which the same admin also manages.
+    const res = await recApp.request(
+      `/api/workspace/call-rooms/${roomA.id}/recordings/groups/call-rec-group-b/stop`,
+      { method: "POST", headers: jsonHeaders(cookie) }
+    );
+    expect(res.status).toBe(404);
+    expect(stopped).toEqual([]);
+  });
+
+  it("stops active recording egress when the session ends", async () => {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-end",
+      tenantId: "tenant-alpha",
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Звонок",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-end",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-end",
+      tenantId: "tenant-alpha",
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    const stopped: string[] = [];
+    const egress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [{ trackId: "track-end", kind: "video", participantIdentity: "user-alpha-admin" }];
+      },
+      async startTrackEgress() {
+        return "egress-end-1";
+      },
+      async stopEgress(id) {
+        stopped.push(id);
+      },
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, egress);
+    const cookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+    const startRes = await recApp.request(
+      `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/recordings/start`,
+      { method: "POST", headers: jsonHeaders(cookie) }
+    );
+    expect(startRes.status).toBe(201);
+    const endRes = await recApp.request(
+      `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/end`,
+      { method: "POST", headers: jsonHeaders(cookie) }
+    );
+    expect(endRes.status).toBe(200);
+    expect(stopped).toContain("egress-end-1");
+  });
+
+  it("exposes the active session in the call room detail so a second participant can join", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+
+    const detail = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}`, {
+      headers: jsonHeaders(adminCookie)
+    });
+    expect(detail.status).toBe(200);
+    const body = (await detail.json()) as { activeSession: { id: string; status: string } | null };
+    expect(body.activeSession?.id).toBe(started.session.id);
+    expect(body.activeSession?.status).toBe("active");
+  });
+
+  it("failRecordingByEgress fails a recording from a failed egress callback and logs recording_failed", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-fail",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Звонок",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-fail",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-fail",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    await dataSource.createCallRecording({
+      id: "call-recording-fail",
+      tenantId,
+      roomId: room.id,
+      sessionId: session.id,
+      recordingGroupId: "call-rec-group-fail",
+      attachmentId: null,
+      egressId: "egress-fail-1",
+      participantId: "user-alpha-admin",
+      trackId: "track-f",
+      kind: "video",
+      status: "recording",
+      durationSeconds: null,
+      endedAt: null,
+      title: "Запись · fail",
+      createdByUserId: "user-alpha-admin"
+    });
+
+    const workspace = createCommunicationRecordingWorkspace({
+      dataSource,
+      egressProvider: null,
+      appendManagementAuditEvent: async () => "audit-id"
+    });
+    const result = await workspace.failRecordingByEgress({ tenantId, egressId: "egress-fail-1" });
+    expect(result.failed).toBe(true);
+
+    const recordings = await dataSource.listCallRecordingsByGroup({
+      tenantId,
+      recordingGroupId: "call-rec-group-fail"
+    });
+    expect(recordings[0]).toMatchObject({ status: "failed" });
+
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    const failedEvent = events.find((event) => event.eventType === "recording_failed");
+    expect(failedEvent).toBeDefined();
+    expect(failedEvent?.payload).toMatchObject({
+      recordingId: "call-recording-fail",
+      reason: "egress_failed"
+    });
+  });
 });

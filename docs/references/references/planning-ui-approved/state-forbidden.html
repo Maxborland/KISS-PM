@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KISS PM — Нет прав</title>
+  <link rel="stylesheet" href="_partials.css" />
+</head>
+<body>
+  <div class="mockup-shell">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><span class="sidebar__brand-mark"></span> KISS PM</div>
+      <div class="sidebar__group">Работа</div>
+      <div class="sidebar__item sidebar__item--active"><span>Проекты</span></div>
+      <div class="sidebar__footer">v0.1 dev</div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar__project">
+          <div class="topbar__icon">ПР</div>
+          <div>
+            <div class="topbar__title">Производственный портал · Релиз 2</div>
+            <div class="topbar__meta"><span class="chip chip--info">В работе</span></div>
+          </div>
+        </div>
+        <label class="topbar__search"><span class="muted">⌕</span><input placeholder="Найти"></label>
+        <div class="topbar__actions"><button class="icon-btn">●</button><button class="icon-btn">И</button></div>
+      </header>
+      <nav class="tabs">
+        <span class="tabs__item">Обзор</span>
+        <span class="tabs__item">График</span>
+        <span class="tabs__item">Ресурсы</span>
+        <span class="tabs__item">Назначения</span>
+        <span class="tabs__item">Календари</span>
+        <span class="tabs__item">Сценарии</span>
+        <span class="tabs__item">Baseline</span>
+        <span class="tabs__item tabs__item--active">Аудит</span>
+        <span class="tabs__item">Настройки</span>
+      </nav>
+      <section class="content">
+        <div class="state-page">
+          <div class="glyph" style="background:var(--warning-soft); color:var(--warning);">🔒</div>
+          <h2>Нет прав на просмотр аудита</h2>
+          <p>Для доступа требуется permission <span class="chip chip--outline">canReadAuditEvents</span>. Обратитесь к администратору workspace.</p>
+          <div class="actions">
+            <button class="btn">Вернуться на Обзор</button>
+            <button class="btn">Запросить доступ</button>
+          </div>
+        </div>
+      </section>
+      <footer class="bottom-bar bottom-bar--hidden"></footer>
+    </main>
+  </div>
+</body>
+</html>

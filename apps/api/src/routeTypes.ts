@@ -8,6 +8,7 @@ import type {
 } from "./apiTypes";
 import type { ApiCapabilities } from "./apiDataPorts";
 import type { AuthRateLimiter } from "./authRateLimit";
+import type { LiveKitEgressProvider } from "./communications/recording/livekitEgressProvider";
 import type { StorageProvider } from "./storageProvider";
 import type { VideoProvider } from "./videoProvider";
 
@@ -18,6 +19,7 @@ export type ApiRouteDeps = {
   secureCookies: boolean;
   storageProvider: StorageProvider;
   videoProvider: VideoProvider;
+  egressProvider: LiveKitEgressProvider | null;
   trustForwardedAuthHeaders: boolean;
   getActor(userId: string | null): Promise<TenantUser | undefined>;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { BackgroundJobKind } from "@kiss-pm/domain";
 
 import { parseMonthIso } from "../capacity/capacityService";
@@ -77,13 +79,70 @@ const capacityCacheWarmup: BackgroundJobHandler = async (job, context) => {
   };
 };
 
+// Reconciles per-track call recordings stuck in 'recording' (a lost egress_ended
+// webhook / orphaned egress) by failing them after a stale window.
+const callRecordingJanitor: BackgroundJobHandler = async (job, context) => {
+  const { dataSource } = context;
+  if (!dataSource.failStaleInProgressRecordings || !dataSource.createCallEvent) {
+    throw new Error("call_recording_janitor_not_configured");
+  }
+  const staleAfterMinutes = readPositiveInteger(job.payload.staleAfterMinutes, 360);
+  const olderThan = new Date(context.now.getTime() - staleAfterMinutes * 60_000);
+  const failed = await dataSource.failStaleInProgressRecordings({
+    tenantId: job.tenantId,
+    olderThan
+  });
+  // Close the timeline of each reaped track AND stop its egress if it is still running
+  // (the row was failed because the egress_ended webhook was lost, so the egress can keep
+  // recording/billing). ponytail: best-effort — the rows are already 'failed', so a crash
+  // mid-loop drops advisory events/stops for the rest (the next run won't re-fail them).
+  let stoppedEgress = 0;
+  for (const recording of failed) {
+    if (recording.egressId && context.egressProvider) {
+      try {
+        await context.egressProvider.stopEgress(recording.egressId);
+        stoppedEgress += 1;
+      } catch {
+        // best-effort; the egress may already be gone
+      }
+    }
+    await dataSource.createCallEvent({
+      id: `call-event-${randomUUID()}`,
+      tenantId: recording.tenantId,
+      roomId: recording.roomId,
+      sessionId: recording.sessionId,
+      actorUserId: recording.createdByUserId,
+      eventType: "recording_failed",
+      payload: {
+        recordingGroupId: recording.recordingGroupId,
+        recordingId: recording.id,
+        trackId: recording.trackId,
+        reason: "stale_egress"
+      }
+    });
+  }
+  return {
+    message: "Stale call recordings reconciled",
+    metadata: { failed: failed.length, stoppedEgress, staleAfterMinutes }
+  };
+};
+
+// Deferred: mux the per-track recording files into a single MP4 (ffmpeg). v1 keeps
+// the per-track files; this is the registered boundary for the future compose step.
+const callRecordingCompose: BackgroundJobHandler = async () => ({
+  message: "Call recording compose boundary completed",
+  metadata: { composed: 0, note: "per-track files preserved; ffmpeg mux deferred" }
+});
+
 export function createDefaultBackgroundJobRegistry(): BackgroundJobRegistry {
   return {
     "storage.asset_cleanup": storageAssetCleanup,
     "notification.dispatch": notificationDispatch,
     "connector.sync": connectorSync,
     "search.projection_rebuild": searchProjectionRebuild,
-    "capacity.cache_warmup": capacityCacheWarmup
+    "capacity.cache_warmup": capacityCacheWarmup,
+    "calls.recording_janitor": callRecordingJanitor,
+    "calls.recording_compose": callRecordingCompose
   };
 }
 
@@ -92,7 +151,9 @@ export const defaultBackgroundJobKinds: BackgroundJobKind[] = [
   "notification.dispatch",
   "connector.sync",
   "search.projection_rebuild",
-  "capacity.cache_warmup"
+  "capacity.cache_warmup",
+  "calls.recording_janitor",
+  "calls.recording_compose"
 ];
 
 function readPositiveInteger(value: unknown, fallback: number): number {

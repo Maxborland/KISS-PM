@@ -3,7 +3,9 @@ export const backgroundJobKinds = [
   "notification.dispatch",
   "connector.sync",
   "search.projection_rebuild",
-  "capacity.cache_warmup"
+  "capacity.cache_warmup",
+  "calls.recording_janitor",
+  "calls.recording_compose"
 ] as const;
 
 export type BackgroundJobKind = (typeof backgroundJobKinds)[number];
