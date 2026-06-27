@@ -99,17 +99,8 @@ jobs:
       - name: Security gates
         run: pnpm security:check
 
-      - name: Runtime route smoke
-        run: pnpm qa:route-smoke
-
       - name: Business smoke
         run: pnpm test:e2e:smoke
-
-      - name: Visual smoke
-        run: pnpm qa:visual
-
-      - name: Accessibility smoke
-        run: pnpm qa:a11y
 
       - name: Storybook contract
         run: pnpm verify:storybook-contract

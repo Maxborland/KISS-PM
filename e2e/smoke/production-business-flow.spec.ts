@@ -40,7 +40,7 @@ test("project-management path persists governed task, blocker, planning and audi
   await page.goto("/my-work");
   await page.getByText("Список", { exact: true }).click();
   const taskRow = page.getByRole("row", { name: new RegExp(escapeRegExp(task.title)) });
-  await taskRow.getByRole("button", { name: `В ${next.name}` }).click();
+  await taskRow.getByRole("button", { name: `→ ${next.name}` }).click();
   await expect(page.getByText("Статус задачи сохранён")).toBeVisible();
   await page.reload();
 
