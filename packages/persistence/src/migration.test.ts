@@ -229,11 +229,18 @@ const projectResourcePoolMembersMigration = readFileSync(
   "utf8"
 );
 const baselineAssignmentRoleUnitsMigration = readFileSync(
-  new URL(
-    "../migrations/0044_baseline_assignment_role_units.sql",
-    import.meta.url
-  ),
-  "utf8"
+new URL(
+"../migrations/0044_baseline_assignment_role_units.sql",
+import.meta.url
+),
+"utf8"
+);
+const phase9PlanForecastRunsMigration = readFileSync(
+new URL(
+"../migrations/0045_phase_9_plan_forecast_runs.sql",
+import.meta.url
+),
+"utf8"
 );
 const callScreenShareEventsMigration = readFileSync(
   new URL("../migrations/0045_call_screen_share_events.sql", import.meta.url),
@@ -970,6 +977,29 @@ describe("Project resource pool SQL migration", () => {
     );
     expect(projectResourcePoolMembersMigration).toContain(
       "CONSTRAINT \"project_resource_pool_members_role_chk\" CHECK(\"role\" in ('project_manager', 'resource', 'observer'))"
+    );
+  });
+});
+
+describe("Phase 9 plan forecast runs SQL migration", () => {
+  it("adds tenant-scoped read-only forecast run storage", () => {
+    expect(phase9PlanForecastRunsMigration).toContain(
+      'CREATE TABLE IF NOT EXISTS "planning_forecast_runs"'
+    );
+    expect(phase9PlanForecastRunsMigration).toContain(
+      'CONSTRAINT "planning_forecast_runs_pkey" PRIMARY KEY("tenant_id","project_id","id")'
+    );
+    expect(phase9PlanForecastRunsMigration).toContain(
+      'CONSTRAINT "planning_forecast_runs_project_fk"'
+    );
+    expect(phase9PlanForecastRunsMigration).toContain(
+      'CONSTRAINT "planning_forecast_runs_actor_fk"'
+    );
+    expect(phase9PlanForecastRunsMigration).toContain(
+      "CHECK(\"health\" in ('stable', 'watch', 'needs_decision', 'unstable', 'blocked'))"
+    );
+    expect(phase9PlanForecastRunsMigration).toContain(
+      'CREATE INDEX IF NOT EXISTS "planning_forecast_runs_tenant_project_expires_idx"'
     );
   });
 });

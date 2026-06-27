@@ -1677,6 +1677,55 @@ export const planningSolverRuns = pgTable(
   ]
 );
 
+export const planningForecastRuns = pgTable(
+  "planning_forecast_runs",
+  {
+    id: text("id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    clientPlanVersion: integer("client_plan_version").notNull(),
+    engineVersion: text("engine_version").notNull(),
+    health: text("health").notNull(),
+    managerSummary: text("manager_summary").notNull(),
+    riskDrivers: jsonb("risk_drivers").$type<Record<string, unknown>[]>().notNull(),
+    recommendations: jsonb("recommendations").$type<Record<string, unknown>[]>().notNull(),
+    engineMetadata: jsonb("engine_metadata").$type<Record<string, unknown>>().notNull(),
+    engineDebug: jsonb("engine_debug").$type<Record<string, unknown> | null>(),
+    actorUserId: text("actor_user_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "planning_forecast_runs_pkey",
+      columns: [table.tenantId, table.projectId, table.id]
+    }),
+    foreignKey({
+      name: "planning_forecast_runs_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "planning_forecast_runs_actor_fk",
+      columns: [table.tenantId, table.actorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("restrict"),
+    index("planning_forecast_runs_tenant_project_expires_idx").on(
+      table.tenantId,
+      table.projectId,
+      table.expiresAt
+    ),
+    check(
+      "planning_forecast_runs_health_chk",
+      sql`${table.health} in ('stable', 'watch', 'needs_decision', 'unstable', 'blocked')`
+    ),
+    check(
+      "planning_forecast_runs_client_plan_version_chk",
+      sql`${table.clientPlanVersion} > 0`
+    )
+  ]
+);
+
 export const planningCommandIdempotencyKeys = pgTable(
   "planning_command_idempotency_keys",
   {

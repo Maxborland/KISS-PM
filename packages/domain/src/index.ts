@@ -54,6 +54,7 @@ export * from "./planning/occupancy";
 export * from "./planning/employeeCapacity";
 export * from "./planning/scenarioPlanning";
 export * from "./planning/autoSolver";
+export * from "./planning/planForecast";
 export * from "./control";
 export * from "./controlSurfaces";
 export * from "./retrospectives";

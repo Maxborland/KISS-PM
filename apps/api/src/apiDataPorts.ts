@@ -65,10 +65,12 @@ export type PlanningDataPort = Pick<
   ApiTenantDataSource,
   | "applyPlanningCommand"
   | "createPlanningCommandIdempotency"
+  | "createPlanningForecastRun"
   | "createPlanningScenarioRun"
   | "createPlanningSolverRun"
   | "ensurePlanVersion"
   | "findPlanningCommandIdempotency"
+  | "findPlanningForecastRun"
   | "findPlanningScenarioRun"
   | "findPlanningSolverRun"
   | "getPlanSnapshot"

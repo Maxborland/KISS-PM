@@ -90,4 +90,13 @@ A component fails the gate if:
 - A route imports a generic table even though the workflow needs status grouping, risk priority, or timeline context.
 - Visual tests capture Storybook chrome instead of the component/product root.
 - The component looks acceptable in isolation but creates a sparse or broken operational screen composition.
+### Component: PlanForecastPanel
+
+- Status: missing / not beta-ready
+- Used by: future Planning Workspace read-only forecast panel
+- Runtime props: must be based on `PlanningForecastRunResponse`
+- Required states: stable, watch, needs_decision, unstable, blocked, loading, error, permission denied, expired run
+- Interaction contract: no auto-apply; action links only open existing governed planning flows when permission allows
+- QA proof required: desktop and 390px runtime screenshots, console/page-error capture, and interaction evidence for any visible action link
+- Notes: backend/API contract exists; runtime UI is not approved in this increment
 

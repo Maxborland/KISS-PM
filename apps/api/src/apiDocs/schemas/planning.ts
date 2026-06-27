@@ -1209,5 +1209,93 @@ export const planningSchemas = openApiSchemaFragment({
       proposals: { type: "array", items: schemaRef("PlanningAutoSolverProposal") }
     },
     additionalProperties: false
+  },
+
+  PlanningForecastRunCreateRequest: {
+    type: "object",
+    required: ["clientPlanVersion"],
+    properties: {
+      clientPlanVersion: { type: "integer", minimum: 1 }
+    },
+    additionalProperties: false
+  },
+
+  PlanningForecastHealth: {
+    type: "string",
+    enum: ["stable", "watch", "needs_decision", "unstable", "blocked"]
+  },
+
+  PlanningForecastRiskDriver: {
+    type: "object",
+    required: ["code", "severity", "message", "taskIds", "resourceIds"],
+    properties: {
+      code: {
+        type: "string",
+        enum: [
+          "deadline_too_tight",
+          "dependency_chain_fragile",
+          "resource_overloaded",
+          "review_bottleneck",
+          "blocked_task",
+          "historical_delay_pattern",
+          "solver_has_no_safe_proposal"
+        ]
+      },
+      severity: { type: "string", enum: ["info", "warning", "critical"] },
+      message: { type: "string", minLength: 1 },
+      taskIds: { type: "array", items: stringIdSchema },
+      resourceIds: { type: "array", items: stringIdSchema },
+      dependencyIds: { type: "array", items: stringIdSchema },
+      date: planDateOrNullSchema,
+      overloadMinutes: { type: ["integer", "null"], minimum: 0 },
+      deadlineDeltaDays: { type: ["integer", "null"] },
+      validationIssueCodes: { type: "array", items: { type: "string" } }
+    },
+    additionalProperties: false
+  },
+
+  PlanningForecastRecommendation: {
+    type: "object",
+    required: ["code", "message", "actionRequired", "taskIds", "resourceIds"],
+    properties: {
+      code: {
+        type: "string",
+        enum: ["keep_plan", "add_buffer", "move_task", "add_resource", "reduce_scope", "resolve_blocker", "use_auto_solver"]
+      },
+      message: { type: "string", minLength: 1 },
+      actionRequired: { type: "boolean" },
+      taskIds: { type: "array", items: stringIdSchema },
+      resourceIds: { type: "array", items: stringIdSchema }
+    },
+    additionalProperties: false
+  },
+
+  PlanningForecastRunResponse: {
+    type: "object",
+    required: [
+      "runId",
+      "projectId",
+      "clientPlanVersion",
+      "engineVersion",
+      "health",
+      "managerSummary",
+      "riskDrivers",
+      "recommendations",
+      "expiresAt",
+      "createdAt"
+    ],
+    properties: {
+      runId: stringIdSchema,
+      projectId: stringIdSchema,
+      clientPlanVersion: { type: "integer", minimum: 1 },
+      engineVersion: { type: "string", minLength: 1 },
+      health: schemaRef("PlanningForecastHealth"),
+      managerSummary: { type: "string", minLength: 1 },
+      riskDrivers: { type: "array", items: schemaRef("PlanningForecastRiskDriver") },
+      recommendations: { type: "array", items: schemaRef("PlanningForecastRecommendation") },
+      expiresAt: dateTimeSchema,
+      createdAt: dateTimeSchema
+    },
+    additionalProperties: false
   }
 });

@@ -88,3 +88,11 @@ type PlanRealtimeEvent =
 - `App.tsx` ≤ 200 строк (shell в `features/planning/`).
 - `WbsGrid.tsx` ≤ 400 строк (subfiles: selection, keyboard, columns, renderers).
 - Ban-list: видимая активная кнопка без handler/permission check; голый `<select>` в planning UI.
+## Plan Forecast API decision
+
+Plan Forecast routes are available as read-only Planning Workspace API contracts:
+
+- `POST /api/workspace/projects/{projectId}/planning/forecast-runs`
+- `GET /api/workspace/projects/{projectId}/planning/forecast-runs/{runId}`
+
+The API response uses `health`, `managerSummary`, `riskDrivers`, `recommendations`, `expiresAt`, and `createdAt`. It must not expose `engineDebug` in the default manager response. Runtime UI remains blocked until a real panel design, permission mapping, action-link routing, loading/error states, and evidence captures are accepted.

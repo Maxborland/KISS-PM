@@ -83,7 +83,7 @@ describe("planning repository", () => {
   });
 
   beforeEach(async () => {
-    await client`TRUNCATE planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, task_assignment_allocations, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE planning_command_idempotency_keys, planning_forecast_runs, planning_solver_runs, planning_scenario_runs, task_assignment_allocations, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await seedTenantDataset(
       createDatabase(client),
       planningSeed,
@@ -92,7 +92,7 @@ describe("planning repository", () => {
   });
 
   afterAll(async () => {
-    await client`TRUNCATE planning_command_idempotency_keys, planning_solver_runs, planning_scenario_runs, task_assignment_allocations, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE planning_command_idempotency_keys, planning_forecast_runs, planning_solver_runs, planning_scenario_runs, task_assignment_allocations, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, audit_events, task_activities, task_participants, tasks, task_statuses, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, contacts, clients, project_types, deal_stages, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
 
@@ -502,6 +502,126 @@ describe("planning repository", () => {
       appliedProposalId: "proposal-1"
     });
     expect(run?.appliedAt?.toISOString()).toBe("2026-05-21T00:10:00.000Z");
+    expect(crossTenantRun).toBeUndefined();
+    expect(crossProjectRun).toBeUndefined();
+  });
+
+  it("persists forecast runs with scoped readback and JSON payloads", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+    const otherProjectId = await createActiveProjectWithTasks(intakeRepository, workRepository, {
+      opportunityId: "opportunity-forecast-other",
+      projectId: "project-forecast-other",
+      taskAId: "task-forecast-other-alpha",
+      taskBId: "task-forecast-other-beta"
+    });
+    const calculatedAt = new Date("2026-05-21T00:05:00.000Z");
+    const createdAt = new Date("2026-05-21T00:06:00.000Z");
+    const expiresAt = new Date("2026-05-22T00:06:00.000Z");
+
+    await planningRepository.createPlanningForecastRun({
+      id: "forecast-run-alpha",
+      tenantId: "tenant-alpha",
+      projectId,
+      clientPlanVersion: 7,
+      engineVersion: "forecast-engine-v1",
+      health: "needs_decision",
+      managerSummary: "Plan needs a manager decision before commit.",
+      riskDrivers: [
+        {
+          code: "resource_overloaded",
+          severity: "critical",
+          message: "Executor is overloaded.",
+          taskIds: ["task-alpha"],
+          resourceIds: ["user-alpha-executor"],
+          dependencyIds: [],
+          date: "2026-06-20",
+          overloadMinutes: 240,
+          deadlineDeltaDays: null,
+          validationIssueCodes: []
+        }
+      ],
+      recommendations: [
+        {
+          code: "add_resource",
+          message: "Add another executor before changing baseline.",
+          actionRequired: true,
+          taskIds: ["task-alpha"],
+          resourceIds: ["user-alpha-executor"]
+        }
+      ],
+      engineMetadata: {
+        source: "deterministic_planning_engine",
+        tenantId: "tenant-alpha",
+        projectId,
+        planVersion: 7,
+        engineVersion: "forecast-engine-v1",
+        calculatedAt: calculatedAt.toISOString(),
+        projectFinish: "2026-06-20",
+        deadline: "2026-06-18",
+        deadlineDeltaDays: 2,
+        solverProposalCount: 1
+      },
+      engineDebug: {
+        inspectedTaskIds: ["task-alpha"],
+        matrix: { "user-alpha-executor": 1240 }
+      },
+      actorUserId: "user-alpha-admin",
+      createdAt,
+      expiresAt
+    });
+
+    const run = await planningRepository.findPlanningForecastRun(
+      "tenant-alpha",
+      projectId,
+      "forecast-run-alpha"
+    );
+    const crossTenantRun = await planningRepository.findPlanningForecastRun(
+      "tenant-beta",
+      projectId,
+      "forecast-run-alpha"
+    );
+    const crossProjectRun = await planningRepository.findPlanningForecastRun(
+      "tenant-alpha",
+      otherProjectId,
+      "forecast-run-alpha"
+    );
+
+    expect(run).toMatchObject({
+      id: "forecast-run-alpha",
+      tenantId: "tenant-alpha",
+      projectId,
+      clientPlanVersion: 7,
+      engineVersion: "forecast-engine-v1",
+      health: "needs_decision",
+      managerSummary: "Plan needs a manager decision before commit.",
+      riskDrivers: [
+        expect.objectContaining({
+          code: "resource_overloaded",
+          resourceIds: ["user-alpha-executor"]
+        })
+      ],
+      recommendations: [
+        expect.objectContaining({
+          code: "add_resource",
+          taskIds: ["task-alpha"]
+        })
+      ],
+      engineMetadata: expect.objectContaining({
+        planVersion: 7,
+        solverProposalCount: 1
+      }),
+      engineDebug: {
+        inspectedTaskIds: ["task-alpha"],
+        matrix: { "user-alpha-executor": 1240 }
+      },
+      actorUserId: "user-alpha-admin"
+    });
+    expect(run?.createdAt).toEqual(createdAt);
+    expect(run?.expiresAt).toEqual(expiresAt);
     expect(crossTenantRun).toBeUndefined();
     expect(crossProjectRun).toBeUndefined();
   });
