@@ -1,7 +1,11 @@
-"use client";
+import { WorkspaceRuntimeProvider } from "@/workspace/lib/workspace-runtime";
+import { DashboardSurface } from "@/workspace/dashboard/dashboard-surface";
 
-import { RuntimeScreenView } from "@/views/screens/runtime-screen-view";
-
+// Прод-route «Дашборд» (v3) на боевом workspace API.
 export default function DashboardPage() {
-  return <RuntimeScreenView id="01-dashboard" />;
+  return (
+    <WorkspaceRuntimeProvider live>
+      <DashboardSurface />
+    </WorkspaceRuntimeProvider>
+  );
 }

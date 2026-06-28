@@ -1,7 +1,11 @@
-"use client";
+import { WorkspaceRuntimeProvider } from "@/workspace/lib/workspace-runtime";
+import { ProjectsListSurface } from "@/workspace/projects/projects-list-surface";
 
-import { RuntimeScreenView } from "@/views/screens/runtime-screen-view";
-
+// Прод-route «Проекты» (v3): список активных проектов из GET /api/workspace/projects.
 export default function ProjectsPage() {
-  return <RuntimeScreenView id="07-projects-list" />;
+  return (
+    <WorkspaceRuntimeProvider live>
+      <ProjectsListSurface />
+    </WorkspaceRuntimeProvider>
+  );
 }

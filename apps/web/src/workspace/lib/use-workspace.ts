@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   WorkspaceApiError,
   createWorkspaceClient,
   type ProjectRecord,
   type TaskRecord,
-  type WorkspaceClient
+  type WorkspaceClient,
+  type WorkspaceTaskStatus,
+  type WorkspaceUser
 } from "./workspace-client";
 import { createMockWorkspaceFetch } from "./mock-workspace-backend";
+import { useWorkspaceRuntime } from "./workspace-runtime";
 
 export type WorkspaceLoadStatus = "loading" | "ready" | "error";
 // Результат мутации смены статуса: {ok} либо {ok,code,message} (как guard в use-crm).
@@ -19,10 +22,15 @@ export type WorkspaceMutationResult = { ok: true } | { ok: false; code?: string;
    in-memory сессия) + свой createWorkspaceClient. Переключение на боевой
    API = смена apiOrigin + удаление fetchImpl. Зеркало useCrm/usePlanning. */
 function useWorkspaceClient(): WorkspaceClient {
+  const { live } = useWorkspaceRuntime();
   const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null) fetchRef.current = createMockWorkspaceFetch();
+  if (fetchRef.current === null && !live) fetchRef.current = createMockWorkspaceFetch();
   const clientRef = useRef<WorkspaceClient | null>(null);
-  if (clientRef.current === null) clientRef.current = createWorkspaceClient({ apiOrigin: "", fetchImpl: fetchRef.current });
+  if (clientRef.current === null) {
+    clientRef.current = live
+      ? createWorkspaceClient({ apiOrigin: "" })
+      : createWorkspaceClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
+  }
   return clientRef.current;
 }
 
@@ -114,4 +122,31 @@ export function useMyWork() {
   }, [client, data]);
 
   return { data, status, error, reload: load, updateTaskStatus };
+}
+
+// ---- useWorkspaceUsers: справочник пользователей (исполнитель/заказчик/владелец). mock=WORKSPACE_USERS, live=GET /users ----
+export function useWorkspaceUsers() {
+  const client = useWorkspaceClient();
+  const [list, setList] = useState<WorkspaceUser[]>([]);
+  useEffect(() => {
+    let active = true;
+    void client.listUsers().then((r) => { if (active) setList(r.users); }).catch(() => { if (active) setList([]); });
+    return () => { active = false; };
+  }, [client]);
+  return useMemo(() => {
+    const byId = new Map(list.map((u) => [u.id, u]));
+    return { list, byId, name: (id: string) => byId.get(id)?.name ?? id, indexOf: (id: string) => list.findIndex((u) => u.id === id) };
+  }, [list]);
+}
+
+// ---- useWorkspaceTaskStatuses: системные статусы (колонки канбана/селект). mock=TASK_STATUSES, live=GET /task-statuses ----
+export function useWorkspaceTaskStatuses() {
+  const client = useWorkspaceClient();
+  const [list, setList] = useState<WorkspaceTaskStatus[]>([]);
+  useEffect(() => {
+    let active = true;
+    void client.listTaskStatuses().then((r) => { if (active) setList([...r.taskStatuses].sort((a, b) => a.sortOrder - b.sortOrder)); }).catch(() => { if (active) setList([]); });
+    return () => { active = false; };
+  }, [client]);
+  return useMemo(() => ({ list, byId: new Map(list.map((s) => [s.id, s])) }), [list]);
 }
