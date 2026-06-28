@@ -463,6 +463,27 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     return context.json({ readState });
   });
 
+  // Сводка непрочитанного для бейджа nav/comms — один дешёвый запрос, без перебора сущностей.
+  app.get("/api/workspace/unread-summary", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!deps.dataSource.listUserNotifications || !deps.dataSource.countUnreadConversationMessagesForUser) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    // limit=200: бейдж насыщается («200+»); точное число сверх этого не нужно.
+    const unread = await deps.dataSource.listUserNotifications({
+      tenantId: actor.tenantId,
+      userId: actor.id,
+      status: "unread",
+      limit: 200
+    });
+    const conversations = await deps.dataSource.countUnreadConversationMessagesForUser({
+      tenantId: actor.tenantId,
+      userId: actor.id
+    });
+    return context.json({ notifications: unread.length, conversations });
+  });
+
   app.get("/api/workspace/notifications", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
     if (!actor) return context.json({ error: "session_required" }, 401);

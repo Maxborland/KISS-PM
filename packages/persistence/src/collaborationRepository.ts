@@ -232,6 +232,7 @@ export type CollaborationRepository = {
     conversationId: string;
     userId: UserId;
   }): Promise<ConversationReadState>;
+  countUnreadConversationMessagesForUser(input: { tenantId: TenantId; userId: UserId }): Promise<number>;
   createUserNotification(input: UserNotificationInput): Promise<UserNotification>;
   listUserNotifications(input: {
     tenantId: TenantId;
@@ -973,6 +974,33 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         lastReadAt,
         unreadCount: unread?.count ?? 0
       };
+    },
+    async countUnreadConversationMessagesForUser(input) {
+      // Непрочитанные = сообщения других авторов после lastReadAt по всем беседам пользователя
+      // (зеркало логики getConversationReadState, агрегировано через read-states пользователя).
+      const [row] = await db
+        .select({ total: count() })
+        .from(discussionMessages)
+        .innerJoin(
+          conversationReadStates,
+          and(
+            eq(conversationReadStates.tenantId, discussionMessages.tenantId),
+            eq(conversationReadStates.conversationId, discussionMessages.conversationId),
+            eq(conversationReadStates.userId, input.userId)
+          )
+        )
+        .where(
+          and(
+            eq(discussionMessages.tenantId, input.tenantId),
+            ne(discussionMessages.authorUserId, input.userId),
+            isNull(discussionMessages.archivedAt),
+            or(
+              isNull(conversationReadStates.lastReadAt),
+              gt(discussionMessages.createdAt, conversationReadStates.lastReadAt)
+            )
+          )
+        );
+      return row?.total ?? 0;
     },
     async markConversationRead(input) {
       const [latestMessage] = await db

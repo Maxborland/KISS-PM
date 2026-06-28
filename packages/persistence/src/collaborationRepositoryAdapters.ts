@@ -19,6 +19,7 @@ export type ConversationPersistenceAdapter = Pick<
   | "getConversationReadState"
   | "listConversationsByEntity"
   | "markConversationRead"
+  | "countUnreadConversationMessagesForUser"
 >;
 
 export type DiscussionMessagePersistenceAdapter = Pick<
@@ -146,7 +147,8 @@ export function createFocusedCollaborationPersistenceAdapters(
       findConversation: repository.findConversation.bind(repository),
       getConversationReadState: repository.getConversationReadState.bind(repository),
       listConversationsByEntity: repository.listConversationsByEntity.bind(repository),
-      markConversationRead: repository.markConversationRead.bind(repository)
+      markConversationRead: repository.markConversationRead.bind(repository),
+      countUnreadConversationMessagesForUser: repository.countUnreadConversationMessagesForUser.bind(repository)
     },
     messages: {
       archiveDiscussionMessage: repository.archiveDiscussionMessage.bind(repository),

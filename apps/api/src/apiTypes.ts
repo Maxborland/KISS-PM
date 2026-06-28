@@ -951,6 +951,7 @@ export type ApiTenantDataSource = {
     conversationId: string;
     userId: UserId;
   }): Promise<ConversationReadState>;
+  countUnreadConversationMessagesForUser?(input: { tenantId: TenantId; userId: UserId }): Promise<number>;
   createUserNotification?(input: Omit<
     UserNotification,
     "createdAt" | "readAt" | "archivedAt"
