@@ -20,7 +20,10 @@ const config: StorybookConfig = {
     config.resolve ??= {};
     config.resolve.alias = {
       ...config.resolve.alias,
-      "@": join(webRoot, "src")
+      "@": join(webRoot, "src"),
+      // Storybook (Vite) не имеет Next-рантайма — мокаем router/link, иначе chrome-экраны падают на "process is not defined".
+      "next/link": join(configDir, "mocks/next-link.tsx"),
+      "next/navigation": join(configDir, "mocks/next-navigation.ts")
     };
     return config;
   }
