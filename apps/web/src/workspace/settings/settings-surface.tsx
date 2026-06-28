@@ -13,6 +13,7 @@ import { authErr } from "@/auth/lib/auth-bits";
 import { ProfileContent } from "@/auth/profile/profile-surface";
 import { NotificationsPrefs } from "@/communications/notifications/notifications-surface";
 import { useAuth } from "@/auth/lib/use-auth";
+import { useAuthRuntime } from "@/auth/lib/auth-runtime";
 import type { WorkspaceUser } from "@/auth/lib/auth-client";
 
 /* ============================================================
@@ -72,6 +73,7 @@ export function SettingsSurface() {
 
 /* Вкладка «Профиль» — единый useAuth + авто-вход демо-кредами (мок стартует anonymous). */
 function ProfileTab() {
+  const { live } = useAuthRuntime();
   const { state, status, error, user, permissions, login, updateProfile, updateTheme } = useAuth();
 
   const autoLoginRef = useRef(false);
@@ -82,10 +84,13 @@ function ProfileTab() {
   const bootstrap = useCallback(async () => {
     setBootstrapping(true);
     setLoginErr(null);
+    // live: сессия уже есть (вход в приложение) — useAuth грузит /api/auth/me на маунте, демо-вход не нужен.
+    // mock: contract-mock стартует anonymous → демо-вход для наполнения профиля в Storybook.
+    if (live) { setBootstrapping(false); return; }
     const r = await login(DEMO_EMAIL, DEMO_PASSWORD);
     if (!r.ok) setLoginErr(r.code ?? r.message);
     setBootstrapping(false);
-  }, [login]);
+  }, [live, login]);
 
   useEffect(() => {
     if (autoLoginRef.current) return;

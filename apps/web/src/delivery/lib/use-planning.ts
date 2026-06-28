@@ -31,6 +31,33 @@ export type ScenarioApplyResult =
 export type CommitMetaView = { version: number; actionType: string; summary: string; changedTaskIds: string[]; auditEventId: string; at: string; revertible: boolean };
 export type CommitsView = { commits: CommitMetaView[]; latestRevert: { auditEventId: string; commands: PlanningCommand[]; before: PlanningReadModel } | null };
 
+// Боевой журнал = GET /api/tenant/current/audit-events. afterState даёт версию/изменённые задачи;
+// beforeState — только счётчики (не полный read-model), поэтому откат в live недоступен (revertible=false).
+type PlanningAuditEvent = {
+  id: string;
+  actionType: string;
+  sourceWorkflow: string | null;
+  input?: { command?: { type?: string } };
+  afterState: { planVersion: number; changedTaskIds?: string[] };
+  createdAt: string;
+};
+const PLAN_COMMAND_SUMMARY: Record<string, string> = {
+  "task.create": "Создана задача",
+  "task.update_identity": "Изменено название задачи",
+  "task.update_schedule": "Сдвинуты сроки задачи",
+  "task.update_work_model": "Изменена трудоёмкость",
+  "task.update_status": "Изменён статус задачи",
+  "task.update_progress": "Обновлён прогресс",
+  "task.move_wbs": "Перемещена в WBS",
+  "task.delete_or_archive": "Задача архивирована",
+  "dependency.upsert": "Добавлена связь",
+  "dependency.delete": "Снята связь",
+  "assignment.upsert": "Назначен ресурс",
+  "assignment.delete": "Снято назначение",
+  "baseline.capture": "Зафиксирован базовый план",
+  "risk.accept_overload": "Принят перегруз"
+};
+
 /**
  * Работает через настоящий @kiss-pm/planning-client. Транспорт —
  * contract-mock (createMockPlanningFetch), отдельный на каждый монтаж
@@ -176,12 +203,30 @@ export function usePlanning(projectId: string) {
   // история берётся отдельным fetchProjectAuditEvents → /api/tenant/current/audit-events (другой путь,
   // не участвует в «смене apiOrigin» как планировочные команды) — при интеграции вынести в метод клиента.
   const loadCommits = useCallback(async (): Promise<CommitsView> => {
-    // commits-журнал пока только на mock-маршруте /planning/commits. Боевой источник —
-    // GET /api/tenant/current/audit-events → CommitMetaView — подключается со слайсом commits/overview.
-    if (!fetchRef.current) throw new Error("commits_feed_live_unwired");
-    const res = await fetchRef.current("/planning/commits");
-    return (await res.json()) as CommitsView;
-  }, []);
+    // mock: contract-mock /planning/commits (с откатом latestRevert). live: журнал из audit-events.
+    if (!live) {
+      const res = await fetchRef.current!("/planning/commits");
+      return (await res.json()) as CommitsView;
+    }
+    // live: GET /api/tenant/current/audit-events — planning-события проекта. Откат недоступен
+    // (audit.beforeState — только счётчики, не полный read-model), поэтому latestRevert=null.
+    const res = await fetch(`/api/tenant/current/audit-events?projectId=${encodeURIComponent(projectId)}`, { credentials: "same-origin" });
+    if (!res.ok) throw new Error("audit_events_failed");
+    const body = (await res.json()) as { auditEvents: PlanningAuditEvent[] };
+    const commits: CommitMetaView[] = body.auditEvents
+      .filter((event) => event.sourceWorkflow === "planning" && event.afterState?.planVersion != null)
+      .map((event) => ({
+        version: event.afterState.planVersion,
+        actionType: event.actionType,
+        summary: (event.input?.command?.type && PLAN_COMMAND_SUMMARY[event.input.command.type]) || event.actionType,
+        changedTaskIds: event.afterState.changedTaskIds ?? [],
+        auditEventId: event.id,
+        at: event.createdAt,
+        revertible: false
+      }))
+      .sort((left, right) => right.version - left.version);
+    return { commits, latestRevert: null };
+  }, [live, projectId]);
 
   return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch, previewScenarios, applyScenario, loadCommits };
 }

@@ -10,8 +10,9 @@ import { cn } from "@/lib/cn";
 import { Bento, BentoCard, StatTile } from "@/delivery/ui/bento";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
-import { isoToDay, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning, type CommitMetaView } from "@/delivery/lib/use-planning";
+import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { demoAction } from "@/views/lib/demo";
 
 type RawTask = { id: string; wbsCode: string; title: string; percentComplete: number; statusId: string; plannedStart: string; plannedFinish: string; workMinutes: number; durationMinutes: number | null; customFields?: { kind?: string; resLabel?: string } };
@@ -21,7 +22,6 @@ type BcTask = { taskId: string; baselineFinish: string | null; finishDeltaDays: 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const TODAY = "2026-06-23"; // фиксированная «сегодня» прототипа (для просрочек/резерва — детерминированно)
 const AV: Array<"c1" | "c2" | "c3" | "c4" | "c5"> = ["c1", "c2", "c3", "c4", "c5"];
-const resName = (id: string) => RESOURCES.find((r) => r.id === id)?.name ?? id;
 const initials = (label: string) => { const parts = label.replace(/·.*/, "").trim().split(/\s+/).filter(Boolean); return parts.length ? (parts[0]![0] ?? "") + (parts[1]?.[0] ?? "") : "—"; };
 const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
 const ddmmyyyy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
@@ -33,8 +33,9 @@ function ProgressBar({ value, critical }: { value: number; critical?: boolean })
   return <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--panel-strong)]"><div className={cn("h-full rounded-full", critical ? "bg-[var(--critical-stripe)]" : "bg-[var(--success)]")} style={{ width: `${Math.min(100, value)}%` }} /></div>;
 }
 
-export function ProjectOverview() {
-  const { readModel, status, error, reload, loadCommits } = usePlanning(MOCK_PROJECT_ID);
+export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { readModel, status, error, reload, loadCommits } = usePlanning(projectId);
+  const resDir = useResourceDirectory();
   const [commits, setCommits] = useState<CommitMetaView[]>([]);
 
   useEffect(() => {
@@ -89,7 +90,7 @@ export function ProjectOverview() {
   const signals: Array<{ tone: "danger" | "warning" | "info"; icon: typeof Zap; title: string; detail: string; action: string }> = [];
   // срыв дедлайна — самый критичный выводимый из плана факт, ведёт список
   if (reserveDays != null && reserveDays < 0) signals.push({ tone: "danger", icon: AlertTriangle, title: `Финиш за дедлайном: +${-reserveDays} дн.`, detail: `расчётный ${ddmmyyyy(model.projectFinish)} · дедлайн ${ddmmyyyy(model.deadline ?? "")}`, action: "Открыть График" });
-  if (overloadResources.length > 0) signals.push({ tone: "danger", icon: Zap, title: `Перегруз ресурсов: ${overloadResources.length}`, detail: `${overloadResources.map(resName).join(", ")} · ${model.overloads.length} дн с превышением`, action: "Открыть Сценарии" });
+  if (overloadResources.length > 0) signals.push({ tone: "danger", icon: Zap, title: `Перегруз ресурсов: ${overloadResources.length}`, detail: `${overloadResources.map(resDir.name).join(", ")} · ${model.overloads.length} дн с превышением`, action: "Открыть Сценарии" });
   if (projDelta > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Финиш сдвинут +${projDelta} дн от базового плана`, detail: `текущий ${ddmm(model.projectFinish)} · базовый ${ddmm(baseFinishDay ? model.bc.find((t) => t.baselineFinish && isoToDay(t.baselineFinish) === baseFinishDay)?.baselineFinish ?? null : null)}`, action: "Открыть Baseline" });
   if (overdue.length > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Просрочено задач: ${overdue.length}`, detail: `срок раньше ${ddmmyyyy(TODAY)}, не закрыты`, action: "Открыть График" });
   if (critNoSlack.length > 0) signals.push({ tone: "info", icon: TrendingUp, title: `На критическом пути: ${critNoSlack.length} задач`, detail: "резерв 0 дн — сдвиг тянет дедлайн", action: "Показать путь" });

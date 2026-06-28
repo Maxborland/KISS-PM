@@ -26,8 +26,8 @@ const typeOf = (actionType: string): { label: string; cls: string } => {
   return { label: "план", cls: "bg-[var(--info-soft)] text-[var(--info)]" };
 };
 
-export function ProjectCommits() {
-  const { readModel, status, error, reload, applyBatch, loadCommits } = usePlanning(MOCK_PROJECT_ID);
+export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { readModel, status, error, reload, applyBatch, loadCommits } = usePlanning(projectId);
   const [data, setData] = useState<CommitsView | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
