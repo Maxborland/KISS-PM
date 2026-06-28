@@ -711,6 +711,39 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     return context.json({ meeting: serializeMeeting(updated) });
   });
 
+  // Композитная карточка встречи: сама встреча + участники/заметки/задачи/ссылки одним запросом.
+  // Read-доступ уже проверяет resolveMeetingForActor (readDecision). POST-ы создают эти под-ресурсы,
+  // здесь — единственный GET, чтобы фронт перечитывал детали (раньше детали были только в payload списка).
+  app.get("/api/workspace/meetings/:meetingId", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const meeting = await resolveMeetingForActor(context.req.param("meetingId"), actor, deps);
+    if (!meeting.ok) return context.json({ error: meeting.error }, meeting.status);
+    const dataSource = deps.dataSource;
+    if (
+      !dataSource.listMeetingParticipants ||
+      !dataSource.listMeetingNotes ||
+      !dataSource.listMeetingActionItems ||
+      !dataSource.listMeetingExternalLinks
+    ) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const meetingId = meeting.value.meeting.id;
+    const [participants, notes, actionItems, externalLinks] = await Promise.all([
+      dataSource.listMeetingParticipants(actor.tenantId, meetingId),
+      dataSource.listMeetingNotes(actor.tenantId, meetingId),
+      dataSource.listMeetingActionItems(actor.tenantId, meetingId),
+      dataSource.listMeetingExternalLinks(actor.tenantId, meetingId)
+    ]);
+    return context.json({
+      meeting: serializeMeeting(meeting.value.meeting),
+      participants: participants.map(serializeMeetingParticipant),
+      notes: notes.map(serializeMeetingNote),
+      actionItems: actionItems.map(serializeMeetingActionItem),
+      externalLinks: externalLinks.map(serializeMeetingExternalLink)
+    });
+  });
+
   app.post("/api/workspace/meetings/:meetingId/external-links", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -1354,4 +1387,8 @@ function serializeMeetingActionItem(actionItem: import("@kiss-pm/domain").Meetin
     createdAt: actionItem.createdAt.toISOString(),
     archivedAt: actionItem.archivedAt?.toISOString() ?? null
   };
+}
+
+function serializeMeetingParticipant(participant: import("@kiss-pm/domain").MeetingParticipant) {
+  return { ...participant, createdAt: participant.createdAt.toISOString() };
 }
