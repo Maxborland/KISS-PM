@@ -10,12 +10,13 @@ import { toast } from "sonner";
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { CardPanel } from "@/components/domain/card-panel";
 import { CellStack } from "@/components/domain/cell-stack";
-import { DataTable } from "@/components/domain/data-table";
 import { Field } from "@/components/domain/form-layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Chip } from "@/components/ui/chip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AppPreloader, FeedSkeleton, TableSkeleton } from "@/components/ui/loaders";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
@@ -465,29 +466,29 @@ function ProjectResourcesRuntime({ id }: { id: string }) {
 function AssignmentsTable({ planning }: { planning: PlanningReadModel }) {
   const tasksById = new Map(planning.authored.tasks.map((task) => [task.id, task]));
   return (
-    <DataTable>
-      <thead>
-        <tr>
-          <th>Задача</th>
-          <th>Роль</th>
-          <th>Ресурс</th>
-          <th>План</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Задача</TableHead>
+          <TableHead>Роль</TableHead>
+          <TableHead>Ресурс</TableHead>
+          <TableHead numeric>План</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {planning.authored.assignments.map((assignment, index) => {
           const task = tasksById.get(assignment.taskId);
           return (
-            <tr key={assignment.id}>
-              <td>{task?.title ?? "Задача без названия"}</td>
-              <td>{businessStatus(assignment.role)}</td>
-              <td>Ресурс {index + 1}</td>
-              <td className="mono">{Math.round((assignment.workMinutes ?? 0) / 60)} ч</td>
-            </tr>
+            <TableRow key={assignment.id}>
+              <TableCell className="max-w-[20rem] font-medium">{task?.title ?? "Задача без названия"}</TableCell>
+              <TableCell className="text-[var(--muted)]">{businessStatus(assignment.role)}</TableCell>
+              <TableCell className="text-[var(--muted)]">Ресурс {index + 1}</TableCell>
+              <TableCell numeric className="whitespace-nowrap">{Math.round((assignment.workMinutes ?? 0) / 60)} ч</TableCell>
+            </TableRow>
           );
         })}
-      </tbody>
-    </DataTable>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -812,17 +813,34 @@ function ProjectsTable({ projects }: { projects: Project[] }) {
             </TableCell>
             <TableCell numeric className="whitespace-nowrap text-[var(--muted)]">{formatDate(project.plannedFinish)}</TableCell>
             <TableCell align="right">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Открыть проект"
-                className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                asChild
-              >
-                <Link href={`/projects/${project.id}`}>
-                  <MoreHorizontal className="size-4" />
-                </Link>
-              </Button>
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Действия: ${project.title}`}
+                        className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Действия</TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/projects/${project.id}`}>Открыть проект</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/projects/${project.id}/timeline`}>План-график</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/projects/${project.id}/resources`}>Ресурсы</Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </TableCell>
           </TableRow>
         ))}
