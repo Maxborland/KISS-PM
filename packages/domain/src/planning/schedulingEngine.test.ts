@@ -324,6 +324,7 @@ function createSnapshot(overrides: Partial<PlanSnapshot> = {}): PlanSnapshot {
     planVersion: 1,
     project: {
       id: "project-alpha",
+      title: "Project Alpha",
       sourceType: "opportunity",
       sourceOpportunityId: "opportunity-alpha",
       plannedStart: "2026-06-01",

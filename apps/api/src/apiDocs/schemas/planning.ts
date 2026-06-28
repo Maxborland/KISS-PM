@@ -31,6 +31,7 @@ export const planningSchemas = openApiSchemaFragment({
     type: "object",
     required: [
       "id",
+      "title",
       "sourceType",
       "sourceOpportunityId",
       "plannedStart",
@@ -40,6 +41,7 @@ export const planningSchemas = openApiSchemaFragment({
     ],
     properties: {
       id: stringIdSchema,
+      title: { type: "string" },
       sourceType: { type: "string", enum: ["opportunity", "workspace_inbox", "manual"] },
       sourceOpportunityId: nullableStringSchema,
       plannedStart: dateSchema,
@@ -781,6 +783,7 @@ export const planningSchemas = openApiSchemaFragment({
     required: [
       "project",
       "authored",
+      "resources",
       "calculatedPlan",
       "baselineComparison",
       "resourceLoad",
@@ -790,6 +793,15 @@ export const planningSchemas = openApiSchemaFragment({
     ],
     properties: {
       project: schemaRef("PlanningProject"),
+      resources: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["id", "name"],
+          properties: { id: stringIdSchema, name: { type: "string" } },
+          additionalProperties: false
+        }
+      },
       authored: {
         type: "object",
         required: ["tasks", "dependencies", "assignments", "assignmentAllocations", "baselines"],

@@ -32,6 +32,7 @@ export function createPlanningReadModel(snapshot: PlanSnapshot) {
 
   return {
     project: snapshot.project,
+    resources: snapshot.resources.map((resource) => ({ id: resource.id, name: resource.name })),
     authored: {
       tasks: snapshot.tasks,
       dependencies: snapshot.dependencies,

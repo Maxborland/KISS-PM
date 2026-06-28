@@ -117,6 +117,7 @@ function createSnapshot(input: Partial<PlanSnapshot> = {}): PlanSnapshot {
     planVersion: 7,
     project: {
       id: "project-alpha",
+      title: "Project Alpha",
       sourceType: "manual",
       sourceOpportunityId: null,
       plannedStart: "2026-05-01",

@@ -3824,6 +3824,7 @@ function createControlActionSnapshot(): PlanSnapshot {
     planVersion: 5,
     project: {
       id: "project-control",
+      title: "Project Alpha",
       sourceType: "manual",
       sourceOpportunityId: null,
       plannedStart: "2026-05-24",

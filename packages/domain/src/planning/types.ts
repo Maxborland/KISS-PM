@@ -16,6 +16,7 @@ export type ProjectSourceType = "opportunity" | "workspace_inbox" | "manual";
 
 export type PlanProject = {
   id: string;
+  title: string;
   sourceType: ProjectSourceType;
   sourceOpportunityId: string | null;
   plannedStart: PlanDate;

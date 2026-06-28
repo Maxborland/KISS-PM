@@ -200,6 +200,7 @@ function createLateOverloadedSnapshot(): PlanSnapshot {
     planVersion: 7,
     project: {
       id: "project-a",
+      title: "Project Alpha",
       sourceType: "manual",
       sourceOpportunityId: null,
       plannedStart: "2026-05-24",

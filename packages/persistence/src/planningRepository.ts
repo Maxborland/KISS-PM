@@ -370,6 +370,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
         planVersion,
         project: {
           id: project.id,
+          title: project.title,
           sourceType: project.sourceType as ProjectSourceType,
           sourceOpportunityId: project.sourceOpportunityId,
           plannedStart: toPlanDate(project.plannedStart),

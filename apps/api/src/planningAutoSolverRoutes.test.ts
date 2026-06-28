@@ -526,6 +526,7 @@ function createSnapshot(): PlanSnapshot {
     planVersion: 3,
     project: {
       id: "project-solver",
+      title: "Project Alpha",
       sourceType: "manual",
       sourceOpportunityId: null,
       plannedStart: "2026-06-01",

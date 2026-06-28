@@ -421,6 +421,7 @@ describe("project work API routes", () => {
       },
       project: {
         id: "workspace-inbox-tenant-alpha",
+        title: "Project Alpha",
         sourceType: "workspace_inbox",
         sourceOpportunityId: null,
         status: "active"

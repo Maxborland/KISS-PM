@@ -301,6 +301,7 @@ function planSnapshot(): PlanSnapshot {
     planVersion: 1,
     project: {
       id: "project-a",
+      title: "Project Alpha",
       sourceType: "manual",
       sourceOpportunityId: null,
       plannedStart: "2026-06-01",
