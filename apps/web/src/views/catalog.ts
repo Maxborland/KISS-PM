@@ -16,7 +16,7 @@ export type ScreenMeta = {
   storyTitle: string;
   pageTitle: string;
   lead: string;
-  breadcrumb: { label: string; current?: boolean }[];
+  breadcrumb: { label: string; href?: string; current?: boolean }[];
   activeNav?: string;
   variant?: "workspace" | "login" | "bare";
 };

@@ -15,7 +15,7 @@ export function AppTopbar({ breadcrumbs, actions }: AppTopbarProps) {
       {breadcrumbs}
       <div className="topbar-actions">
         <CommandPalette />
-        <IconButton label="Уведомления">
+        <IconButton label="Уведомления" disabled title="Уведомления — скоро">
           <Bell className="size-4" />
         </IconButton>
         {actions}

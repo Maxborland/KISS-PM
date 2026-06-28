@@ -114,7 +114,10 @@ export function RuntimeScreenView({ id, entityId }: { id: RuntimeScreenId; entit
 
   const meta = runtimeScreenMeta(id);
   return (
-    <WorkspaceChrome meta={meta}>
+    <WorkspaceChrome
+      meta={meta}
+      user={{ name: me.data.user.name, initials: initials(me.data.user.name), color: "c4", ...(me.data.user.email ? { email: me.data.user.email } : {}) }}
+    >
       <RuntimeScreenContent id={id} entityId={entityId} me={me.data} />
     </WorkspaceChrome>
   );

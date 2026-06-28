@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 
-export type Crumb = { label: string; current?: boolean };
+export type Crumb = { label: string; href?: string; current?: boolean };
 
 export function TopbarBreadcrumbs({ items, className }: { items: Crumb[]; className?: string }) {
   return (
@@ -11,12 +12,10 @@ export function TopbarBreadcrumbs({ items, className }: { items: Crumb[]; classN
       {items.map((item, i) => (
         <span key={item.label} className="inline-flex items-center gap-2">
           {i > 0 ? <ChevronRight className="crumb-sep size-3.5" aria-hidden /> : null}
-          {item.current ? (
-            <span className="u-text-strong">{item.label}</span>
+          {item.current || !item.href ? (
+            <span className={item.current ? "u-text-strong" : undefined}>{item.label}</span>
           ) : (
-            <a href="#" onClick={(e) => e.preventDefault()}>
-              {item.label}
-            </a>
+            <Link href={item.href}>{item.label}</Link>
           )}
         </span>
       ))}

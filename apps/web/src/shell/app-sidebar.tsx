@@ -1,10 +1,15 @@
-import type { ReactNode } from "react";
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { cn } from "@/lib/cn";
 
 export type SidebarItem = {
   label: string;
+  href?: string;
+  soon?: boolean;
   active?: boolean;
   nested?: boolean;
   badge?: string;
@@ -22,7 +27,12 @@ export type AppSidebarProps = {
   user?: { initials: string; name: string; email: string; color?: "c1" | "c2" | "c3" | "c4" | "c5" };
 };
 
+function isActive(pathname: string, href: string) {
+  return href === "/dashboard" ? pathname === "/dashboard" : pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function AppSidebar({ workspace = "acme.studio", groups, user }: AppSidebarProps) {
+  const pathname = usePathname() ?? "";
   return (
     <aside className="app-sidebar">
       <div className="app-sidebar__brand">
@@ -35,30 +45,40 @@ export function AppSidebar({ workspace = "acme.studio", groups, user }: AppSideb
       {groups.map((g) => (
         <div key={g.title} className="app-sidebar__group">
           <div className="app-sidebar__group-title">{g.title}</div>
-          {g.items.map((item) => (
-            <a
-              key={item.label}
-              href="#"
-              className={cn(
-                "app-sidebar__item",
-                item.nested && "app-sidebar__item--nested",
-                item.active && "is-active"
-              )}
-              onClick={(e) => e.preventDefault()}
-            >
-              {item.label}
-              {item.badge ? (
+          {g.items.map((item) => {
+            const active = item.href ? isActive(pathname, item.href) : false;
+            const badge = item.soon ? (
+              <span className="app-sidebar__item-badge opacity-70">скоро</span>
+            ) : item.badge ? (
+              <span className={cn("app-sidebar__item-badge", item.alert && "app-sidebar__item-badge--alert")}>{item.badge}</span>
+            ) : null;
+
+            if (item.soon || !item.href) {
+              return (
                 <span
-                  className={cn(
-                    "app-sidebar__item-badge",
-                    item.alert && "app-sidebar__item-badge--alert"
-                  )}
+                  key={item.label}
+                  aria-disabled="true"
+                  title="Скоро"
+                  className={cn("app-sidebar__item cursor-default opacity-55", item.nested && "app-sidebar__item--nested")}
                 >
-                  {item.badge}
+                  {item.label}
+                  {badge}
                 </span>
-              ) : null}
-            </a>
-          ))}
+              );
+            }
+
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn("app-sidebar__item", item.nested && "app-sidebar__item--nested", active && "is-active")}
+              >
+                {item.label}
+                {badge}
+              </Link>
+            );
+          })}
         </div>
       ))}
       {user ? (
