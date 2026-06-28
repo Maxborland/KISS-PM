@@ -10,6 +10,7 @@ import {
 } from "@kiss-pm/planning-client";
 
 import { createMockPlanningFetch } from "./mock-planning-backend";
+import { usePlanningRuntime } from "./planning-runtime";
 
 // "forbidden" — 403 при загрузке read-model (нет права на проект). В моке теоретичен
 // (бэкенд отдаёт 200 для демо-сессии), но проводка позволяет поверхностям показывать
@@ -37,11 +38,16 @@ export type CommitsView = { commits: CommitMetaView[]; latestRevert: { auditEven
  * apiOrigin и удаление fetchImpl.
  */
 export function usePlanning(projectId: string) {
+  const { live } = usePlanningRuntime();
+  // mock: contract-mock fetch (Storybook). live: боевой клиент без fetchImpl → глобальный fetch
+  // на /api/* (проксируется в Hono next.config'ом, cookie-сессия автоматически).
   const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null) fetchRef.current = createMockPlanningFetch();
+  if (fetchRef.current === null && !live) fetchRef.current = createMockPlanningFetch();
   const clientRef = useRef<ReturnType<typeof createPlanningApiClient> | null>(null);
   if (clientRef.current === null) {
-    clientRef.current = createPlanningApiClient({ apiOrigin: "", fetchImpl: fetchRef.current });
+    clientRef.current = live
+      ? createPlanningApiClient({ apiOrigin: "" })
+      : createPlanningApiClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
   }
   const client = clientRef.current;
 
@@ -170,7 +176,10 @@ export function usePlanning(projectId: string) {
   // история берётся отдельным fetchProjectAuditEvents → /api/tenant/current/audit-events (другой путь,
   // не участвует в «смене apiOrigin» как планировочные команды) — при интеграции вынести в метод клиента.
   const loadCommits = useCallback(async (): Promise<CommitsView> => {
-    const res = await fetchRef.current!("/planning/commits");
+    // commits-журнал пока только на mock-маршруте /planning/commits. Боевой источник —
+    // GET /api/tenant/current/audit-events → CommitMetaView — подключается со слайсом commits/overview.
+    if (!fetchRef.current) throw new Error("commits_feed_live_unwired");
+    const res = await fetchRef.current("/planning/commits");
     return (await res.json()) as CommitsView;
   }, []);
 
