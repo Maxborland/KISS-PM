@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 import {
   CommsApiError,
   createCommsClient,
   type ActionItemInput,
+  type CommsUser,
   type CallEvent,
   type CallParticipantStateValue,
   type CallRecording,
@@ -33,6 +34,7 @@ import {
   type VideoJoinContract
 } from "./comms-client";
 import { createMockCommsFetch } from "./mock-comms-backend";
+import { useCommsRuntime } from "./comms-runtime";
 
 /* ============================================================
    Узкие хуки блока «Коммуникации» (зеркало use-crm, но раздельные хуки
@@ -98,22 +100,31 @@ function useCommsLoad<T>(fetcher: () => Promise<T>): CommsLoadState<T> {
   return { data, status, error, setData, reload };
 }
 
-// Общий клиент/транспорт: ОДИН createMockCommsFetch на весь модуль (общий стор).
-// Раньше каждый хук строил свой стор → канал/комната, созданные родительским
-// useChannels()/useCallRooms(), не были видны детальным useChannel()/useCallRoom()
-// (getChannel(newId) → channel_not_found): create-then-open ломался. Теперь все хуки
-// делят один стор. Переключение на боевой API = смена apiOrigin + удаление fetchImpl.
-let sharedCommsClient: ReturnType<typeof createCommsClient> | null = null;
-function getSharedCommsClient(): ReturnType<typeof createCommsClient> {
-  if (sharedCommsClient === null) {
-    sharedCommsClient = createCommsClient({ apiOrigin: "", fetchImpl: createMockCommsFetch() });
-  }
-  return sharedCommsClient;
+// Общий клиент/транспорт. Два режима транспорта (см. CommsRuntimeProvider):
+//  • mock  — ОДИН createMockCommsFetch на весь модуль (общий in-memory стор). Раньше каждый
+//    хук строил свой стор → канал/комната, созданные родительским useChannels()/useCallRooms(),
+//    не были видны детальным useChannel()/useCallRoom() (getChannel(newId) → channel_not_found):
+//    create-then-open ломался. Поэтому все хуки делят ОДИН мок-клиент.
+//  • live — боевой createCommsClient без fetchImpl: fetch на /api/workspace/* (next.config-прокси
+//    в Hono), credentials:"include" → cookie-сессия. Один общий live-клиент (стора нет — состояние
+//    на сервере), та же причина «один клиент»: согласованность между списком и деталью.
+// Singletons держим на уровне модуля, чтобы все хуки одного режима делили клиент. Режим фиксируется
+// провайдером на монтаж (live не меняется в рамках дерева), поэтому выбор один раз в ref безопасен.
+let sharedMockClient: ReturnType<typeof createCommsClient> | null = null;
+let sharedLiveClient: ReturnType<typeof createCommsClient> | null = null;
+function getSharedMockClient(): ReturnType<typeof createCommsClient> {
+  if (sharedMockClient === null) sharedMockClient = createCommsClient({ apiOrigin: "", fetchImpl: createMockCommsFetch() });
+  return sharedMockClient;
+}
+function getSharedLiveClient(): ReturnType<typeof createCommsClient> {
+  if (sharedLiveClient === null) sharedLiveClient = createCommsClient({ apiOrigin: "" });
+  return sharedLiveClient;
 }
 
 function useCommsClient() {
+  const { live } = useCommsRuntime();
   const clientRef = useRef<ReturnType<typeof createCommsClient> | null>(null);
-  if (clientRef.current === null) clientRef.current = getSharedCommsClient();
+  if (clientRef.current === null) clientRef.current = live ? getSharedLiveClient() : getSharedMockClient();
   return clientRef.current;
 }
 
@@ -399,3 +410,25 @@ export function useNotificationPreferences() {
 
   return { client, data, status, error, reload: load, savePreferences };
 }
+
+/* ============================================================
+   СПРАВОЧНИК ПОЛЬЗОВАТЕЛЕЙ: useCommsUsers().
+   mock = COMMS_USERS (мок отдаёт сид по тому же пути), live = GET /api/workspace/users.
+   Возвращает { list, byId, name } — зеркало useWorkspaceUsers. name() резолвит id→имя
+   с честным фолбэком на сам id (как comms-bits.userName), чтобы неизвестные боевые id
+   деградировали мягко. Список — для выбора участника канала/встречи/ответственного.
+   ============================================================ */
+export function useCommsUsers() {
+  const client = useCommsClient();
+  const [list, setList] = useState<CommsUser[]>([]);
+  useEffect(() => {
+    let active = true;
+    void client.listUsers().then((r) => { if (active) setList(r.users); }).catch(() => { if (active) setList([]); });
+    return () => { active = false; };
+  }, [client]);
+  return useMemo(() => {
+    const byId = new Map(list.map((u) => [u.id, u]));
+    return { list, byId, name: (id: string | null): string => (id ? byId.get(id)?.name ?? id : "—") };
+  }, [list]);
+}
+export type CommsUsersDir = ReturnType<typeof useCommsUsers>;

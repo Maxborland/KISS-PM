@@ -13,13 +13,16 @@ import {
   type WorkspaceUser
 } from "./auth-client";
 import { createMockAuthFetch } from "./mock-auth-backend";
+import { useAuthRuntime } from "./auth-runtime";
 
 /* ============================================================
    useAuth + useProfile (§3) — два хука по образцу comms (раздельные).
 
-   Работают через настоящий createAuthClient. Транспорт — contract-mock
-   (createMockAuthFetch), ОДИН на монтаж (изолированная сессия, как useCrm).
-   Переключение на боевой API = смена apiOrigin + удаление fetchImpl.
+   Работают через настоящий createAuthClient. Транспорт переключается через
+   AuthRuntimeProvider: live=false (Storybook, по умолчанию) → contract-mock
+   (createMockAuthFetch), ОДИН на монтаж (изолированная сессия, как useCrm);
+   live=true (прод-routes) → боевой API (createAuthClient без fetchImpl →
+   fetch на /api/auth/* + /api/profile, HttpOnly cookie-сессия).
 
    СОСТОЯНИЕ держим ИЗ ОТВЕТОВ me/login, НЕ из document.cookie:
    боевой cookie — HttpOnly, JS его прочитать не может.
@@ -33,11 +36,17 @@ export type AuthMutationResult = { ok: true } | { ok: false; code?: string; mess
 export type AuthDataResult<T> = { ok: true; data: T } | { ok: false; code?: string; message: string };
 
 // Общий фабричный хелпер: один fetch+client на монтаж (изолированная сессия).
+// live (из AuthRuntimeProvider) переключает транспорт: mock fetchImpl vs боевой fetch.
 function useAuthClient() {
+  const { live } = useAuthRuntime();
   const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null) fetchRef.current = createMockAuthFetch();
+  if (fetchRef.current === null && !live) fetchRef.current = createMockAuthFetch();
   const clientRef = useRef<ReturnType<typeof createAuthClient> | null>(null);
-  if (clientRef.current === null) clientRef.current = createAuthClient({ apiOrigin: "", fetchImpl: fetchRef.current });
+  if (clientRef.current === null) {
+    clientRef.current = live
+      ? createAuthClient({ apiOrigin: "" })
+      : createAuthClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
+  }
   return clientRef.current;
 }
 

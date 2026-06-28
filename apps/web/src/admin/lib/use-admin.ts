@@ -8,6 +8,7 @@ import {
   type Position, type UserCreateInput, type UserUpdateInput, type WorkspaceUser
 } from "./admin-client";
 import { createMockAdminFetch } from "./mock-admin-backend";
+import { useAdminRuntime } from "./admin-runtime";
 
 export type AdminLoadStatus = "loading" | "ready" | "error";
 export type AdminData = {
@@ -18,19 +19,28 @@ export type AdminData = {
 export type AdminMutationResult = { ok: true } | { ok: false; code?: string; message: string };
 
 /**
- * Работает через настоящий createAdminClient. Транспорт — contract-mock
- * (createMockAdminFetch), отдельный на каждый монтаж (изолированная сессия).
- * Переключение на боевой API = смена apiOrigin + удаление fetchImpl.
+ * Работает через настоящий createAdminClient. Транспорт выбирается по
+ * AdminRuntime: live → боевой API (fetch на /api/*, cookie-сессия), mock →
+ * contract-mock (createMockAdminFetch), отдельный на каждый монтаж (изолированная
+ * сессия). Прод-routes оборачивают surface в <AdminRuntimeProvider live>; stories
+ * без провайдера → mock.
  *
  * Зеркало useCrm/usePlanning: загрузка тройки справочников параллельно,
  * guard-обёртка мутаций (AdminApiError.code → {ok:false,code,message}),
  * точечное обновление локального кэша по затронутой сущности.
  */
 export function useAdmin() {
+  // live → боевой createAdminClient (без fetchImpl, fetch на /api/* + cookie-сессия);
+  // mock → contract-mock fetchImpl на каждый монтаж (изолированная in-memory сессия).
+  const { live } = useAdminRuntime();
   const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null) fetchRef.current = createMockAdminFetch();
+  if (fetchRef.current === null && !live) fetchRef.current = createMockAdminFetch();
   const clientRef = useRef<ReturnType<typeof createAdminClient> | null>(null);
-  if (clientRef.current === null) clientRef.current = createAdminClient({ apiOrigin: "", fetchImpl: fetchRef.current });
+  if (clientRef.current === null) {
+    clientRef.current = live
+      ? createAdminClient({ apiOrigin: "" })
+      : createAdminClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
+  }
   const client = clientRef.current;
 
   const [data, setData] = useState<AdminData | null>(null);

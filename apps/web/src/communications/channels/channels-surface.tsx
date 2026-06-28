@@ -14,8 +14,8 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
-import { useChannel, useChannels } from "@/communications/lib/use-comms";
-import { avatarColor, commsErr, COMMS_USERS, initials, relTime, RoleChip, userName } from "@/communications/lib/comms-bits";
+import { useChannel, useChannels, useCommsUsers, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { avatarColor, commsErr, initials, relTime, RoleChip } from "@/communications/lib/comms-bits";
 import type {
   Channel,
   ChannelMember,
@@ -73,6 +73,8 @@ function ChannelTypeChip({ type }: { type: CommunicationChannelType }) {
 
 export function ChannelsSurface() {
   const { data, status, error, reload, createChannel } = useChannels();
+  // Справочник людей тенанта (выбор/имена участников): mock=COMMS_USERS, live=GET /api/workspace/users.
+  const users = useCommsUsers();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -176,7 +178,7 @@ export function ChannelsSurface() {
 
         {/* СПРАВА: детальная панель */}
         {selected ? (
-          <ChannelDetail key={selected.id} channelId={selected.id} fallback={selected} />
+          <ChannelDetail key={selected.id} channelId={selected.id} fallback={selected} users={users} />
         ) : (
           <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-6 shadow-[var(--shadow-card)]">
             <EmptyState title="Нет каналов" description="Создайте первый канал кнопкой «Канал»." />
@@ -193,7 +195,7 @@ export function ChannelsSurface() {
    Детальная панель канала (useChannel): инфо + участники + беседа.
    fallback — запись из листинга на время загрузки детали (без мерцания).
    ============================================================ */
-function ChannelDetail({ channelId, fallback }: { channelId: string; fallback: Channel }) {
+function ChannelDetail({ channelId, fallback, users }: { channelId: string; fallback: Channel; users: CommsUsersDir }) {
   const { client, data, status, error, reload, patchChannel, addMember, removeMember } = useChannel(channelId);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -225,7 +227,7 @@ function ChannelDetail({ channelId, fallback }: { channelId: string; fallback: C
     setNotice(null);
     const res = await removeMember(userId);
     setBusy(false);
-    if (res.ok) setNotice(`Участник ${userName(userId)} удалён`);
+    if (res.ok) setNotice(`Участник ${users.name(userId)} удалён`);
     else setNotice(`Отклонено: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
   }
 
@@ -234,7 +236,7 @@ function ChannelDetail({ channelId, fallback }: { channelId: string; fallback: C
     setNotice(null);
     const res = await addMember({ userId, role });
     setBusy(false);
-    if (res.ok) setNotice(`Участник ${userName(userId)} добавлен`);
+    if (res.ok) setNotice(`Участник ${users.name(userId)} добавлен`);
     else setNotice(`Отклонено: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
     return res;
   }
@@ -280,7 +282,7 @@ function ChannelDetail({ channelId, fallback }: { channelId: string; fallback: C
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
         {/* Беседа канала (read-only лента + композер); client из useChannel — тот же стор. */}
-        <ChannelConversation client={client} channelId={channelId} conversation={data?.conversation ?? null} loading={status === "loading" && !data} />
+        <ChannelConversation client={client} channelId={channelId} conversation={data?.conversation ?? null} loading={status === "loading" && !data} users={users} />
 
         {/* Участники */}
         <section className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
@@ -295,7 +297,7 @@ function ChannelDetail({ channelId, fallback }: { channelId: string; fallback: C
           ) : (
             <ul className="flex flex-col gap-2">
               {members.map((m) => (
-                <MemberRow key={m.userId} member={m} canManage={canManage} busy={busy} onRemove={() => void doRemove(m.userId)} />
+                <MemberRow key={m.userId} member={m} canManage={canManage} busy={busy} onRemove={() => void doRemove(m.userId)} users={users} />
               ))}
             </ul>
           )}
@@ -303,7 +305,7 @@ function ChannelDetail({ channelId, fallback }: { channelId: string; fallback: C
           {canManage ? (
             <>
               <Separator />
-              <AddMemberForm members={members} busy={busy} onAdd={doAdd} />
+              <AddMemberForm members={members} busy={busy} onAdd={doAdd} users={users} />
             </>
           ) : null}
         </section>
@@ -315,8 +317,8 @@ function ChannelDetail({ channelId, fallback }: { channelId: string; fallback: C
 }
 
 // Строка участника канала.
-function MemberRow({ member, canManage, busy, onRemove }: { member: ChannelMember; canManage: boolean; busy: boolean; onRemove: () => void }) {
-  const name = userName(member.userId);
+function MemberRow({ member, canManage, busy, onRemove, users }: { member: ChannelMember; canManage: boolean; busy: boolean; onRemove: () => void; users: CommsUsersDir }) {
+  const name = users.name(member.userId);
   return (
     <li className="flex items-center gap-2.5">
       <BemAvatar initials={initials(name)} color={avatarColor(member.userId)} size="sm" title={name} />
@@ -338,16 +340,18 @@ function MemberRow({ member, canManage, busy, onRemove }: { member: ChannelMembe
 function AddMemberForm({
   members,
   busy,
-  onAdd
+  onAdd,
+  users
 }: {
   members: ChannelMember[];
   busy: boolean;
   onAdd: (userId: string, role: CommunicationChannelRole) => Promise<{ ok: boolean }>;
+  users: CommsUsersDir;
 }) {
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState<CommunicationChannelRole>("member");
-  // Пользователи, ещё не состоящие в канале (active membership).
-  const candidates = COMMS_USERS.filter((u) => !members.some((m) => m.userId === u.id));
+  // Пользователи, ещё не состоящие в канале (active membership). Список из справочника тенанта.
+  const candidates = users.list.filter((u) => !members.some((m) => m.userId === u.id));
   const valid = Boolean(userId) && candidates.some((u) => u.id === userId);
 
   const submit = async () => {
@@ -395,12 +399,14 @@ function ChannelConversation({
   client,
   channelId,
   conversation,
-  loading
+  loading,
+  users
 }: {
   client: ReturnType<typeof useChannel>["client"];
   channelId: string;
   conversation: Conversation | null;
   loading: boolean;
+  users: CommsUsersDir;
 }) {
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [draft, setDraft] = useState("");
@@ -459,7 +465,7 @@ function ChannelConversation({
           <div className="flex flex-1 items-center justify-center text-[length:var(--text-xs)] text-[var(--muted-soft)]">Сообщений пока нет — начните беседу канала.</div>
         ) : (
           visible.map((m) => {
-            const name = userName(m.authorUserId);
+            const name = users.name(m.authorUserId);
             return (
               <div key={m.id} className="flex gap-2.5">
                 <BemAvatar initials={initials(name)} color={avatarColor(m.authorUserId)} size="sm" title={name} />

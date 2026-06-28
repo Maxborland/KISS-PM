@@ -1874,6 +1874,12 @@ export function createMockCommsFetch(): typeof fetch {
       return json({ preferences });
     }
 
+    /* 36) GET /users — справочник пользователей рабочей области (боевой эквивалент — тот же путь
+       /api/workspace/users). Мок отдаёт сид COMMS_USERS, чтобы stories видели тех же 4 людей. */
+    if (method === "GET" && path === "/api/workspace/users") {
+      return json({ users: COMMS_USERS });
+    }
+
     /* Общий 404 fallback (неизвестная ручка). */
     return err("not_found", 404);
   };

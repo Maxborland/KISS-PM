@@ -63,6 +63,11 @@ import type {
 /* Алиас для удобства: тип сущности, к которой привязана коллаборация. */
 export type EntityType = CollaborationEntityType;
 
+/* Справочник пользователей рабочей области (GET /api/workspace/users).
+   Боевой ответ — суперсет ({ tenantId, createdAt, … }); структурно совместим с { id, name }.
+   Тот же эндпойнт, что и у блоков workspace/CRM — единый источник правды по людям тенанта. */
+export type CommsUser = { id: string; name: string };
+
 export type CommsApiClientOptions = { apiOrigin: string; fetchImpl?: typeof fetch; credentials?: RequestCredentials };
 
 /* Зеркало CrmApiError: статус + код ошибки + сырое тело ответа. */
@@ -627,6 +632,13 @@ export function createCommsClient(options: CommsApiClientOptions) {
         method: "PUT",
         body: JSON.stringify({ preferences })
       });
+    },
+
+    /* ===== СПРАВОЧНИК ПОЛЬЗОВАТЕЛЕЙ ===== */
+    // 36) Список пользователей тенанта (для @mentions, участников, ответственных, выбора участника канала).
+    // Тот же боевой эндпойнт, что у workspace/CRM. В моке отдаётся COMMS_USERS.
+    listUsers() {
+      return requestJson<{ users: CommsUser[] }>("/api/workspace/users");
     }
   };
 }

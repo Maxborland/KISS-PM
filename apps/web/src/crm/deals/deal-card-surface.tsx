@@ -11,15 +11,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { money } from "@/crm/ui/crm-bits";
-import { useCrm } from "@/crm/lib/use-crm";
-import { CRM_USERS } from "@/crm/lib/mock-crm-backend";
+import { useCrm, useCrmUsers, type CrmUsersIndex } from "@/crm/lib/use-crm";
 import type { CrmActivity, FeasibilityAssessment, Opportunity } from "@/crm/lib/crm-client";
 
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
-const userById = new Map(CRM_USERS.map((u) => [u.id, u]));
-const ownerColor = (id: string | null): BemAvatarColor => { const i = CRM_USERS.findIndex((u) => u.id === id); return i < 0 ? "c5" : AV[i % AV.length]!; };
 const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean); return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—"; };
-const ownerName = (id: string | null) => (id ? userById.get(id)?.name ?? id : "—");
+// Имя/цвет аватара владельца/автора/исполнителя — резолв из справочника пользователей (useCrmUsers),
+// переданного пропом из родителя (ActivityItem — many-instance, поэтому данные приходят пропом).
+const ownerName = (users: CrmUsersIndex, id: string | null) => users.name(id);
+const ownerColor = (users: CrmUsersIndex, id: string | null): BemAvatarColor => { const i = users.indexOf(id); return i < 0 ? "c5" : AV[i % AV.length]!; };
 
 const STATUS_LABEL: Record<Opportunity["status"], string> = { new: "Новая", feasibility: "Проверка", ready_to_activate: "Готова к запуску", won_closed: "Выиграна", lost_rejected: "Проиграна" };
 const isFinal = (o: Opportunity) => o.status === "won_closed" || o.status === "lost_rejected";
@@ -62,10 +62,13 @@ const formOf = (o: Opportunity): FormState => ({
   plannedStart: o.plannedStart, plannedFinish: o.plannedFinish
 });
 
-export function DealCard() {
+// initialId — стартовая сделка из URL (route app/crm/deals/[id]); по умолчанию пусто → fallback ниже
+// на opp-2207 (mock-сид), затем первая (live). Stories рендерят без initialId → прежнее поведение.
+export function DealCard({ initialId }: { initialId?: string } = {}) {
   const crm = useCrm();
+  const users = useCrmUsers();
   const { data, status, error, reload } = crm;
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialId ?? null);
 
   const selected = useMemo<Opportunity | null>(() => {
     if (!data) return null;
@@ -104,12 +107,12 @@ export function DealCard() {
         </select>
       }
     >
-      <DealCardBody key={selected.id} crm={crm} data={data} opp={selected} />
+      <DealCardBody key={selected.id} crm={crm} data={data} opp={selected} users={users} />
     </CrmFrame>
   );
 }
 
-function DealCardBody({ crm, data, opp }: { crm: ReturnType<typeof useCrm>; data: NonNullable<ReturnType<typeof useCrm>["data"]>; opp: Opportunity }) {
+function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm>; data: NonNullable<ReturnType<typeof useCrm>["data"]>; opp: Opportunity; users: CrmUsersIndex }) {
   const [form, setForm] = useState<FormState>(() => formOf(opp));
   const [feasibility, setFeasibility] = useState<FeasibilityAssessment | null>(() => (opp.feasibilityResult as FeasibilityAssessment | null) ?? null);
   const [activities, setActivities] = useState<CrmActivity[] | null>(null);
@@ -197,7 +200,7 @@ function DealCardBody({ crm, data, opp }: { crm: ReturnType<typeof useCrm>; data
 
       {/* шапка */}
       <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-3 shadow-[var(--shadow-card)]">
-        <BemAvatar initials={initials(ownerName(opp.ownerUserId))} color={ownerColor(opp.ownerUserId)} title={ownerName(opp.ownerUserId)} />
+        <BemAvatar initials={initials(ownerName(users, opp.ownerUserId))} color={ownerColor(users, opp.ownerUserId)} title={ownerName(users, opp.ownerUserId)} />
         <div className="mr-auto min-w-0">
           <h2 className="truncate text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">{opp.title}</h2>
           <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]"><span className="v4-mono">{opp.id}</span> · {opp.clientName} · {opp.contactName}</p>
@@ -227,7 +230,7 @@ function DealCardBody({ crm, data, opp }: { crm: ReturnType<typeof useCrm>; data
               </label>
               <label className={labelCls}>Владелец
                 <select value={form.ownerUserId} onChange={(e) => set("ownerUserId", e.target.value)} disabled={locked} className={selCls}>
-                  {CRM_USERS.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  {users.list.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </label>
               <label className={labelCls}>Старт<Input type="date" value={form.plannedStart} onChange={(e) => set("plannedStart", e.target.value)} disabled={locked} /></label>
@@ -259,7 +262,7 @@ function DealCardBody({ crm, data, opp }: { crm: ReturnType<typeof useCrm>; data
               <p className="py-4 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Пока нет активностей.</p>
             ) : (
               <ul className="flex flex-col gap-2.5">
-                {activities.map((a) => <ActivityItem key={a.id} a={a} busy={busy} onToggle={() => void toggleTask(a)} />)}
+                {activities.map((a) => <ActivityItem key={a.id} a={a} users={users} busy={busy} onToggle={() => void toggleTask(a)} />)}
               </ul>
             )}
           </section>
@@ -343,12 +346,12 @@ function FeasibilityWidget({ a, checkedAt }: { a: FeasibilityAssessment; checked
   );
 }
 
-function ActivityItem({ a, busy, onToggle }: { a: CrmActivity; busy: boolean; onToggle: () => void }) {
-  const author = ownerName(a.authorUserId);
+function ActivityItem({ a, users, busy, onToggle }: { a: CrmActivity; users: CrmUsersIndex; busy: boolean; onToggle: () => void }) {
+  const author = ownerName(users, a.authorUserId);
   const when = new Date(a.createdAt).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   return (
     <li className="flex gap-2.5">
-      <BemAvatar initials={initials(author)} color={ownerColor(a.authorUserId)} size="sm" title={author} />
+      <BemAvatar initials={initials(author)} color={ownerColor(users, a.authorUserId)} size="sm" title={author} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{author}</strong>
@@ -364,7 +367,7 @@ function ActivityItem({ a, busy, onToggle }: { a: CrmActivity; busy: boolean; on
             <div className="min-w-0">
               <p className={`text-[length:var(--text-sm)] ${a.status === "done" ? "text-[var(--muted-soft)] line-through" : "text-[var(--text)]"}`}>{a.title}</p>
               {a.body ? <p className="text-[length:var(--text-xs)] text-[var(--muted)]">{a.body}</p> : null}
-              {a.dueDate ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Срок: {a.dueDate}{a.assigneeUserId ? ` · ${ownerName(a.assigneeUserId)}` : ""}</p> : null}
+              {a.dueDate ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Срок: {a.dueDate}{a.assigneeUserId ? ` · ${ownerName(users, a.assigneeUserId)}` : ""}</p> : null}
             </div>
           </div>
         ) : a.type === "file" ? (

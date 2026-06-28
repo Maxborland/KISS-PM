@@ -12,9 +12,9 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
-import { useConversation } from "@/communications/lib/use-comms";
-import { avatarColor, commsErr, initials, relTime, userName, UnreadDot } from "@/communications/lib/comms-bits";
-import type { Conversation, Message, Reaction } from "@/communications/lib/comms-client";
+import { useCommsUsers, useConversation, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { avatarColor, commsErr, initials, relTime, UnreadDot } from "@/communications/lib/comms-bits";
+import type { Conversation, EntityType, Message, Reaction } from "@/communications/lib/comms-client";
 
 /* ============================================================
    Поверхность ЧАТ блока «Коммуникации».
@@ -23,11 +23,14 @@ import type { Conversation, Message, Reaction } from "@/communications/lib/comms
    Работает на useConversation (createCommsClient поверх in-memory мока).
    ============================================================ */
 
-// «Текущий пользователь» прототипа = u-anna (зеркало CURRENT_ACTOR_ID в моке).
+// «Текущий пользователь» прототипа = u-anna (зеркало CURRENT_ACTOR_ID в моке). На боевом API
+// «свои» реакции/авторство определяются сессией сервера; отдельной ручки «кто я» здесь нет —
+// ME остаётся прототипным актором (см. blockers). Подсветка своих реакций на live приблизительна.
 const ME = "u-anna";
 
-// Demo-сущность (entity-scoped): беседы/звонки/митинги привязаны к проекту proj-portal.
-const DEMO_ENTITY_TYPE = "project" as const;
+// Demo-сущность (entity-scoped): беседы привязаны к проекту proj-portal. Прод-route может
+// передать реальные entityType/entityId пропсами; по умолчанию — демо (для stories).
+const DEMO_ENTITY_TYPE: EntityType = "project";
 const DEMO_ENTITY_ID = "proj-portal";
 
 // Сид-стикеры (StickerAsset не отдаётся клиентом отдельным методом — берём из сид-набора).
@@ -40,9 +43,11 @@ const stickerEmoji = (id: string): string => STICKERS.find((s) => s.id === id)?.
 // Быстрые реакции для попапа под сообщением.
 const QUICK_EMOJI = ["👍", "🎉", "❤️", "🔥", "👀", "✅"];
 
-export function ChatSurface() {
-  const conv = useConversation(DEMO_ENTITY_TYPE, DEMO_ENTITY_ID);
+export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENTITY_ID }: { entityType?: EntityType; entityId?: string } = {}) {
+  const conv = useConversation(entityType, entityId);
   const { data, status, error, reload, selectConversation } = conv;
+  // Справочник людей тенанта (имена авторов): mock=COMMS_USERS, live=GET /api/workspace/users.
+  const users = useCommsUsers();
 
   // Верхнеуровневый статус поверхности: forbidden (403) / error / loading / ready.
   // (ВЛОЖЕННЫЙ EmptyState «Нет бесед» — НЕ top-level: остаётся внутри ready-разметки.)
@@ -51,7 +56,7 @@ export function ChatSurface() {
   const selected = data?.conversations.find((c) => c.id === data.selectedConversationId) ?? null;
 
   return (
-    <CommsFrame activeTab="Чат" subtitle="Беседы проекта · proj-portal">
+    <CommsFrame activeTab="Чат" subtitle={`Беседы · ${entityType} / ${entityId}`}>
       <div className="flex flex-col gap-3">
         <PrototypeBanner />
         <SurfaceState
@@ -70,7 +75,7 @@ export function ChatSurface() {
                 onSelect={(id) => void selectConversation(id)}
               />
               {selected ? (
-                <ChatPane key={selected.id} conv={conv} conversation={selected} messages={data.messages} />
+                <ChatPane key={selected.id} conv={conv} conversation={selected} messages={data.messages} users={users} />
               ) : (
                 <div className="grid min-h-[480px] place-items-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
                   <EmptyState title="Нет бесед" description="У этой сущности пока нет бесед." />
@@ -151,11 +156,13 @@ function ConversationList({
 function ChatPane({
   conv,
   conversation,
-  messages
+  messages,
+  users
 }: {
   conv: ReturnType<typeof useConversation>;
   conversation: Conversation;
   messages: Message[];
+  users: CommsUsersDir;
 }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -206,7 +213,7 @@ function ChatPane({
       <header className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
         <div className="mr-auto min-w-0">
           <h2 className="truncate text-[length:var(--text-sm)] font-bold text-[var(--text-strong)]">{conversation.title}</h2>
-          <p className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{ordered.length} сообщ. · proj-portal</p>
+          <p className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{ordered.length} сообщ. · {conversation.entityId}</p>
         </div>
         <Button
           variant="ghost"
@@ -226,7 +233,7 @@ function ChatPane({
           {pinned.map((m) => (
             <div key={m.id} className="flex items-center gap-2 text-[length:var(--text-xs)]">
               <Pin className="size-3 shrink-0 text-[var(--accent)]" aria-hidden />
-              <span className="font-semibold text-[var(--muted-strong)]">{userName(m.authorUserId)}:</span>
+              <span className="font-semibold text-[var(--muted-strong)]">{users.name(m.authorUserId)}:</span>
               <span className="truncate text-[var(--muted)]">{m.body || (m.stickers[0] ? stickerEmoji(m.stickers[0].stickerAssetId) : "—")}</span>
             </div>
           ))}
@@ -243,6 +250,7 @@ function ChatPane({
               <MessageBubble
                 key={m.id}
                 message={m}
+                users={users}
                 busy={busy}
                 onToggleReaction={(emoji) => toggleReaction(m, emoji)}
                 onEdit={(body) => void run(() => conv.editMessage(cid, m.id, { body }), "Сообщение изменено")}
@@ -270,6 +278,7 @@ function ChatPane({
 // Бабл сообщения: аватар + автор + relTime + тело/стикер + реакции + hover-меню.
 function MessageBubble({
   message,
+  users,
   busy,
   onToggleReaction,
   onEdit,
@@ -277,6 +286,7 @@ function MessageBubble({
   onPin
 }: {
   message: Message;
+  users: CommsUsersDir;
   busy: boolean;
   onToggleReaction: (emoji: string) => void;
   onEdit: (body: string) => void;
@@ -293,10 +303,10 @@ function MessageBubble({
   if (archived) {
     return (
       <div className="flex gap-2.5 opacity-60">
-        <BemAvatar initials={initials(userName(m.authorUserId))} color={avatarColor(m.authorUserId)} size="sm" title={userName(m.authorUserId)} />
+        <BemAvatar initials={initials(users.name(m.authorUserId))} color={avatarColor(m.authorUserId)} size="sm" title={users.name(m.authorUserId)} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">{userName(m.authorUserId)}</strong>
+            <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">{users.name(m.authorUserId)}</strong>
             <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{relTime(m.createdAt)}</span>
           </div>
           <p className="mt-0.5 text-[length:var(--text-sm)] italic text-[var(--muted-soft)]">сообщение удалено</p>
@@ -310,10 +320,10 @@ function MessageBubble({
 
   return (
     <div className="group flex gap-2.5">
-      <BemAvatar initials={initials(userName(m.authorUserId))} color={avatarColor(m.authorUserId)} size="sm" title={userName(m.authorUserId)} />
+      <BemAvatar initials={initials(users.name(m.authorUserId))} color={avatarColor(m.authorUserId)} size="sm" title={users.name(m.authorUserId)} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{userName(m.authorUserId)}</strong>
+          <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{users.name(m.authorUserId)}</strong>
           <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{relTime(m.createdAt)}</span>
           {m.editedAt ? <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">(изм.)</span> : null}
           {m.pinnedAt ? <Pin className="size-3 text-[var(--accent)]" aria-hidden /> : null}

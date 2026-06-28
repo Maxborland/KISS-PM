@@ -1,7 +1,11 @@
-"use client";
+import { AdminRuntimeProvider } from "@/admin/lib/admin-runtime";
+import { AdminUsersSurface } from "@/admin/users/users-surface";
 
-import { RuntimeScreenView } from "@/views/screens/runtime-screen-view";
-
+// Прод-route «Администрирование · Пользователи» (v3) на боевом admin API.
 export default function AdminUsersPage() {
-  return <RuntimeScreenView id="09-admin" entityId="users" />;
+  return (
+    <AdminRuntimeProvider live>
+      <AdminUsersSurface />
+    </AdminRuntimeProvider>
+  );
 }

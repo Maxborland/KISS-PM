@@ -55,17 +55,26 @@ const DEMO_PASSWORD = "kiss-pm-admin";
 
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
-export function ProfileSurface() {
-  // ЕДИНЫЙ useAuth: вход + профиль (user из me) + права + правка — одна мок-сессия.
+export type ProfileSurfaceProps = {
+  /** Демо-авто-вход админом на монтаже (мок стартует anonymous). По умолчанию true —
+   *  сохраняет поведение Storybook. Боевой /profile передаёт false: профиль читается
+   *  из РЕАЛЬНОЙ cookie-сессии (GET /api/auth/me), без подстановки демо-кред. */
+  demoAutoLogin?: boolean;
+};
+
+export function ProfileSurface({ demoAutoLogin = true }: ProfileSurfaceProps = {}) {
+  // ЕДИНЫЙ useAuth: вход + профиль (user из me) + права + правка — одна сессия.
   // (Раздельный useProfile создавал бы ОТДЕЛЬНУЮ изолированную сессию → 401.)
   const { state, status, error, user, permissions, login, logout, reload, updateProfile, updateTheme } = useAuth();
 
   // Авто-вход демо-кредами ОДИН раз (мок стартует anonymous). useRef — защита от StrictMode-двойного эффекта.
   const autoLoginRef = useRef(false);
-  const [bootstrapping, setBootstrapping] = useState(true);
+  // В боевом режиме (demoAutoLogin=false) авто-входа нет → не блокируем рендер: статус ведёт useAuth (me).
+  const [bootstrapping, setBootstrapping] = useState(demoAutoLogin);
   const [loggedOut, setLoggedOut] = useState(false);
 
   useEffect(() => {
+    if (!demoAutoLogin) return; // боевой: полагаемся на реальную cookie-сессию (me), без демо-кред
     if (autoLoginRef.current) return;
     autoLoginRef.current = true;
     void (async () => {
@@ -135,13 +144,15 @@ export function ProfileSurface() {
           ) : null}
         </div>
 
-        {/* Честная плашка про авто-вход (демо). */}
-        <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">
-            Демо
-          </span>
-          <span>Выполнен вход админом ({DEMO_EMAIL}) — мок стартует анонимно, поэтому сессия открыта автоматически. GET /api/auth/me отдаёт профиль ниже.</span>
-        </div>
+        {/* Честная плашка про авто-вход (демо). В боевом режиме её нет — сессия настоящая. */}
+        {demoAutoLogin ? (
+          <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+            <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">
+              Демо
+            </span>
+            <span>Выполнен вход админом ({DEMO_EMAIL}) — мок стартует анонимно, поэтому сессия открыта автоматически. GET /api/auth/me отдаёт профиль ниже.</span>
+          </div>
+        ) : null}
 
         <SurfaceState
           status={surfaceStatus}

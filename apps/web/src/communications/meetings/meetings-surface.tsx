@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, CheckSquare, Link2, Plus, Send, StickyNote, Users } from "lucide-react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
@@ -14,10 +14,11 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
-import { useMeetings } from "@/communications/lib/use-comms";
-import { avatarColor, commsErr, COMMS_USERS, initials, relTime, userName } from "@/communications/lib/comms-bits";
+import { useCommsUsers, useMeetings, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { avatarColor, commsErr, initials, relTime } from "@/communications/lib/comms-bits";
 import type {
   ActionItemInput,
+  EntityType,
   Meeting,
   MeetingActionItem,
   MeetingCreateInput,
@@ -43,8 +44,10 @@ import type {
    записи (мутация вернула ok). В приложении детали подтянутся с сервера.
    ============================================================ */
 
-const ENTITY_TYPE = "project" as const;
-const ENTITY_ID = "proj-portal";
+// Демо-сущность (entity-scoped): mock/stories показывают встречи проекта proj-portal.
+// Прод-route может передать реальные entityType/entityId через пропсы MeetingsSurface.
+const DEMO_ENTITY_TYPE: EntityType = "project";
+const DEMO_ENTITY_ID = "proj-portal";
 
 const STATUS: Record<MeetingStatus, { label: string; variant: "info" | "success" | "danger" }> = {
   scheduled: { label: "Запланирована", variant: "info" },
@@ -120,8 +123,10 @@ const SEED_DETAIL: Record<string, MeetingDetail> = {
 };
 const emptyDetail = (): MeetingDetail => ({ participants: [], notes: [], links: [], actionItems: [] });
 
-export function MeetingsSurface() {
-  const { data, status, error, reload, createMeeting, patchMeeting, addNote, addExternalLink, addActionItem } = useMeetings(ENTITY_TYPE, ENTITY_ID);
+export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENTITY_ID }: { entityType?: EntityType; entityId?: string } = {}) {
+  const { data, status, error, reload, createMeeting, patchMeeting, addNote, addExternalLink, addActionItem } = useMeetings(entityType, entityId);
+  // Справочник людей тенанта (участники/ответственные/имена): mock=COMMS_USERS, live=GET /api/workspace/users.
+  const users = useCommsUsers();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -214,7 +219,7 @@ export function MeetingsSurface() {
     setBusy(false);
     if (res.ok) {
       mergeDetail(meetingId, {
-        actionItems: [...(detail[meetingId]?.actionItems ?? []), { id: `local-action-${Date.now()}`, tenantId: "demo", meetingId, title: input.title, ownerUserId: input.ownerUserId, dueDate: input.dueDate ?? null, targetEntityType: input.targetEntityType ?? "project", targetEntityId: input.targetEntityId ?? ENTITY_ID, status: "open", createdByUserId: "u-anna", createdAt: new Date().toISOString(), archivedAt: null }]
+        actionItems: [...(detail[meetingId]?.actionItems ?? []), { id: `local-action-${Date.now()}`, tenantId: "demo", meetingId, title: input.title, ownerUserId: input.ownerUserId, dueDate: input.dueDate ?? null, targetEntityType: input.targetEntityType ?? "project", targetEntityId: input.targetEntityId ?? entityId, status: "open", createdByUserId: "u-anna", createdAt: new Date().toISOString(), archivedAt: null }]
       });
       setNotice("Action item добавлен");
     } else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
@@ -225,7 +230,7 @@ export function MeetingsSurface() {
     <CommsFrame
       activeTab="Встречи"
       subtitle="Встречи проекта «Портал»"
-      actions={<CreateMeetingDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createMeeting} />}
+      actions={<CreateMeetingDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createMeeting} users={users} entityType={entityType} entityId={entityId} />}
     >
       <div className="flex flex-col gap-3">
         {/* Честный баннер «Прототип» */}
@@ -283,6 +288,7 @@ export function MeetingsSurface() {
               key={selected.id}
               meeting={selected}
               detail={detailOf(selected.id)}
+              users={users}
               busy={busy}
               onPatchStatus={(s) => void doPatchStatus(selected.id, s)}
               onAddNote={(b) => doAddNote(selected.id, b)}
@@ -308,6 +314,7 @@ export function MeetingsSurface() {
 function MeetingDetailPanel({
   meeting,
   detail,
+  users,
   busy,
   onPatchStatus,
   onAddNote,
@@ -316,6 +323,7 @@ function MeetingDetailPanel({
 }: {
   meeting: Meeting;
   detail: MeetingDetail;
+  users: CommsUsersDir;
   busy: boolean;
   onPatchStatus: (status: MeetingStatus) => void;
   onAddNote: (body: string) => Promise<boolean>;
@@ -363,7 +371,7 @@ function MeetingDetailPanel({
           ) : (
             <ul className="flex flex-col gap-2">
               {detail.participants.map((p) => {
-                const name = userName(p.userId);
+                const name = users.name(p.userId);
                 return (
                   <li key={p.userId} className="flex items-center gap-2">
                     <BemAvatar initials={initials(name)} color={avatarColor(p.userId)} size="sm" title={name} />
@@ -381,17 +389,17 @@ function MeetingDetailPanel({
         <ExternalLinksCard links={detail.links} busy={busy} onAdd={onAddLink} />
 
         {/* Ноты-лента */}
-        <NotesCard notes={detail.notes} busy={busy} onAdd={onAddNote} />
+        <NotesCard notes={detail.notes} busy={busy} onAdd={onAddNote} users={users} />
 
         {/* Action-items */}
-        <ActionItemsCard items={detail.actionItems} busy={busy} onAdd={onAddAction} />
+        <ActionItemsCard items={detail.actionItems} busy={busy} onAdd={onAddAction} users={users} />
       </div>
     </section>
   );
 }
 
 /* ---- Ноты-лента + добавить ноту ---- */
-function NotesCard({ notes, busy, onAdd }: { notes: MeetingNote[]; busy: boolean; onAdd: (body: string) => Promise<boolean> }) {
+function NotesCard({ notes, busy, onAdd, users }: { notes: MeetingNote[]; busy: boolean; onAdd: (body: string) => Promise<boolean>; users: CommsUsersDir }) {
   const [body, setBody] = useState("");
   const submit = async () => {
     if (!body.trim()) return;
@@ -415,7 +423,7 @@ function NotesCard({ notes, busy, onAdd }: { notes: MeetingNote[]; busy: boolean
       ) : (
         <ul className="flex flex-col gap-2.5">
           {notes.map((n) => {
-            const author = userName(n.authorUserId);
+            const author = users.name(n.authorUserId);
             return (
               <li key={n.id} className="flex gap-2.5">
                 <BemAvatar initials={initials(author)} color={avatarColor(n.authorUserId)} size="sm" title={author} />
@@ -484,10 +492,14 @@ function ExternalLinksCard({ links, busy, onAdd }: { links: MeetingExternalLink[
 }
 
 /* ---- Action-items (чек-список, status ВСЕГДА open — мутации статуса НЕТ) ---- */
-function ActionItemsCard({ items, busy, onAdd }: { items: MeetingActionItem[]; busy: boolean; onAdd: (input: ActionItemInput) => Promise<boolean> }) {
+function ActionItemsCard({ items, busy, onAdd, users }: { items: MeetingActionItem[]; busy: boolean; onAdd: (input: ActionItemInput) => Promise<boolean>; users: CommsUsersDir }) {
   const [title, setTitle] = useState("");
-  const [ownerUserId, setOwnerUserId] = useState(COMMS_USERS[0]?.id ?? "");
+  const [ownerUserId, setOwnerUserId] = useState("");
   const [dueDate, setDueDate] = useState("");
+  // Ответственный по умолчанию — первый из справочника (подставляем, когда список загрузился).
+  useEffect(() => {
+    if (!ownerUserId && users.list[0]) setOwnerUserId(users.list[0].id);
+  }, [users.list, ownerUserId]);
   const valid = Boolean(title.trim() && ownerUserId);
   const submit = async () => {
     if (!valid) return;
@@ -506,7 +518,7 @@ function ActionItemsCard({ items, busy, onAdd }: { items: MeetingActionItem[]; b
       ) : (
         <ul className="mb-3 flex flex-col gap-2">
           {items.map((it) => {
-            const owner = userName(it.ownerUserId);
+            const owner = users.name(it.ownerUserId);
             return (
               <li key={it.id} className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-2">
                 <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-[4px] border border-[var(--border-strong)] bg-[var(--panel)]" title="Статус «open» — переключение в приложении" aria-hidden />
@@ -528,7 +540,8 @@ function ActionItemsCard({ items, busy, onAdd }: { items: MeetingActionItem[]; b
         <div className="grid grid-cols-2 gap-2">
           <label className={labelCls}>Ответственный
             <select value={ownerUserId} onChange={(e) => setOwnerUserId(e.target.value)} className={selCls}>
-              {COMMS_USERS.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              {users.list.length === 0 ? <option value="" disabled>Загрузка…</option> : null}
+              {users.list.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </label>
           <label className={labelCls}>Срок<Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></label>
@@ -549,12 +562,18 @@ function CreateMeetingDialog({
   busy,
   setBusy,
   setNotice,
-  create
+  create,
+  users,
+  entityType,
+  entityId
 }: {
   busy: boolean;
   setBusy: (v: boolean) => void;
   setNotice: (v: string | null) => void;
   create: ReturnType<typeof useMeetings>["createMeeting"];
+  users: CommsUsersDir;
+  entityType: EntityType;
+  entityId: string;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -585,8 +604,8 @@ function CreateMeetingDialog({
     const participants = Object.entries(picked).map(([userId, role]) => ({ userId, role }));
     // exactOptionalPropertyTypes: опускаем agenda/participants, а не шлём undefined.
     const input: MeetingCreateInput = {
-      entityType: ENTITY_TYPE,
-      entityId: ENTITY_ID,
+      entityType,
+      entityId,
       title: title.trim(),
       scheduledStart: fromLocalInput(start),
       scheduledFinish: fromLocalInput(finish)
@@ -615,7 +634,8 @@ function CreateMeetingDialog({
         <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] p-2.5">
           <div className="mb-2 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Участники</div>
           <ul className="flex flex-col gap-2">
-            {COMMS_USERS.map((u) => {
+            {users.list.length === 0 ? <li className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Загрузка участников…</li> : null}
+            {users.list.map((u) => {
               const on = u.id in picked;
               return (
                 <li key={u.id} className="flex items-center gap-2">

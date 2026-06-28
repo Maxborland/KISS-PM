@@ -24,12 +24,13 @@ import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
-import { CallStatusChip, commsErr, relTime, userName } from "@/communications/lib/comms-bits";
-import { useCallRoom, useCallRooms, type CallRoomDetail } from "@/communications/lib/use-comms";
+import { CallStatusChip, commsErr, relTime } from "@/communications/lib/comms-bits";
+import { useCallRoom, useCallRooms, useCommsUsers, type CallRoomDetail, type CommsUsersDir } from "@/communications/lib/use-comms";
 import type {
   CallEventType,
   CallMediaKind,
   CallRoomProvider,
+  EntityType,
   VideoJoinContract
 } from "@/communications/lib/comms-client";
 
@@ -41,7 +42,9 @@ import type {
    Демо-сущность: project / proj-portal.
    ============================================================ */
 
-const DEMO_ENTITY = { entityType: "project" as const, entityId: "proj-portal" };
+// Демо-сущность (entity-scoped): mock/stories показывают звонки проекта proj-portal.
+// Прод-route может передать реальные entityType/entityId пропсами CallsSurface.
+const DEMO_ENTITY = { entityType: "project" as EntityType, entityId: "proj-portal" };
 
 /* Провайдеры/тип медиа — RU-подписи. */
 const PROVIDER_LABEL: Record<CallRoomProvider, string> = { manual: "Ручной", jitsi: "Jitsi", livekit: "LiveKit" };
@@ -82,8 +85,10 @@ const EVENT_LABEL: Record<CallEventType, string> = {
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
-export function CallsSurface() {
-  const { data, status, error, reload, createRoom } = useCallRooms(DEMO_ENTITY.entityType, DEMO_ENTITY.entityId);
+export function CallsSurface({ entityType = DEMO_ENTITY.entityType, entityId = DEMO_ENTITY.entityId }: { entityType?: EntityType; entityId?: string } = {}) {
+  const { data, status, error, reload, createRoom } = useCallRooms(entityType, entityId);
+  // Справочник людей тенанта (имена создателей/участников событий): mock=COMMS_USERS, live=GET /api/workspace/users.
+  const users = useCommsUsers();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -99,7 +104,7 @@ export function CallsSurface() {
   // Кнопку создания сохраняем и в шапке, и в empty-action — пустое состояние остаётся рабочим.
   if (status === "forbidden" || status === "error" || !data || rooms.length === 0) {
     const createAction = (
-      <CreateRoomDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRoom} onCreated={(id) => setSelectedId(id)} />
+      <CreateRoomDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRoom} onCreated={(id) => setSelectedId(id)} entityType={entityType} entityId={entityId} />
     );
     return (
       <CommsFrame activeTab="Звонки" actions={data && rooms.length === 0 ? createAction : undefined}>
@@ -130,7 +135,7 @@ export function CallsSurface() {
     <CommsFrame
       activeTab="Звонки"
       subtitle="Комнаты звонков проекта · честно без WebRTC"
-      actions={<CreateRoomDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRoom} onCreated={(id) => setSelectedId(id)} />}
+      actions={<CreateRoomDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRoom} onCreated={(id) => setSelectedId(id)} entityType={entityType} entityId={entityId} />}
     >
       {/* Честный баннер «Прототип» */}
       <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
@@ -176,7 +181,7 @@ export function CallsSurface() {
         {/* СПРАВА: детальная комната */}
         <section className="min-w-0">
           {activeRoomId ? (
-            <RoomDetail key={activeRoomId} roomId={activeRoomId} />
+            <RoomDetail key={activeRoomId} roomId={activeRoomId} users={users} />
           ) : (
             <div className="grid h-[320px] place-items-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[length:var(--text-sm)] text-[var(--muted-soft)]">
               Выберите комнату слева, чтобы открыть детали.
@@ -193,7 +198,7 @@ export function CallsSurface() {
 /* ============================================================
    Детальная комната: инфо + управление сессией + таймлайн + записи.
    ============================================================ */
-function RoomDetail({ roomId }: { roomId: string }) {
+function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir }) {
   const { data, status, error, reload, startSession, joinToken, participantState, endSession } = useCallRoom(roomId);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -267,7 +272,7 @@ function RoomDetail({ roomId }: { roomId: string }) {
         <div className="mr-auto min-w-0">
           <h2 className="truncate text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">{room.title}</h2>
           <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">
-            <span className="v4-mono">{room.roomId}</span> · создал {userName(room.createdByUserId)} · {relTime(room.createdAt)}
+            <span className="v4-mono">{room.roomId}</span> · создал {users.name(room.createdByUserId)} · {relTime(room.createdAt)}
           </p>
         </div>
         <CallStatusChip status={room.status} />
@@ -337,8 +342,8 @@ function RoomDetail({ roomId }: { roomId: string }) {
                     <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{relTime(ev.createdAt)}</span>
                   </div>
                   <p className="text-[length:var(--text-xs)] text-[var(--muted)]">
-                    {userName(ev.actorUserId)}
-                    {typeof ev.payload.userId === "string" && ev.payload.userId !== ev.actorUserId ? ` · участник ${userName(ev.payload.userId)}` : ""}
+                    {users.name(ev.actorUserId)}
+                    {typeof ev.payload.userId === "string" && ev.payload.userId !== ev.actorUserId ? ` · участник ${users.name(ev.payload.userId)}` : ""}
                     {typeof ev.payload.provider === "string" ? ` · ${PROVIDER_LABEL[ev.payload.provider as CallRoomProvider] ?? ev.payload.provider}` : ""}
                   </p>
                 </div>
@@ -418,12 +423,14 @@ function JoinDialog({ open, onOpenChange, join }: { open: boolean; onOpenChange:
 /* ============================================================
    Диалог создания комнаты: title / mediaKind / provider (+ опц.).
    ============================================================ */
-function CreateRoomDialog({ busy, setBusy, setNotice, create, onCreated }: {
+function CreateRoomDialog({ busy, setBusy, setNotice, create, onCreated, entityType, entityId }: {
   busy: boolean;
   setBusy: (v: boolean) => void;
   setNotice: (v: string | null) => void;
   create: ReturnType<typeof useCallRooms>["createRoom"];
   onCreated: (roomId: string) => void;
+  entityType: EntityType;
+  entityId: string;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -438,8 +445,8 @@ function CreateRoomDialog({ busy, setBusy, setNotice, create, onCreated }: {
     setBusy(true); setNotice(null);
     const trimmedRoomId = providerRoomId.trim();
     const res = await create({
-      entityType: DEMO_ENTITY.entityType,
-      entityId: DEMO_ENTITY.entityId,
+      entityType,
+      entityId,
       title: title.trim(),
       provider,
       mediaKind,
