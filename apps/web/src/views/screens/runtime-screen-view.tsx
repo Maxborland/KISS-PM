@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, Calendar, Clock, Folder, Inbox, MoreHorizontal, Users } from "lucide-react";
+import { Ban, Calendar, ChevronDown, ChevronUp, Clock, Filter, Folder, Inbox, Link2, MoreHorizontal, Plus, Trash2, Unlink, Users } from "lucide-react";
 import { FormEvent, ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -28,7 +28,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { KanbanBoard, KanbanColumn } from "@/widgets/kanban/kanban-board";
 import { KanbanCard } from "@/widgets/kanban/kanban-card";
 import { Gantt } from "@/widgets/gantt";
-import type { GanttData } from "@/widgets/gantt";
+import type { GanttData, GanttRow } from "@/widgets/gantt";
 import { SCREEN_META, type ScreenId } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
 import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
@@ -80,10 +80,13 @@ type Task = {
 };
 type TaskStatus = { id: string; name: string; category: string; sortOrder: number; status: string };
 type AuditEvent = { id: string; actionType: string; createdAt: string; executionResult?: Record<string, unknown> | null; sourceEntity?: Record<string, unknown> | null };
+type PlanningTask = { id: string; title: string; statusId: string; parentTaskId?: string | null; plannedStart: string | null; plannedFinish: string | null; durationMinutes?: number | null; workMinutes?: number | null; percentComplete?: number | null; schedulingMode?: string | null; taskType?: string | null; wbsCode?: string | null };
 type PlanningReadModel = {
   project: { id: string; title: string; plannedStart: string; plannedFinish: string };
   resources: Array<{ id: string; name: string }>;
-  authored: { tasks: Array<{ id: string; title: string; statusId: string; plannedStart: string | null; plannedFinish: string | null; workMinutes?: number | null; percentComplete?: number | null; schedulingMode?: string | null; wbsCode?: string | null }>; assignments: Array<{ id: string; taskId: string; resourceId: string; role: string; workMinutes: number | null }> };
+  // API (createPlanningReadModel) отдаёт куда больше, чем web потреблял — ниже только поля, которые реально читаем.
+  authored: { tasks: PlanningTask[]; dependencies?: Array<{ id: string; predecessorTaskId: string; successorTaskId: string; type: string }>; assignments: Array<{ id: string; taskId: string; resourceId: string; role: string; workMinutes: number | null }> };
+  calculatedPlan?: { criticalPathTaskIds?: string[] };
   planVersion: number;
 };
 type PlanningPreview = { planDelta: { changedTaskIds: string[]; changedAssignmentIds: string[]; changedDependencyIds: string[] }; validationIssues: Array<{ code: string; message: string; severity: string }> };
@@ -410,9 +413,26 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
   const planning = usePlanning(id);
   const queryClient = useQueryClient();
   const [preview, setPreview] = useState<PlanningPreview | null>(null);
-  const data = useMemo(() => planning.data ? toGanttData(planning.data) : undefined, [planning.data]);
+  // ponytail: zoom презентационный — виджет рисует фиксированную дневную сетку (как и Storybook-Гант). Ceiling: настоящая зум-гранулярность, если виджет начнёт её учитывать.
+  const [zoom, setZoom] = useState<"hour" | "day" | "week" | "month">("day");
+  const [showCritical, setShowCritical] = useState(true);
+  const data = useMemo(() => planning.data ? toGanttData(planning.data, showCritical) : undefined, [planning.data, showCritical]);
   const command = planning.data ? nextScheduleCommand(planning.data) : null;
   const reason = disabledReason(me, PERMISSIONS.manageProjectPlan);
+  const ganttStats = useMemo(() => {
+    const tasks = planning.data?.authored.tasks ?? [];
+    const parentIds = new Set(tasks.map((task) => task.parentTaskId).filter(Boolean));
+    const leaves = tasks.filter((task) => !parentIds.has(task.id) && (task.workMinutes ?? 0) > 0);
+    const totalWork = leaves.reduce((sum, task) => sum + (task.workMinutes ?? 0), 0);
+    const earned = leaves.reduce((sum, task) => sum + (task.workMinutes ?? 0) * Math.max(0, Math.min(1, (task.percentComplete ?? 0) / 100)), 0);
+    return {
+      progressPct: totalWork > 0 ? Math.round((earned / totalWork) * 100) : 0,
+      taskCount: leaves.length,
+      criticalCount: planning.data?.calculatedPlan?.criticalPathTaskIds?.length ?? 0
+    };
+  }, [planning.data]);
+  // Действия редактирования плана требуют command-эндпоинтов (add/del/indent/link/baseline) — показываем структуру тулбара, но честно отключаем до их появления. Не фейк-контролы: видимо disabled с причиной.
+  const editSoon = "Редактирование плана появится после command-эндпоинтов";
   const previewMutation = useMutation({
     mutationFn: () => {
       if (reason) throw new Error(reason);
@@ -451,7 +471,33 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
       />
       <DisabledReason reason={reason} />
       <StateGate state={planning} empty="План проекта пока пуст.">
-        <div className="gantt-stats"><span className="gantt-stats__item"><span className="gantt-stats__label">Версия</span><span className="gantt-stats__value">{planning.data?.planVersion ?? 0}</span></span><span className="gantt-stats__item"><span className="gantt-stats__label">Задач</span><span className="gantt-stats__value">{planning.data?.authored.tasks.length ?? 0}</span></span><span className="gantt-stats__item"><span className="gantt-stats__label">Предпросмотр</span><span className="gantt-stats__value">{preview ? preview.planDelta.changedTaskIds.length : 0}</span></span></div>
+        <div className="gantt-toolbar" role="toolbar" aria-label="Действия Ганта">
+          <div className="gantt-toolbar__group">
+            <Button variant="ghost" size="icon-sm" aria-label="Добавить" disabled title={editSoon}><Plus className="size-4" /></Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Удалить" disabled title={editSoon}><Trash2 className="size-4" /></Button>
+          </div>
+          <div className="gantt-toolbar__group">
+            <Button variant="ghost" size="icon-sm" aria-label="Уровень выше" disabled title={editSoon}><ChevronUp className="size-4" /></Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Уровень глубже" disabled title={editSoon}><ChevronDown className="size-4" /></Button>
+          </div>
+          <div className="gantt-toolbar__group">
+            <Button variant="ghost" size="icon-sm" aria-label="Связать" disabled title={editSoon}><Link2 className="size-4" /></Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Снять связь" disabled title={editSoon}><Unlink className="size-4" /></Button>
+          </div>
+          <span className="gantt-toolbar__sep" />
+          <Button variant={showCritical ? "primary" : "ghost"} size="sm" aria-pressed={showCritical} onClick={() => setShowCritical((value) => !value)}>крит. путь</Button>
+          <Button variant="ghost" size="sm" disabled title="Сравнение с базовым планом — скоро">Базовый план</Button>
+          <span className="gantt-toolbar__sep" />
+          <Button variant="ghost" size="icon-sm" aria-label="Фильтр" disabled title="Фильтрация — скоро"><Filter className="size-4" /></Button>
+          <div className="gantt-toolbar__spacer" />
+          <Segmented name="gantt-zoom" value={zoom} onChange={setZoom} options={[{ value: "hour", label: "Час" }, { value: "day", label: "День" }, { value: "week", label: "Нед" }, { value: "month", label: "Мес" }]} />
+        </div>
+        <div className="gantt-stats">
+          <span className="gantt-stats__item"><span className="gantt-stats__label">Прогресс</span><span className="gantt-stats__value">{ganttStats.progressPct}%</span></span>
+          <span className="gantt-stats__item"><span className="gantt-stats__label">Задач</span><span className="gantt-stats__value">{ganttStats.taskCount}</span></span>
+          <span className="gantt-stats__item"><span className="gantt-stats__label">Крит. путь</span><span className="gantt-stats__value">{ganttStats.criticalCount}</span></span>
+          <span className="gantt-stats__item"><span className="gantt-stats__label">Версия</span><span className="gantt-stats__value">{planning.data?.planVersion ?? 0}</span></span>
+        </div>
         {preview ? <CardPanel title="Сверка изменения" subtitle="До применения план не меняется"><p className="u-text-body">Будет изменено задач: {preview.planDelta.changedTaskIds.length}. Проверок: {preview.validationIssues.length}.</p></CardPanel> : null}
         {data ? <Gantt data={data} /> : null}
       </StateGate>
@@ -1070,13 +1116,30 @@ function businessStatus(value: string) {
 }
 function currentMonthIso() { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; }
 function capacityCount(summary: CapacitySummary | undefined) { return summary?.overloadUserCount ?? summary?.overloadedEmployeeCount ?? summary?.overloadedEmployees ?? 0; }
-function toGanttData(model: PlanningReadModel): GanttData {
+// Числовое сравнение WBS-кодов ("1.2" < "1.10"); локальная копия логики persistence/planningWbs, чтобы не тянуть серверный пакет в web.
+function compareWbs(left: string, right: string): number {
+  const a = left.split("."), b = right.split(".");
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const x = a[i], y = b[i];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    const nx = Number(x), ny = Number(y);
+    if (!Number.isNaN(nx) && !Number.isNaN(ny) && nx !== ny) return nx - ny;
+    if (x !== y) return x.localeCompare(y, undefined, { numeric: true });
+  }
+  return 0;
+}
+
+function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
   const base = new Date(model.project.plannedStart);
+  const startOfBase = new Date(base.getFullYear(), base.getMonth(), base.getDate()).getTime();
+  const now = new Date();
+  const todayIndex = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - startOfBase) / 86_400_000);
   const days = Array.from({ length: 30 }, (_, index) => {
     const day = new Date(base);
     day.setDate(base.getDate() + index);
     const weekdayShort = new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(day).slice(0, 2);
-    return { day: day.getDate(), weekdayShort, weekend: day.getDay() === 0 || day.getDay() === 6, today: index === 0 };
+    return { day: day.getDate(), weekdayShort, weekend: day.getDay() === 0 || day.getDay() === 6, today: index === todayIndex };
   });
   const resourceNameById = new Map(model.resources.map((resource) => [resource.id, resource.name]));
   const resourceNameByTask = new Map<string, string>();
@@ -1085,28 +1148,64 @@ function toGanttData(model: PlanningReadModel): GanttData {
     const name = resourceNameById.get(assignment.resourceId);
     if (name) resourceNameByTask.set(assignment.taskId, name);
   }
-  return {
-    monthLabel: new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(base),
-    days,
-    rows: model.authored.tasks.map((task) => {
-      const start = task.plannedStart ? Math.max(0, Math.round((new Date(task.plannedStart).getTime() - base.getTime()) / 86_400_000)) : 0;
-      const finish = task.plannedFinish ? Math.max(start + 1, Math.round((new Date(task.plannedFinish).getTime() - base.getTime()) / 86_400_000) + 1) : start + 1;
+  const criticalIds = new Set(showCritical ? model.calculatedPlan?.criticalPathTaskIds ?? [] : []);
+  const taskById = new Map(model.authored.tasks.map((task) => [task.id, task]));
+  const childrenByParent = new Map<string | null, PlanningTask[]>();
+  for (const task of model.authored.tasks) {
+    const parentId = task.parentTaskId ?? null;
+    childrenByParent.set(parentId, [...(childrenByParent.get(parentId) ?? []), task]);
+  }
+  const startDayOf = (task: PlanningTask) =>
+    task.plannedStart ? Math.max(0, Math.round((new Date(task.plannedStart).getTime() - base.getTime()) / 86_400_000)) : 0;
+  const finishDayOf = (task: PlanningTask, start: number) =>
+    task.plannedFinish ? Math.max(start + 1, Math.round((new Date(task.plannedFinish).getTime() - base.getTime()) / 86_400_000) + 1) : start + 1;
+  // Прогресс суммарной строки — труд-взвешенный roll-up листьев (модель не хранит % фазы).
+  const rollup = (id: string): { work: number; earned: number } => {
+    const kids = childrenByParent.get(id) ?? [];
+    if (kids.length === 0) {
+      const task = taskById.get(id);
+      const work = task?.workMinutes ?? 0;
+      return { work, earned: work * Math.max(0, Math.min(1, (task?.percentComplete ?? 0) / 100)) };
+    }
+    return kids.reduce((acc, kid) => { const r = rollup(kid.id); return { work: acc.work + r.work, earned: acc.earned + r.earned }; }, { work: 0, earned: 0 });
+  };
+
+  const rows: GanttRow[] = [];
+  const walk = (parentId: string | null, level: number): void => {
+    const siblings = [...(childrenByParent.get(parentId) ?? [])].sort((l, r) => compareWbs(l.wbsCode ?? "", r.wbsCode ?? ""));
+    for (const task of siblings) {
+      const summary = (childrenByParent.get(task.id)?.length ?? 0) > 0;
+      // ponytail: модель не знает типа "веха" — эвристика «лист без работы». Ceiling: добавить TaskType "milestone", если появится в домене.
+      const milestone = !summary && (task.workMinutes ?? 0) === 0;
+      const start = startDayOf(task);
+      const finish = finishDayOf(task, start);
       const resourceName = resourceNameByTask.get(task.id);
-      return {
+      const progress = summary ? (() => { const r = rollup(task.id); return r.work > 0 ? r.earned / r.work : 0; })() : Math.max(0, Math.min(1, (task.percentComplete ?? 0) / 100));
+      rows.push({
         id: task.id,
-        level: 0 as const,
-        kind: "task" as const,
+        level: Math.min(level, 3) as 0 | 1 | 2 | 3,
+        kind: summary ? "summary" : milestone ? "milestone" : "task",
         name: task.title,
         wbs: task.wbsCode ?? "",
         startDay: start,
         durationDays: Math.max(1, finish - start),
-        progress: Math.max(0, Math.min(1, (task.percentComplete ?? 0) / 100)),
+        progress,
         mode: task.schedulingMode === "manual" ? "Руч." : "Авто",
         workMinutes: task.workMinutes ?? null,
         startLabel: task.plannedStart ? formatDate(task.plannedStart) : "—",
         finishLabel: task.plannedFinish ? formatDate(task.plannedFinish) : "—",
+        ...(criticalIds.has(task.id) ? { critical: true } : {}),
+        ...(summary ? { collapsible: true } : {}),
         ...(resourceName ? { resourceName, assignee: { initials: initials(resourceName), color: "c1" as const } } : {})
-      };
-    })
+      });
+      walk(task.id, level + 1);
+    }
+  };
+  walk(null, 0);
+
+  return {
+    monthLabel: new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(base),
+    days,
+    rows
   };
 }
