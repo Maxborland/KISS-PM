@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Chip } from "@/components/ui/chip";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AppPreloader, FeedSkeleton, TableSkeleton } from "@/components/ui/loaders";
@@ -634,6 +635,35 @@ function taskStatusTone(category: string): React.ComponentProps<typeof Badge>["v
   if (category === "review" || category === "in_progress") return "info";
   return "secondary";
 }
+function TaskDetailSheet({ task, children }: { task: Task; children: ReactNode }) {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>{children}</SheetTrigger>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>{task.title}</SheetTitle>
+          <SheetDescription>Детали задачи · только просмотр</SheetDescription>
+        </SheetHeader>
+        <SheetBody className="flex flex-col gap-[var(--space-4)]">
+          <div className="flex flex-wrap items-center gap-[var(--space-2)]">
+            <Badge variant={taskStatusTone(task.statusCategory)}>{task.statusName}</Badge>
+            <Badge variant="secondary">{businessStatus(task.priority)}</Badge>
+          </div>
+          <dl className="flex flex-col gap-[var(--space-2)]">
+            <div><dt className="u-text-xs u-text-muted">Срок</dt><dd className="u-text-body u-text-strong">{dateRange(task.plannedStart, task.plannedFinish)}</dd></div>
+            <div><dt className="u-text-xs u-text-muted">Прогресс</dt><dd className="u-text-body u-text-strong">{task.progress}%</dd></div>
+            <div><dt className="u-text-xs u-text-muted">Трудоёмкость</dt><dd className="u-text-body u-text-strong">{task.plannedWork} ч</dd></div>
+            <div><dt className="u-text-xs u-text-muted">Участников</dt><dd className="u-text-body u-text-strong">{task.participants?.length ?? 0}</dd></div>
+          </dl>
+          <div>
+            <p className="u-text-xs u-text-muted">Описание</p>
+            <p className="u-text-body">{task.description ?? "Без описания"}</p>
+          </div>
+        </SheetBody>
+      </SheetContent>
+    </Sheet>
+  );
+}
 function TaskTable({ tasks, statuses, actorId, auth, compactActions = false }: { tasks: Task[]; statuses: TaskStatus[]; actorId?: string | undefined; auth: AuthMe; compactActions?: boolean }) {
   return (
     <Table>
@@ -652,7 +682,14 @@ function TaskTable({ tasks, statuses, actorId, auth, compactActions = false }: {
         {tasks.map((task) => (
           <TableRow key={task.id}>
             <TableCell className="max-w-[20rem]">
-              <CellStack title={task.title} subtitle={task.description ?? "Без описания"} truncate />
+              <TaskDetailSheet task={task}>
+                <button
+                  type="button"
+                  className="-mx-1 block w-full rounded-[var(--radius-sm)] px-1 text-left transition-colors hover:bg-[var(--panel-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]"
+                >
+                  <CellStack title={task.title} subtitle={task.description ?? "Без описания"} truncate />
+                </button>
+              </TaskDetailSheet>
             </TableCell>
             <TableCell numeric className="whitespace-nowrap text-[var(--muted)]">{formatDate(task.plannedFinish)}</TableCell>
             <TableCell>
