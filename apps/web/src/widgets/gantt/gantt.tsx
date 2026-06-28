@@ -18,11 +18,6 @@ function durationLabel(row: GanttRow) {
   return `${row.durationDays}д`;
 }
 
-function fakeDate(dayIndex: number) {
-  const d = Math.min(Math.max(dayIndex + 1, 1), 28);
-  return `${String(d).padStart(2, "0")}.05.2026`;
-}
-
 function ChartBar({ row, todayIndex }: { row: GanttRow; todayIndex: number }) {
   const start = row.startDay + 1;
   const span = Math.max(row.durationDays, 1);
@@ -98,9 +93,9 @@ function DataRow({
   index: number;
   todayIndex: number;
 }) {
-  const resources =
-    row.assignee && row.kind === "task" ? `Инициалы ${row.assignee.initials}` : "—";
-  const labor = row.kind === "task" ? `${Math.round(row.durationDays * 8)}ч` : "—";
+  const resources = row.kind === "task" ? row.resourceName ?? "—" : "—";
+  const labor =
+    row.kind === "task" && row.workMinutes != null ? `${Math.round(row.workMinutes / 60)}ч` : "—";
 
   return (
     <div
@@ -113,16 +108,14 @@ function DataRow({
     >
       <div className="gantt2__cell gantt2__cell--num">{index + 1}</div>
       <div className="gantt2__cell">
-        <span className="wbs-mode">Авто</span>
+        <span className="wbs-mode">{row.mode ?? "Авто"}</span>
       </div>
       <div className="gantt2__cell gantt2__cell--mono gantt2__cell--muted">{row.wbs ?? "—"}</div>
       <NameCell row={row} />
       <div className="gantt2__cell gantt2__cell--center">{durationLabel(row)}</div>
       <div className="gantt2__cell gantt2__cell--center">{pctLabel(row.progress)}</div>
-      <div className="gantt2__cell gantt2__cell--mono gantt2__cell--center">{fakeDate(row.startDay)}</div>
-      <div className="gantt2__cell gantt2__cell--mono gantt2__cell--center">
-        {fakeDate(row.startDay + Math.max(row.durationDays - 1, 0))}
-      </div>
+      <div className="gantt2__cell gantt2__cell--mono gantt2__cell--center">{row.startLabel ?? "—"}</div>
+      <div className="gantt2__cell gantt2__cell--mono gantt2__cell--center">{row.finishLabel ?? "—"}</div>
       <div className="gantt2__cell gantt2__cell--center gantt2__cell--muted">—</div>
       <div className="gantt2__cell">{resources}</div>
       <div className="gantt2__cell gantt2__cell--right">{labor}</div>

@@ -17,6 +17,16 @@ export type GanttRow = {
   durationDays: number;
   /** Процент выполнения (0..1). */
   progress?: number;
+  /** Режим планирования (Авто/Руч.). */
+  mode?: string;
+  /** Трудоёмкость в минутах. */
+  workMinutes?: number | null;
+  /** Дата начала (отформатированная). */
+  startLabel?: string;
+  /** Дата окончания (отформатированная). */
+  finishLabel?: string;
+  /** Имя назначенного ресурса. */
+  resourceName?: string;
   /** Назначение (короткие инициалы). */
   assignee?: { initials: string; color: "c1" | "c2" | "c3" | "c4" | "c5" | "c6" };
   /** Критический путь — рисуем красную рамку. */

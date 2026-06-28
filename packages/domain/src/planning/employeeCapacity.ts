@@ -71,6 +71,9 @@ export type CapacitySummary = {
   generatedAt: string;
   overloadProjectIds: string[];
   overloadUserCount: number;
+  totalWorkMinutes: number;
+  totalCapacityMinutes: number;
+  totalOverloadMinutes: number;
   buckets: { low: number; mid: number; high: number };
 };
 
@@ -496,6 +499,9 @@ export function buildCapacitySummary(input: {
   let low = 0;
   let mid = 0;
   let high = 0;
+  let totalWorkMinutes = 0;
+  let totalCapacityMinutes = 0;
+  let totalOverloadMinutes = 0;
   const overloadUsers = new Set<string>();
 
   for (const direction of input.tree.orgGroups) {
@@ -507,6 +513,9 @@ export function buildCapacitySummary(input: {
             if (day.heat === 1) low += 1;
             if (day.heat === 2) mid += 1;
             if (day.heat === 3) high += 1;
+            totalWorkMinutes += day.workMinutes;
+            totalCapacityMinutes += day.capacityMinutes;
+            totalOverloadMinutes += day.overloadMinutes;
           }
         }
       }
@@ -520,6 +529,9 @@ export function buildCapacitySummary(input: {
       (id) => id !== HIDDEN_PROJECT_ID
     ),
     overloadUserCount: overloadUsers.size,
+    totalWorkMinutes,
+    totalCapacityMinutes,
+    totalOverloadMinutes,
     buckets: { low, mid, high }
   };
 }

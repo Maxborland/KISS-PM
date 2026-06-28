@@ -1070,4 +1070,43 @@ function businessStatus(value: string) {
 }
 function currentMonthIso() { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; }
 function capacityCount(summary: CapacitySummary | undefined) { return summary?.overloadUserCount ?? summary?.overloadedEmployeeCount ?? summary?.overloadedEmployees ?? 0; }
-function toGanttData(model: PlanningReadModel): GanttData { const base = new Date(model.project.plannedStart); const days = Array.from({ length: 30 }, (_, index) => { const day = new Date(base); day.setDate(base.getDate() + index); const weekdayShort = new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(day).slice(0, 2); return { day: day.getDate(), weekdayShort, weekend: day.getDay() === 0 || day.getDay() === 6, today: index === 0 }; }); return { monthLabel: new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(base), days, rows: model.authored.tasks.map((task, index) => { const start = task.plannedStart ? Math.max(0, Math.round((new Date(task.plannedStart).getTime() - base.getTime()) / 86_400_000)) : 0; const finish = task.plannedFinish ? Math.max(start + 1, Math.round((new Date(task.plannedFinish).getTime() - base.getTime()) / 86_400_000) + 1) : start + 1; return { id: task.id, level: 0, kind: "task", name: task.title, wbs: String(index + 1), startDay: start, durationDays: Math.max(1, finish - start), progress: 0.4, assignee: { initials: "ИИ", color: "c1" } }; }) }; }
+function toGanttData(model: PlanningReadModel): GanttData {
+  const base = new Date(model.project.plannedStart);
+  const days = Array.from({ length: 30 }, (_, index) => {
+    const day = new Date(base);
+    day.setDate(base.getDate() + index);
+    const weekdayShort = new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(day).slice(0, 2);
+    return { day: day.getDate(), weekdayShort, weekend: day.getDay() === 0 || day.getDay() === 6, today: index === 0 };
+  });
+  const resourceNameById = new Map(model.resources.map((resource) => [resource.id, resource.name]));
+  const resourceNameByTask = new Map<string, string>();
+  for (const assignment of model.authored.assignments) {
+    if (resourceNameByTask.has(assignment.taskId)) continue;
+    const name = resourceNameById.get(assignment.resourceId);
+    if (name) resourceNameByTask.set(assignment.taskId, name);
+  }
+  return {
+    monthLabel: new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(base),
+    days,
+    rows: model.authored.tasks.map((task) => {
+      const start = task.plannedStart ? Math.max(0, Math.round((new Date(task.plannedStart).getTime() - base.getTime()) / 86_400_000)) : 0;
+      const finish = task.plannedFinish ? Math.max(start + 1, Math.round((new Date(task.plannedFinish).getTime() - base.getTime()) / 86_400_000) + 1) : start + 1;
+      const resourceName = resourceNameByTask.get(task.id);
+      return {
+        id: task.id,
+        level: 0 as const,
+        kind: "task" as const,
+        name: task.title,
+        wbs: task.wbsCode ?? "",
+        startDay: start,
+        durationDays: Math.max(1, finish - start),
+        progress: Math.max(0, Math.min(1, (task.percentComplete ?? 0) / 100)),
+        mode: task.schedulingMode === "manual" ? "Руч." : "Авто",
+        workMinutes: task.workMinutes ?? null,
+        startLabel: task.plannedStart ? formatDate(task.plannedStart) : "—",
+        finishLabel: task.plannedFinish ? formatDate(task.plannedFinish) : "—",
+        ...(resourceName ? { resourceName, assignee: { initials: initials(resourceName), color: "c1" as const } } : {})
+      };
+    })
+  };
+}
