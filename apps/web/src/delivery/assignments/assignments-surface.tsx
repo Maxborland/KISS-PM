@@ -51,8 +51,8 @@ const nid = (p: string) => `${p}-n${(NID += 1)}`;
 
 type AsgMeta = { asg: AsgRaw; days: number[]; scheduledSet: Set<number>; flatPer: number; explicit: Map<number, number>; hasExplicit: boolean };
 
-export function ProjectAssignments() {
-  const { readModel, status, error, reload, apply } = usePlanning(MOCK_PROJECT_ID);
+export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { readModel, status, error, reload, apply } = usePlanning(projectId);
   const [gran, setGran] = useState<Gran>("day");
   const [monthOffset, setMonthOffset] = useState(0);
   const [sel, setSel] = useState<string | null>(null); // assignmentId

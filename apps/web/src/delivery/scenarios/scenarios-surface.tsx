@@ -36,8 +36,8 @@ const h = (min: number) => Math.round(min / 60);
 const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 const riskOf = (score: number) => score >= 67 ? { label: "высокий риск", cls: "bg-[var(--danger-soft)] text-[var(--danger-text)]" } : score >= 34 ? { label: "средний риск", cls: "bg-[var(--warning-soft)] text-[var(--warning-text)]" } : { label: "низкий риск", cls: "bg-[var(--success-soft)] text-[var(--success-text)]" };
 
-export function ProjectScenarios() {
-  const { readModel, status, error, reload, previewScenarios, applyScenario } = usePlanning(MOCK_PROJECT_ID);
+export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { readModel, status, error, reload, previewScenarios, applyScenario } = usePlanning(projectId);
   const [targetKey, setTargetKey] = useState<string>("");
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);

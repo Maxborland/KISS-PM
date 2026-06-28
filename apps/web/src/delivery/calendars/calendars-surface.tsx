@@ -30,8 +30,8 @@ const jsDow = (day: number) => { const d = new Date(BASE_MS + day * 86_400_000).
 let NID = 0;
 const nid = (p: string) => `${p}-n${(NID += 1)}`;
 
-export function ProjectCalendars() {
-  const { readModel, status, error, reload, apply, applyBatch } = usePlanning(MOCK_PROJECT_ID);
+export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { readModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
   const [selCal, setSelCal] = useState<string>("project"); // "project" | resourceId
   const [monthOffset, setMonthOffset] = useState(0);
   const [busy, setBusy] = useState(false);

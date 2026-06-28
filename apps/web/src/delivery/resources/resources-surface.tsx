@@ -26,8 +26,8 @@ const SCOPE: MatrixScope = { level: "project", groupLevels: ["team", "role", "pe
 let NID = 0;
 const nid = (p: string) => `${p}-n${(NID += 1)}`;
 
-export function ProjectResources() {
-  const { readModel, status, error, reload, apply, applyBatch } = usePlanning(MOCK_PROJECT_ID);
+export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { readModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; taskId?: string; asgId?: string; initial: TaskModalValues } | null>(null);
@@ -105,7 +105,7 @@ export function ProjectResources() {
     const cmds: PlanningCommand[] = [];
     if (m.mode === "create") {
       const id = nid("t");
-      cmds.push({ type: "task.create", payload: { id, projectId: MOCK_PROJECT_ID, parentTaskId: null, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? fin(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } } as PlanningCommand);
+      cmds.push({ type: "task.create", payload: { id, projectId, parentTaskId: null, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? fin(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } } as PlanningCommand);
       if (v.startIso) cmds.push({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: fin(v.startIso, v.durDays) } } as PlanningCommand);
       if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: nid("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
       if (v.pct > 0) cmds.push({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } } as PlanningCommand);

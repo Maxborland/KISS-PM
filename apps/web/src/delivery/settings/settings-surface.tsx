@@ -47,8 +47,8 @@ const ROValue = ({ children, mono }: { children: React.ReactNode; mono?: boolean
   <div className={cn("rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel-subtle)] px-2.5 py-1.5 text-[length:var(--text-sm)] text-[var(--text)]", mono && "v4-num")}>{children}</div>
 );
 
-export function ProjectSettings() {
-  const { readModel, status, error, reload, apply } = usePlanning(MOCK_PROJECT_ID);
+export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { readModel, status, error, reload, apply } = usePlanning(projectId);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [editDeadline, setEditDeadline] = useState(false);
