@@ -8,8 +8,9 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
-import { isoToDay, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 
 type Profile = "aggressive" | "balanced" | "resilient";
 type DiffRow = { wbs: string; title: string; detail: string; delta: string };
@@ -30,14 +31,13 @@ const PROFILE_META: Record<Profile, { label: string; desc: string }> = {
   aggressive: { label: "Агрессивный", desc: "Принять перегруз, сохранить дату финиша" },
   balanced: { label: "Балансированный", desc: "Снять половину перегруза на альт-исполнителя, минимальный сдвиг" },
   resilient: { label: "Устойчивый", desc: "Снять весь перегруз, заложить резерв; финиш сдвигается больше" }
-};
-const resName = (id: string) => RESOURCES.find((r) => r.id === id)?.name ?? id;
-const h = (min: number) => Math.round(min / 60);
+};const h = (min: number) => Math.round(min / 60);
 const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 const riskOf = (score: number) => score >= 67 ? { label: "высокий риск", cls: "bg-[var(--danger-soft)] text-[var(--danger-text)]" } : score >= 34 ? { label: "средний риск", cls: "bg-[var(--warning-soft)] text-[var(--warning-text)]" } : { label: "низкий риск", cls: "bg-[var(--success-soft)] text-[var(--success-text)]" };
 
 export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, previewScenarios, applyScenario } = usePlanning(projectId);
+  const resDir = useResourceDirectory();
   const [targetKey, setTargetKey] = useState<string>("");
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
@@ -112,12 +112,12 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const overloadDelta = (p: Proposal) => p.explainability.overloadMinutes - baseOverloadMin;
   const deriveDiff = (p: Proposal): DiffRow[] => p.planDelta.commands.map((cmd): DiffRow => {
     const pay = cmd.payload ?? {};
-    if (cmd.type === "risk.accept_overload") return { wbs: "—", title: target ? `${resName(target.resourceId)} · ${ddmm(target.date)}` : "—", detail: "Перегруз принят как осознанный риск", delta: "+0 дн" };
+    if (cmd.type === "risk.accept_overload") return { wbs: "—", title: target ? `${resDir.name(target.resourceId)} · ${ddmm(target.date)}` : "—", detail: "Перегруз принят как осознанный риск", delta: "+0 дн" };
     const taskId = String(pay.taskId ?? ""); const rid = String(pay.resourceId ?? ""); const wm = Number(pay.workMinutes ?? 0);
     const task = model.taskById.get(taskId);
     const existing = model.asgById.get(String(pay.id ?? ""));
-    if (existing) { const d = wm - existing.workMinutes; return { wbs: task?.wbsCode ?? taskId, title: task?.title ?? taskId, detail: `${resName(rid)}: труд ${h(existing.workMinutes)} → ${h(wm)} ч`, delta: `${d < 0 ? "−" : "+"}${h(Math.abs(d))} ч` }; }
-    return { wbs: task?.wbsCode ?? taskId, title: task?.title ?? taskId, detail: `+ ${resName(rid)} (${pay.role === "co_executor" ? "соисполнитель" : "исполнитель"})`, delta: `+${h(wm)} ч` };
+    if (existing) { const d = wm - existing.workMinutes; return { wbs: task?.wbsCode ?? taskId, title: task?.title ?? taskId, detail: `${resDir.name(rid)}: труд ${h(existing.workMinutes)} → ${h(wm)} ч`, delta: `${d < 0 ? "−" : "+"}${h(Math.abs(d))} ч` }; }
+    return { wbs: task?.wbsCode ?? taskId, title: task?.title ?? taskId, detail: `+ ${resDir.name(rid)} (${pay.role === "co_executor" ? "соисполнитель" : "исполнитель"})`, delta: `+${h(wm)} ч` };
   });
 
   const onApply = async (p: Proposal) => {
@@ -169,9 +169,9 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
               <span className="inline-flex items-center rounded-full bg-[var(--info-soft)] px-2 py-0.5 font-medium text-[var(--info)]">Цель: снять перегруз</span>
               {model.overloads.length > 1 ? (
                 <select value={target ? `${target.resourceId}|${target.date}` : ""} onChange={(e) => { setTargetKey(e.target.value); setProposals(null); setCompareId(null); setScenarioErr(null); }} className="h-7 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]" aria-label="Перегруз">
-                  {model.overloads.map((o) => <option key={`${o.resourceId}|${o.date}`} value={`${o.resourceId}|${o.date}`}>{resName(o.resourceId)} · {ddmm(o.date)} · {h(o.overloadMinutes)} ч</option>)}
+                  {model.overloads.map((o) => <option key={`${o.resourceId}|${o.date}`} value={`${o.resourceId}|${o.date}`}>{resDir.name(o.resourceId)} · {ddmm(o.date)} · {h(o.overloadMinutes)} ч</option>)}
                 </select>
-              ) : target ? <span className="inline-flex items-center rounded-full bg-[var(--info-soft)] px-2 py-0.5 font-medium text-[var(--info)]">{resName(target.resourceId)} · {ddmm(target.date)} · {h(target.overloadMinutes)} ч</span> : null}
+              ) : target ? <span className="inline-flex items-center rounded-full bg-[var(--info-soft)] px-2 py-0.5 font-medium text-[var(--info)]">{resDir.name(target.resourceId)} · {ddmm(target.date)} · {h(target.overloadMinutes)} ч</span> : null}
               <span className="inline-flex items-center rounded-full bg-[var(--info-soft)] px-2 py-0.5 font-medium text-[var(--info)]">Защитить критпуть: да</span>
               <span className="inline-flex items-center rounded-full bg-[var(--info-soft)] px-2 py-0.5 font-medium text-[var(--info)]">Ресурсы: текущая команда</span>
             </div>

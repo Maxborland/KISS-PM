@@ -11,6 +11,7 @@ import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib
 import { demoAction } from "@/views/lib/demo";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu, TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
 import type { PlanningCommand } from "@kiss-pm/domain";
 import { buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/planning-client";
@@ -54,8 +55,8 @@ type RMCalc = { id: string; calculatedStart: string; calculatedFinish: string; t
 type RMDep = { id: string; predecessorTaskId: string; successorTaskId: string; type: string; lagMinutes: number };
 type RMBaseTask = { taskId: string; baselineStart: string | null; baselineFinish: string | null };
 
-function mapRows(rm: PlanningReadModel): { rows: Row[]; deadlineDay: number | null; projectFinishDay: number } {
-  const authored = rm.authored as unknown as { tasks: RMTask[]; dependencies: RMDep[] };
+function mapRows(rm: PlanningReadModel, resName: (id: string) => string): { rows: Row[]; deadlineDay: number | null; projectFinishDay: number } {
+  const authored = rm.authored as unknown as { tasks: RMTask[]; dependencies: RMDep[]; assignments: Array<{ taskId: string; resourceId: string }> };
   const calc = (rm.calculatedPlan as unknown as { tasks: RMCalc[] }).tasks;
   const baseCmp = (rm.baselineComparison as unknown as { tasks: RMBaseTask[] }).tasks ?? [];
   const project = rm.project as unknown as { deadline: string | null; plannedFinish: string };
@@ -73,6 +74,15 @@ function mapRows(rm: PlanningReadModel): { rows: Row[]; deadlineDay: number | nu
     arr.push({ depId: d.id, predId: d.predecessorTaskId, type: d.type, lagDays: Math.round(d.lagMinutes / MIN_PER_DAY) });
     predsBySucc.set(d.successorTaskId, arr);
   }
+  // Имена ресурсов для колонки «Ресурсы»: read-model не отдаёт customFields.resLabel,
+  // поэтому собираем из назначений (taskId→resourceId) через справочник (live: реальные users).
+  const assigneesByTask = new Map<string, string[]>();
+  for (const a of authored.assignments ?? []) {
+    const arr = assigneesByTask.get(a.taskId) ?? [];
+    arr.push(resName(a.resourceId));
+    assigneesByTask.set(a.taskId, arr);
+  }
+  const assigneeLabel = (taskId: string) => (assigneesByTask.get(taskId) ?? []).join(", ");
 
   const rows: Row[] = authored.tasks.map((t) => {
     const c = calcById.get(t.id);
@@ -105,7 +115,7 @@ function mapRows(rm: PlanningReadModel): { rows: Row[]; deadlineDay: number | nu
       finishIso: finish,
       predDisplay,
       predList,
-      res: cf.resLabel ?? "—",
+      res: cf.resLabel ?? (assigneeLabel(t.id) || "—"),
       workH: Math.round(t.workMinutes / 60),
       slackDays: c?.totalSlackMinutes != null ? Math.round(c.totalSlackMinutes / MIN_PER_DAY) : null,
       dayStart,
@@ -282,6 +292,7 @@ const cellBtn = "block w-full cursor-pointer truncate rounded-[var(--radius-xs)]
 
 export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, setReadModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
+  const resDir = useResourceDirectory();
   const [zoom, setZoom] = useState<Zoom>("week");
   const [sel, setSel] = useState<string | null>("t-3.2.1");
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -311,7 +322,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const [colDrag, setColDrag] = useState<ColDrag | null>(null);
   const [link, setLink] = useState<LinkDrag | null>(null);
 
-  const mapped = useMemo(() => (readModel ? mapRows(readModel) : null), [readModel]);
+  const mapped = useMemo(() => (readModel ? mapRows(readModel, resDir.name) : null), [readModel, resDir.name]);
   const dayW = ZOOM_DAY_W[zoom];
   const dragRef = useRef<DragState | null>(null);
   const colDragRef = useRef<ColDrag | null>(null);

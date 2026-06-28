@@ -9,8 +9,9 @@ import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
-import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
 import type { PlanningCommand } from "@kiss-pm/domain";
 
@@ -22,9 +23,7 @@ type CalcRaw = { id: string; calculatedStart: string; calculatedFinish: string }
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
 const MONTHS_CAP = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 const DOW_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-const BASE_MS = Date.UTC(2026, 2, 2);
-const resOf = (id: string) => RESOURCES.find((r) => r.id === id);
-const ddmm = (iso: string) => { const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
+const BASE_MS = Date.UTC(2026, 2, 2);const ddmm = (iso: string) => { const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 const jsDow = (day: number) => { const d = new Date(BASE_MS + day * 86_400_000).getUTCDay(); return d === 0 ? 7 : d; }; // 1..7 (Пн..Вс)
 
 let NID = 0;
@@ -32,6 +31,7 @@ const nid = (p: string) => `${p}-n${(NID += 1)}`;
 
 export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
+  const resDir = useResourceDirectory();
   const [selCal, setSelCal] = useState<string>("project"); // "project" | resourceId
   const [monthOffset, setMonthOffset] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -100,7 +100,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const focusMonth = model.monthsList[Math.max(0, Math.min(monthOffset, model.monthsList.length - 1))] ?? "";
   const monthLabel = focusMonth ? `${MONTHS_CAP[Number(focusMonth.slice(5, 7)) - 1]} ${focusMonth.slice(0, 4)}` : "";
   const isResourceView = selCal !== "project";
-  const selRes = isResourceView ? resOf(selCal) : null;
+  const selRes = isResourceView ? resDir.of(selCal) : null;
   const absMap = isResourceView ? model.absByResDay.get(selCal) ?? new Map<number, ExcRaw>() : new Map<number, ExcRaw>();
 
   // сетка месяца: 6 недель × 7 дней, начиная с понедельника
@@ -191,7 +191,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
             <span className="rounded-full bg-[var(--accent-soft)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--accent)]">проект</span>
           </button>
           <div className="max-h-[520px] overflow-auto">
-            {RESOURCES.map((r) => {
+            {resDir.list.map((r) => {
               const cnt = model.absByResDay.get(r.id)?.size ?? 0;
               const active = selCal === r.id;
               return (
@@ -252,7 +252,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
               {listExc.length === 0 ? <div className="px-3 py-4 text-center text-[length:var(--text-sm)] text-[var(--muted)]">Нет исключений.</div> : listExc.map((x) => (
                 <div key={x.id} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-1.5 last:border-b-0">
                   <span className={cn("inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", x.resourceId === null ? "bg-[var(--warning-soft)] text-[var(--warning-text)]" : "bg-[color-mix(in_oklab,var(--violet)_16%,var(--panel))] text-[var(--violet)]")}>{x.resourceId === null ? "праздник" : (x.reason || "отсутствие")}</span>
-                  <span className="mono min-w-0 flex-1 truncate text-[length:var(--text-xs)] text-[var(--muted-strong)]">{ddmm(x.date)}{x.resourceId && x.resourceId !== selCal ? ` · ${resOf(x.resourceId)?.name ?? ""}` : ""}</span>
+                  <span className="mono min-w-0 flex-1 truncate text-[length:var(--text-xs)] text-[var(--muted-strong)]">{ddmm(x.date)}{x.resourceId && x.resourceId !== selCal ? ` · ${resDir.of(x.resourceId)?.name ?? ""}` : ""}</span>
                   <button type="button" onClick={() => removeExc(x)} disabled={busy} className="grid size-5 shrink-0 place-items-center rounded text-[var(--muted)] hover:bg-[var(--panel-strong)] hover:text-[var(--danger)]" title="Снять исключение"><X className="size-3.5" aria-hidden /></button>
                 </div>
               ))}
