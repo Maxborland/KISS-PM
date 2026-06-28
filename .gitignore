@@ -20,3 +20,10 @@ Thumbs.db
 tmp/
 .worktrees/
 apps/web/.storybook-verify-tmp/*.png
+apps/web/public/livekit/wasm/
+apps/web/public/livekit/*.tflite
+# Runtime file-asset storage written by the local storage provider (dev/tests).
+.kiss-pm-storage/
+
+# Figma design-reference exports (heavy binary bundles) — kept locally, not committed.
+docs/design/*__copy__*/

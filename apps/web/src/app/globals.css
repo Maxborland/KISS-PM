@@ -9,6 +9,9 @@
 @import "../styles/kiss-v4.css" layer(components);
 @import "../styles/widgets/resource-matrix.css" layer(components);
 @import "../styles/widgets/gantt.css" layer(components);
+@import "../styles/widgets/call.css" layer(components);
+@import "../styles/widgets/chat.css" layer(components);
+@import "../styles/widgets/comms.css" layer(components);
 
 /* Активируем enter/exit-утилиты (animate-in/out, fade/zoom/slide) для Radix-оверлеев.
    Размечены в components/ui/* (dialog/popover/dropdown/select/tooltip), но без подключения

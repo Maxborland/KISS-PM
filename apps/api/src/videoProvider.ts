@@ -62,7 +62,7 @@ export function createVideoProviderFromEnv(env: NodeJS.ProcessEnv = process.env)
     return createVideoProvider({
       kind,
       allowInsecureHttp,
-      url: requiredEnvUrl(env.KISS_PM_VIDEO_LIVEKIT_URL, allowInsecureHttp),
+      url: requiredEnvUrl(env.KISS_PM_VIDEO_LIVEKIT_URL, allowInsecureHttp, true),
       apiKey: requiredSecret(env.KISS_PM_VIDEO_LIVEKIT_API_KEY),
       apiSecret: requiredSecret(env.KISS_PM_VIDEO_LIVEKIT_API_SECRET),
       ...(tokenTtlSeconds === undefined ? {} : { tokenTtlSeconds })
@@ -100,7 +100,8 @@ export function createVideoProvider(config: VideoProviderConfig): VideoProvider 
 
   const ttlSeconds = boundedTtl(config.tokenTtlSeconds);
   const url = normalizeBaseUrl(config.url, {
-    allowInsecureHttp: config.allowInsecureHttp ?? true
+    allowInsecureHttp: config.allowInsecureHttp ?? true,
+    allowWebSocketScheme: true
   });
   return {
     kind: "livekit",
@@ -127,7 +128,10 @@ export function createVideoProvider(config: VideoProviderConfig): VideoProvider 
             room: input.providerRoomId,
             roomJoin: true,
             canPublish: true,
-            canSubscribe: true
+            canSubscribe: true,
+            // In-call chat rides LiveKit data packets, which need a distinct grant from
+            // canPublish; without it composer messages never reach other participants.
+            canPublishData: true
           }
         },
         config.apiSecret
@@ -166,9 +170,13 @@ function boundedTtl(value: number | undefined): number {
   return Math.min(Math.max(value ?? defaultTokenTtlSeconds, minTokenTtlSeconds), maxTokenTtlSeconds);
 }
 
-function requiredEnvUrl(value: string | undefined, allowInsecureHttp: boolean): string {
+function requiredEnvUrl(
+  value: string | undefined,
+  allowInsecureHttp: boolean,
+  allowWebSocketScheme = false
+): string {
   if (!value) throw new Error("video_provider_misconfigured");
-  return normalizeBaseUrl(value, { allowInsecureHttp });
+  return normalizeBaseUrl(value, { allowInsecureHttp, allowWebSocketScheme });
 }
 
 function requiredSecret(value: string | undefined): string {
@@ -180,13 +188,19 @@ function requiredSecret(value: string | undefined): string {
 
 function normalizeBaseUrl(
   value: string,
-  options: { allowInsecureHttp: boolean }
+  options: { allowInsecureHttp: boolean; allowWebSocketScheme?: boolean }
 ): string {
   const url = new URL(value);
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
+  const isHttpScheme = url.protocol === "https:" || url.protocol === "http:";
+  // LiveKit join URLs are WebSocket endpoints (ws:/wss:); manual/jitsi stay http(s)-only.
+  const isWebSocketScheme = url.protocol === "wss:" || url.protocol === "ws:";
+  const schemeAllowed =
+    isHttpScheme || (options.allowWebSocketScheme === true && isWebSocketScheme);
+  if (!schemeAllowed) {
     throw new Error("video_provider_misconfigured");
   }
-  if (url.protocol === "http:" && !options.allowInsecureHttp) {
+  const isInsecureScheme = url.protocol === "http:" || url.protocol === "ws:";
+  if (isInsecureScheme && !options.allowInsecureHttp) {
     throw new Error("video_provider_insecure_url");
   }
   if (url.username || url.password) {

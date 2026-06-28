@@ -55,7 +55,7 @@ Route is linked from a frontend screen recipe with invalidation/conflict handlin
 | Capacity/calendar/occupancy | L2/L3 | Add examples for masked capacity contribution and private occupancy cases. |
 | KPI/control/closure/control surfaces | L2/L3 | Add examples for governed action apply, surface publish validation and project-close conflicts. |
 | Storage/search/documents | L2/L3 | Add examples and generated SDK samples once schema generation is wired. |
-| Collaboration/meetings/calls/stickers | L2/L3 | Add examples for message mentions, sticker import and provider join-token expiry. |
+| Collaboration/meetings/calls/stickers | L2/L3 | Add examples for message mentions, sticker import and provider join-token expiry. Add self-hosted A/V media plane (`docs/46`): turn-credentials, egress start/stop/list, per-track recordings and the internal signature-verified LiveKit webhook receiver. Response examples must prove no secret serialization (no TURN cred, LiveKit api-secret, egress storage key or raw webhook Authorization). |
 | Background jobs | L2/L3 | Add examples for retry/dead job lifecycle and operator enqueue flows. |
 
 ## Definition Of Done For The Active Goal

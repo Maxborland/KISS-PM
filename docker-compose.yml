@@ -68,6 +68,35 @@ services:
       PLANNING_EVENTS_BACKEND: redis
       REDIS_URL: redis://redis:6379
       PORT: 4000
+      # Media plane (self-hosted LiveKit) — opt-in. Defaults keep video disabled so
+      # the standard dev stack is unchanged. To run audio/video calls, set these in
+      # .env and start the media profile: docker compose --profile media up
+      KISS_PM_VIDEO_PROVIDER: ${KISS_PM_VIDEO_PROVIDER:-disabled}
+      KISS_PM_VIDEO_LIVEKIT_URL: ${KISS_PM_VIDEO_LIVEKIT_URL:-}
+      # Server-reachable LiveKit URL for egress (the ws://localhost browser URL would resolve
+      # to the API container). Compose DNS reaches the livekit service at http://livekit:7880.
+      KISS_PM_VIDEO_LIVEKIT_HTTP_URL: ${KISS_PM_VIDEO_LIVEKIT_HTTP_URL:-http://livekit:7880}
+      KISS_PM_VIDEO_LIVEKIT_API_KEY: ${KISS_PM_VIDEO_LIVEKIT_API_KEY:-}
+      KISS_PM_VIDEO_LIVEKIT_API_SECRET: ${KISS_PM_VIDEO_LIVEKIT_API_SECRET:-}
+      KISS_PM_VIDEO_TOKEN_TTL_SECONDS: ${KISS_PM_VIDEO_TOKEN_TTL_SECONDS:-600}
+      KISS_PM_VIDEO_ALLOW_INSECURE_HTTP: ${KISS_PM_VIDEO_ALLOW_INSECURE_HTTP:-false}
+      KISS_PM_MEDIA_READINESS_URL: ${KISS_PM_MEDIA_READINESS_URL:-}
+      # TURN credentials (standalone coturn) — server-side only, returned in responses.
+      KISS_PM_TURN_URL: ${KISS_PM_TURN_URL:-}
+      KISS_PM_TURN_SHARED_SECRET: ${KISS_PM_TURN_SHARED_SECRET:-}
+      KISS_PM_TURN_CREDENTIAL_TTL_SECONDS: ${KISS_PM_TURN_CREDENTIAL_TTL_SECONDS:-600}
+      # Per-track Egress recording — only records when EGRESS_ENABLED=true + provider=livekit
+      # + storage=s3 (the S3 sink Egress writes to, also the API's storage provider).
+      KISS_PM_VIDEO_EGRESS_ENABLED: ${KISS_PM_VIDEO_EGRESS_ENABLED:-false}
+      KISS_PM_VIDEO_LIVEKIT_WEBHOOK_VERIFY: ${KISS_PM_VIDEO_LIVEKIT_WEBHOOK_VERIFY:-true}
+      KISS_PM_STORAGE_PROVIDER: ${KISS_PM_STORAGE_PROVIDER:-}
+      KISS_PM_STORAGE_S3_BUCKET: ${KISS_PM_STORAGE_S3_BUCKET:-}
+      KISS_PM_STORAGE_S3_REGION: ${KISS_PM_STORAGE_S3_REGION:-}
+      KISS_PM_STORAGE_S3_ENDPOINT: ${KISS_PM_STORAGE_S3_ENDPOINT:-}
+      KISS_PM_STORAGE_S3_ACCESS_KEY_ID: ${KISS_PM_STORAGE_S3_ACCESS_KEY_ID:-}
+      KISS_PM_STORAGE_S3_SECRET_ACCESS_KEY: ${KISS_PM_STORAGE_S3_SECRET_ACCESS_KEY:-}
+      KISS_PM_STORAGE_S3_TIMEOUT_MS: ${KISS_PM_STORAGE_S3_TIMEOUT_MS:-}
+      KISS_PM_STORAGE_S3_ALLOW_INSECURE_HTTP: ${KISS_PM_STORAGE_S3_ALLOW_INSECURE_HTTP:-false}
     ports:
       - "${KISS_PM_API_PORT:-4000}:4000"
     depends_on:
@@ -118,6 +147,50 @@ services:
       - kiss_pm_domain_node_modules:/workspace/packages/domain/node_modules
       - kiss_pm_persistence_node_modules:/workspace/packages/persistence/node_modules
       - kiss_pm_test_fixtures_node_modules:/workspace/packages/test-fixtures/node_modules
+
+  # Self-hosted LiveKit media plane (SFU + signaling). Opt-in via the `media`
+  # profile so the default dev stack is unchanged:
+  #   docker compose --profile media up
+  # The browser reaches signaling at ws://localhost:7880; the API reaches it for
+  # the readiness probe at http://livekit:7880 (compose DNS). coturn/egress are
+  # added in later epic phases (see docs/plans/communications-self-hosted-av-epic.md).
+  livekit:
+    image: livekit/livekit-server:v1.8
+    profiles: ["media"]
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ./infra/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880" # HTTP + WebSocket signaling + health
+      - "7881:7881" # ICE/TCP fallback
+      - "50000-50019:50000-50019/udp" # RTC media (dev: small range)
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # LiveKit Egress — per-track server recording (Phase 5). Separate "recording"
+  # profile (NOT "media"), because infra/egress/egress.yaml uses ${...} placeholders
+  # the operator must render (envsubst / EGRESS_CONFIG_BODY) with real LiveKit + S3
+  # values; keeping it out of "media" means `docker compose --profile media up` (the
+  # dev A/V stack) does not start a broken egress. Full recording stack:
+  #   docker compose --profile media --profile recording up
+  # Records only when KISS_PM_VIDEO_EGRESS_ENABLED=true and storage=s3.
+  egress:
+    image: livekit/egress:v1.9
+    profiles: ["recording"]
+    environment:
+      EGRESS_CONFIG_FILE: /etc/egress.yaml
+    cap_add:
+      - SYS_ADMIN # required by the egress chrome sandbox
+    volumes:
+      - ./infra/egress/egress.yaml:/etc/egress.yaml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   kiss_pm_postgres_data:

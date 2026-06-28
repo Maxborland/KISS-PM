@@ -118,7 +118,11 @@ export const callEventTypes = [
   "participant_joined",
   "participant_left",
   "session_ended",
-  "recording_attached"
+  "recording_attached",
+  "recording_started",
+  "recording_track_completed",
+  "recording_completed",
+  "recording_failed"
 ] as const;
 export type CallEventType = (typeof callEventTypes)[number];
 
@@ -385,15 +389,29 @@ export type CallEvent = {
   createdAt: Date;
 };
 
+export const callRecordingKinds = ["audio", "video", "composed"] as const;
+export type CallRecordingKind = (typeof callRecordingKinds)[number];
+
+export const callRecordingStatuses = ["starting", "recording", "ready", "failed"] as const;
+export type CallRecordingStatus = (typeof callRecordingStatuses)[number];
+
 export type CallRecording = {
   id: string;
   tenantId: TenantId;
   roomId: string;
   sessionId: string | null;
-  attachmentId: string;
+  recordingGroupId: string;
+  attachmentId: string | null;
+  egressId: string | null;
+  participantId: string | null;
+  trackId: string | null;
+  kind: CallRecordingKind;
+  status: CallRecordingStatus;
+  durationSeconds: number | null;
   title: string;
   createdByUserId: UserId;
   createdAt: Date;
+  endedAt: Date | null;
   archivedAt: Date | null;
 };
 

@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   doublePrecision,
   foreignKey,
@@ -2145,7 +2146,9 @@ export const fileAssets = pgTable(
     originalName: text("original_name").notNull(),
     safeDisplayName: text("safe_display_name").notNull(),
     mimeType: text("mime_type").notNull(),
-    sizeBytes: integer("size_bytes").notNull(),
+    // bigint: HD call recordings routinely exceed the 2GB PostgreSQL integer ceiling; mode
+    // "number" keeps the JS surface unchanged (sizes stay well under 2^53).
+    sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
     checksumSha256: text("checksum_sha256"),
     status: text("status").notNull(),
     createdByUserId: text("created_by_user_id").notNull(),
@@ -2319,7 +2322,7 @@ export const backgroundJobSchedules = pgTable(
     ),
     check(
       "background_job_schedules_kind_chk",
-      sql`${table.kind} in ('storage.asset_cleanup', 'notification.dispatch', 'connector.sync', 'search.projection_rebuild', 'capacity.cache_warmup')`
+      sql`${table.kind} in ('storage.asset_cleanup', 'notification.dispatch', 'connector.sync', 'search.projection_rebuild', 'capacity.cache_warmup', 'calls.recording_janitor', 'calls.recording_compose')`
     ),
     check("background_job_schedules_interval_chk", sql`${table.intervalSeconds} > 0`)
   ]
@@ -2366,7 +2369,7 @@ export const backgroundJobRuns = pgTable(
     index("background_job_runs_tenant_status_idx").on(table.tenantId, table.status),
     check(
       "background_job_runs_kind_chk",
-      sql`${table.kind} in ('storage.asset_cleanup', 'notification.dispatch', 'connector.sync', 'search.projection_rebuild', 'capacity.cache_warmup')`
+      sql`${table.kind} in ('storage.asset_cleanup', 'notification.dispatch', 'connector.sync', 'search.projection_rebuild', 'capacity.cache_warmup', 'calls.recording_janitor', 'calls.recording_compose')`
     ),
     check(
       "background_job_runs_status_chk",
@@ -3290,7 +3293,7 @@ export const callEvents = pgTable(
     ),
     check(
       "call_events_type_chk",
-      sql`${table.eventType} in ('room_created', 'session_started', 'join_token_issued', 'participant_invited', 'participant_joining', 'participant_joined', 'participant_left', 'session_ended', 'recording_attached')`
+      sql`${table.eventType} in ('room_created', 'session_started', 'join_token_issued', 'participant_invited', 'participant_joining', 'participant_joined', 'participant_left', 'session_ended', 'recording_attached', 'recording_started', 'recording_track_completed', 'recording_completed', 'recording_failed')`
     )
   ]
 );
@@ -3304,10 +3307,18 @@ export const callRecordings = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     roomId: text("room_id").notNull(),
     sessionId: text("session_id"),
-    attachmentId: text("attachment_id").notNull(),
+    recordingGroupId: text("recording_group_id").notNull(),
+    attachmentId: text("attachment_id"),
+    egressId: text("egress_id"),
+    participantId: text("participant_id"),
+    trackId: text("track_id"),
+    kind: text("kind").notNull(),
+    status: text("status").notNull(),
+    durationSeconds: integer("duration_seconds"),
     title: text("title").notNull(),
     createdByUserId: text("created_by_user_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true })
   },
   (table) => [
@@ -3339,6 +3350,19 @@ export const callRecordings = pgTable(
       table.tenantId,
       table.roomId,
       table.createdAt
+    ),
+    index("call_recordings_tenant_group_idx").on(table.tenantId, table.recordingGroupId),
+    uniqueIndex("call_recordings_tenant_egress_uidx")
+      .on(table.tenantId, table.egressId)
+      .where(sql`${table.egressId} is not null`),
+    check("call_recordings_kind_chk", sql`${table.kind} in ('audio', 'video', 'composed')`),
+    check(
+      "call_recordings_status_chk",
+      sql`${table.status} in ('starting', 'recording', 'ready', 'failed')`
+    ),
+    check(
+      "call_recordings_ready_attachment_chk",
+      sql`((${table.status} = 'ready' and ${table.attachmentId} is not null) or (${table.status} <> 'ready'))`
     )
   ]
 );

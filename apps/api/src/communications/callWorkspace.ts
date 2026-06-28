@@ -442,12 +442,23 @@ export function createCommunicationCallWorkspace(deps: CommunicationCallWorkspac
         return { ok: false, status: 400, error: "call_recording_attachment_invalid" };
       }
       const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+        const recordingId = `call-recording-${randomUUID()}`;
+        // A manually attached recording is a single composed, ready track grouped by itself
+        // (the per-track Egress path uses startRecordingGroup in recordingWorkspace.ts).
         const recording = await requireMethod(transactionDataSource.createCallRecording).call(transactionDataSource, {
-          id: `call-recording-${randomUUID()}`,
+          id: recordingId,
           tenantId: input.actor.tenantId,
           roomId: input.room.id,
           sessionId: input.command.sessionId,
+          recordingGroupId: recordingId,
           attachmentId: attachment.id,
+          egressId: null,
+          participantId: null,
+          trackId: null,
+          kind: "composed",
+          status: "ready",
+          durationSeconds: null,
+          endedAt: null,
           title: input.command.title,
           createdByUserId: input.actor.id
         });

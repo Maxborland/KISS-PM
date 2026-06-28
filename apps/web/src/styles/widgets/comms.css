@@ -1,0 +1,59 @@
+/* Communications collaboration lists (notifications, meetings). Tokens only. */
+
+.comms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.comms-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.comms-row--unread {
+  border-color: var(--accent);
+}
+
+.comms-row__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  background: var(--panel-strong);
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.comms-row__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.comms-row__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.comms-row__meta {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.comms-row__trailing {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
