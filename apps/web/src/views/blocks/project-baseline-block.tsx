@@ -1,10 +1,10 @@
 ﻿import { ArrowDown, ArrowRight, ArrowUp } from "lucide-react";
 
 import { CellStack } from "@/components/domain/cell-stack";
-import { DataTable } from "@/components/domain/data-table";
 import { CardPanel } from "@/components/domain/card-panel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MOCK_PROJECT_CRM, mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
 
@@ -49,40 +49,44 @@ export function ProjectBaselineBlock() {
         }
       />
       <CardPanel title="Базовый план v2 · 21.05.2026" subtitle="Сравнение с актуальным планом" flush>
-        <DataTable>
-          <thead>
-            <tr>
-              <th>Задача</th>
-              <th>План</th>
-              <th>Факт</th>
-              <th>Δ</th>
-              <th>Статус</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Задача</TableHead>
+              <TableHead numeric>План</TableHead>
+              <TableHead numeric>Факт</TableHead>
+              <TableHead numeric>Δ</TableHead>
+              <TableHead>Статус</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {ROWS.map((r) => (
-              <tr key={r.code}>
-                <td>
+              <TableRow key={r.code}>
+                <TableCell>
                   <CellStack title={r.task} subtitle={r.code} />
-                </td>
-                <td className="mono">{r.base}</td>
-                <td className="mono">{r.actual}</td>
-                <td>
+                </TableCell>
+                <TableCell numeric className="mono whitespace-nowrap">
+                  {r.base}
+                </TableCell>
+                <TableCell numeric className="mono whitespace-nowrap">
+                  {r.actual}
+                </TableCell>
+                <TableCell numeric>
                   <DeltaCell d={r.delta} />
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   {r.delta === 0 ? (
-                    <Chip variant="success">В графике</Chip>
+                    <Badge variant="success">В графике</Badge>
                   ) : r.delta < 0 ? (
-                    <Chip variant="info">Опережение</Chip>
+                    <Badge variant="info">Опережение</Badge>
                   ) : (
-                    <Chip variant="warning">Отклонение</Chip>
+                    <Badge variant="warning">Отклонение</Badge>
                   )}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </DataTable>
+          </TableBody>
+        </Table>
       </CardPanel>
     </>
   );

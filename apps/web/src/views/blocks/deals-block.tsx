@@ -5,12 +5,12 @@ import { Plus, Filter } from "lucide-react";
 
 import { BemAvatar, BemAvatarStack } from "@/components/domain/bem-avatar";
 import { CellStack } from "@/components/domain/cell-stack";
-import { DataTable } from "@/components/domain/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
 import { SearchPill } from "@/components/ui/search-pill";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageIntro } from "@/views/layout/page-intro";
 
 const STAGES = [
@@ -95,37 +95,37 @@ export function DealsBlock() {
         </p>
       )}
       {mode !== "forecast" ? (
-      <DataTable className="u-mt-4">
-        <thead>
-          <tr>
-            <th>Сделка</th>
-            <th>Клиент</th>
-            <th>Стадия</th>
-            <th>Сумма</th>
-            <th>Команда</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table className="u-mt-4">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Сделка</TableHead>
+            <TableHead>Клиент</TableHead>
+            <TableHead>Стадия</TableHead>
+            <TableHead numeric>Сумма</TableHead>
+            <TableHead>Команда</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {DEALS.map((d) => (
-            <tr key={d.id}>
-              <td>
-                <CellStack title={d.title} subtitle={d.id} />
-              </td>
-              <td>{d.client}</td>
-              <td>
-                <Chip variant="info">{STAGES.find((s) => s.id === d.stage)?.title}</Chip>
-              </td>
-              <td className="mono">{d.amount}</td>
-              <td>
+            <TableRow key={d.id}>
+              <TableCell className="max-w-[20rem]">
+                <CellStack title={d.title} subtitle={d.id} truncate />
+              </TableCell>
+              <TableCell truncate>{d.client}</TableCell>
+              <TableCell>
+                <Badge variant="info">{STAGES.find((s) => s.id === d.stage)?.title}</Badge>
+              </TableCell>
+              <TableCell numeric className="mono whitespace-nowrap">{d.amount}</TableCell>
+              <TableCell>
                 <BemAvatarStack>
                   <BemAvatar {...d.owner} size="sm" />
                   <BemAvatar initials="ВВ" color="c3" size="sm" />
                 </BemAvatarStack>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </DataTable>
+        </TableBody>
+      </Table>
       ) : null}
     </>
   );

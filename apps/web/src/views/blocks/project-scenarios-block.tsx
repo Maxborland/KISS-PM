@@ -1,8 +1,8 @@
-﻿import { CellStack } from "@/components/domain/cell-stack";
-import { DataTable } from "@/components/domain/data-table";
+import { CellStack } from "@/components/domain/cell-stack";
 import { CardPanel } from "@/components/domain/card-panel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
 
@@ -21,46 +21,54 @@ export function ProjectScenariosBlock() {
         actions={<Button variant="primary">Принять сценарий</Button>}
       />
       <CardPanel title="Сравнение" subtitle={`${SCENARIOS.length} варианта`} flush>
-        <DataTable>
-          <thead>
-            <tr>
-              <th>Сценарий</th>
-              <th>Срок</th>
-              <th>Бюджет</th>
-              <th>Риск</th>
-              <th>SPI</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Сценарий</TableHead>
+              <TableHead numeric>Срок</TableHead>
+              <TableHead numeric>Бюджет</TableHead>
+              <TableHead>Риск</TableHead>
+              <TableHead numeric>SPI</TableHead>
+              <TableHead>
+                <span className="sr-only">Действия</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {SCENARIOS.map((s) => (
-              <tr key={s.id} className={s.recommended ? "is-selected" : undefined}>
-                <td>
+              <TableRow key={s.id} data-state={s.recommended ? "selected" : undefined}>
+                <TableCell>
                   <CellStack title={s.name} subtitle={s.id} />
-                </td>
-                <td className="mono">{s.deadline}</td>
-                <td className="mono">{s.cost}</td>
-                <td>
-                  <Chip
+                </TableCell>
+                <TableCell numeric className="whitespace-nowrap">
+                  {s.deadline}
+                </TableCell>
+                <TableCell numeric className="whitespace-nowrap">
+                  {s.cost}
+                </TableCell>
+                <TableCell>
+                  <Badge
                     variant={s.risk === "Низкий" ? "success" : s.risk === "Средний" ? "info" : "warning"}
                   >
                     {s.risk}
-                  </Chip>
-                </td>
-                <td className="mono">{s.spi}</td>
-                <td>
+                  </Badge>
+                </TableCell>
+                <TableCell numeric className="whitespace-nowrap">
+                  {s.spi}
+                </TableCell>
+                <TableCell align="right">
                   {s.recommended ? (
-                    <Chip variant="success">Рекомендуем</Chip>
+                    <Badge variant="success">Рекомендуем</Badge>
                   ) : (
                     <Button variant="ghost" size="sm">
                       Принять
                     </Button>
                   )}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </DataTable>
+          </TableBody>
+        </Table>
       </CardPanel>
     </>
   );

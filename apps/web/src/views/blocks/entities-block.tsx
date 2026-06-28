@@ -2,11 +2,11 @@ import { Filter, MoreHorizontal, Plus, Upload } from "lucide-react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { CellStack } from "@/components/domain/cell-stack";
-import { DataTable } from "@/components/domain/data-table";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
 import { IconButton } from "@/components/ui/icon-button";
 import { SearchPill } from "@/components/ui/search-pill";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageIntro } from "@/views/layout/page-intro";
 
 export type EntityKind = "clients" | "contacts" | "products";
@@ -43,6 +43,8 @@ const COPY: Record<EntityKind, { title: string; lead: string; cols: string[]; ro
   }
 };
 
+const NUMERIC_COLS = new Set(["Сделок", "Сумма", "Цена", "Активных сделок"]);
+
 export function EntitiesBlock({ kind }: { kind: EntityKind }) {
   const c = COPY[kind];
   return (
@@ -70,66 +72,66 @@ export function EntitiesBlock({ kind }: { kind: EntityKind }) {
           Фильтр
         </Button>
       </div>
-      <DataTable>
-        <thead>
-          <tr>
+      <Table>
+        <TableHeader>
+          <TableRow>
             {c.cols.map((col) => (
-              <th key={col}>{col}</th>
+              <TableHead key={col} numeric={NUMERIC_COLS.has(col)}>{col}</TableHead>
             ))}
-            <th />
-          </tr>
-        </thead>
-        <tbody>
+            <TableHead><span className="sr-only">Действия</span></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {c.rows.map((r, i) => (
-            <tr key={i}>
-              <td>
+            <TableRow key={i}>
+              <TableCell>
                 <CellStack title={String(r.name)} subtitle={String(r.code)} />
-              </td>
+              </TableCell>
               {kind === "clients" ? (
                 <>
-                  <td>
+                  <TableCell>
                     <BemAvatar initials={(r.manager as { initials: string }).initials} color={(r.manager as { color: "c1" | "c2" | "c4" }).color} size="sm" /> {(r.manager as { name: string }).name}
-                  </td>
-                  <td>
-                    <Chip variant="info">{String(r.segment)}</Chip>
-                  </td>
-                  <td>{String(r.deals)}</td>
-                  <td className="mono">{String(r.amount)}</td>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="info">{String(r.segment)}</Badge>
+                  </TableCell>
+                  <TableCell numeric>{String(r.deals)}</TableCell>
+                  <TableCell numeric className="mono">{String(r.amount)}</TableCell>
                 </>
               ) : null}
               {kind === "contacts" ? (
                 <>
-                  <td>{String(r.company)}</td>
-                  <td>{String(r.role)}</td>
-                  <td className="u-text-muted">{String(r.email)}</td>
-                  <td className="u-text-xs u-text-muted">12 событий · сегодня</td>
+                  <TableCell>{String(r.company)}</TableCell>
+                  <TableCell>{String(r.role)}</TableCell>
+                  <TableCell className="u-text-muted">{String(r.email)}</TableCell>
+                  <TableCell className="u-text-xs u-text-muted">12 событий · сегодня</TableCell>
                 </>
               ) : null}
               {kind === "products" ? (
                 <>
-                  <td>
-                    <Chip variant="violet">{String(r.category)}</Chip>
-                  </td>
-                  <td className="mono">{String(r.price)}</td>
-                  <td>{String(r.deals)}</td>
-                  <td>
+                  <TableCell>
+                    <Badge variant="violet">{String(r.category)}</Badge>
+                  </TableCell>
+                  <TableCell numeric className="mono">{String(r.price)}</TableCell>
+                  <TableCell numeric>{String(r.deals)}</TableCell>
+                  <TableCell>
                     {String(r.status) === "active" ? (
-                      <Chip variant="success">Активен</Chip>
+                      <Badge variant="success">Активен</Badge>
                     ) : (
-                      <Chip>Черновик</Chip>
+                      <Badge variant="info">Черновик</Badge>
                     )}
-                  </td>
+                  </TableCell>
                 </>
               ) : null}
-              <td className="cell-actions">
+              <TableCell className="cell-actions">
                 <IconButton label="Действия" variant="ghost" size="sm">
                   <MoreHorizontal />
                 </IconButton>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </DataTable>
+        </TableBody>
+      </Table>
     </>
   );
 }

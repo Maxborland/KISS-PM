@@ -25,5 +25,11 @@
 - [ ] **Ресурсы — заголовок** «Ресурсы · Проект»: `planning.project.title` отдаёт дженерик «Проект» вместо названия проекта. Бэк/мэппинг read-model.
 - [ ] **Ресурсы — имена** «Ресурс 1…9» (плейсхолдер `Ресурс {index+1}` в `AssignmentsTable`): `assignment.resourceId` не резолвится в имя сотрудника. Нужен джойн на пользователя в read-model или на клиенте.
 
-## Вне scope этого захода (другие поверхности)
-- Storybook mock-блоки на BEM `DataTable`: `deals-block`, `entities-block`, `admin-block`, `project-baseline-block`, `project-scenarios-block`. Пользователь выбрал prod-runtime первым; блоки — отдельный заход.
+## Storybook mock-блоки → shadcn (сделано)
+- [x] **deals/entities/admin/baseline/scenarios** мигрированы с BEM `DataTable` на shadcn `Table` по утверждённому паттерну (numeric/truncate/Badge/align). `Chip`→`Badge` внутри таблиц (kanban-карточки с Chip не тронуты). web typecheck зелёный; визуально сверены deals/entities-products/baseline в Storybook (:6006) — консистентно с runtime.
+- [ ] **Мелочь:** статус «Черновик» (entities-products) рендерится info-цветом (унаследовано от Chip defaultVariants), а не нейтральным. Faithful к оригиналу; при желании → `Badge variant="secondary"`.
+
+## Дальше по плану пользователя (3→2→1)
+- [x] (3) Storybook mock-блоки → shadcn — выше.
+- [ ] (2) Row-detail Sheet (peek по строке).
+- [ ] (1) Визуальный проход по остальным prod-экранам (дашборд/моя работа/админ/гант/настройки).

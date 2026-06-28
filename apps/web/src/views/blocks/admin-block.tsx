@@ -2,12 +2,12 @@ import { MoreHorizontal, ShieldCheck, UserPlus } from "lucide-react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { CellStack } from "@/components/domain/cell-stack";
-import { DataTable } from "@/components/domain/data-table";
 import { CardPanel } from "@/components/domain/card-panel";
 import { SwitchRow, SwitchRowList } from "@/components/domain/switch-row";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
 import { IconButton } from "@/components/ui/icon-button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MOCK_PROJECT_CRM } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
 
@@ -33,40 +33,42 @@ export function AdminBlock() {
       />
       <div className="grid-2">
         <CardPanel title="Пользователи" subtitle={`${USERS.length} активных`} flush>
-          <DataTable>
-            <thead>
-              <tr>
-                <th>Имя</th>
-                <th>Роль</th>
-                <th>Активен</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Имя</TableHead>
+                <TableHead>Роль</TableHead>
+                <TableHead>Активен</TableHead>
+                <TableHead>
+                  <span className="sr-only">Действия</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {USERS.map((u) => (
-                <tr key={u.email}>
-                  <td>
+                <TableRow key={u.email}>
+                  <TableCell>
                     <CellStack
                       title={u.name}
                       subtitle={u.email}
                       icon={<BemAvatar initials={u.initials} color={u.color} size="sm" />}
                     />
-                  </td>
-                  <td>
-                    <Chip variant="info">{u.role}</Chip>
-                  </td>
-                  <td>
-                    {u.active ? <Chip variant="success">Активен</Chip> : <Chip>Заблокирован</Chip>}
-                  </td>
-                  <td className="cell-actions">
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="info">{u.role}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {u.active ? <Badge variant="success">Активен</Badge> : <Badge variant="secondary">Заблокирован</Badge>}
+                  </TableCell>
+                  <TableCell align="right">
                     <IconButton label="Действия" variant="ghost" size="sm">
                       <MoreHorizontal />
                     </IconButton>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </DataTable>
+            </TableBody>
+          </Table>
         </CardPanel>
         <CardPanel
           title="Политики безопасности"
