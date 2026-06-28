@@ -16,7 +16,7 @@ backend слайсы 1–4 готовы (PR #210, каждый e2e против 
 ## P1 — Замкнуть петлю по готовому бэку (высокий value / низкий effort)  ·  ветка #209
 Эндпоинты УЖЕ есть (слайсы 1/3/4) — фронт пока на честных заглушках. Подключаем:
 - [x] **P1.1** meetings-surface → `GET /api/workspace/meetings/:id` (`SEED_DETAIL` убран; `comms-client.getMeeting` + `useMeetingDetail` + mock-роут; рефетч после мутаций). ✅ tsc 0 · Storybook рендерит реальную деталь.
-- [ ] **P1.2** meetings ActionItemsCard → `PATCH …/action-items/:id {status}` (живой toggle вместо инертного чекбокса; `comms-client.patchActionItem`). S
+- [x] **P1.2** meetings ActionItemsCard → `PATCH …/action-items/:id {status}` (живой select open/done/cancelled; `comms-client.patchActionItem` + `useMeetings.patchActionItem` + mock PATCH-роут). ✅ tsc 0 · Storybook рендерит селект.
 - [ ] **P1.3** nav/comms бейдж непрочитанного → `GET /api/workspace/unread-summary` (`comms-client.getUnreadSummary`, бейджи в `comms-frame`/topbar). S
 - Приёмка: Storybook этих экранов не падает (mock-роуты добавить в `mock-comms-backend`); e2e на :55433 показывает реальные детали/тоггл/число.
 

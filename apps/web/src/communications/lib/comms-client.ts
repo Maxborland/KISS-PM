@@ -622,6 +622,13 @@ export function createCommsClient(options: CommsApiClientOptions) {
         body: JSON.stringify(input)
       });
     },
+    // Сменить статус action-item (open/done/cancelled).
+    patchActionItem(meetingId: string, actionItemId: string, status: MeetingActionItemStatus) {
+      return requestJson<{ actionItem: MeetingActionItem }>(`/api/workspace/meetings/${enc(meetingId)}/action-items/${enc(actionItemId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status })
+      });
+    },
 
     /* ===== УВЕДОМЛЕНИЯ (32-35) ===== */
     // 32) Лента уведомлений (status: ''|unread|read; limit def 20, cap 100).

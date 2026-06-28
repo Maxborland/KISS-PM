@@ -7,6 +7,7 @@ import {
   createCommsClient,
   type ActionItemInput,
   type CommsUser,
+  type MeetingActionItemStatus,
   type CallEvent,
   type CallParticipantStateValue,
   type CallRecording,
@@ -369,8 +370,9 @@ export function useMeetings(entityType: EntityType, entityId: string) {
     [client, guard]
   );
   const addActionItem = useCallback((meetingId: string, input: ActionItemInput) => guard(async () => { await client.addActionItem(meetingId, input); }), [client, guard]);
+  const patchActionItem = useCallback((meetingId: string, actionItemId: string, status: MeetingActionItemStatus) => guard(async () => { await client.patchActionItem(meetingId, actionItemId, status); }), [client, guard]);
 
-  return { client, data, status, error, reload: load, createMeeting, patchMeeting, addNote, addExternalLink, addActionItem };
+  return { client, data, status, error, reload: load, createMeeting, patchMeeting, addNote, addExternalLink, addActionItem, patchActionItem };
 }
 
 // Детали выбранной встречи (участники/ноты/задачи/ссылки) из GET /api/workspace/meetings/:id.

@@ -21,6 +21,7 @@ import type {
   EntityType,
   Meeting,
   MeetingActionItem,
+  MeetingActionItemStatus,
   MeetingCreateInput,
   MeetingExternalLink,
   MeetingExternalLinkProvider,
@@ -97,7 +98,7 @@ type MeetingDetail = { participants: MeetingParticipant[]; notes: MeetingNote[];
 const emptyDetail = (): MeetingDetail => ({ participants: [], notes: [], links: [], actionItems: [] });
 
 export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENTITY_ID }: { entityType?: EntityType; entityId?: string } = {}) {
-  const { data, status, error, reload, createMeeting, patchMeeting, addNote, addExternalLink, addActionItem } = useMeetings(entityType, entityId);
+  const { data, status, error, reload, createMeeting, patchMeeting, addNote, addExternalLink, addActionItem, patchActionItem } = useMeetings(entityType, entityId);
   // Справочник людей тенанта (участники/ответственные/имена): mock=COMMS_USERS, live=GET /api/workspace/users.
   const users = useCommsUsers();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -174,6 +175,14 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
     return res.ok;
   }
 
+  async function doPatchAction(meetingId: string, actionItemId: string, next: MeetingActionItemStatus) {
+    setBusy(true); setNotice(null);
+    const res = await patchActionItem(meetingId, actionItemId, next);
+    if (res.ok) await meetingDetail.reload();
+    setBusy(false);
+    setNotice(res.ok ? "Статус задачи обновлён" : `Отклонено: ${commsErr(res.code, res.message)}`);
+  }
+
   return (
     <CommsFrame
       activeTab="Встречи"
@@ -186,7 +195,7 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
           <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
           <span>
             Реальный контракт: /api/workspace/meetings (GET список + GET деталь, POST создать, PATCH статус, POST .../notes, .../external-links, .../action-items). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.
-            {" "}Детали митинга (участники/ноты/ссылки/action-items) — из GET /meetings/:id; статус action-item пока всегда «open» (PATCH — следующий слайс). Приватные URL отклоняются 400.
+            {" "}Детали митинга — из GET /meetings/:id; статус action-item меняется селектом (PATCH). Приватные URL отклоняются 400.
           </span>
         </div>
 
@@ -242,6 +251,7 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
               onAddNote={(b) => doAddNote(selected.id, b)}
               onAddLink={(i) => doAddLink(selected.id, i)}
               onAddAction={(i) => doAddAction(selected.id, i)}
+              onPatchAction={(id, s) => void doPatchAction(selected.id, id, s)}
             />
           ) : (
             <section className="grid place-items-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-6 text-[var(--muted)] shadow-[var(--shadow-card)]">
@@ -267,7 +277,8 @@ function MeetingDetailPanel({
   onPatchStatus,
   onAddNote,
   onAddLink,
-  onAddAction
+  onAddAction,
+  onPatchAction
 }: {
   meeting: Meeting;
   detail: MeetingDetail;
@@ -277,6 +288,7 @@ function MeetingDetailPanel({
   onAddNote: (body: string) => Promise<boolean>;
   onAddLink: (input: { provider: MeetingExternalLinkProvider; url: string; title: string }) => Promise<boolean>;
   onAddAction: (input: ActionItemInput) => Promise<boolean>;
+  onPatchAction: (actionItemId: string, status: MeetingActionItemStatus) => void;
 }) {
   return (
     <section className="flex flex-col gap-3">
@@ -340,7 +352,7 @@ function MeetingDetailPanel({
         <NotesCard notes={detail.notes} busy={busy} onAdd={onAddNote} users={users} />
 
         {/* Action-items */}
-        <ActionItemsCard items={detail.actionItems} busy={busy} onAdd={onAddAction} users={users} />
+        <ActionItemsCard items={detail.actionItems} busy={busy} onAdd={onAddAction} onPatchStatus={onPatchAction} users={users} />
       </div>
     </section>
   );
@@ -440,7 +452,7 @@ function ExternalLinksCard({ links, busy, onAdd }: { links: MeetingExternalLink[
 }
 
 /* ---- Action-items (чек-список, status ВСЕГДА open — мутации статуса НЕТ) ---- */
-function ActionItemsCard({ items, busy, onAdd, users }: { items: MeetingActionItem[]; busy: boolean; onAdd: (input: ActionItemInput) => Promise<boolean>; users: CommsUsersDir }) {
+function ActionItemsCard({ items, busy, onAdd, onPatchStatus, users }: { items: MeetingActionItem[]; busy: boolean; onAdd: (input: ActionItemInput) => Promise<boolean>; onPatchStatus: (actionItemId: string, status: MeetingActionItemStatus) => void; users: CommsUsersDir }) {
   const [title, setTitle] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -460,7 +472,7 @@ function ActionItemsCard({ items, busy, onAdd, users }: { items: MeetingActionIt
         <CheckSquare className="size-4" aria-hidden /> Action items
         <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{items.length}</span>
       </h3>
-      <p className="mb-3 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Создаются со статусом «open»; изменение статуса появится в приложении (мутации статуса в этом слайсе нет).</p>
+      <p className="mb-3 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Создаются со статусом «Открыта»; статус меняется селектом (PATCH).</p>
       {items.length === 0 ? (
         <p className="mb-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Задач по итогам встречи пока нет.</p>
       ) : (
@@ -469,15 +481,18 @@ function ActionItemsCard({ items, busy, onAdd, users }: { items: MeetingActionIt
             const owner = users.name(it.ownerUserId);
             return (
               <li key={it.id} className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-2">
-                <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-[4px] border border-[var(--border-strong)] bg-[var(--panel)]" title="Статус «open» — переключение в приложении" aria-hidden />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[length:var(--text-sm)] text-[var(--text)]">{it.title}</p>
+                  <p className={cn("text-[length:var(--text-sm)] text-[var(--text)]", it.status !== "open" && "text-[var(--muted)] line-through")}>{it.title}</p>
                   <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
                     {owner}
                     {it.dueDate ? ` · срок ${it.dueDate}` : ""}
                   </p>
                 </div>
-                <Chip variant="info">Open</Chip>
+                <select value={it.status} disabled={busy} onChange={(e) => onPatchStatus(it.id, e.target.value as MeetingActionItemStatus)} className={cn(selCls, "h-8 w-[116px]")} title="PATCH статус action-item">
+                  <option value="open">Открыта</option>
+                  <option value="done">Готово</option>
+                  <option value="cancelled">Отменена</option>
+                </select>
               </li>
             );
           })}

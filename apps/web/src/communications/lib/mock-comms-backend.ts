@@ -1724,6 +1724,22 @@ export function createMockCommsFetch(): typeof fetch {
       return json({ note }, 201);
     }
 
+    /* 31b) PATCH /meetings/:id/action-items/:itemId — статус (manage; open/done/cancelled). */
+    const actionItemPatch = method === "PATCH" ? path.match(/^\/api\/workspace\/meetings\/([^/]+)\/action-items\/([^/]+)$/) : null;
+    if (actionItemPatch) {
+      const resolved = resolveMeeting(actionItemPatch[1]!);
+      if (!resolved.ok) return err(resolved.error, resolved.status);
+      if (!canManageEntity(resolved.meeting.entityType, resolved.meeting.entityId)) return err("permission_missing", 403);
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const nextStatus = parsedBody.body.status;
+      if (nextStatus !== "open" && nextStatus !== "done" && nextStatus !== "cancelled") return err("meeting_action_item_status_invalid", 400);
+      const item = db.meetingActionItems.find((a) => a.id === decodeURIComponent(actionItemPatch[2]!) && a.meetingId === resolved.meeting.id && a.archivedAt === null);
+      if (!item) return err("meeting_action_item_not_found", 404);
+      item.status = nextStatus;
+      return json({ actionItem: item });
+    }
+
     /* 31) POST /meetings/:id/action-items — action-item (manage → title → owner → dueDate → target; status forced 'open'). */
     const actionItem = method === "POST" ? path.match(/^\/api\/workspace\/meetings\/([^/]+)\/action-items$/) : null;
     if (actionItem) {
