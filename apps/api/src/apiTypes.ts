@@ -101,6 +101,7 @@ import type {
 } from "@kiss-pm/persistence";
 import type { AuthRateLimiter } from "./authRateLimit";
 import type { EmailProvider } from "./emailProvider";
+import type { LiveKitEgressProvider } from "./communications/recording/livekitEgressProvider";
 import type { ReadinessChecks } from "./healthRoutes";
 import type { StorageProvider } from "./storageProvider";
 import type { VideoProvider } from "./videoProvider";
@@ -1169,6 +1170,10 @@ export type ApiTenantDataSource = {
     roomId: string;
     sessionId: string;
   }): Promise<CallSession | undefined>;
+  findActiveCallSessionByRoom?(input: {
+    tenantId: TenantId;
+    roomId: string;
+  }): Promise<CallSession | undefined>;
   endCallSession?(input: {
     tenantId: TenantId;
     sessionId: string;
@@ -1195,6 +1200,26 @@ export type ApiTenantDataSource = {
   listCallRecordings?(input: {
     tenantId: TenantId;
     roomId: string;
+  }): Promise<CallRecording[]>;
+  findCallRecordingByEgressId?(input: {
+    tenantId: TenantId;
+    egressId: string;
+  }): Promise<CallRecording | undefined>;
+  listCallRecordingsByGroup?(input: {
+    tenantId: TenantId;
+    recordingGroupId: string;
+  }): Promise<CallRecording[]>;
+  updateCallRecordingByEgress?(input: {
+    tenantId: TenantId;
+    egressId: string;
+    status: CallRecording["status"];
+    attachmentId?: string | null;
+    durationSeconds?: number | null;
+    endedAt?: Date | null;
+  }): Promise<CallRecording | undefined>;
+  failStaleInProgressRecordings?(input: {
+    tenantId: TenantId;
+    olderThan: Date;
   }): Promise<CallRecording[]>;
   createKnowledgeDocument?(input: Omit<
     KnowledgeDocument,
@@ -1330,6 +1355,7 @@ export type CreateAppOptions = {
   dataSource?: ApiTenantDataSource;
   storageProvider?: StorageProvider;
   videoProvider?: VideoProvider;
+  egressProvider?: LiveKitEgressProvider | null;
   authRateLimiter?: AuthRateLimiter;
   emailProvider?: EmailProvider;
   readinessChecks?: ReadinessChecks;

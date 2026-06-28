@@ -729,13 +729,37 @@ export const collaborationSchemas = openApiSchemaFragment({
   },
   CallRecording: {
     type: "object",
-    required: ["id", "tenantId", "roomId", "sessionId", "attachmentId", "title", "createdByUserId", "createdAt"],
+    required: [
+      "id",
+      "roomId",
+      "sessionId",
+      "recordingGroupId",
+      "attachmentId",
+      "egressId",
+      "participantId",
+      "trackId",
+      "kind",
+      "status",
+      "durationSeconds",
+      "endedAt",
+      "title",
+      "createdByUserId",
+      "createdAt"
+    ],
     properties: {
       id: stringIdSchema,
-      tenantId: stringIdSchema,
       roomId: stringIdSchema,
       sessionId: nullableStringSchema,
-      attachmentId: stringIdSchema,
+      recordingGroupId: stringIdSchema,
+      // null until the per-track Egress file is reconciled (the recording is in progress).
+      attachmentId: nullableStringSchema,
+      egressId: nullableStringSchema,
+      participantId: nullableStringSchema,
+      trackId: nullableStringSchema,
+      kind: { type: "string" },
+      status: { type: "string" },
+      durationSeconds: { type: ["integer", "null"] },
+      endedAt: { type: ["string", "null"], format: "date-time" },
       title: { type: "string", minLength: 1 },
       createdByUserId: stringIdSchema,
       createdAt: dateTimeSchema
@@ -792,9 +816,11 @@ export const collaborationSchemas = openApiSchemaFragment({
   },
   CallRoomDetailResponse: {
     type: "object",
-    required: ["callRoom", "events", "recordings"],
+    required: ["callRoom", "activeSession", "events", "recordings"],
     properties: {
       callRoom: schemaRef("CallRoom"),
+      // The active session a second participant joins; null when the room has none.
+      activeSession: { anyOf: [schemaRef("CallSession"), { type: "null" }] },
       events: { type: "array", items: schemaRef("CallEvent") },
       recordings: { type: "array", items: schemaRef("CallRecording") }
     },

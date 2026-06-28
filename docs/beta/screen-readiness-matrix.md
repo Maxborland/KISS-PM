@@ -74,6 +74,11 @@ Every beta screen must satisfy:
 | Finance | Finance, CEO, PM | FIN-01 | deferred unless existing data supports it | Permission test and visible payment/contract status |
 | Agent Chat | PM, CEO, Sales, Lead | AGENT-01, AGENT-02, PM-04, CEO-03 | prototype TBD | Proposal -> confirm -> mutation -> audit; no mutation before confirm |
 | Settings/Admin | Admin, CEO | ADMIN-01, permissions support | wired/prototype TBD | Permission/read-only state and no dead controls |
+| Comms/Channels | PM, Lead, Specialist | (Phase G.5) | deferred | Real channel list/thread/composer on `docs/44` backend; no fake send; Cyrillic copy; loading/empty/error/forbidden states |
+| Comms/Call | PM, Lead, Specialist | (Phase G.5) | deferred | Self-hosted LiveKit lobby/active/screen-share/in-chat/device-settings/reconnecting; accessible mute/leave; axe no critical; 390px; provider-disabled without dead controls |
+| In-context chat panel | PM, Lead, Specialist | (Phase G.5) | deferred | Entity-scoped chat on `/projects/:id` `/deals/:id` `/my-work`; conversation+messages from real backend; no remote-fetch demo data |
+
+> Note: communications (channels, in-context chat, calls/meetings) is a **post-founder-beta epic** (Phase G.5, contracts `docs/46`/`docs/47`). These screens stay `deferred` and outside the founder-beta route scope; they must reach `wired` (real data/actions, real states, QA proof) before joining the founder-beta route scope. Strict-prod call gates (Egress recording, TURN/coturn readiness fail-closed, webhook signature verification, RBAC/audit + recording-attachment isolation, axe-clean 390px call UI, no test/mock call hooks in prod) are required before any public production exposure.
 
 ## Visual Quality Rubric
 

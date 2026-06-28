@@ -15,6 +15,8 @@ export type ServerRuntimeConfig = {
   backgroundJobsEnabled: boolean;
   backgroundJobsPollMs: number;
   production: boolean;
+  videoProvider: string | undefined;
+  mediaReadinessUrl: string | undefined;
 };
 
 export function assertServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env) {
@@ -34,6 +36,23 @@ export function assertServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env) 
     readRuntimeSecurityConfig(env);
   }
   parseBackgroundJobsPollMs(env.KISS_PM_BACKGROUND_JOBS_POLL_MS);
+  // Media plane fail-closed: in production a configured LiveKit provider must expose a
+  // readiness probe so /health/ready can gate traffic on the SFU.
+  if (
+    env.NODE_ENV === "production" &&
+    env.KISS_PM_VIDEO_PROVIDER === "livekit" &&
+    !env.KISS_PM_MEDIA_READINESS_URL
+  ) {
+    throw new Error("media_readiness_url_required_in_production");
+  }
+  if (env.KISS_PM_VIDEO_EGRESS_ENABLED === "true") {
+    if (env.KISS_PM_VIDEO_PROVIDER !== "livekit") {
+      throw new Error("egress_requires_livekit_provider");
+    }
+    if (env.KISS_PM_STORAGE_PROVIDER !== "s3") {
+      throw new Error("egress_requires_s3_storage");
+    }
+  }
 }
 
 export function readServerRuntimeConfig(
@@ -49,7 +68,9 @@ export function readServerRuntimeConfig(
     planningEventsRedisUrl: planningEventsRedisUrlFromEnv(env),
     backgroundJobsEnabled: env.KISS_PM_BACKGROUND_JOBS_ENABLED === "true",
     backgroundJobsPollMs: parseBackgroundJobsPollMs(env.KISS_PM_BACKGROUND_JOBS_POLL_MS),
-    production: env.NODE_ENV === "production"
+    production: env.NODE_ENV === "production",
+    videoProvider: env.KISS_PM_VIDEO_PROVIDER,
+    mediaReadinessUrl: env.KISS_PM_MEDIA_READINESS_URL
   };
 }
 

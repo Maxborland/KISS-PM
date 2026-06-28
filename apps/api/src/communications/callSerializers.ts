@@ -62,9 +62,17 @@ export function serializeCallRecording(recording: CallRecording) {
     attachmentId: recording.attachmentId,
     createdAt: recording.createdAt.toISOString(),
     createdByUserId: recording.createdByUserId,
+    durationSeconds: recording.durationSeconds,
+    egressId: recording.egressId,
+    endedAt: recording.endedAt?.toISOString() ?? null,
     id: recording.id,
+    kind: recording.kind,
+    participantId: recording.participantId,
+    recordingGroupId: recording.recordingGroupId,
     roomId: recording.roomId,
     sessionId: recording.sessionId,
-    title: recording.title
+    status: recording.status,
+    title: recording.title,
+    trackId: recording.trackId
   };
 }

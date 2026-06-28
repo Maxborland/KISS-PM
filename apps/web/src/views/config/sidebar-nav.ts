@@ -21,6 +21,14 @@ const BASE_GROUPS: SidebarGroup[] = [
     ]
   },
   {
+    title: "Общение",
+    items: [
+      { label: "Чаты", badge: "3" },
+      { label: "Звонки" },
+      { label: "Встречи" }
+    ]
+  },
+  {
     title: "Инструменты",
     items: [
       { label: "Уведомления", badge: "7", alert: true },

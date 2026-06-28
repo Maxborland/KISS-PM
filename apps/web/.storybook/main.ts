@@ -16,6 +16,7 @@ const config: StorybookConfig = {
     "../src/auth/**/*.stories.@(ts|tsx)",
     "../src/workspace/**/*.stories.@(ts|tsx)",
     "../src/admin/**/*.stories.@(ts|tsx)",
+    "../src/widgets/**/*.stories.@(ts|tsx)",
     "../src/stories/foundations/**/*.stories.@(ts|tsx)",
     "../src/stories/catalog/**/*.stories.@(ts|tsx)"
   ],

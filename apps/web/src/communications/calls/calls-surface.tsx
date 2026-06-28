@@ -57,7 +57,11 @@ const EVENT_ICON: Record<CallEventType, ReactNode> = {
   participant_joined: <LogIn className="size-3.5" aria-hidden />,
   participant_left: <LogOut className="size-3.5" aria-hidden />,
   session_ended: <PhoneOff className="size-3.5" aria-hidden />,
-  recording_attached: <CircleDot className="size-3.5" aria-hidden />
+  recording_attached: <CircleDot className="size-3.5" aria-hidden />,
+  recording_started: <CircleDot className="size-3.5" aria-hidden />,
+  recording_track_completed: <CircleDot className="size-3.5" aria-hidden />,
+  recording_completed: <CircleDot className="size-3.5" aria-hidden />,
+  recording_failed: <PhoneOff className="size-3.5" aria-hidden />
 };
 const EVENT_LABEL: Record<CallEventType, string> = {
   room_created: "Комната создана",
@@ -68,7 +72,11 @@ const EVENT_LABEL: Record<CallEventType, string> = {
   participant_joined: "Участник вошёл",
   participant_left: "Участник вышел",
   session_ended: "Сессия завершена",
-  recording_attached: "Прикреплена запись"
+  recording_attached: "Прикреплена запись",
+  recording_started: "Запись начата",
+  recording_track_completed: "Дорожка записи готова",
+  recording_completed: "Запись завершена",
+  recording_failed: "Ошибка записи"
 };
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";

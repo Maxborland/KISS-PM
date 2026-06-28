@@ -26,6 +26,8 @@ import {
   type CommunicationEntityAccessContext
 } from "./communications/entityAccess";
 import { readLimitedJsonBody } from "./jsonBody";
+import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
+import { createTurnConfigFromEnv, issueTurnCredentials } from "./turnCredentials";
 import type { ApiRouteDeps } from "./routeTypes";
 
 type ResolvedCallRoom = {
@@ -35,6 +37,12 @@ type ResolvedCallRoom = {
 
 export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDeps) {
   const callWorkspace = createCommunicationCallWorkspace(deps);
+  const recordingWorkspace = createCommunicationRecordingWorkspace({
+    dataSource: deps.dataSource,
+    egressProvider: deps.egressProvider,
+    appendManagementAuditEvent: deps.appendManagementAuditEvent
+  });
+  const turnConfig = createTurnConfigFromEnv();
 
   app.get("/api/workspace/call-rooms", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
@@ -97,7 +105,7 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     if (!resolved.value.access.readDecision.allowed) {
       return context.json({ error: resolved.value.access.readDecision.reason }, 403);
     }
-    const [events, recordings] = await Promise.all([
+    const [events, recordings, activeSession] = await Promise.all([
       deps.dataSource.listCallEvents?.({
         tenantId: actor.tenantId,
         roomId: resolved.value.room.id,
@@ -106,10 +114,16 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
       deps.dataSource.listCallRecordings?.({
         tenantId: actor.tenantId,
         roomId: resolved.value.room.id
-      }) ?? []
+      }) ?? [],
+      deps.dataSource.findActiveCallSessionByRoom?.({
+        tenantId: actor.tenantId,
+        roomId: resolved.value.room.id
+      }) ?? undefined
     ]);
     return context.json({
       callRoom: serializeCallRoom(resolved.value.room),
+      // The active session a second participant joins instead of starting a new one.
+      activeSession: activeSession ? serializeCallSession(activeSession) : null,
       events: events.map(serializeCallEvent),
       recordings: recordings.map(serializeCallRecording)
     });
@@ -171,6 +185,30 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
       },
       event: serializeCallEvent(result.event)
     });
+  });
+
+  app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/turn-credentials", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const resolved = await resolveCallRoomAndSession(
+      context.req.param("roomId"),
+      context.req.param("sessionId"),
+      actor,
+      deps
+    );
+    if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
+    if (!resolved.value.access.readDecision.allowed) {
+      return context.json({ error: resolved.value.access.readDecision.reason }, 403);
+    }
+    if (resolved.value.session.status !== "active") {
+      return context.json({ error: "call_session_not_active" }, 409);
+    }
+    if (!turnConfig) {
+      // No TURN configured — the client falls back to STUN/host candidates.
+      return context.json({ turn: null });
+    }
+    const credentials = issueTurnCredentials(turnConfig, actor.id, Math.floor(Date.now() / 1000));
+    return context.json({ turn: credentials });
   });
 
   app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/participant-state", async (context) => {
@@ -247,6 +285,12 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     if (!result.ok) {
       return context.json({ error: result.error }, result.status);
     }
+    // Ending the session must not leave egress recording the (now-ended) call.
+    await recordingWorkspace.stopActiveEgressForSession({
+      tenantId: actor.tenantId,
+      roomId: resolved.value.room.id,
+      sessionId: resolved.value.session.id
+    });
     return context.json({
       callRoom: serializeCallRoom(result.room),
       session: serializeCallSession(result.session),
@@ -286,6 +330,67 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
       event: serializeCallEvent(result.event),
       recording: serializeCallRecording(result.recording)
     }, 201);
+  });
+
+  app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/recordings/start", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const resolved = await resolveCallRoomAndSession(
+      context.req.param("roomId"),
+      context.req.param("sessionId"),
+      actor,
+      deps
+    );
+    if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
+    if (!resolved.value.access.manageDecision.allowed) {
+      await callWorkspace.appendDeniedAudit({
+        actionType: "communications.denied",
+        actor,
+        commandInput: { action: "recording.start", roomId: context.req.param("roomId") },
+        permissionResult: resolved.value.access.manageDecision,
+        sourceEntity: resolved.value.access.sourceEntity
+      });
+      return context.json({ error: resolved.value.access.manageDecision.reason }, 403);
+    }
+    const result = await recordingWorkspace.startRecording({
+      access: resolved.value.access,
+      actor,
+      room: resolved.value.room,
+      session: resolved.value.session
+    });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
+    return context.json(
+      {
+        recordingGroupId: result.recordingGroupId,
+        recordings: result.recordings.map(serializeCallRecording)
+      },
+      201
+    );
+  });
+
+  app.post("/api/workspace/call-rooms/:roomId/recordings/groups/:groupId/stop", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const resolved = await resolveCallRoomForActor(context.req.param("roomId"), actor, deps);
+    if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
+    if (!resolved.value.access.manageDecision.allowed) {
+      await callWorkspace.appendDeniedAudit({
+        actionType: "communications.denied",
+        actor,
+        commandInput: { action: "recording.stop", roomId: context.req.param("roomId") },
+        permissionResult: resolved.value.access.manageDecision,
+        sourceEntity: resolved.value.access.sourceEntity
+      });
+      return context.json({ error: resolved.value.access.manageDecision.reason }, 403);
+    }
+    const result = await recordingWorkspace.stopRecording({
+      access: resolved.value.access,
+      actor,
+      room: resolved.value.room,
+      recordingGroupId: context.req.param("groupId")
+    });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
+    return context.json({ stopped: result.stopped, failed: result.failed });
   });
 
   app.get("/api/workspace/call-rooms/:roomId/events", async (context) => {

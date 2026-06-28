@@ -130,6 +130,71 @@ describe("video provider", () => {
       tenantId: "tenant-alpha"
     });
   });
+
+  it("accepts secure WebSocket (wss) LiveKit URLs", async () => {
+    const provider = createVideoProvider({
+      kind: "livekit",
+      url: "wss://livekit.kiss.local",
+      apiKey: "livekit-key",
+      apiSecret: "livekit-secret",
+      tokenTtlSeconds: 120
+    });
+
+    const result = await provider.issueJoinToken(joinInput());
+    expect(result.provider).toBe("livekit");
+    expect(result.joinUrl).toBe("wss://livekit.kiss.local");
+  });
+
+  it("accepts wss LiveKit URLs from env", () => {
+    expect(
+      createVideoProviderFromEnv({
+        KISS_PM_VIDEO_LIVEKIT_API_KEY: "livekit-key",
+        KISS_PM_VIDEO_LIVEKIT_API_SECRET: "livekit-secret",
+        KISS_PM_VIDEO_LIVEKIT_URL: "wss://livekit.kiss.local",
+        KISS_PM_VIDEO_PROVIDER: "livekit"
+      } as NodeJS.ProcessEnv).kind
+    ).toBe("livekit");
+  });
+
+  it("treats ws LiveKit URLs as insecure unless explicitly allowed", () => {
+    expect(() =>
+      createVideoProvider({
+        kind: "livekit",
+        url: "ws://livekit.kiss.local",
+        apiKey: "livekit-key",
+        apiSecret: "livekit-secret",
+        allowInsecureHttp: false
+      })
+    ).toThrow("video_provider_insecure_url");
+
+    expect(
+      createVideoProvider({
+        kind: "livekit",
+        url: "ws://livekit.kiss.local",
+        apiKey: "livekit-key",
+        apiSecret: "livekit-secret",
+        allowInsecureHttp: true
+      }).kind
+    ).toBe("livekit");
+  });
+
+  it("rejects insecure ws LiveKit URLs from production env", () => {
+    expect(() =>
+      createVideoProviderFromEnv({
+        NODE_ENV: "production",
+        KISS_PM_VIDEO_LIVEKIT_API_KEY: "livekit-key",
+        KISS_PM_VIDEO_LIVEKIT_API_SECRET: "livekit-secret",
+        KISS_PM_VIDEO_LIVEKIT_URL: "ws://livekit.kiss.local",
+        KISS_PM_VIDEO_PROVIDER: "livekit"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("video_provider_insecure_url");
+  });
+
+  it("still rejects WebSocket URLs for non-LiveKit providers", () => {
+    expect(() =>
+      createVideoProvider({ kind: "jitsi", baseUrl: "wss://meet.kiss.local" })
+    ).toThrow("video_provider_misconfigured");
+  });
 });
 
 function joinInput() {

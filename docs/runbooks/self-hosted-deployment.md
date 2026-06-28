@@ -63,3 +63,30 @@ Readiness responses may expose check names and safe provider labels only. They m
 ## Collaboration dependency note
 
 Collaboration & Communications backend uses the same operational contract: DB is the source of truth, attachments use the storage layer, external meeting links are metadata references, video providers issue join contracts only, and realtime delivery is optional Redis-backed infrastructure rather than a business-state source of truth.
+
+## Media plane (self-hosted A/V — LiveKit + coturn + Egress)
+
+Opt-in via the `media` compose profile (`docker compose --profile media up`). Config lives in `infra/livekit/`, `infra/coturn/`, `infra/egress/`.
+
+**Fail-closed invariants** (`serverConfig.ts`):
+- `KISS_PM_VIDEO_PROVIDER` must be exactly `manual | jitsi | livekit` or startup is rejected.
+- In production with `KISS_PM_VIDEO_PROVIDER=livekit`, `KISS_PM_MEDIA_READINESS_URL` is **required** so `/health/ready` gates on the SFU (returns 503 if LiveKit is unreachable).
+- `KISS_PM_VIDEO_EGRESS_ENABLED=true` requires `KISS_PM_VIDEO_PROVIDER=livekit` **and** `KISS_PM_STORAGE_PROVIDER=s3` (Egress cannot write to the local provider) — otherwise startup is rejected.
+
+**Ports / firewall (media host ingress):**
+- `7880/tcp` — LiveKit signaling + HTTP/health (terminate TLS at a proxy → `wss` on 443).
+- `7881/tcp` — ICE/TCP fallback.
+- `50000–60000/udp` — LiveKit RTC media (open the whole range — the single biggest firewall requirement).
+- `3478/udp+tcp`, `5349/tcp` (+ optionally `443/tcp`) — coturn STUN/TURN(/TLS).
+- coturn relay UDP range (e.g. `49160–49200/udp`).
+- Redis (`6379`) stays internal — never public.
+
+**TLS:** terminate `wss` for LiveKit at a reverse proxy; coturn does its **own** TLS (cert/pkey in `turnserver.conf`) because TURN/TLS cannot sit behind an HTTP proxy. Use a SAN cert covering `livekit.*` and `turn.*`, or two certs.
+
+**TURN credentials:** the API issues short-lived HMAC creds at `POST .../sessions/:id/turn-credentials` (`username=<expiry>:<userId>`, `credential=base64(HMAC-SHA1(KISS_PM_TURN_SHARED_SECRET, username))`, TTL `KISS_PM_TURN_CREDENTIAL_TTL_SECONDS` bounded 60..3600). The shared secret is server-side only and never appears in readiness/audit/logs; creds are response-only. Without TURN configured the endpoint returns `{ turn: null }` and clients fall back to STUN/host candidates.
+
+**Secrets never logged:** LiveKit api-secret, coturn shared secret, TURN credential, Egress S3 keys, and join tokens must never appear in readiness/audit/logs/OpenAPI examples.
+
+**Egress webhook:** `POST /integrations/livekit/webhook` is signature-verified (LiveKit `WebhookReceiver`) and exempt from the `x-kiss-pm-action` browser guard (server-to-server). Tenant is parsed from the egress output key (`recordings/{tenantId}/...`), never trusted from the payload.
+
+**Follow-ups (operational):** prove the TURN-relay path from a symmetric-NAT network; a periodic `listEgress` janitor to reconcile recordings stuck in `recording`; single-node sizing vs multi-node Redis-cluster scaling; per-track files compose to a single MP4 via a deferred ffmpeg background job.

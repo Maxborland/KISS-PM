@@ -55,6 +55,9 @@ A reusable component is beta-approved only when:
 | Forms and drawers | approved/needs-adaptation TBD | Create/edit flows | Validation and save/error states required |
 | Empty/error states | missing/needs-adaptation TBD | All screens | Must be role/task-specific, not generic placeholder copy |
 | Audit/activity trail | missing/needs-adaptation TBD | Agent and mutations | Required for trust in agent operations |
+| comms-chat (channel-list/conversation/composer/message-bubble/reaction-bar) | deferred (Phase G.5) | Channels, in-context chat panels | No fake send: composer either posts to real conversation or is disabled with reason; Cyrillic copy; `livekit-client` never imported here; empty/loading/error/forbidden states |
+| call-stage (lobby/grid/controls/screen-share/recording-indicator/in-call-chat/device-settings) | deferred (Phase G.5) | `/calls/:roomId` | Accessible mute/leave (keyboard); no remote fetch in widget (view-model only, SDK under `lib/call/*`); provider-disabled/reconnecting/permission-denied without dead controls; axe no critical |
+| sticker-picker | deferred (Phase G.5) | Composer | Loads tenant sticker packs from real backend, no remote fetch; insert creates real sticker message or control disabled; safe image sizing |
 
 ## Codex/Cursor Instruction Contract
 

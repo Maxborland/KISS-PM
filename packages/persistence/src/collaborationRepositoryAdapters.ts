@@ -87,6 +87,10 @@ export type CallPersistenceAdapter = Pick<
   | "listCallEvents"
   | "listCallParticipantStates"
   | "listCallRecordings"
+  | "findCallRecordingByEgressId"
+  | "listCallRecordingsByGroup"
+  | "updateCallRecordingByEgress"
+  | "failStaleInProgressRecordings"
   | "listCallRoomsByEntity"
   | "updateCallRoomStatus"
   | "upsertCallParticipantState"
@@ -118,6 +122,10 @@ export function createFocusedCollaborationPersistenceAdapters(
       listCallEvents: repository.listCallEvents.bind(repository),
       listCallParticipantStates: repository.listCallParticipantStates.bind(repository),
       listCallRecordings: repository.listCallRecordings.bind(repository),
+      findCallRecordingByEgressId: repository.findCallRecordingByEgressId.bind(repository),
+      listCallRecordingsByGroup: repository.listCallRecordingsByGroup.bind(repository),
+      updateCallRecordingByEgress: repository.updateCallRecordingByEgress.bind(repository),
+      failStaleInProgressRecordings: repository.failStaleInProgressRecordings.bind(repository),
       listCallRoomsByEntity: repository.listCallRoomsByEntity.bind(repository),
       updateCallRoomStatus: repository.updateCallRoomStatus.bind(repository),
       upsertCallParticipantState: repository.upsertCallParticipantState.bind(repository)

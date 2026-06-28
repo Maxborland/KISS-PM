@@ -472,8 +472,8 @@ a:hover { color: var(--accent-hover); }
   font-family: var(--font-display);
   font-size: var(--text-h1);
   line-height: var(--lh-h1);
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  letter-spacing: -0.025em;
   margin: 0 0 var(--space-2);
   color: var(--text-strong);
 }
@@ -920,7 +920,7 @@ a:hover { color: var(--accent-hover); }
   color: var(--text-strong);
 }
 
-.card__sub { font-size: var(--text-xs); color: var(--muted); margin-top: 2px; }
+.card__sub { font-size: var(--text-sm); color: var(--muted); margin-top: 2px; }
 
 .card__body { padding: var(--space-4) var(--space-5) var(--space-5); }
 .card__body--flush { padding: 0; }
@@ -1567,7 +1567,7 @@ a:hover { color: var(--accent-hover); }
 .skeleton {
   background: linear-gradient(90deg, var(--panel-strong) 25%, var(--panel-subtle) 50%, var(--panel-strong) 75%);
   background-size: 200% 100%;
-  animation: skeleton 1.4s ease-in-out infinite;
+  animation: skeleton 1.4s linear infinite;
   border-radius: var(--radius-md);
 }
 
@@ -2036,6 +2036,7 @@ a:hover { color: var(--accent-hover); }
 .u-flex { display: flex; }
 .u-flex-col { display: flex; flex-direction: column; }
 .u-items-center { align-items: center; }
+.u-justify-center { justify-content: center; }
 .u-between { display: flex; justify-content: space-between; align-items: center; }
 .u-gap-1 { gap: 4px; }
 .u-gap-2 { gap: 8px; }

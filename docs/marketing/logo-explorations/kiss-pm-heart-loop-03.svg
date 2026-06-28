@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="KISS PM heart loop logo mark, variant 03">
+  <defs>
+    <linearGradient id="kiss-left-lobe" x1="246" y1="246" x2="546" y2="778" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b39d6"/>
+      <stop offset="0.58" stop-color="#1167f1"/>
+      <stop offset="1" stop-color="#20c8da"/>
+    </linearGradient>
+    <linearGradient id="kiss-right-lobe" x1="788" y1="250" x2="504" y2="792" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8792ff"/>
+      <stop offset="0.54" stop-color="#6f78f4"/>
+      <stop offset="1" stop-color="#2338ca"/>
+    </linearGradient>
+    <linearGradient id="kiss-inner-shadow" x1="420" y1="700" x2="610" y2="850" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111a87" stop-opacity="0"/>
+      <stop offset="0.35" stop-color="#111a87" stop-opacity="0.18"/>
+      <stop offset="0.68" stop-color="#111a87" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#111a87" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="kiss-center-cutout" maskUnits="userSpaceOnUse">
+      <rect width="1024" height="1024" fill="#ffffff"/>
+      <path
+        d="M512 381C520 381 528 384 534 390L634 490C646 502 646 522 634 534L534 634C522 646 502 646 490 634L390 534C378 522 378 502 390 490L490 390C496 384 504 381 512 381Z"
+        fill="#000000"/>
+    </mask>
+    <clipPath id="kiss-icon-bounds">
+      <rect x="112" y="112" width="800" height="800" rx="0"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#kiss-icon-bounds)" mask="url(#kiss-center-cutout)">
+    <path
+      d="M512 291C430 207 304 202 223 283C140 366 145 501 236 592L454 810C486 842 538 842 570 810L641 739L397 495L520 372C546 346 543 322 512 291Z"
+      fill="url(#kiss-left-lobe)"/>
+    <path
+      d="M512 291C594 207 720 202 801 283C884 366 879 501 788 592L570 810C538 842 486 842 454 810L383 739L627 495L504 372C478 346 481 322 512 291Z"
+      fill="url(#kiss-right-lobe)"/>
+    <path
+      d="M382 739L454 810C486 842 538 842 570 810L642 739L592 790C548 834 476 834 432 790Z"
+      fill="url(#kiss-inner-shadow)"/>
+  </g>
+</svg>
