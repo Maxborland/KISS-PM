@@ -404,6 +404,7 @@ function ProjectDetailRuntime({ id, me }: { id: string; me: AuthMe }) {
 
 function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
   const planning = usePlanning(id);
+  const project = useProject(id);
   const queryClient = useQueryClient();
   const [preview, setPreview] = useState<PlanningPreview | null>(null);
   const data = useMemo(() => planning.data ? toGanttData(planning.data) : undefined, [planning.data]);
@@ -441,7 +442,7 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
   return (
     <>
       <PageIntro
-        title={`Гант · ${planning.data?.project.title ?? "Проект"}`}
+        title={`Гант · ${project.data?.project.title ?? planning.data?.project.title ?? "Проект"}`}
         lead="План-факт и WBS проекта из текущего плана. Изменение проходит через сверку и применение с версией плана."
         actions={<><Button variant="secondary" disabled={Boolean(reason) || !command || previewMutation.isPending} title={reason ?? undefined} onClick={() => previewMutation.mutate()}>Подготовить сверку</Button><Button variant="primary" disabled={Boolean(reason) || !preview || applyMutation.isPending} title={reason ?? undefined} onClick={() => applyMutation.mutate()}>Применить</Button></>}
       />
@@ -459,13 +460,14 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
 function ProjectResourcesRuntime({ id }: { id: string }) {
   const monthIso = currentMonthIso();
   const planning = usePlanning(id);
+  const project = useProject(id);
   const capacity = useCapacitySummary(monthIso);
   const capacityTree = useCapacityTree(monthIso, id);
   const assignedHours = planning.data?.authored.assignments.reduce((sum, assignment) => sum + ((assignment.workMinutes ?? 0) / 60), 0) ?? 0;
   const uniqueResources = new Set(planning.data?.authored.assignments.map((assignment) => assignment.resourceId) ?? []).size;
   return (
     <>
-      <PageIntro title={`Ресурсы · ${planning.data?.project.title ?? "Проект"}`} lead="Загрузка строится из назначений и доступности команды: перегрузки видны по людям и задачам." />
+      <PageIntro title={`Ресурсы · ${project.data?.project.title ?? planning.data?.project.title ?? "Проект"}`} lead="Загрузка строится из назначений и доступности команды: перегрузки видны по людям и задачам." />
       <div className="bento">
         <MetricTile label="Назначено" value={Math.round(assignedHours)} sub="часов в плане" />
         <MetricTile label="Участники" value={uniqueResources} sub="ресурсов с назначениями" />
