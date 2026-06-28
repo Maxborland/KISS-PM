@@ -1521,6 +1521,23 @@ export function createMockCommsFetch(): typeof fetch {
       return json({ meetings });
     }
 
+    /* 26b) GET /meetings/:id — composite деталь (зеркало боевого GET meeting detail). */
+    const meetingDetailMatch = method === "GET" ? path.match(/^\/api\/workspace\/meetings\/([^/]+)$/) : null;
+    if (meetingDetailMatch) {
+      const idParsed = parseCollaborationId(decodeURIComponent(meetingDetailMatch[1]!), "meeting_id_invalid");
+      if (!idParsed.ok) return err(idParsed.error, 400);
+      const meeting = db.meetings.find((m) => m.id === idParsed.value && m.archivedAt === null);
+      if (!meeting) return err("meeting_not_found", 404);
+      if (!canReadEntity(meeting.entityType, meeting.entityId)) return err("permission_missing", 403);
+      return json({
+        meeting,
+        participants: db.meetingParticipants.filter((p) => p.meetingId === meeting.id),
+        notes: db.meetingNotes.filter((n) => n.meetingId === meeting.id && n.archivedAt === null),
+        actionItems: db.meetingActionItems.filter((a) => a.meetingId === meeting.id && a.archivedAt === null),
+        externalLinks: db.meetingExternalLinks.filter((l) => l.meetingId === meeting.id && l.archivedAt === null)
+      });
+    }
+
     /* 27) POST /meetings — создать (тело+участники ДО access; организатор авто; meeting_invite побочка). */
     if (method === "POST" && path === "/api/workspace/meetings") {
       // Тело ДО access (боевой). Порядок: entity → title → agenda → start → finish → schedule → participants → tenant_user → access.

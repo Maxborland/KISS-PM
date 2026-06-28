@@ -583,6 +583,16 @@ export function createCommsClient(options: CommsApiClientOptions) {
     listMeetings(entityType: EntityType, entityId: string) {
       return requestJson<{ meetings: Meeting[] }>(`/api/workspace/meetings${qs({ entityType, entityId })}`);
     },
+    // GET деталь митинга (composite): участники/ноты/задачи/ссылки одним запросом.
+    getMeeting(meetingId: string) {
+      return requestJson<{
+        meeting: Meeting;
+        participants: MeetingParticipant[];
+        notes: MeetingNote[];
+        actionItems: MeetingActionItem[];
+        externalLinks: MeetingExternalLink[];
+      }>(`/api/workspace/meetings/${enc(meetingId)}`);
+    },
     // 27) Создать митинг (organizer=actor авто accepted; meeting_invite каждому ≠ actor).
     createMeeting(input: MeetingCreateInput) {
       return requestJson<{ meeting: Meeting; participants: MeetingParticipant[] }>("/api/workspace/meetings", {

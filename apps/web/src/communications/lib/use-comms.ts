@@ -373,6 +373,17 @@ export function useMeetings(entityType: EntityType, entityId: string) {
   return { client, data, status, error, reload: load, createMeeting, patchMeeting, addNote, addExternalLink, addActionItem };
 }
 
+// Детали выбранной встречи (участники/ноты/задачи/ссылки) из GET /api/workspace/meetings/:id.
+// Рефетч при смене meetingId; reload() — после мутаций. null id → пусто (без запроса).
+export function useMeetingDetail(meetingId: string | null) {
+  const client = useCommsClient();
+  const fetcher = useCallback(
+    () => (meetingId ? client.getMeeting(meetingId) : Promise.resolve(null)),
+    [client, meetingId]
+  );
+  return useCommsLoad(fetcher);
+}
+
 /* ============================================================
    УВЕДОМЛЕНИЯ: useNotifications(status?) + useNotificationPreferences().
    Лента уведомлений работает (сид-уведомление есть); markRead/preferences

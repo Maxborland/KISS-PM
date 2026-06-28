@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
-import { useCommsUsers, useMeetings, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { useCommsUsers, useMeetingDetail, useMeetings, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { avatarColor, commsErr, initials, relTime } from "@/communications/lib/comms-bits";
 import type {
   ActionItemInput,
@@ -92,35 +92,8 @@ function toLocalInput(iso: string): string {
 // datetime-local (локальное) → ISO для контракта.
 const fromLocalInput = (local: string): string => (local ? new Date(local).toISOString() : "");
 
-/* ---- Демо-снимок деталей засеянных митингов (нет GET-ручки детали — см. плашку). ----
-   Зеркалит сид mock-comms-backend (meeting-kickoff/meeting-retro). Используется
-   как стартовое содержимое детальной панели; оптимистичные добавления мержатся поверх. */
+// Деталь митинга для панели (зеркало composite GET /api/workspace/meetings/:id).
 type MeetingDetail = { participants: MeetingParticipant[]; notes: MeetingNote[]; links: MeetingExternalLink[]; actionItems: MeetingActionItem[] };
-const SEED_DETAIL: Record<string, MeetingDetail> = {
-  "meeting-kickoff": {
-    participants: [
-      { tenantId: "demo", meetingId: "meeting-kickoff", userId: "u-anna", role: "organizer", response: "accepted", createdAt: "" },
-      { tenantId: "demo", meetingId: "meeting-kickoff", userId: "u-ivan", role: "required", response: "pending", createdAt: "" },
-      { tenantId: "demo", meetingId: "meeting-kickoff", userId: "u-sergey", role: "optional", response: "pending", createdAt: "" }
-    ],
-    notes: [
-      { id: "meeting-note-kickoff-1", tenantId: "demo", meetingId: "meeting-kickoff", authorUserId: "u-anna", body: "Подготовить список задач до встречи.", createdAt: "2026-06-22T09:00:00.000Z", editedAt: null, archivedAt: null },
-      { id: "meeting-note-kickoff-2", tenantId: "demo", meetingId: "meeting-kickoff", authorUserId: "u-sergey", body: "Уточнить зависимости по бэкенду.", createdAt: "2026-06-22T09:05:00.000Z", editedAt: null, archivedAt: null }
-    ],
-    links: [
-      { id: "meeting-link-kickoff-zoom", tenantId: "demo", meetingId: "meeting-kickoff", provider: "zoom", url: "https://zoom.us/j/123456789", title: "Zoom-комната kickoff", createdByUserId: "u-anna", createdAt: "", archivedAt: null }
-    ],
-    actionItems: [
-      { id: "meeting-action-kickoff-1", tenantId: "demo", meetingId: "meeting-kickoff", title: "Составить дорожную карту релиза", ownerUserId: "u-ivan", dueDate: "2026-06-30", targetEntityType: "project", targetEntityId: "proj-portal", status: "open", createdByUserId: "u-anna", createdAt: "", archivedAt: null }
-    ]
-  },
-  "meeting-retro": {
-    participants: [{ tenantId: "demo", meetingId: "meeting-retro", userId: "u-anna", role: "organizer", response: "accepted", createdAt: "" }],
-    notes: [],
-    links: [],
-    actionItems: []
-  }
-};
 const emptyDetail = (): MeetingDetail => ({ participants: [], notes: [], links: [], actionItems: [] });
 
 export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENTITY_ID }: { entityType?: EntityType; entityId?: string } = {}) {
@@ -130,9 +103,6 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  // Оптимистичный кэш деталей по митингам (нет GET-детали — см. плашку).
-  const [detail, setDetail] = useState<Record<string, MeetingDetail>>({});
-
   const meetings = useMemo(() => {
     if (!data) return [];
     return [...data.meetings].sort((a, b) => Date.parse(b.scheduledStart) - Date.parse(a.scheduledStart));
@@ -142,6 +112,8 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
     if (meetings.length === 0) return null;
     return meetings.find((m) => m.id === selectedId) ?? meetings[0] ?? null;
   }, [meetings, selectedId]);
+  // Деталь выбранного митинга — реальный composite GET /meetings/:id (рефетч при смене/после мутаций).
+  const meetingDetail = useMeetingDetail(selected?.id ?? null);
 
   // Верхнеуровневый статус поверхности: forbidden (403) / error / loading.
   // ВНУТРЕННИЙ EmptyState «Встреч пока нет» (data есть, список пуст) — НЕ top-level: остаётся в ready.
@@ -162,22 +134,11 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
     );
   }
 
-  // Детали выбранного: сид-снимок ⊕ оптимистичные добавления за сессию.
-  const detailOf = (id: string): MeetingDetail => {
-    const seed = SEED_DETAIL[id] ?? emptyDetail();
-    const live = detail[id] ?? emptyDetail();
-    return {
-      participants: seed.participants,
-      notes: [...seed.notes, ...live.notes],
-      links: [...seed.links, ...live.links],
-      actionItems: [...seed.actionItems, ...live.actionItems]
-    };
-  };
-  const mergeDetail = (id: string, patch: Partial<MeetingDetail>) =>
-    setDetail((d) => {
-      const cur = d[id] ?? emptyDetail();
-      return { ...d, [id]: { ...cur, ...patch } };
-    });
+  // Деталь из GET /meetings/:id (externalLinks → links для панели); пусто, пока грузится/нет выбора.
+  const dd = meetingDetail.data;
+  const selectedDetail: MeetingDetail = dd
+    ? { participants: dd.participants, notes: dd.notes, links: dd.externalLinks, actionItems: dd.actionItems }
+    : emptyDetail();
 
   async function doPatchStatus(meetingId: string, next: MeetingStatus) {
     setBusy(true); setNotice(null);
@@ -190,13 +151,8 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
     setBusy(true); setNotice(null);
     const res = await addNote(meetingId, body);
     setBusy(false);
-    if (res.ok) {
-      // Оптимистично: ноту в локальный кэш (мутация не возвращает запись — см. плашку).
-      mergeDetail(meetingId, {
-        notes: [...(detail[meetingId]?.notes ?? []), { id: `local-note-${Date.now()}`, tenantId: "demo", meetingId, authorUserId: "u-anna", body, createdAt: new Date().toISOString(), editedAt: null, archivedAt: null }]
-      });
-      setNotice("Заметка добавлена");
-    } else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) { await meetingDetail.reload(); setNotice("Заметка добавлена"); }
+    else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res.ok;
   }
 
@@ -204,12 +160,8 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
     setBusy(true); setNotice(null);
     const res = await addExternalLink(meetingId, input);
     setBusy(false);
-    if (res.ok) {
-      mergeDetail(meetingId, {
-        links: [...(detail[meetingId]?.links ?? []), { id: `local-link-${Date.now()}`, tenantId: "demo", meetingId, provider: input.provider, url: input.url, title: input.title, createdByUserId: "u-anna", createdAt: new Date().toISOString(), archivedAt: null }]
-      });
-      setNotice("Ссылка добавлена");
-    } else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) { await meetingDetail.reload(); setNotice("Ссылка добавлена"); }
+    else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res.ok;
   }
 
@@ -217,12 +169,8 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
     setBusy(true); setNotice(null);
     const res = await addActionItem(meetingId, input);
     setBusy(false);
-    if (res.ok) {
-      mergeDetail(meetingId, {
-        actionItems: [...(detail[meetingId]?.actionItems ?? []), { id: `local-action-${Date.now()}`, tenantId: "demo", meetingId, title: input.title, ownerUserId: input.ownerUserId, dueDate: input.dueDate ?? null, targetEntityType: input.targetEntityType ?? "project", targetEntityId: input.targetEntityId ?? entityId, status: "open", createdByUserId: "u-anna", createdAt: new Date().toISOString(), archivedAt: null }]
-      });
-      setNotice("Action item добавлен");
-    } else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) { await meetingDetail.reload(); setNotice("Action item добавлен"); }
+    else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res.ok;
   }
 
@@ -237,8 +185,8 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
         <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
           <span>
-            Реальный контракт: /api/workspace/meetings (GET список, POST создать, PATCH статус, POST .../notes, .../external-links, .../action-items). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.
-            {" "}В этом слайсе нет GET-ручки деталей митинга, поэтому участники/ноты/ссылки/action-items — демо-снимок плюс добавленные за сессию (приватные URL отклоняются 400; статус action-item всегда «open»).
+            Реальный контракт: /api/workspace/meetings (GET список + GET деталь, POST создать, PATCH статус, POST .../notes, .../external-links, .../action-items). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.
+            {" "}Детали митинга (участники/ноты/ссылки/action-items) — из GET /meetings/:id; статус action-item пока всегда «open» (PATCH — следующий слайс). Приватные URL отклоняются 400.
           </span>
         </div>
 
@@ -287,7 +235,7 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
             <MeetingDetailPanel
               key={selected.id}
               meeting={selected}
-              detail={detailOf(selected.id)}
+              detail={selectedDetail}
               users={users}
               busy={busy}
               onPatchStatus={(s) => void doPatchStatus(selected.id, s)}
