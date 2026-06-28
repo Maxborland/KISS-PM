@@ -14,6 +14,7 @@ import { Field } from "@/components/domain/form-layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Chip } from "@/components/ui/chip";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -310,6 +311,7 @@ function DealDetailRuntime({ id, me }: { id: string; me: AuthMe }) {
   const deal = useQuery({ queryKey: ["opportunity", id], queryFn: () => apiFetch<{ opportunity: Opportunity }>(`/api/workspace/opportunities/${id}`) });
   const queryClient = useQueryClient();
   const router = useRouter();
+  const [confirmActivate, setConfirmActivate] = useState(false);
   const feasibilityReason = disabledReason(me, PERMISSIONS.readResourceFeasibility);
   const activateReason = disabledReason(me, PERMISSIONS.manageProjectActivation);
   const feasibility = useMutation({
@@ -329,6 +331,7 @@ function DealDetailRuntime({ id, me }: { id: string; me: AuthMe }) {
     },
     onSuccess: async (payload) => {
       toast.success("Проект активирован");
+      setConfirmActivate(false);
       router.push(`/projects/${payload.project.id}`);
     }
   });
@@ -338,7 +341,28 @@ function DealDetailRuntime({ id, me }: { id: string; me: AuthMe }) {
       <PageIntro
         title={item?.title ?? "Карточка сделки"}
         lead={item ? `${item.clientName} · ${dateRange(item.plannedStart, item.plannedFinish)}` : "Загружаем сделку"}
-        actions={<><Button variant="secondary" onClick={() => feasibility.mutate()} disabled={Boolean(feasibilityReason) || feasibility.isPending} title={feasibilityReason ?? undefined}>Проверить реализуемость</Button><Button variant="primary" onClick={() => activate.mutate()} disabled={Boolean(activateReason) || activate.isPending} title={activateReason ?? undefined}>Активировать проект</Button></>}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => feasibility.mutate()} disabled={Boolean(feasibilityReason) || feasibility.isPending} title={feasibilityReason ?? undefined}>Проверить реализуемость</Button>
+            <Dialog open={confirmActivate} onOpenChange={setConfirmActivate}>
+              <DialogTrigger asChild>
+                <Button variant="primary" disabled={Boolean(activateReason) || activate.isPending} title={activateReason ?? undefined}>Активировать проект</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Активировать проект?</DialogTitle>
+                  <DialogDescription>
+                    Сделка{item ? ` «${item.title}»` : ""} станет проектом. Действие необратимо — вернуть запись в воронку нельзя.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="secondary" onClick={() => setConfirmActivate(false)} disabled={activate.isPending}>Отмена</Button>
+                  <Button variant="primary" onClick={() => activate.mutate()} disabled={activate.isPending}>Активировать</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
       />
       <DisabledReason reason={feasibilityReason ?? activateReason} />
       <StateGate state={deal} empty="Сделка не найдена.">
@@ -987,6 +1011,12 @@ function businessStatus(value: string) {
     controller: "Контролёр",
     approver: "Согласующий",
     observer: "Наблюдатель",
+    ok: "В норме",
+    warning: "Предупреждение",
+    conflict: "Конфликт",
+    blocked: "Заблокировано",
+    sufficient: "Достаточно",
+    insufficient: "Недостаточно",
     recorded: "Записано",
     task_status_changed: "Статус задачи изменён",
     "task.status_changed": "Статус задачи изменён",
