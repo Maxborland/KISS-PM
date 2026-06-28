@@ -66,6 +66,7 @@ export type MeetingPersistenceAdapter = Pick<
   | "createMeetingNote"
   | "findMeeting"
   | "listMeetingActionItems"
+  | "updateMeetingActionItem"
   | "listMeetingExternalLinks"
   | "listMeetingNotes"
   | "listMeetingParticipants"
@@ -169,6 +170,7 @@ export function createFocusedCollaborationPersistenceAdapters(
       createMeetingNote: repository.createMeetingNote.bind(repository),
       findMeeting: repository.findMeeting.bind(repository),
       listMeetingActionItems: repository.listMeetingActionItems.bind(repository),
+      updateMeetingActionItem: repository.updateMeetingActionItem.bind(repository),
       listMeetingExternalLinks: repository.listMeetingExternalLinks.bind(repository),
       listMeetingNotes: repository.listMeetingNotes.bind(repository),
       listMeetingParticipants: repository.listMeetingParticipants.bind(repository),

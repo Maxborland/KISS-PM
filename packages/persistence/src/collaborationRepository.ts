@@ -281,6 +281,12 @@ export type CollaborationRepository = {
   listMeetingNotes(tenantId: TenantId, meetingId: string): Promise<MeetingNote[]>;
   createMeetingActionItem(input: MeetingActionItemInput): Promise<MeetingActionItem>;
   listMeetingActionItems(tenantId: TenantId, meetingId: string): Promise<MeetingActionItem[]>;
+  updateMeetingActionItem(input: {
+    tenantId: TenantId;
+    meetingId: string;
+    actionItemId: string;
+    status: MeetingActionItemStatus;
+  }): Promise<MeetingActionItem | undefined>;
   createCallRoom(input: CallRoomInput): Promise<CallRoom>;
   findCallRoom(tenantId: TenantId, roomId: string): Promise<CallRoom | undefined>;
   listCallRoomsByEntity(input: {
@@ -1260,6 +1266,21 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         )
         .orderBy(asc(meetingActionItems.createdAt));
       return rows.map(mapMeetingActionItem);
+    },
+    async updateMeetingActionItem(input) {
+      const [row] = await db
+        .update(meetingActionItems)
+        .set({ status: input.status })
+        .where(
+          and(
+            eq(meetingActionItems.tenantId, input.tenantId),
+            eq(meetingActionItems.meetingId, input.meetingId),
+            eq(meetingActionItems.id, input.actionItemId),
+            isNull(meetingActionItems.archivedAt)
+          )
+        )
+        .returning();
+      return row ? mapMeetingActionItem(row) : undefined;
     },
     async createCallRoom(input) {
       const now = new Date();

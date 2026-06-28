@@ -30,6 +30,7 @@ import type {
   KpiEvaluation,
   Meeting,
   MeetingActionItem,
+  MeetingActionItemStatus,
   MeetingExternalLink,
   MeetingNote,
   MeetingParticipant,
@@ -1017,6 +1018,12 @@ export type ApiTenantDataSource = {
     tenantId: TenantId,
     meetingId: string
   ): Promise<MeetingActionItem[]>;
+  updateMeetingActionItem?(input: {
+    tenantId: TenantId;
+    meetingId: string;
+    actionItemId: string;
+    status: MeetingActionItemStatus;
+  }): Promise<MeetingActionItem | undefined>;
   createCallRoom?(input: Omit<
     CallRoom,
     "createdAt" | "updatedAt" | "archivedAt"

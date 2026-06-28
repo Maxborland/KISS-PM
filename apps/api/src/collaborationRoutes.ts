@@ -8,6 +8,7 @@ import {
   parseCollaborationId,
   parseConversationTitle,
   parseDigestFrequency,
+  parseMeetingActionItemStatus,
   parseMeetingActionTargetType,
   parseMeetingAgenda,
   parseMeetingExternalLinkProvider,
@@ -909,6 +910,54 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       return createdActionItem;
     });
     return context.json({ actionItem: serializeMeetingActionItem(actionItem) }, 201);
+  });
+
+  // Смена статуса задачи встречи (open/done/cancelled). Manage-гейт как у POST; раньше статус
+  // был всегда "open" — фронт показывал инертный чекбокс.
+  app.patch("/api/workspace/meetings/:meetingId/action-items/:actionItemId", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const meeting = await resolveMeetingForActor(context.req.param("meetingId"), actor, deps);
+    if (!meeting.ok) return context.json({ error: meeting.error }, meeting.status);
+    if (!meeting.value.access.manageDecision.allowed) {
+      await appendDeniedAudit(deps, {
+        actionType: "collaboration.meeting_action_item_updated",
+        actor,
+        sourceEntity: meeting.value.access.sourceEntity,
+        commandInput: { meetingId: meeting.value.meeting.id },
+        permissionResult: meeting.value.access.manageDecision
+      });
+      return context.json({ error: meeting.value.access.manageDecision.reason }, 403);
+    }
+    const actionItemId = parseCollaborationId(context.req.param("actionItemId"), "meeting_action_item_id_invalid");
+    if (!actionItemId.ok) return context.json({ error: actionItemId.error }, 400);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const status = parseMeetingActionItemStatus(readRecord(body.value).status);
+    if (!status.ok) return context.json({ error: status.error }, 400);
+    if (!deps.dataSource.updateMeetingActionItem) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const updated = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const updatedActionItem = await requireMethod(transactionDataSource.updateMeetingActionItem).call(transactionDataSource, {
+        tenantId: actor.tenantId,
+        meetingId: meeting.value.meeting.id,
+        actionItemId: actionItemId.value,
+        status: status.value
+      });
+      if (!updatedActionItem) return undefined;
+      await deps.appendManagementAuditEvent(collaborationAudit({
+        actionType: "collaboration.meeting_action_item_updated",
+        actor,
+        sourceEntity: meeting.value.access.sourceEntity,
+        commandInput: { meetingId: meeting.value.meeting.id, actionItemId: actionItemId.value },
+        permissionResult: meeting.value.access.manageDecision,
+        afterState: { status: updatedActionItem.status }
+      }), transactionDataSource);
+      return updatedActionItem;
+    });
+    if (!updated) return context.json({ error: "meeting_action_item_not_found" }, 404);
+    return context.json({ actionItem: serializeMeetingActionItem(updated) });
   });
 }
 
