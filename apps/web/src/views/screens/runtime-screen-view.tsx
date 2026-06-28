@@ -23,12 +23,15 @@ import { AppPreloader, FeedSkeleton, TableSkeleton } from "@/components/ui/loade
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import { ApiError, apiFetch } from "@/lib/api";
 import { KanbanBoard, KanbanColumn } from "@/widgets/kanban/kanban-board";
 import { KanbanCard } from "@/widgets/kanban/kanban-card";
 import { Gantt } from "@/widgets/gantt";
 import type { GanttData, GanttRow } from "@/widgets/gantt";
+import { ResourceMatrix, ResourceMatrixLegend, ResourceMatrixStats } from "@/widgets/resource-matrix";
+import type { DayCell, DayHeader, MatrixPercent, MatrixRow, ResourceMatrixData } from "@/widgets/resource-matrix";
 import { SCREEN_META, type ScreenId } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
 import { WorkspaceChrome } from "@/views/layout/workspace-chrome";
@@ -92,8 +95,13 @@ type PlanningReadModel = {
 type PlanningPreview = { planDelta: { changedTaskIds: string[]; changedAssignmentIds: string[]; changedDependencyIds: string[] }; validationIssues: Array<{ code: string; message: string; severity: string }> };
 type AccessProfile = { id: string; name: string; permissions: string[] };
 type CapacitySummary = { overloadUserCount?: number; overloadedEmployeeCount?: number; overloadedEmployees?: number; totalWorkMinutes?: number; totalPlannedMinutes?: number; totalCapacityMinutes?: number; totalOverloadMinutes?: number; monthIso?: string };
-type CapacityDay = { date: string; workMinutes: number; capacityMinutes: number; freeMinutes: number; overloadMinutes: number; heat: string };
-type CapacityTreeNode = { id: string; type: string; name: string; days: CapacityDay[]; children?: CapacityTreeNode[] };
+// Реальная форма /capacity/tree (hierarchyMode "org"): direction → unit → position → employee, богатые дневные ячейки.
+type CapacityDayCell = { date: string; workMinutes: number; capacityMinutes: number; freeMinutes: number; overloadMinutes: number; isWeekend: boolean; isHoliday: boolean; hasAbsence: boolean; isFreeDay: boolean; isException: boolean; isOverload: boolean; heat: number };
+type CapacityEmployeeRow = { user: { id: string; name: string; positionName?: string | null }; days: CapacityDayCell[] };
+type CapacityPosition = { position: { id: string; name: string }; rows: CapacityEmployeeRow[]; positionDays: CapacityDayCell[] };
+type CapacityUnit = { unit: { id: string; name: string }; unitDays: CapacityDayCell[]; positions: CapacityPosition[] };
+type CapacityOrgGroup = { direction: { id: string; name: string }; directionDays: CapacityDayCell[]; units: CapacityUnit[] };
+type CapacityTree = { monthIso: string; hierarchyMode: string; days: Array<{ date: string; isoWeekday: number; isWeekend: boolean; isHoliday: boolean }>; orgGroups: CapacityOrgGroup[]; unassignedRows?: CapacityEmployeeRow[] };
 
 type QueryState<T> = { data: T | undefined; isLoading: boolean; error: Error | null; refetch?: () => unknown };
 
@@ -135,7 +143,7 @@ function RuntimeScreenContent({ id, entityId, me }: { id: RuntimeScreenId; entit
   if (id === "07-projects-list") return <ProjectsRuntime />;
   if (id === "07b-project-detail") return entityId ? <ProjectDetailRuntime id={entityId} me={me} /> : <MissingRouteContext entity="проекта" />;
   if (id === "12-project-gantt") return entityId ? <ProjectGanttRuntime id={entityId} me={me} /> : <MissingRouteContext entity="проекта" />;
-  if (id === "13-project-resources") return entityId ? <ProjectResourcesRuntime id={entityId} /> : <MissingRouteContext entity="проекта" />;
+  if (id === "13-project-resources") return entityId ? <ProjectResourcesRuntime id={entityId} me={me} /> : <MissingRouteContext entity="проекта" />;
   if (id === "09-admin") return <AdminRuntime section={entityId === "roles" || entityId === "audit" ? entityId : "users"} />;
   if (id === "11-agent") return <AgentRuntime me={me} />;
   return <SettingsRuntime />;
@@ -506,35 +514,137 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
   );
 }
 
-function ProjectResourcesRuntime({ id }: { id: string }) {
-  const monthIso = currentMonthIso();
+const ASSIGN_ROLES = ["executor", "co_executor", "controller", "approver", "observer"] as const;
+function monthLabel(iso: string) { return new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(new Date(`${iso}-01T00:00:00`)); }
+function monthRange(centerIso: string): string[] {
+  const [year, month] = centerIso.split("-").map(Number);
+  return Array.from({ length: 12 }, (_, index) => {
+    const date = new Date((year ?? 2026), (month ?? 1) - 1 - 3 + index, 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  });
+}
+
+function ProjectResourcesRuntime({ id, me }: { id: string; me: AuthMe }) {
   const planning = usePlanning(id);
+  const planMonth = planning.data?.project.plannedStart?.slice(0, 7);
+  const [monthOverride, setMonthOverride] = useState<string | null>(null);
+  const monthIso = monthOverride ?? planMonth ?? currentMonthIso();
+  const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const capacity = useCapacitySummary(monthIso);
   const capacityTree = useCapacityTree(monthIso, id);
-  const assignedHours = planning.data?.authored.assignments.reduce((sum, assignment) => sum + ((assignment.workMinutes ?? 0) / 60), 0) ?? 0;
-  const uniqueResources = new Set(planning.data?.authored.assignments.map((assignment) => assignment.resourceId) ?? []).size;
+  const positions = useMemo(() => collectResourcePositions(capacityTree.data), [capacityTree.data]);
+  const matrix = useMemo(() => (capacityTree.data && capacity.data ? toResourceMatrix(capacityTree.data, capacity.data, positionFilter) : undefined), [capacityTree.data, capacity.data, positionFilter]);
+  const months = useMemo(() => monthRange(monthIso), [monthIso]);
+  const activeRole = positions.find((position) => position.id === positionFilter)?.name;
   return (
     <>
-      <PageIntro title={`Ресурсы · ${planning.data?.project.title ?? "Проект"}`} lead="Загрузка строится из назначений и доступности команды: перегрузки видны по людям и задачам." />
-      <div className="bento">
-        <MetricTile label="Назначено" value={Math.round(assignedHours)} sub="часов в плане" />
-        <MetricTile label="Участники" value={uniqueResources} sub="ресурсов с назначениями" />
-        <MetricTile label="Перегрузка" value={capacityCount(capacity.data)} sub="сотрудников в зоне риска" danger={capacityCount(capacity.data) > 0} />
-        <MetricTile label="Перегруз, ч" value={Math.round((capacity.data?.totalOverloadMinutes ?? 0) / 60)} sub="по общей загрузке" danger={(capacity.data?.totalOverloadMinutes ?? 0) > 0} />
-      </div>
-      <div className="entity-grid">
-        <div className="entity-grid__main">
-          <CardPanel title="Назначения проекта" subtitle="По задачам текущего плана" flush>
-            <StateGate state={planning} empty="Назначений пока нет.">
-              {planning.data ? <AssignmentsTable planning={planning.data} /> : null}
-            </StateGate>
-          </CardPanel>
-        </div>
-        <aside className="entity-grid__aside">
-          <CapacityRiskPanel state={capacityTree} />
-        </aside>
+      <PageIntro
+        title={`Ресурсы · ${planning.data?.project.title ?? "Проект"}`}
+        lead="Дневная матрица загрузки на месяц: ёмкость, назначения и перегрузки по людям."
+        actions={<>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant={positionFilter ? "secondary" : "ghost"} size="sm"><Filter className="size-4" aria-hidden />{activeRole ?? "Роли"}</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setPositionFilter(null)}>Все роли</DropdownMenuItem>
+              {positions.map((position) => <DropdownMenuItem key={position.id} onClick={() => setPositionFilter(position.id)}>{position.name}</DropdownMenuItem>)}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm"><Calendar className="size-4" aria-hidden />{monthLabel(monthIso)}</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-[18rem] overflow-y-auto">
+              {months.map((month) => <DropdownMenuItem key={month} onClick={() => setMonthOverride(month)}>{monthLabel(month)}</DropdownMenuItem>)}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AssignResourceDialog projectId={id} planning={planning.data} me={me} />
+        </>}
+      />
+      <StateGate state={capacityTree} empty="Данных загрузки нет." skeleton={<TableSkeleton columns={6} rows={6} />}>
+        {matrix ? (
+          <>
+            <ResourceMatrixStats stats={matrix.stats} />
+            <div className="u-flex u-items-center u-justify-between u-gap-3 u-mb-3"><ResourceMatrixLegend /></div>
+            <ResourceMatrix data={matrix} />
+          </>
+        ) : null}
+      </StateGate>
+      <div className="u-mt-3">
+        <CardPanel title="Назначения проекта" subtitle="По задачам текущего плана" flush>
+          <StateGate state={planning} empty="Назначений пока нет.">
+            {planning.data ? <AssignmentsTable planning={planning.data} /> : null}
+          </StateGate>
+        </CardPanel>
       </div>
     </>
+  );
+}
+
+function AssignResourceDialog({ projectId, planning, me }: { projectId: string; planning: PlanningReadModel | undefined; me: AuthMe }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [taskId, setTaskId] = useState("");
+  const [resourceId, setResourceId] = useState("");
+  const [role, setRole] = useState<string>("executor");
+  const [hours, setHours] = useState("8");
+  const [preview, setPreview] = useState<PlanningPreview | null>(null);
+  const reason = disabledReason(me, PERMISSIONS.manageProjectPlan);
+  const assignableTasks = (planning?.authored.tasks ?? []).filter((task) => (task.workMinutes ?? 0) > 0);
+  const command = useMemo(() => {
+    if (!taskId || !resourceId) return null;
+    return { type: "assignment.upsert" as const, payload: { id: crypto.randomUUID(), taskId, resourceId, role, unitsPermille: 1000, workMinutes: Math.max(0, Math.round(Number(hours) * 60)) || null } };
+  }, [taskId, resourceId, role, hours]);
+  const previewMutation = useMutation({
+    mutationFn: () => { if (!planning || !command) throw new Error("Выберите задачу и ресурс"); return apiFetch<PlanningPreview>(`/api/workspace/projects/${projectId}/planning/preview-command`, { method: "POST", json: { command, clientPlanVersion: planning.planVersion } }); },
+    onSuccess: (payload) => { setPreview(payload); toast.success("Предпросмотр подготовлен"); }
+  });
+  const applyMutation = useMutation({
+    mutationFn: () => { if (!planning || !command) throw new Error("Нет команды"); return apiFetch(`/api/workspace/projects/${projectId}/planning/apply-command`, { method: "POST", json: { command, clientPlanVersion: planning.planVersion, idempotencyKey: `assign-${command.payload.id}` } }); },
+    onSuccess: async () => { toast.success("Ресурс назначен"); setOpen(false); setPreview(null); await queryClient.invalidateQueries(); }
+  });
+  return (
+    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setPreview(null); }}>
+      <DialogTrigger asChild>
+        <Button variant="primary" size="sm" disabled={Boolean(reason)} title={reason ?? undefined}><Plus className="size-4" aria-hidden />Назначить</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Назначить ресурс на задачу</DialogTitle>
+          <DialogDescription>Назначение проходит через сверку и применение с версией плана.</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-[var(--space-3)]">
+          <Field label="Задача" htmlFor="assign-task">
+            <Select value={taskId} onValueChange={(value) => { setTaskId(value); setPreview(null); }}>
+              <SelectTrigger id="assign-task" className="w-full"><SelectValue placeholder="Выберите задачу" /></SelectTrigger>
+              <SelectContent>{assignableTasks.map((task) => <SelectItem key={task.id} value={task.id}>{task.title}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
+          <Field label="Ресурс" htmlFor="assign-resource">
+            <Select value={resourceId} onValueChange={(value) => { setResourceId(value); setPreview(null); }}>
+              <SelectTrigger id="assign-resource" className="w-full"><SelectValue placeholder="Выберите ресурс" /></SelectTrigger>
+              <SelectContent>{(planning?.resources ?? []).map((resource) => <SelectItem key={resource.id} value={resource.id}>{resource.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
+          <Field label="Роль" htmlFor="assign-role">
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger id="assign-role" className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>{ASSIGN_ROLES.map((value) => <SelectItem key={value} value={value}>{businessStatus(value)}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
+          <Field label="Трудоёмкость, ч" htmlFor="assign-hours">
+            <Input id="assign-hours" type="number" min={0} value={hours} onChange={(event) => { setHours(event.target.value); setPreview(null); }} />
+          </Field>
+          {preview ? <p className="u-text-sm u-text-muted">Будет изменено: задач {preview.planDelta.changedTaskIds.length}, назначений {preview.planDelta.changedAssignmentIds.length}. Проверок: {preview.validationIssues.length}.</p> : null}
+          <MutationMessage error={previewMutation.error ?? applyMutation.error} />
+        </div>
+        <DialogFooter>
+          <Button variant="secondary" disabled={!command || previewMutation.isPending} onClick={() => previewMutation.mutate()}>Подготовить сверку</Button>
+          <Button variant="primary" disabled={!preview || applyMutation.isPending} onClick={() => applyMutation.mutate()}>Назначить</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -565,28 +675,6 @@ function AssignmentsTable({ planning }: { planning: PlanningReadModel }) {
         })}
       </TableBody>
     </Table>
-  );
-}
-
-function CapacityRiskPanel({ state }: { state: QueryState<CapacityTreeNode | CapacityTreeNode[]> }) {
-  const employees = flattenCapacityNodes(state.data).filter((node) => node.type === "employee");
-  const overloaded = employees
-    .map((node) => ({ node, overloadMinutes: node.days.reduce((sum, day) => sum + day.overloadMinutes, 0) }))
-    .filter((item) => item.overloadMinutes > 0)
-    .sort((left, right) => right.overloadMinutes - left.overloadMinutes)
-    .slice(0, 5);
-  return (
-    <CardPanel title="Риски загрузки" subtitle="По проекту и участникам">
-      <StateGate state={state} empty="Данных загрузки нет.">
-        {overloaded.length > 0 ? (
-          <ul className="link-list">
-            {overloaded.map(({ node, overloadMinutes }) => <li key={node.id}>{node.name} · перегруз {Math.round(overloadMinutes / 60)} ч</li>)}
-          </ul>
-        ) : (
-          <p className="u-text-sm u-text-muted">Перегрузок по выбранному проекту нет.</p>
-        )}
-      </StateGate>
-    </CardPanel>
   );
 }
 
@@ -1006,7 +1094,7 @@ function DisabledReason({ reason }: { reason: string | null }) { return reason ?
 
 function useOpportunities() { return useQuery({ queryKey: ["opportunities"], queryFn: () => apiFetch<{ opportunities: Opportunity[] }>("/api/workspace/opportunities") }); }
 function useDealStages() { return useQuery({ queryKey: ["deal-stages"], queryFn: () => apiFetch<{ dealStages: DealStage[] }>("/api/workspace/deal-stages") }); }
-function useCapacityTree(monthIso: string, projectId: string) { return useQuery({ queryKey: ["capacity-tree", monthIso, projectId], queryFn: () => apiFetch<CapacityTreeNode | CapacityTreeNode[]>(`/api/workspace/capacity/tree?monthIso=${monthIso}&projectId=${projectId}`) }); }
+function useCapacityTree(monthIso: string, projectId: string) { return useQuery({ queryKey: ["capacity-tree", monthIso, projectId], queryFn: () => apiFetch<CapacityTree>(`/api/workspace/capacity/tree?monthIso=${monthIso}&projectId=${projectId}`) }); }
 function useProjects() { return useQuery({ queryKey: ["projects"], queryFn: () => apiFetch<{ projects: Project[] }>("/api/workspace/projects") }); }
 function runtimeScreenMeta(id: RuntimeScreenId) {
   if (id === "11-agent") return { breadcrumb: [{ label: "Агент", current: true }], activeNav: "Агент" };
@@ -1040,15 +1128,74 @@ function auditResultLabel(event: AuditEvent) {
   if (status === "denied") return "Отклонено правами";
   return "Записано в журнал";
 }
-function flattenCapacityNodes(input: CapacityTreeNode | CapacityTreeNode[] | undefined): CapacityTreeNode[] {
-  const roots = Array.isArray(input) ? input : input ? [input] : [];
-  const result: CapacityTreeNode[] = [];
-  const visit = (node: CapacityTreeNode) => {
-    result.push(node);
-    for (const child of node.children ?? []) visit(child);
+const CAPACITY_WEEKDAYS_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"] as const;
+const MATRIX_AVATAR_COLORS = ["c1", "c2", "c3", "c4", "c5", "c6"] as const;
+function capacityDayCell(day: CapacityDayCell): DayCell {
+  if (day.isWeekend) return { kind: "weekend" };
+  if (day.isHoliday) return { kind: "holiday" };
+  if (day.hasAbsence) return { kind: "vacation" };
+  if (day.isFreeDay || day.workMinutes === 0) return { kind: "zero" };
+  const hours = Math.round((day.workMinutes / 60) * 10) / 10;
+  const level = day.isOverload || day.overloadMinutes > 0 ? "over" : day.capacityMinutes > 0 && day.workMinutes / day.capacityMinutes >= 0.9 ? "high" : "normal";
+  return { kind: "load", hours, level };
+}
+function capacityMonthPercent(days: CapacityDayCell[]): MatrixPercent {
+  const work = days.reduce((sum, day) => sum + day.workMinutes, 0);
+  const capacity = days.reduce((sum, day) => sum + day.capacityMinutes, 0);
+  const value = capacity > 0 ? Math.round((work / capacity) * 100) : 0;
+  const level = value > 100 ? "over" : value >= 90 ? "high" : value >= 80 ? "norm" : value >= 50 ? "mid" : "low";
+  return { value, level };
+}
+function collectResourcePositions(tree: CapacityTree | undefined): Array<{ id: string; name: string }> {
+  if (!tree) return [];
+  const seen = new Map<string, string>();
+  for (const group of tree.orgGroups) for (const unit of group.units) for (const position of unit.positions) if (!seen.has(position.position.id)) seen.set(position.position.id, position.position.name);
+  return [...seen].map(([id, name]) => ({ id, name }));
+}
+// Маппинг реального /capacity/tree в дневную матрицу виджета. ponytail: org-режим (orgGroups); __unplaced__ direction скрываем, глубже 3-го уровня indent упирается в 2.
+function toResourceMatrix(tree: CapacityTree, summary: CapacitySummary, positionFilterId?: string | null): ResourceMatrixData {
+  const filtering = Boolean(positionFilterId);
+  const todayIso = isoDate(new Date());
+  const days: DayHeader[] = tree.days.map((day) => ({
+    day: Number(day.date.slice(8, 10)),
+    weekdayShort: CAPACITY_WEEKDAYS_RU[day.isoWeekday % 7] ?? "",
+    weekend: day.isWeekend,
+    holiday: day.isHoliday,
+    today: day.date === todayIso
+  }));
+  const rows: MatrixRow[] = [];
+  let personSeq = 0;
+  const pushPerson = (row: CapacityEmployeeRow, indent: 0 | 1 | 2) => {
+    rows.push({ id: `emp-${row.user.id}`, kind: "person", indent, name: row.user.name, avatar: { initials: initials(row.user.name), color: MATRIX_AVATAR_COLORS[personSeq++ % MATRIX_AVATAR_COLORS.length] ?? "c1" }, percent: capacityMonthPercent(row.days), cells: row.days.map(capacityDayCell) });
   };
-  for (const root of roots) visit(root);
-  return result;
+  for (const group of tree.orgGroups) {
+    const showDirection = group.direction.id !== "__unplaced__" && !filtering;
+    if (showDirection) rows.push({ id: `dir-${group.direction.id}`, kind: "workshop", indent: 0, name: group.direction.name, collapsible: true, percent: capacityMonthPercent(group.directionDays), cells: group.directionDays.map(capacityDayCell) });
+    const unitIndent = (showDirection ? 1 : 0) as 0 | 1 | 2;
+    const posIndent = (filtering ? 0 : Math.min(unitIndent + 1, 2)) as 0 | 1 | 2;
+    for (const unit of group.units) {
+      if (!filtering) rows.push({ id: `unit-${unit.unit.id}`, kind: "sub", indent: unitIndent, name: unit.unit.name, collapsible: true, percent: capacityMonthPercent(unit.unitDays), cells: unit.unitDays.map(capacityDayCell) });
+      for (const position of unit.positions) {
+        if (positionFilterId && position.position.id !== positionFilterId) continue;
+        rows.push({ id: `pos-${position.position.id}`, kind: "role", indent: posIndent, name: position.position.name, collapsible: true, percent: capacityMonthPercent(position.positionDays), cells: position.positionDays.map(capacityDayCell) });
+        for (const row of position.rows) pushPerson(row, filtering ? 1 : 2);
+      }
+    }
+  }
+  if (!filtering) for (const row of tree.unassignedRows ?? []) pushPerson(row, 0);
+  const capacity = summary.totalCapacityMinutes ?? 0;
+  const work = summary.totalWorkMinutes ?? 0;
+  return {
+    days,
+    rows,
+    stats: {
+      capacityHours: Math.round(capacity / 60),
+      assignedHours: Math.round(work / 60),
+      loadPct: capacity > 0 ? Math.round((work / capacity) * 100) : 0,
+      freeHours: Math.round(Math.max(0, capacity - work) / 60),
+      employees: rows.filter((row) => row.kind === "person").length
+    }
+  };
 }
 function addDays(value: Date, days: number) {
   const next = new Date(value);
