@@ -1,7 +1,7 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { RuntimeScreenView } from "@/views/screens/runtime-screen-view";
-
+// Лендинг «Администрирование» → первая боевая v3-вкладка (Пользователи).
+// (Раньше рендерил v2-монолит 09-admin; теперь — реальная поверхность.)
 export default function AdminPage() {
-  return <RuntimeScreenView id="09-admin" />;
+  redirect("/admin/users");
 }
