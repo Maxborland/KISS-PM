@@ -28,6 +28,44 @@ const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_res
 
 const OVERLOAD_CAP = 30; // ponytail: режем payload до топ-N перегрузок (по минутам), upgrade — пагинация если мало
 
+const ATTACH_MAX_COUNT = 5;
+const ATTACH_MAX_TOTAL_CHARS = 50_000; // ponytail: inline-контекст для LLM; крупнее — не тянем
+// Текстовые типы, из которых извлекаем контент (brief/спека/данные). Бинарь не парсим.
+const TEXT_MIME_RE = /^(text\/|application\/(json|xml|csv|x-yaml|yaml|markdown))/i;
+
+// Извлекаем содержимое приложенных файлов по id через ШТАТНЫЙ download-роут (внутренняя
+// переотправка): RBAC/хранилище/audit переиспользуются. Только текстовые типы, с обрезкой.
+export async function resolveAttachments(app: ApiApp, cookie: string | null, ids: string[]): Promise<Array<{ name: string; content: string }>> {
+  const out: Array<{ name: string; content: string }> = [];
+  let total = 0;
+  for (const id of ids.slice(0, ATTACH_MAX_COUNT)) {
+    if (total >= ATTACH_MAX_TOTAL_CHARS) break;
+    const response = await app.request(`/api/workspace/attachments/${encodeURIComponent(id)}/download`, {
+      method: "GET",
+      headers: { "x-kiss-pm-action": "same-origin", ...(cookie ? { cookie } : {}) }
+    });
+    if (!response.ok) continue;
+    const mime = response.headers.get("content-type") ?? "";
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const nameMatch = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+    const name = nameMatch?.[1] ? decodeURIComponent(nameMatch[1]) : id;
+    if (!TEXT_MIME_RE.test(mime)) {
+      out.push({ name, content: `(нетекстовый файл ${mime || "?"} — содержимое не извлечено)` });
+      continue;
+    }
+    let content = await response.text();
+    if (total + content.length > ATTACH_MAX_TOTAL_CHARS) content = content.slice(0, Math.max(0, ATTACH_MAX_TOTAL_CHARS - total));
+    total += content.length;
+    out.push({ name, content });
+  }
+  return out;
+}
+
+function parseAttachmentIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, ATTACH_MAX_COUNT);
+}
+
 // Лимиты цикла из env (стоимость/время) с разумными дефолтами. 0/пусто → дефолт.
 function agentLimitsFromEnv(): { maxIterations: number; maxTotalOutputTokens: number; timeoutMs: number } {
   const num = (value: string | undefined, fallback: number) => {
@@ -164,11 +202,13 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     actor: TenantUser,
     profile: AccessProfile,
     goal: string,
+    attachmentIds: string[],
     onEvent?: (event: AgentLoopEvent) => void | Promise<void>
   ) {
     const allowed = allowedToolsForActor(actor, profile);
     // LLM получает: разрешённые mutation-инструменты (как предлагаемые) + подключённые analyze.
     const offered = allowed.filter((tool) => tool.kind === "mutation" || WIRED_ANALYZE.has(tool.name));
+    const attachments = attachmentIds.length > 0 ? await resolveAttachments(app, cookie, attachmentIds) : [];
     const result = await runAgentLoop({
       provider: createAgentLlmProviderFromEnv(),
       system: AGENT_SYSTEM_PROMPT,
@@ -176,6 +216,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       tools: offered,
       executeAnalyze: buildAnalyzeExecutor(deps, app, cookie, actor.tenantId, actor.id),
       limits: agentLimitsFromEnv(),
+      ...(attachments.length > 0 ? { attachments } : {}),
       ...(onEvent ? { onEvent } : {})
     });
     // Аннотируем предложения грубым capability (точная проверка — при /execute).
@@ -204,9 +245,10 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const goal = typeof (body.value as { goal?: unknown }).goal === "string" ? (body.value as { goal: string }).goal.trim() : "";
     if (goal.length === 0 || goal.length > 2000) return context.json({ error: "invalid_goal" }, 400);
+    const attachmentIds = parseAttachmentIds((body.value as { attachmentIds?: unknown }).attachmentIds);
 
     const profile = await deps.getActorProfile(actor);
-    return context.json(await runProposeLoop(cookie, actor, profile, goal));
+    return context.json(await runProposeLoop(cookie, actor, profile, goal, attachmentIds));
   });
 
   // То же предложение, но потоком (SSE): события reasoning/analyze/proposal по мере работы +
@@ -219,11 +261,12 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const goal = typeof (body.value as { goal?: unknown }).goal === "string" ? (body.value as { goal: string }).goal.trim() : "";
     if (goal.length === 0 || goal.length > 2000) return context.json({ error: "invalid_goal" }, 400);
+    const attachmentIds = parseAttachmentIds((body.value as { attachmentIds?: unknown }).attachmentIds);
 
     const profile = await deps.getActorProfile(actor);
     return streamSSE(context, async (stream) => {
       try {
-        const result = await runProposeLoop(cookie, actor, profile, goal, async (event) => {
+        const result = await runProposeLoop(cookie, actor, profile, goal, attachmentIds, async (event) => {
           await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
         });
         await stream.writeSSE({ event: "done", data: JSON.stringify(result) });
