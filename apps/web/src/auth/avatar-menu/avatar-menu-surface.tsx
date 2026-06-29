@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, Check, ChevronDown, LogOut, Settings, ShieldCheck, TriangleAlert, User } from "lucide-react";
+import { Bell, Check, ChevronDown, LogOut, Monitor, Settings, ShieldCheck, TriangleAlert, User, X } from "lucide-react";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
@@ -30,8 +30,8 @@ import type { WorkspaceUser } from "@/auth/lib/auth-client";
 
    ЧЕСТНОСТЬ: мок стартует anonymous → авто-вход демо-кредами один раз
    (плашка «Демо»). Переходы Профиль/Настройки/Уведомления — навигация
-   рабочего приложения (demoAction). «Активные сессии» БЕЗ контракта —
-   честный плейсхолдер, не фейковый список.
+   рабочего приложения (demoAction). «Активные сессии» — реальный контракт
+   GET/DELETE /api/auth/sessions (список устройств + отзыв чужой сессии).
    ============================================================ */
 
 const initials = (name: string) => {
@@ -46,11 +46,24 @@ const avatarColor = (name: string): BemAvatarColor => {
 };
 const THEME_LABEL: Record<WorkspaceUser["theme"], string> = { light: "Светлая", dark: "Тёмная" };
 
+// ISO → относительное «время активности» (только-что / N мин|ч|дн назад / дата).
+function formatLastSeen(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "только что";
+  if (min < 60) return `${min} мин назад`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} ч назад`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d} дн назад`;
+  return new Date(iso).toLocaleDateString("ru-RU");
+}
+
 const DEMO_EMAIL = "admin@kiss-pm.local";
 const DEMO_PASSWORD = "kiss-pm-admin";
 
 export function AvatarMenuSurface() {
-  const { state, status, error, user, permissions, login, logout, reload, updateTheme } = useAuth();
+  const { state, status, error, user, permissions, sessions, loadSessions, revokeSession, login, logout, reload, updateTheme } = useAuth();
 
   const autoLoginRef = useRef(false);
   const [bootstrapping, setBootstrapping] = useState(true);
@@ -69,7 +82,20 @@ export function AvatarMenuSurface() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Загрузить активные сессии, как только сессия аутентифицирована.
+  useEffect(() => {
+    if (state === "authenticated") void loadSessions();
+  }, [state, loadSessions]);
+
   const profileUser: WorkspaceUser | null = user && "email" in user ? (user as WorkspaceUser) : null;
+
+  async function handleRevoke(sessionId: string) {
+    setBusy(true);
+    setNotice(null);
+    const res = await revokeSession(sessionId);
+    setBusy(false);
+    setNotice(res.ok ? { ok: true, text: "Сессия отозвана" } : { ok: false, text: `Не удалось отозвать: ${authErr(res.code)}` });
+  }
 
   async function handleLogout() {
     setBusy(true);
@@ -223,8 +249,36 @@ export function AvatarMenuSurface() {
                     <dd className="v4-num text-[var(--muted-strong)]">{permissions.length}</dd>
                   </div>
                 </dl>
-                <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
-                  Список активных устройств появится после контракта сессий — здесь честный плейсхолдер вместо фейковых данных.
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Активные сессии</span>
+                    <span className="v4-num text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{sessions.length}</span>
+                  </div>
+                  {sessions.length === 0 ? (
+                    <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Активных сессий нет.</span>
+                  ) : (
+                    <ul className="flex flex-col gap-1">
+                      {sessions.map((s) => (
+                        <li key={s.id} className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
+                          <Monitor className="size-3.5 shrink-0 text-[var(--muted)]" aria-hidden />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate text-[length:var(--text-xs)] font-medium text-[var(--text-strong)]">{s.deviceLabel}</span>
+                              {s.current ? <Chip variant="success">Текущая</Chip> : null}
+                            </div>
+                            <div className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
+                              {[s.ipAddress, `активность ${formatLastSeen(s.lastSeenAt)}`].filter(Boolean).join(" · ")}
+                            </div>
+                          </div>
+                          {s.current ? null : (
+                            <Button variant="ghost" size="sm" disabled={busy} onClick={() => void handleRevoke(s.id)} title="Отозвать сессию" aria-label={`Отозвать сессию ${s.deviceLabel}`}>
+                              <X className="size-3.5" aria-hidden />
+                            </Button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 <Button variant="destructive-soft" size="sm" className="self-start" disabled={busy} onClick={() => void handleLogout()}>
                   <LogOut className="size-3.5" aria-hidden />

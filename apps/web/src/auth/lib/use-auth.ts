@@ -6,6 +6,7 @@ import {
   AuthApiError,
   createAuthClient,
   type AuthMeResponse,
+  type AuthSession,
   type ProfileUpdateInput,
   type RegisterRequest,
   type TenantUser,
@@ -85,6 +86,7 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<TenantUser | WorkspaceUser | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [sessions, setSessions] = useState<AuthSession[]>([]);
 
   // Рефетч сессии: me() → state из ответа (НЕ из cookie). 401 session_required → anonymous (это не ошибка).
   const refresh = useCallback(async () => {
@@ -100,6 +102,7 @@ export function useAuth() {
       if (e instanceof AuthApiError && e.status === 401) {
         setUser(null);
         setPermissions([]);
+        setSessions([]);
         setState("anonymous");
         setStatus("ready");
         setError(null);
@@ -109,6 +112,26 @@ export function useAuth() {
       setError(e instanceof Error ? e.message : "load_failed");
     }
   }, [client]);
+
+  // Активные сессии текущего пользователя (GET /api/auth/sessions). 401 → пустой список (не ошибка гейта).
+  const loadSessions = useCallback(async () => {
+    try {
+      const r = await client.listSessions();
+      setSessions(r.sessions);
+    } catch {
+      setSessions([]);
+    }
+  }, [client]);
+
+  // Отзыв чужой сессии (DELETE) → рефетч списка. Текущую нельзя (self_session_revoke_forbidden).
+  const revokeSession = useCallback(
+    (sessionId: string): Promise<AuthMutationResult> =>
+      guard(async () => {
+        await client.revokeSession(sessionId);
+        await loadSessions();
+      }),
+    [client, loadSessions]
+  );
 
   useEffect(() => {
     void refresh();
@@ -175,7 +198,7 @@ export function useAuth() {
     [client, refresh]
   );
 
-  return { client, state, status, error, user, permissions, reload: refresh, login, logout, register, requestPasswordReset, confirmPasswordReset, updateProfile, updateTheme };
+  return { client, state, status, error, user, permissions, sessions, loadSessions, revokeSession, reload: refresh, login, logout, register, requestPasswordReset, confirmPasswordReset, updateProfile, updateTheme };
 }
 
 /* ============================================================
