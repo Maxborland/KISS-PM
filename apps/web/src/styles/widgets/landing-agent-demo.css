@@ -538,6 +538,46 @@
   color: var(--lad-muted);
 }
 
+/* Панель вложений над композером: якорь-проект + чипы загруженных файлов. */
+.lad-attach-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px 0;
+}
+
+.lad-attach-anchor {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--lad-border);
+  border-radius: 10px;
+  background: var(--lad-surface);
+  color: var(--lad-text);
+  font-size: 13px;
+}
+
+.lad-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 10px;
+  border: 1px solid var(--lad-border);
+  border-radius: 999px;
+  background: var(--lad-surface-muted, var(--lad-surface));
+  font-size: 12px;
+  color: var(--lad-text);
+}
+
+.lad-attach-chip button {
+  border: 0;
+  background: transparent;
+  color: var(--lad-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
 .lad-send-button {
   min-height: 54px;
   width: 54px;

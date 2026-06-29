@@ -1,8 +1,14 @@
+import type { Context } from "hono";
+import { streamSSE } from "hono/streaming";
+
+import type { AccessProfile } from "@kiss-pm/access-control";
+import type { TenantUser } from "@kiss-pm/domain";
+
 import type { ApiApp, ApiRouteDeps } from "../routeTypes";
 import { readLimitedJsonBody } from "../jsonBody";
 import { createPlanningReadModel } from "../planning/planningReadModel";
 import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
-import { runAgentLoop, type AnalyzeExecutor } from "./agentLoop";
+import { runAgentLoop, type AgentLoopEvent, type AnalyzeExecutor } from "./agentLoop";
 import { createAgentLlmProviderFromEnv } from "./llmProvider";
 import { AGENT_TOOLS, allowedToolsForActor, findAgentTool, listToolAvailability, type AgentTool } from "./toolRegistry";
 
@@ -22,6 +28,101 @@ const AGENT_SYSTEM_PROMPT = [
 const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_resource_overloads", "preview_resource_resolution"]);
 
 const OVERLOAD_CAP = 30; // ponytail: режем payload до топ-N перегрузок (по минутам), upgrade — пагинация если мало
+
+const ATTACH_MAX_COUNT = 5;
+const ATTACH_MAX_TOTAL_CHARS = 50_000; // ponytail: inline-контекст для LLM; крупнее — не тянем
+// Текстовые типы. Плюс octet-stream/пустой MIME (частый случай для .md/.csv из браузера) пробуем
+// прочитать и отбраковываем по эвристике бинарности (null-байт), а не по одному Content-Type.
+const TEXT_MIME_RE = /^(text\/|application\/(json|ld\+json|xml|csv|x-yaml|yaml|markdown|x-ndjson))/i;
+const MAYBE_TEXT_MIME_RE = /^(application\/octet-stream|$)/i;
+
+// Имя файла из content-disposition. filename*=UTF-8''… percent-декодируем (безопасно, с
+// откатом на сырое при невалидном %); plain filename="…" берём как есть (литеральный %).
+function attachmentName(disposition: string, fallback: string): string {
+  const extended = /filename\*=(?:UTF-8'')?([^";]+)/i.exec(disposition);
+  if (extended?.[1]) { try { return decodeURIComponent(extended[1]); } catch { return extended[1]; } }
+  const plain = /filename="?([^";]+)"?/i.exec(disposition);
+  return plain?.[1] ?? fallback;
+}
+
+// Читаем поток не более maxChars символов (не материализуя весь файл — upload допускает 25 МиБ).
+async function readBoundedText(response: Response, maxChars: number): Promise<string> {
+  if (maxChars <= 0) { await response.body?.cancel(); return ""; }
+  if (!response.body) return (await response.text()).slice(0, maxChars);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    text += decoder.decode(value, { stream: true });
+    if (text.length >= maxChars) { await reader.cancel(); break; }
+  }
+  text += decoder.decode(); // финальный flush: добираем хвостовой многобайтовый символ из буфера
+  return text.slice(0, maxChars);
+}
+
+// Извлекаем содержимое приложенных файлов по id через ШТАТНЫЙ download-роут (внутренняя
+// переотправка): RBAC/хранилище/audit переиспользуются. Текст извлекаем, бинарь помечаем.
+// Сбой одного файла не валит весь батч; превышение бюджета честно маркируем.
+export async function resolveAttachments(app: ApiApp, cookie: string | null, ids: string[]): Promise<Array<{ name: string; content: string }>> {
+  const out: Array<{ name: string; content: string }> = [];
+  const wanted = ids.slice(0, ATTACH_MAX_COUNT);
+  let total = 0;
+  let budgetDropped = 0; // файлы, опущенные из-за исчерпания символьного бюджета
+  const push = (name: string, content: string) => { out.push({ name, content }); total += content.length; };
+  for (let i = 0; i < wanted.length; i += 1) {
+    if (total >= ATTACH_MAX_TOTAL_CHARS) { budgetDropped = wanted.length - i; break; }
+    const id = wanted[i]!;
+    try {
+      const response = await app.request(`/api/workspace/attachments/${encodeURIComponent(id)}/download`, {
+        method: "GET",
+        headers: { "x-kiss-pm-action": "same-origin", ...(cookie ? { cookie } : {}) }
+      });
+      if (!response.ok) continue;
+      const mime = response.headers.get("content-type") ?? "";
+      const name = attachmentName(response.headers.get("content-disposition") ?? "", id);
+      if (!TEXT_MIME_RE.test(mime) && !MAYBE_TEXT_MIME_RE.test(mime)) {
+        await response.body?.cancel();
+        push(name, `(нетекстовый файл ${mime || "?"} — содержимое не извлечено)`);
+        continue;
+      }
+      const content = await readBoundedText(response, ATTACH_MAX_TOTAL_CHARS - total);
+      // Эвристика бинарности для octet-stream/без MIME: null-байт → не текст.
+      if (content.includes(String.fromCharCode(0))) push(name, `(бинарный файл ${mime || "?"} — содержимое не извлечено)`);
+      else push(name, content);
+    } catch {
+      // битый файл/декод — пропускаем, не роняя propose
+    }
+  }
+  // Опущенные файлы (превышен лимит по числу ИЛИ по символам) честно маркируем — иначе агент
+  // (и пользователь) принимали бы решение по неполному контексту, не зная об этом.
+  const omitted = (ids.length - wanted.length) + budgetDropped;
+  if (omitted > 0) {
+    out.push({ name: "—", content: `(ещё ${omitted} файл(ов) опущено: лимит ${ATTACH_MAX_COUNT} вложений и ${ATTACH_MAX_TOTAL_CHARS} символов контекста)` });
+  }
+  return out;
+}
+
+// Не режем до ATTACH_MAX_COUNT здесь — иначе resolveAttachments не узнает истинное число и не
+// сможет сообщить об опущенных. Лишь страхуемся верхним пределом от абьюза огромным массивом.
+function parseAttachmentIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 50);
+}
+
+// Лимиты цикла из env (стоимость/время) с разумными дефолтами. 0/пусто → дефолт.
+function agentLimitsFromEnv(): { maxIterations: number; maxTotalOutputTokens: number; timeoutMs: number } {
+  const num = (value: string | undefined, fallback: number) => {
+    const parsed = Number.parseInt(value ?? "", 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
+  return {
+    maxIterations: num(process.env.KISS_PM_AGENT_MAX_ITERATIONS, 6),
+    maxTotalOutputTokens: num(process.env.KISS_PM_AGENT_MAX_OUTPUT_TOKENS, 16_000),
+    timeoutMs: num(process.env.KISS_PM_AGENT_TIMEOUT_MS, 60_000)
+  };
+}
 
 /**
  * Внутренняя переотправка в тот же Hono-app — агент НЕ дублирует governed-логику, а зовёт те же
@@ -140,43 +241,85 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     return context.json({ tools: listToolAvailability(actor, profile) });
   });
 
-  app.post("/api/workspace/agent/propose", async (context) => {
+  // Общая преамбула /propose и /propose/stream (auth + разбор тела) — единый источник правды,
+  // чтобы валидация не разъезжалась между JSON- и SSE-эндпоинтами. На ошибке отдаёт готовый Response.
+  type ProposeRequest = { cookie: string | null; actor: TenantUser; profile: AccessProfile; goal: string; attachmentIds: string[] };
+  async function parseProposeRequest(context: Context): Promise<{ ok: true; value: ProposeRequest } | { ok: false; response: Response }> {
     const cookie = context.req.header("cookie") ?? null;
     const actor = await deps.getSessionActorFromHeaders(cookie);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!actor) return { ok: false, response: context.json({ error: "session_required" }, 401) };
     const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
+    if (!body.ok) return { ok: false, response: context.json({ error: body.error }, body.status) };
     const goal = typeof (body.value as { goal?: unknown }).goal === "string" ? (body.value as { goal: string }).goal.trim() : "";
-    if (goal.length === 0 || goal.length > 2000) return context.json({ error: "invalid_goal" }, 400);
-
+    if (goal.length === 0 || goal.length > 2000) return { ok: false, response: context.json({ error: "invalid_goal" }, 400) };
+    const attachmentIds = parseAttachmentIds((body.value as { attachmentIds?: unknown }).attachmentIds);
     const profile = await deps.getActorProfile(actor);
+    return { ok: true, value: { cookie, actor, profile, goal, attachmentIds } };
+  }
+
+  // Ядро предложения — общее для /propose (JSON) и /propose/stream (SSE).
+  async function runProposeLoop(
+    cookie: string | null,
+    actor: TenantUser,
+    profile: AccessProfile,
+    goal: string,
+    attachmentIds: string[],
+    onEvent?: (event: AgentLoopEvent) => void | Promise<void>
+  ) {
     const allowed = allowedToolsForActor(actor, profile);
     // LLM получает: разрешённые mutation-инструменты (как предлагаемые) + подключённые analyze.
     const offered = allowed.filter((tool) => tool.kind === "mutation" || WIRED_ANALYZE.has(tool.name));
-
-    const provider = createAgentLlmProviderFromEnv();
+    const attachments = attachmentIds.length > 0 ? await resolveAttachments(app, cookie, attachmentIds) : [];
     const result = await runAgentLoop({
-      provider,
+      provider: createAgentLlmProviderFromEnv(),
       system: AGENT_SYSTEM_PROMPT,
       goal,
       tools: offered,
-      executeAnalyze: buildAnalyzeExecutor(deps, app, cookie, actor.tenantId, actor.id)
+      executeAnalyze: buildAnalyzeExecutor(deps, app, cookie, actor.tenantId, actor.id),
+      limits: agentLimitsFromEnv(),
+      ...(attachments.length > 0 ? { attachments } : {}),
+      ...(onEvent ? { onEvent } : {})
     });
-
     // Аннотируем предложения грубым capability (точная проверка — при /execute).
     const capabilityByTool = new Map(AGENT_TOOLS.map((tool) => [tool.name, tool.capability({ actor, profile })]));
     const proposedActions = result.proposedActions.map((action) => ({
       ...action,
       capability: capabilityByTool.get(action.tool) ?? { allowed: false, reason: "permission_missing" }
     }));
-
-    return context.json({
+    return {
       goal,
       model: result.model,
       reasoning: result.reasoning,
       analyzeResults: result.analyzeResults,
       proposedActions,
-      iterations: result.iterations
+      iterations: result.iterations,
+      stopReason: result.stopReason,
+      outputTokens: result.outputTokens
+    };
+  }
+
+  app.post("/api/workspace/agent/propose", async (context) => {
+    const parsed = await parseProposeRequest(context);
+    if (!parsed.ok) return parsed.response;
+    const { cookie, actor, profile, goal, attachmentIds } = parsed.value;
+    return context.json(await runProposeLoop(cookie, actor, profile, goal, attachmentIds));
+  });
+
+  // То же предложение, но потоком (SSE): события reasoning/analyze/proposal по мере работы +
+  // финальное событие done с полным результатом. CoT-трейс для живого «агент думает».
+  app.post("/api/workspace/agent/propose/stream", async (context) => {
+    const parsed = await parseProposeRequest(context);
+    if (!parsed.ok) return parsed.response;
+    const { cookie, actor, profile, goal, attachmentIds } = parsed.value;
+    return streamSSE(context, async (stream) => {
+      try {
+        const result = await runProposeLoop(cookie, actor, profile, goal, attachmentIds, async (event) => {
+          await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
+        });
+        await stream.writeSSE({ event: "done", data: JSON.stringify(result) });
+      } catch (error) {
+        await stream.writeSSE({ event: "error", data: JSON.stringify({ error: error instanceof Error ? error.message : "agent_failed" }) });
+      }
     });
   });
 

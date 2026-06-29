@@ -65,5 +65,97 @@ describe("runAgentLoop", () => {
     expect(result.iterations).toBe(1);
     expect(result.proposedActions).toHaveLength(0);
     expect(result.reasoning).toContain("Нет безопасных действий");
+    expect(result.stopReason).toBe("completed");
+  });
+
+  it("останавливается по токен-бюджету (stopReason=token_budget)", async () => {
+    // Каждый ответ зовёт analyze (цикл продолжается) + тратит 600 токенов; бюджет 1000 → стоп после 2-го.
+    const loop: LlmResponse = {
+      stopReason: "tool_use",
+      content: [{ type: "tool_use", id: "t", name: "list_my_tasks", input: {} }],
+      usage: { inputTokens: 0, outputTokens: 600 }
+    };
+    const result = await runAgentLoop({
+      provider: createMockLlmProvider([loop]),
+      system: "test",
+      goal: "тест",
+      tools: [listMyTasks],
+      executeAnalyze: vi.fn().mockResolvedValue({ tasks: [] }),
+      limits: { maxTotalOutputTokens: 1000, maxIterations: 50 }
+    });
+    expect(result.stopReason).toBe("token_budget");
+    expect(result.outputTokens).toBeGreaterThanOrEqual(1000);
+    expect(result.iterations).toBeLessThan(50);
+  });
+
+  it("сохраняет предложение из ответа, превысившего бюджет токенов", async () => {
+    // Ответ с mutation-предложением сразу выбивает бюджет; предложение должно сохраниться,
+    // а остановка случиться на следующей итерации (запись proposal не требует нового вызова LLM).
+    const script: LlmResponse[] = [
+      { stopReason: "tool_use", content: [{ type: "tool_use", id: "m", name: "change_task_status", input: { projectId: "p", taskId: "t", statusId: "status-review" } }], usage: { inputTokens: 0, outputTokens: 2000 } },
+      { stopReason: "end_turn", content: [{ type: "text", text: "done" }] }
+    ];
+    const result = await runAgentLoop({
+      provider: createMockLlmProvider(script),
+      system: "s",
+      goal: "g",
+      tools: [changeStatus],
+      executeAnalyze: vi.fn(),
+      limits: { maxTotalOutputTokens: 1000, maxIterations: 50 }
+    });
+    expect(result.proposedActions).toHaveLength(1);
+    expect(result.proposedActions[0]!.tool).toBe("change_task_status");
+    expect(result.stopReason).toBe("token_budget");
+  });
+
+  it("останавливается по дедлайну (stopReason=deadline)", async () => {
+    let t = 0;
+    const result = await runAgentLoop({
+      provider: createMockLlmProvider([{ stopReason: "tool_use", content: [{ type: "tool_use", id: "t", name: "list_my_tasks", input: {} }] }]),
+      system: "test",
+      goal: "тест",
+      tools: [listMyTasks],
+      executeAnalyze: vi.fn().mockResolvedValue({ tasks: [] }),
+      limits: { timeoutMs: 100, maxIterations: 50 },
+      now: () => (t += 60) // 0,60,120… → дедлайн 100 пройден на 2-й проверке
+    });
+    expect(result.stopReason).toBe("deadline");
+    expect(result.iterations).toBeLessThan(50);
+  });
+
+  it("эмитит CoT-события onEvent в порядке: reasoning → analyze → proposal", async () => {
+    const script: LlmResponse[] = [
+      { stopReason: "tool_use", content: [{ type: "text", text: "Смотрю задачи." }, { type: "tool_use", id: "t1", name: "list_my_tasks", input: {} }] },
+      { stopReason: "tool_use", content: [{ type: "tool_use", id: "t2", name: "change_task_status", input: { projectId: "p1", taskId: "task-1", statusId: "status-review" } }] },
+      { stopReason: "end_turn", content: [{ type: "text", text: "Готово." }] }
+    ];
+    const events: string[] = [];
+    await runAgentLoop({
+      provider: createMockLlmProvider(script),
+      system: "test",
+      goal: "тест",
+      tools: [listMyTasks, changeStatus],
+      executeAnalyze: vi.fn().mockResolvedValue({ tasks: [{ id: "task-1" }] }),
+      onEvent: (e) => { events.push(`${e.type}:${e.type === "reasoning" ? e.text : e.tool}`); }
+    });
+    expect(events).toEqual([
+      "reasoning:Смотрю задачи.",
+      "analyze:list_my_tasks",
+      "proposal:change_task_status",
+      "reasoning:Готово."
+    ]);
+  });
+
+  it("останавливается по максимуму итераций (stopReason=max_iterations)", async () => {
+    const result = await runAgentLoop({
+      provider: createMockLlmProvider([{ stopReason: "tool_use", content: [{ type: "tool_use", id: "t", name: "list_my_tasks", input: {} }] }]),
+      system: "test",
+      goal: "тест",
+      tools: [listMyTasks],
+      executeAnalyze: vi.fn().mockResolvedValue({ tasks: [] }),
+      limits: { maxIterations: 3 }
+    });
+    expect(result.stopReason).toBe("max_iterations");
+    expect(result.iterations).toBe(3);
   });
 });

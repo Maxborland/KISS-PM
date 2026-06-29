@@ -19,7 +19,8 @@ export type LlmContentBlock = LlmTextBlock | LlmToolUseBlock;
 export type LlmToolResultBlock = { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean };
 export type LlmMessage = { role: "user" | "assistant"; content: string | Array<LlmContentBlock | LlmToolResultBlock> };
 
-export type LlmResponse = { stopReason: string; content: LlmContentBlock[] };
+export type LlmUsage = { inputTokens: number; outputTokens: number };
+export type LlmResponse = { stopReason: string; content: LlmContentBlock[]; usage?: LlmUsage };
 
 export interface LlmProvider {
   readonly model: string;
@@ -50,7 +51,9 @@ export function createAnthropicLlmProvider(opts: { apiKey: string; model?: strin
         if (block.type === "tool_use") return [{ type: "tool_use", id: String(block.id), name: String(block.name), input: (block.input as Record<string, unknown>) ?? {} }];
         return [];
       });
-      return { stopReason: String(response.stop_reason ?? "end_turn"), content };
+      const usage = response.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+      const base: LlmResponse = { stopReason: String(response.stop_reason ?? "end_turn"), content };
+      return usage ? { ...base, usage: { inputTokens: usage.input_tokens ?? 0, outputTokens: usage.output_tokens ?? 0 } } : base;
     }
   };
 }
@@ -127,7 +130,8 @@ export function createAgentLlmProviderFromEnv(): LlmProvider {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const model = process.env.KISS_PM_AGENT_MODEL || DEFAULT_MODEL;
   if (apiKey && apiKey.length > 0) {
-    return createAnthropicLlmProvider({ apiKey, model });
+    const maxTokens = Number.parseInt(process.env.KISS_PM_AGENT_MAX_TOKENS ?? "", 10);
+    return createAnthropicLlmProvider({ apiKey, model, ...(Number.isFinite(maxTokens) && maxTokens > 0 ? { maxTokens } : {}) });
   }
   // Без ключа: demo-мозг (если включён) или пустой mock.
   if (process.env.KISS_PM_AGENT_DEMO === "true") return createDemoLlmProvider();

@@ -35,7 +35,15 @@ export type AgentProposeResponse = {
   analyzeResults: AnalyzeResult[];
   proposedActions: ProposedAction[];
   iterations: number;
+  stopReason?: string;
+  outputTokens?: number;
 };
+
+// События живого хода работы агента (SSE /propose/stream).
+export type AgentStreamEvent =
+  | { type: "reasoning"; text: string }
+  | { type: "analyze"; tool: string; title: string; ok: boolean }
+  | { type: "proposal"; tool: string; title: string };
 
 export type AgentExecuteResultItem = { tool: string; ok: boolean; status?: number; error?: string; result?: unknown };
 export type AgentExecuteResponse = { results: AgentExecuteResultItem[]; applied: boolean };
@@ -70,8 +78,87 @@ export function createAgentClient(options: AgentApiClientOptions) {
     listTools() {
       return requestJson<{ tools: AgentToolAvailability[] }>("/api/workspace/agent/tools");
     },
-    propose(goal: string) {
-      return requestJson<AgentProposeResponse>("/api/workspace/agent/propose", { method: "POST", body: JSON.stringify({ goal }) });
+    propose(goal: string, attachmentIds: string[] = []) {
+      return requestJson<AgentProposeResponse>("/api/workspace/agent/propose", { method: "POST", body: JSON.stringify({ goal, attachmentIds }) });
+    },
+    // Загрузка файла через ШТАТНУЮ ручку вложений (multipart), привязка к сущности-якорю.
+    async uploadAttachment(file: File, entityType: string, entityId: string): Promise<{ id: string; name: string }> {
+      const form = new FormData();
+      form.append("entityType", entityType);
+      form.append("entityId", entityId);
+      form.append("file", file);
+      // content-type НЕ ставим — браузер выставит multipart-boundary сам.
+      const response = await fetchImpl(`${options.apiOrigin}/api/workspace/attachments/files`, {
+        method: "POST",
+        credentials,
+        headers: { "x-kiss-pm-action": "same-origin" },
+        body: form
+      });
+      const raw = await response.text();
+      let body: Record<string, unknown> = {};
+      try { const parsed: unknown = JSON.parse(raw); if (parsed && typeof parsed === "object") body = parsed as Record<string, unknown>; } catch { /* keep */ }
+      if (!response.ok) throw new AgentApiError(response.status, typeof body.error === "string" ? body.error : "upload_failed");
+      // serializeAttachment кладёт имя под fileAsset (наверху только id) — берём оттуда.
+      const attachment = (body.attachment ?? {}) as { id?: unknown; fileAsset?: { safeDisplayName?: unknown; originalName?: unknown } };
+      const fileAsset = attachment.fileAsset ?? {};
+      return { id: String(attachment.id ?? ""), name: String(fileAsset.safeDisplayName ?? fileAsset.originalName ?? file.name) };
+    },
+    // Активные проекты тенанта — для выбора якоря вложения.
+    async listProjects(): Promise<Array<{ id: string; label: string }>> {
+      const body = await requestJson<{ projects?: Array<{ id?: string; title?: string; name?: string }> }>("/api/workspace/projects");
+      return (body.projects ?? []).map((project) => ({ id: String(project.id ?? ""), label: String(project.title ?? project.name ?? project.id ?? "") })).filter((p) => p.id.length > 0);
+    },
+    // Потоковое предложение: вызывает onEvent на каждое SSE-событие, резолвится финальным `done`.
+    async proposeStream(goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = []): Promise<AgentProposeResponse> {
+      const response = await fetchImpl(`${options.apiOrigin}/api/workspace/agent/propose/stream`, {
+        method: "POST",
+        credentials,
+        headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin" },
+        body: JSON.stringify({ goal, attachmentIds })
+      });
+      if (!response.ok) {
+        const raw = await response.text();
+        let err = "request_failed";
+        try { const parsed = JSON.parse(raw) as { error?: string }; if (typeof parsed.error === "string") err = parsed.error; } catch { /* keep */ }
+        throw new AgentApiError(response.status, err);
+      }
+      if (!response.body) throw new AgentApiError(500, "stream_unsupported");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let done: AgentProposeResponse | null = null;
+      const handleEvent = (eventName: string, data: string) => {
+        if (data.length === 0) return;
+        if (eventName === "done") { done = JSON.parse(data) as AgentProposeResponse; return; }
+        if (eventName === "error") { const e = JSON.parse(data) as { error?: string }; throw new AgentApiError(500, e.error ?? "agent_failed"); }
+        onEvent(JSON.parse(data) as AgentStreamEvent);
+      };
+      try {
+        // Парсим SSE-кадры (event:/data:), разделённые пустой строкой. Нормализуем CRLF→LF
+        // (прокси/CDN могут переписать переводы строк) — иначе границы кадров не находятся.
+        for (;;) {
+          const { value, done: streamDone } = await reader.read();
+          if (streamDone) break;
+          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+          let sep: number;
+          while ((sep = buffer.indexOf("\n\n")) >= 0) {
+            const frame = buffer.slice(0, sep);
+            buffer = buffer.slice(sep + 2);
+            let eventName = "message";
+            const dataLines: string[] = [];
+            for (const line of frame.split("\n")) {
+              if (line.startsWith("event:")) eventName = line.slice(6).trim();
+              else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+            }
+            handleEvent(eventName, dataLines.join("\n"));
+          }
+        }
+      } finally {
+        // Всегда отпускаем поток — в т.ч. когда handleEvent бросил на `event: error`.
+        await reader.cancel().catch(() => {});
+      }
+      if (!done) throw new AgentApiError(500, "stream_incomplete");
+      return done;
     },
     execute(actions: AgentActionInput[]) {
       return requestJson<AgentExecuteResponse>("/api/workspace/agent/execute", { method: "POST", body: JSON.stringify({ actions }) });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/cn";
 import {
@@ -77,11 +77,16 @@ const clock = (offsetMs: number): string => new Date(offsetMs).toLocaleTimeStrin
  * live → реальный LLM (ключ на сервере); mock/Storybook → детерминированный демо-«мозг».
  */
 export function AgentSurface() {
-  const { propose, execute, status } = useAgent();
+  const { proposeStream, execute, uploadAttachment, listProjects, status } = useAgent();
 
   const [phase, setPhase] = useState<DemoPhase>("draft");
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<DemoMessage[]>([]);
+  const [liveSteps, setLiveSteps] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<Array<{ id: string; name: string }>>([]);
+  const [anchorId, setAnchorId] = useState("");
+  const [projects, setProjects] = useState<Array<{ id: string; label: string }>>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [changes, setChanges] = useState<DemoChange[]>([]);
   const [activeChangeId, setActiveChangeId] = useState("");
   const [editingChangeId, setEditingChangeId] = useState<string | undefined>(undefined);
@@ -98,18 +103,58 @@ export function AgentSurface() {
   const addMessage = (author: "user" | "henry", text: string) =>
     setMessages((m) => [...m, { id: `${author}-${m.length}`, author, time: now(), text }]);
 
+  // Проекты-якоря для вложений грузим один раз.
+  useEffect(() => {
+    let active = true;
+    void listProjects().then((list) => { if (active) setProjects(list); });
+    return () => { active = false; };
+  }, [listProjects]);
+
+  function openFilePicker() {
+    if (!anchorId) {
+      addMessage("henry", projects.length === 0
+        ? "Нет доступных проектов для привязки файла — вложения требуют проекта, которым вы управляете."
+        : "Сначала выберите проект, к которому привязать файл.");
+      return;
+    }
+    fileRef.current?.click();
+  }
+
+  async function onFilePicked(file: File) {
+    const res = await uploadAttachment(file, "project", anchorId);
+    if (res.ok) { setAttachments((list) => [...list, res.data]); return; }
+    // Загрузка вложений требует прав на управление проектом (canManageProjects); для
+    // read-only/участника якорь недоступен — честно сообщаем, а не молча роняем.
+    const denied = res.code === "permission_missing" || res.code === "cross_tenant_denied" || res.code === "forbidden";
+    addMessage("henry", denied
+      ? "Нет прав на добавление файла в этот проект — выберите проект, которым вы управляете."
+      : `Не удалось загрузить файл: ${res.code}.`);
+  }
+
   async function sendMessage() {
     const goal = inputValue.trim();
     if (goal.length === 0) return;
     addMessage("user", goal);
     setInputValue("");
     setPhase("thinking");
-    const res = await propose(goal);
+    setLiveSteps([]);
+    const attachmentIds = attachments.map((file) => file.id);
+    // Живой CoT-трейс по SSE: показываем реальные шаги (анализ/рассуждение/предложение) по мере работы.
+    const res = await proposeStream(goal, (event) => {
+      const label =
+        event.type === "analyze" ? `Анализ: ${event.title}${event.ok ? "" : " (ошибка)"}`
+        : event.type === "proposal" ? `Предложение: ${event.title}`
+        : event.text.length > 80 ? `${event.text.slice(0, 80)}…` : event.text;
+      setLiveSteps((steps) => [...steps, label]);
+    }, attachmentIds);
     if (!res.ok) {
+      // НЕ стираем вложения при сбое — пользователь сможет повторить, не загружая файл заново.
       addMessage("henry", `Не удалось обработать запрос: ${res.code}`);
       setPhase("draft");
+      setLiveSteps([]);
       return;
     }
+    setAttachments([]); // успех — вложения учтены агентом, чистим панель
     const data = res.data;
     const newChanges = data.proposedActions.map(actionToChange);
     const map: Record<string, AgentActionInput> = {};
@@ -139,6 +184,9 @@ export function AgentSurface() {
 
   function resetDemo() {
     setMessages([]);
+    setLiveSteps([]);
+    setAttachments([]);
+    setAnchorId("");
     setChanges([]);
     setActionMap({});
     setActiveChangeId("");
@@ -157,11 +205,47 @@ export function AgentSurface() {
           messages={messages}
           inputValue={inputValue}
           visibleSteps={3}
+          liveSteps={liveSteps}
           phase={status === "proposing" ? "thinking" : phase}
           agentMenuOpen={agentMenuOpen}
           reviewVisible={reviewVisible}
+          attachSlot={
+            projects.length > 0 || attachments.length > 0 ? (
+              <div className="lad-attach-bar">
+                <select
+                  className="lad-attach-anchor"
+                  value={anchorId}
+                  onChange={(event) => setAnchorId(event.target.value)}
+                  aria-label="Проект-якорь для файла"
+                >
+                  <option value="">Привязать файл к проекту…</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>{project.label}</option>
+                  ))}
+                </select>
+                {attachments.map((file) => (
+                  <span key={file.id} className="lad-attach-chip">
+                    {file.name}
+                    <button type="button" aria-label="Убрать файл" onClick={() => setAttachments((list) => list.filter((f) => f.id !== file.id))}>×</button>
+                  </span>
+                ))}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  hidden
+                  accept=".txt,.md,.markdown,.csv,.json,.yaml,.yml,text/*,application/json"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void onFilePicked(file);
+                    event.target.value = "";
+                  }}
+                />
+              </div>
+            ) : undefined
+          }
           onInputChange={setInputValue}
           onSend={() => void sendMessage()}
+          onAttachClick={openFilePicker}
           onToggleAgentMenu={() => setAgentMenuOpen((v) => !v)}
           onOpenMobileLeft={() => { setMobileLeft(true); setMobileReview(false); }}
           onOpenMobileReview={() => { setMobileReview(reviewVisible); setMobileLeft(false); }}
