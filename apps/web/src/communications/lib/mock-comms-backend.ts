@@ -672,6 +672,43 @@ export function createMockCommsFetch(): typeof fetch {
     return conv;
   };
 
+  /* --- P4.2 DM (mock): членство в замыкании; сид одного DM u-anna↔u-ivan с сообщением. --- */
+  const directMembers = new Map<string, string[]>();
+  const dmConversation = (id: string, createdByUserId: string): Conversation => ({
+    id,
+    tenantId: TENANT,
+    entityType: "direct" as Conversation["entityType"],
+    entityId: id,
+    conversationType: "direct" as Conversation["conversationType"],
+    title: "",
+    createdByUserId,
+    createdAt: nowIso(),
+    archivedAt: null
+  });
+  const seedDmId = "dm-u-anna--u-ivan";
+  db.conversations.push(dmConversation(seedDmId, "u-ivan"));
+  directMembers.set(seedDmId, ["u-anna", "u-ivan"]);
+  db.messages.push({
+    id: "message-dm-1", tenantId: TENANT, conversationId: seedDmId, authorUserId: "u-ivan",
+    body: "Привет! Можем обсудить интеграцию здесь, в личке?", metadata: {},
+    createdAt: "2026-01-13T08:00:00.000Z", editedAt: null, archivedAt: null, pinnedAt: null, pinnedByUserId: null,
+    reactions: [], stickers: []
+  });
+  db.readStates.push({ tenantId: TENANT, conversationId: seedDmId, userId: CURRENT_ACTOR_ID, lastReadMessageId: null, lastReadAt: null, unreadCount: 1 });
+
+  // create-or-get DM с targetId (actor = CURRENT_ACTOR_ID); детерминированный id по паре.
+  const ensureDirectConversation = (targetId: string): Conversation => {
+    const pair = [CURRENT_ACTOR_ID, targetId].sort();
+    const id = `dm-${pair.join("--")}`;
+    let conv = db.conversations.find((c) => c.id === id);
+    if (!conv) {
+      conv = dmConversation(id, CURRENT_ACTOR_ID);
+      db.conversations.push(conv);
+    }
+    directMembers.set(id, pair);
+    return conv;
+  };
+
   /* --- ensureWorkspaceGeneralChannel: всегда присутствует в списке каналов. --- */
   const ensureWorkspaceGeneralChannel = (): Channel => {
     let ch = db.channels.find((c) => c.channelType === "workspace_general");
@@ -832,6 +869,35 @@ export function createMockCommsFetch(): typeof fetch {
     /* ============================================================
        ЧАТ (1-9)
        ============================================================ */
+
+    /* 1b) GET /conversations/direct — DM текущего пользователя (P4.2): membership + memberUserIds + readState. */
+    if (method === "GET" && path === "/api/workspace/conversations/direct") {
+      const result = db.conversations
+        .filter((c) => (c.conversationType as string) === "direct" && (directMembers.get(c.id) ?? []).includes(CURRENT_ACTOR_ID))
+        .map((c) => {
+          const members = directMembers.get(c.id) ?? [];
+          return {
+            ...c,
+            memberUserIds: members,
+            counterpartUserIds: members.filter((id) => id !== CURRENT_ACTOR_ID),
+            readState: db.readStates.find((r) => r.conversationId === c.id && r.userId === CURRENT_ACTOR_ID) ?? null
+          };
+        });
+      return json({ conversations: result });
+    }
+
+    /* 1c) POST /conversations/direct {userId} — открыть/получить DM (create-or-get; self/unknown коды зеркалят бэк). */
+    if (method === "POST" && path === "/api/workspace/conversations/direct") {
+      const parsed = parseBody();
+      if (!parsed.ok) return err("invalid_json", 400);
+      const targetId = typeof parsed.body.userId === "string" ? parsed.body.userId.trim() : "";
+      if (!targetId) return err("direct_user_id_invalid", 400);
+      if (targetId === CURRENT_ACTOR_ID) return err("direct_self_forbidden", 400);
+      if (!COMMS_USERS.some((u) => u.id === targetId)) return err("direct_user_not_found", 404);
+      const conv = ensureDirectConversation(targetId);
+      const members = directMembers.get(conv.id) ?? [];
+      return json({ conversation: conv, memberUserIds: members, counterpartUserIds: members.filter((id) => id !== CURRENT_ACTOR_ID) }, 201);
+    }
 
     /* 1) GET /conversations?entityType&entityId — беседы сущности (+readState, ensure default). */
     if (method === "GET" && path === "/api/workspace/conversations") {

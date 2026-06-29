@@ -21,6 +21,7 @@ import {
   type CommunicationChannelRole,
   type CommunicationChannelType,
   type Conversation,
+  type DirectConversation,
   type EntityType,
   type Meeting,
   type MeetingCreateInput,
@@ -396,6 +397,35 @@ export function useUnreadSummary() {
   const client = useCommsClient();
   const fetcher = useCallback(() => client.getUnreadSummary(), [client]);
   return useCommsLoad(fetcher);
+}
+
+/* ============================================================
+   useDirectMessages — DM-список текущего пользователя (P4.2).
+   list = GET /conversations/direct; open(userId) = POST /conversations/direct
+   (create-or-get) → возвращает id DM для выбора в чате.
+   ============================================================ */
+export function useDirectMessages() {
+  const client = useCommsClient();
+  const fetcher = useCallback(
+    async (): Promise<{ conversations: DirectConversation[] }> => client.listDirectConversations(),
+    [client]
+  );
+  const { data, status, error, reload } = useCommsLoad(fetcher);
+
+  const open = useCallback(
+    async (userId: string): Promise<string | null> => {
+      try {
+        const result = await client.createDirectConversation(userId);
+        await reload();
+        return result.conversation.id;
+      } catch {
+        return null;
+      }
+    },
+    [client, reload]
+  );
+
+  return { data, status, error, reload, open };
 }
 
 export function useNotifications(filterStatus?: "unread" | "read") {

@@ -114,6 +114,27 @@ export type Conversation = {
   readState?: ConversationReadState | null;
 };
 
+/* DM-беседа (P4.2): прямые сообщения по членству. entityType/conversationType —
+   литералы "direct" (не зависят от domain-enum фронта). memberUserIds — участники
+   (имена резолвятся через справочник пользователей). */
+export type DirectConversationBase = {
+  id: string;
+  tenantId: string;
+  entityType: "direct";
+  entityId: string;
+  conversationType: "direct";
+  title: string;
+  createdByUserId: string;
+  createdAt: string;
+  archivedAt: string | null;
+};
+export type DirectConversation = DirectConversationBase & {
+  memberUserIds: string[];
+  // Участники без текущего пользователя (для отображения «с кем» переписка).
+  counterpartUserIds: string[];
+  readState: ConversationReadState | null;
+};
+
 export type Reaction = {
   id: string;
   tenantId: string;
@@ -434,6 +455,17 @@ export function createCommsClient(options: CommsApiClientOptions) {
     // 1) Беседы сущности (+ readState). Лениво гарантирует ≥1 default-беседу.
     listConversations(entityType: EntityType, entityId: string) {
       return requestJson<{ conversations: Conversation[] }>(`/api/workspace/conversations${qs({ entityType, entityId })}`);
+    },
+    // 1b) DM текущего пользователя (P4.2): беседы conversationType="direct" + memberUserIds + readState.
+    listDirectConversations() {
+      return requestJson<{ conversations: DirectConversation[] }>("/api/workspace/conversations/direct");
+    },
+    // 1c) Открыть/получить DM с пользователем (create-or-get по детерминированной паре).
+    createDirectConversation(userId: string) {
+      return requestJson<{ conversation: DirectConversationBase; memberUserIds: string[]; counterpartUserIds: string[] }>(
+        "/api/workspace/conversations/direct",
+        { method: "POST", body: JSON.stringify({ userId }) }
+      );
     },
     // 2) Сообщения беседы (обратная курсорная пагинация: nextCursor = первый элемент).
     listMessages(conversationId: string, params?: { limit?: number; cursor?: string }) {

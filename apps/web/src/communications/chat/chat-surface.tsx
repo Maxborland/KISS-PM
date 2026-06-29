@@ -12,10 +12,10 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
-import { useCommsUsers, useConversation, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { useCommsUsers, useConversation, useDirectMessages, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
 import { avatarColor, commsErr, initials, relTime, UnreadDot } from "@/communications/lib/comms-bits";
-import type { Conversation, EntityType, Message, Reaction } from "@/communications/lib/comms-client";
+import type { Conversation, DirectConversation, EntityType, Message, Reaction } from "@/communications/lib/comms-client";
 
 /* ============================================================
    Поверхность ЧАТ блока «Коммуникации».
@@ -49,6 +49,8 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
   const { data, status, error, reload, selectConversation } = conv;
   // Справочник людей тенанта (имена авторов): mock=COMMS_USERS, live=GET /api/workspace/users.
   const users = useCommsUsers();
+  // P4.2 DM: список личных бесед текущего пользователя (отдельная ось от бесед сущности).
+  const dm = useDirectMessages();
 
   // P4.1 realtime: в live-режиме новое сообщение в открытой беседе прилетает push'ем
   // (SSE) → перечитываем ленту без поллинга. В mock (Storybook) хук — no-op.
@@ -61,7 +63,11 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
   // (ВЛОЖЕННЫЙ EmptyState «Нет бесед» — НЕ top-level: остаётся внутри ready-разметки.)
   const surfaceStatus =
     status === "forbidden" ? "forbidden" : status === "error" || !data ? (status === "loading" ? "loading" : "error") : "ready";
-  const selected = data?.conversations.find((c) => c.id === data.selectedConversationId) ?? null;
+  // selected ищем и среди бесед сущности, и среди DM (DM адаптируем к Conversation: title = имя собеседника).
+  const selectedDm = dm.data?.conversations.find((c) => c.id === data?.selectedConversationId) ?? null;
+  const selected: Conversation | null =
+    data?.conversations.find((c) => c.id === data?.selectedConversationId) ??
+    (selectedDm ? adaptDmToConversation(selectedDm, users) : null);
 
   return (
     <CommsFrame activeTab="Чат" subtitle={`Беседы · ${entityType} / ${entityId}`}>
@@ -77,11 +83,23 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
         >
           {data ? (
             <div className="grid min-h-0 gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
-              <ConversationList
-                conversations={data.conversations}
-                selectedId={data.selectedConversationId}
-                onSelect={(id) => void selectConversation(id)}
-              />
+              <div className="flex min-h-0 flex-col gap-3">
+                <ConversationList
+                  conversations={data.conversations}
+                  selectedId={data.selectedConversationId}
+                  onSelect={(id) => void selectConversation(id)}
+                />
+                <DirectMessageList
+                  dms={dm.data?.conversations ?? []}
+                  users={users}
+                  selectedId={data.selectedConversationId}
+                  onSelect={(id) => void selectConversation(id)}
+                  onOpen={async (userId) => {
+                    const id = await dm.open(userId);
+                    if (id) void selectConversation(id);
+                  }}
+                />
+              </div>
               {selected ? (
                 <ChatPane key={selected.id} conv={conv} conversation={selected} messages={data.messages} users={users} />
               ) : (
@@ -157,6 +175,114 @@ function ConversationList({
         ) : null}
       </div>
     </aside>
+  );
+}
+
+// Имя собеседника(ов) DM (counterpartUserIds → имена).
+function dmTitle(dmConv: DirectConversation, users: CommsUsersDir): string {
+  const names = dmConv.counterpartUserIds.map((id) => users.name(id));
+  return names.length > 0 ? names.join(", ") : "Личные сообщения";
+}
+
+// Адаптация DM к Conversation для ChatPane (title = имя собеседника; entityType/conversationType — cast).
+function adaptDmToConversation(dmConv: DirectConversation, users: CommsUsersDir): Conversation {
+  return {
+    id: dmConv.id,
+    tenantId: dmConv.tenantId,
+    entityType: dmConv.entityType as Conversation["entityType"],
+    entityId: dmConv.entityId,
+    conversationType: dmConv.conversationType as Conversation["conversationType"],
+    title: dmTitle(dmConv, users),
+    createdByUserId: dmConv.createdByUserId,
+    createdAt: dmConv.createdAt,
+    archivedAt: dmConv.archivedAt,
+    readState: dmConv.readState
+  };
+}
+
+// СЛЕВА (ниже бесед сущности): личные сообщения (DM) + кнопка «новый DM».
+function DirectMessageList({
+  dms,
+  users,
+  selectedId,
+  onSelect,
+  onOpen
+}: {
+  dms: DirectConversation[];
+  users: CommsUsersDir;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onOpen: (userId: string) => void;
+}) {
+  return (
+    <aside className="flex flex-col rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2">
+        <span className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Личные сообщения</span>
+        <NewDirectPicker users={users} onOpen={onOpen} />
+      </div>
+      <div className="flex flex-col gap-1 p-2">
+        {dms.map((c) => {
+          const active = c.id === selectedId;
+          const unread = c.readState?.unreadCount ?? 0;
+          const name = dmTitle(c, users);
+          return (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => onSelect(c.id)}
+              className={cn(
+                "flex items-center gap-2 rounded-[var(--radius-md)] border px-2.5 py-2 text-left transition-colors",
+                active
+                  ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                  : "border-transparent hover:border-[var(--border)] hover:bg-[var(--panel-subtle)]"
+              )}
+            >
+              <BemAvatar initials={initials(name)} color={avatarColor(c.counterpartUserIds[0] ?? c.id)} size="sm" title={name} />
+              <span className={cn("min-w-0 flex-1 truncate text-[length:var(--text-sm)] font-medium", active ? "text-[var(--accent-text)]" : "text-[var(--text-strong)]")}>
+                {name}
+              </span>
+              <UnreadDot count={unread} />
+            </button>
+          );
+        })}
+        {dms.length === 0 ? (
+          <p className="px-1 py-4 text-center text-[length:var(--text-xs)] text-[var(--muted-soft)]">Личных бесед пока нет.</p>
+        ) : null}
+      </div>
+    </aside>
+  );
+}
+
+// Пикер «новый DM»: выбор пользователя → create-or-get DM.
+function NewDirectPicker({ users, onOpen }: { users: CommsUsersDir; onOpen: (userId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" title="Новое личное сообщение">
+          <Send className="size-3.5" aria-hidden />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[220px] p-1">
+        <div className="flex flex-col">
+          {users.list.length === 0 ? (
+            <p className="px-2 py-3 text-center text-[length:var(--text-xs)] text-[var(--muted-soft)]">Нет пользователей.</p>
+          ) : (
+            users.list.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => { onOpen(u.id); setOpen(false); }}
+                className="flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 text-left text-[length:var(--text-sm)] text-[var(--text-strong)] hover:bg-[var(--panel-subtle)]"
+              >
+                <BemAvatar initials={initials(u.name)} color={avatarColor(u.id)} size="sm" />
+                <span className="min-w-0 flex-1 truncate">{u.name}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
