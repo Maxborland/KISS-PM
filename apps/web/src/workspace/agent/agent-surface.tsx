@@ -77,11 +77,12 @@ const clock = (offsetMs: number): string => new Date(offsetMs).toLocaleTimeStrin
  * live → реальный LLM (ключ на сервере); mock/Storybook → детерминированный демо-«мозг».
  */
 export function AgentSurface() {
-  const { propose, execute, status } = useAgent();
+  const { proposeStream, execute, status } = useAgent();
 
   const [phase, setPhase] = useState<DemoPhase>("draft");
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<DemoMessage[]>([]);
+  const [liveSteps, setLiveSteps] = useState<string[]>([]);
   const [changes, setChanges] = useState<DemoChange[]>([]);
   const [activeChangeId, setActiveChangeId] = useState("");
   const [editingChangeId, setEditingChangeId] = useState<string | undefined>(undefined);
@@ -104,10 +105,19 @@ export function AgentSurface() {
     addMessage("user", goal);
     setInputValue("");
     setPhase("thinking");
-    const res = await propose(goal);
+    setLiveSteps([]);
+    // Живой CoT-трейс по SSE: показываем реальные шаги (анализ/рассуждение/предложение) по мере работы.
+    const res = await proposeStream(goal, (event) => {
+      const label =
+        event.type === "analyze" ? `Анализ: ${event.title}${event.ok ? "" : " (ошибка)"}`
+        : event.type === "proposal" ? `Предложение: ${event.title}`
+        : event.text.length > 80 ? `${event.text.slice(0, 80)}…` : event.text;
+      setLiveSteps((steps) => [...steps, label]);
+    });
     if (!res.ok) {
       addMessage("henry", `Не удалось обработать запрос: ${res.code}`);
       setPhase("draft");
+      setLiveSteps([]);
       return;
     }
     const data = res.data;
@@ -139,6 +149,7 @@ export function AgentSurface() {
 
   function resetDemo() {
     setMessages([]);
+    setLiveSteps([]);
     setChanges([]);
     setActionMap({});
     setActiveChangeId("");
@@ -157,6 +168,7 @@ export function AgentSurface() {
           messages={messages}
           inputValue={inputValue}
           visibleSteps={3}
+          liveSteps={liveSteps}
           phase={status === "proposing" ? "thinking" : phase}
           agentMenuOpen={agentMenuOpen}
           reviewVisible={reviewVisible}

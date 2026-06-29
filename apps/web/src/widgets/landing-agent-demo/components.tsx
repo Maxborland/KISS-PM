@@ -128,6 +128,7 @@ type AgentChatPanelProps = {
   phase: string;
   agentMenuOpen: boolean;
   reviewVisible: boolean;
+  liveSteps?: string[]; // реальные шаги CoT (live SSE); нет → демо-шаги
   onInputChange: (value: string) => void;
   onSend: () => void;
   onToggleAgentMenu: () => void;
@@ -142,6 +143,7 @@ export function AgentChatPanel({
   phase,
   agentMenuOpen,
   reviewVisible,
+  liveSteps,
   onInputChange,
   onSend,
   onToggleAgentMenu,
@@ -190,7 +192,7 @@ export function AgentChatPanel({
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}
-        {isThinking ? <AgentActivitySteps visibleSteps={visibleSteps} /> : null}
+        {isThinking ? <AgentActivitySteps visibleSteps={visibleSteps} {...(liveSteps ? { steps: liveSteps } : {})} /> : null}
       </div>
 
       <form
@@ -248,12 +250,15 @@ function MessageBubble({ message }: { message: DemoMessage }) {
   );
 }
 
-export function AgentActivitySteps({ visibleSteps }: { visibleSteps: number }) {
+export function AgentActivitySteps({ visibleSteps, steps }: { visibleSteps: number; steps?: string[] }) {
+  // Живые шаги (реальный CoT) при наличии, иначе — демо-список (витрина).
+  const list = steps && steps.length > 0 ? steps : ACTIVITY_STEPS;
+  const revealed = steps && steps.length > 0 ? steps.length : visibleSteps;
   return (
     <div className="lad-steps" aria-label="Действия Генри">
-      {ACTIVITY_STEPS.map((step, index) => (
-        <div key={step} className={cn("lad-step", index < visibleSteps && "is-visible")}>
-          <span className="lad-step__icon">{index + 1 < visibleSteps ? <Check aria-hidden /> : <Clock3 aria-hidden />}</span>
+      {list.map((step, index) => (
+        <div key={`${index}-${step}`} className={cn("lad-step", index < revealed && "is-visible")}>
+          <span className="lad-step__icon">{index + 1 < revealed ? <Check aria-hidden /> : <Clock3 aria-hidden />}</span>
           <span>{step}</span>
         </div>
       ))}
