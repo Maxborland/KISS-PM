@@ -223,7 +223,8 @@ const ENTITY_LABEL: Record<EntityType, string> = {
   client: "Клиент",
   contact: "Контакт",
   product: "Продукт",
-  communication_channel: "Канал"
+  communication_channel: "Канал",
+  direct: "Диалог"
 };
 // Бейдж типа сущности, к которой привязана коллаборация.
 export function EntityBadge({ entityType }: { entityType: EntityType }) {

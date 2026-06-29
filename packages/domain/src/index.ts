@@ -58,6 +58,7 @@ export * from "./control";
 export * from "./controlSurfaces";
 export * from "./retrospectives";
 export * from "./collaboration";
+export * from "./securityPolicy";
 export * from "./backgroundJobs";
 export * from "./knowledge";
 export * from "./auth";

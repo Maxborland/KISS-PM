@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { emitMessageCreated, emitNotificationCreated } from "./workspaceEventBus";
+
 import type { AccessProfile } from "@kiss-pm/access-control";
 import {
   meetingActionTargetTypes,
@@ -8,6 +10,7 @@ import {
   parseCollaborationId,
   parseConversationTitle,
   parseDigestFrequency,
+  parseMeetingActionItemStatus,
   parseMeetingActionTargetType,
   parseMeetingAgenda,
   parseMeetingExternalLinkProvider,
@@ -101,6 +104,74 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       });
     }
     return context.json({ conversations: result });
+  });
+
+  // P4.2 — список DM текущего пользователя (беседы conversationType="direct", где он участник).
+  app.get("/api/workspace/conversations/direct", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!deps.dataSource.listDirectConversationsForUser) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const directConversations = await deps.dataSource.listDirectConversationsForUser(actor.tenantId, actor.id);
+    const result = [];
+    for (const conversation of directConversations) {
+      const memberUserIds = deps.dataSource.listConversationMemberIds
+        ? await deps.dataSource.listConversationMemberIds(actor.tenantId, conversation.id)
+        : [];
+      const readState = deps.dataSource.getConversationReadState
+        ? await deps.dataSource.getConversationReadState({ tenantId: actor.tenantId, conversationId: conversation.id, userId: actor.id })
+        : null;
+      result.push({
+        ...serializeConversation(conversation),
+        memberUserIds,
+        counterpartUserIds: memberUserIds.filter((id) => id !== actor.id),
+        readState
+      });
+    }
+    return context.json({ conversations: result });
+  });
+
+  // P4.2 — открыть/получить DM с пользователем (create-or-get по детерминированной паре).
+  app.post("/api/workspace/conversations/direct", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!deps.dataSource.ensureConversation || !deps.dataSource.addConversationMembers || !deps.dataSource.listUsersByTenantId) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const targetParse = parseCollaborationId(readRecord(body.value).userId, "direct_user_id_invalid");
+    if (!targetParse.ok) return context.json({ error: targetParse.error }, 400);
+    const targetId = targetParse.value;
+    if (targetId === actor.id) return context.json({ error: "direct_self_forbidden" }, 400);
+
+    const tenantUsers = await deps.dataSource.listUsersByTenantId(actor.tenantId);
+    if (!tenantUsers.some((user) => user.id === targetId)) {
+      return context.json({ error: "direct_user_not_found" }, 404);
+    }
+
+    // Детерминированный id пары → create-or-get идемпотентен (ensureConversation по entity-tuple).
+    const pair = [actor.id, targetId].sort();
+    const dmId = `dm-${pair.join("--")}`;
+    const conversation = await deps.dataSource.ensureConversation({
+      id: dmId,
+      tenantId: actor.tenantId,
+      entityType: "direct",
+      entityId: dmId,
+      conversationType: "direct",
+      title: "",
+      createdByUserId: actor.id
+    });
+    await deps.dataSource.addConversationMembers({ tenantId: actor.tenantId, conversationId: conversation.id, userIds: pair });
+    const memberUserIds = deps.dataSource.listConversationMemberIds
+      ? await deps.dataSource.listConversationMemberIds(actor.tenantId, conversation.id)
+      : pair;
+    return context.json({
+      conversation: serializeConversation(conversation),
+      memberUserIds,
+      counterpartUserIds: memberUserIds.filter((id) => id !== actor.id)
+    }, 201);
   });
 
   app.get("/api/workspace/conversations/:conversationId/messages", async (context) => {
@@ -215,16 +286,28 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         }),
         transactionDataSource
       );
-      return { message, mentions, sticker };
+      return { message, mentions, sticker, mentionUserIds };
     });
 
-    return context.json({
-      message: serializeMessageWithExtras(result.message, {
-        reactions: [],
-        stickers: result.sticker ? [result.sticker] : []
-      }),
-      mentions: result.mentions
-    }, 201);
+    const serialized = serializeMessageWithExtras(result.message, {
+      reactions: [],
+      stickers: result.sticker ? [result.sticker] : []
+    });
+    // P4.1 realtime (после коммита транзакции): сообщение → подписчикам беседы,
+    // уведомление об упоминании → каждому упомянутому пользователю (бейдж/чат живут на push).
+    emitMessageCreated(conversation.value.conversation.id, serialized);
+    for (const userId of result.mentionUserIds) {
+      emitNotificationCreated(userId, "mention");
+    }
+    // DM: realtime-уведомление второму участнику (бейдж/непрочитанное реагируют на push).
+    if (conversation.value.conversation.conversationType === "direct" && deps.dataSource.listConversationMemberIds) {
+      const memberIds = await deps.dataSource.listConversationMemberIds(actor.tenantId, conversation.value.conversation.id);
+      for (const memberId of memberIds) {
+        if (memberId !== actor.id) emitNotificationCreated(memberId, "direct_message");
+      }
+    }
+
+    return context.json({ message: serialized, mentions: result.mentions }, 201);
   });
 
   app.post("/api/workspace/conversations/:conversationId/messages/:messageId/reactions", async (context) => {
@@ -460,6 +543,27 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     });
     if (!readState) return context.json({ error: "collaboration_not_configured" }, 501);
     return context.json({ readState });
+  });
+
+  // Сводка непрочитанного для бейджа nav/comms — один дешёвый запрос, без перебора сущностей.
+  app.get("/api/workspace/unread-summary", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!deps.dataSource.listUserNotifications || !deps.dataSource.countUnreadConversationMessagesForUser) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    // limit=200: бейдж насыщается («200+»); точное число сверх этого не нужно.
+    const unread = await deps.dataSource.listUserNotifications({
+      tenantId: actor.tenantId,
+      userId: actor.id,
+      status: "unread",
+      limit: 200
+    });
+    const conversations = await deps.dataSource.countUnreadConversationMessagesForUser({
+      tenantId: actor.tenantId,
+      userId: actor.id
+    });
+    return context.json({ notifications: unread.length, conversations });
   });
 
   app.get("/api/workspace/notifications", async (context) => {
@@ -711,6 +815,39 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     return context.json({ meeting: serializeMeeting(updated) });
   });
 
+  // Композитная карточка встречи: сама встреча + участники/заметки/задачи/ссылки одним запросом.
+  // Read-доступ уже проверяет resolveMeetingForActor (readDecision). POST-ы создают эти под-ресурсы,
+  // здесь — единственный GET, чтобы фронт перечитывал детали (раньше детали были только в payload списка).
+  app.get("/api/workspace/meetings/:meetingId", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const meeting = await resolveMeetingForActor(context.req.param("meetingId"), actor, deps);
+    if (!meeting.ok) return context.json({ error: meeting.error }, meeting.status);
+    const dataSource = deps.dataSource;
+    if (
+      !dataSource.listMeetingParticipants ||
+      !dataSource.listMeetingNotes ||
+      !dataSource.listMeetingActionItems ||
+      !dataSource.listMeetingExternalLinks
+    ) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const meetingId = meeting.value.meeting.id;
+    const [participants, notes, actionItems, externalLinks] = await Promise.all([
+      dataSource.listMeetingParticipants(actor.tenantId, meetingId),
+      dataSource.listMeetingNotes(actor.tenantId, meetingId),
+      dataSource.listMeetingActionItems(actor.tenantId, meetingId),
+      dataSource.listMeetingExternalLinks(actor.tenantId, meetingId)
+    ]);
+    return context.json({
+      meeting: serializeMeeting(meeting.value.meeting),
+      participants: participants.map(serializeMeetingParticipant),
+      notes: notes.map(serializeMeetingNote),
+      actionItems: actionItems.map(serializeMeetingActionItem),
+      externalLinks: externalLinks.map(serializeMeetingExternalLink)
+    });
+  });
+
   app.post("/api/workspace/meetings/:meetingId/external-links", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -877,6 +1014,54 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     });
     return context.json({ actionItem: serializeMeetingActionItem(actionItem) }, 201);
   });
+
+  // Смена статуса задачи встречи (open/done/cancelled). Manage-гейт как у POST; раньше статус
+  // был всегда "open" — фронт показывал инертный чекбокс.
+  app.patch("/api/workspace/meetings/:meetingId/action-items/:actionItemId", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const meeting = await resolveMeetingForActor(context.req.param("meetingId"), actor, deps);
+    if (!meeting.ok) return context.json({ error: meeting.error }, meeting.status);
+    if (!meeting.value.access.manageDecision.allowed) {
+      await appendDeniedAudit(deps, {
+        actionType: "collaboration.meeting_action_item_updated",
+        actor,
+        sourceEntity: meeting.value.access.sourceEntity,
+        commandInput: { meetingId: meeting.value.meeting.id },
+        permissionResult: meeting.value.access.manageDecision
+      });
+      return context.json({ error: meeting.value.access.manageDecision.reason }, 403);
+    }
+    const actionItemId = parseCollaborationId(context.req.param("actionItemId"), "meeting_action_item_id_invalid");
+    if (!actionItemId.ok) return context.json({ error: actionItemId.error }, 400);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const status = parseMeetingActionItemStatus(readRecord(body.value).status);
+    if (!status.ok) return context.json({ error: status.error }, 400);
+    if (!deps.dataSource.updateMeetingActionItem) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const updated = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const updatedActionItem = await requireMethod(transactionDataSource.updateMeetingActionItem).call(transactionDataSource, {
+        tenantId: actor.tenantId,
+        meetingId: meeting.value.meeting.id,
+        actionItemId: actionItemId.value,
+        status: status.value
+      });
+      if (!updatedActionItem) return undefined;
+      await deps.appendManagementAuditEvent(collaborationAudit({
+        actionType: "collaboration.meeting_action_item_updated",
+        actor,
+        sourceEntity: meeting.value.access.sourceEntity,
+        commandInput: { meetingId: meeting.value.meeting.id, actionItemId: actionItemId.value },
+        permissionResult: meeting.value.access.manageDecision,
+        afterState: { status: updatedActionItem.status }
+      }), transactionDataSource);
+      return updatedActionItem;
+    });
+    if (!updated) return context.json({ error: "meeting_action_item_not_found" }, 404);
+    return context.json({ actionItem: serializeMeetingActionItem(updated) });
+  });
 }
 
 async function requireActor(cookie: string | null, deps: CollaborationRouteDeps) {
@@ -903,6 +1088,14 @@ async function resolveConversationForActor(
   if (!conversationId.ok) return { ok: false, status: 400, error: conversationId.error };
   const conversation = await deps.dataSource.findConversation?.(actor.tenantId, conversationId.value);
   if (!conversation) return { ok: false, status: 404, error: "conversation_not_found" };
+  // DM: доступ по членству (а не по правам на сущность). Синтезируем access-контекст.
+  if (conversation.conversationType === "direct") {
+    const member = deps.dataSource.isConversationMember
+      ? await deps.dataSource.isConversationMember(actor.tenantId, conversation.id, actor.id)
+      : false;
+    if (!member) return { ok: false, status: 403, error: "conversation_forbidden" };
+    return { ok: true, value: { conversation, access: directAccessContext(conversation) } };
+  }
   const profile = await deps.getActorProfile(actor);
   const access = await resolveCollaborationEntityAccess({
     actor,
@@ -1219,7 +1412,21 @@ function routeForEntity(entity: CollaborationEntityAccessContext) {
   if (entity.entityType === "client") return `/clients/${entity.entityId}`;
   if (entity.entityType === "contact") return `/contacts/${entity.entityId}`;
   if (entity.entityType === "product") return `/products/${entity.entityId}`;
+  if (entity.entityType === "direct") return `/communications/chat?conversationId=${entity.entityId}`;
   return `/communication-channels/${entity.entityId}`;
+}
+
+// Синтез access-контекста для DM-беседы: доступ уже подтверждён членством.
+function directAccessContext(conversation: Conversation): CollaborationEntityAccessContext {
+  const allowed = { allowed: true as const, reason: "same_tenant_permission_granted" as const };
+  return {
+    entityType: "direct",
+    entityId: conversation.entityId,
+    sourceEntity: { type: "DirectMessage", id: conversation.id },
+    readDecision: allowed,
+    manageDecision: allowed,
+    title: conversation.title
+  };
 }
 
 async function appendDeniedAudit(
@@ -1354,4 +1561,8 @@ function serializeMeetingActionItem(actionItem: import("@kiss-pm/domain").Meetin
     createdAt: actionItem.createdAt.toISOString(),
     archivedAt: actionItem.archivedAt?.toISOString() ?? null
   };
+}
+
+function serializeMeetingParticipant(participant: import("@kiss-pm/domain").MeetingParticipant) {
+  return { ...participant, createdAt: participant.createdAt.toISOString() };
 }

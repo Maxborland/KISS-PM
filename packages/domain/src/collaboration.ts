@@ -10,11 +10,13 @@ export const collaborationEntityTypes = [
   "client",
   "contact",
   "product",
-  "communication_channel"
+  "communication_channel",
+  // Прямые сообщения (DM): беседа не привязана к сущности, доступ — по членству.
+  "direct"
 ] as const;
 export type CollaborationEntityType = (typeof collaborationEntityTypes)[number];
 
-export const conversationTypes = ["default", "meeting_followup"] as const;
+export const conversationTypes = ["default", "meeting_followup", "direct"] as const;
 export type ConversationType = (typeof conversationTypes)[number];
 
 export const communicationChannelTypes = [
@@ -644,6 +646,15 @@ export function parseMeetingStatus(value: unknown): CollaborationParseResult<Mee
     return { ok: true, value: value as MeetingStatus };
   }
   return { ok: false, error: "meeting_status_invalid" };
+}
+
+export function parseMeetingActionItemStatus(
+  value: unknown
+): CollaborationParseResult<MeetingActionItemStatus> {
+  if (typeof value === "string" && meetingActionItemStatuses.includes(value as MeetingActionItemStatus)) {
+    return { ok: true, value: value as MeetingActionItemStatus };
+  }
+  return { ok: false, error: "meeting_action_item_status_invalid" };
 }
 
 export function parseMeetingExternalLinkProvider(

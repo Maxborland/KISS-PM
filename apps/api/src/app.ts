@@ -33,6 +33,8 @@ import { registerBackgroundJobRoutes } from "./backgroundJobRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
 import { registerCrmPipelineRoutes } from "./crmPipelineRoutes";
 import { registerCollaborationRoutes } from "./collaborationRoutes";
+import { registerWorkspaceEventsRoute } from "./workspaceEventsRoute";
+import { registerAgentRoutes } from "./agent/agentRoutes";
 import { registerCommunicationUpgradeRoutes } from "./communicationUpgradeRoutes";
 import { registerCommunicationRealtimeRoutes } from "./communicationRealtimeRoutes";
 import { registerCommunicationRecordingWebhookRoute } from "./communicationRecordingWebhookRoute";
@@ -129,9 +131,19 @@ export function createApp(options: CreateAppOptions = {}) {
     const token = getSessionTokenFromCookie(cookieHeader);
     if (!token) return undefined;
 
-    const session = await dataSource.findSessionByTokenHash(hashSessionToken(token));
+    const tokenHash = hashSessionToken(token);
+    const session = await dataSource.findSessionByTokenHash(tokenHash);
     if (!session || session.expiresAt.getTime() <= Date.now()) {
       return undefined;
+    }
+
+    // ponytail: bump «последняя активность» не чаще раза в минуту — иначе UPDATE на каждый
+    // авторизованный запрос. Достаточная точность для списка активных сессий.
+    if (dataSource.touchSession) {
+      const lastSeen = session.lastSeenAt?.getTime() ?? 0;
+      if (Date.now() - lastSeen > 60_000) {
+        await dataSource.touchSession(tokenHash, new Date());
+      }
     }
 
     const actor = await dataSource.findUserById(session.userId);
@@ -264,6 +276,8 @@ export function createApp(options: CreateAppOptions = {}) {
   registerControlRoutes(app, routeDeps);
   registerControlSurfaceRoutes(app, routeDeps);
   registerCollaborationRoutes(app, routeDeps);
+  registerWorkspaceEventsRoute(app, routeDeps);
+  registerAgentRoutes(app, routeDeps);
   registerCommunicationUpgradeRoutes(app, routeDeps);
   registerCommunicationRealtimeRoutes(app, routeDeps);
   registerCommunicationRecordingWebhookRoute(app, routeDeps);

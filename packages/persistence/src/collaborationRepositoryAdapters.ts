@@ -19,6 +19,7 @@ export type ConversationPersistenceAdapter = Pick<
   | "getConversationReadState"
   | "listConversationsByEntity"
   | "markConversationRead"
+  | "countUnreadConversationMessagesForUser"
 >;
 
 export type DiscussionMessagePersistenceAdapter = Pick<
@@ -66,6 +67,7 @@ export type MeetingPersistenceAdapter = Pick<
   | "createMeetingNote"
   | "findMeeting"
   | "listMeetingActionItems"
+  | "updateMeetingActionItem"
   | "listMeetingExternalLinks"
   | "listMeetingNotes"
   | "listMeetingParticipants"
@@ -145,7 +147,8 @@ export function createFocusedCollaborationPersistenceAdapters(
       findConversation: repository.findConversation.bind(repository),
       getConversationReadState: repository.getConversationReadState.bind(repository),
       listConversationsByEntity: repository.listConversationsByEntity.bind(repository),
-      markConversationRead: repository.markConversationRead.bind(repository)
+      markConversationRead: repository.markConversationRead.bind(repository),
+      countUnreadConversationMessagesForUser: repository.countUnreadConversationMessagesForUser.bind(repository)
     },
     messages: {
       archiveDiscussionMessage: repository.archiveDiscussionMessage.bind(repository),
@@ -169,6 +172,7 @@ export function createFocusedCollaborationPersistenceAdapters(
       createMeetingNote: repository.createMeetingNote.bind(repository),
       findMeeting: repository.findMeeting.bind(repository),
       listMeetingActionItems: repository.listMeetingActionItems.bind(repository),
+      updateMeetingActionItem: repository.updateMeetingActionItem.bind(repository),
       listMeetingExternalLinks: repository.listMeetingExternalLinks.bind(repository),
       listMeetingNotes: repository.listMeetingNotes.bind(repository),
       listMeetingParticipants: repository.listMeetingParticipants.bind(repository),

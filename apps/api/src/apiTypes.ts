@@ -34,6 +34,7 @@ import type {
   KpiEvaluation,
   Meeting,
   MeetingActionItem,
+  MeetingActionItemStatus,
   MeetingExternalLink,
   MeetingNote,
   MeetingParticipant,
@@ -53,6 +54,7 @@ import type {
   RetrospectiveReadModel,
   Tenant,
   TenantId,
+  TenantSecurityPolicy,
   TenantUser,
   TemplateImprovementAction,
   UserNotification,
@@ -374,6 +376,10 @@ export type UserSessionRecord = {
   userId: UserId;
   tokenHash: string;
   expiresAt: Date;
+  createdAt?: Date;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+  lastSeenAt?: Date | null;
 };
 
 export type PasswordResetTokenRecord = {
@@ -761,7 +767,10 @@ export type ApiTenantDataSource = {
   findSessionByTokenHash?(
     tokenHash: string
   ): Promise<UserSessionRecord | undefined>;
+  listUserSessions?(tenantId: TenantId, userId: UserId): Promise<UserSessionRecord[]>;
+  touchSession?(tokenHash: string, lastSeenAt: Date): Promise<void>;
   deleteSessionByTokenHash?(tokenHash: string): Promise<void>;
+  deleteSessionById?(tenantId: TenantId, userId: UserId, sessionId: string): Promise<boolean>;
   deleteSessionsByUserId?(tenantId: TenantId, userId: UserId): Promise<void>;
   createPasswordResetToken?(input: PasswordResetTokenRecord): Promise<void>;
   findPasswordResetTokenByHash?(
@@ -995,6 +1004,10 @@ export type ApiTenantDataSource = {
     entityType: CollaborationEntityType;
     entityId: string;
   }): Promise<Conversation[]>;
+  addConversationMembers?(input: { tenantId: TenantId; conversationId: string; userIds: string[] }): Promise<void>;
+  isConversationMember?(tenantId: TenantId, conversationId: string, userId: UserId): Promise<boolean>;
+  listConversationMemberIds?(tenantId: TenantId, conversationId: string): Promise<string[]>;
+  listDirectConversationsForUser?(tenantId: TenantId, userId: UserId): Promise<Conversation[]>;
   createDiscussionMessage?(input: Omit<
     DiscussionMessage,
     "createdAt" | "editedAt" | "archivedAt" | "pinnedAt" | "pinnedByUserId"
@@ -1075,6 +1088,7 @@ export type ApiTenantDataSource = {
     conversationId: string;
     userId: UserId;
   }): Promise<ConversationReadState>;
+  countUnreadConversationMessagesForUser?(input: { tenantId: TenantId; userId: UserId }): Promise<number>;
   createUserNotification?(input: Omit<
     UserNotification,
     "createdAt" | "readAt" | "archivedAt"
@@ -1095,6 +1109,11 @@ export type ApiTenantDataSource = {
     userId: UserId
   ): Promise<NotificationPreference[]>;
   upsertNotificationPreferences?(input: NotificationPreference[]): Promise<NotificationPreference[]>;
+  getTenantSecurityPolicy?(tenantId: TenantId): Promise<TenantSecurityPolicy>;
+  upsertTenantSecurityPolicy?(
+    tenantId: TenantId,
+    policy: TenantSecurityPolicy
+  ): Promise<TenantSecurityPolicy>;
   createMeeting?(input: Omit<Meeting, "createdAt" | "archivedAt">): Promise<Meeting>;
   updateMeeting?(input: {
     tenantId: TenantId;
@@ -1142,6 +1161,12 @@ export type ApiTenantDataSource = {
     tenantId: TenantId,
     meetingId: string
   ): Promise<MeetingActionItem[]>;
+  updateMeetingActionItem?(input: {
+    tenantId: TenantId;
+    meetingId: string;
+    actionItemId: string;
+    status: MeetingActionItemStatus;
+  }): Promise<MeetingActionItem | undefined>;
   createCallRoom?(input: Omit<
     CallRoom,
     "createdAt" | "updatedAt" | "archivedAt"

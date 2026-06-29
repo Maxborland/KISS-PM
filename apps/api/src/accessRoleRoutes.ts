@@ -1,6 +1,7 @@
 import {
   canManageAccessProfiles,
   canReadAccessProfiles,
+  permissions,
   type PolicyDecision
 } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
@@ -167,6 +168,19 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     return context.json({
       accessRoles: await dataSource.listAccessProfilesByTenantId(actor.tenantId)
     });
+  });
+
+  // Каталог назначаемых прав (статический список из @kiss-pm/access-control) — для редактора ролей.
+  app.get("/api/workspace/permission-catalog", async (context) => {
+    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const decision = canReadAccessProfiles({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    return context.json({ permissions });
   });
 
   app.patch("/api/workspace/access-roles/:roleId", async (context) => {
