@@ -1,7 +1,11 @@
+"use client";
+
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
+import { useUnreadSummary } from "@/communications/lib/use-comms";
+import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
 
 /**
  * CommsFrame — продуктовый каркас области «Коммуникации» (зеркало CrmFrame).
@@ -24,6 +28,12 @@ export function CommsFrame({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  // Бейджи непрочитанного: notifications → таб «Уведомления», conversations → таб «Чат».
+  const unread = useUnreadSummary();
+  const summary = unread.data;
+  // P4.1 realtime: в live-режиме новое уведомление прилетает push'ем (SSE, канал
+  // пользователя) → перечитываем сводку непрочитанного. В mock (Storybook) — no-op.
+  useWorkspaceRealtime({ onNotification: () => { void unread.reload(); } });
   return (
     <WorkspaceShell activeNav="Коммуникации">
       {/* Заголовок области */}
@@ -40,6 +50,7 @@ export function CommsFrame({
       <nav className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 md:px-4">
         {COMMS_TABS.map((tab) => {
           const active = tab === activeTab;
+          const count = tab === "Уведомления" ? summary?.notifications ?? 0 : tab === "Чат" ? summary?.conversations ?? 0 : 0;
           return (
             <span
               key={tab}
@@ -51,6 +62,7 @@ export function CommsFrame({
               )}
             >
               {tab}
+              {count ? <span className="ml-1.5 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[length:var(--text-2xs)] font-semibold leading-[1.1rem] text-white">{count > 99 ? "99+" : count}</span> : null}
               {active ? <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[var(--accent)]" /> : null}
             </span>
           );

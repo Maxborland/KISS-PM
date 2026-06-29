@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Chip } from "@/components/ui/chip";
@@ -9,8 +9,8 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { StatTile } from "@/delivery/ui/bento";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { cn } from "@/lib/cn";
-import { useProjectDetail, useProjects } from "@/workspace/lib/use-workspace";
-import { MOCK_PROJECT_ID, WORKSPACE_USERS } from "@/workspace/lib/mock-workspace-backend";
+import { useProjectDetail, useProjects, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
+import { MOCK_PROJECT_ID } from "@/workspace/lib/mock-workspace-backend";
 import type { ProjectRecord, TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
 
 /* ============================================================
@@ -29,13 +29,6 @@ import type { ProjectRecord, TaskRecord, TaskStatusCategory } from "@/workspace/
    ============================================================ */
 
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
-const userById = new Map(WORKSPACE_USERS.map((u) => [u.id, u]));
-const userName = (id: string | null) => (id ? userById.get(id)?.name ?? id : "—");
-// Цвет аватара — детерминированно по индексу в справочнике (стабилен между рендерами).
-const userColor = (id: string | null): BemAvatarColor => {
-  const i = WORKSPACE_USERS.findIndex((u) => u.id === id);
-  return i < 0 ? "c5" : AV[i % AV.length]!;
-};
 const initials = (name: string) => {
   const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean);
   return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—";
@@ -83,10 +76,15 @@ const STATUS_TONE: Record<TaskStatusCategory, "info" | "success" | "warning" | "
   done: "success"
 };
 
-export function ProjectDetailSurface() {
+export function ProjectDetailSurface({ initialProjectId }: { initialProjectId?: string } = {}) {
   // Выбор проекта — реальный список активных (GET /api/workspace/projects), старт = MOCK_PROJECT_ID.
   const projectsList = useProjects();
-  const [selectedId, setSelectedId] = useState<string>(MOCK_PROJECT_ID);
+  // старт = MOCK_PROJECT_ID (mock-fidelity); на live его в списке нет — переключаемся на первый реальный проект.
+  const [selectedId, setSelectedId] = useState<string>(initialProjectId ?? MOCK_PROJECT_ID);
+  useEffect(() => {
+    const projects = projectsList.data?.projects ?? [];
+    if (projects.length && !projects.some((p) => p.id === selectedId)) setSelectedId(projects[0]!.id);
+  }, [projectsList.data, selectedId]);
   // Карточка проекта + его задачи (GET /api/workspace/projects/:id) — реальный запрос на смену selectedId.
   const { data, status, error, reload } = useProjectDetail(selectedId);
 
@@ -230,6 +228,12 @@ function ProgressBar({ value }: { value: number }) {
 
 // Таблица задач проекта: задача / статус-Chip / исполнитель / срок / прогресс.
 function ProjectTasks({ tasks }: { tasks: TaskRecord[] }) {
+  const usersDir = useWorkspaceUsers();
+  const userName = (id: string | null) => (id ? usersDir.name(id) : "—");
+  const userColor = (id: string | null): BemAvatarColor => {
+    const i = id ? usersDir.indexOf(id) : -1;
+    return i < 0 ? "c5" : AV[i % AV.length]!;
+  };
   // Сортировка: незакрытые вперёд, затем по плановому финишу (ближайшие выше).
   const sorted = useMemo(
     () =>

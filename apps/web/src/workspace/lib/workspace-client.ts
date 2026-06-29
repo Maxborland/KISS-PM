@@ -39,6 +39,10 @@ export type TaskPriority = "low" | "normal" | "high" | "critical";
 export type TaskSource = "manual";
 export type TaskParticipantRole = "executor" | "co_executor" | "requester" | "controller" | "approver" | "observer";
 export type TaskParticipant = { userId: string; role: TaskParticipantRole };
+// Справочные контракты домашних экранов (GET /api/workspace/users, /task-statuses).
+// Боевой ответ — суперсет (tenantId/createdAt/…); структурно совместим.
+export type WorkspaceUser = { id: string; name: string };
+export type WorkspaceTaskStatus = { id: string; name: string; category: TaskStatusCategory; sortOrder: number; isSystem: boolean };
 
 // Серилизованная задача (persistence.TaskRecord; даты ISO). status === statusCategory (категория системного статуса).
 export type TaskRecord = {
@@ -131,7 +135,11 @@ export function createWorkspaceClient(options: WorkspaceApiClientOptions) {
     // Смена статуса задачи (PATCH /api/workspace/projects/:projectId/tasks/:taskId/status, тело {statusId}).
     updateTaskStatus(projectId: string, taskId: string, statusId: string) {
       return requestJson<{ task: TaskRecord }>(`/api/workspace/projects/${enc(projectId)}/tasks/${enc(taskId)}/status`, { method: "PATCH", body: JSON.stringify({ statusId }) });
-    }
+    },
+    // Справочник пользователей (GET /api/workspace/users) — резолв исполнителя/заказчика/владельца.
+    listUsers() { return requestJson<{ users: WorkspaceUser[] }>("/api/workspace/users"); },
+    // Системные статусы задач (GET /api/workspace/task-statuses) — колонки канбана + селект статуса.
+    listTaskStatuses() { return requestJson<{ taskStatuses: WorkspaceTaskStatus[] }>("/api/workspace/task-statuses"); }
   };
 }
 

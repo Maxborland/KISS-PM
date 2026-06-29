@@ -63,6 +63,11 @@ import type {
 /* Алиас для удобства: тип сущности, к которой привязана коллаборация. */
 export type EntityType = CollaborationEntityType;
 
+/* Справочник пользователей рабочей области (GET /api/workspace/users).
+   Боевой ответ — суперсет ({ tenantId, createdAt, … }); структурно совместим с { id, name }.
+   Тот же эндпойнт, что и у блоков workspace/CRM — единый источник правды по людям тенанта. */
+export type CommsUser = { id: string; name: string };
+
 export type CommsApiClientOptions = { apiOrigin: string; fetchImpl?: typeof fetch; credentials?: RequestCredentials };
 
 /* Зеркало CrmApiError: статус + код ошибки + сырое тело ответа. */
@@ -108,6 +113,30 @@ export type Conversation = {
   // В листинге GET /conversations и в GET .../conversation каждой беседе подмешивается readState.
   readState?: ConversationReadState | null;
 };
+
+/* DM-беседа (P4.2): прямые сообщения по членству. entityType/conversationType —
+   литералы "direct" (не зависят от domain-enum фронта). memberUserIds — участники
+   (имена резолвятся через справочник пользователей). */
+export type DirectConversationBase = {
+  id: string;
+  tenantId: string;
+  entityType: "direct";
+  entityId: string;
+  conversationType: "direct";
+  title: string;
+  createdByUserId: string;
+  createdAt: string;
+  archivedAt: string | null;
+};
+export type DirectConversation = DirectConversationBase & {
+  memberUserIds: string[];
+  // Участники без текущего пользователя (для отображения «с кем» переписка).
+  counterpartUserIds: string[];
+  readState: ConversationReadState | null;
+};
+
+/* Присутствие (P4.3): online (есть открытое SSE), away (недавно отключился), offline. */
+export type PresenceStatus = "online" | "away" | "offline";
 
 export type Reaction = {
   id: string;
@@ -430,6 +459,21 @@ export function createCommsClient(options: CommsApiClientOptions) {
     listConversations(entityType: EntityType, entityId: string) {
       return requestJson<{ conversations: Conversation[] }>(`/api/workspace/conversations${qs({ entityType, entityId })}`);
     },
+    // 1b) DM текущего пользователя (P4.2): беседы conversationType="direct" + memberUserIds + readState.
+    listDirectConversations() {
+      return requestJson<{ conversations: DirectConversation[] }>("/api/workspace/conversations/direct");
+    },
+    // 1c) Открыть/получить DM с пользователем (create-or-get по детерминированной паре).
+    createDirectConversation(userId: string) {
+      return requestJson<{ conversation: DirectConversationBase; memberUserIds: string[]; counterpartUserIds: string[] }>(
+        "/api/workspace/conversations/direct",
+        { method: "POST", body: JSON.stringify({ userId }) }
+      );
+    },
+    // 1d) Снимок присутствия пользователей тенанта (P4.3): { userId: online|away|offline }.
+    getPresence() {
+      return requestJson<{ presence: Record<string, PresenceStatus> }>("/api/workspace/presence");
+    },
     // 2) Сообщения беседы (обратная курсорная пагинация: nextCursor = первый элемент).
     listMessages(conversationId: string, params?: { limit?: number; cursor?: string }) {
       return requestJson<{ messages: Message[]; nextCursor: string | null }>(
@@ -578,6 +622,16 @@ export function createCommsClient(options: CommsApiClientOptions) {
     listMeetings(entityType: EntityType, entityId: string) {
       return requestJson<{ meetings: Meeting[] }>(`/api/workspace/meetings${qs({ entityType, entityId })}`);
     },
+    // GET деталь митинга (composite): участники/ноты/задачи/ссылки одним запросом.
+    getMeeting(meetingId: string) {
+      return requestJson<{
+        meeting: Meeting;
+        participants: MeetingParticipant[];
+        notes: MeetingNote[];
+        actionItems: MeetingActionItem[];
+        externalLinks: MeetingExternalLink[];
+      }>(`/api/workspace/meetings/${enc(meetingId)}`);
+    },
     // 27) Создать митинг (organizer=actor авто accepted; meeting_invite каждому ≠ actor).
     createMeeting(input: MeetingCreateInput) {
       return requestJson<{ meeting: Meeting; participants: MeetingParticipant[] }>("/api/workspace/meetings", {
@@ -607,11 +661,22 @@ export function createCommsClient(options: CommsApiClientOptions) {
         body: JSON.stringify(input)
       });
     },
+    // Сменить статус action-item (open/done/cancelled).
+    patchActionItem(meetingId: string, actionItemId: string, status: MeetingActionItemStatus) {
+      return requestJson<{ actionItem: MeetingActionItem }>(`/api/workspace/meetings/${enc(meetingId)}/action-items/${enc(actionItemId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status })
+      });
+    },
 
     /* ===== УВЕДОМЛЕНИЯ (32-35) ===== */
     // 32) Лента уведомлений (status: ''|unread|read; limit def 20, cap 100).
     listNotifications(params?: { status?: "unread" | "read"; limit?: number }) {
       return requestJson<{ notifications: UserNotification[] }>(`/api/workspace/notifications${qs({ status: params?.status, limit: params?.limit })}`);
+    },
+    // Счётчики непрочитанного для бейджей nav/comms (одним запросом).
+    getUnreadSummary() {
+      return requestJson<{ notifications: number; conversations: number }>("/api/workspace/unread-summary");
     },
     // 33) Отметить уведомление прочитанным (НЕ идемпотентно: readAt=now каждый раз).
     markNotificationRead(notificationId: string) {
@@ -627,6 +692,13 @@ export function createCommsClient(options: CommsApiClientOptions) {
         method: "PUT",
         body: JSON.stringify({ preferences })
       });
+    },
+
+    /* ===== СПРАВОЧНИК ПОЛЬЗОВАТЕЛЕЙ ===== */
+    // 36) Список пользователей тенанта (для @mentions, участников, ответственных, выбора участника канала).
+    // Тот же боевой эндпойнт, что у workspace/CRM. В моке отдаётся COMMS_USERS.
+    listUsers() {
+      return requestJson<{ users: CommsUser[] }>("/api/workspace/users");
     }
   };
 }

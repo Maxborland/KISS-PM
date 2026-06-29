@@ -5,11 +5,11 @@ import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 
 /**
  * AdminFrame — продуктовый каркас области «Администрирование» (зеркало CrmFrame).
- * Сверху — заголовок области и табы [Пользователи, Роли]. Слева — общий
+ * Сверху — заголовок области и табы [Пользователи, Роли, Безопасность]. Слева — общий
  * WorkspaceShell с активным пунктом «Администрирование».
  * Прототип: переключение табов не подключено (handoff-каркас) — как в CRM/Delivery.
  */
-export const ADMIN_TABS = ["Пользователи", "Роли"] as const;
+export const ADMIN_TABS = ["Пользователи", "Роли", "Безопасность", "Аудит"] as const;
 export type AdminTab = (typeof ADMIN_TABS)[number];
 
 export function AdminFrame({

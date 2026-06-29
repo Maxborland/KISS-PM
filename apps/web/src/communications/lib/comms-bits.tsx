@@ -178,6 +178,24 @@ export function UnreadDot({ count, className }: { count: number; className?: str
   );
 }
 
+// Индикатор присутствия (P4.3): зелёный=online, янтарь=away, серый=offline.
+const PRESENCE_STYLE: Record<"online" | "away" | "offline", { color: string; label: string }> = {
+  online: { color: "var(--success)", label: "В сети" },
+  away: { color: "var(--warning, #d97706)", label: "Недавно был(а)" },
+  offline: { color: "var(--muted-soft)", label: "Не в сети" }
+};
+export function PresenceDot({ status, className }: { status: "online" | "away" | "offline"; className?: string }) {
+  const style = PRESENCE_STYLE[status];
+  return (
+    <span
+      title={style.label}
+      aria-label={style.label}
+      className={cn("inline-block size-2 shrink-0 rounded-full ring-2 ring-[var(--panel)]", className)}
+      style={{ backgroundColor: style.color }}
+    />
+  );
+}
+
 const ROLE_LABEL: Record<CommunicationChannelRole, string> = { owner: "Владелец", moderator: "Модератор", member: "Участник" };
 // Чип роли участника канала.
 export function RoleChip({ role }: { role: CommunicationChannelRole }) {

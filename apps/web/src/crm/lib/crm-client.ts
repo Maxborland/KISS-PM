@@ -59,6 +59,10 @@ export type Product = { id: string; tenantId: string; name: string; sku: string 
 // Мультиворонки: стадия получает воронку (pipelineId), к которой принадлежит (null — legacy-стадия без воронки).
 export type DealStage = { id: string; tenantId: string; pipelineId: string | null; name: string; sortOrder: number; status: CrmStatus; createdAt: string; updatedAt: string };
 export type ProjectType = { id: string; tenantId: string; name: string; description: string | null; status: CrmStatus; createdAt: string; updatedAt: string };
+// Справочник пользователей рабочей области (владелец/автор/исполнитель). Боевой GET /api/workspace/users
+// отдаёт TenantUser (id + name достаточно для CRM-отображения); positionId/positionName опциональны
+// (присутствуют в contract-mock, на боевом могут отсутствовать). Зеркало WorkspaceUser.
+export type CrmUser = { id: string; name: string; positionId?: string | null; positionName?: string | null };
 
 // Мультиворонки: воронка (набор стадий со своими правилами переходов).
 export type Pipeline = { id: string; tenantId: string; name: string; description: string | null; isDefault: boolean; sortOrder: number; status: CrmStatus; createdAt: string; updatedAt: string };
@@ -164,6 +168,8 @@ export function createCrmClient(options: CrmApiClientOptions) {
     updateProduct(productId: string, input: Record<string, unknown>) { return requestJson<{ product: Product }>(`/api/workspace/products/${enc(productId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     listDealStages() { return requestJson<{ dealStages: DealStage[] }>("/api/workspace/deal-stages"); },
     listProjectTypes() { return requestJson<{ projectTypes: ProjectType[] }>("/api/workspace/project-types"); },
+    // Справочник пользователей — резолв владельца/автора/исполнителя сделки (отображение аватара/имени).
+    listUsers() { return requestJson<{ users: CrmUser[] }>("/api/workspace/users"); },
 
     // сделки (opportunities)
     listOpportunities() { return requestJson<{ opportunities: Opportunity[] }>("/api/workspace/opportunities"); },

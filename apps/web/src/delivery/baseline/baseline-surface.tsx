@@ -27,8 +27,8 @@ const signH = (m: number) => `${m > 0 ? "+" : m < 0 ? "−" : ""}${h(Math.abs(m)
 let NID = 0;
 const nid = (p: string) => `${p}-n${(NID += 1)}`;
 
-export function ProjectBaseline() {
-  const { readModel, status, error, reload, apply } = usePlanning(MOCK_PROJECT_ID);
+export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { readModel, status, error, reload, apply } = usePlanning(projectId);
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);

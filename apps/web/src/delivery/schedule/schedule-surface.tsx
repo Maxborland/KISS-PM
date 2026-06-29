@@ -11,6 +11,7 @@ import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib
 import { demoAction } from "@/views/lib/demo";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu, TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
 import type { PlanningCommand } from "@kiss-pm/domain";
 import { buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/planning-client";
@@ -54,8 +55,8 @@ type RMCalc = { id: string; calculatedStart: string; calculatedFinish: string; t
 type RMDep = { id: string; predecessorTaskId: string; successorTaskId: string; type: string; lagMinutes: number };
 type RMBaseTask = { taskId: string; baselineStart: string | null; baselineFinish: string | null };
 
-function mapRows(rm: PlanningReadModel): { rows: Row[]; deadlineDay: number | null; projectFinishDay: number } {
-  const authored = rm.authored as unknown as { tasks: RMTask[]; dependencies: RMDep[] };
+function mapRows(rm: PlanningReadModel, resName: (id: string) => string): { rows: Row[]; deadlineDay: number | null; projectFinishDay: number } {
+  const authored = rm.authored as unknown as { tasks: RMTask[]; dependencies: RMDep[]; assignments: Array<{ taskId: string; resourceId: string }> };
   const calc = (rm.calculatedPlan as unknown as { tasks: RMCalc[] }).tasks;
   const baseCmp = (rm.baselineComparison as unknown as { tasks: RMBaseTask[] }).tasks ?? [];
   const project = rm.project as unknown as { deadline: string | null; plannedFinish: string };
@@ -73,6 +74,15 @@ function mapRows(rm: PlanningReadModel): { rows: Row[]; deadlineDay: number | nu
     arr.push({ depId: d.id, predId: d.predecessorTaskId, type: d.type, lagDays: Math.round(d.lagMinutes / MIN_PER_DAY) });
     predsBySucc.set(d.successorTaskId, arr);
   }
+  // Имена ресурсов для колонки «Ресурсы»: read-model не отдаёт customFields.resLabel,
+  // поэтому собираем из назначений (taskId→resourceId) через справочник (live: реальные users).
+  const assigneesByTask = new Map<string, string[]>();
+  for (const a of authored.assignments ?? []) {
+    const arr = assigneesByTask.get(a.taskId) ?? [];
+    arr.push(resName(a.resourceId));
+    assigneesByTask.set(a.taskId, arr);
+  }
+  const assigneeLabel = (taskId: string) => (assigneesByTask.get(taskId) ?? []).join(", ");
 
   const rows: Row[] = authored.tasks.map((t) => {
     const c = calcById.get(t.id);
@@ -105,7 +115,7 @@ function mapRows(rm: PlanningReadModel): { rows: Row[]; deadlineDay: number | nu
       finishIso: finish,
       predDisplay,
       predList,
-      res: cf.resLabel ?? "—",
+      res: cf.resLabel ?? (assigneeLabel(t.id) || "—"),
       workH: Math.round(t.workMinutes / 60),
       slackDays: c?.totalSlackMinutes != null ? Math.round(c.totalSlackMinutes / MIN_PER_DAY) : null,
       dayStart,
@@ -280,8 +290,9 @@ const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 const numInput = "w-full rounded-[var(--radius-xs)] border border-[var(--accent)] bg-[var(--panel)] px-1 text-right text-[length:var(--text-sm)] tabular-nums outline-none";
 const cellBtn = "block w-full cursor-pointer truncate rounded-[var(--radius-xs)] px-1 text-left hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]";
 
-export function ProjectSchedule() {
-  const { readModel, setReadModel, status, error, reload, apply, applyBatch } = usePlanning(MOCK_PROJECT_ID);
+export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { readModel, setReadModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
+  const resDir = useResourceDirectory();
   const [zoom, setZoom] = useState<Zoom>("week");
   const [sel, setSel] = useState<string | null>("t-3.2.1");
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -311,7 +322,7 @@ export function ProjectSchedule() {
   const [colDrag, setColDrag] = useState<ColDrag | null>(null);
   const [link, setLink] = useState<LinkDrag | null>(null);
 
-  const mapped = useMemo(() => (readModel ? mapRows(readModel) : null), [readModel]);
+  const mapped = useMemo(() => (readModel ? mapRows(readModel, resDir.name) : null), [readModel, resDir.name]);
   const dayW = ZOOM_DAY_W[zoom];
   const dragRef = useRef<DragState | null>(null);
   const colDragRef = useRef<ColDrag | null>(null);
@@ -687,7 +698,7 @@ export function ProjectSchedule() {
     const cmds: PlanningCommand[] = [];
     if (m.mode === "create") {
       const id = genId("t");
-      cmds.push({ type: "task.create", payload: { id, projectId: MOCK_PROJECT_ID, parentTaskId: m.parentId, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? addFinish(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } } as PlanningCommand);
+      cmds.push({ type: "task.create", payload: { id, projectId, parentTaskId: m.parentId, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? addFinish(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } } as PlanningCommand);
       if (v.startIso) cmds.push({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: addFinish(v.startIso, v.durDays) } } as PlanningCommand);
       if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: genId("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
       if (v.pct > 0) cmds.push({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } } as PlanningCommand);
@@ -716,7 +727,7 @@ export function ProjectSchedule() {
       type: "task.create",
       payload: {
         id: genId("t"),
-        projectId: MOCK_PROJECT_ID,
+        projectId,
         parentTaskId: parentId,
         title: t,
         statusId: "todo",

@@ -13,16 +13,12 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { StatTile } from "@/delivery/ui/bento";
 import { cn } from "@/lib/cn";
 import { CrmFrame } from "@/crm/ui/crm-frame";
-import { useCrm } from "@/crm/lib/use-crm";
-import { CRM_USERS } from "@/crm/lib/mock-crm-backend";
+import { useCrm, useCrmUsers } from "@/crm/lib/use-crm";
 import type { DealStage, Opportunity, Pipeline, StageTransition } from "@/crm/lib/crm-client";
 
 type Mode = "kanban" | "list" | "forecast";
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
-const userById = new Map(CRM_USERS.map((u) => [u.id, u]));
-const ownerColor = (id: string | null): BemAvatarColor => { const i = CRM_USERS.findIndex((u) => u.id === id); return i < 0 ? "c5" : AV[i % AV.length]!; };
 const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean); return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—"; };
-const ownerName = (id: string | null) => (id ? userById.get(id)?.name ?? id : "—");
 const money = (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} млн ₽` : `${Math.round(v / 1000).toLocaleString("ru-RU")} тыс ₽`);
 const STATUS_LABEL: Record<Opportunity["status"], string> = { new: "Новая", feasibility: "Проверка", ready_to_activate: "Готова", won_closed: "Выиграна", lost_rejected: "Проиграна" };
 const isFinal = (o: Opportunity) => o.status === "won_closed" || o.status === "lost_rejected";
@@ -53,6 +49,7 @@ const ruErr = (code?: string, fallback?: string) => (code && ERR_RU[code]) || fa
 
 export function ProjectDeals() {
   const { data, status, error, reload, moveStage, movePipeline, createOpportunity } = useCrm();
+  const users = useCrmUsers();
   const [mode, setMode] = useState<Mode>("kanban");
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [moveTarget, setMoveTarget] = useState<Opportunity | null>(null);
@@ -104,6 +101,8 @@ export function ProjectDeals() {
     );
   }
 
+  const ownerName = (id: string | null) => users.name(id);
+  const ownerColor = (id: string | null): BemAvatarColor => { const i = users.indexOf(id); return i < 0 ? "c5" : AV[i % AV.length]!; };
   const stageName = (id: string | null) => model.allStages.find((s) => s.id === id)?.name ?? "—";
   const pipelineName = (id: string | null) => model.pipelines.find((p) => p.id === id)?.name ?? "—";
   const pipelineOfStage = (stageId: string | null) => model.allStages.find((s) => s.id === stageId)?.pipelineId ?? null;

@@ -17,7 +17,12 @@
    нет; «текущий пользователь» (ACTOR_ID) защищён self-гвардами.
    ============================================================ */
 
-import type { AccessProfile, Permission, Position, UserStatus, WorkspaceUser } from "./admin-client";
+import type { AccessProfile, AuditEvent, Permission, Position, SecurityPolicy, UserStatus, WorkspaceUser } from "./admin-client";
+import { ALL_PERMISSIONS } from "./permissions-catalog";
+
+// Каталог прав живёт в permissions-catalog (статическая константа домена, не «мок»).
+// Ре-экспорт сохраняется для совместимости импортов (тесты, прежние ссылки).
+export { ALL_PERMISSIONS } from "./permissions-catalog";
 
 const TENANT = "tenant-alpha";
 const ACTOR_ID = "user-anna"; // «текущий пользователь» сессии: Администратор, защищён self-гвардами
@@ -62,43 +67,6 @@ const parseNullableContact = (v: unknown): string | null | false => {
 
 const nowIso = () => new Date().toISOString();
 
-/* Полный перечень прав — зеркало packages/access-control/src/index.ts (массив permissions).
-   Роль «Администратор» получает ВЕСЬ список (полный доступ). */
-export const ALL_PERMISSIONS: Permission[] = [
-  "tenant.users.read", "tenant.users.manage",
-  "tenant.access_profiles.read", "tenant.access_profiles.manage",
-  "tenant.positions.read", "tenant.positions.manage",
-  "tenant.audit_events.read",
-  "tenant.workspace_config.read", "tenant.workspace_config.manage",
-  "tenant.absences.read", "tenant.absences.manage",
-  "tenant.org_structure.read", "tenant.org_structure.manage",
-  "tenant.clients.read", "tenant.clients.manage",
-  "tenant.contacts.read", "tenant.contacts.manage",
-  "tenant.products.read", "tenant.products.manage",
-  "tenant.project_types.read", "tenant.project_types.manage",
-  "tenant.deal_stages.read", "tenant.deal_stages.manage",
-  "tenant.opportunities.read", "tenant.opportunities.manage",
-  "tenant.projects.read", "tenant.projects.manage",
-  "tenant.project_plan.read", "tenant.project_plan.manage",
-  "tenant.project_baselines.manage",
-  "tenant.project_resources.read", "tenant.project_resources.manage",
-  "tenant.planning_scenarios.preview", "tenant.planning_scenarios.apply",
-  "tenant.kpi_definitions.read", "tenant.kpi_definitions.manage",
-  "tenant.control_signals.read", "tenant.control_signals.manage",
-  "tenant.management_actions.execute",
-  "tenant.corrective_actions.manage",
-  "tenant.control_surfaces.read", "tenant.control_surfaces.manage", "tenant.control_surfaces.publish",
-  "tenant.retrospectives.read", "tenant.retrospectives.manage",
-  "tenant.template_improvements.apply",
-  "tenant.background_jobs.read", "tenant.background_jobs.manage",
-  "tenant.communications.read", "tenant.communications.manage",
-  "tenant.tasks.create", "tenant.tasks.edit", "tenant.tasks.delete",
-  "tenant.task_statuses.manage",
-  "tenant.project_activation.manage",
-  "tenant.resource_feasibility.read",
-  "profile.read", "profile.update",
-  "workspace.theme.manage"
-];
 const PERMISSION_SET = new Set<string>(ALL_PERMISSIONS);
 const isPermission = (v: unknown): v is Permission => typeof v === "string" && PERMISSION_SET.has(v);
 
@@ -106,6 +74,7 @@ type Store = {
   accessRoles: AccessProfile[];
   users: WorkspaceUser[];
   positions: Position[];
+  securityPolicy: SecurityPolicy;
 };
 
 function seed(): Store {
@@ -163,12 +132,33 @@ function seed(): Store {
     user("user-oleg", "oleg@kiss-pm.dev", "Олег Деактивирован", "role-observer", "position-sales", "inactive")
   ];
 
-  return { accessRoles, users, positions };
+  // Политика безопасности: боевой DEFAULT_TENANT_SECURITY_POLICY, но с демо-allowlist для наглядности карточки.
+  const securityPolicy: SecurityPolicy = {
+    twoFactorRequired: true,
+    sessionTimeoutHours: 12,
+    ssoSamlEnabled: false,
+    domainAllowlist: ["kiss-pm.dev", "kiss-pm.local"]
+  };
+
+  return { accessRoles, users, positions, securityPolicy };
 }
 
 /* ---- Транспорт: fetchImpl, совместимый с createAdminClient ---- */
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const err = (error: string, status: number) => json({ error }, status);
+
+// Сид журнала аудита: реальные action-типы со смешанными статусами (succeeded/denied/failed),
+// по убыванию времени — как боевой listAuditEventsByTenantId (orderBy createdAt desc).
+const AUDIT_EVENTS: AuditEvent[] = [
+  { id: "audit-1", actionType: "workspace.security_policy.updated", createdAt: "2026-01-14T10:42:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "SecurityPolicy", id: TENANT } },
+  { id: "audit-2", actionType: "access_role.created", createdAt: "2026-01-14T09:15:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "AccessProfile", id: "role-manager" } },
+  { id: "audit-3", actionType: "workspace.user.deactivated", createdAt: "2026-01-13T17:30:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "User", id: "user-oleg" } },
+  { id: "audit-4", actionType: "control_surface.published", createdAt: "2026-01-13T14:05:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "ControlSurface", id: "surface-deals" } },
+  { id: "audit-5", actionType: "access_role.update", createdAt: "2026-01-13T11:20:00.000Z", executionResult: { status: "denied" }, sourceEntity: { type: "AccessProfile", id: "role-administrator" } },
+  { id: "audit-6", actionType: "workspace.custom_field.created", createdAt: "2026-01-12T16:48:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "CustomFieldDefinition", id: "cf-priority" } },
+  { id: "audit-7", actionType: "control_surface.publish_blocked", createdAt: "2026-01-12T13:10:00.000Z", executionResult: { status: "failed" }, sourceEntity: { type: "ControlSurface", id: "surface-projects" } },
+  { id: "audit-8", actionType: "workspace.project_template.updated", createdAt: "2026-01-12T09:02:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "ProjectTemplate", id: "tpl-default" } }
+];
 
 // Парсинг тела роли (зеркало parseAccessProfileCreateBody): id → name → permissions, коды и порядок.
 type RoleParse = { ok: true; id: string; name: string; permissions: Permission[] } | { ok: false; error: string };
@@ -203,6 +193,36 @@ export function createMockAdminFetch(): typeof fetch {
     // Список: сортировка по id (боевой repositories: orderBy accessProfiles.id).
     if (path === "/api/workspace/access-roles" && method === "GET") {
       return json({ accessRoles: [...db.accessRoles].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) });
+    }
+    // Каталог прав (боевой GET /api/workspace/permission-catalog) — статический список access-control.
+    if (path === "/api/workspace/permission-catalog" && method === "GET") {
+      return json({ permissions: ALL_PERMISSIONS });
+    }
+
+    /* ---- audit-events (журнал аудита) ---- */
+    if (path === "/api/tenant/current/audit-events" && method === "GET") {
+      const limit = Math.max(1, Math.min(100, Number(new URL(url, "http://x").searchParams.get("limit")) || 50));
+      return json({ auditEvents: AUDIT_EVENTS.slice(0, limit) });
+    }
+
+    /* ---- security-policy (политика безопасности тенанта) ---- */
+    if (path === "/api/tenant/current/security-policy" && method === "GET") {
+      return json({ securityPolicy: db.securityPolicy });
+    }
+    if (path === "/api/tenant/current/security-policy" && method === "PUT") {
+      // Зеркало боевого parseSecurityPolicyBody: тело { securityPolicy: {...} }; booleans обязательны,
+      // timeout — целое 1..8760, allowlist — массив строк, нормализуется (trim/lowercase/dedup).
+      const record = body.securityPolicy;
+      if (!record || typeof record !== "object" || Array.isArray(record)) return err("security_policy_invalid", 400);
+      const c = record as Record<string, unknown>;
+      if (typeof c.twoFactorRequired !== "boolean" || typeof c.ssoSamlEnabled !== "boolean") return err("security_policy_invalid", 400);
+      const timeout = c.sessionTimeoutHours;
+      if (typeof timeout !== "number" || !Number.isInteger(timeout) || timeout < 1 || timeout > 8760) return err("security_policy_session_timeout_invalid", 400);
+      const rawList = c.domainAllowlist ?? [];
+      if (!Array.isArray(rawList) || rawList.some((e) => typeof e !== "string")) return err("security_policy_domain_allowlist_invalid", 400);
+      const domainAllowlist = Array.from(new Set((rawList as string[]).map((e) => e.trim().toLowerCase()).filter((e) => e.length > 0)));
+      db.securityPolicy = { twoFactorRequired: c.twoFactorRequired, sessionTimeoutHours: timeout, ssoSamlEnabled: c.ssoSamlEnabled, domainAllowlist };
+      return json({ securityPolicy: db.securityPolicy });
     }
     // Создание роли — POST /api/tenant/current/access-profiles (id обязателен; коды taken).
     if (path === "/api/tenant/current/access-profiles" && method === "POST") {

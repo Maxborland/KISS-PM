@@ -7,8 +7,7 @@ import { Chip } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
-import { useProjects } from "@/workspace/lib/use-workspace";
-import { WORKSPACE_USERS } from "@/workspace/lib/mock-workspace-backend";
+import { useProjects, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
 import type { ProjectRecord } from "@/workspace/lib/workspace-client";
 
 /* ============================================================
@@ -33,10 +32,6 @@ type Filter = "active" | "all";
 
 // Аватары/инициалы/цвет — по образцу deals-surface (детерминированно по справочнику).
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
-const userColor = (id: string): BemAvatarColor => {
-  const i = WORKSPACE_USERS.findIndex((u) => u.id === id);
-  return i < 0 ? "c5" : AV[i % AV.length]!;
-};
 const initials = (name: string) => {
   const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean);
   return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—";
@@ -73,6 +68,11 @@ const statusVariant = (status: string) =>
   status === "active" ? "success" : status === "closed" || status === "archived" ? "danger" : "info";
 
 export function ProjectsListSurface() {
+  const usersDir = useWorkspaceUsers();
+  const userColor = (id: string): BemAvatarColor => {
+    const i = usersDir.indexOf(id);
+    return i < 0 ? "c5" : AV[i % AV.length]!;
+  };
   const { data, status, error, reload } = useProjects();
   const [filter, setFilter] = useState<Filter>("active");
 
@@ -129,7 +129,7 @@ export function ProjectsListSurface() {
           loadingLabel="Загрузка проектов…"
           empty={{ title: "Нет проектов", description: "Активных проектов в рабочей области пока нет." }}
         >
-          <ProjectsTable projects={projects} />
+          <ProjectsTable projects={projects} userColor={userColor} />
         </SurfaceState>
       </main>
     </WorkspaceShell>
@@ -152,7 +152,7 @@ function ProtoBanner() {
 }
 
 // Таблица проектов: Проект · Клиент · Статус · Срок · Сумма · План.часы · Спрос.
-function ProjectsTable({ projects }: { projects: ProjectRecord[] }) {
+function ProjectsTable({ projects, userColor }: { projects: ProjectRecord[]; userColor: (id: string) => BemAvatarColor }) {
   return (
     <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
       <table className="w-full border-collapse text-[length:var(--text-sm)]">

@@ -1,7 +1,12 @@
-"use client";
+import { WorkspaceRuntimeProvider } from "@/workspace/lib/workspace-runtime";
+import { MyWorkSurface } from "@/workspace/my-work/my-work-surface";
 
-import { RuntimeScreenView } from "@/views/screens/runtime-screen-view";
-
+// Прод-route «Моя работа» (v3) на боевом workspace API: канбан/список задач,
+// статусы и исполнители из GET /api/workspace/{my-work,task-statuses,users}.
 export default function MyWorkPage() {
-  return <RuntimeScreenView id="02-my-work" />;
+  return (
+    <WorkspaceRuntimeProvider live>
+      <MyWorkSurface />
+    </WorkspaceRuntimeProvider>
+  );
 }

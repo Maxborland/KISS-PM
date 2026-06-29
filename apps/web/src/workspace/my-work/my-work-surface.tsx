@@ -8,8 +8,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { cn } from "@/lib/cn";
-import { useMyWork } from "@/workspace/lib/use-workspace";
-import { TASK_STATUSES, WORKSPACE_USERS } from "@/workspace/lib/mock-workspace-backend";
+import { useMyWork, useWorkspaceTaskStatuses, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
 import type { TaskPriority, TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
 
 /* ============================================================
@@ -36,12 +35,6 @@ const initials = (name: string) => {
 
 // Детерминированный цвет аватара по id пользователя (стабилен между рендерами).
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
-const userById = new Map(WORKSPACE_USERS.map((u) => [u.id, u]));
-const userName = (id: string) => userById.get(id)?.name ?? id;
-const userColor = (id: string): BemAvatarColor => {
-  const i = WORKSPACE_USERS.findIndex((u) => u.id === id);
-  return i < 0 ? "c5" : AV[i % AV.length]!;
-};
 
 // RU-маппер кодов ошибок смены статуса (локальный, зеркало ruErr из deals-surface).
 // Коды зеркалят projectWorkRoutes/taskLifecycleCommands боевого API.
@@ -82,6 +75,13 @@ type Mode = "kanban" | "list";
 
 export function MyWorkSurface() {
   const { data, status, error, reload, updateTaskStatus } = useMyWork();
+  const usersDir = useWorkspaceUsers();
+  const statuses = useWorkspaceTaskStatuses();
+  const userName = (id: string) => usersDir.name(id);
+  const userColor = (id: string): BemAvatarColor => {
+    const i = usersDir.indexOf(id);
+    return i < 0 ? "c5" : AV[i % AV.length]!;
+  };
   const [mode, setMode] = useState<Mode>("kanban");
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -96,16 +96,16 @@ export function MyWorkSurface() {
   // Колонки канбана по системным статусам (TASK_STATUSES, упорядочены sortOrder).
   // Группировка по statusCategory задачи (status === statusCategory), как в боевом TaskRecord.
   const columns = useMemo(() => {
-    const sorted = [...TASK_STATUSES].sort((a, b) => a.sortOrder - b.sortOrder);
+    const sorted = statuses.list;
     const byCategory = new Map<TaskStatusCategory, TaskRecord[]>();
     for (const s of sorted) byCategory.set(s.category, []);
     for (const t of tasks ?? []) byCategory.get(t.statusCategory)?.push(t);
     return sorted.map((s) => ({ status: s, items: byCategory.get(s.category) ?? [] }));
-  }, [tasks]);
+  }, [tasks, statuses.list]);
 
   // Применить смену статуса (общий путь для DnD и select). Отклонение перехода — честный notice.
   async function applyStatus(taskId: string, targetStatusId: string) {
-    const target = TASK_STATUSES.find((s) => s.id === targetStatusId);
+    const target = statuses.byId.get(targetStatusId);
     setBusyTaskId(taskId);
     setNotice(null);
     const res = await updateTaskStatus(taskId, targetStatusId);
@@ -191,6 +191,8 @@ export function MyWorkSurface() {
                             setDragId(null);
                             setOverStatusId(null);
                           }}
+                          userName={userName}
+                          userColor={userColor}
                         />
                       ))}
                       {items.length === 0 ? (
@@ -236,7 +238,7 @@ export function MyWorkSurface() {
                               onChange={(e) => void applyStatus(t.id, e.target.value)}
                               className="h-7 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-1.5 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
                             >
-                              {TASK_STATUSES.map((s) => (
+                              {statuses.list.map((s) => (
                                 <option key={s.id} value={s.id}>
                                   {s.name}
                                 </option>
@@ -295,13 +297,17 @@ function TaskCard({
   busy,
   dragging,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  userName,
+  userColor
 }: {
   task: TaskRecord;
   busy: boolean;
   dragging: boolean;
   onDragStart: () => void;
   onDragEnd: () => void;
+  userName: (id: string) => string;
+  userColor: (id: string) => BemAvatarColor;
 }) {
   const due = dueLabel(task.plannedFinish);
   return (

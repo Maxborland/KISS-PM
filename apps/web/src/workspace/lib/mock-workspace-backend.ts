@@ -217,6 +217,16 @@ export function createMockWorkspaceFetch(): typeof fetch {
       return json({ tasks });
     }
 
+    /* ---- GET /api/workspace/users: справочник пользователей (боевой эквивалент — тот же путь) ---- */
+    if (method === "GET" && path === "/api/workspace/users") {
+      return json({ users: WORKSPACE_USERS });
+    }
+
+    /* ---- GET /api/workspace/task-statuses: системные статусы (боевой эквивалент — тот же путь) ---- */
+    if (method === "GET" && path === "/api/workspace/task-statuses") {
+      return json({ taskStatuses: TASK_STATUSES });
+    }
+
     /* ---- GET /api/workspace/projects/:projectId: проект + его задачи; 404 на чужой/неактивный ---- */
     const projectDetail = method === "GET" ? path.match(/^\/api\/workspace\/projects\/([^/]+)$/) : null;
     if (projectDetail) {

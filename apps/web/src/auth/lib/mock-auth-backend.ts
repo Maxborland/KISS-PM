@@ -182,7 +182,20 @@ export function createMockAuthFetch(): typeof fetch {
   // ---- In-memory модель в замыкании (изолирована на каждый монтаж) ----
   let sessionToken: string | null = null; // null = anonymous (зеркало "нет валидного cookie")
   let currentUserId: string | null = null;
+  let currentSessionId: string | null = null;
   const users: WorkspaceUser[] = seedUsers();
+
+  // Активные сессии (P3.2): список по пользователю. Сид — «другие устройства» демо-админа;
+  // текущая создаётся при login (startSession). Зеркало боевого serializeSession.
+  type MockSession = {
+    id: string; userId: string; deviceLabel: string; userAgent: string | null;
+    ipAddress: string | null; createdAt: number; lastSeenAt: number; expiresAt: number;
+  };
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const sessions: MockSession[] = [
+    { id: "session-seed-firefox", userId: "u-admin", deviceLabel: "Firefox · Linux", userAgent: "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0", ipAddress: "10.0.0.14", createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000, lastSeenAt: Date.now() - 6 * 60 * 60 * 1000, expiresAt: Date.now() + WEEK_MS },
+    { id: "session-seed-safari", userId: "u-admin", deviceLabel: "Safari · iOS", userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1", ipAddress: "10.0.0.9", createdAt: Date.now() - 9 * 24 * 60 * 60 * 1000, lastSeenAt: Date.now() - 26 * 60 * 60 * 1000, expiresAt: Date.now() + WEEK_MS }
+  ];
   // Креды: email → {userId, password}. plaintext-демо, НЕ scrypt — честное упрощение мока.
   const credentials = new Map<string, Credential>([
     ["admin@kiss-pm.local", { userId: "u-admin", password: "kiss-pm-admin" }],
@@ -216,8 +229,30 @@ export function createMockAuthFetch(): typeof fetch {
   const recordSuccess = (email: string) => { failures.delete(email); };
 
   // Установка/сброс сессии (зеркало createSession + Set-Cookie / expired-cookie).
-  const startSession = (userId: string): string => { const t = genToken(); sessionToken = t; currentUserId = userId; return t; };
-  const clearSession = () => { sessionToken = null; currentUserId = null; };
+  // startSession также создаёт запись в списке активных сессий (текущее устройство).
+  const startSession = (userId: string): string => {
+    const t = genToken();
+    sessionToken = t;
+    currentUserId = userId;
+    const id = `session-${(SEQ += 1).toString(36)}-${Date.now().toString(36)}`;
+    const now = Date.now();
+    sessions.push({ id, userId, deviceLabel: "Текущий браузер", userAgent: null, ipAddress: null, createdAt: now, lastSeenAt: now, expiresAt: now + WEEK_MS });
+    currentSessionId = id;
+    return t;
+  };
+  // clearSession (logout) удаляет текущую сессию из списка (зеркало deleteSessionByTokenHash).
+  const clearSession = () => {
+    if (currentSessionId) {
+      const idx = sessions.findIndex((s) => s.id === currentSessionId);
+      if (idx >= 0) sessions.splice(idx, 1);
+    }
+    sessionToken = null; currentUserId = null; currentSessionId = null;
+  };
+  const serializeSession = (s: MockSession) => ({
+    id: s.id, deviceLabel: s.deviceLabel, userAgent: s.userAgent, ipAddress: s.ipAddress,
+    createdAt: new Date(s.createdAt).toISOString(), lastSeenAt: new Date(s.lastSeenAt).toISOString(),
+    expiresAt: new Date(s.expiresAt).toISOString(), current: s.id === currentSessionId
+  });
 
   const mockFetch: typeof fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
@@ -272,6 +307,28 @@ export function createMockAuthFetch(): typeof fetch {
       const actor = findUser(currentUserId);
       if (!actor) return err("session_required", 401);
       return json({ user: actor, permissions: SEED_PERMISSIONS, workspace: { id: actor.tenantId } });
+    }
+
+    // GET /api/auth/sessions — активные сессии текущего пользователя (нет сессии 401).
+    if (path === "/api/auth/sessions" && method === "GET") {
+      if (sessionToken === null || currentUserId === null) return err("session_required", 401);
+      const list = sessions
+        .filter((s) => s.userId === currentUserId)
+        .sort((a, b) => b.lastSeenAt - a.lastSeenAt)
+        .map(serializeSession);
+      return json({ sessions: list });
+    }
+
+    // DELETE /api/auth/sessions/:id — отзыв чужой сессии; текущую нельзя (self_session_revoke_forbidden).
+    const sessionDelete = method === "DELETE" ? path.match(/^\/api\/auth\/sessions\/([^/]+)$/) : null;
+    if (sessionDelete) {
+      if (sessionToken === null || currentUserId === null) return err("session_required", 401);
+      const sessionId = decodeURIComponent(sessionDelete[1]!);
+      const target = sessions.find((s) => s.id === sessionId && s.userId === currentUserId);
+      if (!target) return err("session_not_found", 404);
+      if (sessionId === currentSessionId) return err("self_session_revoke_forbidden", 400);
+      sessions.splice(sessions.indexOf(target), 1);
+      return json({ status: "deleted" });
     }
 
     /* ---- PROFILE: ДВЕ боевые ручки (profileRoutes.ts зеркаль 1:1) ---- */

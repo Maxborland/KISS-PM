@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { CrmApiError, createCrmClient, type Client, type Contact, type CrmActivity, type CrmActivityEntityType, type CrmStatus, type DealStage, type FeasibilityAssessment, type Opportunity, type OpportunityCreateInput, type OpportunityUpdateInput, type Pipeline, type Product, type ProjectActivationInput, type ProjectRecord, type ProjectType, type StageTransition } from "./crm-client";
+import { CrmApiError, createCrmClient, type Client, type Contact, type CrmActivity, type CrmActivityEntityType, type CrmClient, type CrmStatus, type CrmUser, type DealStage, type FeasibilityAssessment, type Opportunity, type OpportunityCreateInput, type OpportunityUpdateInput, type Pipeline, type Product, type ProjectActivationInput, type ProjectRecord, type ProjectType, type StageTransition } from "./crm-client";
 import { createMockCrmFetch } from "./mock-crm-backend";
+import { useCrmRuntime } from "./crm-runtime";
 
 // forbidden — отдельный статус загрузки: при CrmApiError.status===403 surface рендерит
 // SurfaceState forbidden (а не error). В моке 403 теоретичен, но проводка нужна для боевого API.
@@ -31,12 +32,25 @@ export type CrmDataResult<T> = { ok: true; data: T } | { ok: false; code?: strin
  * В отличие от usePlanning: CRM без planVersion → нет conflict-ветки;
  * мутации возвращают затронутую сущность, локальный кэш точечно обновляем.
  */
-export function useCrm() {
+/* Изолированный клиент на каждый монтаж: в mock-режиме — свой fetchImpl-мок (отдельная
+   in-memory сессия), в live — createCrmClient без fetchImpl → боевой /api/* с cookie-сессией.
+   Транспорт выбирается через CrmRuntime (provider = live, без провайдера = mock).
+   Зеркало useWorkspaceClient/usePlanning. */
+function useCrmClient(): CrmClient {
+  const { live } = useCrmRuntime();
   const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null) fetchRef.current = createMockCrmFetch();
-  const clientRef = useRef<ReturnType<typeof createCrmClient> | null>(null);
-  if (clientRef.current === null) clientRef.current = createCrmClient({ apiOrigin: "", fetchImpl: fetchRef.current });
-  const client = clientRef.current;
+  if (fetchRef.current === null && !live) fetchRef.current = createMockCrmFetch();
+  const clientRef = useRef<CrmClient | null>(null);
+  if (clientRef.current === null) {
+    clientRef.current = live
+      ? createCrmClient({ apiOrigin: "" })
+      : createCrmClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
+  }
+  return clientRef.current;
+}
+
+export function useCrm() {
+  const client = useCrmClient();
 
   const [data, setData] = useState<CrmData | null>(null);
   const [status, setStatus] = useState<CrmLoadStatus>("loading");
@@ -143,4 +157,31 @@ export function useCrm() {
   const updateTaskStatus = useCallback((entityType: CrmActivityEntityType, entityId: string, activityId: string, status: "todo" | "done"): Promise<CrmDataResult<CrmActivity>> => guardData(async () => { const r = await client.updateTaskStatus(entityType, entityId, activityId, status); return r.activity; }), [client, guardData]);
 
   return { client, data, status, error, reload: load, moveStage, movePipeline, finalize, createOpportunity, createClient, updateClient, createContact, updateContact, createProduct, updateProduct, createPipeline, createStageTransition, deleteStageTransition, updateOpportunity, checkFeasibility, activate, loadActivities, createComment, createTask, createFile, updateTaskStatus };
+}
+
+// ---- useCrmUsers: справочник пользователей (владелец/автор/исполнитель). mock=CRM_USERS, live=GET /api/workspace/users ----
+// Зеркало useWorkspaceUsers: useState+useEffect+useMemo, отдаёт { list, byId, name, indexOf }.
+export type CrmUsersIndex = {
+  list: CrmUser[];
+  byId: Map<string, CrmUser>;
+  name: (id: string | null) => string;
+  indexOf: (id: string | null) => number;
+};
+export function useCrmUsers(): CrmUsersIndex {
+  const client = useCrmClient();
+  const [list, setList] = useState<CrmUser[]>([]);
+  useEffect(() => {
+    let active = true;
+    void client.listUsers().then((r) => { if (active) setList(r.users); }).catch(() => { if (active) setList([]); });
+    return () => { active = false; };
+  }, [client]);
+  return useMemo(() => {
+    const byId = new Map(list.map((u) => [u.id, u]));
+    return {
+      list,
+      byId,
+      name: (id: string | null) => (id ? byId.get(id)?.name ?? id : "—"),
+      indexOf: (id: string | null) => (id ? list.findIndex((u) => u.id === id) : -1)
+    };
+  }, [list]);
 }

@@ -79,6 +79,18 @@ export type ThemeUpdateInput = Partial<{
   accentColor: string;
 }>;
 
+/* GET /api/auth/sessions → активные сессии текущего пользователя (боевой serializeSession). */
+export type AuthSession = {
+  id: string;
+  deviceLabel: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  current: boolean;
+};
+
 /* Боевой контракт register/reset (apps/api/src/authRegistrationRoutes.ts + packages/domain/src/auth). */
 export type RegisterRequest = { email: string; password: string; name: string };
 export type ResetRequestInput = { email: string };
@@ -139,6 +151,15 @@ export function createAuthClient(options: AuthApiClientOptions) {
     // PATCH /api/profile/theme — ОТДЕЛЬНАЯ ручка: ТОЛЬКО theme/accentColor → обновлённый WorkspaceUser (боевой).
     updateTheme(input: ThemeUpdateInput) {
       return requestJson<{ user: WorkspaceUser }>("/api/profile/theme", { method: "PATCH", body: JSON.stringify(input) });
+    },
+
+    // GET /api/auth/sessions — активные сессии текущего пользователя (устройство/IP/активность/current).
+    listSessions() {
+      return requestJson<{ sessions: AuthSession[] }>("/api/auth/sessions");
+    },
+    // DELETE /api/auth/sessions/:id — отзыв чужой сессии (текущую нельзя → self_session_revoke_forbidden).
+    revokeSession(sessionId: string) {
+      return requestJson<{ status: "deleted" }>(`/api/auth/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
     },
 
     /* ---- БОЕВЫЕ ручки register/reset (мок зеркалит, authRegistrationRoutes.ts) ---- */

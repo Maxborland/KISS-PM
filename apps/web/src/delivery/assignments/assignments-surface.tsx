@@ -8,8 +8,9 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
-import { MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
+import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AddAssigneeDialog, distribute, presetWeights, ROLES, roleLabel } from "@/delivery/assignments/assignments-editors";
 import type { PlanningCommand } from "@kiss-pm/domain";
 
@@ -37,8 +38,6 @@ const CROSS_FOCAL = "shadow-[inset_0_0_0_9999px_color-mix(in_oklab,var(--accent)
 // строки, поэтому на выбранной (accent-soft) строке не закрашивает подсветку серым (без «полос»).
 // На белом фоне (panel=#fff) визуально идентичен непрозрачному muted-soft 18%.
 const WEEKEND_BG = "color-mix(in oklab, var(--muted-soft) 18%, transparent)";
-const resName = (id: string) => RESOURCES.find((r) => r.id === id)?.name ?? id;
-const resOf = (id: string) => RESOURCES.find((r) => r.id === id);
 const h1 = (min: number) => (Math.round((min / 60) * 10) / 10).toLocaleString("ru-RU");
 // Источник дат таймлайна — read-model (project.plannedStart), а не хардкод mock-бэка: «переключение на live = смена apiOrigin».
 // Чистые помощники относительно произвольного начала (baseMs); внутри компонента биндятся на origin плана.
@@ -51,8 +50,9 @@ const nid = (p: string) => `${p}-n${(NID += 1)}`;
 
 type AsgMeta = { asg: AsgRaw; days: number[]; scheduledSet: Set<number>; flatPer: number; explicit: Map<number, number>; hasExplicit: boolean };
 
-export function ProjectAssignments() {
-  const { readModel, status, error, reload, apply } = usePlanning(MOCK_PROJECT_ID);
+export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { readModel, status, error, reload, apply } = usePlanning(projectId);
+  const resDir = useResourceDirectory();
   const [gran, setGran] = useState<Gran>("day");
   const [monthOffset, setMonthOffset] = useState(0);
   const [sel, setSel] = useState<string | null>(null); // assignmentId
@@ -250,7 +250,7 @@ export function ProjectAssignments() {
                     {asgs.length === 0 ? (
                       <div className="flex items-center border-b border-[var(--border-subtle)] px-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]" style={{ height: ROW_H, width: LEFT_W, paddingLeft: 28 }}>нет исполнителей</div>
                     ) : asgs.map((a) => {
-                      const r = resOf(a.resourceId);
+                      const r = resDir.of(a.resourceId);
                       const m = model.metaByAsg.get(a.id)!;
                       const isSel = sel === a.id;
                       return (
@@ -288,7 +288,7 @@ export function ProjectAssignments() {
                           const inCross = crosshair?.col === p.key || crosshair?.key === `a:${m.asg.id}`;
                           const isFocal = crosshair?.col === p.key && crosshair?.key === `a:${m.asg.id}`;
                           const bg = mm > 0 ? `color-mix(in oklab, var(--accent) ${Math.round(14 + intensity * 46)}%, var(--panel))` : p.weekend ? WEEKEND_BG : "transparent";
-                          return <span key={p.key} onMouseEnter={() => setHover({ key: `a:${m.asg.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] tabular-nums", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: bg, color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resName(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? Math.round(hrs) : ""}</span>;
+                          return <span key={p.key} onMouseEnter={() => setHover({ key: `a:${m.asg.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] tabular-nums", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: bg, color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resDir.name(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? Math.round(hrs) : ""}</span>;
                         })}
                       </div>
                     ))}
@@ -305,7 +305,7 @@ export function ProjectAssignments() {
             <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
               <div className="min-w-0">
                 <div className="mono text-[length:var(--text-xs)] text-[var(--muted)]">{selTask.wbsCode} · {selTask.title}</div>
-                <h3 className="truncate text-[length:var(--text-base)] font-bold text-[var(--text-strong)]">{resName(selMeta.asg.resourceId)}</h3>
+                <h3 className="truncate text-[length:var(--text-base)] font-bold text-[var(--text-strong)]">{resDir.name(selMeta.asg.resourceId)}</h3>
               </div>
               <button type="button" onClick={() => { setSel(null); setDraft(null); }} className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)]" aria-label="Закрыть"><X className="size-4" aria-hidden /></button>
             </div>
@@ -314,7 +314,7 @@ export function ProjectAssignments() {
               <div className="grid grid-cols-2 gap-2">
                 <label className="col-span-2 block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Ресурс</span>
                   <select value={selMeta.asg.resourceId} onChange={(e) => void upsert(selMeta.asg, { resourceId: e.target.value })} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
-                    {RESOURCES.map((r) => <option key={r.id} value={r.id}>{r.name} · {r.positionName}</option>)}
+                    {resDir.list.map((r) => <option key={r.id} value={r.id}>{r.name} · {r.positionName}</option>)}
                   </select>
                 </label>
                 <label className="block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Роль</span>

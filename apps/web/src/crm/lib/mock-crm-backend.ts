@@ -387,9 +387,11 @@ export function createMockCrmFetch(): typeof fetch {
     let bodyArray = false, bodyPrimitive = false;
     if (init?.body) { try { const p: unknown = JSON.parse(String(init.body)); if (p && typeof p === "object" && !Array.isArray(p)) body = p as Record<string, unknown>; else if (Array.isArray(p)) bodyArray = true; else bodyPrimitive = true; } catch { return err("invalid_json", 400); } }
 
-    /* ---- справочники: deal-stages, project-types (read-only сид) ---- */
+    /* ---- справочники: deal-stages, project-types, users (read-only сид) ---- */
     if (method === "GET" && path === "/api/workspace/deal-stages") return json({ dealStages: [...db.dealStages].sort((a, b) => a.sortOrder - b.sortOrder) });
     if (method === "GET" && path === "/api/workspace/project-types") return json({ projectTypes: db.projectTypes });
+    // Пользователи рабочей области — отдаём сид CRM_USERS (боевой эквивалент GET /api/workspace/users).
+    if (method === "GET" && path === "/api/workspace/users") return json({ users: CRM_USERS });
 
     /* ---- clients ---- */
     if (path === "/api/workspace/clients" && method === "GET") return json({ clients: db.clients });

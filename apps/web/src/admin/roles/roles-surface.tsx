@@ -10,23 +10,24 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { AdminFrame } from "@/admin/ui/admin-frame";
 import { adminErr } from "@/admin/ui/admin-bits";
 import { useAdmin } from "@/admin/lib/use-admin";
-import { ALL_PERMISSIONS } from "@/admin/lib/mock-admin-backend";
+import { ALL_PERMISSIONS } from "@/admin/lib/permissions-catalog";
 import type { AccessProfile, Permission } from "@/admin/lib/admin-client";
 
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
 // Группировка прав по префиксу (первый dot-сегмент): tenant.* / profile.* / workspace.*.
 const GROUP_LABEL: Record<string, string> = { tenant: "Рабочая область (tenant.*)", profile: "Профиль (profile.*)", workspace: "Настройки (workspace.*)" };
-const PERMISSION_GROUPS: { key: string; label: string; permissions: Permission[] }[] = (() => {
+type PermissionGroup = { key: string; label: string; permissions: Permission[] };
+function buildPermissionGroups(permissions: Permission[]): PermissionGroup[] {
   const order: string[] = [];
   const byKey = new Map<string, Permission[]>();
-  for (const p of ALL_PERMISSIONS) {
+  for (const p of permissions) {
     const key = p.split(".")[0] ?? p;
     if (!byKey.has(key)) { byKey.set(key, []); order.push(key); }
     byKey.get(key)!.push(p);
   }
   return order.map((key) => ({ key, label: GROUP_LABEL[key] ?? key, permissions: byKey.get(key)! }));
-})();
+}
 
 // Слаг из названия роли → допустимый route-id (a-z0-9 старт, далее _-, длина 3..120).
 // Кириллица-only имя (частый кейс RU-UI, напр. «Координатор») целиком вырезается
@@ -41,6 +42,8 @@ const slugify = (name: string): string => {
 export function AdminRolesSurface() {
   const admin = useAdmin();
   const { data, status, error, reload, createRole, updateRole, deleteRole } = admin;
+  // Каталог прав из бэка (GET /permission-catalog); ALL_PERMISSIONS — типизированный fallback на время загрузки.
+  const groups = useMemo(() => buildPermissionGroups(data?.permissions ?? ALL_PERMISSIONS), [data?.permissions]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -66,7 +69,7 @@ export function AdminRolesSurface() {
     <AdminFrame
       activeTab="Роли"
       subtitle="Роли доступа (access-profiles)"
-      actions={<CreateRoleDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRole} />}
+      actions={<CreateRoleDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRole} groups={groups} />}
     >
       <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
         <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
@@ -96,7 +99,7 @@ export function AdminRolesSurface() {
                       <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{count}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center justify-end gap-1">
-                          <EditRoleDialog role={r} busy={busy} setBusy={setBusy} setNotice={setNotice} update={updateRole} />
+                          <EditRoleDialog role={r} busy={busy} setBusy={setBusy} setNotice={setNotice} update={updateRole} groups={groups} />
                           <Button variant="ghost" size="sm" disabled={busy} onClick={() => void remove(r)} title={count > 0 ? "Назначена пользователям — удаление отклонится" : "Удалить роль"}><Trash2 className="size-3.5" aria-hidden /></Button>
                         </div>
                       </td>
@@ -114,10 +117,10 @@ export function AdminRolesSurface() {
 }
 
 /** Чек-лист прав, сгруппированный по префиксу. Управляет Set выбранных permission-строк. */
-function PermissionChecklist({ selected, toggle }: { selected: Set<Permission>; toggle: (p: Permission) => void }) {
+function PermissionChecklist({ selected, toggle, groups }: { selected: Set<Permission>; toggle: (p: Permission) => void; groups: PermissionGroup[] }) {
   return (
     <div className="flex max-h-[44vh] flex-col gap-3 overflow-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] p-2.5">
-      {PERMISSION_GROUPS.map((group) => (
+      {groups.map((group) => (
         <fieldset key={group.key} className="flex flex-col gap-1">
           <legend className="mb-1 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">{group.label}</legend>
           <div className="grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-2">
@@ -134,9 +137,9 @@ function PermissionChecklist({ selected, toggle }: { selected: Set<Permission>; 
   );
 }
 
-function CreateRoleDialog({ busy, setBusy, setNotice, create }: {
+function CreateRoleDialog({ busy, setBusy, setNotice, create, groups }: {
   busy: boolean; setBusy: (v: boolean) => void; setNotice: (v: string | null) => void;
-  create: ReturnType<typeof useAdmin>["createRole"];
+  create: ReturnType<typeof useAdmin>["createRole"]; groups: PermissionGroup[];
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -149,7 +152,7 @@ function CreateRoleDialog({ busy, setBusy, setNotice, create }: {
     if (!valid) return;
     setBusy(true); setNotice(null);
     // id обязателен — генерируем слаг из названия (боевой route-id формат).
-    const permissions = ALL_PERMISSIONS.filter((p) => selected.has(p));
+    const permissions = [...selected];
     const res = await create({ id: slugify(name), name: name.trim(), permissions });
     setBusy(false);
     if (res.ok) { setNotice(`Роль «${name.trim()}» создана`); setOpen(false); }
@@ -162,7 +165,7 @@ function CreateRoleDialog({ busy, setBusy, setNotice, create }: {
         <DialogHeader><DialogTitle>Новая роль</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-3">
           <label className={labelCls}>Название<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Координатор" /></label>
-          <div className={labelCls}>Права ({selected.size})<PermissionChecklist selected={selected} toggle={toggle} /></div>
+          <div className={labelCls}>Права ({selected.size})<PermissionChecklist selected={selected} toggle={toggle} groups={groups} /></div>
         </div>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
@@ -173,9 +176,9 @@ function CreateRoleDialog({ busy, setBusy, setNotice, create }: {
   );
 }
 
-function EditRoleDialog({ role, busy, setBusy, setNotice, update }: {
+function EditRoleDialog({ role, busy, setBusy, setNotice, update, groups }: {
   role: AccessProfile; busy: boolean; setBusy: (v: boolean) => void; setNotice: (v: string | null) => void;
-  update: ReturnType<typeof useAdmin>["updateRole"];
+  update: ReturnType<typeof useAdmin>["updateRole"]; groups: PermissionGroup[];
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(role.name);
@@ -188,7 +191,7 @@ function EditRoleDialog({ role, busy, setBusy, setNotice, update }: {
     if (!valid) return;
     setBusy(true); setNotice(null);
     // full-replace: name + полный набор permissions. Роль актора → self_access_role_update_forbidden.
-    const permissions = ALL_PERMISSIONS.filter((p) => selected.has(p));
+    const permissions = [...selected];
     const res = await update(role.id, { name: name.trim(), permissions });
     setBusy(false);
     if (res.ok) { setNotice(`Роль «${name.trim()}» обновлена`); setOpen(false); }
@@ -202,7 +205,7 @@ function EditRoleDialog({ role, busy, setBusy, setNotice, update }: {
         <div className="flex flex-col gap-3">
           <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{role.id}</div>
           <label className={labelCls}>Название<Input value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <div className={labelCls}>Права ({selected.size})<PermissionChecklist selected={selected} toggle={toggle} /></div>
+          <div className={labelCls}>Права ({selected.size})<PermissionChecklist selected={selected} toggle={toggle} groups={groups} /></div>
         </div>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>

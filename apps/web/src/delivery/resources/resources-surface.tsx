@@ -5,8 +5,9 @@ import { useMemo, useState } from "react";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
-import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import {
   ResourceLoadMatrix,
   type MatrixAssignment,
@@ -26,8 +27,9 @@ const SCOPE: MatrixScope = { level: "project", groupLevels: ["team", "role", "pe
 let NID = 0;
 const nid = (p: string) => `${p}-n${(NID += 1)}`;
 
-export function ProjectResources() {
-  const { readModel, status, error, reload, apply, applyBatch } = usePlanning(MOCK_PROJECT_ID);
+export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { readModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
+  const resDir = useResourceDirectory();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; taskId?: string; asgId?: string; initial: TaskModalValues } | null>(null);
@@ -45,14 +47,14 @@ export function ProjectResources() {
     const calendarId = (typeof projCalId === "string" ? calendars.find((c) => c.id === projCalId)?.id : undefined) ?? calendars[0]?.id ?? "cal-5x8";
     const data: MatrixData = {
       buckets: rl.buckets ?? [],
-      resources: RESOURCES,
+      resources: resDir.list,
       taskById: new Map(authored.tasks.map((t) => [t.id, { id: t.id, wbsCode: t.wbsCode, title: t.title, workMinutes: t.workMinutes, percentComplete: t.percentComplete }])),
       asgById: new Map(authored.assignments.map((x) => [x.id, x])),
       calcStartById: new Map(calc.map((c) => [c.id, c.calculatedStart])),
       accepted: new Set(rl.acceptedOverloads ?? [])
     };
     return { data, rawById, calendarId };
-  }, [readModel]);
+  }, [readModel, resDir.list]);
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
   // готовый контент — только при наличии model+readModel. Frame-обёртку сохраняем.
@@ -105,7 +107,7 @@ export function ProjectResources() {
     const cmds: PlanningCommand[] = [];
     if (m.mode === "create") {
       const id = nid("t");
-      cmds.push({ type: "task.create", payload: { id, projectId: MOCK_PROJECT_ID, parentTaskId: null, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? fin(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } } as PlanningCommand);
+      cmds.push({ type: "task.create", payload: { id, projectId, parentTaskId: null, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? fin(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } } as PlanningCommand);
       if (v.startIso) cmds.push({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: fin(v.startIso, v.durDays) } } as PlanningCommand);
       if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: nid("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
       if (v.pct > 0) cmds.push({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } } as PlanningCommand);

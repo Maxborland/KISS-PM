@@ -672,6 +672,43 @@ export function createMockCommsFetch(): typeof fetch {
     return conv;
   };
 
+  /* --- P4.2 DM (mock): членство в замыкании; сид одного DM u-anna↔u-ivan с сообщением. --- */
+  const directMembers = new Map<string, string[]>();
+  const dmConversation = (id: string, createdByUserId: string): Conversation => ({
+    id,
+    tenantId: TENANT,
+    entityType: "direct" as Conversation["entityType"],
+    entityId: id,
+    conversationType: "direct" as Conversation["conversationType"],
+    title: "",
+    createdByUserId,
+    createdAt: nowIso(),
+    archivedAt: null
+  });
+  const seedDmId = "dm-u-anna--u-ivan";
+  db.conversations.push(dmConversation(seedDmId, "u-ivan"));
+  directMembers.set(seedDmId, ["u-anna", "u-ivan"]);
+  db.messages.push({
+    id: "message-dm-1", tenantId: TENANT, conversationId: seedDmId, authorUserId: "u-ivan",
+    body: "Привет! Можем обсудить интеграцию здесь, в личке?", metadata: {},
+    createdAt: "2026-01-13T08:00:00.000Z", editedAt: null, archivedAt: null, pinnedAt: null, pinnedByUserId: null,
+    reactions: [], stickers: []
+  });
+  db.readStates.push({ tenantId: TENANT, conversationId: seedDmId, userId: CURRENT_ACTOR_ID, lastReadMessageId: null, lastReadAt: null, unreadCount: 1 });
+
+  // create-or-get DM с targetId (actor = CURRENT_ACTOR_ID); детерминированный id по паре.
+  const ensureDirectConversation = (targetId: string): Conversation => {
+    const pair = [CURRENT_ACTOR_ID, targetId].sort();
+    const id = `dm-${pair.join("--")}`;
+    let conv = db.conversations.find((c) => c.id === id);
+    if (!conv) {
+      conv = dmConversation(id, CURRENT_ACTOR_ID);
+      db.conversations.push(conv);
+    }
+    directMembers.set(id, pair);
+    return conv;
+  };
+
   /* --- ensureWorkspaceGeneralChannel: всегда присутствует в списке каналов. --- */
   const ensureWorkspaceGeneralChannel = (): Channel => {
     let ch = db.channels.find((c) => c.channelType === "workspace_general");
@@ -832,6 +869,47 @@ export function createMockCommsFetch(): typeof fetch {
     /* ============================================================
        ЧАТ (1-9)
        ============================================================ */
+
+    /* 1b) GET /conversations/direct — DM текущего пользователя (P4.2): membership + memberUserIds + readState. */
+    if (method === "GET" && path === "/api/workspace/conversations/direct") {
+      const result = db.conversations
+        .filter((c) => (c.conversationType as string) === "direct" && (directMembers.get(c.id) ?? []).includes(CURRENT_ACTOR_ID))
+        .map((c) => {
+          const members = directMembers.get(c.id) ?? [];
+          return {
+            ...c,
+            memberUserIds: members,
+            counterpartUserIds: members.filter((id) => id !== CURRENT_ACTOR_ID),
+            readState: db.readStates.find((r) => r.conversationId === c.id && r.userId === CURRENT_ACTOR_ID) ?? null
+          };
+        });
+      return json({ conversations: result });
+    }
+
+    /* 1c) POST /conversations/direct {userId} — открыть/получить DM (create-or-get; self/unknown коды зеркалят бэк). */
+    if (method === "POST" && path === "/api/workspace/conversations/direct") {
+      const parsed = parseBody();
+      if (!parsed.ok) return err("invalid_json", 400);
+      const targetId = typeof parsed.body.userId === "string" ? parsed.body.userId.trim() : "";
+      if (!targetId) return err("direct_user_id_invalid", 400);
+      if (targetId === CURRENT_ACTOR_ID) return err("direct_self_forbidden", 400);
+      if (!COMMS_USERS.some((u) => u.id === targetId)) return err("direct_user_not_found", 404);
+      const conv = ensureDirectConversation(targetId);
+      const members = directMembers.get(conv.id) ?? [];
+      return json({ conversation: conv, memberUserIds: members, counterpartUserIds: members.filter((id) => id !== CURRENT_ACTOR_ID) }, 201);
+    }
+
+    /* 1d) GET /presence — снимок присутствия (P4.3). Мок: статика (SSE-сервера нет). */
+    if (method === "GET" && path === "/api/workspace/presence") {
+      return json({
+        presence: {
+          "u-anna": "online",
+          "u-ivan": "online",
+          "u-sergey": "away",
+          "u-maria": "offline"
+        }
+      });
+    }
 
     /* 1) GET /conversations?entityType&entityId — беседы сущности (+readState, ensure default). */
     if (method === "GET" && path === "/api/workspace/conversations") {
@@ -1521,6 +1599,30 @@ export function createMockCommsFetch(): typeof fetch {
       return json({ meetings });
     }
 
+    /* 26c) GET /unread-summary — счётчики непрочитанного (демо: unread notifications + сумма read-state). */
+    if (method === "GET" && path === "/api/workspace/unread-summary") {
+      const notifications = db.notifications.filter((n) => n.userId === CURRENT_ACTOR_ID && n.readAt === null && n.archivedAt === null).length;
+      const conversations = db.readStates.filter((r) => r.userId === CURRENT_ACTOR_ID).reduce((sum, r) => sum + r.unreadCount, 0);
+      return json({ notifications, conversations });
+    }
+
+    /* 26b) GET /meetings/:id — composite деталь (зеркало боевого GET meeting detail). */
+    const meetingDetailMatch = method === "GET" ? path.match(/^\/api\/workspace\/meetings\/([^/]+)$/) : null;
+    if (meetingDetailMatch) {
+      const idParsed = parseCollaborationId(decodeURIComponent(meetingDetailMatch[1]!), "meeting_id_invalid");
+      if (!idParsed.ok) return err(idParsed.error, 400);
+      const meeting = db.meetings.find((m) => m.id === idParsed.value && m.archivedAt === null);
+      if (!meeting) return err("meeting_not_found", 404);
+      if (!canReadEntity(meeting.entityType, meeting.entityId)) return err("permission_missing", 403);
+      return json({
+        meeting,
+        participants: db.meetingParticipants.filter((p) => p.meetingId === meeting.id),
+        notes: db.meetingNotes.filter((n) => n.meetingId === meeting.id && n.archivedAt === null),
+        actionItems: db.meetingActionItems.filter((a) => a.meetingId === meeting.id && a.archivedAt === null),
+        externalLinks: db.meetingExternalLinks.filter((l) => l.meetingId === meeting.id && l.archivedAt === null)
+      });
+    }
+
     /* 27) POST /meetings — создать (тело+участники ДО access; организатор авто; meeting_invite побочка). */
     if (method === "POST" && path === "/api/workspace/meetings") {
       // Тело ДО access (боевой). Порядок: entity → title → agenda → start → finish → schedule → participants → tenant_user → access.
@@ -1707,6 +1809,22 @@ export function createMockCommsFetch(): typeof fetch {
       return json({ note }, 201);
     }
 
+    /* 31b) PATCH /meetings/:id/action-items/:itemId — статус (manage; open/done/cancelled). */
+    const actionItemPatch = method === "PATCH" ? path.match(/^\/api\/workspace\/meetings\/([^/]+)\/action-items\/([^/]+)$/) : null;
+    if (actionItemPatch) {
+      const resolved = resolveMeeting(actionItemPatch[1]!);
+      if (!resolved.ok) return err(resolved.error, resolved.status);
+      if (!canManageEntity(resolved.meeting.entityType, resolved.meeting.entityId)) return err("permission_missing", 403);
+      const parsedBody = parseBody();
+      if (!parsedBody.ok) return err("invalid_json", 400);
+      const nextStatus = parsedBody.body.status;
+      if (nextStatus !== "open" && nextStatus !== "done" && nextStatus !== "cancelled") return err("meeting_action_item_status_invalid", 400);
+      const item = db.meetingActionItems.find((a) => a.id === decodeURIComponent(actionItemPatch[2]!) && a.meetingId === resolved.meeting.id && a.archivedAt === null);
+      if (!item) return err("meeting_action_item_not_found", 404);
+      item.status = nextStatus;
+      return json({ actionItem: item });
+    }
+
     /* 31) POST /meetings/:id/action-items — action-item (manage → title → owner → dueDate → target; status forced 'open'). */
     const actionItem = method === "POST" ? path.match(/^\/api\/workspace\/meetings\/([^/]+)\/action-items$/) : null;
     if (actionItem) {
@@ -1872,6 +1990,12 @@ export function createMockCommsFetch(): typeof fetch {
         .slice()
         .sort((a, b) => a.channel.localeCompare(b.channel) || a.notificationType.localeCompare(b.notificationType));
       return json({ preferences });
+    }
+
+    /* 36) GET /users — справочник пользователей рабочей области (боевой эквивалент — тот же путь
+       /api/workspace/users). Мок отдаёт сид COMMS_USERS, чтобы stories видели тех же 4 людей. */
+    if (method === "GET" && path === "/api/workspace/users") {
+      return json({ users: COMMS_USERS });
     }
 
     /* Общий 404 fallback (неизвестная ручка). */

@@ -49,6 +49,23 @@ export type WorkspaceUser = {
 // Позиция (должность). Боевой PositionRecord.
 export type Position = { id: string; tenantId: string; name: string; description: string | null };
 
+// Политика безопасности рабочей области (боевой TenantSecurityPolicy). Один экземпляр на тенант.
+export type SecurityPolicy = {
+  twoFactorRequired: boolean;
+  sessionTimeoutHours: number;
+  ssoSamlEnabled: boolean;
+  domainAllowlist: string[];
+};
+
+// Событие журнала аудита (боевой GET /api/tenant/current/audit-events).
+export type AuditEvent = {
+  id: string;
+  actionType: string;
+  createdAt: string;
+  executionResult?: { status?: string } | null;
+  sourceEntity?: { type?: string; id?: string } | null;
+};
+
 // Тело создания роли (POST /api/tenant/current/access-profiles). id обязателен (боевой parseAccessProfileCreateBody).
 export type AccessRoleCreateInput = { id: string; name: string; permissions: Permission[] };
 // Тело обновления роли (PATCH /api/workspace/access-roles/:roleId) — full-replace (id из URL).
@@ -95,6 +112,8 @@ export function createAdminClient(options: AdminApiClientOptions) {
   return {
     // роли (access-profiles): list/update/delete под /access-roles; create под /tenant/current/access-profiles
     listAccessRoles() { return requestJson<{ accessRoles: AccessProfile[] }>("/api/workspace/access-roles"); },
+    // Каталог назначаемых прав (статический список access-control) — для чек-листа ролей.
+    listPermissionCatalog() { return requestJson<{ permissions: Permission[] }>("/api/workspace/permission-catalog"); },
     createAccessRole(input: AccessRoleCreateInput) { return requestJson<{ accessProfile: AccessProfile }>("/api/tenant/current/access-profiles", { method: "POST", body: JSON.stringify(input) }); },
     updateAccessRole(roleId: string, input: AccessRoleUpdateInput) { return requestJson<{ accessRole: AccessProfile }>(`/api/workspace/access-roles/${enc(roleId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     deleteAccessRole(roleId: string) { return requestJson<{ status: "deleted" }>(`/api/workspace/access-roles/${enc(roleId)}`, { method: "DELETE" }); },
@@ -107,7 +126,14 @@ export function createAdminClient(options: AdminApiClientOptions) {
     deactivateUser(userId: string) { return requestJson<{ user: WorkspaceUser }>(`/api/workspace/users/${enc(userId)}`, { method: "PATCH", body: JSON.stringify({ status: "inactive" }) }); },
 
     // позиции (должности) — справочник для назначения пользователю
-    listPositions() { return requestJson<{ positions: Position[] }>("/api/workspace/positions"); }
+    listPositions() { return requestJson<{ positions: Position[] }>("/api/workspace/positions"); },
+
+    // журнал аудита тенанта (GET /api/tenant/current/audit-events?limit=N) — последние события.
+    listAuditEvents(limit = 50) { return requestJson<{ auditEvents: AuditEvent[] }>(`/api/tenant/current/audit-events?limit=${limit}`); },
+
+    // политика безопасности тенанта (GET/PUT /api/tenant/current/security-policy)
+    getSecurityPolicy() { return requestJson<{ securityPolicy: SecurityPolicy }>("/api/tenant/current/security-policy"); },
+    updateSecurityPolicy(input: SecurityPolicy) { return requestJson<{ securityPolicy: SecurityPolicy }>("/api/tenant/current/security-policy", { method: "PUT", body: JSON.stringify({ securityPolicy: input }) }); }
   };
 }
 
