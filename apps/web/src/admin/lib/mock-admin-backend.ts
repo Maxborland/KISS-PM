@@ -17,7 +17,7 @@
    нет; «текущий пользователь» (ACTOR_ID) защищён self-гвардами.
    ============================================================ */
 
-import type { AccessProfile, Permission, Position, SecurityPolicy, UserStatus, WorkspaceUser } from "./admin-client";
+import type { AccessProfile, AuditEvent, Permission, Position, SecurityPolicy, UserStatus, WorkspaceUser } from "./admin-client";
 import { ALL_PERMISSIONS } from "./permissions-catalog";
 
 // Каталог прав живёт в permissions-catalog (статическая константа домена, не «мок»).
@@ -147,6 +147,19 @@ function seed(): Store {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const err = (error: string, status: number) => json({ error }, status);
 
+// Сид журнала аудита: реальные action-типы со смешанными статусами (succeeded/denied/failed),
+// по убыванию времени — как боевой listAuditEventsByTenantId (orderBy createdAt desc).
+const AUDIT_EVENTS: AuditEvent[] = [
+  { id: "audit-1", actionType: "workspace.security_policy.updated", createdAt: "2026-01-14T10:42:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "SecurityPolicy", id: TENANT } },
+  { id: "audit-2", actionType: "access_role.created", createdAt: "2026-01-14T09:15:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "AccessProfile", id: "role-manager" } },
+  { id: "audit-3", actionType: "workspace.user.deactivated", createdAt: "2026-01-13T17:30:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "User", id: "user-oleg" } },
+  { id: "audit-4", actionType: "control_surface.published", createdAt: "2026-01-13T14:05:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "ControlSurface", id: "surface-deals" } },
+  { id: "audit-5", actionType: "access_role.update", createdAt: "2026-01-13T11:20:00.000Z", executionResult: { status: "denied" }, sourceEntity: { type: "AccessProfile", id: "role-administrator" } },
+  { id: "audit-6", actionType: "workspace.custom_field.created", createdAt: "2026-01-12T16:48:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "CustomFieldDefinition", id: "cf-priority" } },
+  { id: "audit-7", actionType: "control_surface.publish_blocked", createdAt: "2026-01-12T13:10:00.000Z", executionResult: { status: "failed" }, sourceEntity: { type: "ControlSurface", id: "surface-projects" } },
+  { id: "audit-8", actionType: "workspace.project_template.updated", createdAt: "2026-01-12T09:02:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "ProjectTemplate", id: "tpl-default" } }
+];
+
 // Парсинг тела роли (зеркало parseAccessProfileCreateBody): id → name → permissions, коды и порядок.
 type RoleParse = { ok: true; id: string; name: string; permissions: Permission[] } | { ok: false; error: string };
 const parseAccessProfileBody = (body: Record<string, unknown>): RoleParse => {
@@ -184,6 +197,12 @@ export function createMockAdminFetch(): typeof fetch {
     // Каталог прав (боевой GET /api/workspace/permission-catalog) — статический список access-control.
     if (path === "/api/workspace/permission-catalog" && method === "GET") {
       return json({ permissions: ALL_PERMISSIONS });
+    }
+
+    /* ---- audit-events (журнал аудита) ---- */
+    if (path === "/api/tenant/current/audit-events" && method === "GET") {
+      const limit = Math.max(1, Math.min(100, Number(new URL(url, "http://x").searchParams.get("limit")) || 50));
+      return json({ auditEvents: AUDIT_EVENTS.slice(0, limit) });
     }
 
     /* ---- security-policy (политика безопасности тенанта) ---- */

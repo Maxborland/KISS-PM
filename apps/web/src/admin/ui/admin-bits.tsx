@@ -48,3 +48,38 @@ export function UserStatusChip({ status }: { status: UserStatus }) {
     <span className="inline-flex items-center rounded-[var(--radius-sm)] bg-[var(--panel-strong)] px-1.5 py-0.5 text-[length:var(--text-xs)] font-medium text-[var(--muted-soft)]">Неактивен</span>
   );
 }
+
+// Результат события аудита (зеркало v2 auditResultLabel: status → RU).
+export const auditResultLabel = (status?: string): "Успешно" | "Ошибка" | "Отклонено правами" | "Записано в журнал" =>
+  status === "succeeded" || status === "success" ? "Успешно"
+  : status === "failed" || status === "error" ? "Ошибка"
+  : status === "denied" ? "Отклонено правами"
+  : "Записано в журнал";
+
+export function AuditResultChip({ status }: { status?: string | undefined }) {
+  const label = auditResultLabel(status);
+  if (label === "Успешно") return <Chip variant="success">{label}</Chip>;
+  if (label === "Ошибка") return <Chip variant="danger">{label}</Chip>;
+  if (label === "Отклонено правами") return <Chip variant="warning">{label}</Chip>;
+  return <Chip variant="info">{label}</Chip>;
+}
+
+// Человекочитаемая метка action-типа аудита. Известные группы → RU; иначе — сам код (mono).
+const AUDIT_ACTION_LABEL: Record<string, string> = {
+  "workspace.security_policy.updated": "Политика безопасности обновлена",
+  "access_role.created": "Роль создана",
+  "access_role.update": "Роль изменена",
+  "access_role.deleted": "Роль удалена",
+  "workspace.user.created": "Пользователь создан",
+  "workspace.user.updated": "Пользователь изменён",
+  "workspace.user.deactivated": "Пользователь деактивирован",
+  "control_surface.published": "Контрол-поверхность опубликована",
+  "control_surface.publish_blocked": "Публикация поверхности заблокирована",
+  "control_surface.rolled_back": "Откат контрол-поверхности",
+  "workspace.custom_field.created": "Кастом-поле создано",
+  "workspace.custom_field.updated": "Кастом-поле изменено",
+  "workspace.project_template.created": "Шаблон проекта создан",
+  "workspace.project_template.updated": "Шаблон проекта изменён",
+  "notification.preference_updated": "Настройки уведомлений обновлены"
+};
+export const auditActionLabel = (actionType: string): string => AUDIT_ACTION_LABEL[actionType] ?? actionType;

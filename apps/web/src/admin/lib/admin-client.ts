@@ -57,6 +57,15 @@ export type SecurityPolicy = {
   domainAllowlist: string[];
 };
 
+// Событие журнала аудита (боевой GET /api/tenant/current/audit-events).
+export type AuditEvent = {
+  id: string;
+  actionType: string;
+  createdAt: string;
+  executionResult?: { status?: string } | null;
+  sourceEntity?: { type?: string; id?: string } | null;
+};
+
 // Тело создания роли (POST /api/tenant/current/access-profiles). id обязателен (боевой parseAccessProfileCreateBody).
 export type AccessRoleCreateInput = { id: string; name: string; permissions: Permission[] };
 // Тело обновления роли (PATCH /api/workspace/access-roles/:roleId) — full-replace (id из URL).
@@ -118,6 +127,9 @@ export function createAdminClient(options: AdminApiClientOptions) {
 
     // позиции (должности) — справочник для назначения пользователю
     listPositions() { return requestJson<{ positions: Position[] }>("/api/workspace/positions"); },
+
+    // журнал аудита тенанта (GET /api/tenant/current/audit-events?limit=N) — последние события.
+    listAuditEvents(limit = 50) { return requestJson<{ auditEvents: AuditEvent[] }>(`/api/tenant/current/audit-events?limit=${limit}`); },
 
     // политика безопасности тенанта (GET/PUT /api/tenant/current/security-policy)
     getSecurityPolicy() { return requestJson<{ securityPolicy: SecurityPolicy }>("/api/tenant/current/security-policy"); },
