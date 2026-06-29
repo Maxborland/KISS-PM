@@ -122,7 +122,12 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       const readState = deps.dataSource.getConversationReadState
         ? await deps.dataSource.getConversationReadState({ tenantId: actor.tenantId, conversationId: conversation.id, userId: actor.id })
         : null;
-      result.push({ ...serializeConversation(conversation), memberUserIds, readState });
+      result.push({
+        ...serializeConversation(conversation),
+        memberUserIds,
+        counterpartUserIds: memberUserIds.filter((id) => id !== actor.id),
+        readState
+      });
     }
     return context.json({ conversations: result });
   });
@@ -162,7 +167,11 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const memberUserIds = deps.dataSource.listConversationMemberIds
       ? await deps.dataSource.listConversationMemberIds(actor.tenantId, conversation.id)
       : pair;
-    return context.json({ conversation: serializeConversation(conversation), memberUserIds }, 201);
+    return context.json({
+      conversation: serializeConversation(conversation),
+      memberUserIds,
+      counterpartUserIds: memberUserIds.filter((id) => id !== actor.id)
+    }, 201);
   });
 
   app.get("/api/workspace/conversations/:conversationId/messages", async (context) => {
