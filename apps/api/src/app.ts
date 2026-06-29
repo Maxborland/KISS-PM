@@ -30,6 +30,7 @@ import { registerAuthRoutes } from "./authRoutes";
 import { registerBackgroundJobRoutes } from "./backgroundJobRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
 import { registerCollaborationRoutes } from "./collaborationRoutes";
+import { registerWorkspaceEventsRoute } from "./workspaceEventsRoute";
 import { registerCommunicationUpgradeRoutes } from "./communicationUpgradeRoutes";
 import { registerCommunicationRealtimeRoutes } from "./communicationRealtimeRoutes";
 import { registerCommunicationRecordingWebhookRoute } from "./communicationRecordingWebhookRoute";
@@ -269,6 +270,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerControlRoutes(app, routeDeps);
   registerControlSurfaceRoutes(app, routeDeps);
   registerCollaborationRoutes(app, routeDeps);
+  registerWorkspaceEventsRoute(app, routeDeps);
   registerCommunicationUpgradeRoutes(app, routeDeps);
   registerCommunicationRealtimeRoutes(app, routeDeps);
   registerCommunicationRecordingWebhookRoute(app, routeDeps);

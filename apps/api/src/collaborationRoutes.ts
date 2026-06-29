@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { emitMessageCreated, emitNotificationCreated } from "./workspaceEventBus";
+
 import type { AccessProfile } from "@kiss-pm/access-control";
 import {
   meetingActionTargetTypes,
@@ -216,16 +218,21 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         }),
         transactionDataSource
       );
-      return { message, mentions, sticker };
+      return { message, mentions, sticker, mentionUserIds };
     });
 
-    return context.json({
-      message: serializeMessageWithExtras(result.message, {
-        reactions: [],
-        stickers: result.sticker ? [result.sticker] : []
-      }),
-      mentions: result.mentions
-    }, 201);
+    const serialized = serializeMessageWithExtras(result.message, {
+      reactions: [],
+      stickers: result.sticker ? [result.sticker] : []
+    });
+    // P4.1 realtime (после коммита транзакции): сообщение → подписчикам беседы,
+    // уведомление об упоминании → каждому упомянутому пользователю (бейдж/чат живут на push).
+    emitMessageCreated(conversation.value.conversation.id, serialized);
+    for (const userId of result.mentionUserIds) {
+      emitNotificationCreated(userId, "mention");
+    }
+
+    return context.json({ message: serialized, mentions: result.mentions }, 201);
   });
 
   app.post("/api/workspace/conversations/:conversationId/messages/:messageId/reactions", async (context) => {
