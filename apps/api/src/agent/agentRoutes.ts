@@ -1,5 +1,6 @@
 import type { ApiApp, ApiRouteDeps } from "../routeTypes";
 import { readLimitedJsonBody } from "../jsonBody";
+import { createPlanningReadModel } from "../planning/planningReadModel";
 import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
 import { runAgentLoop, type AnalyzeExecutor } from "./agentLoop";
 import { createAgentLlmProviderFromEnv } from "./llmProvider";
@@ -15,12 +16,15 @@ const AGENT_SYSTEM_PROMPT = [
   "analyze. Объясняй кратко и по-русски."
 ].join(" ");
 
-// Какие analyze-инструменты уже подключены к данным (slice 2). Остальные analyze (план/ресурсы)
-// подключаются в slice 3 и пока не предлагаются LLM, чтобы он не звал неготовое.
-const WIRED_ANALYZE = new Set(["list_my_tasks"]);
+// Какие analyze-инструменты подключены к данным. Сценарные mutation-инструменты по ресурсам
+// (preview/apply) пока возвращают предложение, но не исполняются в /execute — это route-bound
+// транзакционная логика, выносится в переиспользуемый сервис отдельным слайсом.
+const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_resource_overloads"]);
 
-function buildAnalyzeExecutor(deps: ApiRouteDeps, actorTenantId: string, actorUserId: string): AnalyzeExecutor {
-  return async (tool: AgentTool) => {
+const OVERLOAD_CAP = 30; // ponytail: режем payload до топ-N перегрузок (по минутам), upgrade — пагинация если мало
+
+export function buildAnalyzeExecutor(deps: ApiRouteDeps, actorTenantId: string, actorUserId: string): AnalyzeExecutor {
+  return async (tool: AgentTool, input: Record<string, unknown>) => {
     if (tool.name === "list_my_tasks") {
       if (!deps.dataSource.listMyWorkTasks) return { tasks: [], note: "persistence_not_configured" };
       const tasks = await deps.dataSource.listMyWorkTasks(actorTenantId, actorUserId);
@@ -28,6 +32,46 @@ function buildAnalyzeExecutor(deps: ApiRouteDeps, actorTenantId: string, actorUs
         tasks: tasks.map((task) => ({ id: task.id, title: task.title, statusId: task.statusId, projectId: task.projectId, priority: task.priority }))
       };
     }
+
+    if (tool.name === "read_project_plan") {
+      const projectId = typeof input.projectId === "string" ? input.projectId : "";
+      if (!projectId) return { note: "projectId_required" };
+      if (!deps.dataSource.getPlanSnapshot) return { note: "persistence_not_configured" };
+      const snapshot = await deps.dataSource.getPlanSnapshot(actorTenantId, projectId);
+      if (!snapshot) return { note: "project_not_found", projectId };
+      const readModel = createPlanningReadModel(snapshot);
+      return {
+        projectId,
+        planVersion: readModel.planVersion,
+        tasks: readModel.authored.tasks.map((task) => ({ id: task.id, title: task.title })),
+        overloadCount: readModel.resourceLoad.overloads.length,
+        overloads: readModel.resourceLoad.overloads
+          .slice(0, OVERLOAD_CAP)
+          .map((overload) => ({ resourceId: overload.resourceId, date: overload.date, overloadMinutes: overload.overloadMinutes, taskIds: overload.taskIds }))
+      };
+    }
+
+    if (tool.name === "detect_resource_overloads") {
+      if (!deps.dataSource.getPlanSnapshot) return { note: "persistence_not_configured", overloads: [] };
+      const wanted = typeof input.projectId === "string" && input.projectId ? input.projectId : null;
+      const projectIds = wanted
+        ? [wanted]
+        : deps.dataSource.listProjects
+          ? (await deps.dataSource.listProjects(actorTenantId)).map((project) => project.id)
+          : [];
+      const overloads: Array<{ projectId: string; resourceId: string; date: string; overloadMinutes: number; taskIds: string[] }> = [];
+      for (const projectId of projectIds) {
+        const snapshot = await deps.dataSource.getPlanSnapshot(actorTenantId, projectId);
+        if (!snapshot) continue;
+        const readModel = createPlanningReadModel(snapshot);
+        for (const overload of readModel.resourceLoad.overloads) {
+          overloads.push({ projectId, resourceId: overload.resourceId, date: overload.date, overloadMinutes: overload.overloadMinutes, taskIds: overload.taskIds });
+        }
+      }
+      overloads.sort((left, right) => right.overloadMinutes - left.overloadMinutes);
+      return { overloadCount: overloads.length, overloads: overloads.slice(0, OVERLOAD_CAP) };
+    }
+
     throw new Error("analyze_tool_not_wired");
   };
 }
