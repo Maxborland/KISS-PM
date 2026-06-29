@@ -38,7 +38,7 @@ backend слайсы 1–4 готовы (PR #210, каждый e2e против 
 - Приёмка: каждая миграция идемпотентна; e2e GET/PUT/list. ✓
 
 ## P4 — Realtime-эпик (L, отдельный эпик)  ·  PR #210/новый
-- [ ] **P4.1** **SSE realtime**: `GET /api/workspace/realtime/events` (text/event-stream) для `message.created` + `notification.created` (зеркало `planningEventBus`/`planningEventsRoute`). Фронт: chat/notifications живут на push вместо poll. L
+- [x] **P4.1** **SSE realtime** — backend (#210): `workspaceEventBus` (in-memory pub/sub по каналам `user:{id}`/`conversation:{id}`; ponytail: Redis при >1 реплике) + `GET /api/workspace/realtime/events` (SSE, всегда `user:{actor}`, опц. `conversation:{id}` с валидацией доступа; heartbeat 15с) + эмит `message.created`/`notification.created` после коммита POST-сообщения. Фронт (#209): `useWorkspaceRealtime` (live-only EventSource; mock=no-op) → chat перечитывает ленту на `message.created`, comms-frame перечитывает unread на `notification.created`. ✅ tsc 0 (api+web) · openapi 6/6 · app 57/57 · comms-mock 64/64 · e2e :55433 (SSE 401/404/200 event-stream → POST 201 → `message.created` получен с телом) · Storybook chat рендерит без регрессий. ⚠️ live-push в браузере требует полного стека (Next+API) — backend-доставка доказана node-e2e.
 - [ ] **P4.2** **DM-канал**: миграция (тип conversation `direct` + membership) + `POST /conversations/direct`. Фронт: DM-список в chat. L ⬩dep: migration + P4.1.
 - [ ] **P4.3** **presence**: presence-эндпоинт/поле + online/away в chat. L ⬩dep: P4.1.
 - Приёмка: e2e — новое сообщение приходит подписчику без рефетча.

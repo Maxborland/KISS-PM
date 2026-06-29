@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { useUnreadSummary } from "@/communications/lib/use-comms";
+import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
 
 /**
  * CommsFrame — продуктовый каркас области «Коммуникации» (зеркало CrmFrame).
@@ -28,7 +29,11 @@ export function CommsFrame({
   children: ReactNode;
 }) {
   // Бейджи непрочитанного: notifications → таб «Уведомления», conversations → таб «Чат».
-  const summary = useUnreadSummary().data;
+  const unread = useUnreadSummary();
+  const summary = unread.data;
+  // P4.1 realtime: в live-режиме новое уведомление прилетает push'ем (SSE, канал
+  // пользователя) → перечитываем сводку непрочитанного. В mock (Storybook) — no-op.
+  useWorkspaceRealtime({ onNotification: () => { void unread.reload(); } });
   return (
     <WorkspaceShell activeNav="Коммуникации">
       {/* Заголовок области */}

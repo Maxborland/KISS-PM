@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
 import { useCommsUsers, useConversation, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
 import { avatarColor, commsErr, initials, relTime, UnreadDot } from "@/communications/lib/comms-bits";
 import type { Conversation, EntityType, Message, Reaction } from "@/communications/lib/comms-client";
 
@@ -48,6 +49,13 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
   const { data, status, error, reload, selectConversation } = conv;
   // Справочник людей тенанта (имена авторов): mock=COMMS_USERS, live=GET /api/workspace/users.
   const users = useCommsUsers();
+
+  // P4.1 realtime: в live-режиме новое сообщение в открытой беседе прилетает push'ем
+  // (SSE) → перечитываем ленту без поллинга. В mock (Storybook) хук — no-op.
+  useWorkspaceRealtime({
+    conversationId: data?.selectedConversationId ?? null,
+    onMessage: () => { void conv.reloadMessages(); }
+  });
 
   // Верхнеуровневый статус поверхности: forbidden (403) / error / loading / ready.
   // (ВЛОЖЕННЫЙ EmptyState «Нет бесед» — НЕ top-level: остаётся внутри ready-разметки.)
