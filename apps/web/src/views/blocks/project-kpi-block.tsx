@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { MOCK_PROJECT_CRM, mockProjectScreenTitle } from "@/views/catalog";
 import { PageIntro } from "@/views/layout/page-intro";
+import { demoAction } from "@/views/lib/demo";
 
 const KPI = [
   { label: "SPI", value: "0.94", delta: "+0.02 неделя", tone: "warm" as const },
@@ -25,7 +26,7 @@ export function ProjectKpiBlock() {
       <PageIntro
         title={mockProjectScreenTitle("KPI")}
         lead="Показатели и сигналы управления."
-        actions={<Button variant="secondary">Открыть управленческую поверхность</Button>}
+        actions={<Button variant="secondary" {...demoAction("управленческая поверхность")}>Открыть управленческую поверхность</Button>}
       />
       <div className="bento">
         {KPI.map((k, i) => (
@@ -56,7 +57,7 @@ export function ProjectKpiBlock() {
                     <div className="u-text-xs u-text-muted">{s.body}</div>
                   </div>
                   <Chip variant={s.tone === "danger" ? "warning" : s.tone === "warning" ? "warning" : "info"}>
-                    {s.tone === "danger" ? "Action" : "Review"}
+                    {s.tone === "danger" ? "К действию" : "На контроле"}
                   </Chip>
                 </li>
               ))}

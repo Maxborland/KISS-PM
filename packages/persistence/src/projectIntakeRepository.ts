@@ -4,6 +4,7 @@ import type { TenantId } from "@kiss-pm/domain";
 
 import type { KissPmDatabase } from "./connection";
 import {
+  crmPipelineStages,
   opportunities,
   opportunityDemands,
   projectPositionDemands,
@@ -37,6 +38,9 @@ export type OpportunityRecord = {
   ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
+  // Мультиворонки: воронка сделки. Управляется сервером (смена стадии/воронки),
+  // не задаётся напрямую в create-flow.
+  pipelineId: string | null;
   clientName: string;
   contactName: string;
   title: string;
@@ -67,6 +71,7 @@ export type OpportunityInput = Omit<
   | "feasibilityResult"
   | "feasibilityCheckedAt"
   | "ownerUserId"
+  | "pipelineId"
   | "customFieldValues"
 > & {
   ownerUserId?: string | null;
@@ -134,6 +139,15 @@ export type ProjectIntakeRepository = {
     tenantId: TenantId;
     opportunityId: string;
     stageId: string;
+    // Мультиворонки: воронка целевой стадии (проставляется одновременно со сменой стадии).
+    pipelineId?: string | null;
+  }): Promise<OpportunityRecord | undefined>;
+  // Мультиворонки: перенос сделки в другую воронку на её стадию.
+  updateOpportunityPipeline(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    stageId: string;
+    pipelineId: string;
   }): Promise<OpportunityRecord | undefined>;
   finalizeOpportunity(input: {
     tenantId: TenantId;
@@ -233,6 +247,16 @@ export function createProjectIntakeRepository(
     },
     async createOpportunity(input) {
       return db.transaction(async (transaction) => {
+        // Мультиворонки: воронку выводим из целевой стадии (все боевые/мигрированные
+        // стадии принадлежат воронке). Иначе сделка создаётся с pipeline_id = null,
+        // и карточка открывается с воронкой «—» без валидного списка стадий, пока
+        // не починит отдельная смена стадии. Зеркалит mock-crm-backend (create берёт
+        // pipelineId из стадии). null оставляем только если у сделки нет стадии.
+        const pipelineId = await resolveStagePipelineId(
+          transaction,
+          input.tenantId,
+          input.stageId
+        );
         const [row] = await transaction
           .insert(opportunities)
           .values({
@@ -243,6 +267,7 @@ export function createProjectIntakeRepository(
             ownerUserId: input.ownerUserId ?? null,
             projectTypeId: input.projectTypeId,
             stageId: input.stageId,
+            pipelineId,
             clientName: input.clientName,
             contactName: input.contactName,
             title: input.title,
@@ -307,6 +332,15 @@ export function createProjectIntakeRepository(
     async updateOpportunity(input) {
       return db.transaction(async (transaction) => {
         const now = new Date();
+        // Мультиворонки: full-update (полное сохранение карточки) может сменить stageId
+        // в другую воронку — выводим pipeline_id из целевой стадии, иначе строка остаётся
+        // с устаревшей/null воронкой при перенесённой стадии и выпадает из видов по воронке
+        // (Сделки фильтруют по pipelineId). null оставляем только если у сделки нет стадии.
+        const pipelineId = await resolveStagePipelineId(
+          transaction,
+          input.tenantId,
+          input.stageId
+        );
         const [row] = await transaction
           .update(opportunities)
           .set({
@@ -315,6 +349,7 @@ export function createProjectIntakeRepository(
             ownerUserId: input.ownerUserId ?? null,
             projectTypeId: input.projectTypeId,
             stageId: input.stageId,
+            pipelineId,
             clientName: input.clientName,
             contactName: input.contactName,
             title: input.title,
@@ -373,6 +408,36 @@ export function createProjectIntakeRepository(
         .update(opportunities)
         .set({
           stageId: input.stageId,
+          // Мультиворонки: при наличии pipelineId синхронизируем воронку сделки
+          // с воронкой целевой стадии. undefined → колонку не трогаем (back-compat).
+          ...(input.pipelineId !== undefined
+            ? { pipelineId: input.pipelineId }
+            : {}),
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(opportunities.tenantId, input.tenantId),
+            eq(opportunities.id, input.opportunityId),
+            notInArray(opportunities.status, finalOpportunityStatuses)
+          )
+        )
+        .returning();
+
+      if (!row) return undefined;
+      const demandByOpportunity = await listOpportunityDemand(input.tenantId, [
+        input.opportunityId
+      ]);
+
+      return mapOpportunityRecord(row, demandByOpportunity.get(row.id) ?? []);
+    },
+    async updateOpportunityPipeline(input) {
+      // Мультиворонки: транзакционный перенос сделки в другую воронку на её стадию.
+      const [row] = await db
+        .update(opportunities)
+        .set({
+          stageId: input.stageId,
+          pipelineId: input.pipelineId,
           updatedAt: new Date()
         })
         .where(
@@ -631,6 +696,29 @@ export function createProjectIntakeRepository(
   };
 }
 
+// Транзакционный исполнитель (db.transaction callback) — у него тот же query-builder,
+// что и у соединения, поэтому хелперы внутри транзакции принимают этот тип.
+type TransactionExecutor = Parameters<
+  Parameters<KissPmDatabase["transaction"]>[0]
+>[0];
+
+// Мультиворонки: воронка сделки выводится из её стадии. Возвращаем pipeline_id
+// целевой стадии (tenant-scoped) или null, если стадии нет / стадия не найдена /
+// у стадии нет воронки (legacy). Вызывать ВНУТРИ транзакции записи сделки.
+async function resolveStagePipelineId(
+  transaction: TransactionExecutor,
+  tenantId: TenantId,
+  stageId: string | null
+): Promise<string | null> {
+  if (!stageId) return null;
+  const [stage] = await transaction
+    .select({ pipelineId: crmPipelineStages.pipelineId })
+    .from(crmPipelineStages)
+    .where(and(eq(crmPipelineStages.tenantId, tenantId), eq(crmPipelineStages.id, stageId)))
+    .limit(1);
+  return stage?.pipelineId ?? null;
+}
+
 function isSingleSourceOpportunityProjectError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -650,6 +738,7 @@ function mapOpportunityRecord(
     ownerUserId: row.ownerUserId,
     projectTypeId: row.projectTypeId,
     stageId: row.stageId,
+    pipelineId: row.pipelineId,
     clientName: row.clientName,
     contactName: row.contactName,
     title: row.title,

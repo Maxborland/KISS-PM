@@ -24,6 +24,10 @@ export const permissions = [
   "tenant.project_types.manage",
   "tenant.deal_stages.read",
   "tenant.deal_stages.manage",
+  "tenant.crm_pipelines.read",
+  "tenant.crm_pipelines.manage",
+  "tenant.crm_pipeline_rules.manage",
+  "tenant.crm_pipeline_automations.manage",
   "tenant.opportunities.read",
   "tenant.opportunities.manage",
   "tenant.projects.read",
@@ -384,6 +388,51 @@ export function canManageDealStages(input: {
   return evaluateTenantPermission({
     ...input,
     permission: "tenant.deal_stages.manage"
+  });
+}
+
+
+export function canReadCrmPipelines(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.crm_pipelines.read"
+  });
+}
+
+export function canManageCrmPipelines(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.crm_pipelines.manage"
+  });
+}
+
+export function canManageCrmPipelineRules(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.crm_pipeline_rules.manage"
+  });
+}
+
+export function canManageCrmPipelineAutomations(input: {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+}): PolicyDecision {
+  return evaluateTenantPermission({
+    ...input,
+    permission: "tenant.crm_pipeline_automations.manage"
   });
 }
 

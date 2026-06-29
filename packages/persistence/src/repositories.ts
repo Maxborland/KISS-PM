@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
@@ -13,6 +13,7 @@ import type { KissPmDatabase } from "./connection";
 import {
   accessProfiles,
   auditEvents,
+  passwordResetTokens,
   positions,
   tenants,
   tenantUsers,
@@ -39,6 +40,10 @@ import {
   type ClientRecord,
   type ContactInput,
   type ContactRecord,
+  type CrmPipelineInput,
+  type CrmPipelineStageAutomationDefinitionInput,
+  type CrmPipelineStageInput,
+  type CrmPipelineTransitionRuleInput,
   type CrmRepository,
   type DealStageInput,
   type DealStageRecord,
@@ -102,7 +107,7 @@ export type ProjectTemplateRecord = {
   updatedAt: Date;
 };
 export type ProjectTemplateInput = Omit<ProjectTemplateRecord, "createdAt" | "updatedAt">;
-export type { ClientInput, ClientRecord, ContactInput, ContactRecord, DealStageInput, DealStageRecord, ProductInput, ProductRecord, ProjectTypeInput, ProjectTypeRecord };
+export type { ClientInput, ClientRecord, ContactInput, ContactRecord, CrmPipelineInput, CrmPipelineStageAutomationDefinitionInput, CrmPipelineStageInput, CrmPipelineTransitionRuleInput, DealStageInput, DealStageRecord, ProductInput, ProductRecord, ProjectTypeInput, ProjectTypeRecord };
 export type UserCredentialRecord = {
   userId: UserId;
   tenantId: TenantId;
@@ -116,6 +121,16 @@ export type UserSessionRecord = {
   userId: UserId;
   tokenHash: string;
   expiresAt: Date;
+};
+export type PasswordResetTokenRecord = {
+  id: string;
+  tenantId: TenantId;
+  userId: UserId;
+  tokenHash: string;
+  expiresAt: Date;
+  consumedAt: Date | null;
+  requestedIp: string | null;
+  createdAt: Date;
 };
 export type PostgresTenantDataSource = CrmRepository &
   ProjectIntakeRepository &
@@ -169,10 +184,32 @@ export type PostgresTenantDataSource = CrmRepository &
   findCredentialByEmail(email: string): Promise<UserCredentialRecord | undefined>;
   upsertCredential(input: UserCredentialRecord): Promise<void>;
   updateCredentialEmail(tenantId: TenantId, userId: UserId, email: string): Promise<void>;
+  updateCredentialPassword(
+    tenantId: TenantId,
+    userId: UserId,
+    input: { passwordHash: string; passwordSalt: string }
+  ): Promise<void>;
+  createTenant(input: { id: string; name: string }): Promise<void>;
   createSession(input: UserSessionRecord): Promise<void>;
   findSessionByTokenHash(tokenHash: string): Promise<UserSessionRecord | undefined>;
   deleteSessionByTokenHash(tokenHash: string): Promise<void>;
   deleteSessionsByUserId(tenantId: TenantId, userId: UserId): Promise<void>;
+  createPasswordResetToken(input: PasswordResetTokenRecord): Promise<void>;
+  findPasswordResetTokenByHash(
+    tokenHash: string
+  ): Promise<PasswordResetTokenRecord | undefined>;
+  // Возвращает число затронутых строк: 1 — токен погашен этим вызовом, 0 —
+  // он уже был погашен (гонка двойного использования). Условие IS NULL делает
+  // погашение атомарным, а вызывающий код проверяет результат внутри транзакции.
+  markPasswordResetTokenConsumed(
+    tenantId: TenantId,
+    id: string,
+    consumedAt: Date
+  ): Promise<number>;
+  deletePasswordResetTokensByUserId(
+    tenantId: TenantId,
+    userId: UserId
+  ): Promise<void>;
   withTransaction<T>(
     operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
   ): Promise<T>;
@@ -186,6 +223,29 @@ export type PostgresTenantDataSource = CrmRepository &
     }
   ): Promise<AuditEventListItem[]>;
 };
+
+// Маппер строки токена сброса пароля в доменную запись (Date↔timestamptz, nullable-поля).
+function mapPasswordResetTokenRecord(row: {
+  id: string;
+  tenantId: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  consumedAt: Date | null;
+  requestedIp: string | null;
+  createdAt: Date;
+}): PasswordResetTokenRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    userId: row.userId,
+    tokenHash: row.tokenHash,
+    expiresAt: row.expiresAt,
+    consumedAt: row.consumedAt,
+    requestedIp: row.requestedIp,
+    createdAt: row.createdAt
+  };
+}
 
 export function createPostgresTenantDataSource(
   db: KissPmDatabase
@@ -503,6 +563,27 @@ export function createPostgresTenantDataSource(
           )
         );
     },
+    async updateCredentialPassword(tenantId, userId, input) {
+      await db
+        .update(userCredentials)
+        .set({
+          passwordHash: input.passwordHash,
+          passwordSalt: input.passwordSalt
+        })
+        .where(
+          and(
+            eq(userCredentials.tenantId, tenantId),
+            eq(userCredentials.userId, userId)
+          )
+        );
+    },
+    async createTenant(input) {
+      await db.insert(tenants).values({
+        id: input.id,
+        name: input.name,
+        createdAt: new Date()
+      });
+    },
     async createSession(input) {
       await db.insert(userSessions).values({
         ...input,
@@ -533,6 +614,55 @@ export function createPostgresTenantDataSource(
       await db
         .delete(userSessions)
         .where(and(eq(userSessions.tenantId, tenantId), eq(userSessions.userId, userId)));
+    },
+    async createPasswordResetToken(input) {
+      await db.insert(passwordResetTokens).values({
+        id: input.id,
+        tenantId: input.tenantId,
+        userId: input.userId,
+        tokenHash: input.tokenHash,
+        expiresAt: input.expiresAt,
+        consumedAt: input.consumedAt,
+        requestedIp: input.requestedIp,
+        createdAt: input.createdAt
+      });
+    },
+    async findPasswordResetTokenByHash(tokenHash) {
+      const [row] = await db
+        .select()
+        .from(passwordResetTokens)
+        .where(eq(passwordResetTokens.tokenHash, tokenHash))
+        .limit(1);
+
+      return row ? mapPasswordResetTokenRecord(row) : undefined;
+    },
+    async markPasswordResetTokenConsumed(tenantId, id, consumedAt) {
+      // Атомарное одноразовое погашение: WHERE ... AND consumed_at IS NULL.
+      // .returning() даёт реально обновлённые строки — длина 0 означает, что
+      // токен уже был погашен (параллельный confirm), и вызывающий код прервёт
+      // транзакцию с reset_token_used.
+      const rows = await db
+        .update(passwordResetTokens)
+        .set({ consumedAt })
+        .where(
+          and(
+            eq(passwordResetTokens.tenantId, tenantId),
+            eq(passwordResetTokens.id, id),
+            isNull(passwordResetTokens.consumedAt)
+          )
+        )
+        .returning({ id: passwordResetTokens.id });
+      return rows.length;
+    },
+    async deletePasswordResetTokensByUserId(tenantId, userId) {
+      await db
+        .delete(passwordResetTokens)
+        .where(
+          and(
+            eq(passwordResetTokens.tenantId, tenantId),
+            eq(passwordResetTokens.userId, userId)
+          )
+        );
     },
     async withTransaction(operation) {
       return db.transaction((transaction) =>

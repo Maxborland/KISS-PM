@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/cn";
+import { demoAction } from "@/views/lib/demo";
 import type { GanttData, GanttDayHeader, GanttRow } from "./types";
 
 const DAY_W = 28;
@@ -50,7 +51,12 @@ function NameCell({ row }: { row: GanttRow }) {
     <div className="gantt2__cell gantt2__cell--name">
       {indent > 0 ? <span className={cn("wbs-indent", `wbs-indent--${indent}`)} aria-hidden /> : null}
       {row.collapsible ? (
-        <button type="button" className="wbs-toggle" aria-label={row.collapsed ? "Развернуть" : "Свернуть"}>
+        <button
+          type="button"
+          className="wbs-toggle"
+          aria-label={row.collapsed ? "Развернуть" : "Свернуть"}
+          {...demoAction("сворачивание ветки")}
+        >
           <ChevronRight className={cn("size-3", !row.collapsed && "rotate-90")} aria-hidden />
         </button>
       ) : null}

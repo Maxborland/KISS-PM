@@ -18,7 +18,7 @@ import { parsePlanningCommand, parseScenarioApplyEnvelope } from "../planningPar
 import { previewPlanningCommands } from "./planningCommandCore";
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { createPlanningReadModel } from "./planningReadModel";
-import { canReadPlanningReadModel, permissionForCommand } from "./planningRouteAuth";
+import { canReadPlanningReadModel, includeResourceExceptionsFor, permissionForCommand } from "./planningRouteAuth";
 import {
   appendPlanningAuditIfConfigured,
   errorResponseBody,
@@ -546,7 +546,7 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
             applied: preview.planDelta,
             newPlanVersion,
             auditEventId,
-            readModel: createPlanningReadModel(appliedSnapshot)
+            readModel: createPlanningReadModel(appliedSnapshot, { includeResourceExceptions: includeResourceExceptionsFor({ actor, profile }) })
           }
         };
       });

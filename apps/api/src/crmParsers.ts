@@ -1,6 +1,19 @@
+import {
+  isCrmPipelineAutomationTrigger,
+  isCrmPipelineLifecycleState,
+  isCrmPipelineStatus
+} from "@kiss-pm/domain";
+import type {
+  PipelineInput,
+  StageTransitionInput
+} from "@kiss-pm/persistence";
 import type {
   ClientInput,
   ContactInput,
+  CrmPipelineInput,
+  CrmPipelineStageAutomationDefinitionInput,
+  CrmPipelineStageInput,
+  CrmPipelineTransitionRuleInput,
   DealStageInput,
   ProductInput,
   ProjectTypeInput
@@ -28,7 +41,10 @@ const maxLengths = {
   sku: 80,
   unit: 40,
   telegram: 80,
-  role: 120
+  role: 120,
+  actionType: 120,
+  permission: 160,
+  fieldKey: 120
 } as const;
 
 export function parseClientBody(
@@ -184,6 +200,189 @@ export function parseProjectTypeBody(
   return { ok: true, value: { id, tenantId, name, description, status } };
 }
 
+
+export function parseCrmPipelineBody(
+  body: unknown,
+  tenantId: string,
+  existing?: Pick<CrmPipelineInput, "id" | "lifecycleGraphMetadata">
+): ParseResult<CrmPipelineInput> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const id = existing?.id ?? getOptionalString(input, "id") ?? `crm-pipeline-${crypto.randomUUID()}`;
+  const name = getOptionalString(input, "name");
+  const status = parseCrmPipelineStatusValue(getOptionalString(input, "status") ?? "active");
+  // Операционные поля мультиворонок (унификация): description/isDefault/sortOrder.
+  const description = getOptionalString(input, "description") ?? null;
+  const isDefault = input.isDefault === undefined ? false : parseOptionalBoolean(input.isDefault);
+  const sortOrder = input.sortOrder === undefined ? 1 : parsePositiveInteger(input.sortOrder);
+
+  if (!isId(id)) return { ok: false, error: "invalid_crm_pipeline_id" };
+  if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
+    return { ok: false, error: "invalid_crm_pipeline_name" };
+  }
+  if (description !== null && !isSafeMultilineText(description, maxLengths.description)) {
+    return { ok: false, error: "invalid_description" };
+  }
+  if (isDefault === null) return { ok: false, error: "invalid_body" };
+  if (sortOrder === null) return { ok: false, error: "invalid_crm_pipeline_sort_order" };
+  if (!status) return { ok: false, error: "invalid_status" };
+
+  return {
+    ok: true,
+    value: {
+      id,
+      tenantId,
+      name,
+      description,
+      isDefault,
+      sortOrder,
+      status,
+      lifecycleGraphMetadata: existing?.lifecycleGraphMetadata ?? {
+        pipelineId: id,
+        initialStageId: null,
+        finalStageIds: [],
+        stages: [],
+        transitions: []
+      }
+    }
+  };
+}
+
+export function parseCrmPipelineStageBody(
+  body: unknown,
+  tenantId: string,
+  pipelineId: string,
+  existingId?: string
+): ParseResult<CrmPipelineStageInput> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const id = existingId ?? getOptionalString(input, "id") ?? `crm-pipeline-stage-${crypto.randomUUID()}`;
+  const name = getOptionalString(input, "name");
+  const sortOrder = parsePositiveInteger(input.sortOrder);
+  const status = parseCrmPipelineStatusValue(getOptionalString(input, "status") ?? "active");
+  const lifecycleState = parseCrmPipelineLifecycleStateValue(
+    getOptionalString(input, "lifecycleState") ?? "open"
+  );
+  const isFinal = parseBoolean(input.isFinal, false);
+
+  if (!isId(id)) return { ok: false, error: "invalid_crm_pipeline_stage_id" };
+  if (!isId(pipelineId)) return { ok: false, error: "invalid_crm_pipeline_id" };
+  if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
+    return { ok: false, error: "invalid_crm_pipeline_stage_name" };
+  }
+  if (sortOrder === null) return { ok: false, error: "invalid_sort_order" };
+  if (!status) return { ok: false, error: "invalid_status" };
+  if (!lifecycleState) return { ok: false, error: "invalid_lifecycle_state" };
+  if (isFinal === null) return { ok: false, error: "invalid_is_final" };
+  if (isFinal && lifecycleState === "open") return { ok: false, error: "invalid_final_lifecycle_state" };
+  if (!isFinal && lifecycleState !== "open") {
+    return { ok: false, error: "invalid_open_lifecycle_state" };
+  }
+
+  return {
+    ok: true,
+    value: { id, tenantId, pipelineId, name, sortOrder, status, lifecycleState, isFinal }
+  };
+}
+
+export function parseCrmPipelineTransitionRuleBody(
+  body: unknown,
+  tenantId: string,
+  pipelineId: string,
+  existingId?: string
+): ParseResult<CrmPipelineTransitionRuleInput> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const id = existingId ?? getOptionalString(input, "id") ?? `crm-pipeline-rule-${crypto.randomUUID()}`;
+  const fromStageId = getOptionalString(input, "fromStageId");
+  const toStageId = getOptionalString(input, "toStageId");
+  const requiredPermission = getOptionalString(input, "requiredPermission") ?? null;
+  const requiredFields = parseStringArray(input.requiredFields ?? []);
+  const requireReason = parseBoolean(input.requireReason, false);
+  const status = parseCrmPipelineStatusValue(getOptionalString(input, "status") ?? "active");
+  // Runtime-гварды перехода (унификация мультиворонок).
+  const requireFeasibilityOk = parseBoolean(input.requireFeasibilityOk, false);
+  const guardNote = getOptionalString(input, "guardNote") ?? null;
+  let minProbability: number | null = null;
+  if (input.minProbability !== undefined && input.minProbability !== null) {
+    const parsedProbability = parseProbability(input.minProbability);
+    if (parsedProbability === null) return { ok: false, error: "invalid_min_probability" };
+    minProbability = parsedProbability;
+  }
+
+  if (!isId(id)) return { ok: false, error: "invalid_crm_pipeline_transition_rule_id" };
+  if (!isId(pipelineId)) return { ok: false, error: "invalid_crm_pipeline_id" };
+  if (!fromStageId || !isId(fromStageId)) return { ok: false, error: "invalid_from_stage_id" };
+  if (!toStageId || !isId(toStageId)) return { ok: false, error: "invalid_to_stage_id" };
+  if (fromStageId === toStageId) return { ok: false, error: "invalid_transition_self_loop" };
+  if (
+    requiredPermission !== null &&
+    !isSafeSingleLineText(requiredPermission, maxLengths.permission)
+  ) {
+    return { ok: false, error: "invalid_required_permission" };
+  }
+  if (!requiredFields || !requiredFields.every(isFieldKey)) {
+    return { ok: false, error: "invalid_required_fields" };
+  }
+  if (requireReason === null) return { ok: false, error: "invalid_require_reason" };
+  if (requireFeasibilityOk === null) return { ok: false, error: "invalid_body" };
+  if (guardNote !== null && !isSafeSingleLineText(guardNote, maxLengths.name)) {
+    return { ok: false, error: "invalid_guard_note" };
+  }
+  if (!status) return { ok: false, error: "invalid_status" };
+
+  return {
+    ok: true,
+    value: {
+      id,
+      tenantId,
+      pipelineId,
+      fromStageId,
+      toStageId,
+      requiredPermission,
+      requiredFields,
+      requireReason,
+      requireFeasibilityOk,
+      minProbability,
+      guardNote,
+      status
+    }
+  };
+}
+
+export function parseCrmPipelineStageAutomationDefinitionBody(
+  body: unknown,
+  tenantId: string,
+  pipelineId: string,
+  existingId?: string
+): ParseResult<CrmPipelineStageAutomationDefinitionInput> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const id = existingId ?? getOptionalString(input, "id") ?? `crm-pipeline-automation-${crypto.randomUUID()}`;
+  const stageId = getOptionalString(input, "stageId");
+  const trigger = parseCrmPipelineAutomationTriggerValue(
+    getOptionalString(input, "trigger") ?? "stage_entered"
+  );
+  const actionType = getOptionalString(input, "actionType");
+  const actionConfig = parseJsonObject(input.actionConfig ?? {});
+  const status = parseCrmPipelineStatusValue(getOptionalString(input, "status") ?? "active");
+
+  if (!isId(id)) return { ok: false, error: "invalid_crm_pipeline_automation_id" };
+  if (!isId(pipelineId)) return { ok: false, error: "invalid_crm_pipeline_id" };
+  if (!stageId || !isId(stageId)) return { ok: false, error: "invalid_crm_pipeline_stage_id" };
+  if (!trigger) return { ok: false, error: "invalid_automation_trigger" };
+  if (!actionType || !isSafeSingleLineText(actionType, maxLengths.actionType)) {
+    return { ok: false, error: "invalid_action_type" };
+  }
+  if (!actionConfig) return { ok: false, error: "invalid_action_config" };
+  if (!status) return { ok: false, error: "invalid_status" };
+
+  return {
+    ok: true,
+    value: { id, tenantId, pipelineId, stageId, trigger, actionType, actionConfig, status }
+  };
+}
+
 export function parseDealStageBody(
   body: unknown,
   tenantId: string
@@ -194,6 +393,9 @@ export function parseDealStageBody(
   const name = getOptionalString(input, "name");
   const sortOrder = parsePositiveInteger(input.sortOrder);
   const status = parseStatus(getOptionalString(input, "status") ?? "active");
+  // Мультиворонки: воронка стадии. Пробрасывается из тела/before-state роутом;
+  // отсутствие → null (back-compat для legacy-стадий без воронки).
+  const pipelineId = getOptionalString(input, "pipelineId");
 
   if (!isId(id)) return { ok: false, error: "invalid_deal_stage_id" };
   if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
@@ -201,8 +403,11 @@ export function parseDealStageBody(
   }
   if (sortOrder === null) return { ok: false, error: "invalid_sort_order" };
   if (!status) return { ok: false, error: "invalid_status" };
+  if (pipelineId !== null && !isId(pipelineId)) {
+    return { ok: false, error: "invalid_pipeline_id" };
+  }
 
-  return { ok: true, value: { id, tenantId, name, sortOrder, status } };
+  return { ok: true, value: { id, tenantId, pipelineId, name, sortOrder, status } };
 }
 
 export function parseDealStageChangeBody(body: unknown): ParseResult<{ stageId: string }> {
@@ -213,8 +418,147 @@ export function parseDealStageChangeBody(body: unknown): ParseResult<{ stageId: 
   return { ok: true, value: { stageId } };
 }
 
+// Мультиворонки: тело переноса сделки между воронками { pipelineId, stageId }.
+export function parseOpportunityPipelineChangeBody(
+  body: unknown
+): ParseResult<{ pipelineId: string; stageId: string }> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const pipelineId = getOptionalString(body, "pipelineId");
+  if (!pipelineId || !isId(pipelineId)) {
+    return { ok: false, error: "invalid_pipeline_id" };
+  }
+  const stageId = getOptionalString(body, "stageId");
+  if (!stageId || !isId(stageId)) return { ok: false, error: "invalid_deal_stage_id" };
+
+  return { ok: true, value: { pipelineId, stageId } };
+}
+
+// Мультиворонки: тело воронки (create/full-replace). status/isDefault опциональны.
+export function parsePipelineBody(
+  body: unknown,
+  tenantId: string
+): ParseResult<PipelineInput> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const id = getOptionalString(input, "id") ?? `pipeline-${crypto.randomUUID()}`;
+  const name = getOptionalString(input, "name");
+  const description = getOptionalString(input, "description") ?? null;
+  const sortOrder = parsePositiveInteger(input.sortOrder);
+  const isDefault = parseOptionalBoolean(input.isDefault);
+  const status = parseStatus(getOptionalString(input, "status") ?? "active");
+
+  if (!isId(id)) return { ok: false, error: "invalid_pipeline_id" };
+  if (!name || !isSafeSingleLineText(name, maxLengths.name)) {
+    return { ok: false, error: "invalid_pipeline_name" };
+  }
+  if (description !== null && !isSafeMultilineText(description, maxLengths.description)) {
+    return { ok: false, error: "invalid_description" };
+  }
+  if (sortOrder === null) return { ok: false, error: "invalid_pipeline_sort_order" };
+  if (isDefault === null) return { ok: false, error: "invalid_body" };
+  if (!status) return { ok: false, error: "invalid_status" };
+
+  return {
+    ok: true,
+    value: { id, tenantId, name, description, isDefault, sortOrder, status }
+  };
+}
+
+// Мультиворонки: тело правила перехода между стадиями. pipelineId передаётся отдельно
+// (из роут-параметра), здесь валидируются from/to/условия.
+export function parseStageTransitionBody(
+  body: unknown,
+  tenantId: string,
+  pipelineId: string
+): ParseResult<StageTransitionInput> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const input = body as Record<string, unknown>;
+  const id = getOptionalString(input, "id") ?? `stage-transition-${crypto.randomUUID()}`;
+  const fromStageId = getOptionalString(input, "fromStageId");
+  const toStageId = getOptionalString(input, "toStageId");
+  const requireFeasibilityOk = parseOptionalBoolean(input.requireFeasibilityOk);
+  const guardNote = getOptionalString(input, "guardNote") ?? null;
+
+  if (!isId(id)) return { ok: false, error: "invalid_transition_id" };
+  if (!fromStageId || !isId(fromStageId)) {
+    return { ok: false, error: "invalid_deal_stage_id" };
+  }
+  if (!toStageId || !isId(toStageId)) {
+    return { ok: false, error: "invalid_deal_stage_id" };
+  }
+  if (fromStageId === toStageId) {
+    return { ok: false, error: "invalid_transition_stages" };
+  }
+  if (requireFeasibilityOk === null) return { ok: false, error: "invalid_body" };
+
+  // minProbability: опционально; если задано — целое 0..100.
+  let minProbability: number | null = null;
+  if (input.minProbability !== undefined && input.minProbability !== null) {
+    const parsed = parseProbability(input.minProbability);
+    if (parsed === null) return { ok: false, error: "invalid_min_probability" };
+    minProbability = parsed;
+  }
+
+  if (guardNote !== null && !isSafeMultilineText(guardNote, maxLengths.description)) {
+    return { ok: false, error: "invalid_description" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      id,
+      tenantId,
+      pipelineId,
+      fromStageId,
+      toStageId,
+      requireFeasibilityOk,
+      minProbability,
+      guardNote
+    }
+  };
+}
+
 export function isId(value: string): boolean {
   return idPattern.test(value);
+}
+
+
+function parseCrmPipelineStatusValue(value: string) {
+  return isCrmPipelineStatus(value) ? value : null;
+}
+
+function parseCrmPipelineLifecycleStateValue(value: string) {
+  return isCrmPipelineLifecycleState(value) ? value : null;
+}
+
+function parseCrmPipelineAutomationTriggerValue(value: string) {
+  return isCrmPipelineAutomationTrigger(value) ? value : null;
+}
+
+function parseBoolean(value: unknown, defaultValue: boolean): boolean | null {
+  if (value === undefined) return defaultValue;
+  return typeof value === "boolean" ? value : null;
+}
+
+function parseStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const parsed: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") return null;
+    const trimmed = item.trim();
+    if (!trimmed) return null;
+    parsed.push(trimmed);
+  }
+  return parsed;
+}
+
+function parseJsonObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function isFieldKey(value: string): boolean {
+  return isSafeSingleLineText(value, maxLengths.fieldKey) && /^[a-zA-Z][a-zA-Z0-9_.-]*$/.test(value);
 }
 
 function parseStatus(value: string): "active" | "archived" | null {
@@ -234,6 +578,21 @@ function parsePositiveInteger(value: unknown): number | null {
   ) {
     return null;
   }
+  return value;
+}
+
+// Мультиворонки: целое 0..100 для порога вероятности перехода.
+function parseProbability(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 100) {
+    return null;
+  }
+  return value;
+}
+
+// undefined → дефолт false; boolean → как есть; иное (строка/число) → null (ошибка тела).
+function parseOptionalBoolean(value: unknown): boolean | null {
+  if (value === undefined) return false;
+  if (typeof value !== "boolean") return null;
   return value;
 }
 

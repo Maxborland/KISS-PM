@@ -1,6 +1,9 @@
+import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import {
+  crmPipelineStages,
+  crmPipelines,
   getPersistenceTableColumns,
   persistenceTableNames,
   tenantOwnedTableNames
@@ -18,7 +21,10 @@ describe("PostgreSQL persistence schema", () => {
       "contacts",
       "products",
       "project_types",
-      "deal_stages",
+      "crm_pipelines",
+      "crm_pipeline_stages",
+      "crm_pipeline_transition_rules",
+      "crm_pipeline_stage_automation_definitions",
       "opportunities",
       "opportunity_demands",
       "projects",
@@ -95,6 +101,7 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_users",
       "user_credentials",
       "user_sessions",
+      "password_reset_tokens",
       "audit_events"
     ]);
   });
@@ -109,7 +116,10 @@ describe("PostgreSQL persistence schema", () => {
       "contacts",
       "products",
       "project_types",
-      "deal_stages",
+      "crm_pipelines",
+      "crm_pipeline_stages",
+      "crm_pipeline_transition_rules",
+      "crm_pipeline_stage_automation_definitions",
       "opportunities",
       "opportunity_demands",
       "projects",
@@ -186,12 +196,92 @@ describe("PostgreSQL persistence schema", () => {
       "tenant_users",
       "user_credentials",
       "user_sessions",
+      "password_reset_tokens",
       "audit_events"
     ]);
 
     for (const tableName of tenantOwnedTableNames) {
       expect(getPersistenceTableColumns(tableName)).toContain("tenant_id");
     }
+  });
+
+  it("stores the Phase I password reset token contract", () => {
+    expect(getPersistenceTableColumns("password_reset_tokens")).toEqual(
+      expect.arrayContaining([
+        "token_hash",
+        "expires_at",
+        "consumed_at",
+        "user_id"
+      ])
+    );
+  });
+
+  it("stores unified first-class CRM pipeline contract (multi-funnel)", () => {
+    expect(getPersistenceTableColumns("crm_pipelines")).toEqual([
+      "id",
+      "tenant_id",
+      "name",
+      "description",
+      "is_default",
+      "sort_order",
+      "status",
+      "lifecycle_graph_metadata",
+      "created_at",
+      "updated_at"
+    ]);
+    expect(getPersistenceTableColumns("crm_pipeline_stages")).toEqual([
+      "id",
+      "tenant_id",
+      "pipeline_id",
+      "name",
+      "sort_order",
+      "status",
+      "lifecycle_state",
+      "is_final",
+      "created_at",
+      "updated_at"
+    ]);
+    expect(getPersistenceTableColumns("crm_pipeline_transition_rules")).toEqual([
+      "id",
+      "tenant_id",
+      "pipeline_id",
+      "from_stage_id",
+      "to_stage_id",
+      "required_permission",
+      "required_fields",
+      "require_reason",
+      "require_feasibility_ok",
+      "min_probability",
+      "guard_note",
+      "status",
+      "created_at",
+      "updated_at"
+    ]);
+    expect(getPersistenceTableColumns("crm_pipeline_stage_automation_definitions")).toEqual([
+      "id",
+      "tenant_id",
+      "pipeline_id",
+      "stage_id",
+      "trigger",
+      "action_type",
+      "action_config",
+      "status",
+      "created_at",
+      "updated_at"
+    ]);
+  });
+
+  it("requires explicit structured lifecycle graph metadata for CRM pipelines", () => {
+    expect(crmPipelines.lifecycleGraphMetadata.notNull).toBe(true);
+    expect(crmPipelines.lifecycleGraphMetadata.hasDefault).toBe(false);
+  });
+
+  it("keeps CRM pipeline stage finality consistent with lifecycle state", () => {
+    const stageChecks = getTableConfig(crmPipelineStages).checks.map(
+      (constraint) => constraint.name
+    );
+
+    expect(stageChecks).toContain("crm_pipeline_stages_final_lifecycle_state_chk");
   });
 
   it("stores Phase 12 personal calendars and occupancy events", () => {
@@ -344,11 +434,33 @@ describe("PostgreSQL persistence schema", () => {
     expect(getPersistenceTableColumns("contacts")).toEqual(
       expect.arrayContaining(["client_id", "email", "phone", "telegram", "role"])
     );
-    expect(getPersistenceTableColumns("deal_stages")).toEqual(
+    expect(getPersistenceTableColumns("crm_pipeline_stages")).toEqual(
       expect.arrayContaining(["sort_order"])
     );
     expect(getPersistenceTableColumns("products")).toEqual(
       expect.arrayContaining(["sku", "type", "unit", "price", "status"])
+    );
+  });
+
+  it("models multi-funnel pipelines, stage transitions and links stages/opportunities to a pipeline", () => {
+    expect(getPersistenceTableColumns("crm_pipelines")).toEqual(
+      expect.arrayContaining(["name", "description", "is_default", "sort_order", "status"])
+    );
+    expect(getPersistenceTableColumns("crm_pipeline_transition_rules")).toEqual(
+      expect.arrayContaining([
+        "pipeline_id",
+        "from_stage_id",
+        "to_stage_id",
+        "require_feasibility_ok",
+        "min_probability",
+        "guard_note"
+      ])
+    );
+    expect(getPersistenceTableColumns("crm_pipeline_stages")).toEqual(
+      expect.arrayContaining(["pipeline_id"])
+    );
+    expect(getPersistenceTableColumns("opportunities")).toEqual(
+      expect.arrayContaining(["pipeline_id"])
     );
   });
 

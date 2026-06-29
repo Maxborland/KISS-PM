@@ -6,11 +6,19 @@
 @import "react-day-picker/dist/style.css" layer(components);
 @import "../styles/bem.css" layer(components);
 @import "../styles/bem-supplement.css" layer(components);
+@import "../styles/kiss-v4.css" layer(components);
 @import "../styles/widgets/resource-matrix.css" layer(components);
 @import "../styles/widgets/gantt.css" layer(components);
 @import "../styles/widgets/call.css" layer(components);
 @import "../styles/widgets/chat.css" layer(components);
 @import "../styles/widgets/comms.css" layer(components);
+
+/* Активируем enter/exit-утилиты (animate-in/out, fade/zoom/slide) для Radix-оверлеев.
+   Размечены в components/ui/* (dialog/popover/dropdown/select/tooltip), но без подключения
+   плагина к Tailwind v4 не генерировали CSS. ВАЖНО: @plugin ПОСЛЕ всех @import — иначе
+   @import-ы оказываются после не-@import-правила и игнорируются (ломается загрузка
+   tokens/bem/kiss-v4 → весь preview без стилей). */
+@plugin "tailwindcss-animate";
 
 @theme inline {
   --color-background: var(--canvas);
@@ -68,5 +76,71 @@
   .mono, code, kbd, samp, pre {
     font-family: var(--font-mono);
     font-feature-settings: "tnum", "zero";
+  }
+}
+
+/* ============================================================
+   Motion-примитивы появления контента (design-v3).
+   Держим в globals.css (рядом с @theme), со своими keyframes — единое место
+   для motion, грузится и в Next, и в Storybook. Применяются к ready-контенту
+   (SurfaceState), инлайн-нотисам/алертам, свопам вкладок. reduced-motion-гард
+   ниже. Оверлеи (dialog/popover/dropdown/select/tooltip) анимируются отдельно —
+   через tailwindcss-animate (@plugin выше), их разметка уже в components/ui/*.
+   ============================================================ */
+@keyframes ds-anim-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ds-anim-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.anim-fade-in {
+  animation: ds-anim-fade 260ms var(--ease-out, cubic-bezier(0, 0, .2, 1)) both;
+}
+.anim-rise-in {
+  animation: ds-anim-rise 280ms var(--ease-out, cubic-bezier(0, 0, .2, 1)) both;
+}
+.anim-rise-in-fast {
+  animation: ds-anim-rise 200ms var(--ease-out, cubic-bezier(0, 0, .2, 1)) both;
+}
+
+/* Лёгкий каскад для списков/сеток: дочерние элементы появляются со сдвигом.
+   Применяется к контейнеру: <ul class="anim-stagger"> или <div class="anim-stagger">. */
+.anim-stagger > * {
+  animation: ds-anim-rise 320ms var(--ease-out, cubic-bezier(0, 0, .2, 1)) both;
+}
+.anim-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.anim-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.anim-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.anim-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.anim-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.anim-stagger > *:nth-child(6) { animation-delay: 200ms; }
+.anim-stagger > *:nth-child(n + 7) { animation-delay: 240ms; }
+
+/* Hover-lift: карточка слегка приподнимается при наведении (subtle, 2px). */
+.hover-lift {
+  transition: transform var(--duration-fast, 120ms) var(--ease-out, cubic-bezier(0, 0, .2, 1)),
+              box-shadow var(--duration-fast, 120ms) var(--ease-out, cubic-bezier(0, 0, .2, 1));
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.16);
+}
+
+/* reduced-motion-гард. В Storybook-витрине ВСЕГДА показываем motion (data-force-motion
+   ставится в .storybook/preview.tsx), даже если в ОС включён «reduce motion» — это
+   витрина дизайна. В реальном Next-приложении атрибута нет → a11y соблюдается. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-force-motion]) .anim-fade-in,
+  :root:not([data-force-motion]) .anim-rise-in,
+  :root:not([data-force-motion]) .anim-rise-in-fast,
+  :root:not([data-force-motion]) .anim-stagger > * {
+    animation: none !important;
+  }
+  :root:not([data-force-motion]) .hover-lift,
+  :root:not([data-force-motion]) .hover-lift:hover {
+    transition: none !important;
+    transform: none !important;
   }
 }

@@ -1,6 +1,10 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type {
   PlanningCommand,
+  CrmPipeline,
+  CrmPipelineStage,
+  CrmPipelineStageAutomationDefinition,
+  CrmPipelineTransitionRule,
   BackgroundJobEvent,
   BackgroundJobKind,
   BackgroundJobRun,
@@ -81,6 +85,10 @@ import type {
   ExternalReferenceRecord,
   FileAssetInput,
   FileAssetRecord,
+  PipelineInput,
+  PipelineRecord,
+  StageTransitionInput,
+  StageTransitionRecord,
   PersonalCalendarEventInput,
   ActionExecutionInput,
   ActionExecutionRecord,
@@ -92,6 +100,7 @@ import type {
   TaskStatusRecord
 } from "@kiss-pm/persistence";
 import type { AuthRateLimiter } from "./authRateLimit";
+import type { EmailProvider } from "./emailProvider";
 import type { LiveKitEgressProvider } from "./communications/recording/livekitEgressProvider";
 import type { ReadinessChecks } from "./healthRoutes";
 import type { StorageProvider } from "./storageProvider";
@@ -200,6 +209,8 @@ export type ProjectTypeInput = Omit<ProjectTypeRecord, "createdAt" | "updatedAt"
 export type DealStageRecord = {
   id: string;
   tenantId: TenantId;
+  // Мультиворонки: воронка стадии (null — «бесхозная» стадия legacy-периода).
+  pipelineId: string | null;
   name: string;
   sortOrder: number;
   status: CrmEntityStatus;
@@ -208,6 +219,17 @@ export type DealStageRecord = {
 };
 
 export type DealStageInput = Omit<DealStageRecord, "createdAt" | "updatedAt">;
+
+export type CrmPipelineInput = Omit<CrmPipeline, "createdAt" | "updatedAt">;
+export type CrmPipelineStageInput = Omit<CrmPipelineStage, "createdAt" | "updatedAt">;
+export type CrmPipelineTransitionRuleInput = Omit<
+  CrmPipelineTransitionRule,
+  "createdAt" | "updatedAt"
+>;
+export type CrmPipelineStageAutomationDefinitionInput = Omit<
+  CrmPipelineStageAutomationDefinition,
+  "createdAt" | "updatedAt"
+>;
 
 export type CustomFieldDefinitionRecord = {
   id: string;
@@ -259,6 +281,7 @@ export type OpportunityRecord = {
   ownerUserId: string | null;
   projectTypeId: string | null;
   stageId: string | null;
+  pipelineId: string | null;
   clientName: string;
   contactName: string;
   title: string;
@@ -289,6 +312,7 @@ export type OpportunityInput = Omit<
   | "feasibilityResult"
   | "feasibilityCheckedAt"
   | "ownerUserId"
+  | "pipelineId"
   | "customFieldValues"
 > & {
   ownerUserId?: string | null;
@@ -350,6 +374,17 @@ export type UserSessionRecord = {
   userId: UserId;
   tokenHash: string;
   expiresAt: Date;
+};
+
+export type PasswordResetTokenRecord = {
+  id: string;
+  tenantId: TenantId;
+  userId: UserId;
+  tokenHash: string;
+  expiresAt: Date;
+  consumedAt: Date | null;
+  requestedIp: string | null;
+  createdAt: Date;
 };
 
 export type ManagementAuditEventInput = {
@@ -434,6 +469,69 @@ export type ApiTenantDataSource = {
   ): Promise<DealStageRecord | undefined>;
   createDealStage?(input: DealStageInput): Promise<DealStageRecord>;
   updateDealStage?(input: DealStageInput): Promise<DealStageRecord>;
+  listPipelines?(tenantId: TenantId): Promise<PipelineRecord[]>;
+  findPipelineById?(
+    tenantId: TenantId,
+    pipelineId: string
+  ): Promise<PipelineRecord | undefined>;
+  createPipeline?(input: PipelineInput): Promise<PipelineRecord>;
+  updatePipeline?(input: PipelineInput): Promise<PipelineRecord>;
+  listStageTransitions?(
+    tenantId: TenantId,
+    pipelineId?: string
+  ): Promise<StageTransitionRecord[]>;
+  findStageTransitionById?(
+    tenantId: TenantId,
+    transitionId: string
+  ): Promise<StageTransitionRecord | undefined>;
+  createStageTransition?(input: StageTransitionInput): Promise<StageTransitionRecord>;
+  deleteStageTransition?(tenantId: TenantId, transitionId: string): Promise<void>;
+  listCrmPipelines?(tenantId: TenantId): Promise<CrmPipeline[]>;
+  findCrmPipelineById?(tenantId: TenantId, pipelineId: string): Promise<CrmPipeline | undefined>;
+  createCrmPipeline?(input: CrmPipelineInput): Promise<CrmPipeline>;
+  updateCrmPipeline?(input: CrmPipelineInput): Promise<CrmPipeline>;
+  refreshCrmPipelineLifecycleGraph?(
+    tenantId: TenantId,
+    pipelineId: string
+  ): Promise<CrmPipeline | undefined>;
+  listCrmPipelineStages?(tenantId: TenantId, pipelineId?: string): Promise<CrmPipelineStage[]>;
+  findCrmPipelineStageById?(
+    tenantId: TenantId,
+    pipelineId: string,
+    stageId: string
+  ): Promise<CrmPipelineStage | undefined>;
+  createCrmPipelineStage?(input: CrmPipelineStageInput): Promise<CrmPipelineStage>;
+  updateCrmPipelineStage?(input: CrmPipelineStageInput): Promise<CrmPipelineStage>;
+  listCrmPipelineTransitionRules?(
+    tenantId: TenantId,
+    pipelineId: string
+  ): Promise<CrmPipelineTransitionRule[]>;
+  findCrmPipelineTransitionRuleById?(
+    tenantId: TenantId,
+    pipelineId: string,
+    ruleId: string
+  ): Promise<CrmPipelineTransitionRule | undefined>;
+  createCrmPipelineTransitionRule?(
+    input: CrmPipelineTransitionRuleInput
+  ): Promise<CrmPipelineTransitionRule>;
+  updateCrmPipelineTransitionRule?(
+    input: CrmPipelineTransitionRuleInput
+  ): Promise<CrmPipelineTransitionRule>;
+  listCrmPipelineStageAutomationDefinitions?(
+    tenantId: TenantId,
+    pipelineId: string
+  ): Promise<CrmPipelineStageAutomationDefinition[]>;
+  findCrmPipelineStageAutomationDefinitionById?(
+    tenantId: TenantId,
+    pipelineId: string,
+    automationId: string
+  ): Promise<CrmPipelineStageAutomationDefinition | undefined>;
+  createCrmPipelineStageAutomationDefinition?(
+    input: CrmPipelineStageAutomationDefinitionInput
+  ): Promise<CrmPipelineStageAutomationDefinition>;
+  updateCrmPipelineStageAutomationDefinition?(
+    input: CrmPipelineStageAutomationDefinitionInput
+  ): Promise<CrmPipelineStageAutomationDefinition>;
   listCustomFieldDefinitions?(
     tenantId: TenantId
   ): Promise<CustomFieldDefinitionRecord[]>;
@@ -468,6 +566,13 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     opportunityId: string;
     stageId: string;
+    pipelineId?: string | null;
+  }): Promise<OpportunityRecord | undefined>;
+  updateOpportunityPipeline?(input: {
+    tenantId: TenantId;
+    opportunityId: string;
+    stageId: string;
+    pipelineId: string;
   }): Promise<OpportunityRecord | undefined>;
   finalizeOpportunity?(input: {
     tenantId: TenantId;
@@ -646,12 +751,32 @@ export type ApiTenantDataSource = {
     userId: UserId,
     email: string
   ): Promise<void>;
+  updateCredentialPassword?(
+    tenantId: TenantId,
+    userId: UserId,
+    input: { passwordHash: string; passwordSalt: string }
+  ): Promise<void>;
+  createTenant?(input: { id: string; name: string }): Promise<void>;
   createSession?(input: UserSessionRecord): Promise<void>;
   findSessionByTokenHash?(
     tokenHash: string
   ): Promise<UserSessionRecord | undefined>;
   deleteSessionByTokenHash?(tokenHash: string): Promise<void>;
   deleteSessionsByUserId?(tenantId: TenantId, userId: UserId): Promise<void>;
+  createPasswordResetToken?(input: PasswordResetTokenRecord): Promise<void>;
+  findPasswordResetTokenByHash?(
+    tokenHash: string
+  ): Promise<PasswordResetTokenRecord | undefined>;
+  // Возвращает число затронутых строк (атомарное single-use: WHERE consumed_at IS NULL).
+  markPasswordResetTokenConsumed?(
+    tenantId: TenantId,
+    id: string,
+    consumedAt: Date
+  ): Promise<number>;
+  deletePasswordResetTokensByUserId?(
+    tenantId: TenantId,
+    userId: UserId
+  ): Promise<void>;
   withTransaction?<T>(
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
   ): Promise<T>;
@@ -1232,6 +1357,7 @@ export type CreateAppOptions = {
   videoProvider?: VideoProvider;
   egressProvider?: LiveKitEgressProvider | null;
   authRateLimiter?: AuthRateLimiter;
+  emailProvider?: EmailProvider;
   readinessChecks?: ReadinessChecks;
   secureCookies?: boolean;
   trustedMutationOrigins?: string[];

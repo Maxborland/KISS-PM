@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
+import { DEMO_NAV_TITLE } from "@/views/lib/demo";
 
 export type Crumb = { label: string; current?: boolean };
 
@@ -14,9 +15,10 @@ export function TopbarBreadcrumbs({ items, className }: { items: Crumb[]; classN
           {item.current ? (
             <span className="u-text-strong">{item.label}</span>
           ) : (
-            <a href="#" onClick={(e) => e.preventDefault()}>
+            // Прототип: навигация не подключена — путь как текст, без fake-ссылки.
+            <span className="crumb-parent" title={DEMO_NAV_TITLE}>
               {item.label}
-            </a>
+            </span>
           )}
         </span>
       ))}

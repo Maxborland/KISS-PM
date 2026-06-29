@@ -10,7 +10,10 @@ import type {
   ManagementAuditEventInput
 } from "./apiTypes";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
-import { parseDealStageChangeBody } from "./crmParsers";
+import {
+  parseDealStageChangeBody,
+  parseOpportunityPipelineChangeBody
+} from "./crmParsers";
 import { readLimitedJsonBody } from "./jsonBody";
 import {
   parseOpportunityBody,
@@ -160,6 +163,36 @@ export function registerProjectIntakeRoutes(
     const result = await projectIntakeService.changeOpportunityStage({
       actor,
       opportunityId: opportunityId.value,
+      stageId: parsed.value.stageId
+    });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
+
+    return context.json({ opportunity: result.opportunity });
+  });
+
+  // Мультиворонки: перенос сделки в другую воронку на её стадию.
+  app.patch("/api/workspace/opportunities/:opportunityId/pipeline", async (context) => {
+    const opportunityId = parseOpportunityIdParam(context.req.param("opportunityId"));
+    if (!opportunityId.ok) return context.json({ error: opportunityId.error }, 400);
+
+    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+
+    const preflight = await projectIntakeService.preflightChangeOpportunityPipeline({
+      actor,
+      opportunityId: opportunityId.value
+    });
+    if (!preflight.ok) return context.json({ error: preflight.error }, preflight.status);
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseOpportunityPipelineChangeBody(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const result = await projectIntakeService.changeOpportunityPipeline({
+      actor,
+      opportunityId: opportunityId.value,
+      pipelineId: parsed.value.pipelineId,
       stageId: parsed.value.stageId
     });
     if (!result.ok) return context.json({ error: result.error }, result.status);

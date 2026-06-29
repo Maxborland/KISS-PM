@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { CardPanel } from "@/components/domain/card-panel";
 import { PageIntro } from "@/views/layout/page-intro";
+import { demoAction } from "@/views/lib/demo";
 
 export type ScreenPlaceholderBlockProps = {
   title: string;
@@ -12,13 +13,13 @@ export function ScreenPlaceholderBlock({ title, lead, hint }: ScreenPlaceholderB
   return (
     <>
       <PageIntro title={title} lead={lead} />
-      <CardPanel title="Контент экрана" subtitle={hint ?? "React view · parity с design-v2 HTML"}>
+      <CardPanel title="Контент экрана" subtitle={hint ?? "Экран в разработке"}>
         <p className="u-text-sm u-text-muted">
-          Полный контент экрана подключается по мере Phase 2. Shell, page-intro и токены уже согласованы.
+          Полный контент экрана появится в рабочем приложении.
         </p>
         <div className="state-empty__actions u-mt-4">
-          <Button variant="primary">Основное действие</Button>
-          <Button variant="secondary">Вторичное</Button>
+          <Button variant="primary" {...demoAction("основное действие")}>Основное действие</Button>
+          <Button variant="secondary" {...demoAction("вторичное действие")}>Вторичное</Button>
         </div>
       </CardPanel>
     </>

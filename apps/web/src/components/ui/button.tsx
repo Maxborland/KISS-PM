@@ -20,18 +20,18 @@ const buttonVariants = cva(
         // Тёмная "primary" — главная кнопка-действие в шаблонах CRM/планирования
         default: [
           "bg-[var(--text-strong)] text-white border border-[var(--text-strong)]",
-          "shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(15,23,42,0.16)]",
-          "hover:bg-[#1f2937] hover:border-[#1f2937]"
+          "shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_color-mix(in_oklab,var(--text-strong),transparent_84%)]",
+          "hover:bg-[color-mix(in_oklab,var(--text-strong),white_14%)] hover:border-[color-mix(in_oklab,var(--text-strong),white_14%)]"
         ].join(" "),
         // Акцентная (синяя) — выделение положительного действия
         primary: [
           "bg-[var(--accent)] text-white border border-[var(--accent)]",
-          "shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_1px_2px_rgba(37,99,235,0.25)]",
+          "shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_1px_2px_var(--accent-ring)]",
           "hover:bg-[var(--accent-hover)] hover:border-[var(--accent-hover)]"
         ].join(" "),
         accent: [
           "bg-[var(--accent)] text-white border border-[var(--accent)]",
-          "shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_1px_2px_rgba(37,99,235,0.25)]",
+          "shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_1px_2px_var(--accent-ring)]",
           "hover:bg-[var(--accent-hover)] hover:border-[var(--accent-hover)]"
         ].join(" "),
         // Мягкий accent — нативно для secondary действий
@@ -54,8 +54,8 @@ const buttonVariants = cva(
         ].join(" "),
         destructive: [
           "bg-[var(--danger)] text-white border border-[var(--danger)]",
-          "shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_1px_2px_rgba(220,38,38,0.25)]",
-          "hover:bg-[var(--danger-text,#b91c1c)] hover:border-[var(--danger-text,#b91c1c)]"
+          "shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_1px_2px_color-mix(in_oklab,var(--danger),transparent_75%)]",
+          "hover:bg-[var(--danger-text)] hover:border-[var(--danger-text)]"
         ].join(" "),
         "destructive-soft": [
           "bg-[var(--danger-soft)] text-[var(--danger-text,var(--danger))] border border-transparent",
