@@ -1,164 +1,190 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Bot, Check, ChevronRight, ShieldCheck, TriangleAlert } from "lucide-react";
+import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
-import { SurfaceState } from "@/components/domain/surface-state";
-import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
-import { useMyWork, useWorkspaceTaskStatuses } from "@/workspace/lib/use-workspace";
-import type { TaskRecord } from "@/workspace/lib/workspace-client";
+import { cn } from "@/lib/cn";
+import {
+  AgentChatPanel,
+  AgentConversationList,
+  AgentWorkspaceFrame,
+  ChangeReviewPanel,
+  CollapsedAppNav,
+  MobileDrawerBackdrop
+} from "@/widgets/landing-agent-demo/components";
+import type { DemoChange, DemoMessage, DemoPhase } from "@/widgets/landing-agent-demo/types";
+import { useAgent } from "@/workspace/agent/use-agent";
+import type { AgentActionInput, ProposedAction } from "@/workspace/agent/agent-client";
 
-// «Продвинуть работу»: прямой forward-путь по категориям статусов (подмножество боевого
-// ALLOWED_TRANSITIONS — только безопасное движение вперёд). done → дальше некуда.
-const FORWARD: Record<string, string> = {
-  new: "in_progress",
-  waiting: "in_progress",
-  in_progress: "review",
-  review: "done",
-  done: ""
+// Человекочитаемое имя статуса (mock: status-*, боевой: task-status-*).
+const STATUS_NAME: Record<string, string> = {
+  new: "Новая", waiting: "Ожидание", "in-progress": "В работе", inprogress: "В работе", review: "На проверке", done: "Готово"
+};
+const humanizeStatus = (id: string): string => {
+  const key = id.replace(/^(task-)?status-/, "");
+  return STATUS_NAME[key] ?? key.replace(/-/g, " ");
 };
 
-type Proposal = { task: TaskRecord; from: { id: string; name: string }; to: { id: string; name: string } };
+const summarize = (input: Record<string, unknown>): string =>
+  Object.entries(input)
+    .filter(([, v]) => typeof v === "string" || typeof v === "number")
+    .map(([k, v]) => `${k}: ${String(v)}`)
+    .join(" · ");
+
+const KIND_BY_TOOL: Record<string, DemoChange["kind"]> = {
+  change_task_status: "status",
+  update_task: "text",
+  comment_task: "text",
+  create_task: "text",
+  apply_resource_resolution: "date",
+  apply_plan_commands: "date"
+};
+
+function actionToChange(action: ProposedAction, index: number): DemoChange {
+  const allowed = action.capability.allowed;
+  const kind = KIND_BY_TOOL[action.tool] ?? "text";
+  let before = "—";
+  let after = summarize(action.input);
+  if (action.tool === "change_task_status") {
+    before = "текущий статус";
+    after = humanizeStatus(String(action.input.statusId ?? ""));
+  }
+  return {
+    id: `chg-${index}`,
+    number: index + 1,
+    title: action.title,
+    before,
+    after,
+    status: allowed ? "выбрано" : "требует прав",
+    selected: allowed,
+    kind
+  };
+}
+
+const clock = (offsetMs: number): string => new Date(offsetMs).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 
 /**
- * Агент — альтернативный способ ведения работы: анализирует задачи пользователя
- * (GET /api/workspace/my-work) и предлагает безопасные действия (перевод задачи в
- * следующий статус по разрешённым переходам). Применение — ТОЛЬКО после подтверждения,
- * боевым PATCH /api/workspace/projects/:id/tasks/:taskId/status (тот же контракт, что
- * канбан «Моей работы»). Транспорт — WorkspaceRuntime (live/mock).
+ * Агент — полноценный чат с AI-ассистентом, действующим в рамках прав сотрудника.
+ * Дизайн — SSOT `LandingAgentDemo` (чат-тред + панель сверки изменений), но на БОЕВОМ
+ * контракте: сообщение → POST /agent/propose (LLM-цикл, ничего не меняется) → изменения в
+ * панели сверки → подтверждение → POST /agent/execute (governed-команды + audit).
+ * live → реальный LLM (ключ на сервере); mock/Storybook → детерминированный демо-«мозг».
  */
 export function AgentSurface() {
-  const myWork = useMyWork();
-  const statuses = useWorkspaceTaskStatuses();
-  const [busy, setBusy] = useState(false);
-  const [confirmTaskId, setConfirmTaskId] = useState<string | null>(null);
-  const [log, setLog] = useState<{ key: string; text: string }[]>([]);
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const { propose, execute, status } = useAgent();
 
-  const statusList = statuses.list;
+  const [phase, setPhase] = useState<DemoPhase>("draft");
+  const [inputValue, setInputValue] = useState("");
+  const [messages, setMessages] = useState<DemoMessage[]>([]);
+  const [changes, setChanges] = useState<DemoChange[]>([]);
+  const [activeChangeId, setActiveChangeId] = useState("");
+  const [editingChangeId, setEditingChangeId] = useState<string | undefined>(undefined);
+  const [actionMap, setActionMap] = useState<Record<string, AgentActionInput>>({});
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false);
+  const [navExpanded, setNavExpanded] = useState(false);
+  const [mobileLeft, setMobileLeft] = useState(false);
+  const [mobileReview, setMobileReview] = useState(false);
+  const [seq, setSeq] = useState(0);
 
-  // Безопасные предложения: для каждой задачи — доступный forward-переход (исключая done).
-  const proposals: Proposal[] = useMemo(() => {
-    const tasks = myWork.data?.tasks ?? [];
-    return tasks.flatMap((task) => {
-      const from = statuses.byId.get(task.statusId);
-      if (!from) return [];
-      const nextCat = FORWARD[from.category];
-      const to = nextCat ? statusList.find((s) => s.category === nextCat) : undefined;
-      if (!to) return [];
-      return [{ task, from: { id: from.id, name: from.name }, to: { id: to.id, name: to.name } }];
-    });
-  }, [myWork.data, statuses.byId, statusList]);
+  const reviewVisible = changes.length > 0 && phase !== "draft" && phase !== "thinking";
+  const now = () => { const t = 10 * 3600_000 + 41 * 60_000 + seq * 60_000; setSeq((s) => s + 1); return clock(t); };
 
-  const surfaceStatus =
-    myWork.status === "loading" ? "loading" : myWork.status === "error" ? "error" : "ready";
+  const addMessage = (author: "user" | "henry", text: string) =>
+    setMessages((m) => [...m, { id: `${author}-${m.length}`, author, time: now(), text }]);
 
-  const apply = async (proposal: Proposal) => {
-    setBusy(true);
-    setNotice(null);
-    const res = await myWork.updateTaskStatus(proposal.task.id, proposal.to.id);
-    setBusy(false);
-    setConfirmTaskId(null);
-    if (res.ok) {
-      setLog((l) => [{ key: `${proposal.task.id}-${l.length}`, text: `«${proposal.task.title}»: ${proposal.from.name} → ${proposal.to.name}` }, ...l]);
-      setNotice({ ok: true, text: "Предложение применено" });
-      await myWork.reload();
-    } else {
-      setNotice({ ok: false, text: `Отклонено: ${res.code ?? res.message}` });
+  async function sendMessage() {
+    const goal = inputValue.trim();
+    if (goal.length === 0) return;
+    addMessage("user", goal);
+    setInputValue("");
+    setPhase("thinking");
+    const res = await propose(goal);
+    if (!res.ok) {
+      addMessage("henry", `Не удалось обработать запрос: ${res.code}`);
+      setPhase("draft");
+      return;
     }
-  };
+    const data = res.data;
+    const newChanges = data.proposedActions.map(actionToChange);
+    const map: Record<string, AgentActionInput> = {};
+    data.proposedActions.forEach((action, i) => { map[`chg-${i}`] = { tool: action.tool, input: action.input }; });
+    setActionMap(map);
+    setChanges(newChanges);
+    setActiveChangeId(newChanges[0]?.id ?? "");
+    addMessage("henry", data.reasoning || (newChanges.length ? "Подготовил предложение — проверьте сверку справа." : "Безопасных действий не нашёл."));
+    setPhase(newChanges.length ? "review-open" : "applied");
+  }
+
+  async function applySelected() {
+    const selected = changes.filter((c) => c.selected && c.status !== "отклонено" && c.status !== "требует прав" && c.status !== "применено");
+    const actions = selected.map((c) => actionMap[c.id]).filter((a): a is AgentActionInput => Boolean(a));
+    if (actions.length === 0) return;
+    const res = await execute(actions);
+    if (res.ok && res.data.applied) {
+      const okCount = res.data.results.filter((r) => r.ok).length;
+      setChanges((cs) => cs.map((c) => (selected.includes(c) ? { ...c, status: "применено" } : c)));
+      setPhase("applied");
+      addMessage("henry", `Применил ${okCount} изменени${okCount === 1 ? "е" : "я"}. Готово — данные обновлены.`);
+    } else {
+      const failure = res.ok ? res.data.results.find((r) => !r.ok)?.error ?? "не применено" : res.code;
+      addMessage("henry", `Не удалось применить: ${failure}.`);
+    }
+  }
+
+  function resetDemo() {
+    setMessages([]);
+    setChanges([]);
+    setActionMap({});
+    setActiveChangeId("");
+    setEditingChangeId(undefined);
+    setPhase("draft");
+    setSeq(0);
+  }
 
   return (
-    <WorkspaceShell activeNav="Агент">
-      <main className="min-w-0 flex-1 overflow-auto bg-[var(--canvas)] p-4 md:p-6">
-        <div className="mb-3 flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-[var(--radius-md)] bg-[var(--accent-soft)] text-[var(--accent)]"><Bot className="size-5" aria-hidden /></span>
-          <div>
-            <h1 className="font-[family-name:var(--font-display)] text-[length:var(--text-22)] font-extrabold leading-tight tracking-[-0.025em] text-[var(--text-strong)]">Агент</h1>
-            <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Анализирует ваши задачи и предлагает безопасные действия. Без подтверждения ничего не меняется.</p>
-          </div>
-        </div>
-
-        <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-          <span>Реальный контракт: GET /api/workspace/my-work + PATCH /api/workspace/projects/:id/tasks/:taskId/status. Агент предлагает только разрешённые переходы (ALLOWED_TRANSITIONS) и применяет их по подтверждению (createWorkspaceClient + in-memory mock, swap = apiOrigin).</span>
-        </div>
-
-        <SurfaceState status={surfaceStatus} error={myWork.error} onRetry={() => void myWork.reload()}>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
-            {/* Предложения агента */}
-            <section className="flex flex-col gap-2.5">
-              <div className="flex items-center gap-2 text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">
-                <ShieldCheck className="size-4 text-[var(--success-text)]" aria-hidden />
-                Безопасные предложения
-                <Chip variant="info">{proposals.length}</Chip>
-              </div>
-              {proposals.length === 0 ? (
-                <div className="rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--panel-subtle)] px-4 py-8 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">
-                  Сейчас нет безопасных действий — задачи в финальных статусах или ждут вашего решения.
-                </div>
-              ) : (
-                proposals.map((p) => {
-                  const confirming = confirmTaskId === p.task.id;
-                  return (
-                    <article key={p.task.id} className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-3.5 shadow-[var(--shadow-card)]">
-                      <div className="flex items-center gap-2 text-[length:var(--text-sm)]">
-                        <span className="min-w-0 flex-1 truncate font-medium text-[var(--text-strong)]">{p.task.title}</span>
-                        <span className="inline-flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-                          {p.from.name}<ChevronRight className="size-3.5 text-[var(--muted-soft)]" aria-hidden />
-                          <span className="font-semibold text-[var(--accent-text)]">{p.to.name}</span>
-                        </span>
-                      </div>
-                      <div className="mt-2.5 flex items-center gap-2">
-                        {!confirming ? (
-                          <Button variant="outline" size="sm" disabled={busy} onClick={() => { setConfirmTaskId(p.task.id); setNotice(null); }}>
-                            Подготовить предложение
-                          </Button>
-                        ) : (
-                          <>
-                            <span className="text-[length:var(--text-xs)] text-[var(--muted)]">Подтвердите — до этого изменение не отправляется.</span>
-                            <span className="ml-auto flex items-center gap-2">
-                              <Button variant="ghost" size="sm" disabled={busy} onClick={() => setConfirmTaskId(null)}>Отмена</Button>
-                              <Button variant="default" size="sm" disabled={busy} onClick={() => void apply(p)}>
-                                <Check className="size-3.5" aria-hidden />Подтвердить
-                              </Button>
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })
-              )}
-              {notice ? (
-                <div {...(notice.ok ? {} : { role: "alert" })} className={`anim-rise-in-fast inline-flex items-center gap-1.5 text-[length:var(--text-xs)] ${notice.ok ? "text-[var(--muted-strong)]" : "text-[var(--danger-text)]"}`}>
-                  {notice.ok ? <Check className="size-3.5 text-[var(--success-text)]" aria-hidden /> : <TriangleAlert className="size-3.5" aria-hidden />}
-                  {notice.text}
-                </div>
-              ) : null}
-            </section>
-
-            {/* Лог применённых действий за сессию */}
-            <aside className="flex flex-col gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-3.5 shadow-[var(--shadow-card)]">
-              <div className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Действия агента</div>
-              {log.length === 0 ? (
-                <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Пока ничего не применено.</p>
-              ) : (
-                <ul className="flex flex-col gap-1.5">
-                  {log.map((entry) => (
-                    <li key={entry.key} className="flex items-start gap-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-                      <Check className="mt-0.5 size-3 shrink-0 text-[var(--success-text)]" aria-hidden />
-                      <span>{entry.text}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </aside>
-          </div>
-        </SurfaceState>
-      </main>
-    </WorkspaceShell>
+    <AgentWorkspaceFrame>
+      <div className={cn("lad-layout", navExpanded && "lad-layout--nav-expanded", reviewVisible && "lad-layout--review-open")}>
+        <CollapsedAppNav expanded={navExpanded} mobileOpen={mobileLeft} onToggle={() => setNavExpanded((v) => !v)} />
+        <MobileDrawerBackdrop visible={mobileLeft || mobileReview} onClick={() => { setMobileLeft(false); setMobileReview(false); }} />
+        <AgentConversationList />
+        <AgentChatPanel
+          messages={messages}
+          inputValue={inputValue}
+          visibleSteps={3}
+          phase={status === "proposing" ? "thinking" : phase}
+          agentMenuOpen={agentMenuOpen}
+          reviewVisible={reviewVisible}
+          onInputChange={setInputValue}
+          onSend={() => void sendMessage()}
+          onToggleAgentMenu={() => setAgentMenuOpen((v) => !v)}
+          onOpenMobileLeft={() => { setMobileLeft(true); setMobileReview(false); }}
+          onOpenMobileReview={() => { setMobileReview(reviewVisible); setMobileLeft(false); }}
+        />
+        <ChangeReviewPanel
+          changes={changes}
+          visible={reviewVisible}
+          opening={phase === "review-opening"}
+          applied={phase === "applied" || changes.some((c) => c.status === "применено")}
+          activeChangeId={activeChangeId}
+          editingChangeId={editingChangeId}
+          mobileOpen={reviewVisible && mobileReview}
+          onCloseMobile={() => setMobileReview(false)}
+          onSelectChange={(id) =>
+            setChanges((cs) => cs.map((c) => (c.id === id && c.status !== "требует прав" && c.status !== "применено"
+              ? { ...c, selected: !c.selected, status: c.selected ? "отклонено" : "выбрано" }
+              : c)))
+          }
+          onFocusChange={setActiveChangeId}
+          onRejectChange={(id) =>
+            setChanges((cs) => cs.map((c) => (c.id === id ? { ...c, selected: false, status: "отклонено" } : c)))
+          }
+          onEditChange={(id) => { setActiveChangeId(id); setEditingChangeId(id); }}
+          onUpdateChange={(id, value) =>
+            setChanges((cs) => cs.map((c) => (c.id === id ? { ...c, after: value, status: "изменено", selected: true } : c)))
+          }
+          onApply={() => void applySelected()}
+          onReset={resetDemo}
+        />
+      </div>
+    </AgentWorkspaceFrame>
   );
 }

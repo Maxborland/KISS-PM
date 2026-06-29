@@ -12,6 +12,7 @@
 @import "../styles/widgets/call.css" layer(components);
 @import "../styles/widgets/chat.css" layer(components);
 @import "../styles/widgets/comms.css" layer(components);
+@import "../styles/widgets/landing-agent-demo.css" layer(components);
 
 /* Активируем enter/exit-утилиты (animate-in/out, fade/zoom/slide) для Radix-оверлеев.
    Размечены в components/ui/* (dialog/popover/dropdown/select/tooltip), но без подключения
