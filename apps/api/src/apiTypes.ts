@@ -50,6 +50,7 @@ import type {
   RetrospectiveReadModel,
   Tenant,
   TenantId,
+  TenantSecurityPolicy,
   TenantUser,
   TemplateImprovementAction,
   UserNotification,
@@ -972,6 +973,11 @@ export type ApiTenantDataSource = {
     userId: UserId
   ): Promise<NotificationPreference[]>;
   upsertNotificationPreferences?(input: NotificationPreference[]): Promise<NotificationPreference[]>;
+  getTenantSecurityPolicy?(tenantId: TenantId): Promise<TenantSecurityPolicy>;
+  upsertTenantSecurityPolicy?(
+    tenantId: TenantId,
+    policy: TenantSecurityPolicy
+  ): Promise<TenantSecurityPolicy>;
   createMeeting?(input: Omit<Meeting, "createdAt" | "archivedAt">): Promise<Meeting>;
   updateMeeting?(input: {
     tenantId: TenantId;

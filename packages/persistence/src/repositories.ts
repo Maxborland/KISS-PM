@@ -33,6 +33,7 @@ import { createOccupancyRepository, type OccupancyRepository } from "./occupancy
 import { createResourceAbsencesRepository, type ResourceAbsencesRepository } from "./resourceAbsencesRepository";
 import { createRetrospectiveRepository, type RetrospectiveRepository } from "./retrospectiveRepository";
 import { createTenantProductionCalendarRepository, type TenantProductionCalendarRepository } from "./tenantProductionCalendarRepository";
+import { createTenantSecurityPolicyRepository, type TenantSecurityPolicyRepository } from "./tenantSecurityPolicyRepository";
 import {
   createCrmRepository,
   type ClientInput,
@@ -123,6 +124,7 @@ export type PostgresTenantDataSource = CrmRepository &
   PlanningSavedViewsRepository &
   ProjectWorkRepository &
   TenantProductionCalendarRepository &
+  TenantSecurityPolicyRepository &
   ResourceAbsencesRepository &
   OccupancyRepository &
   ControlRepository &
@@ -202,6 +204,7 @@ export function createPostgresTenantDataSource(
     ...createPlanningSavedViewsRepository(db),
     ...createProjectWorkRepository(db),
     ...createTenantProductionCalendarRepository(db),
+    ...createTenantSecurityPolicyRepository(db),
     ...createResourceAbsencesRepository(db),
     ...createOccupancyRepository(db),
     ...createAttachmentRepository(db),

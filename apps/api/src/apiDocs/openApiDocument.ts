@@ -57,6 +57,8 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/config/project-templates", tag: "Workspace config", summary: "List project templates", successSchema: "ProjectTemplatesResponse" },
   { method: "post", path: "/api/workspace/config/project-templates", tag: "Workspace config", summary: "Create project template", requestSchema: "ProjectTemplateWriteRequest", successSchema: "ProjectTemplateResponse", successStatus: 201 },
   { method: "patch", path: "/api/workspace/config/project-templates/:templateId", tag: "Workspace config", summary: "Update project template", requestSchema: "ProjectTemplateWriteRequest", successSchema: "ProjectTemplateResponse" },
+  { method: "get", path: "/api/tenant/current/security-policy", tag: "Workspace config", summary: "Read tenant security policy" },
+  { method: "put", path: "/api/tenant/current/security-policy", tag: "Workspace config", summary: "Replace tenant security policy" },
   { method: "get", path: "/api/workspace/clients", tag: "CRM", summary: "List clients", successSchema: "ClientsResponse" },
   { method: "post", path: "/api/workspace/clients", tag: "CRM", summary: "Create client", requestSchema: "ClientWriteRequest", successSchema: "ClientResponse", successStatus: 201 },
   { method: "patch", path: "/api/workspace/clients/:clientId", tag: "CRM", summary: "Update client", requestSchema: "ClientWriteRequest", successSchema: "ClientResponse" },

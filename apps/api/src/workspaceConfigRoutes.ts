@@ -4,7 +4,11 @@ import {
   type AccessProfile,
   type PolicyDecision
 } from "@kiss-pm/access-control";
-import type { TenantUser } from "@kiss-pm/domain";
+import {
+  DEFAULT_TENANT_SECURITY_POLICY,
+  type TenantSecurityPolicy,
+  type TenantUser
+} from "@kiss-pm/domain";
 import type { Hono } from "hono";
 import type {
   ApiTenantDataSource,
@@ -40,10 +44,12 @@ type WorkspaceConfigRouteDataSource = Pick<
   | "appendAuditEvent"
   | "createCustomFieldDefinition"
   | "createProjectTemplate"
+  | "getTenantSecurityPolicy"
   | "listCustomFieldDefinitions"
   | "listProjectTemplates"
   | "updateCustomFieldDefinition"
   | "updateProjectTemplate"
+  | "upsertTenantSecurityPolicy"
   | "withTransaction"
 >;
 
@@ -54,6 +60,7 @@ type WorkspaceConfigMutationDataSource = Pick<
   | "createProjectTemplate"
   | "updateCustomFieldDefinition"
   | "updateProjectTemplate"
+  | "upsertTenantSecurityPolicy"
 >;
 
 export function registerWorkspaceConfigRoutes(
@@ -482,6 +489,145 @@ export function registerWorkspaceConfigRoutes(
 
     return context.json({ projectTemplate });
   });
+
+  app.get("/api/tenant/current/security-policy", async (context) => {
+    const actor = await getSessionActorFromHeaders(
+      context.req.header("cookie") ?? null
+    );
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!dataSource.getTenantSecurityPolicy) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canReadWorkspaceConfig({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) {
+      await appendWorkspaceConfigDeniedAudit(deps, actor, {
+        actionType: "workspace.config.read_denied",
+        entityType: "WorkspaceConfig",
+        entityId: "security-policy",
+        commandInput: { resource: "security-policy" },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    return context.json({
+      securityPolicy: await dataSource.getTenantSecurityPolicy(actor.tenantId)
+    });
+  });
+
+  app.put("/api/tenant/current/security-policy", async (context) => {
+    const actor = await getSessionActorFromHeaders(
+      context.req.header("cookie") ?? null
+    );
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (
+      !dataSource.getTenantSecurityPolicy ||
+      !dataSource.upsertTenantSecurityPolicy ||
+      !dataSource.withTransaction ||
+      !dataSource.appendAuditEvent
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const decision = canManageWorkspaceConfig({
+      actor,
+      profile: await getActorProfile(actor),
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) {
+      await appendWorkspaceConfigDeniedAudit(deps, actor, {
+        actionType: "workspace.security_policy.update_denied",
+        entityType: "SecurityPolicy",
+        entityId: actor.tenantId,
+        commandInput: { operation: "update_security_policy" },
+        decision
+      });
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseSecurityPolicyBody(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const beforeState = await dataSource.getTenantSecurityPolicy(actor.tenantId);
+    const securityPolicy = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.upsertTenantSecurityPolicy) {
+        throw new Error("transactional_security_policy_update_not_configured");
+      }
+      const saved = await transactionDataSource.upsertTenantSecurityPolicy(
+        actor.tenantId,
+        parsed.value
+      );
+      await appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "workspace.security_policy.updated",
+          sourceWorkflow: "single_workspace_config",
+          sourceEntity: { type: "SecurityPolicy", id: actor.tenantId },
+          commandInput: parsed.value,
+          beforeState,
+          afterState: saved,
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
+      return saved;
+    });
+
+    return context.json({ securityPolicy });
+  });
+}
+
+function parseSecurityPolicyBody(
+  input: unknown
+): { ok: true; value: TenantSecurityPolicy } | { ok: false; error: string } {
+  const record = input && typeof input === "object" && !Array.isArray(input)
+    ? (input as Record<string, unknown>).securityPolicy
+    : undefined;
+  if (!record || typeof record !== "object" || Array.isArray(record)) {
+    return { ok: false, error: "security_policy_invalid" };
+  }
+  const candidate = record as Record<string, unknown>;
+
+  const twoFactorRequired = candidate.twoFactorRequired;
+  const ssoSamlEnabled = candidate.ssoSamlEnabled;
+  if (typeof twoFactorRequired !== "boolean" || typeof ssoSamlEnabled !== "boolean") {
+    return { ok: false, error: "security_policy_invalid" };
+  }
+
+  const sessionTimeoutHours = candidate.sessionTimeoutHours;
+  if (
+    typeof sessionTimeoutHours !== "number" ||
+    !Number.isInteger(sessionTimeoutHours) ||
+    sessionTimeoutHours < 1 ||
+    sessionTimeoutHours > 8760
+  ) {
+    return { ok: false, error: "security_policy_session_timeout_invalid" };
+  }
+
+  const rawAllowlist = candidate.domainAllowlist ?? DEFAULT_TENANT_SECURITY_POLICY.domainAllowlist;
+  if (!Array.isArray(rawAllowlist) || rawAllowlist.some((entry) => typeof entry !== "string")) {
+    return { ok: false, error: "security_policy_domain_allowlist_invalid" };
+  }
+  const domainAllowlist = Array.from(
+    new Set(
+      (rawAllowlist as string[])
+        .map((entry) => entry.trim().toLowerCase())
+        .filter((entry) => entry.length > 0)
+    )
+  );
+
+  return {
+    ok: true,
+    value: { twoFactorRequired, sessionTimeoutHours, ssoSamlEnabled, domainAllowlist }
+  };
 }
 
 async function appendWorkspaceConfigDeniedAudit(

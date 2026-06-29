@@ -16,6 +16,7 @@ export * from "./planningSavedViewsRepository";
 export * from "./projectWorkRepository";
 export * from "./tenantProductionCalendarConstants";
 export * from "./tenantProductionCalendarRepository";
+export * from "./tenantSecurityPolicyRepository";
 export * from "./resourceAbsencesRepository";
 export * from "./occupancyRepository";
 export * from "./retrospectiveRepository";

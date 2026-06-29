@@ -810,6 +810,30 @@ export const tenantProductionCalendarExceptions = pgTable(
   ]
 );
 
+export const tenantSecurityPolicies = pgTable(
+  "tenant_security_policies",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    twoFactorRequired: boolean("two_factor_required").notNull().default(false),
+    sessionTimeoutHours: integer("session_timeout_hours").notNull().default(24),
+    ssoSamlEnabled: boolean("sso_saml_enabled").notNull().default(false),
+    domainAllowlist: jsonb("domain_allowlist").$type<string[]>().notNull().default([]),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "tenant_security_policies_pkey",
+      columns: [table.tenantId]
+    }),
+    check(
+      "tenant_security_policies_timeout_chk",
+      sql`${table.sessionTimeoutHours} >= 1`
+    )
+  ]
+);
+
 export const planningSavedViews = pgTable(
   "planning_saved_views",
   {
