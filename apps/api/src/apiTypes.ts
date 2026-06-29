@@ -892,6 +892,10 @@ export type ApiTenantDataSource = {
     entityType: CollaborationEntityType;
     entityId: string;
   }): Promise<Conversation[]>;
+  addConversationMembers?(input: { tenantId: TenantId; conversationId: string; userIds: string[] }): Promise<void>;
+  isConversationMember?(tenantId: TenantId, conversationId: string, userId: UserId): Promise<boolean>;
+  listConversationMemberIds?(tenantId: TenantId, conversationId: string): Promise<string[]>;
+  listDirectConversationsForUser?(tenantId: TenantId, userId: UserId): Promise<Conversation[]>;
   createDiscussionMessage?(input: Omit<
     DiscussionMessage,
     "createdAt" | "editedAt" | "archivedAt" | "pinnedAt" | "pinnedByUserId"

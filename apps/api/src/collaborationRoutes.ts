@@ -106,6 +106,65 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     return context.json({ conversations: result });
   });
 
+  // P4.2 — список DM текущего пользователя (беседы conversationType="direct", где он участник).
+  app.get("/api/workspace/conversations/direct", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!deps.dataSource.listDirectConversationsForUser) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const directConversations = await deps.dataSource.listDirectConversationsForUser(actor.tenantId, actor.id);
+    const result = [];
+    for (const conversation of directConversations) {
+      const memberUserIds = deps.dataSource.listConversationMemberIds
+        ? await deps.dataSource.listConversationMemberIds(actor.tenantId, conversation.id)
+        : [];
+      const readState = deps.dataSource.getConversationReadState
+        ? await deps.dataSource.getConversationReadState({ tenantId: actor.tenantId, conversationId: conversation.id, userId: actor.id })
+        : null;
+      result.push({ ...serializeConversation(conversation), memberUserIds, readState });
+    }
+    return context.json({ conversations: result });
+  });
+
+  // P4.2 — открыть/получить DM с пользователем (create-or-get по детерминированной паре).
+  app.post("/api/workspace/conversations/direct", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!deps.dataSource.ensureConversation || !deps.dataSource.addConversationMembers || !deps.dataSource.listUsersByTenantId) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const targetParse = parseCollaborationId(readRecord(body.value).userId, "direct_user_id_invalid");
+    if (!targetParse.ok) return context.json({ error: targetParse.error }, 400);
+    const targetId = targetParse.value;
+    if (targetId === actor.id) return context.json({ error: "direct_self_forbidden" }, 400);
+
+    const tenantUsers = await deps.dataSource.listUsersByTenantId(actor.tenantId);
+    if (!tenantUsers.some((user) => user.id === targetId)) {
+      return context.json({ error: "direct_user_not_found" }, 404);
+    }
+
+    // Детерминированный id пары → create-or-get идемпотентен (ensureConversation по entity-tuple).
+    const pair = [actor.id, targetId].sort();
+    const dmId = `dm-${pair.join("--")}`;
+    const conversation = await deps.dataSource.ensureConversation({
+      id: dmId,
+      tenantId: actor.tenantId,
+      entityType: "direct",
+      entityId: dmId,
+      conversationType: "direct",
+      title: "",
+      createdByUserId: actor.id
+    });
+    await deps.dataSource.addConversationMembers({ tenantId: actor.tenantId, conversationId: conversation.id, userIds: pair });
+    const memberUserIds = deps.dataSource.listConversationMemberIds
+      ? await deps.dataSource.listConversationMemberIds(actor.tenantId, conversation.id)
+      : pair;
+    return context.json({ conversation: serializeConversation(conversation), memberUserIds }, 201);
+  });
+
   app.get("/api/workspace/conversations/:conversationId/messages", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -230,6 +289,13 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     emitMessageCreated(conversation.value.conversation.id, serialized);
     for (const userId of result.mentionUserIds) {
       emitNotificationCreated(userId, "mention");
+    }
+    // DM: realtime-уведомление второму участнику (бейдж/непрочитанное реагируют на push).
+    if (conversation.value.conversation.conversationType === "direct" && deps.dataSource.listConversationMemberIds) {
+      const memberIds = await deps.dataSource.listConversationMemberIds(actor.tenantId, conversation.value.conversation.id);
+      for (const memberId of memberIds) {
+        if (memberId !== actor.id) emitNotificationCreated(memberId, "direct_message");
+      }
     }
 
     return context.json({ message: serialized, mentions: result.mentions }, 201);
@@ -1013,6 +1079,14 @@ async function resolveConversationForActor(
   if (!conversationId.ok) return { ok: false, status: 400, error: conversationId.error };
   const conversation = await deps.dataSource.findConversation?.(actor.tenantId, conversationId.value);
   if (!conversation) return { ok: false, status: 404, error: "conversation_not_found" };
+  // DM: доступ по членству (а не по правам на сущность). Синтезируем access-контекст.
+  if (conversation.conversationType === "direct") {
+    const member = deps.dataSource.isConversationMember
+      ? await deps.dataSource.isConversationMember(actor.tenantId, conversation.id, actor.id)
+      : false;
+    if (!member) return { ok: false, status: 403, error: "conversation_forbidden" };
+    return { ok: true, value: { conversation, access: directAccessContext(conversation) } };
+  }
   const profile = await deps.getActorProfile(actor);
   const access = await resolveCollaborationEntityAccess({
     actor,
@@ -1329,7 +1403,21 @@ function routeForEntity(entity: CollaborationEntityAccessContext) {
   if (entity.entityType === "client") return `/clients/${entity.entityId}`;
   if (entity.entityType === "contact") return `/contacts/${entity.entityId}`;
   if (entity.entityType === "product") return `/products/${entity.entityId}`;
+  if (entity.entityType === "direct") return `/communications/chat?conversationId=${entity.entityId}`;
   return `/communication-channels/${entity.entityId}`;
+}
+
+// Синтез access-контекста для DM-беседы: доступ уже подтверждён членством.
+function directAccessContext(conversation: Conversation): CollaborationEntityAccessContext {
+  const allowed = { allowed: true as const, reason: "same_tenant_permission_granted" as const };
+  return {
+    entityType: "direct",
+    entityId: conversation.entityId,
+    sourceEntity: { type: "DirectMessage", id: conversation.id },
+    readDecision: allowed,
+    manageDecision: allowed,
+    title: conversation.title
+  };
 }
 
 async function appendDeniedAudit(

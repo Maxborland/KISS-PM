@@ -10,11 +10,13 @@ export const collaborationEntityTypes = [
   "client",
   "contact",
   "product",
-  "communication_channel"
+  "communication_channel",
+  // Прямые сообщения (DM): беседа не привязана к сущности, доступ — по членству.
+  "direct"
 ] as const;
 export type CollaborationEntityType = (typeof collaborationEntityTypes)[number];
 
-export const conversationTypes = ["default", "meeting_followup"] as const;
+export const conversationTypes = ["default", "meeting_followup", "direct"] as const;
 export type ConversationType = (typeof conversationTypes)[number];
 
 export const communicationChannelTypes = [

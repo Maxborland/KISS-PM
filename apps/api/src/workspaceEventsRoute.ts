@@ -13,7 +13,7 @@ import {
 } from "./workspaceEventBus";
 
 type WorkspaceEventsRouteDeps = {
-  dataSource: Pick<ApiTenantDataSource, "findConversation"> & CollaborationEntityAccessDataSource;
+  dataSource: Pick<ApiTenantDataSource, "findConversation" | "isConversationMember"> & CollaborationEntityAccessDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
 };
@@ -38,17 +38,25 @@ export function registerWorkspaceEventsRoute(app: Hono, deps: WorkspaceEventsRou
       }
       const conversation = await deps.dataSource.findConversation(actor.tenantId, conversationIdRaw);
       if (!conversation) return context.json({ error: "conversation_not_found" }, 404);
-      const profile = await deps.getActorProfile(actor);
-      const access = await resolveCollaborationEntityAccess({
-        actor,
-        dataSource: deps.dataSource,
-        entityId: conversation.entityId,
-        entityType: conversation.entityType,
-        profile
-      });
-      if (!access.ok) return context.json({ error: access.error }, access.status);
-      if (!access.value.readDecision.allowed) {
-        return context.json({ error: access.value.readDecision.reason }, 403);
+      if (conversation.conversationType === "direct") {
+        // DM: доступ по членству (а не по правам на сущность).
+        const member = deps.dataSource.isConversationMember
+          ? await deps.dataSource.isConversationMember(actor.tenantId, conversation.id, actor.id)
+          : false;
+        if (!member) return context.json({ error: "conversation_forbidden" }, 403);
+      } else {
+        const profile = await deps.getActorProfile(actor);
+        const access = await resolveCollaborationEntityAccess({
+          actor,
+          dataSource: deps.dataSource,
+          entityId: conversation.entityId,
+          entityType: conversation.entityType,
+          profile
+        });
+        if (!access.ok) return context.json({ error: access.error }, access.status);
+        if (!access.value.readDecision.allowed) {
+          return context.json({ error: access.value.readDecision.reason }, 403);
+        }
       }
       channels.push(conversationChannel(conversationIdRaw));
     }

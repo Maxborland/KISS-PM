@@ -2381,9 +2381,39 @@ export const conversations = pgTable(
     ),
     check(
       "conversations_entity_type_chk",
-      sql`${table.entityType} in ('project', 'task', 'opportunity', 'client', 'contact', 'product', 'communication_channel')`
+      sql`${table.entityType} in ('project', 'task', 'opportunity', 'client', 'contact', 'product', 'communication_channel', 'direct')`
     ),
-    check("conversations_type_chk", sql`${table.conversationType} in ('default', 'meeting_followup')`)
+    check("conversations_type_chk", sql`${table.conversationType} in ('default', 'meeting_followup', 'direct')`)
+  ]
+);
+
+// Участники беседы (P4.2 DM): явное членство для прямых сообщений. Доступ к direct-беседе
+// определяется наличием строки здесь (а не правами на сущность). Сущностные беседы членство
+// не используют — доступ к ним остаётся по правам на entity.
+export const conversationMembers = pgTable(
+  "conversation_members",
+  {
+    tenantId: text("tenant_id").notNull(),
+    conversationId: text("conversation_id").notNull(),
+    userId: text("user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "conversation_members_pkey",
+      columns: [table.tenantId, table.conversationId, table.userId]
+    }),
+    index("conversation_members_user_idx").on(table.tenantId, table.userId),
+    foreignKey({
+      name: "conversation_members_conversation_fk",
+      columns: [table.tenantId, table.conversationId],
+      foreignColumns: [conversations.tenantId, conversations.id]
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "conversation_members_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade")
   ]
 );
 

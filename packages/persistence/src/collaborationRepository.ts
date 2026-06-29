@@ -58,6 +58,7 @@ import {
   callSessions,
   communicationChannelMembers,
   communicationChannels,
+  conversationMembers,
   conversationReadStates,
   conversations,
   discussionMessages,
@@ -155,6 +156,10 @@ export type CollaborationRepository = {
     entityType: CollaborationEntityType;
     entityId: string;
   }): Promise<Conversation[]>;
+  addConversationMembers(input: { tenantId: TenantId; conversationId: string; userIds: string[] }): Promise<void>;
+  isConversationMember(tenantId: TenantId, conversationId: string, userId: UserId): Promise<boolean>;
+  listConversationMemberIds(tenantId: TenantId, conversationId: string): Promise<string[]>;
+  listDirectConversationsForUser(tenantId: TenantId, userId: UserId): Promise<Conversation[]>;
   createDiscussionMessage(input: DiscussionMessageInput): Promise<DiscussionMessage>;
   listDiscussionMessages(input: {
     tenantId: TenantId;
@@ -592,6 +597,70 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         )
         .orderBy(asc(conversations.conversationType), asc(conversations.createdAt));
       return rows.map(mapConversation);
+    },
+    async addConversationMembers(input) {
+      if (input.userIds.length === 0) return;
+      const now = new Date();
+      await db
+        .insert(conversationMembers)
+        .values(
+          input.userIds.map((userId) => ({
+            tenantId: input.tenantId,
+            conversationId: input.conversationId,
+            userId,
+            createdAt: now
+          }))
+        )
+        .onConflictDoNothing();
+    },
+    async isConversationMember(tenantId, conversationId, userId) {
+      const [row] = await db
+        .select({ userId: conversationMembers.userId })
+        .from(conversationMembers)
+        .where(
+          and(
+            eq(conversationMembers.tenantId, tenantId),
+            eq(conversationMembers.conversationId, conversationId),
+            eq(conversationMembers.userId, userId)
+          )
+        )
+        .limit(1);
+      return Boolean(row);
+    },
+    async listConversationMemberIds(tenantId, conversationId) {
+      const rows = await db
+        .select({ userId: conversationMembers.userId })
+        .from(conversationMembers)
+        .where(
+          and(
+            eq(conversationMembers.tenantId, tenantId),
+            eq(conversationMembers.conversationId, conversationId)
+          )
+        )
+        .orderBy(asc(conversationMembers.userId));
+      return rows.map((row) => row.userId);
+    },
+    async listDirectConversationsForUser(tenantId, userId) {
+      const rows = await db
+        .select()
+        .from(conversations)
+        .innerJoin(
+          conversationMembers,
+          and(
+            eq(conversationMembers.tenantId, conversations.tenantId),
+            eq(conversationMembers.conversationId, conversations.id)
+          )
+        )
+        .where(
+          and(
+            eq(conversations.tenantId, tenantId),
+            eq(conversationMembers.userId, userId),
+            eq(conversations.conversationType, "direct"),
+            isNull(conversations.archivedAt)
+          )
+        )
+        .orderBy(desc(conversations.createdAt));
+      return rows.map((row) => mapConversation(row.conversations));
     },
     async createDiscussionMessage(input) {
       const [row] = await db
