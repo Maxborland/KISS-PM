@@ -111,7 +111,12 @@ export function AgentSurface() {
   }, [listProjects]);
 
   function openFilePicker() {
-    if (!anchorId) { addMessage("henry", "Сначала выберите проект, к которому привязать файл."); return; }
+    if (!anchorId) {
+      addMessage("henry", projects.length === 0
+        ? "Нет доступных проектов для привязки файла — вложения требуют проекта, которым вы управляете."
+        : "Сначала выберите проект, к которому привязать файл.");
+      return;
+    }
     fileRef.current?.click();
   }
 
@@ -142,13 +147,14 @@ export function AgentSurface() {
         : event.text.length > 80 ? `${event.text.slice(0, 80)}…` : event.text;
       setLiveSteps((steps) => [...steps, label]);
     }, attachmentIds);
-    setAttachments([]);
     if (!res.ok) {
+      // НЕ стираем вложения при сбое — пользователь сможет повторить, не загружая файл заново.
       addMessage("henry", `Не удалось обработать запрос: ${res.code}`);
       setPhase("draft");
       setLiveSteps([]);
       return;
     }
+    setAttachments([]); // успех — вложения учтены агентом, чистим панель
     const data = res.data;
     const newChanges = data.proposedActions.map(actionToChange);
     const map: Record<string, AgentActionInput> = {};

@@ -46,6 +46,10 @@ export type AgentLoopEvent =
 const DEADLINE_HIT = Symbol("deadline");
 async function awaitWithDeadline<T>(promise: Promise<T>, remainingMs: number): Promise<T | typeof DEADLINE_HIT> {
   if (!Number.isFinite(remainingMs)) return promise;
+  // Если дедлайн выиграет гонку, промис останется висеть и может ОТКЛОНИТЬСЯ позже (таймаут/сеть);
+  // без обработчика это unhandledRejection (вплоть до падения процесса). Гасим позднее отклонение —
+  // на исход гонки это не влияет (race по-прежнему увидит отклонение, если оно успеет до таймаута).
+  promise.catch(() => {});
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<typeof DEADLINE_HIT>((resolve) => {
     timer = setTimeout(() => resolve(DEADLINE_HIT), Math.max(0, remainingMs));
@@ -74,6 +78,11 @@ export async function runAgentLoop(input: {
   const maxTotalOutputTokens = input.limits?.maxTotalOutputTokens ?? Number.POSITIVE_INFINITY;
   const clock = input.now ?? (() => Date.now());
   const deadline = input.limits?.timeoutMs && input.limits.timeoutMs > 0 ? clock() + input.limits.timeoutMs : Number.POSITIVE_INFINITY;
+  // Гонку с дедлайном применяем только на реальных часах (тесты с инъекцией now полагаются на
+  // проверку между итерациями — фейковое время не совпадает с реальным setTimeout).
+  const raceClock = !input.now && Number.isFinite(deadline);
+  const raceIt = <T,>(promise: Promise<T>): Promise<T | typeof DEADLINE_HIT> =>
+    raceClock ? awaitWithDeadline(promise, deadline - clock()) : promise;
   const toolByName = new Map(input.tools.map((tool) => [tool.name, tool]));
   const toolSchemas = input.tools.map((tool) => ({ name: tool.name, description: tool.description, input_schema: tool.inputSchema }));
 
@@ -95,12 +104,7 @@ export async function runAgentLoop(input: {
     if (clock() >= deadline) { stopReason = "deadline"; break; }
     if (outputTokens >= maxTotalOutputTokens) { stopReason = "token_budget"; break; }
     iterations += 1;
-    // Гонку с дедлайном применяем только на реальных часах (тесты с инъекцией now полагаются
-    // на проверку между итерациями — фейковое время не совпадает с реальным setTimeout).
-    const messagePromise = input.provider.createMessage({ system: input.system, messages, tools: toolSchemas });
-    const raced = !input.now && Number.isFinite(deadline)
-      ? await awaitWithDeadline(messagePromise, deadline - clock())
-      : await messagePromise;
+    const raced = await raceIt(input.provider.createMessage({ system: input.system, messages, tools: toolSchemas }));
     if (raced === DEADLINE_HIT) { stopReason = "deadline"; break; }
     const response = raced;
     outputTokens += response.usage?.outputTokens ?? 0;
@@ -119,6 +123,7 @@ export async function runAgentLoop(input: {
     // (это не требует нового вызова LLM), а следующую итерацию остановит проверка наверху цикла.
 
     const toolResults: LlmToolResultBlock[] = [];
+    let deadlineHit = false;
     for (const use of toolUses) {
       const tool = toolByName.get(use.name);
       if (!tool) {
@@ -127,7 +132,9 @@ export async function runAgentLoop(input: {
       }
       if (tool.kind === "analyze") {
         try {
-          const result = await input.executeAnalyze(tool, use.input);
+          // Дедлайн покрывает и analyze (внутренний fan-out может зависнуть), не только LLM-вызов.
+          const result = await raceIt(input.executeAnalyze(tool, use.input));
+          if (result === DEADLINE_HIT) { deadlineHit = true; break; }
           analyzeResults.push({ tool: tool.name, input: use.input, result });
           toolResults.push({ type: "tool_result", tool_use_id: use.id, content: JSON.stringify(result).slice(0, 16_000) });
           await emit({ type: "analyze", tool: tool.name, title: tool.title, ok: true });
@@ -142,6 +149,7 @@ export async function runAgentLoop(input: {
         await emit({ type: "proposal", tool: tool.name, title: tool.title });
       }
     }
+    if (deadlineHit) { stopReason = "deadline"; break; }
     messages.push({ role: "user", content: toolResults });
   }
 

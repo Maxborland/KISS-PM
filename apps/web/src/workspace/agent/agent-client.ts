@@ -98,8 +98,10 @@ export function createAgentClient(options: AgentApiClientOptions) {
       let body: Record<string, unknown> = {};
       try { const parsed: unknown = JSON.parse(raw); if (parsed && typeof parsed === "object") body = parsed as Record<string, unknown>; } catch { /* keep */ }
       if (!response.ok) throw new AgentApiError(response.status, typeof body.error === "string" ? body.error : "upload_failed");
-      const attachment = (body.attachment ?? {}) as { id?: unknown; safeDisplayName?: unknown; originalName?: unknown };
-      return { id: String(attachment.id ?? ""), name: String(attachment.safeDisplayName ?? attachment.originalName ?? file.name) };
+      // serializeAttachment кладёт имя под fileAsset (наверху только id) — берём оттуда.
+      const attachment = (body.attachment ?? {}) as { id?: unknown; fileAsset?: { safeDisplayName?: unknown; originalName?: unknown } };
+      const fileAsset = attachment.fileAsset ?? {};
+      return { id: String(attachment.id ?? ""), name: String(fileAsset.safeDisplayName ?? fileAsset.originalName ?? file.name) };
     },
     // Активные проекты тенанта — для выбора якоря вложения.
     async listProjects(): Promise<Array<{ id: string; label: string }>> {
@@ -131,23 +133,29 @@ export function createAgentClient(options: AgentApiClientOptions) {
         if (eventName === "error") { const e = JSON.parse(data) as { error?: string }; throw new AgentApiError(500, e.error ?? "agent_failed"); }
         onEvent(JSON.parse(data) as AgentStreamEvent);
       };
-      // Парсим SSE-кадры (event:/data:), разделённые пустой строкой.
-      for (;;) {
-        const { value, done: streamDone } = await reader.read();
-        if (streamDone) break;
-        buffer += decoder.decode(value, { stream: true });
-        let sep: number;
-        while ((sep = buffer.indexOf("\n\n")) >= 0) {
-          const frame = buffer.slice(0, sep);
-          buffer = buffer.slice(sep + 2);
-          let eventName = "message";
-          const dataLines: string[] = [];
-          for (const line of frame.split("\n")) {
-            if (line.startsWith("event:")) eventName = line.slice(6).trim();
-            else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+      try {
+        // Парсим SSE-кадры (event:/data:), разделённые пустой строкой. Нормализуем CRLF→LF
+        // (прокси/CDN могут переписать переводы строк) — иначе границы кадров не находятся.
+        for (;;) {
+          const { value, done: streamDone } = await reader.read();
+          if (streamDone) break;
+          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+          let sep: number;
+          while ((sep = buffer.indexOf("\n\n")) >= 0) {
+            const frame = buffer.slice(0, sep);
+            buffer = buffer.slice(sep + 2);
+            let eventName = "message";
+            const dataLines: string[] = [];
+            for (const line of frame.split("\n")) {
+              if (line.startsWith("event:")) eventName = line.slice(6).trim();
+              else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+            }
+            handleEvent(eventName, dataLines.join("\n"));
           }
-          handleEvent(eventName, dataLines.join("\n"));
         }
+      } finally {
+        // Всегда отпускаем поток — в т.ч. когда handleEvent бросил на `event: error`.
+        await reader.cancel().catch(() => {});
       }
       if (!done) throw new AgentApiError(500, "stream_incomplete");
       return done;

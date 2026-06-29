@@ -80,4 +80,35 @@ describe("agent attachments", () => {
     expect(result[1]!.content.length).toBeLessThanOrEqual(50_000);
     expect(result[1]!.content.length).toBeGreaterThan(40_000);
   });
+
+  it("review #7: octet-stream извлекается как текст, null-байт → бинарь-метка", async () => {
+    const responses: Record<string, Response> = {
+      "octet": new Response("plain brief text", { status: 200, headers: { "content-type": "application/octet-stream", "content-disposition": 'attachment; filename="brief.md"' } }),
+      "nul": new Response(`prefix${String.fromCharCode(0)}suffix`, { status: 200, headers: { "content-type": "application/octet-stream", "content-disposition": 'attachment; filename="data.bin"' } })
+    };
+    const app = {
+      request: (path: string) => Promise.resolve(responses[/attachments\/([^/]+)\/download/.exec(path)?.[1] ?? ""] ?? new Response("", { status: 404 }))
+    } as unknown as ApiApp;
+
+    const result = await resolveAttachments(app, null, ["octet", "nul"]);
+    expect(result[0]).toEqual({ name: "brief.md", content: "plain brief text" }); // octet-stream c текстом извлечён
+    expect(result[1]!.content).toContain("бинарный файл"); // null-байт → не текст
+  });
+
+  it("review #9: превышение бюджета честно маркируется числом опущенных файлов", async () => {
+    const responses: Record<string, Response> = {
+      "big": new Response("x".repeat(50_000), { status: 200, headers: { "content-type": "text/plain", "content-disposition": 'attachment; filename="big.txt"' } }),
+      "a": new Response("a", { status: 200, headers: { "content-type": "text/plain", "content-disposition": 'attachment; filename="a.txt"' } }),
+      "b": new Response("b", { status: 200, headers: { "content-type": "text/plain", "content-disposition": 'attachment; filename="b.txt"' } })
+    };
+    const app = {
+      request: (path: string) => Promise.resolve(responses[/attachments\/([^/]+)\/download/.exec(path)?.[1] ?? ""] ?? new Response("", { status: 404 }))
+    } as unknown as ApiApp;
+
+    const result = await resolveAttachments(app, null, ["big", "a", "b"]);
+    // big заполняет бюджет; a и b опущены → один маркер с числом 2
+    const marker = result.find((r) => r.content.includes("опущено"));
+    expect(marker).toBeDefined();
+    expect(marker!.content).toContain("2 файл");
+  });
 });
