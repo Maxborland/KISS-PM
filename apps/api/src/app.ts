@@ -243,7 +243,6 @@ export function createApp(options: CreateAppOptions = {}) {
     isWorkspaceUserActive,
     runDataSourceTransaction,
     secureCookies,
-    exposeDevSecrets: enableDevTenantRoutes,
     storageProvider,
     videoProvider,
     trustForwardedAuthHeaders

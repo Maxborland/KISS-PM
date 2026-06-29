@@ -357,15 +357,6 @@ export type UserSessionRecord = {
   ipAddress?: string | null;
   lastSeenAt?: Date | null;
 };
-export type PasswordResetTokenRecord = {
-  id: string;
-  tenantId: TenantId;
-  userId: UserId;
-  email: string;
-  tokenHash: string;
-  expiresAt: Date;
-  consumedAt: Date | null;
-};
 
 export type ManagementAuditEventInput = {
   auditEventId?: string;
@@ -390,7 +381,6 @@ export type ApiTenantDataSource = {
   listDevUsers(): Promise<TenantUser[]>;
   findUserById(userId: UserId): Promise<TenantUser | undefined>;
   findTenantById(tenantId: TenantId): Promise<Tenant | undefined>;
-  createTenant?(input: Tenant): Promise<Tenant>;
   findAccessProfileById?(
     tenantId: TenantId,
     accessProfileId: string
@@ -671,9 +661,6 @@ export type ApiTenantDataSource = {
   deleteSessionByTokenHash?(tokenHash: string): Promise<void>;
   deleteSessionById?(tenantId: TenantId, userId: UserId, sessionId: string): Promise<boolean>;
   deleteSessionsByUserId?(tenantId: TenantId, userId: UserId): Promise<void>;
-  createPasswordResetToken?(input: Omit<PasswordResetTokenRecord, "consumedAt">): Promise<void>;
-  findPasswordResetTokenByHash?(tokenHash: string): Promise<PasswordResetTokenRecord | undefined>;
-  consumePasswordResetToken?(tokenHash: string, consumedAt: Date): Promise<void>;
   withTransaction?<T>(
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
   ): Promise<T>;

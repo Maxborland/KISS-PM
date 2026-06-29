@@ -1,5 +1,4 @@
-import { hashPassword, hashSessionToken, verifyPassword } from "@kiss-pm/persistence";
-import { permissions } from "@kiss-pm/access-control";
+import { hashSessionToken, verifyPassword } from "@kiss-pm/persistence";
 import { randomBytes, randomUUID } from "node:crypto";
 import {
   buildExpiredSessionCookieHeader,
@@ -24,7 +23,6 @@ const loginEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
   const {
     dataSource,
-    exposeDevSecrets,
     getActorProfile,
     getSessionActorFromHeaders,
     isWorkspaceUserActive,
@@ -105,129 +103,6 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
       throw error;
     }
-  });
-
-  // Самрегистрация нового тенанта: свежий tenant + роль-владелец (полный каталог прав) +
-  // пользователь + кред, затем авто-логин. Порядок проверок зеркалит фронтовый contract-mock.
-  app.post("/api/auth/register", async (context) => {
-    const ds = dataSource;
-    if (
-      !ds.findCredentialByEmail || !ds.createTenant || !ds.createAccessProfile ||
-      !ds.createWorkspaceUser || !ds.upsertCredential || !ds.createSession || !ds.withTransaction
-    ) {
-      return context.json({ error: "auth_not_configured" }, 501);
-    }
-
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseRegistrationInput(body.value);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const { email, name, password } = parsed.value;
-
-    const existing = await ds.findCredentialByEmail(email);
-    if (existing) return context.json({ error: "email_taken" }, 409);
-
-    const tenantId = `tenant-${randomUUID()}`;
-    const accessProfileId = `access-profile-${randomUUID()}`;
-    const userId = `user-${randomUUID()}`;
-    const { passwordHash, passwordSalt } = hashPassword(password);
-
-    const created = await deps.runDataSourceTransaction(async (tx) => {
-      if (!tx.createTenant || !tx.createAccessProfile || !tx.createWorkspaceUser || !tx.upsertCredential) {
-        return { ok: false as const };
-      }
-      await tx.createTenant({ id: tenantId, name });
-      await tx.createAccessProfile({ id: accessProfileId, tenantId, name: "Владелец", permissions: [...permissions] });
-      await tx.createWorkspaceUser({
-        id: userId, tenantId, accessProfileId, positionId: null,
-        email, name, phone: null, telegram: null, status: "active", theme: "light", accentColor: "#0f766e"
-      });
-      await tx.upsertCredential({ userId, tenantId, email, passwordHash, passwordSalt });
-      return { ok: true as const };
-    });
-    if (!created.ok) return context.json({ error: "auth_not_configured" }, 501);
-
-    // Авто-логин: создаём сессию (как login) + Set-Cookie.
-    const rawToken = randomBytes(32).toString("hex");
-    const loginNow = new Date();
-    await ds.createSession({
-      id: `session-${randomUUID()}`,
-      tenantId,
-      userId,
-      tokenHash: hashSessionToken(rawToken),
-      expiresAt: new Date(loginNow.getTime() + sessionTtlMs),
-      userAgent: normalizeUserAgent(context.req.header("user-agent")),
-      ipAddress: getClientIp(context.req.raw.headers, { trustForwardedHeaders: trustForwardedAuthHeaders }) ?? null,
-      lastSeenAt: loginNow
-    });
-    context.header("Set-Cookie", buildSessionCookieHeader(rawToken, { secure: secureCookies }));
-    return context.json({ user: { id: userId, tenantId, name, accessProfileId }, workspace: { id: tenantId } }, 201);
-  });
-
-  // Запрос сброса пароля: anti-enumeration — ВСЕГДА 202 {status:"ok"}.
-  // Для известного email создаётся reset-токен; доставка: dev → devToken в ответе, иначе письмо.
-  app.post("/api/auth/password-reset/request", async (context) => {
-    const ds = dataSource;
-    if (!ds.findCredentialByEmail || !ds.createPasswordResetToken) {
-      return context.json({ error: "auth_not_configured" }, 501);
-    }
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    const email = parseResetRequestEmail(body.value);
-    if (!email) return context.json({ error: "invalid_email" }, 400);
-
-    let devToken: string | undefined;
-    const credential = await ds.findCredentialByEmail(email);
-    if (credential) {
-      const rawToken = randomBytes(32).toString("hex");
-      await ds.createPasswordResetToken({
-        id: `reset-${randomUUID()}`,
-        tenantId: credential.tenantId,
-        userId: credential.userId,
-        email,
-        tokenHash: hashSessionToken(rawToken),
-        expiresAt: new Date(Date.now() + resetTokenTtlMs)
-      });
-      // Доставка токена. dev (KISS_PM_ENABLE_DEV_ROUTES) → отдаём в ответе для тестов/демо.
-      // ponytail: prod-путь — console-лог как временная доставка; заменить на EmailProvider.send,
-      // когда подключим SMTP/почтового провайдера (письмо со ссылкой сброса).
-      if (exposeDevSecrets) devToken = rawToken;
-      else console.info(`[password-reset] токен для ${email}: ${rawToken} — настройте EmailProvider для доставки письмом`);
-    }
-    // НЕ раскрываем существование email: статус всегда 202. devToken — только dev и только для известного email.
-    return context.json(devToken ? { status: "ok", devToken } : { status: "ok" }, 202);
-  });
-
-  // Подтверждение сброса: меняем пароль по токену, помечаем токен использованным, гасим все сессии.
-  app.post("/api/auth/password-reset/confirm", async (context) => {
-    const ds = dataSource;
-    if (
-      !ds.findPasswordResetTokenByHash || !ds.consumePasswordResetToken ||
-      !ds.upsertCredential || !ds.deleteSessionsByUserId || !ds.withTransaction
-    ) {
-      return context.json({ error: "auth_not_configured" }, 501);
-    }
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseResetConfirmInput(body.value);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const { token, password } = parsed.value;
-
-    const record = await ds.findPasswordResetTokenByHash(hashSessionToken(token));
-    if (!record) return context.json({ error: "invalid_reset_token" }, 400);
-    if (record.consumedAt !== null) return context.json({ error: "reset_token_used" }, 400);
-    if (Date.now() >= record.expiresAt.getTime()) return context.json({ error: "token_expired" }, 400);
-
-    const { passwordHash, passwordSalt } = hashPassword(password);
-    await deps.runDataSourceTransaction(async (tx) => {
-      if (!tx.upsertCredential || !tx.consumePasswordResetToken || !tx.deleteSessionsByUserId) {
-        throw new Error("transactional_password_reset_not_configured");
-      }
-      await tx.upsertCredential({ userId: record.userId, tenantId: record.tenantId, email: record.email, passwordHash, passwordSalt });
-      await tx.consumePasswordResetToken(record.tokenHash, new Date());
-      await tx.deleteSessionsByUserId(record.tenantId, record.userId); // инвалидация всех сессий
-    });
-    return context.json({ status: "ok" });
   });
 
   app.post("/api/auth/logout", async (context) => {
@@ -435,77 +310,6 @@ function parseLoginCredentials(
   return { ok: true, value: { email, password } };
 }
 
-const maxRegistrationNameLength = 160;
-
-// Парсер тела /register: email+name → invalid_registration_payload; пароль (слабый) → weak_password.
-// Порядок зеркалит фронтовый contract-mock (mock-auth-backend): payload(email+name) → weak_password.
-function parseRegistrationInput(
-  value: unknown
-):
-  | { ok: true; value: { email: string; name: string; password: string } }
-  | { ok: false; error: string } {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { ok: false, error: "invalid_registration_payload" };
-  }
-  const record = value as { email?: unknown; password?: unknown; name?: unknown };
-  if (typeof record.email !== "string") return { ok: false, error: "invalid_registration_payload" };
-  const email = record.email.trim().toLowerCase();
-  if (
-    email.length < 3 ||
-    email.length > maxLoginEmailLength ||
-    hasControlChar(email) ||
-    !loginEmailPattern.test(email)
-  ) {
-    return { ok: false, error: "invalid_registration_payload" };
-  }
-  if (typeof record.name !== "string") return { ok: false, error: "invalid_registration_payload" };
-  const name = record.name.trim();
-  if (name.length < 1 || name.length > maxRegistrationNameLength || hasControlChar(name)) {
-    return { ok: false, error: "invalid_registration_payload" };
-  }
-  if (isWeakPassword(record.password)) return { ok: false, error: "weak_password" };
-  return { ok: true, value: { email, name, password: record.password as string } };
-}
-
-// Парольная политика: ≥8, ≤1024, без управляющих символов (зеркало мок isWeakPassword / доменной политики).
-function isWeakPassword(value: unknown): boolean {
-  return typeof value !== "string" || value.length < 8 || value.length > maxLoginPasswordLength || hasControlChar(value);
-}
-
-const resetTokenTtlMs = 60 * 60 * 1000; // 1 час
-const maxResetTokenLength = 256;
-
-// /password-reset/request: email только по формату (anti-enumeration) — иначе invalid_email.
-function parseResetRequestEmail(value: unknown): string | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const email = (value as { email?: unknown }).email;
-  if (typeof email !== "string") return null;
-  const normalized = email.trim().toLowerCase();
-  if (
-    normalized.length < 3 ||
-    normalized.length > maxLoginEmailLength ||
-    hasControlChar(normalized) ||
-    !loginEmailPattern.test(normalized)
-  ) {
-    return null;
-  }
-  return normalized;
-}
-
-// /password-reset/confirm: token (1..256, /^[A-Za-z0-9]+$/) → invalid_reset_confirm_payload; пароль → weak_password.
-function parseResetConfirmInput(
-  value: unknown
-):
-  | { ok: true; value: { token: string; password: string } }
-  | { ok: false; error: string } {
-  const record = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-  const token = typeof record.token === "string" ? record.token : "";
-  if (token.length < 1 || token.length > maxResetTokenLength || !/^[A-Za-z0-9]+$/.test(token)) {
-    return { ok: false, error: "invalid_reset_confirm_payload" };
-  }
-  if (isWeakPassword(record.password)) return { ok: false, error: "weak_password" };
-  return { ok: true, value: { token, password: record.password as string } };
-}
 
 function toPublicUser(user: TenantUser) {
   return {
