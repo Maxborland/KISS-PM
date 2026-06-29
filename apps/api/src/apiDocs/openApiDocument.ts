@@ -35,6 +35,7 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/tenant/current/access-profiles", tag: "Access control", summary: "List access profiles", successSchema: "AccessProfilesResponse" },
   { method: "post", path: "/api/tenant/current/access-profiles", tag: "Access control", summary: "Create access profile", requestSchema: "AccessProfileWriteRequest", successSchema: "AccessProfileResponse", successStatus: 201 },
   { method: "get", path: "/api/workspace/access-roles", tag: "Access control", summary: "List workspace access roles", successSchema: "AccessProfilesResponse" },
+  { method: "get", path: "/api/workspace/permission-catalog", tag: "Access control", summary: "List assignable permission catalog" },
   { method: "patch", path: "/api/workspace/access-roles/:roleId", tag: "Access control", summary: "Update workspace access role", requestSchema: "AccessProfileWriteRequest", successSchema: "AccessProfileResponse" },
   { method: "delete", path: "/api/workspace/access-roles/:roleId", tag: "Access control", summary: "Archive workspace access role", body: "none", successSchema: "OkResponse" },
   { method: "get", path: "/api/tenant/current/audit-events", tag: "Audit", summary: "List tenant audit events", successSchema: "AuditEventsResponse", queryParameters: [{ name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } }] },
