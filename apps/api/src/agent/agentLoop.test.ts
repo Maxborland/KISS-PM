@@ -65,5 +65,54 @@ describe("runAgentLoop", () => {
     expect(result.iterations).toBe(1);
     expect(result.proposedActions).toHaveLength(0);
     expect(result.reasoning).toContain("Нет безопасных действий");
+    expect(result.stopReason).toBe("completed");
+  });
+
+  it("останавливается по токен-бюджету (stopReason=token_budget)", async () => {
+    // Каждый ответ зовёт analyze (цикл продолжается) + тратит 600 токенов; бюджет 1000 → стоп после 2-го.
+    const loop: LlmResponse = {
+      stopReason: "tool_use",
+      content: [{ type: "tool_use", id: "t", name: "list_my_tasks", input: {} }],
+      usage: { inputTokens: 0, outputTokens: 600 }
+    };
+    const result = await runAgentLoop({
+      provider: createMockLlmProvider([loop]),
+      system: "test",
+      goal: "тест",
+      tools: [listMyTasks],
+      executeAnalyze: vi.fn().mockResolvedValue({ tasks: [] }),
+      limits: { maxTotalOutputTokens: 1000, maxIterations: 50 }
+    });
+    expect(result.stopReason).toBe("token_budget");
+    expect(result.outputTokens).toBeGreaterThanOrEqual(1000);
+    expect(result.iterations).toBeLessThan(50);
+  });
+
+  it("останавливается по дедлайну (stopReason=deadline)", async () => {
+    let t = 0;
+    const result = await runAgentLoop({
+      provider: createMockLlmProvider([{ stopReason: "tool_use", content: [{ type: "tool_use", id: "t", name: "list_my_tasks", input: {} }] }]),
+      system: "test",
+      goal: "тест",
+      tools: [listMyTasks],
+      executeAnalyze: vi.fn().mockResolvedValue({ tasks: [] }),
+      limits: { timeoutMs: 100, maxIterations: 50 },
+      now: () => (t += 60) // 0,60,120… → дедлайн 100 пройден на 2-й проверке
+    });
+    expect(result.stopReason).toBe("deadline");
+    expect(result.iterations).toBeLessThan(50);
+  });
+
+  it("останавливается по максимуму итераций (stopReason=max_iterations)", async () => {
+    const result = await runAgentLoop({
+      provider: createMockLlmProvider([{ stopReason: "tool_use", content: [{ type: "tool_use", id: "t", name: "list_my_tasks", input: {} }] }]),
+      system: "test",
+      goal: "тест",
+      tools: [listMyTasks],
+      executeAnalyze: vi.fn().mockResolvedValue({ tasks: [] }),
+      limits: { maxIterations: 3 }
+    });
+    expect(result.stopReason).toBe("max_iterations");
+    expect(result.iterations).toBe(3);
   });
 });

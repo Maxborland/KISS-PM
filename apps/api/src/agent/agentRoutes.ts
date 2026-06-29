@@ -23,6 +23,19 @@ const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_res
 
 const OVERLOAD_CAP = 30; // ponytail: режем payload до топ-N перегрузок (по минутам), upgrade — пагинация если мало
 
+// Лимиты цикла из env (стоимость/время) с разумными дефолтами. 0/пусто → дефолт.
+function agentLimitsFromEnv(): { maxIterations: number; maxTotalOutputTokens: number; timeoutMs: number } {
+  const num = (value: string | undefined, fallback: number) => {
+    const parsed = Number.parseInt(value ?? "", 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
+  return {
+    maxIterations: num(process.env.KISS_PM_AGENT_MAX_ITERATIONS, 6),
+    maxTotalOutputTokens: num(process.env.KISS_PM_AGENT_MAX_OUTPUT_TOKENS, 16_000),
+    timeoutMs: num(process.env.KISS_PM_AGENT_TIMEOUT_MS, 60_000)
+  };
+}
+
 /**
  * Внутренняя переотправка в тот же Hono-app — агент НЕ дублирует governed-логику, а зовёт те же
  * эндпоинты планирования (scenarios/preview, scenarios/:id/apply, apply-command-batch), что и
@@ -160,7 +173,8 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       system: AGENT_SYSTEM_PROMPT,
       goal,
       tools: offered,
-      executeAnalyze: buildAnalyzeExecutor(deps, app, cookie, actor.tenantId, actor.id)
+      executeAnalyze: buildAnalyzeExecutor(deps, app, cookie, actor.tenantId, actor.id),
+      limits: agentLimitsFromEnv()
     });
 
     // Аннотируем предложения грубым capability (точная проверка — при /execute).
@@ -176,7 +190,9 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       reasoning: result.reasoning,
       analyzeResults: result.analyzeResults,
       proposedActions,
-      iterations: result.iterations
+      iterations: result.iterations,
+      stopReason: result.stopReason,
+      outputTokens: result.outputTokens
     });
   });
 
