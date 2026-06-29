@@ -47,6 +47,13 @@ function actionToChange(action: ProposedAction, index: number): DemoChange {
   if (action.tool === "change_task_status") {
     before = "текущий статус";
     after = humanizeStatus(String(action.input.statusId ?? ""));
+  } else if (action.tool === "apply_resource_resolution") {
+    before = "ресурсная перегрузка";
+    after = "план разрешения";
+  } else if (action.tool === "apply_plan_commands") {
+    before = "текущий план";
+    const count = Array.isArray(action.input.commands) ? action.input.commands.length : 0;
+    after = `${count} изменени${count === 1 ? "е" : "я"} плана`;
   }
   return {
     id: `chg-${index}`,
