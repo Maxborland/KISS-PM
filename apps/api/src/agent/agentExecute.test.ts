@@ -97,6 +97,21 @@ async function post(app: ReturnType<typeof createApp>, path: string, body: unkno
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
 
+describe("agent /execute → comment_task is wired (no more 501)", () => {
+  it("re-dispatches comment_task to the governed comments route instead of returning tool_not_executable_yet", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "comment_task", input: { taskId: "task-x", body: "Готово к проверке" } }]
+    });
+    const results = execute.body.results as Array<{ tool: string; ok: boolean; status?: number; error?: string }>;
+    // Раньше агент отвечал tool_not_executable_yet; теперь действие реально уходит в governed-роут
+    // комментариев. В этом harness нет персистентности комментариев → роут отвечает своей ошибкой
+    // (persistence_not_configured), что и доказывает: переотправка ДОШЛА до governed-роута.
+    expect(results[0]!.error).not.toBe("tool_not_executable_yet");
+    expect(["persistence_not_configured", "task_not_found", "permission_missing"]).toContain(results[0]!.error);
+  });
+});
+
 describe("agent /execute → governed scenario apply (internal re-dispatch)", () => {
   it("applies a previewed resource resolution through the agent and bumps the plan version", async () => {
     const harness = createHarness();

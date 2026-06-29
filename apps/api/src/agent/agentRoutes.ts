@@ -26,6 +26,9 @@ const AGENT_SYSTEM_PROMPT = [
 // исполняется вживую через governed-эндпоинт scenarios/preview (он стейджит сценарные run'ы,
 // плана не меняет) — агент получает их id, чтобы предложить применение.
 const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_resource_overloads", "preview_resource_resolution"]);
+// mutation-инструменты, которые /execute РЕАЛЬНО применяет. LLM предлагают только их — иначе
+// агент мог бы предложить действие, которое при подтверждении вернёт 501 (сломанное обещание).
+const EXECUTABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "create_task", "apply_resource_resolution", "apply_plan_commands"]);
 
 const OVERLOAD_CAP = 30; // ponytail: режем payload до топ-N перегрузок (по минутам), upgrade — пагинация если мало
 
@@ -267,8 +270,10 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     onEvent?: (event: AgentLoopEvent) => void | Promise<void>
   ) {
     const allowed = allowedToolsForActor(actor, profile);
-    // LLM получает: разрешённые mutation-инструменты (как предлагаемые) + подключённые analyze.
-    const offered = allowed.filter((tool) => tool.kind === "mutation" || WIRED_ANALYZE.has(tool.name));
+    // LLM получает только то, что реально можно выполнить: исполнимые mutation + подключённые analyze.
+    const offered = allowed.filter((tool) =>
+      (tool.kind === "mutation" && EXECUTABLE_MUTATIONS.has(tool.name)) || WIRED_ANALYZE.has(tool.name)
+    );
     const attachments = attachmentIds.length > 0 ? await resolveAttachments(app, cookie, attachmentIds) : [];
     const result = await runAgentLoop({
       provider: createAgentLlmProviderFromEnv(),
@@ -410,7 +415,39 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
         continue;
       }
 
-      // Остальные mutation (update/create/comment) подключаются отдельно.
+      // Комментарий к задаче — переотправка в governed POST /tasks/:id/comments.
+      if (tool.name === "comment_task") {
+        const taskId = typeof input.taskId === "string" ? input.taskId : "";
+        const commentBody = typeof input.body === "string" ? input.body : "";
+        if (!taskId || !commentBody) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
+          continue;
+        }
+        const res = await dispatchInternal(app, cookie, `/api/workspace/tasks/${taskId}/comments`, { body: commentBody });
+        if (res.status === 200 || res.status === 201) results.push({ tool: tool.name, ok: true, result: res.body });
+        else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "comment_failed" });
+        continue;
+      }
+
+      // Создание задачи — переотправка в governed POST [/projects/:id]/tasks.
+      if (tool.name === "create_task") {
+        const title = typeof input.title === "string" ? input.title : "";
+        const description = typeof input.description === "string" ? input.description : "";
+        const projectId = typeof input.projectId === "string" ? input.projectId : "";
+        if (!title) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
+          continue;
+        }
+        const path = projectId ? `/api/workspace/projects/${projectId}/tasks` : "/api/workspace/tasks";
+        const res = await dispatchInternal(app, cookie, path, { title, priority: "normal", ...(description ? { description } : {}) });
+        if (res.status === 200 || res.status === 201) results.push({ tool: tool.name, ok: true, result: res.body });
+        else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "create_failed" });
+        continue;
+      }
+
+      // update_task пока НЕ исполняем: PATCH требует полное тело + clientUpdatedAt (риск затирания
+      // участников при сборке из частичных fields). До безопасного частичного апдейта он не
+      // предлагается LLM (см. EXECUTABLE_MUTATIONS), так что сюда штатно не попадаем.
       results.push({ tool: tool.name, ok: false, status: 501, error: "tool_not_executable_yet" });
     }
 
