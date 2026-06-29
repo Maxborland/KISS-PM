@@ -31,6 +31,7 @@ import { registerBackgroundJobRoutes } from "./backgroundJobRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
 import { registerCollaborationRoutes } from "./collaborationRoutes";
 import { registerWorkspaceEventsRoute } from "./workspaceEventsRoute";
+import { registerAgentRoutes } from "./agent/agentRoutes";
 import { registerCommunicationUpgradeRoutes } from "./communicationUpgradeRoutes";
 import { registerCommunicationRealtimeRoutes } from "./communicationRealtimeRoutes";
 import { registerCommunicationRecordingWebhookRoute } from "./communicationRecordingWebhookRoute";
@@ -270,6 +271,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerControlSurfaceRoutes(app, routeDeps);
   registerCollaborationRoutes(app, routeDeps);
   registerWorkspaceEventsRoute(app, routeDeps);
+  registerAgentRoutes(app, routeDeps);
   registerCommunicationUpgradeRoutes(app, routeDeps);
   registerCommunicationRealtimeRoutes(app, routeDeps);
   registerCommunicationRecordingWebhookRoute(app, routeDeps);
