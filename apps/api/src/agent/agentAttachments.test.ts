@@ -111,4 +111,19 @@ describe("agent attachments", () => {
     expect(marker).toBeDefined();
     expect(marker!.content).toContain("2 файл");
   });
+
+  it("превышение ЧИСЛА файлов (>5) тоже маркируется (review fac8a686)", async () => {
+    const app = {
+      request: (path: string) => {
+        const id = /attachments\/([^/]+)\/download/.exec(path)?.[1] ?? "";
+        return Promise.resolve(new Response(id, { status: 200, headers: { "content-type": "text/plain", "content-disposition": `attachment; filename="${id}.txt"` } }));
+      }
+    } as unknown as ApiApp;
+
+    const result = await resolveAttachments(app, null, ["f1", "f2", "f3", "f4", "f5", "f6", "f7"]);
+    // 5 обработано + маркер про 2 опущенных
+    expect(result.filter((r) => r.name !== "—")).toHaveLength(5);
+    const marker = result.find((r) => r.content.includes("опущено"));
+    expect(marker!.content).toContain("2 файл");
+  });
 });

@@ -69,13 +69,10 @@ export async function resolveAttachments(app: ApiApp, cookie: string | null, ids
   const out: Array<{ name: string; content: string }> = [];
   const wanted = ids.slice(0, ATTACH_MAX_COUNT);
   let total = 0;
+  let budgetDropped = 0; // файлы, опущенные из-за исчерпания символьного бюджета
   const push = (name: string, content: string) => { out.push({ name, content }); total += content.length; };
   for (let i = 0; i < wanted.length; i += 1) {
-    if (total >= ATTACH_MAX_TOTAL_CHARS) {
-      // Бюджет исчерпан — не молчим: сообщаем модели, сколько файлов опущено.
-      out.push({ name: "—", content: `(ещё ${wanted.length - i} файл(ов) опущено: превышен лимит контекста ${ATTACH_MAX_TOTAL_CHARS} символов)` });
-      break;
-    }
+    if (total >= ATTACH_MAX_TOTAL_CHARS) { budgetDropped = wanted.length - i; break; }
     const id = wanted[i]!;
     try {
       const response = await app.request(`/api/workspace/attachments/${encodeURIComponent(id)}/download`, {
@@ -98,12 +95,20 @@ export async function resolveAttachments(app: ApiApp, cookie: string | null, ids
       // битый файл/декод — пропускаем, не роняя propose
     }
   }
+  // Опущенные файлы (превышен лимит по числу ИЛИ по символам) честно маркируем — иначе агент
+  // (и пользователь) принимали бы решение по неполному контексту, не зная об этом.
+  const omitted = (ids.length - wanted.length) + budgetDropped;
+  if (omitted > 0) {
+    out.push({ name: "—", content: `(ещё ${omitted} файл(ов) опущено: лимит ${ATTACH_MAX_COUNT} вложений и ${ATTACH_MAX_TOTAL_CHARS} символов контекста)` });
+  }
   return out;
 }
 
+// Не режем до ATTACH_MAX_COUNT здесь — иначе resolveAttachments не узнает истинное число и не
+// сможет сообщить об опущенных. Лишь страхуемся верхним пределом от абьюза огромным массивом.
 function parseAttachmentIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, ATTACH_MAX_COUNT);
+  return value.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 50);
 }
 
 // Лимиты цикла из env (стоимость/время) с разумными дефолтами. 0/пусто → дефолт.
