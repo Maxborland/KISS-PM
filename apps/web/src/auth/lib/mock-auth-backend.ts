@@ -19,7 +19,7 @@
    - login/logout/me + правка профиля — зеркаль дословно коды/статусы/
      порядок из apps/api/src/authRoutes.ts (rawMaps area auth-login).
    - register / password-reset/* — боевой контракт реализован
-     apps/api/src/authRegistrationRoutes.ts + packages/domain/src/auth;
+     apps/api/src/authRoutes.ts + packages/domain/src/auth;
      мок зеркалит коды/статусы/порядок. Единственное упрощение —
      письма нет: токен сброса отдаётся отдельным devToken-полем как
      демо-замена письма (в боевом ответе только {status:"ok"}).
@@ -379,7 +379,7 @@ export function createMockAuthFetch(): typeof fetch {
 
     /* ============================================================
        БОЕВЫЕ ручки register / password-reset/* (реализованы
-       apps/api/src/authRegistrationRoutes.ts + packages/domain/src/auth).
+       apps/api/src/authRoutes.ts + packages/domain/src/auth).
        Мок зеркалит коды/статусы/порядок. Упрощение — письма нет:
        reset-токен отдаётся devToken-полем как демо-замена письма.
        ============================================================ */

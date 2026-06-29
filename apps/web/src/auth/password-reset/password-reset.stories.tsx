@@ -5,7 +5,7 @@ import { ResetConfirmSurface } from "@/auth/password-reset/reset-confirm-surface
 
 /**
  * Auth — поверхности «Сброс пароля» (БОЕВОЙ контракт password-reset/{request,confirm},
- * apps/api/src/authRegistrationRoutes.ts; мок зеркалит). Обе работают через настоящий
+ * apps/api/src/authRoutes.ts; мок зеркалит). Обе работают через настоящий
  * createAuthClient + in-memory mock (переключение на боевой API = смена apiOrigin).
  *
  * Запрос: anti-enumeration — всегда нейтральное «Если адрес зарегистрирован — мы

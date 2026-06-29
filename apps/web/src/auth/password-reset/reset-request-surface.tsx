@@ -13,7 +13,7 @@ import { useAuth } from "@/auth/lib/use-auth";
 /* ============================================================
    ResetRequestSurface — экран «Сброс пароля» (запрос инструкций).
    БОЕВОЙ контракт POST /api/auth/password-reset/request
-   (apps/api/src/authRegistrationRoutes.ts) — мок зеркалит.
+   (apps/api/src/authRoutes.ts) — мок зеркалит.
 
    ЧЕСТНОСТЬ:
    - anti-enumeration: ВСЕГДА показываем единое нейтральное подтверждение

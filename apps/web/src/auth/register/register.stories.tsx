@@ -8,7 +8,7 @@ import { RegisterSurface } from "@/auth/register/register-surface";
  *
  * ЧЕСТНОСТЬ: реальный submit идёт в мок через useAuth().register
  * (createAuthClient + in-memory fetchImpl, НЕ demoAction-заглушка). Мок зеркалит
- * боевой контракт (apps/api/src/authRegistrationRoutes.ts): создаётся свежий
+ * боевой контракт (apps/api/src/authRoutes.ts): создаётся свежий
  * тенант + роль-владелец + пользователь. При ok бэк делает авто-логин
  * (refresh → authenticated), и поверхность показывает
  * «Аккаунт создан, вы вошли как {name}».
