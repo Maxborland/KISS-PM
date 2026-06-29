@@ -138,6 +138,8 @@ describe("agent /execute → governed scenario apply (internal re-dispatch)", ()
     expect(harness.appliedCommandTypes.length).toBeGreaterThan(0);
     expect(harness.planVersion).toBe(6);
     expect(harness.auditActionTypes).toContain("planning.scenario.applied");
+    // #3 провенанс: помимо штатного planning-аудита агент пишет отдельное событие sourceWorkflow:"agent".
+    expect(harness.auditActionTypes).toContain("agent.apply_resource_resolution.applied");
   });
 
   it("rejects apply when the actor lacks scenario-apply permission (RBAC at the governed route)", async () => {

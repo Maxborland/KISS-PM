@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
 
@@ -112,6 +114,14 @@ export async function resolveAttachments(app: ApiApp, cookie: string | null, ids
 function parseAttachmentIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 50);
+}
+
+// Сущность-якорь для провенанс-аудита агента: из входа действия.
+function agentSourceEntity(input: Record<string, unknown>): { type: string; id: string } {
+  if (typeof input.taskId === "string") return { type: "Task", id: input.taskId };
+  if (typeof input.scenarioId === "string") return { type: "PlanningScenario", id: input.scenarioId };
+  if (typeof input.projectId === "string") return { type: "Project", id: input.projectId };
+  return { type: "AgentAction", id: "n/a" };
 }
 
 const HISTORY_MAX_TURNS = 12; // память чата: последние N реплик (защита от раздувания контекста)
@@ -462,6 +472,34 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       // участников при сборке из частичных fields). До безопасного частичного апдейта он не
       // предлагается LLM (см. EXECUTABLE_MUTATIONS), так что сюда штатно не попадаем.
       results.push({ tool: tool.name, ok: false, status: 501, error: "tool_not_executable_yet" });
+    }
+
+    // Провенанс агента: на каждое применённое действие — ОТДЕЛЬНОЕ audit-событие
+    // sourceWorkflow:"agent" (сверх штатного аудита governed-команды, который тегает свой workflow),
+    // чтобы действие агента было отличимо от ручного. results[i] выровнен с actions[i].
+    if (deps.dataSource.appendAuditEvent) {
+      const correlationId = `agent-execute-${randomUUID()}`;
+      for (let i = 0; i < results.length; i += 1) {
+        const item = results[i]!;
+        if (!item.ok) continue;
+        const action = (actions[i] ?? {}) as { input?: unknown };
+        const input = (action.input && typeof action.input === "object" ? action.input : {}) as Record<string, unknown>;
+        await deps.dataSource.appendAuditEvent({
+          id: `agent-action-${randomUUID()}`,
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: `agent.${item.tool}.applied`,
+          sourceWorkflow: "agent",
+          sourceEntity: agentSourceEntity(input),
+          input: { tool: item.tool, input },
+          beforeState: null,
+          afterState: (item.result ?? null) as Record<string, unknown> | null,
+          permissionResult: { allowed: true, via: "agent" },
+          executionResult: { status: "succeeded" },
+          correlationId,
+          createdAt: new Date()
+        });
+      }
     }
 
     const anyApplied = results.some((r) => r.ok);
