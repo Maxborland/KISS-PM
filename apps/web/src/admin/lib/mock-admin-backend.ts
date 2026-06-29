@@ -172,6 +172,10 @@ export function createMockAdminFetch(): typeof fetch {
     if (path === "/api/workspace/access-roles" && method === "GET") {
       return json({ accessRoles: [...db.accessRoles].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) });
     }
+    // Каталог прав (боевой GET /api/workspace/permission-catalog) — статический список access-control.
+    if (path === "/api/workspace/permission-catalog" && method === "GET") {
+      return json({ permissions: ALL_PERMISSIONS });
+    }
     // Создание роли — POST /api/tenant/current/access-profiles (id обязателен; коды taken).
     if (path === "/api/tenant/current/access-profiles" && method === "POST") {
       const parsed = parseAccessProfileBody(body);

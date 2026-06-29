@@ -95,6 +95,8 @@ export function createAdminClient(options: AdminApiClientOptions) {
   return {
     // роли (access-profiles): list/update/delete под /access-roles; create под /tenant/current/access-profiles
     listAccessRoles() { return requestJson<{ accessRoles: AccessProfile[] }>("/api/workspace/access-roles"); },
+    // Каталог назначаемых прав (статический список access-control) — для чек-листа ролей.
+    listPermissionCatalog() { return requestJson<{ permissions: Permission[] }>("/api/workspace/permission-catalog"); },
     createAccessRole(input: AccessRoleCreateInput) { return requestJson<{ accessProfile: AccessProfile }>("/api/tenant/current/access-profiles", { method: "POST", body: JSON.stringify(input) }); },
     updateAccessRole(roleId: string, input: AccessRoleUpdateInput) { return requestJson<{ accessRole: AccessProfile }>(`/api/workspace/access-roles/${enc(roleId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     deleteAccessRole(roleId: string) { return requestJson<{ status: "deleted" }>(`/api/workspace/access-roles/${enc(roleId)}`, { method: "DELETE" }); },

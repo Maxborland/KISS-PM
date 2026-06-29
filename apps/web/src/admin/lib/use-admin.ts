@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AdminApiError, createAdminClient,
   type AccessProfile, type AccessRoleCreateInput, type AccessRoleUpdateInput,
-  type Position, type UserCreateInput, type UserUpdateInput, type WorkspaceUser
+  type Permission, type Position, type UserCreateInput, type UserUpdateInput, type WorkspaceUser
 } from "./admin-client";
 import { createMockAdminFetch } from "./mock-admin-backend";
 import { useAdminRuntime } from "./admin-runtime";
@@ -15,6 +15,7 @@ export type AdminData = {
   roles: AccessProfile[];
   users: WorkspaceUser[];
   positions: Position[];
+  permissions: Permission[];
 };
 export type AdminMutationResult = { ok: true } | { ok: false; code?: string; message: string };
 
@@ -50,12 +51,13 @@ export function useAdmin() {
   const load = useCallback(async () => {
     setStatus("loading");
     try {
-      const [roles, users, positions] = await Promise.all([
+      const [roles, users, positions, catalog] = await Promise.all([
         client.listAccessRoles(),
         client.listUsers(),
-        client.listPositions()
+        client.listPositions(),
+        client.listPermissionCatalog()
       ]);
-      setData({ roles: roles.accessRoles, users: users.users, positions: positions.positions });
+      setData({ roles: roles.accessRoles, users: users.users, positions: positions.positions, permissions: catalog.permissions });
       setStatus("ready");
       setError(null);
     } catch (e) {

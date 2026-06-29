@@ -23,8 +23,8 @@ backend слайсы 1–4 готовы (PR #210, каждый e2e против 
 
 ## P2 — Быстрые backend-победы (M, без миграции) + их фронт  ·  PR #210 (бэк) + #209 (фронт)
 - [x] **P2.1** planning **commits revert** — оказался **frontend-only** (backend-эндпоинт НЕ нужен): `usePlanning` держит последний apply (commands + before read-model + afterVersion) в памяти; live `loadCommits` отдаёт его как `latestRevert`, и `commits-surface` строит инверсию через `buildCompensatingCommands` + applyBatch (контракт уже был). Откат — для последнего коммита сессии; произвольный исторический откат = будущая серверная задача (audit.beforeState только счётчики). ✅ tsc 0 · Storybook commits рендерит «Откатить».
-- [ ] **P2.2** admin **permission-catalog**: `GET /api/workspace/permission-catalog` → список назначаемых прав (из `@kiss-pm/access-control`). Фронт `admin/roles` берёт каталог из бэка вместо client-enum. M
-- Приёмка: e2e revert (apply команду → revert → план вернулся к версии N−1); каталог прав отдаётся и рендерится.
+- [x] **P2.2** admin **permission-catalog** — backend `GET /api/workspace/permission-catalog` (59 прав из `@kiss-pm/access-control`, session+canReadAccessProfiles; e2e 200/401) + фронт `admin/roles` берёт каталог из бэка (`useAdmin` грузит `data.permissions`, группы строятся в компоненте; `ALL_PERMISSIONS` — типизированный fallback). ✅ tsc 0 · openapi 6/6 · Storybook рендерит «59 прав».
+- **P2 ЗАКРЫТ** ✅ — delivery замкнут (revert), admin-роли на реальном каталоге.
 
 ## P3 — Backend с миграциями (M–L)  ·  PR #210
 - [ ] **P3.1** admin **security-policy**: новая таблица `tenant_security_policies` (миграция) + `GET`/`PUT /api/tenant/current/security-policy` {twoFactorRequired, sessionTimeoutHours, ssoSamlEnabled, domainAllowlist}. Фронт — карточка «Политики безопасности». M ⬩dep: drizzle migration + schema.
