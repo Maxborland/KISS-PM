@@ -1521,6 +1521,13 @@ export function createMockCommsFetch(): typeof fetch {
       return json({ meetings });
     }
 
+    /* 26c) GET /unread-summary — счётчики непрочитанного (демо: unread notifications + сумма read-state). */
+    if (method === "GET" && path === "/api/workspace/unread-summary") {
+      const notifications = db.notifications.filter((n) => n.userId === CURRENT_ACTOR_ID && n.readAt === null && n.archivedAt === null).length;
+      const conversations = db.readStates.filter((r) => r.userId === CURRENT_ACTOR_ID).reduce((sum, r) => sum + r.unreadCount, 0);
+      return json({ notifications, conversations });
+    }
+
     /* 26b) GET /meetings/:id — composite деталь (зеркало боевого GET meeting detail). */
     const meetingDetailMatch = method === "GET" ? path.match(/^\/api\/workspace\/meetings\/([^/]+)$/) : null;
     if (meetingDetailMatch) {

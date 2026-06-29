@@ -391,6 +391,13 @@ export function useMeetingDetail(meetingId: string | null) {
    Лента уведомлений работает (сид-уведомление есть); markRead/preferences
    используют методы клиента (мок для read/preferences — у следующего агента).
    ============================================================ */
+// Счётчики непрочитанного для бейджей comms-frame/топбара (GET /api/workspace/unread-summary).
+export function useUnreadSummary() {
+  const client = useCommsClient();
+  const fetcher = useCallback(() => client.getUnreadSummary(), [client]);
+  return useCommsLoad(fetcher);
+}
+
 export function useNotifications(filterStatus?: "unread" | "read") {
   const client = useCommsClient();
   const { guard } = useGuard();

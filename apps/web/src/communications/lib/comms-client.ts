@@ -635,6 +635,10 @@ export function createCommsClient(options: CommsApiClientOptions) {
     listNotifications(params?: { status?: "unread" | "read"; limit?: number }) {
       return requestJson<{ notifications: UserNotification[] }>(`/api/workspace/notifications${qs({ status: params?.status, limit: params?.limit })}`);
     },
+    // Счётчики непрочитанного для бейджей nav/comms (одним запросом).
+    getUnreadSummary() {
+      return requestJson<{ notifications: number; conversations: number }>("/api/workspace/unread-summary");
+    },
     // 33) Отметить уведомление прочитанным (НЕ идемпотентно: readAt=now каждый раз).
     markNotificationRead(notificationId: string) {
       return requestJson<{ notification: UserNotification }>(`/api/workspace/notifications/${enc(notificationId)}/read`, { method: "POST" });

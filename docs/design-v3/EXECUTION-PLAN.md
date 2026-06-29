@@ -17,7 +17,8 @@ backend слайсы 1–4 готовы (PR #210, каждый e2e против 
 Эндпоинты УЖЕ есть (слайсы 1/3/4) — фронт пока на честных заглушках. Подключаем:
 - [x] **P1.1** meetings-surface → `GET /api/workspace/meetings/:id` (`SEED_DETAIL` убран; `comms-client.getMeeting` + `useMeetingDetail` + mock-роут; рефетч после мутаций). ✅ tsc 0 · Storybook рендерит реальную деталь.
 - [x] **P1.2** meetings ActionItemsCard → `PATCH …/action-items/:id {status}` (живой select open/done/cancelled; `comms-client.patchActionItem` + `useMeetings.patchActionItem` + mock PATCH-роут). ✅ tsc 0 · Storybook рендерит селект.
-- [ ] **P1.3** nav/comms бейдж непрочитанного → `GET /api/workspace/unread-summary` (`comms-client.getUnreadSummary`, бейджи в `comms-frame`/topbar). S
+- [x] **P1.3** comms бейдж непрочитанного → `GET /api/workspace/unread-summary` (`comms-client.getUnreadSummary` + `useUnreadSummary` + mock-роут; бейджи на табах Чат/Уведомления в `comms-frame`). ✅ tsc 0 · Storybook рендерит «Чат 2 / Уведомления 2».
+- **P1 ЗАКРЫТ** ✅ — все 4 backend-слайса (#210) потребляются фронтом.
 - Приёмка: Storybook этих экранов не падает (mock-роуты добавить в `mock-comms-backend`); e2e на :55433 показывает реальные детали/тоггл/число.
 
 ## P2 — Быстрые backend-победы (M, без миграции) + их фронт  ·  PR #210 (бэк) + #209 (фронт)
