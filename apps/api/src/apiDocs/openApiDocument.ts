@@ -28,6 +28,8 @@ const routeDocs: RouteDoc[] = [
   { method: "post", path: "/api/auth/login", tag: "Auth", summary: "Create browser session", auth: "public", requestSchema: "LoginRequest", successSchema: "AuthSessionResponse" },
   { method: "post", path: "/api/auth/logout", tag: "Auth", summary: "Delete browser session", successSchema: "OkResponse" },
   { method: "get", path: "/api/auth/me", tag: "Auth", summary: "Current authenticated user", successSchema: "AuthMeResponse" },
+  { method: "get", path: "/api/auth/sessions", tag: "Auth", summary: "List active sessions for current user" },
+  { method: "delete", path: "/api/auth/sessions/:sessionId", tag: "Auth", summary: "Revoke a session of current user" },
   { method: "get", path: "/api/session/dev-users", tag: "Dev session", summary: "List deterministic dev users", auth: "dev", successSchema: "DevUsersResponse" },
   { method: "get", path: "/api/session/dev-login", tag: "Dev session", summary: "Create dev session", auth: "dev" },
   { method: "get", path: "/api/tenant/current", tag: "Tenant", summary: "Current tenant and dev user", auth: "dev", successSchema: "CurrentTenantResponse" },

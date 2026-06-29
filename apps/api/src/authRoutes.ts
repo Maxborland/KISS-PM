@@ -74,12 +74,16 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
 
       const rawToken = randomBytes(32).toString("hex");
+      const loginNow = new Date();
       await dataSource.createSession({
         id: `session-${randomUUID()}`,
         tenantId: credential.tenantId,
         userId: credential.userId,
         tokenHash: hashSessionToken(rawToken),
-        expiresAt: new Date(Date.now() + sessionTtlMs)
+        expiresAt: new Date(loginNow.getTime() + sessionTtlMs),
+        userAgent: normalizeUserAgent(context.req.header("user-agent")),
+        ipAddress: rateLimitInput.ip ?? null,
+        lastSeenAt: loginNow
       });
 
       context.header(
@@ -139,6 +143,128 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
     });
   });
+
+  // Активные сессии текущего пользователя (устройство/IP/последняя активность).
+  app.get("/api/auth/sessions", async (context) => {
+    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!dataSource.listUserSessions) return context.json({ error: "auth_not_configured" }, 501);
+
+    const token = getSessionTokenFromCookie(context.req.header("cookie") ?? null);
+    const currentHash = token ? hashSessionToken(token) : null;
+    const sessions = await dataSource.listUserSessions(actor.tenantId, actor.id);
+    return context.json({
+      sessions: sessions.map((session) => serializeSession(session, currentHash))
+    });
+  });
+
+  // Отзыв конкретной сессии (кроме текущей — для выхода есть /logout).
+  app.delete("/api/auth/sessions/:sessionId", async (context) => {
+    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!dataSource.listUserSessions || !dataSource.deleteSessionById) {
+      return context.json({ error: "auth_not_configured" }, 501);
+    }
+    const sessionId = parseSessionId(context.req.param("sessionId"));
+    if (!sessionId) return context.json({ error: "invalid_session_id" }, 400);
+
+    const token = getSessionTokenFromCookie(context.req.header("cookie") ?? null);
+    const currentHash = token ? hashSessionToken(token) : null;
+    const sessions = await dataSource.listUserSessions(actor.tenantId, actor.id);
+    const target = sessions.find((session) => session.id === sessionId);
+    if (!target) return context.json({ error: "session_not_found" }, 404);
+    if (currentHash && target.tokenHash === currentHash) {
+      return context.json({ error: "self_session_revoke_forbidden" }, 400);
+    }
+
+    const deleted = await dataSource.deleteSessionById(actor.tenantId, actor.id, sessionId);
+    if (!deleted) return context.json({ error: "session_not_found" }, 404);
+    return context.json({ status: "deleted" });
+  });
+}
+
+// Сессия → публичный вид: derived deviceLabel из UA, IP, время входа/активности, флаг текущей.
+function serializeSession(
+  session: {
+    id: string;
+    expiresAt: Date;
+    createdAt?: Date;
+    userAgent?: string | null;
+    ipAddress?: string | null;
+    lastSeenAt?: Date | null;
+    tokenHash: string;
+  },
+  currentHash: string | null
+) {
+  return {
+    id: session.id,
+    deviceLabel: describeUserAgent(session.userAgent ?? null),
+    userAgent: session.userAgent ?? null,
+    ipAddress: session.ipAddress ?? null,
+    createdAt: (session.createdAt ?? session.lastSeenAt ?? session.expiresAt).toISOString(),
+    lastSeenAt: (session.lastSeenAt ?? session.createdAt ?? session.expiresAt).toISOString(),
+    expiresAt: session.expiresAt.toISOString(),
+    current: currentHash !== null && session.tokenHash === currentHash
+  };
+}
+
+// UA → короткий человекочитаемый ярлык «Браузер · ОС». Эвристика (не библиотека) — достаточно для списка.
+function describeUserAgent(userAgent: string | null): string {
+  if (!userAgent) return "Неизвестное устройство";
+  const ua = userAgent;
+  const browser = /Edg\//.test(ua) ? "Edge"
+    : /OPR\/|Opera/.test(ua) ? "Opera"
+    : /Firefox\//.test(ua) ? "Firefox"
+    : /Chrome\//.test(ua) ? "Chrome"
+    : /Safari\//.test(ua) ? "Safari"
+    : null;
+  const os = /Windows/.test(ua) ? "Windows"
+    : /Mac OS X|Macintosh/.test(ua) ? "macOS"
+    : /Android/.test(ua) ? "Android"
+    : /iPhone|iPad|iOS/.test(ua) ? "iOS"
+    : /Linux/.test(ua) ? "Linux"
+    : null;
+  if (browser && os) return `${browser} · ${os}`;
+  if (browser) return browser;
+  if (os) return os;
+  return "Неизвестное устройство";
+}
+
+// Параметр маршрута sessionId: непустая строка ≤ 200, без управляющих символов.
+function parseSessionId(value: string | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > 200 || hasControlChar(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
+// UA из заголовка → null|строка ≤ 1024 без управляющих символов (защита от мусора в БД).
+function normalizeUserAgent(userAgent: string | undefined): string | null {
+  if (typeof userAgent !== "string") return null;
+  const trimmed = userAgent.trim();
+  if (trimmed.length === 0) return null;
+  const clean = stripControlChars(trimmed);
+  return clean.length === 0 ? null : clean.slice(0, 1024);
+}
+
+// Управляющие символы (0x00–0x1f, 0x7f) по char-кодам — без regex-литералов с control-байтами.
+function hasControlChar(value: string): boolean {
+  for (let i = 0; i < value.length; i += 1) {
+    const c = value.charCodeAt(i);
+    if (c <= 0x1f || c === 0x7f) return true;
+  }
+  return false;
+}
+
+function stripControlChars(value: string): string {
+  let out = "";
+  for (let i = 0; i < value.length; i += 1) {
+    const c = value.charCodeAt(i);
+    if (c > 0x1f && c !== 0x7f) out += value[i];
+  }
+  return out;
 }
 
 export function verifyLoginPassword(

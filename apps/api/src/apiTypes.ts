@@ -352,6 +352,10 @@ export type UserSessionRecord = {
   userId: UserId;
   tokenHash: string;
   expiresAt: Date;
+  createdAt?: Date;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+  lastSeenAt?: Date | null;
 };
 
 export type ManagementAuditEventInput = {
@@ -652,7 +656,10 @@ export type ApiTenantDataSource = {
   findSessionByTokenHash?(
     tokenHash: string
   ): Promise<UserSessionRecord | undefined>;
+  listUserSessions?(tenantId: TenantId, userId: UserId): Promise<UserSessionRecord[]>;
+  touchSession?(tokenHash: string, lastSeenAt: Date): Promise<void>;
   deleteSessionByTokenHash?(tokenHash: string): Promise<void>;
+  deleteSessionById?(tenantId: TenantId, userId: UserId, sessionId: string): Promise<boolean>;
   deleteSessionsByUserId?(tenantId: TenantId, userId: UserId): Promise<void>;
   withTransaction?<T>(
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>

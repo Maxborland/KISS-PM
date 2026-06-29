@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
@@ -117,6 +117,10 @@ export type UserSessionRecord = {
   userId: UserId;
   tokenHash: string;
   expiresAt: Date;
+  createdAt?: Date;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+  lastSeenAt?: Date | null;
 };
 export type PostgresTenantDataSource = CrmRepository &
   ProjectIntakeRepository &
@@ -173,7 +177,10 @@ export type PostgresTenantDataSource = CrmRepository &
   updateCredentialEmail(tenantId: TenantId, userId: UserId, email: string): Promise<void>;
   createSession(input: UserSessionRecord): Promise<void>;
   findSessionByTokenHash(tokenHash: string): Promise<UserSessionRecord | undefined>;
+  listUserSessions(tenantId: TenantId, userId: UserId): Promise<UserSessionRecord[]>;
+  touchSession(tokenHash: string, lastSeenAt: Date): Promise<void>;
   deleteSessionByTokenHash(tokenHash: string): Promise<void>;
+  deleteSessionById(tenantId: TenantId, userId: UserId, sessionId: string): Promise<boolean>;
   deleteSessionsByUserId(tenantId: TenantId, userId: UserId): Promise<void>;
   withTransaction<T>(
     operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
@@ -507,9 +514,13 @@ export function createPostgresTenantDataSource(
         );
     },
     async createSession(input) {
+      const now = new Date();
       await db.insert(userSessions).values({
         ...input,
-        createdAt: new Date()
+        createdAt: now,
+        userAgent: input.userAgent ?? null,
+        ipAddress: input.ipAddress ?? null,
+        lastSeenAt: input.lastSeenAt ?? now
       });
     },
     async findSessionByTokenHash(tokenHash) {
@@ -519,18 +530,43 @@ export function createPostgresTenantDataSource(
         .where(eq(userSessions.tokenHash, tokenHash))
         .limit(1);
 
-      return row
-        ? {
-            id: row.id,
-            tenantId: row.tenantId,
-            userId: row.userId,
-            tokenHash: row.tokenHash,
-            expiresAt: row.expiresAt
-          }
-        : undefined;
+      return row ? mapUserSession(row) : undefined;
+    },
+    async listUserSessions(tenantId, userId) {
+      const rows = await db
+        .select()
+        .from(userSessions)
+        .where(
+          and(
+            eq(userSessions.tenantId, tenantId),
+            eq(userSessions.userId, userId),
+            gt(userSessions.expiresAt, new Date())
+          )
+        )
+        .orderBy(desc(userSessions.lastSeenAt), desc(userSessions.createdAt));
+      return rows.map(mapUserSession);
+    },
+    async touchSession(tokenHash, lastSeenAt) {
+      await db
+        .update(userSessions)
+        .set({ lastSeenAt })
+        .where(eq(userSessions.tokenHash, tokenHash));
     },
     async deleteSessionByTokenHash(tokenHash) {
       await db.delete(userSessions).where(eq(userSessions.tokenHash, tokenHash));
+    },
+    async deleteSessionById(tenantId, userId, sessionId) {
+      const deleted = await db
+        .delete(userSessions)
+        .where(
+          and(
+            eq(userSessions.tenantId, tenantId),
+            eq(userSessions.userId, userId),
+            eq(userSessions.id, sessionId)
+          )
+        )
+        .returning({ id: userSessions.id });
+      return deleted.length > 0;
     },
     async deleteSessionsByUserId(tenantId, userId) {
       await db
@@ -610,5 +646,19 @@ export function createPostgresTenantDataSource(
         createdAt: row.createdAt
       }));
     }
+  };
+}
+
+function mapUserSession(row: typeof userSessions.$inferSelect): UserSessionRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    userId: row.userId,
+    tokenHash: row.tokenHash,
+    expiresAt: row.expiresAt,
+    createdAt: row.createdAt,
+    userAgent: row.userAgent,
+    ipAddress: row.ipAddress,
+    lastSeenAt: row.lastSeenAt
   };
 }

@@ -509,7 +509,11 @@ export const userSessions = pgTable(
     userId: text("user_id").notNull(),
     tokenHash: text("token_hash").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    // Метаданные устройства/активности (P3.2 active-sessions). Nullable: старые строки без них.
+    userAgent: text("user_agent"),
+    ipAddress: text("ip_address"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
   },
   (table) => [
     uniqueIndex("user_sessions_token_hash_uidx").on(table.tokenHash),
