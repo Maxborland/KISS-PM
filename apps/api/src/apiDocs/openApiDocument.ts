@@ -174,6 +174,7 @@ const routeDocs: RouteDoc[] = [
   { method: "post", path: "/api/workspace/notifications/:notificationId/read", tag: "Collaboration", summary: "Mark notification read", successSchema: "NotificationResponse" },
   { method: "get", path: "/api/workspace/agent/tools", tag: "Agent", summary: "List agent tools available to the current user" },
   { method: "post", path: "/api/workspace/agent/propose", tag: "Agent", summary: "Run the agent loop and return proposed actions (no mutation)" },
+  { method: "post", path: "/api/workspace/agent/execute", tag: "Agent", summary: "Apply confirmed agent actions via governed commands" },
   { method: "get", path: "/api/workspace/realtime/events", tag: "Collaboration", summary: "Workspace realtime event stream (SSE)", response: "event-stream" },
   { method: "get", path: "/api/workspace/presence", tag: "Collaboration", summary: "Presence snapshot of tenant users" },
   { method: "get", path: "/api/workspace/notification-preferences", tag: "Collaboration", summary: "Read notification preferences", successSchema: "NotificationPreferencesResponse" },

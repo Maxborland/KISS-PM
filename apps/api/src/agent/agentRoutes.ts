@@ -1,8 +1,9 @@
 import type { ApiApp, ApiRouteDeps } from "../routeTypes";
 import { readLimitedJsonBody } from "../jsonBody";
+import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
 import { runAgentLoop, type AnalyzeExecutor } from "./agentLoop";
 import { createAgentLlmProviderFromEnv } from "./llmProvider";
-import { AGENT_TOOLS, allowedToolsForActor, listToolAvailability, type AgentTool } from "./toolRegistry";
+import { AGENT_TOOLS, allowedToolsForActor, findAgentTool, listToolAvailability, type AgentTool } from "./toolRegistry";
 
 const AGENT_SYSTEM_PROMPT = [
   "Ты — ассистент-агент в системе управления проектами KISS-PM.",
@@ -81,5 +82,68 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       proposedActions,
       iterations: result.iterations
     });
+  });
+
+  // Применение ПОДТВЕРЖДённых действий. Делегирует в существующие governed-команды:
+  // повторная RBAC-проверка (грубая capability + точная внутри команды) + валидация + audit.
+  app.post("/api/workspace/agent/execute", async (context) => {
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const actions = (body.value as { actions?: unknown }).actions;
+    if (!Array.isArray(actions) || actions.length === 0 || actions.length > 20) {
+      return context.json({ error: "invalid_actions" }, 400);
+    }
+
+    const profile = await deps.getActorProfile(actor);
+    const taskWorkspace = createTaskCommandWorkspace(deps);
+    const results: Array<{ tool: string; ok: boolean; status?: number; error?: string; result?: unknown }> = [];
+
+    for (const raw of actions) {
+      const action = raw as { tool?: unknown; input?: unknown };
+      const toolName = typeof action.tool === "string" ? action.tool : "";
+      const input = (action.input && typeof action.input === "object" ? action.input : {}) as Record<string, unknown>;
+      const tool = findAgentTool(toolName);
+
+      if (!tool || tool.kind !== "mutation") {
+        results.push({ tool: toolName, ok: false, status: 400, error: "invalid_action" });
+        continue;
+      }
+      // Грубая RBAC-проверка (defense-in-depth; точная — внутри команды).
+      const coarse = tool.capability({ actor, profile });
+      if (!coarse.allowed) {
+        results.push({ tool: toolName, ok: false, status: 403, error: coarse.reason });
+        continue;
+      }
+
+      if (tool.name === "change_task_status") {
+        const projectId = typeof input.projectId === "string" ? input.projectId : "";
+        const taskId = typeof input.taskId === "string" ? input.taskId : "";
+        const statusId = typeof input.statusId === "string" ? input.statusId : "";
+        if (!projectId || !taskId || !statusId) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
+          continue;
+        }
+        const preflight = await taskWorkspace.preflightTransitionTaskStatus({ actor, profile, projectId });
+        if (!preflight.ok) {
+          results.push({ tool: tool.name, ok: false, status: preflight.status, error: preflight.error });
+          continue;
+        }
+        const transition = await taskWorkspace.transitionTaskStatus({ actor, profile, projectId, taskId, body: { statusId } });
+        if (!transition.ok) {
+          results.push({ tool: tool.name, ok: false, status: transition.status, error: transition.error });
+          continue;
+        }
+        results.push({ tool: tool.name, ok: true, result: { task: transition.task } });
+        continue;
+      }
+
+      // Остальные mutation (update/create/comment/planning) подключаются в следующих слайсах.
+      results.push({ tool: tool.name, ok: false, status: 501, error: "tool_not_executable_yet" });
+    }
+
+    const anyApplied = results.some((r) => r.ok);
+    return context.json({ results, applied: anyApplied }, anyApplied ? 200 : 422);
   });
 }
