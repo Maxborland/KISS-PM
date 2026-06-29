@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { PlanSnapshot } from "@kiss-pm/domain";
 
-import type { ApiRouteDeps } from "../routeTypes";
+import type { ApiApp, ApiRouteDeps } from "../routeTypes";
 import type { ApiTenantDataSource } from "../apiTypes";
+
+// detect/read_project_plan не делают переотправку — app не вызывается.
+const fakeApp = { request: async () => new Response("{}", { status: 200 }) } as unknown as ApiApp;
 import { createPlanningReadModel } from "../planning/planningReadModel";
 import { buildAnalyzeExecutor } from "./agentRoutes";
 import { findAgentTool } from "./toolRegistry";
@@ -49,7 +52,7 @@ describe("agent analyze: detect_resource_overloads", () => {
     const expected = createPlanningReadModel(snapshot).resourceLoad.overloads;
     expect(expected.length).toBeGreaterThan(0); // fixture must actually overload
 
-    const exec = buildAnalyzeExecutor(deps(snapshot), "tenant-1", "user-1");
+    const exec = buildAnalyzeExecutor(deps(snapshot), fakeApp, null, "tenant-1", "user-1");
     const result = (await exec(findAgentTool("detect_resource_overloads")!, {})) as {
       overloadCount: number;
       overloads: Array<{ projectId: string; resourceId: string; overloadMinutes: number }>;
@@ -63,7 +66,7 @@ describe("agent analyze: detect_resource_overloads", () => {
 
   it("read_project_plan returns plan version, tasks and overload count", async () => {
     const snapshot = overloadedSnapshot();
-    const exec = buildAnalyzeExecutor(deps(snapshot), "tenant-1", "user-1");
+    const exec = buildAnalyzeExecutor(deps(snapshot), fakeApp, null, "tenant-1", "user-1");
     const result = (await exec(findAgentTool("read_project_plan")!, { projectId: "project-1" })) as {
       planVersion: number;
       tasks: unknown[];

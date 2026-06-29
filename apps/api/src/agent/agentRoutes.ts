@@ -16,14 +16,40 @@ const AGENT_SYSTEM_PROMPT = [
   "analyze. Объясняй кратко и по-русски."
 ].join(" ");
 
-// Какие analyze-инструменты подключены к данным. Сценарные mutation-инструменты по ресурсам
-// (preview/apply) пока возвращают предложение, но не исполняются в /execute — это route-bound
-// транзакционная логика, выносится в переиспользуемый сервис отдельным слайсом.
-const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_resource_overloads"]);
+// analyze-инструменты, подключённые к данным/контракту. preview_resource_resolution
+// исполняется вживую через governed-эндпоинт scenarios/preview (он стейджит сценарные run'ы,
+// плана не меняет) — агент получает их id, чтобы предложить применение.
+const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_resource_overloads", "preview_resource_resolution"]);
 
 const OVERLOAD_CAP = 30; // ponytail: режем payload до топ-N перегрузок (по минутам), upgrade — пагинация если мало
 
-export function buildAnalyzeExecutor(deps: ApiRouteDeps, actorTenantId: string, actorUserId: string): AnalyzeExecutor {
+/**
+ * Внутренняя переотправка в тот же Hono-app — агент НЕ дублирует governed-логику, а зовёт те же
+ * эндпоинты планирования (scenarios/preview, scenarios/:id/apply, apply-command-batch), что и
+ * человеческий UI: RBAC, транзакция, version-lock, integrity и audit переиспользуются как есть.
+ */
+async function dispatchInternal(app: ApiApp, cookie: string | null, path: string, body: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
+  const response = await app.request(path, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin", ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body)
+  });
+  const text = await response.text();
+  let parsed: Record<string, unknown> = {};
+  if (text.length > 0) {
+    try { const json: unknown = JSON.parse(text); if (json && typeof json === "object" && !Array.isArray(json)) parsed = json as Record<string, unknown>; } catch { /* keep {} */ }
+  }
+  return { status: response.status, body: parsed };
+}
+
+async function resolvePlanVersion(deps: ApiRouteDeps, tenantId: string, projectId: string, given: unknown): Promise<number | undefined> {
+  if (typeof given === "number") return given;
+  if (!deps.dataSource.getPlanSnapshot) return undefined;
+  const snapshot = await deps.dataSource.getPlanSnapshot(tenantId, projectId);
+  return snapshot?.planVersion;
+}
+
+export function buildAnalyzeExecutor(deps: ApiRouteDeps, app: ApiApp, cookie: string | null, actorTenantId: string, actorUserId: string): AnalyzeExecutor {
   return async (tool: AgentTool, input: Record<string, unknown>) => {
     if (tool.name === "list_my_tasks") {
       if (!deps.dataSource.listMyWorkTasks) return { tasks: [], note: "persistence_not_configured" };
@@ -72,6 +98,31 @@ export function buildAnalyzeExecutor(deps: ApiRouteDeps, actorTenantId: string, 
       return { overloadCount: overloads.length, overloads: overloads.slice(0, OVERLOAD_CAP) };
     }
 
+    if (tool.name === "preview_resource_resolution") {
+      const projectId = typeof input.projectId === "string" ? input.projectId : "";
+      const target = input.target && typeof input.target === "object" ? (input.target as Record<string, unknown>) : null;
+      if (!projectId || !target) return { note: "projectId_and_target_required" };
+      const clientPlanVersion = await resolvePlanVersion(deps, actorTenantId, projectId, input.clientPlanVersion);
+      if (clientPlanVersion === undefined) return { note: "project_not_found", projectId };
+      // Единственный поддерживаемый тип цели — перегрузка ресурса; инжектим, LLM его не передаёт.
+      const fullTarget = { type: "resource_overload", ...target };
+      const res = await dispatchInternal(app, cookie, `/api/workspace/projects/${projectId}/planning/scenarios/preview`, { clientPlanVersion, target: fullTarget });
+      if (res.status !== 200) return { note: "preview_failed", status: res.status, error: res.body.error };
+      const proposals = Array.isArray(res.body.proposals) ? (res.body.proposals as Array<Record<string, unknown>>) : [];
+      // Для apply агенту нужны: id сценария + clientPlanVersion. Объяснимость — кратко.
+      return {
+        projectId,
+        clientPlanVersion: res.body.planVersion ?? clientPlanVersion,
+        expiresAt: res.body.expiresAt,
+        proposals: proposals.map((proposal) => ({
+          scenarioId: proposal.id,
+          profile: proposal.profile,
+          conflictEffect: proposal.conflictEffect,
+          explainability: proposal.explainability
+        }))
+      };
+    }
+
     throw new Error("analyze_tool_not_wired");
   };
 }
@@ -90,7 +141,8 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.post("/api/workspace/agent/propose", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    const cookie = context.req.header("cookie") ?? null;
+    const actor = await deps.getSessionActorFromHeaders(cookie);
     if (!actor) return context.json({ error: "session_required" }, 401);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -108,7 +160,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       system: AGENT_SYSTEM_PROMPT,
       goal,
       tools: offered,
-      executeAnalyze: buildAnalyzeExecutor(deps, actor.tenantId, actor.id)
+      executeAnalyze: buildAnalyzeExecutor(deps, app, cookie, actor.tenantId, actor.id)
     });
 
     // Аннотируем предложения грубым capability (точная проверка — при /execute).
@@ -131,7 +183,8 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   // Применение ПОДТВЕРЖДённых действий. Делегирует в существующие governed-команды:
   // повторная RBAC-проверка (грубая capability + точная внутри команды) + валидация + audit.
   app.post("/api/workspace/agent/execute", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    const cookie = context.req.header("cookie") ?? null;
+    const actor = await deps.getSessionActorFromHeaders(cookie);
     if (!actor) return context.json({ error: "session_required" }, 401);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -183,7 +236,38 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
         continue;
       }
 
-      // Остальные mutation (update/create/comment/planning) подключаются в следующих слайсах.
+      // Применение сценария разрешения перегрузки — переотправка в governed scenario-apply.
+      if (tool.name === "apply_resource_resolution") {
+        const projectId = typeof input.projectId === "string" ? input.projectId : "";
+        const scenarioId = typeof input.scenarioId === "string" ? input.scenarioId : "";
+        const clientPlanVersion = await resolvePlanVersion(deps, actor.tenantId, projectId, input.clientPlanVersion);
+        if (!projectId || !scenarioId || clientPlanVersion === undefined) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
+          continue;
+        }
+        const acceptedRiskReason = typeof input.acceptedRiskReason === "string" ? input.acceptedRiskReason : undefined;
+        const res = await dispatchInternal(app, cookie, `/api/workspace/projects/${projectId}/planning/scenarios/${scenarioId}/apply`, { clientPlanVersion, acceptedRiskReason });
+        if (res.status === 200) results.push({ tool: tool.name, ok: true, result: res.body });
+        else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "apply_failed" });
+        continue;
+      }
+
+      // Применение набора planning-команд — переотправка в governed apply-command-batch (право per-команда).
+      if (tool.name === "apply_plan_commands") {
+        const projectId = typeof input.projectId === "string" ? input.projectId : "";
+        const commands = Array.isArray(input.commands) ? input.commands : null;
+        const clientPlanVersion = await resolvePlanVersion(deps, actor.tenantId, projectId, input.clientPlanVersion);
+        if (!projectId || !commands || commands.length === 0 || clientPlanVersion === undefined) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
+          continue;
+        }
+        const res = await dispatchInternal(app, cookie, `/api/workspace/projects/${projectId}/planning/apply-command-batch`, { commands, clientPlanVersion });
+        if (res.status === 200) results.push({ tool: tool.name, ok: true, result: res.body });
+        else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "apply_failed" });
+        continue;
+      }
+
+      // Остальные mutation (update/create/comment) подключаются отдельно.
       results.push({ tool: tool.name, ok: false, status: 501, error: "tool_not_executable_yet" });
     }
 
