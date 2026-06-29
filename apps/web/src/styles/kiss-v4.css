@@ -1,0 +1,263 @@
+/* ============================================================
+   KISS PM — design v4 (checkpoint 1: Project Delivery)
+   Сильная shadcn+TW+bento база. Современный Linear/Attio-grade бар:
+   мягкие границы + тонкая elevation вместо «коробок», аккуратный
+   indigo-акцент, чистая семантика, уверенная типографическая иерархия,
+   planning layout-токены. Унификация: промоутнут в глобальный :root —
+   единый канонический индиго-look для всех поверхностей (BEM-слой ретайрится).
+   ============================================================ */
+:root {
+  /* Surfaces — холодный светлый фон, чистые карточки */
+  --canvas: #f7f8fa;
+  --canvas-tint: #fbfbfc;
+  --panel: #ffffff;
+  --panel-subtle: #fafbfc;
+  --panel-strong: #f1f2f6;
+  --panel-elevated: #ffffff;
+  /* Тонкие, низкоконтрастные границы — главное отличие от «2000-х» */
+  --border: #ececf1;
+  --border-strong: #e0e1e8;
+  --border-subtle: #f3f3f7;
+
+  /* Text — глубокий neutral, уверенный контраст */
+  --text: #1c2024;
+  --text-strong: #0c0d10;
+  --muted: #6a7280;
+  --muted-strong: #494f59;
+  --muted-soft: #9ca3af;
+
+  /* Accent — современный indigo. Используется точечно (ссылки/активное/фокус).
+     Primary-действия — тёмный neutral (button variant=default). */
+  --accent: #5b5bd6;
+  --accent-hover: #5151c8;
+  --accent-soft: #eeeefb;
+  --accent-muted: #e0e0f8;
+  --accent-ring: rgba(91, 91, 214, 0.22);
+
+  /* Semantic — чистые, контролируемые (Radix-grade) */
+  --success: #30a46c;
+  --success-text: #1a7a4c;
+  --success-soft: #e7f6ee;
+  --warning: #e08c2c;
+  --warning-text: #9a5b12;
+  --warning-soft: #fbf0df;
+  --danger: #e5484d;
+  --danger-text: #c2353b;
+  --danger-soft: #fdecec;
+  --info: #5b5bd6;
+  --info-soft: #eeeefb;
+  --violet: #8347b9;
+  --violet-soft: #f3ecfb;
+
+  /* Без декоративных градиентов */
+  --grad-warm: var(--panel);
+  --grad-cool: var(--panel);
+
+  /* Планировочные layout-токены (MS Project-class) */
+  --row-h: 36px;
+  --row-h-summary: 36px;
+  --gantt-bar-h: 18px;
+  --wbs-width: 720px;
+  --inspector-width: 360px;
+  --cell-day: 40px;
+  --cell-week: 140px;
+  --cell-month: 220px;
+  --critical-stripe: #e5484d;
+
+  /* Современная мягкая elevation вместо жёстких рамок */
+  --shadow-card: 0 1px 2px rgba(12, 13, 16, 0.04), 0 1px 3px rgba(12, 13, 16, 0.03);
+  --shadow-raise: 0 2px 4px rgba(12, 13, 16, 0.05), 0 4px 12px -2px rgba(12, 13, 16, 0.06);
+  --shadow-pop: 0 12px 32px -8px rgba(12, 13, 16, 0.16);
+
+  --radius-card: 14px;
+
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Числа/коды/даты — табличные цифры */
+.v4-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.v4-num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ---- Микроинтеракции / «приятность» ---- */
+
+/* Современный hover для строк списков/таблиц */
+.v4-row {
+  transition: background-color var(--duration-fast, 120ms) var(--ease-out, ease-out);
+}
+.v4-row:hover {
+  background: var(--panel-subtle);
+}
+
+/* Лёгкий подъём карточек/плиток при наведении */
+.v4-lift {
+  transition:
+    box-shadow var(--duration-base, 200ms) var(--ease-out, ease-out),
+    transform var(--duration-base, 200ms) var(--ease-out, ease-out),
+    border-color var(--duration-base, 200ms) var(--ease-out, ease-out);
+}
+.v4-lift:hover {
+  box-shadow: var(--shadow-raise);
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+}
+
+/* Стрелка «уезжает» вправо при наведении на строку */
+.v4-arrow {
+  transition: transform var(--duration-base, 200ms) var(--ease-out, ease-out);
+}
+.group:hover .v4-arrow {
+  transform: translateX(3px);
+}
+
+/* Кнопка отката: мягко увеличивается */
+.v4-pop {
+  transition:
+    transform var(--duration-fast, 120ms) var(--ease-out, ease-out),
+    color var(--duration-fast, 120ms) var(--ease-out, ease-out),
+    opacity var(--duration-base, 200ms) var(--ease-out, ease-out);
+}
+.v4-pop:hover {
+  transform: scale(1.12);
+  color: var(--accent);
+}
+
+/* Пульс индикатора «Сохранено» */
+@keyframes v4-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.78);
+  }
+}
+.v4-pulse {
+  animation: v4-pulse 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v4-lift,
+  .v4-arrow,
+  .v4-pop {
+    transition: none;
+  }
+  .v4-lift:hover,
+  .group:hover .v4-arrow,
+  .v4-pop:hover {
+    transform: none;
+  }
+  .v4-pulse {
+    animation: none;
+  }
+}
+
+/* ---- Gantt bars (цвета через color-mix — надёжнее в CSS, чем в TW arbitrary) ---- */
+.gantt-bar {
+  background: color-mix(in oklab, var(--success) 22%, #ffffff);
+}
+.gantt-bar-fill {
+  background: var(--success);
+}
+.gantt-bar--crit {
+  background: color-mix(in oklab, var(--critical-stripe) 20%, #ffffff);
+}
+.gantt-bar-fill--crit {
+  background: var(--critical-stripe);
+}
+
+/* ---- MS Project-подобная сетка задач: ячеистость, sticky header, выбор строки ----
+   Excel-like grid: видимые границы ячеек, sticky-шапка, hover/selected, без переносов. */
+.msgrid {
+  border-collapse: collapse;
+  width: max-content;
+  table-layout: fixed;
+}
+.msgrid th,
+.msgrid td {
+  height: var(--row-h);
+  padding: 0 8px;
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--text);
+}
+.msgrid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 36px;
+  background: var(--panel-subtle);
+  border-bottom: 1px solid var(--border-strong);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted-soft);
+  user-select: none;
+}
+.msgrid th.num,
+.msgrid td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.msgrid td.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.msgrid td.muted {
+  color: var(--muted);
+}
+.msgrid tbody tr {
+  cursor: pointer;
+  transition: background-color var(--duration-fast, 120ms) var(--ease-out, ease-out);
+}
+.msgrid tbody tr:hover > td {
+  background: var(--panel-subtle);
+}
+.msgrid tbody tr.is-summary > td {
+  background: color-mix(in oklab, var(--panel-strong) 60%, var(--panel));
+}
+.msgrid tbody tr.is-selected > td {
+  background: var(--accent-soft);
+}
+.msgrid tbody tr.is-selected > td:first-child {
+  box-shadow: inset 2px 0 0 0 var(--accent);
+}
+.msgrid .name-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Двухколоночная раскладка инспектора — детерминированно, без зависимости от
+   генерации TW-variant (lg:) для новых файлов. */
+.v4-split {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+@media (min-width: 1024px) {
+  .v4-split {
+    flex-direction: row;
+  }
+  .v4-split > .v4-split__aside {
+    width: var(--inspector-width);
+    flex-shrink: 0;
+  }
+}

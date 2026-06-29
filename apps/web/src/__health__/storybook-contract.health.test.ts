@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,12 +18,6 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(UI_VARIANT_ITEMS.button.length).toBeGreaterThan(0);
   });
 
-  it("deals funnel uses Badge not legacy .badge BEM", () => {
-    const source = read("src/views/blocks/deals-block.tsx");
-    expect(source).toContain("<Badge");
-    expect(source).not.toMatch(/badge badge--soft/);
-  });
-
   it("state screens use bare variant in catalog", () => {
     const source = read("src/views/catalog.ts");
     expect(source).toContain('"state-empty"');
@@ -38,29 +32,13 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(source).not.toMatch(/from "@\/components\/ui\/table"/);
   });
 
-  it("views blocks avoid fake segmented and noop onChange (batch 13g)", () => {
-    const blockFiles = [
-      "src/views/blocks/projects-list-block.tsx",
-      "src/views/blocks/deals-block.tsx",
-      "src/views/blocks/settings-block.tsx",
-      "src/views/blocks/gantt-slice-block.tsx",
-      "src/views/blocks/my-work-block.tsx"
-    ];
-    for (const rel of blockFiles) {
-      const source = read(rel);
-      expect(source).not.toMatch(/<button[^>]*segmented__btn/);
-      expect(source).not.toMatch(/onChange=\{\(\) => \{\}\}/);
-      expect(source).toContain("onChange={");
-    }
-  });
-
   it("WorkspaceChrome default topbar actions are disabled with reason (batch 13g)", () => {
     const source = read("src/views/layout/workspace-chrome.tsx");
     expect(source).toMatch(/disabled title="Демо Storybook: экспорт подключится к API"/);
     expect(source).toMatch(/disabled title="Демо Storybook: создание сущности в продукте"/);
   });
 
-  it("views have no welcome-hero and blocks use PageIntro (batch 14)", () => {
+  it("views have no welcome-hero (batch 14)", () => {
     const viewsDir = join(webRoot, "src/views");
     const walk = (dir: string): string[] => {
       const out: string[] = [];
@@ -76,23 +54,64 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       const source = readFileSync(file, "utf8");
       expect(source, rel).not.toMatch(/welcome-hero/);
     }
-    const blocks = [
-      "src/views/blocks/deals-block.tsx",
-      "src/views/blocks/projects-list-block.tsx",
-      "src/views/blocks/space-discipline-block.tsx"
-    ];
-    for (const rel of blocks) {
-      const source = read(rel);
-      expect(source).toContain("PageIntro");
-      expect(source).not.toMatch(/welcome-hero__title/);
-    }
-    expect(read("src/views/blocks/space-discipline-block.tsx")).toContain('className="type-h3"');
-    expect(read("src/views/blocks/deals-block.tsx")).toMatch(/<h3 className="deal-card__title"/);
+    // P5: весь v2-блок-кластер (views/blocks/*) удалён — уцелевших блоков-прототипов больше нет.
+    expect(existsSync(join(webRoot, "src/views/blocks")), "views/blocks must be gone").toBe(false);
   });
 
-  it("deal-card title uses --text-h3 token (batch 14m)", () => {
-    const css = read("src/styles/bem-supplement.css");
-    expect(css).toMatch(/\.deal-card__title\s*\{[\s\S]*font-size:\s*var\(--text-h3\)/);
+  it("the v2 monolith screen cluster is fully deleted (P5)", () => {
+    // P5: после переноса всех маршрутов на v3-поверхности удалён весь v2-кластер —
+    // монолит-роутер, статический screen-view и все блоки. На диске их быть не должно.
+    const deleted = [
+      "src/views/screens/runtime-screen-view.tsx",
+      "src/views/screens/screen-view.tsx",
+      "src/views/screens/screens.stories.tsx",
+      "src/views/screens/login-screen-view.tsx",
+      "src/views/blocks/dashboard-bento.tsx",
+      "src/views/blocks/my-work-block.tsx",
+      "src/views/blocks/deals-block.tsx",
+      "src/views/blocks/projects-list-block.tsx",
+      "src/views/blocks/admin-block.tsx",
+      "src/views/blocks/space-discipline-block.tsx",
+      "src/views/blocks/state-screen-block.tsx",
+      "src/views/blocks/project-kpi-block.tsx"
+    ];
+    for (const rel of deleted) {
+      expect(existsSync(join(webRoot, rel)), `${rel} must be deleted`).toBe(false);
+    }
+    // call-runtime-view (боевой livekit-экран) сохранён.
+    expect(existsSync(join(webRoot, "src/views/screens/call-runtime-view.tsx")), "call-runtime-view kept").toBe(true);
+  });
+
+  it("each deleted static screen has a functional surface successor on disk", () => {
+    // Каждый удалённый статический экран заменён контракт-обоснованной поверхностью.
+    const successors = [
+      "src/workspace/my-work/my-work-surface.tsx",
+      "src/workspace/projects/projects-list-surface.tsx",
+      "src/workspace/project-detail/project-detail-surface.tsx",
+      "src/delivery/inspector/task-inspector-surface.tsx",
+      "src/crm/deals/deals-surface.tsx",
+      "src/crm/deals/deal-card-surface.tsx",
+      "src/crm/clients/clients-surface.tsx",
+      "src/crm/contacts/contacts-surface.tsx",
+      "src/crm/products/products-surface.tsx",
+      "src/admin/users/users-surface.tsx",
+      "src/admin/roles/roles-surface.tsx",
+      "src/delivery/schedule/schedule-surface.tsx",
+      "src/delivery/resources/resources-surface.tsx",
+      "src/delivery/baseline/baseline-surface.tsx",
+      "src/delivery/scenarios/scenarios-surface.tsx",
+      "src/delivery/commits/commits-surface.tsx",
+      "src/delivery/calendars/calendars-surface.tsx",
+      "src/auth/login/login-surface.tsx",
+      "src/auth/avatar-menu/avatar-menu-surface.tsx",
+      "src/workspace/settings/settings-surface.tsx",
+      "src/workspace/dashboard/dashboard-surface.tsx",
+      "src/workspace/agent/agent-surface.tsx",
+      "src/admin/audit/audit-surface.tsx"
+    ];
+    for (const rel of successors) {
+      expect(existsSync(join(webRoot, rel)), `${rel} must exist`).toBe(true);
+    }
   });
 
   it("batch 15 build evidence records successful web build", () => {

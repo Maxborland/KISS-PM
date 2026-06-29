@@ -21,8 +21,8 @@ const badgeVariants = cva(
         warning: "border-transparent bg-[var(--warning-soft)] text-[var(--warning-text)]",
         danger: "border-transparent bg-[var(--danger-soft)] text-[var(--danger-text)]",
         destructive: "border-transparent bg-[var(--danger-soft)] text-[var(--danger-text)]",
-        info: "border-transparent bg-[var(--info-soft)] text-[#0369a1]",
-        violet: "border-transparent bg-[var(--violet-soft)] text-[#6d28d9]",
+        info: "border-transparent bg-[var(--info-soft)] text-[color-mix(in_oklab,var(--info),black_30%)]",
+        violet: "border-transparent bg-[var(--violet-soft)] text-[color-mix(in_oklab,var(--violet),black_24%)]",
         accent: "border-transparent bg-[var(--accent-soft)] text-[var(--accent)]",
         outline: "border-[var(--border-strong)] bg-transparent text-[var(--text)]"
       }

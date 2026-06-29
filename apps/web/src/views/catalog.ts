@@ -1,4 +1,4 @@
-/** Design v2 screen / pattern ids (parity with docs/design-v2) */
+/** Design v3 screen catalog — статические экраны-прототипы без функционального аналога. */
 
 /** Согласованное RU-имя mock-проекта (§1 DESIGN_CONTRACT). */
 export const MOCK_PROJECT_CRM = "Внедрение CRM";
@@ -18,38 +18,16 @@ export type ScreenMeta = {
   lead: string;
   breadcrumb: { label: string; current?: boolean }[];
   activeNav?: string;
-  variant?: "workspace" | "login" | "bare";
+  variant?: "workspace" | "bare";
 };
 
-export type PatternMeta = {
-  id: string;
-  storyTitle: string;
-};
-
+// Экраны 02/03/05/06/07/07b/08/09/12/13/14/15/17/18/19 переведены в функциональные
+// surface (CRM / Project Delivery / Workspace / Admin / Auth) и удалены отсюда как дубли.
+// Остаются только прототипы без полного функционального аналога.
 export const SCREEN_IDS = [
   "00-space-discipline",
-  "01-dashboard",
-  "02-my-work",
-  "03-task-card",
   "04-create-task-modal",
-  "05-deals",
-  "06-deal-card",
-  "07-projects-list",
-  "07b-project-detail",
-  "08-entities-clients",
-  "08-entities-contacts",
-  "08-entities-products",
-  "09-admin",
-  "10-settings",
-  "11-avatar-menu",
-  "12-project-gantt",
-  "13-project-resources",
-  "14-project-baseline",
-  "15-project-scenarios",
   "16-project-kpi",
-  "17-project-audit",
-  "18-project-calendars",
-  "19-login",
   "state-empty",
   "state-error",
   "state-forbidden",
@@ -70,50 +48,14 @@ export const SCREEN_IDS = [
 
 export type ScreenId = (typeof SCREEN_IDS)[number];
 
-export const PATTERN_IDS = [
-  "shell",
-  "page-header",
-  "entity-two-column",
-  "list-kanban-switcher",
-  "settings-tabs",
-  "avatar-menu",
-  "create-modal"
-] as const;
-
-export type PatternId = (typeof PATTERN_IDS)[number];
-
 export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
   "00-space-discipline": {
     id: "00-space-discipline",
     storyTitle: "00 Дисциплина отступов",
-    pageTitle: "Overlay вместо push",
+    pageTitle: "Наложение вместо сдвига",
     lead: "Уведомления, баннеры, фильтры не должны сдвигать контент. Только overlay.",
     breadcrumb: [{ label: "Design", current: true }],
     activeNav: "Дашборд"
-  },
-  "01-dashboard": {
-    id: "01-dashboard",
-    storyTitle: "01 Дашборд",
-    pageTitle: "Добро пожаловать, Камил",
-    lead: "Ваш персональный дашборд: 12 задач, 8 сделок, 3 митинга на сегодня.",
-    breadcrumb: [{ label: "Дашборд", current: true }],
-    activeNav: "Задачи"
-  },
-  "02-my-work": {
-    id: "02-my-work",
-    storyTitle: "02 Моя работа",
-    pageTitle: "Моя работа",
-    lead: "Канбан и список задач в одном рабочем контуре.",
-    breadcrumb: [{ label: "Задачи", current: true }],
-    activeNav: "Задачи"
-  },
-  "03-task-card": {
-    id: "03-task-card",
-    storyTitle: "03 Карточка задачи",
-    pageTitle: "Согласовать ТЗ",
-    lead: mockTaskProjectRef("MDS-39"),
-    breadcrumb: [{ label: "Задачи" }, { label: "MDS-39", current: true }],
-    activeNav: "Задачи"
   },
   "04-create-task-modal": {
     id: "04-create-task-modal",
@@ -123,118 +65,6 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     breadcrumb: [{ label: "Задачи", current: true }],
     activeNav: "Задачи"
   },
-  "05-deals": {
-    id: "05-deals",
-    storyTitle: "05 Сделки",
-    pageTitle: "Сделки",
-    lead: "Воронка продаж и активные возможности.",
-    breadcrumb: [{ label: "CRM" }, { label: "Сделки", current: true }],
-    activeNav: "Входящие"
-  },
-  "06-deal-card": {
-    id: "06-deal-card",
-    storyTitle: "06 Карточка сделки",
-    pageTitle: "Сделка «Ромашка»",
-    lead: "Активная сделка в воронке «Продажи».",
-    breadcrumb: [{ label: "Сделки" }, { label: "Ромашка", current: true }],
-    activeNav: "Входящие"
-  },
-  "07-projects-list": {
-    id: "07-projects-list",
-    storyTitle: "07 Список проектов",
-    pageTitle: "Проекты",
-    lead: "14 активных проектов, 3 на ревью, 2 на финальной стадии.",
-    breadcrumb: [{ label: "Проекты", current: true }],
-    activeNav: "Отчёты"
-  },
-  "07b-project-detail": {
-    id: "07b-project-detail",
-    storyTitle: "07b Карточка проекта",
-    pageTitle: MOCK_PROJECT_CRM,
-    lead: "PRJ-2026-014 · ООО «Ромашка»",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM, current: true }],
-    activeNav: "Отчёты"
-  },
-  "08-entities-clients": {
-    id: "08-entities-clients",
-    storyTitle: "08 Справочник клиентов",
-    pageTitle: "Клиенты",
-    lead: "Справочник клиентов tenant.",
-    breadcrumb: [{ label: "Справочники" }, { label: "Клиенты", current: true }],
-    activeNav: "Интеграции"
-  },
-  "08-entities-contacts": {
-    id: "08-entities-contacts",
-    storyTitle: "08 Справочник контактов",
-    pageTitle: "Контакты",
-    lead: "Контактные лица и связи с CRM.",
-    breadcrumb: [{ label: "Справочники" }, { label: "Контакты", current: true }],
-    activeNav: "Интеграции"
-  },
-  "08-entities-products": {
-    id: "08-entities-products",
-    storyTitle: "08 Справочник продуктов",
-    pageTitle: "Продукты",
-    lead: "Каталог продуктов для сделок и проектов.",
-    breadcrumb: [{ label: "Справочники" }, { label: "Продукты", current: true }],
-    activeNav: "Интеграции"
-  },
-  "09-admin": {
-    id: "09-admin",
-    storyTitle: "09 Администрирование",
-    pageTitle: "Администрирование",
-    lead: "Пользователи, роли и политики рабочей области.",
-    breadcrumb: [{ label: "Настройки" }, { label: "Админ", current: true }],
-    activeNav: "Настройки"
-  },
-  "10-settings": {
-    id: "10-settings",
-    storyTitle: "10 Настройки",
-    pageTitle: "Настройки рабочей области",
-    lead: "Профиль, уведомления и интеграции.",
-    breadcrumb: [{ label: "Настройки", current: true }],
-    activeNav: "Настройки"
-  },
-  "11-avatar-menu": {
-    id: "11-avatar-menu",
-    storyTitle: "11 Меню аватара",
-    pageTitle: "Профиль пользователя",
-    lead: "Меню аватара и быстрые действия.",
-    breadcrumb: [{ label: "Профиль", current: true }],
-    activeNav: "Дашборд"
-  },
-  "12-project-gantt": {
-    id: "12-project-gantt",
-    storyTitle: "12 Гант проекта",
-    pageTitle: mockProjectScreenTitle("Гант"),
-    lead: "План-факт и WBS проекта.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Гант", current: true }],
-    activeNav: "Отчёты"
-  },
-  "13-project-resources": {
-    id: "13-project-resources",
-    storyTitle: "13 Ресурсы проекта",
-    pageTitle: mockProjectScreenTitle("Ресурсы"),
-    lead: "Матрица загрузки и назначения.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Ресурсы", current: true }],
-    activeNav: "Отчёты"
-  },
-  "14-project-baseline": {
-    id: "14-project-baseline",
-    storyTitle: "14 Базовый план проекта",
-    pageTitle: mockProjectScreenTitle("Базовый план"),
-    lead: "Снимки плана и отклонения.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Базовый план", current: true }],
-    activeNav: "Отчёты"
-  },
-  "15-project-scenarios": {
-    id: "15-project-scenarios",
-    storyTitle: "15 Сценарии проекта",
-    pageTitle: mockProjectScreenTitle("Сценарии"),
-    lead: "Сценарии «что если» и сравнение вариантов.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Сценарии", current: true }],
-    activeNav: "Отчёты"
-  },
   "16-project-kpi": {
     id: "16-project-kpi",
     storyTitle: "16 KPI проекта",
@@ -242,30 +72,6 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     lead: "Показатели и сигналы управления.",
     breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "KPI", current: true }],
     activeNav: "Отчёты"
-  },
-  "17-project-audit": {
-    id: "17-project-audit",
-    storyTitle: "17 Аудит проекта",
-    pageTitle: mockProjectScreenTitle("Аудит"),
-    lead: "Журнал управленческих действий.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Аудит", current: true }],
-    activeNav: "Отчёты"
-  },
-  "18-project-calendars": {
-    id: "18-project-calendars",
-    storyTitle: "18 Календари проекта",
-    pageTitle: mockProjectScreenTitle("Календари"),
-    lead: "Рабочие календари и исключения.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "Календари", current: true }],
-    activeNav: "Календарь"
-  },
-  "19-login": {
-    id: "19-login",
-    storyTitle: "19 Вход",
-    pageTitle: "Войти в KISS PM",
-    lead: "Используйте корпоративный email tenant.",
-    breadcrumb: [],
-    variant: "login"
   },
   "state-empty": {
     id: "state-empty",
@@ -395,14 +201,4 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     breadcrumb: [{ label: "Звонки" }, { label: "Связь", current: true }],
     activeNav: "Звонки"
   }
-};
-
-export const PATTERN_META: Record<PatternId, PatternMeta> = {
-  shell: { id: "shell", storyTitle: "Shell" },
-  "page-header": { id: "page-header", storyTitle: "Page header" },
-  "entity-two-column": { id: "entity-two-column", storyTitle: "Entity two column" },
-  "list-kanban-switcher": { id: "list-kanban-switcher", storyTitle: "List kanban switcher" },
-  "settings-tabs": { id: "settings-tabs", storyTitle: "Settings tabs" },
-  "avatar-menu": { id: "avatar-menu", storyTitle: "Avatar menu" },
-  "create-modal": { id: "create-modal", storyTitle: "Create modal" }
 };

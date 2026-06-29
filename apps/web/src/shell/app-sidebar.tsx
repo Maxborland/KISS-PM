@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
+import { Chip } from "@/components/ui/chip";
 import { cn } from "@/lib/cn";
+import { DEMO_NAV_TITLE, PROTOTYPE_LABEL } from "@/views/lib/demo";
 
 export type SidebarItem = {
   label: string;
@@ -32,19 +34,24 @@ export function AppSidebar({ workspace = "acme.studio", groups, user }: AppSideb
           <span className="app-sidebar__brand-meta">{workspace}</span>
         </span>
       </div>
+      <Chip variant="warning" className="app-sidebar__proto">
+        {PROTOTYPE_LABEL}
+      </Chip>
       {groups.map((g) => (
         <div key={g.title} className="app-sidebar__group">
           <div className="app-sidebar__group-title">{g.title}</div>
           {g.items.map((item) => (
-            <a
+            // Прототип: навигация не подключена. Рендерим как неинтерактивный
+            // пункт (не fake-ссылка href="#"), активный пункт подсвечен снаружи.
+            <span
               key={item.label}
-              href="#"
               className={cn(
-                "app-sidebar__item",
+                "app-sidebar__item app-sidebar__item--demo",
                 item.nested && "app-sidebar__item--nested",
                 item.active && "is-active"
               )}
-              onClick={(e) => e.preventDefault()}
+              aria-current={item.active ? "page" : undefined}
+              title={DEMO_NAV_TITLE}
             >
               {item.label}
               {item.badge ? (
@@ -57,7 +64,7 @@ export function AppSidebar({ workspace = "acme.studio", groups, user }: AppSideb
                   {item.badge}
                 </span>
               ) : null}
-            </a>
+            </span>
           ))}
         </div>
       ))}

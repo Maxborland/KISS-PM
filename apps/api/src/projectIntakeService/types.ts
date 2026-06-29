@@ -29,16 +29,19 @@ export type ProjectIntakeServiceDataSource = Pick<
   | "findContactById"
   | "findDealStageById"
   | "findOpportunityById"
+  | "findPipelineById"
   | "findProjectTypeById"
   | "findUserById"
   | "listCustomFieldDefinitions"
   | "listOpportunities"
   | "listPositions"
   | "listProjects"
+  | "listStageTransitions"
   | "listWorkspaceUsers"
   | "lockTenantResourcePlanning"
   | "updateOpportunity"
   | "updateOpportunityFeasibility"
+  | "updateOpportunityPipeline"
   | "updateOpportunityStage"
   | "withTransaction"
 >;
@@ -57,6 +60,7 @@ export type ProjectIntakeMutationDataSource = Pick<
   | "lockTenantResourcePlanning"
   | "updateOpportunity"
   | "updateOpportunityFeasibility"
+  | "updateOpportunityPipeline"
   | "updateOpportunityStage"
 >;
 
@@ -72,7 +76,7 @@ export type ProjectIntakeServiceDeps = {
   ): Promise<string>;
 };
 
-export type ServiceErrorStatus = 400 | 403 | 404 | 409 | 501;
+export type ServiceErrorStatus = 400 | 403 | 404 | 409 | 422 | 501;
 export type ServiceError = {
   ok: false;
   status: ServiceErrorStatus;
@@ -94,6 +98,14 @@ export type CreateOpportunityResult =
     };
 
 export type ChangeOpportunityStageResult =
+  | ServiceError
+  | {
+      ok: true;
+      status: 200;
+      opportunity: OpportunityRecord;
+    };
+
+export type ChangeOpportunityPipelineResult =
   | ServiceError
   | {
       ok: true;
@@ -151,6 +163,10 @@ export type ProjectIntakeService = {
     actor: TenantUser;
     opportunityId: string;
   }): Promise<AuthorizedResult>;
+  preflightChangeOpportunityPipeline(input: {
+    actor: TenantUser;
+    opportunityId: string;
+  }): Promise<AuthorizedResult>;
   preflightUpdateOpportunity(input: {
     actor: TenantUser;
     opportunityId: string;
@@ -172,6 +188,12 @@ export type ProjectIntakeService = {
     opportunityId: string;
     stageId: string;
   }): Promise<ChangeOpportunityStageResult>;
+  changeOpportunityPipeline(input: {
+    actor: TenantUser;
+    opportunityId: string;
+    pipelineId: string;
+    stageId: string;
+  }): Promise<ChangeOpportunityPipelineResult>;
   updateOpportunity(input: {
     actor: TenantUser;
     opportunityId: string;

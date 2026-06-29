@@ -22,13 +22,16 @@ import type {
   ManagementAuditEventInput
 } from "./apiTypes";
 import { createApiCapabilities } from "./apiDataPorts";
+import { createInMemoryEmailProvider } from "./emailProvider";
 import { createInMemoryTenantDataSource } from "./inMemoryTenantDataSource";
 import { registerAccessRoleRoutes } from "./accessRoleRoutes";
 import { registerAttachmentRoutes } from "./attachmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerAuthRoutes } from "./authRoutes";
+import { registerAuthRegistrationRoutes } from "./authRegistrationRoutes";
 import { registerBackgroundJobRoutes } from "./backgroundJobRoutes";
 import { registerCrmRoutes } from "./crmRoutes";
+import { registerCrmPipelineRoutes } from "./crmPipelineRoutes";
 import { registerCollaborationRoutes } from "./collaborationRoutes";
 import { registerWorkspaceEventsRoute } from "./workspaceEventsRoute";
 import { registerAgentRoutes } from "./agent/agentRoutes";
@@ -81,6 +84,7 @@ export function createApp(options: CreateAppOptions = {}) {
     options.trustedMutationOrigins ?? trustedMutationOriginsFromEnv();
   const storageProvider = options.storageProvider ?? createStorageProviderFromEnv();
   const videoProvider = options.videoProvider ?? createVideoProviderFromEnv();
+  const emailProvider = options.emailProvider ?? createInMemoryEmailProvider();
   const trustForwardedAuthHeaders =
     options.trustForwardedAuthHeaders ?? shouldTrustForwardedAuthHeaders();
   const enableDevTenantRoutes = options.enableDevTenantRoutes ?? false;
@@ -231,6 +235,7 @@ export function createApp(options: CreateAppOptions = {}) {
     authRateLimiter,
     capabilities,
     dataSource,
+    emailProvider,
     // Injectable for tests; falls back to env config. `null` (explicitly disabled) is
     // honoured — only an absent option triggers the env default.
     egressProvider:
@@ -261,6 +266,7 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   registerAuthRoutes(app, routeDeps);
+  registerAuthRegistrationRoutes(app, routeDeps);
   registerBackgroundJobRoutes(app, routeDeps);
   if (enableDevTenantRoutes) {
     registerDevTenantRoutes(app, routeDeps);
@@ -277,6 +283,7 @@ export function createApp(options: CreateAppOptions = {}) {
   registerCommunicationRecordingWebhookRoute(app, routeDeps);
   registerKnowledgeRoutes(app, routeDeps);
   registerCrmRoutes(app, routeDeps);
+  registerCrmPipelineRoutes(app, routeDeps);
   registerProjectIntakeRoutes(app, routeDeps);
   registerCrmActivityRoutes(app, routeDeps);
   registerAttachmentRoutes(app, routeDeps);

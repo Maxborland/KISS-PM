@@ -10,7 +10,7 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
       data-slot="input"
       className={cn(
         inputBase,
-        "aria-invalid:border-[var(--danger)] aria-invalid:shadow-[0_0_0_3px_rgba(239,68,68,0.15)]",
+        "aria-invalid:border-[var(--danger)] aria-invalid:shadow-[0_0_0_3px_color-mix(in_oklab,var(--danger),transparent_85%)]",
         className
       )}
       {...props}

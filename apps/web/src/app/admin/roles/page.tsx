@@ -1,7 +1,11 @@
-"use client";
+import { AdminRuntimeProvider } from "@/admin/lib/admin-runtime";
+import { AdminRolesSurface } from "@/admin/roles/roles-surface";
 
-import { RuntimeScreenView } from "@/views/screens/runtime-screen-view";
-
+// Прод-route «Администрирование · Роли» (v3) на боевом admin API.
 export default function AdminRolesPage() {
-  return <RuntimeScreenView id="09-admin" entityId="roles" />;
+  return (
+    <AdminRuntimeProvider live>
+      <AdminRolesSurface />
+    </AdminRuntimeProvider>
+  );
 }

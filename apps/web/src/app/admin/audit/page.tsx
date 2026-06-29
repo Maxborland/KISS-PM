@@ -1,7 +1,11 @@
-"use client";
+import { AdminRuntimeProvider } from "@/admin/lib/admin-runtime";
+import { AdminAuditSurface } from "@/admin/audit/audit-surface";
 
-import { RuntimeScreenView } from "@/views/screens/runtime-screen-view";
-
+// Прод-route «Администрирование · Аудит» (v3) на боевом GET /api/tenant/current/audit-events.
 export default function AdminAuditPage() {
-  return <RuntimeScreenView id="09-admin" entityId="audit" />;
+  return (
+    <AdminRuntimeProvider live>
+      <AdminAuditSurface />
+    </AdminRuntimeProvider>
+  );
 }

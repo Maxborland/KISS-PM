@@ -31,7 +31,7 @@ function SheetOverlay({
       data-slot="sheet-overlay"
       className={cn(
         "ds-sheet-overlay fixed inset-0",
-        "bg-[rgba(15,23,42,0.4)] backdrop-blur-[2px]",
+        "bg-[color-mix(in_oklab,var(--text-strong),transparent_60%)] backdrop-blur-[2px]",
         className
       )}
       style={{ zIndex: "var(--z-modal)" } as React.CSSProperties}

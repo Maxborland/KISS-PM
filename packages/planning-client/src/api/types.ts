@@ -11,6 +11,8 @@ export type PlanningReadModel = {
   calculatedPlan: Record<string, unknown>;
   baselineComparison: Record<string, unknown>;
   resourceLoad: Record<string, unknown>;
+  calendars: Array<Record<string, unknown>>;
+  calendarExceptions: Array<Record<string, unknown>>;
   validationIssues: ValidationIssue[];
   planVersion: number;
   engineVersion: string;
