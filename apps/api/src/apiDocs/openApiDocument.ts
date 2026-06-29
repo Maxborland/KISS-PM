@@ -176,6 +176,7 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/unread-summary", tag: "Collaboration", summary: "Unread summary (notifications + conversation messages)" },
   { method: "post", path: "/api/workspace/notifications/:notificationId/read", tag: "Collaboration", summary: "Mark notification read", successSchema: "NotificationResponse" },
   { method: "get", path: "/api/workspace/realtime/events", tag: "Collaboration", summary: "Workspace realtime event stream (SSE)", response: "event-stream" },
+  { method: "get", path: "/api/workspace/presence", tag: "Collaboration", summary: "Presence snapshot of tenant users" },
   { method: "get", path: "/api/workspace/notification-preferences", tag: "Collaboration", summary: "Read notification preferences", successSchema: "NotificationPreferencesResponse" },
   { method: "put", path: "/api/workspace/notification-preferences", tag: "Collaboration", summary: "Replace notification preferences", requestSchema: "NotificationPreferencesReplaceRequest", successSchema: "NotificationPreferencesResponse" },
   { method: "get", path: "/api/workspace/meetings", tag: "Meetings", summary: "List meetings", successSchema: "MeetingsResponse", queryParameters: [{ name: "entityType", in: "query", required: true, schema: { $ref: "#/components/schemas/CollaborationEntityType" } }, { name: "entityId", in: "query", required: true, schema: { type: "string", minLength: 1 } }] },

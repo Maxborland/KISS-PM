@@ -7,9 +7,12 @@
  * ponytail: in-memory publisher (один процесс). Для многоинстансного прода —
  * Redis pub/sub по образцу planningRedisEventBus; подключить когда появится >1 реплики.
  */
+import type { PresenceStatus } from "./presenceStore";
+
 export type WorkspaceRealtimeEvent =
   | { type: "message.created"; conversationId: string; message: unknown }
-  | { type: "notification.created"; userId: string; notificationType: string };
+  | { type: "notification.created"; userId: string; notificationType: string }
+  | { type: "presence.changed"; userId: string; status: PresenceStatus };
 
 export type WorkspaceEventListener = (event: WorkspaceRealtimeEvent) => void;
 
@@ -51,6 +54,8 @@ export function setWorkspaceEventPublisher(next: WorkspaceEventPublisher): void 
 
 export const userChannel = (userId: string): string => `user:${userId}`;
 export const conversationChannel = (conversationId: string): string => `conversation:${conversationId}`;
+// Канал тенанта: presence-события рассылаются всем подписчикам рабочей области.
+export const tenantChannel = (tenantId: string): string => `tenant:${tenantId}`;
 
 export function subscribeWorkspaceEvents(
   channel: string,
@@ -69,4 +74,8 @@ export function emitMessageCreated(conversationId: string, message: unknown): vo
 
 export function emitNotificationCreated(userId: string, notificationType: string): void {
   emitWorkspaceEvent(userChannel(userId), { type: "notification.created", userId, notificationType });
+}
+
+export function emitPresenceChanged(tenantId: string, userId: string, status: PresenceStatus): void {
+  emitWorkspaceEvent(tenantChannel(tenantId), { type: "presence.changed", userId, status });
 }
