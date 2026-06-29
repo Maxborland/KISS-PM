@@ -35,6 +35,12 @@ export type AgentLimits = {
   timeoutMs?: number;
 };
 
+// Событие хода рассуждений (для SSE-стрима/CoT-трейса). Цикл вызывает onEvent по мере работы.
+export type AgentLoopEvent =
+  | { type: "reasoning"; text: string }
+  | { type: "analyze"; tool: string; title: string; ok: boolean }
+  | { type: "proposal"; tool: string; title: string };
+
 export async function runAgentLoop(input: {
   provider: LlmProvider;
   system: string;
@@ -44,7 +50,9 @@ export async function runAgentLoop(input: {
   maxIterations?: number;
   limits?: AgentLimits;
   now?: () => number; // инъекция времени для тестов (по умолчанию Date.now)
+  onEvent?: (event: AgentLoopEvent) => void | Promise<void>; // CoT/SSE-трейс хода работы
 }): Promise<AgentLoopResult> {
+  const emit = input.onEvent ?? (() => {});
   const maxIterations = input.limits?.maxIterations ?? input.maxIterations ?? 6;
   const maxTotalOutputTokens = input.limits?.maxTotalOutputTokens ?? Number.POSITIVE_INFINITY;
   const clock = input.now ?? (() => Date.now());
@@ -70,7 +78,10 @@ export async function runAgentLoop(input: {
     messages.push({ role: "assistant", content: response.content });
 
     for (const block of response.content) {
-      if (block.type === "text" && block.text.trim().length > 0) reasoningParts.push(block.text.trim());
+      if (block.type === "text" && block.text.trim().length > 0) {
+        reasoningParts.push(block.text.trim());
+        await emit({ type: "reasoning", text: block.text.trim() });
+      }
     }
 
     const toolUses = response.content.filter((block): block is Extract<LlmContentBlock, { type: "tool_use" }> => block.type === "tool_use");
@@ -90,13 +101,16 @@ export async function runAgentLoop(input: {
           const result = await input.executeAnalyze(tool, use.input);
           analyzeResults.push({ tool: tool.name, input: use.input, result });
           toolResults.push({ type: "tool_result", tool_use_id: use.id, content: JSON.stringify(result).slice(0, 16_000) });
+          await emit({ type: "analyze", tool: tool.name, title: tool.title, ok: true });
         } catch (error) {
           toolResults.push({ type: "tool_result", tool_use_id: use.id, content: JSON.stringify({ error: error instanceof Error ? error.message : "analyze_failed" }), is_error: true });
+          await emit({ type: "analyze", tool: tool.name, title: tool.title, ok: false });
         }
       } else {
         // mutation: записываем как предложение, НЕ исполняем.
         proposedActions.push({ tool: tool.name, title: tool.title, input: use.input });
         toolResults.push({ type: "tool_result", tool_use_id: use.id, content: JSON.stringify({ status: "proposed", note: "pending user confirmation" }) });
+        await emit({ type: "proposal", tool: tool.name, title: tool.title });
       }
     }
     messages.push({ role: "user", content: toolResults });

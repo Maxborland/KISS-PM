@@ -1,8 +1,13 @@
+import { streamSSE } from "hono/streaming";
+
+import type { AccessProfile } from "@kiss-pm/access-control";
+import type { TenantUser } from "@kiss-pm/domain";
+
 import type { ApiApp, ApiRouteDeps } from "../routeTypes";
 import { readLimitedJsonBody } from "../jsonBody";
 import { createPlanningReadModel } from "../planning/planningReadModel";
 import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
-import { runAgentLoop, type AnalyzeExecutor } from "./agentLoop";
+import { runAgentLoop, type AgentLoopEvent, type AnalyzeExecutor } from "./agentLoop";
 import { createAgentLlmProviderFromEnv } from "./llmProvider";
 import { AGENT_TOOLS, allowedToolsForActor, findAgentTool, listToolAvailability, type AgentTool } from "./toolRegistry";
 
@@ -153,6 +158,44 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     return context.json({ tools: listToolAvailability(actor, profile) });
   });
 
+  // Ядро предложения — общее для /propose (JSON) и /propose/stream (SSE).
+  async function runProposeLoop(
+    cookie: string | null,
+    actor: TenantUser,
+    profile: AccessProfile,
+    goal: string,
+    onEvent?: (event: AgentLoopEvent) => void | Promise<void>
+  ) {
+    const allowed = allowedToolsForActor(actor, profile);
+    // LLM получает: разрешённые mutation-инструменты (как предлагаемые) + подключённые analyze.
+    const offered = allowed.filter((tool) => tool.kind === "mutation" || WIRED_ANALYZE.has(tool.name));
+    const result = await runAgentLoop({
+      provider: createAgentLlmProviderFromEnv(),
+      system: AGENT_SYSTEM_PROMPT,
+      goal,
+      tools: offered,
+      executeAnalyze: buildAnalyzeExecutor(deps, app, cookie, actor.tenantId, actor.id),
+      limits: agentLimitsFromEnv(),
+      ...(onEvent ? { onEvent } : {})
+    });
+    // Аннотируем предложения грубым capability (точная проверка — при /execute).
+    const capabilityByTool = new Map(AGENT_TOOLS.map((tool) => [tool.name, tool.capability({ actor, profile })]));
+    const proposedActions = result.proposedActions.map((action) => ({
+      ...action,
+      capability: capabilityByTool.get(action.tool) ?? { allowed: false, reason: "permission_missing" }
+    }));
+    return {
+      goal,
+      model: result.model,
+      reasoning: result.reasoning,
+      analyzeResults: result.analyzeResults,
+      proposedActions,
+      iterations: result.iterations,
+      stopReason: result.stopReason,
+      outputTokens: result.outputTokens
+    };
+  }
+
   app.post("/api/workspace/agent/propose", async (context) => {
     const cookie = context.req.header("cookie") ?? null;
     const actor = await deps.getSessionActorFromHeaders(cookie);
@@ -163,36 +206,30 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (goal.length === 0 || goal.length > 2000) return context.json({ error: "invalid_goal" }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const allowed = allowedToolsForActor(actor, profile);
-    // LLM получает: разрешённые mutation-инструменты (как предлагаемые) + подключённые analyze.
-    const offered = allowed.filter((tool) => tool.kind === "mutation" || WIRED_ANALYZE.has(tool.name));
+    return context.json(await runProposeLoop(cookie, actor, profile, goal));
+  });
 
-    const provider = createAgentLlmProviderFromEnv();
-    const result = await runAgentLoop({
-      provider,
-      system: AGENT_SYSTEM_PROMPT,
-      goal,
-      tools: offered,
-      executeAnalyze: buildAnalyzeExecutor(deps, app, cookie, actor.tenantId, actor.id),
-      limits: agentLimitsFromEnv()
-    });
+  // То же предложение, но потоком (SSE): события reasoning/analyze/proposal по мере работы +
+  // финальное событие done с полным результатом. CoT-трейс для живого «агент думает».
+  app.post("/api/workspace/agent/propose/stream", async (context) => {
+    const cookie = context.req.header("cookie") ?? null;
+    const actor = await deps.getSessionActorFromHeaders(cookie);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const goal = typeof (body.value as { goal?: unknown }).goal === "string" ? (body.value as { goal: string }).goal.trim() : "";
+    if (goal.length === 0 || goal.length > 2000) return context.json({ error: "invalid_goal" }, 400);
 
-    // Аннотируем предложения грубым capability (точная проверка — при /execute).
-    const capabilityByTool = new Map(AGENT_TOOLS.map((tool) => [tool.name, tool.capability({ actor, profile })]));
-    const proposedActions = result.proposedActions.map((action) => ({
-      ...action,
-      capability: capabilityByTool.get(action.tool) ?? { allowed: false, reason: "permission_missing" }
-    }));
-
-    return context.json({
-      goal,
-      model: result.model,
-      reasoning: result.reasoning,
-      analyzeResults: result.analyzeResults,
-      proposedActions,
-      iterations: result.iterations,
-      stopReason: result.stopReason,
-      outputTokens: result.outputTokens
+    const profile = await deps.getActorProfile(actor);
+    return streamSSE(context, async (stream) => {
+      try {
+        const result = await runProposeLoop(cookie, actor, profile, goal, async (event) => {
+          await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
+        });
+        await stream.writeSSE({ event: "done", data: JSON.stringify(result) });
+      } catch (error) {
+        await stream.writeSSE({ event: "error", data: JSON.stringify({ error: error instanceof Error ? error.message : "agent_failed" }) });
+      }
     });
   });
 

@@ -103,6 +103,29 @@ describe("runAgentLoop", () => {
     expect(result.iterations).toBeLessThan(50);
   });
 
+  it("эмитит CoT-события onEvent в порядке: reasoning → analyze → proposal", async () => {
+    const script: LlmResponse[] = [
+      { stopReason: "tool_use", content: [{ type: "text", text: "Смотрю задачи." }, { type: "tool_use", id: "t1", name: "list_my_tasks", input: {} }] },
+      { stopReason: "tool_use", content: [{ type: "tool_use", id: "t2", name: "change_task_status", input: { projectId: "p1", taskId: "task-1", statusId: "status-review" } }] },
+      { stopReason: "end_turn", content: [{ type: "text", text: "Готово." }] }
+    ];
+    const events: string[] = [];
+    await runAgentLoop({
+      provider: createMockLlmProvider(script),
+      system: "test",
+      goal: "тест",
+      tools: [listMyTasks, changeStatus],
+      executeAnalyze: vi.fn().mockResolvedValue({ tasks: [{ id: "task-1" }] }),
+      onEvent: (e) => { events.push(`${e.type}:${e.type === "reasoning" ? e.text : e.tool}`); }
+    });
+    expect(events).toEqual([
+      "reasoning:Смотрю задачи.",
+      "analyze:list_my_tasks",
+      "proposal:change_task_status",
+      "reasoning:Готово."
+    ]);
+  });
+
   it("останавливается по максимуму итераций (stopReason=max_iterations)", async () => {
     const result = await runAgentLoop({
       provider: createMockLlmProvider([{ stopReason: "tool_use", content: [{ type: "tool_use", id: "t", name: "list_my_tasks", input: {} }] }]),
