@@ -22,7 +22,7 @@ backend слайсы 1–4 готовы (PR #210, каждый e2e против 
 - Приёмка: Storybook этих экранов не падает (mock-роуты добавить в `mock-comms-backend`); e2e на :55433 показывает реальные детали/тоггл/число.
 
 ## P2 — Быстрые backend-победы (M, без миграции) + их фронт  ·  PR #210 (бэк) + #209 (фронт)
-- [ ] **P2.1** planning **commits revert**: `POST …/planning/revert/:auditEventId` — server-side reconstruct inverse через `buildCompensatingCommands` (`packages/planning-client/src/undo`) + apply. Включить откат в delivery `commits-surface` (сейчас `latestRevert=null`). M ⬩dep: read governedPlanningApply/planningRouteHelpers. **Завершает delivery-домен по бэку.**
+- [x] **P2.1** planning **commits revert** — оказался **frontend-only** (backend-эндпоинт НЕ нужен): `usePlanning` держит последний apply (commands + before read-model + afterVersion) в памяти; live `loadCommits` отдаёт его как `latestRevert`, и `commits-surface` строит инверсию через `buildCompensatingCommands` + applyBatch (контракт уже был). Откат — для последнего коммита сессии; произвольный исторический откат = будущая серверная задача (audit.beforeState только счётчики). ✅ tsc 0 · Storybook commits рендерит «Откатить».
 - [ ] **P2.2** admin **permission-catalog**: `GET /api/workspace/permission-catalog` → список назначаемых прав (из `@kiss-pm/access-control`). Фронт `admin/roles` берёт каталог из бэка вместо client-enum. M
 - Приёмка: e2e revert (apply команду → revert → план вернулся к версии N−1); каталог прав отдаётся и рендерится.
 

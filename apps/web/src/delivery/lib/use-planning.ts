@@ -81,6 +81,9 @@ export function usePlanning(projectId: string) {
   const [readModel, setReadModel] = useState<PlanningReadModel | null>(null);
   const [status, setStatus] = useState<PlanningStatus>("loading");
   const [error, setError] = useState<string | null>(null);
+  // Последний применённый этой сессией apply: команды + read-model ДО него + версия ПОСЛЕ.
+  // Держим before в памяти клиента, т.к. audit.beforeState (только счётчики) недостаточен для отката.
+  const lastApplyRef = useRef<{ afterVersion: number; commands: PlanningCommand[]; before: PlanningReadModel } | null>(null);
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -118,6 +121,7 @@ export function usePlanning(projectId: string) {
       if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
       try {
         const res = await client.applyCommand(projectId, { command, clientPlanVersion: readModel.planVersion });
+        lastApplyRef.current = { afterVersion: res.newPlanVersion, commands: [command], before: readModel };
         setReadModel(res.readModel);
         return { ok: true, changed: res.applied.changedTaskIds, planVersion: res.newPlanVersion };
       } catch (e) {
@@ -143,6 +147,7 @@ export function usePlanning(projectId: string) {
       if (!readModel || commands.length === 0) return { ok: false, conflict: false, message: "empty_batch" };
       try {
         const res = await client.applyCommandBatch(projectId, { commands, clientPlanVersion: readModel.planVersion });
+        lastApplyRef.current = { afterVersion: res.newPlanVersion, commands, before: readModel };
         setReadModel(res.readModel);
         return { ok: true, changed: res.applied.changedTaskIds, planVersion: res.newPlanVersion };
       } catch (e) {
@@ -208,11 +213,13 @@ export function usePlanning(projectId: string) {
       const res = await fetchRef.current!("/planning/commits");
       return (await res.json()) as CommitsView;
     }
-    // live: GET /api/tenant/current/audit-events — planning-события проекта. Откат недоступен
-    // (audit.beforeState — только счётчики, не полный read-model), поэтому latestRevert=null.
+    // live: GET /api/tenant/current/audit-events — planning-события проекта. Откат доступен ТОЛЬКО
+    // для последнего применённого этой сессией коммита (before read-model держим в памяти клиента —
+    // audit.beforeState недостаточен). Произвольный исторический откат — будущая серверная задача.
     const res = await fetch(`/api/tenant/current/audit-events?projectId=${encodeURIComponent(projectId)}`, { credentials: "same-origin" });
     if (!res.ok) throw new Error("audit_events_failed");
     const body = (await res.json()) as { auditEvents: PlanningAuditEvent[] };
+    const last = lastApplyRef.current;
     const commits: CommitMetaView[] = body.auditEvents
       .filter((event) => event.sourceWorkflow === "planning" && event.afterState?.planVersion != null)
       .map((event) => ({
@@ -222,10 +229,14 @@ export function usePlanning(projectId: string) {
         changedTaskIds: event.afterState.changedTaskIds ?? [],
         auditEventId: event.id,
         at: event.createdAt,
-        revertible: false
+        revertible: last != null && event.afterState.planVersion === last.afterVersion
       }))
       .sort((left, right) => right.version - left.version);
-    return { commits, latestRevert: null };
+    const latestRevert =
+      last != null && commits[0] != null && commits[0].version === last.afterVersion
+        ? { auditEventId: commits[0].auditEventId, commands: last.commands, before: last.before }
+        : null;
+    return { commits, latestRevert };
   }, [live, projectId]);
 
   return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch, previewScenarios, applyScenario, loadCommits };
