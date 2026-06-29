@@ -55,9 +55,14 @@ backend слайсы 1–4 готовы (PR #210, каждый e2e против 
   `GET /api/tenant/current/audit-events`, таблица событий (humanized action + сырой код + сущность + чип
   результата Успешно/Ошибка/Отклонено + время); client/mock/hook/story. Монолит больше тут не рендерится.
   ✅ tsc 0 · mock-admin 30/30 · Storybook `admin-audit--default` рендерит 8 событий со всеми типами результата.
-- [ ] **Ретайр монолита — остался ЕДИНСТВЕННЫЙ консьюмер `/agent`** (11-agent, marketing-демо): v3-аналога нет,
-  удаление = продуктовое решение. Как только судьба `/agent` решена — `runtime-screen-view`/`screen-view`/`views/blocks/*`
-  можно удалить целиком. `/calls/[roomId]` — боевой livekit-экран (НЕ v2), оставлен.
+- [x] **`/agent`** → построена боевая v3 `AgentSurface` (поправка: агент — НЕ marketing-демо, а альтернативный
+  способ ведения работы): анализирует задачи (`GET /api/workspace/my-work`), предлагает безопасные forward-переходы
+  статусов (подмножество ALLOWED_TRANSITIONS), применяет по двухшаговому подтверждению боевым
+  `PATCH …/tasks/:id/status`, ведёт лог сессии. ✅ tsc 0 · Storybook рендерит 6 предложений · apply: «В работе→На проверке» залогирован.
+- [x] **МОНОЛИТ УДАЛЁН ЦЕЛИКОМ** ✅ — все маршруты на v3; снесены `runtime-screen-view.tsx`, `screen-view.tsx`,
+  `screens.stories.tsx`, весь `views/blocks/*` (8 файлов). `call-runtime-view.tsx` (боевой livekit) сохранён.
+  health-тест обновлён под полное удаление. ✅ tsc 0 · полный web-набор 828 passed/1 skip · health 11/11.
+- **P5 ЗАКРЫТ** ✅ (кроме опц. `inspector` — отдельная фича-задача).
 - [ ] Дотянуть `inspector` (сейчас панель) — решить: вкладка проекта или drawer. (Не начато — отдельная фича-задача, не уборка.)
 
 ---

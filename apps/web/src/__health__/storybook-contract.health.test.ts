@@ -38,7 +38,7 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     expect(source).toMatch(/disabled title="Демо Storybook: создание сущности в продукте"/);
   });
 
-  it("views have no welcome-hero and surviving blocks use PageIntro (batch 14)", () => {
+  it("views have no welcome-hero (batch 14)", () => {
     const viewsDir = join(webRoot, "src/views");
     const walk = (dir: string): string[] => {
       const out: string[] = [];
@@ -54,63 +54,32 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       const source = readFileSync(file, "utf8");
       expect(source, rel).not.toMatch(/welcome-hero/);
     }
-    // Уцелевший блок-прототип всё ещё использует общий PageIntro-заголовок.
-    const blocks = ["src/views/blocks/space-discipline-block.tsx"];
-    for (const rel of blocks) {
-      const source = read(rel);
-      expect(source).toContain("PageIntro");
-      expect(source).not.toMatch(/welcome-hero__title/);
-    }
-    expect(read("src/views/blocks/space-discipline-block.tsx")).toContain('className="type-h3"');
+    // P5: весь v2-блок-кластер (views/blocks/*) удалён — уцелевших блоков-прототипов больше нет.
+    expect(existsSync(join(webRoot, "src/views/blocks")), "views/blocks must be gone").toBe(false);
   });
 
-  it("superseded static screens are deleted and screen-view no longer imports them", () => {
-    // Контракт «переделать или удалить»: статические блоки, у которых есть функциональный
-    // surface-аналог, удалены, а роутер screen-view.tsx больше их не импортирует. Это заменяет
-    // прежние текстовые пины на удаляемую разметку (deals/projects-list/my-work/…).
-    const deletedBlocks = [
+  it("the v2 monolith screen cluster is fully deleted (P5)", () => {
+    // P5: после переноса всех маршрутов на v3-поверхности удалён весь v2-кластер —
+    // монолит-роутер, статический screen-view и все блоки. На диске их быть не должно.
+    const deleted = [
+      "src/views/screens/runtime-screen-view.tsx",
+      "src/views/screens/screen-view.tsx",
+      "src/views/screens/screens.stories.tsx",
+      "src/views/screens/login-screen-view.tsx",
       "src/views/blocks/dashboard-bento.tsx",
       "src/views/blocks/my-work-block.tsx",
       "src/views/blocks/deals-block.tsx",
       "src/views/blocks/projects-list-block.tsx",
-      "src/views/blocks/entities-block.tsx",
-      "src/views/blocks/entity-detail-block.tsx",
       "src/views/blocks/admin-block.tsx",
-      "src/views/blocks/gantt-slice-block.tsx",
-      "src/views/blocks/project-resources-block.tsx",
-      "src/views/blocks/project-baseline-block.tsx",
-      "src/views/blocks/project-scenarios-block.tsx",
-      "src/views/blocks/project-audit-block.tsx",
-      "src/views/blocks/project-calendars-block.tsx",
-      "src/views/blocks/avatar-menu-block.tsx",
-      "src/views/blocks/settings-block.tsx",
-      "src/views/screens/login-screen-view.tsx"
+      "src/views/blocks/space-discipline-block.tsx",
+      "src/views/blocks/state-screen-block.tsx",
+      "src/views/blocks/project-kpi-block.tsx"
     ];
-    for (const rel of deletedBlocks) {
+    for (const rel of deleted) {
       expect(existsSync(join(webRoot, rel)), `${rel} must be deleted`).toBe(false);
     }
-    const screenView = read("src/views/screens/screen-view.tsx");
-    const forbiddenImports = [
-      "dashboard-bento",
-      "my-work-block",
-      "deals-block",
-      "projects-list-block",
-      "entities-block",
-      "entity-detail-block",
-      "admin-block",
-      "gantt-slice-block",
-      "project-resources-block",
-      "project-baseline-block",
-      "project-scenarios-block",
-      "project-audit-block",
-      "project-calendars-block",
-      "avatar-menu-block",
-      "settings-block",
-      "login-screen-view"
-    ];
-    for (const mod of forbiddenImports) {
-      expect(screenView, `screen-view must not import ${mod}`).not.toContain(mod);
-    }
+    // call-runtime-view (боевой livekit-экран) сохранён.
+    expect(existsSync(join(webRoot, "src/views/screens/call-runtime-view.tsx")), "call-runtime-view kept").toBe(true);
   });
 
   it("each deleted static screen has a functional surface successor on disk", () => {
@@ -136,7 +105,9 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
       "src/auth/login/login-surface.tsx",
       "src/auth/avatar-menu/avatar-menu-surface.tsx",
       "src/workspace/settings/settings-surface.tsx",
-      "src/workspace/dashboard/dashboard-surface.tsx"
+      "src/workspace/dashboard/dashboard-surface.tsx",
+      "src/workspace/agent/agent-surface.tsx",
+      "src/admin/audit/audit-surface.tsx"
     ];
     for (const rel of successors) {
       expect(existsSync(join(webRoot, rel)), `${rel} must exist`).toBe(true);
