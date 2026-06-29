@@ -15,6 +15,7 @@ import {
   auditEvents,
   positions,
   tenants,
+  passwordResetTokens,
   tenantUsers,
   userCredentials,
   userSessions
@@ -111,6 +112,15 @@ export type UserCredentialRecord = {
   passwordHash: string;
   passwordSalt: string;
 };
+export type PasswordResetTokenRecord = {
+  id: string;
+  tenantId: TenantId;
+  userId: UserId;
+  email: string;
+  tokenHash: string;
+  expiresAt: Date;
+  consumedAt: Date | null;
+};
 export type UserSessionRecord = {
   id: string;
   tenantId: TenantId;
@@ -183,6 +193,9 @@ export type PostgresTenantDataSource = CrmRepository &
   deleteSessionByTokenHash(tokenHash: string): Promise<void>;
   deleteSessionById(tenantId: TenantId, userId: UserId, sessionId: string): Promise<boolean>;
   deleteSessionsByUserId(tenantId: TenantId, userId: UserId): Promise<void>;
+  createPasswordResetToken(input: Omit<PasswordResetTokenRecord, "consumedAt">): Promise<void>;
+  findPasswordResetTokenByHash(tokenHash: string): Promise<PasswordResetTokenRecord | undefined>;
+  consumePasswordResetToken(tokenHash: string, consumedAt: Date): Promise<void>;
   withTransaction<T>(
     operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
   ): Promise<T>;
@@ -581,6 +594,42 @@ export function createPostgresTenantDataSource(
       await db
         .delete(userSessions)
         .where(and(eq(userSessions.tenantId, tenantId), eq(userSessions.userId, userId)));
+    },
+    async createPasswordResetToken(input) {
+      await db.insert(passwordResetTokens).values({
+        id: input.id,
+        tenantId: input.tenantId,
+        userId: input.userId,
+        email: input.email.toLowerCase(),
+        tokenHash: input.tokenHash,
+        expiresAt: input.expiresAt,
+        consumedAt: null,
+        createdAt: new Date()
+      });
+    },
+    async findPasswordResetTokenByHash(tokenHash) {
+      const [row] = await db
+        .select()
+        .from(passwordResetTokens)
+        .where(eq(passwordResetTokens.tokenHash, tokenHash))
+        .limit(1);
+      return row
+        ? {
+            id: row.id,
+            tenantId: row.tenantId,
+            userId: row.userId,
+            email: row.email,
+            tokenHash: row.tokenHash,
+            expiresAt: row.expiresAt,
+            consumedAt: row.consumedAt
+          }
+        : undefined;
+    },
+    async consumePasswordResetToken(tokenHash, consumedAt) {
+      await db
+        .update(passwordResetTokens)
+        .set({ consumedAt })
+        .where(eq(passwordResetTokens.tokenHash, tokenHash));
     },
     async withTransaction(operation) {
       return db.transaction((transaction) =>

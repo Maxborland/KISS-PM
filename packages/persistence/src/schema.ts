@@ -526,6 +526,29 @@ export const userSessions = pgTable(
   ]
 );
 
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    email: text("email").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    uniqueIndex("password_reset_tokens_token_hash_uidx").on(table.tokenHash),
+    index("password_reset_tokens_user_id_idx").on(table.userId),
+    foreignKey({
+      name: "password_reset_tokens_user_fk",
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade")
+  ]
+);
+
 export const taskStatuses = pgTable(
   "task_statuses",
   {

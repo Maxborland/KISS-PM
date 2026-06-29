@@ -17,6 +17,9 @@ export type ApiRouteDeps = {
   capabilities: ApiCapabilities;
   authRateLimiter: AuthRateLimiter;
   secureCookies: boolean;
+  // dev-режим (KISS_PM_ENABLE_DEV_ROUTES): разрешает отдавать reset-токен в ответе
+  // (devToken) вместо письма. В проде false → токен доставляется только письмом.
+  exposeDevSecrets: boolean;
   storageProvider: StorageProvider;
   videoProvider: VideoProvider;
   egressProvider: LiveKitEgressProvider | null;
