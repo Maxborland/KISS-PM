@@ -78,16 +78,41 @@ export function createAgentClient(options: AgentApiClientOptions) {
     listTools() {
       return requestJson<{ tools: AgentToolAvailability[] }>("/api/workspace/agent/tools");
     },
-    propose(goal: string) {
-      return requestJson<AgentProposeResponse>("/api/workspace/agent/propose", { method: "POST", body: JSON.stringify({ goal }) });
+    propose(goal: string, attachmentIds: string[] = []) {
+      return requestJson<AgentProposeResponse>("/api/workspace/agent/propose", { method: "POST", body: JSON.stringify({ goal, attachmentIds }) });
+    },
+    // Загрузка файла через ШТАТНУЮ ручку вложений (multipart), привязка к сущности-якорю.
+    async uploadAttachment(file: File, entityType: string, entityId: string): Promise<{ id: string; name: string }> {
+      const form = new FormData();
+      form.append("entityType", entityType);
+      form.append("entityId", entityId);
+      form.append("file", file);
+      // content-type НЕ ставим — браузер выставит multipart-boundary сам.
+      const response = await fetchImpl(`${options.apiOrigin}/api/workspace/attachments/files`, {
+        method: "POST",
+        credentials,
+        headers: { "x-kiss-pm-action": "same-origin" },
+        body: form
+      });
+      const raw = await response.text();
+      let body: Record<string, unknown> = {};
+      try { const parsed: unknown = JSON.parse(raw); if (parsed && typeof parsed === "object") body = parsed as Record<string, unknown>; } catch { /* keep */ }
+      if (!response.ok) throw new AgentApiError(response.status, typeof body.error === "string" ? body.error : "upload_failed");
+      const attachment = (body.attachment ?? {}) as { id?: unknown; safeDisplayName?: unknown; originalName?: unknown };
+      return { id: String(attachment.id ?? ""), name: String(attachment.safeDisplayName ?? attachment.originalName ?? file.name) };
+    },
+    // Активные проекты тенанта — для выбора якоря вложения.
+    async listProjects(): Promise<Array<{ id: string; label: string }>> {
+      const body = await requestJson<{ projects?: Array<{ id?: string; title?: string; name?: string }> }>("/api/workspace/projects");
+      return (body.projects ?? []).map((project) => ({ id: String(project.id ?? ""), label: String(project.title ?? project.name ?? project.id ?? "") })).filter((p) => p.id.length > 0);
     },
     // Потоковое предложение: вызывает onEvent на каждое SSE-событие, резолвится финальным `done`.
-    async proposeStream(goal: string, onEvent: (event: AgentStreamEvent) => void): Promise<AgentProposeResponse> {
+    async proposeStream(goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = []): Promise<AgentProposeResponse> {
       const response = await fetchImpl(`${options.apiOrigin}/api/workspace/agent/propose/stream`, {
         method: "POST",
         credentials,
         headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin" },
-        body: JSON.stringify({ goal })
+        body: JSON.stringify({ goal, attachmentIds })
       });
       if (!response.ok) {
         const raw = await response.text();

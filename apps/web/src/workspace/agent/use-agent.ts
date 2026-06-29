@@ -69,16 +69,16 @@ export function useAgent() {
   );
 
   const proposeStream = useCallback(
-    async (goal: string, onEvent: (event: AgentStreamEvent) => void): Promise<AgentResult<AgentProposeResponse>> => {
+    async (goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = []): Promise<AgentResult<AgentProposeResponse>> => {
       setStatus("proposing");
       setError(null);
       try {
         // live → реальный SSE; mock/Storybook (нет stream-ручки) → обычный propose +
         // синтез событий из результата, чтобы CoT-трейс отображался и в витрине.
         const data = live
-          ? await client.proposeStream(goal, onEvent)
+          ? await client.proposeStream(goal, onEvent, attachmentIds)
           : await (async () => {
-              const result = await client.propose(goal);
+              const result = await client.propose(goal, attachmentIds);
               for (const analyze of result.analyzeResults) onEvent({ type: "analyze", tool: analyze.tool, title: analyze.tool, ok: true });
               for (const action of result.proposedActions) onEvent({ type: "proposal", tool: action.tool, title: action.title });
               if (result.reasoning) onEvent({ type: "reasoning", text: result.reasoning });
@@ -92,6 +92,31 @@ export function useAgent() {
         return { ok: false, code };
       } finally {
         setStatus("idle");
+      }
+    },
+    [client, live]
+  );
+
+  // Загрузка вложения (live → штатная ручка; mock → синтетика для витрины).
+  const uploadAttachment = useCallback(
+    async (file: File, entityType: string, entityId: string): Promise<AgentResult<{ id: string; name: string }>> => {
+      try {
+        const data = live ? await client.uploadAttachment(file, entityType, entityId) : { id: `mock-att-${file.name}`, name: file.name };
+        return { ok: true, data };
+      } catch (e) {
+        return { ok: false, code: e instanceof AgentApiError ? e.code : "upload_failed" };
+      }
+    },
+    [client, live]
+  );
+
+  // Проекты-якоря (live → реальные; mock → демо-список).
+  const listProjects = useCallback(
+    async (): Promise<Array<{ id: string; label: string }>> => {
+      try {
+        return live ? await client.listProjects() : [{ id: "proj-portal", label: "Портал клиента" }, { id: "proj-crm", label: "CRM-внедрение" }];
+      } catch {
+        return [];
       }
     },
     [client, live]
@@ -115,5 +140,5 @@ export function useAgent() {
     [client]
   );
 
-  return { tools, proposal, setProposal, status, error, propose, proposeStream, execute };
+  return { tools, proposal, setProposal, status, error, propose, proposeStream, uploadAttachment, listProjects, execute };
 }

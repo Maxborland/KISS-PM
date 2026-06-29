@@ -129,9 +129,11 @@ type AgentChatPanelProps = {
   agentMenuOpen: boolean;
   reviewVisible: boolean;
   liveSteps?: string[]; // реальные шаги CoT (live SSE); нет → демо-шаги
+  attachSlot?: React.ReactNode; // панель вложений (якорь + чипы файлов) над композером
   onInputChange: (value: string) => void;
   onSend: () => void;
   onToggleAgentMenu: () => void;
+  onAttachClick?: () => void;
   onOpenMobileLeft?: () => void;
   onOpenMobileReview?: () => void;
 };
@@ -144,9 +146,11 @@ export function AgentChatPanel({
   agentMenuOpen,
   reviewVisible,
   liveSteps,
+  attachSlot,
   onInputChange,
   onSend,
   onToggleAgentMenu,
+  onAttachClick,
   onOpenMobileLeft,
   onOpenMobileReview
 }: AgentChatPanelProps) {
@@ -195,6 +199,7 @@ export function AgentChatPanel({
         {isThinking ? <AgentActivitySteps visibleSteps={visibleSteps} {...(liveSteps ? { steps: liveSteps } : {})} /> : null}
       </div>
 
+      {attachSlot}
       <form
         className="lad-composer"
         onSubmit={(event) => {
@@ -208,7 +213,7 @@ export function AgentChatPanel({
           placeholder="Сообщение Генри Гантту..."
           aria-label="Сообщение Генри Гантту"
         />
-        <button className="lad-icon-button lad-attach-button" type="button" aria-label="Прикрепить файл">
+        <button className="lad-icon-button lad-attach-button" type="button" aria-label="Прикрепить файл" onClick={onAttachClick}>
           <Paperclip aria-hidden />
         </button>
         <button className="lad-send-button" type="submit" disabled={!inputValue.trim()}>
