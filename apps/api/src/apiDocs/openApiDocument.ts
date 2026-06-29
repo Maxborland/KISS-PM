@@ -26,6 +26,7 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/health/ready", tag: "Health", summary: "API readiness probe", auth: "public" },
   { method: "get", path: "/api/health/realtime", tag: "Health", summary: "Realtime planning readiness", auth: "public" },
   { method: "post", path: "/api/auth/login", tag: "Auth", summary: "Create browser session", auth: "public", requestSchema: "LoginRequest", successSchema: "AuthSessionResponse" },
+  { method: "post", path: "/api/auth/register", tag: "Auth", summary: "Self-register a new tenant", auth: "public" },
   { method: "post", path: "/api/auth/logout", tag: "Auth", summary: "Delete browser session", successSchema: "OkResponse" },
   { method: "get", path: "/api/auth/me", tag: "Auth", summary: "Current authenticated user", successSchema: "AuthMeResponse" },
   { method: "get", path: "/api/auth/sessions", tag: "Auth", summary: "List active sessions for current user" },

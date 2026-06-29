@@ -381,6 +381,7 @@ export type ApiTenantDataSource = {
   listDevUsers(): Promise<TenantUser[]>;
   findUserById(userId: UserId): Promise<TenantUser | undefined>;
   findTenantById(tenantId: TenantId): Promise<Tenant | undefined>;
+  createTenant?(input: Tenant): Promise<Tenant>;
   findAccessProfileById?(
     tenantId: TenantId,
     accessProfileId: string

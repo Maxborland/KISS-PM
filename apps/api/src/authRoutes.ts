@@ -1,4 +1,5 @@
-import { hashSessionToken, verifyPassword } from "@kiss-pm/persistence";
+import { hashPassword, hashSessionToken, verifyPassword } from "@kiss-pm/persistence";
+import { permissions } from "@kiss-pm/access-control";
 import { randomBytes, randomUUID } from "node:crypto";
 import {
   buildExpiredSessionCookieHeader,
@@ -103,6 +104,63 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
       throw error;
     }
+  });
+
+  // Самрегистрация нового тенанта: свежий tenant + роль-владелец (полный каталог прав) +
+  // пользователь + кред, затем авто-логин. Порядок проверок зеркалит фронтовый contract-mock.
+  app.post("/api/auth/register", async (context) => {
+    const ds = dataSource;
+    if (
+      !ds.findCredentialByEmail || !ds.createTenant || !ds.createAccessProfile ||
+      !ds.createWorkspaceUser || !ds.upsertCredential || !ds.createSession || !ds.withTransaction
+    ) {
+      return context.json({ error: "auth_not_configured" }, 501);
+    }
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseRegistrationInput(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    const { email, name, password } = parsed.value;
+
+    const existing = await ds.findCredentialByEmail(email);
+    if (existing) return context.json({ error: "email_taken" }, 409);
+
+    const tenantId = `tenant-${randomUUID()}`;
+    const accessProfileId = `access-profile-${randomUUID()}`;
+    const userId = `user-${randomUUID()}`;
+    const { passwordHash, passwordSalt } = hashPassword(password);
+
+    const created = await deps.runDataSourceTransaction(async (tx) => {
+      if (!tx.createTenant || !tx.createAccessProfile || !tx.createWorkspaceUser || !tx.upsertCredential) {
+        return { ok: false as const };
+      }
+      await tx.createTenant({ id: tenantId, name });
+      await tx.createAccessProfile({ id: accessProfileId, tenantId, name: "Владелец", permissions: [...permissions] });
+      await tx.createWorkspaceUser({
+        id: userId, tenantId, accessProfileId, positionId: null,
+        email, name, phone: null, telegram: null, status: "active", theme: "light", accentColor: "#0f766e"
+      });
+      await tx.upsertCredential({ userId, tenantId, email, passwordHash, passwordSalt });
+      return { ok: true as const };
+    });
+    if (!created.ok) return context.json({ error: "auth_not_configured" }, 501);
+
+    // Авто-логин: создаём сессию (как login) + Set-Cookie.
+    const rawToken = randomBytes(32).toString("hex");
+    const loginNow = new Date();
+    await ds.createSession({
+      id: `session-${randomUUID()}`,
+      tenantId,
+      userId,
+      tokenHash: hashSessionToken(rawToken),
+      expiresAt: new Date(loginNow.getTime() + sessionTtlMs),
+      userAgent: normalizeUserAgent(context.req.header("user-agent")),
+      ipAddress: getClientIp(context.req.raw.headers, { trustForwardedHeaders: trustForwardedAuthHeaders }) ?? null,
+      lastSeenAt: loginNow
+    });
+    context.header("Set-Cookie", buildSessionCookieHeader(rawToken, { secure: secureCookies }));
+    return context.json({ user: { id: userId, tenantId, name, accessProfileId }, workspace: { id: tenantId } }, 201);
   });
 
   app.post("/api/auth/logout", async (context) => {
@@ -308,6 +366,43 @@ function parseLoginCredentials(
     return { ok: false, error: "invalid_login_payload" };
   }
   return { ok: true, value: { email, password } };
+}
+
+const maxRegistrationNameLength = 160;
+
+// Парсер тела /register: email+name → invalid_registration_payload; пароль (слабый) → weak_password.
+// Порядок зеркалит фронтовый contract-mock (mock-auth-backend): payload(email+name) → weak_password.
+function parseRegistrationInput(
+  value: unknown
+):
+  | { ok: true; value: { email: string; name: string; password: string } }
+  | { ok: false; error: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, error: "invalid_registration_payload" };
+  }
+  const record = value as { email?: unknown; password?: unknown; name?: unknown };
+  if (typeof record.email !== "string") return { ok: false, error: "invalid_registration_payload" };
+  const email = record.email.trim().toLowerCase();
+  if (
+    email.length < 3 ||
+    email.length > maxLoginEmailLength ||
+    hasControlChar(email) ||
+    !loginEmailPattern.test(email)
+  ) {
+    return { ok: false, error: "invalid_registration_payload" };
+  }
+  if (typeof record.name !== "string") return { ok: false, error: "invalid_registration_payload" };
+  const name = record.name.trim();
+  if (name.length < 1 || name.length > maxRegistrationNameLength || hasControlChar(name)) {
+    return { ok: false, error: "invalid_registration_payload" };
+  }
+  if (isWeakPassword(record.password)) return { ok: false, error: "weak_password" };
+  return { ok: true, value: { email, name, password: record.password as string } };
+}
+
+// Парольная политика: ≥8, ≤1024, без управляющих символов (зеркало мок isWeakPassword / доменной политики).
+function isWeakPassword(value: unknown): boolean {
+  return typeof value !== "string" || value.length < 8 || value.length > maxLoginPasswordLength || hasControlChar(value);
 }
 
 function toPublicUser(user: TenantUser) {

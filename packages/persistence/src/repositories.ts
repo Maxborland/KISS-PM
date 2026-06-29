@@ -143,6 +143,7 @@ export type PostgresTenantDataSource = CrmRepository &
   listDevUsers(): Promise<TenantUser[]>;
   findUserById(userId: UserId): Promise<TenantUser | undefined>;
   findTenantById(tenantId: TenantId): Promise<Tenant | undefined>;
+  createTenant(input: Tenant): Promise<Tenant>;
   findAccessProfileById(
     tenantId: TenantId,
     accessProfileId: string
@@ -245,6 +246,14 @@ export function createPostgresTenantDataSource(
             name: row.name
           }
         : undefined;
+    },
+    async createTenant(input) {
+      const [row] = await db
+        .insert(tenants)
+        .values({ id: input.id, name: input.name, createdAt: new Date() })
+        .returning();
+      if (!row) throw new Error("tenant insert returned no row");
+      return { id: row.id, name: row.name };
     },
     async findAccessProfileById(tenantId, accessProfileId) {
       const [row] = await db
