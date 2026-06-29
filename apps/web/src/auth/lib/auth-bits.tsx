@@ -29,11 +29,11 @@ const ERR: Record<string, string> = {
   invalid_theme: "Недопустимая тема", // PATCH /api/profile/theme
   invalid_accent_color: "Цвет в формате #RRGGBB", // PATCH /api/profile/theme
   persistence_not_configured: "Хранилище профиля недоступно",
-  // register (БОЕВОЙ, authRoutes.ts)
+  // register (БОЕВОЙ, authRegistrationRoutes.ts)
   invalid_registration_payload: "Проверьте имя, email и пароль",
   weak_password: "Пароль слишком простой — минимум 8 символов",
   email_taken: "Этот email уже зарегистрирован",
-  // password-reset (БОЕВОЙ, authRoutes.ts)
+  // password-reset (БОЕВОЙ, authRegistrationRoutes.ts)
   invalid_email: "Некорректный email",
   invalid_reset_confirm_payload: "Проверьте токен и пароль",
   invalid_reset_token: "Ссылка для сброса недействительна",

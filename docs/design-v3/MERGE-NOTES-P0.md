@@ -1,68 +1,32 @@
-# P0 merge notes — известный конфликт стека (register/reset бэк)
+# P0 merge notes — register/reset stack conflict ✅ RESOLVED
 
-**Статус:** ветки #208/#209/#210 индивидуально зелёные, НО при слиянии стека есть
-один реальный конфликт, который надо разрешить вручную. Документируется заранее,
-чтобы P0-merge не упал.
+**Статус: РАЗРЕШЕНО.** Дубль убран с обеих сторон; стек мёржится без ручного
+вмешательства по этому пункту.
 
-## Суть конфликта
+## Что было
 
-`register` + `password-reset` бэкенд реализован **дважды**, в разных файлах, на разных ветках:
+`register` + `password-reset` бэкенд был реализован дважды:
+- **Канон** (фронт-мок зеркалит его): #208/#209 — `apps/api/src/authRegistrationRoutes.ts`
+  + миграция `0042_phase_i_auth_password_reset.sql`.
+- **Дубль** (P3.3, избыточный): #210 — `apps/api/src/authRoutes.ts` + миграция `0046`.
 
-| | Ветка | Файл | Миграция |
-|---|---|---|---|
-| **Канонический** (фронт-мок зеркалит именно его) | #208/#209 (через SSOT) | `apps/api/src/authRegistrationRoutes.ts` | `0042_phase_i_auth_password_reset.sql` |
-| **Дубль** (P3.3, мой, избыточный) | #210 (codex/v3-backend-unblock) | `apps/api/src/authRoutes.ts` (register + password-reset/*) | `0046_password_reset_tokens.sql` |
+Причина: при P3.3 проверил trunk + #210 (там бэка не было) и построил заново, не
+сверившись с SSOT/#209, где канон уже был. Моя ошибка. См. [[pr205-base-and-master-unrelated]].
 
-Причина: при выполнении P3.3 я проверил наличие бэка на `codex/backend-prod-go-no-go-fixes`
-(trunk) и в #210 — там его не было, и я построил заново. Но SSOT (#208), на котором
-стоит #209, **уже содержал** канонический `authRegistrationRoutes.ts`. Это моя ошибка
-(не проверил baseRefName/SSOT перед реализацией). См. [[pr205-base-and-master-unrelated]].
+## Как разрешено
 
-Контракты идентичны по кодам (`invalid_registration_payload` / `weak_password` /
-`email_taken` / `invalid_email` / `invalid_reset_token` / `reset_token_used` /
-`token_expired`), поэтому фронт работает с любым — но **оба одновременно в trunk нельзя**:
-дубль маршрутов Hono + дубль строк в `openApiDocument.ts` (упадёт `openApiDocument.test`)
-+ дубль `pgTable("password_reset_tokens")` в `schema.ts` (TS duplicate export) + дубль
-`createTenant` в `repositories.ts`/`apiTypes.ts`.
+- **#210 (`ebd5a693`):** forward-коммит убрал весь P3.3-дубль (роуты register/reset из
+  `authRoutes.ts`, миграцию 0046, `password_reset_tokens` из schema, `createTenant` +
+  reset-методы из repo/apiTypes, `exposeDevSecrets`). Осталось только net-new:
+  P3.1 (security-policy), P3.2 (active-sessions), P4 (SSE/DM/presence). tsc 0 · тесты зелёные.
+- **#209 (этот коммит):** восстановлены doc-ссылки `authRoutes.ts` → `authRegistrationRoutes.ts`
+  в `apps/web/src/auth/**` (мой P3.3-frontend ошибочно их переименовал; #209 хранит
+  `authRegistrationRoutes.ts`). Login-ссылка (`authRoutes.ts:160`) не тронута.
 
-## Что НЕ конфликтует (чистый net-new в #210)
+## Итог для P0
 
-P3.1 (security-policy, mig 0044), P3.2 (active-sessions, mig 0045), P4.1/4.2/4.3
-(SSE / DM `conversation_members` mig 0047 / presence) — в #209 их нет, конфликта нет.
-Их сохраняем как есть.
-
-## Рекомендованное разрешение при merge (#210 → trunk, после #208/#209)
-
-Канон — версия #209 (`authRegistrationRoutes.ts`). Из ветки #210 **отбросить только P3.3**:
-
-1. `apps/api/src/authRoutes.ts` — удалить роуты `POST /api/auth/register`,
-   `POST /api/auth/password-reset/request`, `…/confirm` и их парсеры
-   (`parseRegistrationInput`, `isWeakPassword`, `parseResetRequestEmail`,
-   `parseResetConfirmInput`, `resetTokenTtlMs`, `maxRegistrationNameLength`,
-   `maxResetTokenLength`) + импорты `hashPassword`/`permissions` если больше не нужны.
-   Оставить login/logout/me + **active-sessions** (P3.2) и `normalizeUserAgent`/charCode-хелперы.
-2. `packages/persistence/migrations/0046_password_reset_tokens.sql` — удалить
-   (канон — `0042_phase_i_auth_password_reset.sql` из #209).
-3. `schema.ts` — убрать `passwordResetTokens` из #210 (оставить версию #209).
-   ⚠️ если имена/колонки таблиц расходятся — сверить и оставить только #209-вариант.
-4. `repositories.ts` / `apiTypes.ts` — `createTenant`: оставить ОДНУ копию (#209 уже
-   добавил `createTenant`; убрать дубль из #210). Убрать `PasswordResetTokenRecord` +
-   методы `createPasswordResetToken`/`findPasswordResetTokenByHash`/`consumePasswordResetToken`
-   из #210, если #209 их предоставляет под своими именами.
-5. `routeTypes.ts`/`app.ts` — `exposeDevSecrets` (P3.3): нужен ли он #209-версии?
-   #210 ввёл его для devToken в reset-request. Если #209's `authRegistrationRoutes`
-   имеет свой механизм dev-токена — `exposeDevSecrets` из #210 можно убрать; иначе оставить.
-6. `apiDocs/openApiDocument.ts` — оставить ОДИН набор строк для register/password-reset.
-7. Фронт #209: комментарии в `apps/web/src/auth/**` снова должны ссылаться на
-   `authRegistrationRoutes.ts` (мой P3.3-frontend-коммит `4d953aef` ошибочно
-   переименовал ссылки в `authRoutes.ts`). Косметика, но для точности — вернуть.
-
-После разрешения: `pnpm exec tsc -b` (0), `vitest run openApiDocument` (6/6),
-`vitest run app.test authRegistrationRoutes` — зелёные; миграции применяются
-идемпотентно; e2e register/reset проходит на каноне #209.
-
-## Альтернатива
-
-Если предпочитаешь — могу заранее отребейзить #210 и убрать P3.3 из его истории
-(риск: P4 стоит поверх P3.3 и трогает те же файлы → конфликты при revert; делать
-аккуратно). Скажи, если так — сделаю.
+Слияние стека (#208 → trunk, #209 → #208, #210 → trunk) по register/reset больше
+не конфликтует: канон — #209's `authRegistrationRoutes.ts`; #210 его не дублирует.
+Прочие миграции #210 (0044 security-policy, 0045 sessions, 0047 direct) с #209 не
+пересекаются. (`0046` удалён; на dev-БД, где он уже применялся, это безвредно —
+`kiss_pm_migrations` просто хранит лишний тег.)

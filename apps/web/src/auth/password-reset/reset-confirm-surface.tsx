@@ -12,7 +12,7 @@ import { useAuth } from "@/auth/lib/use-auth";
 /* ============================================================
    ResetConfirmSurface — экран «Новый пароль» (подтверждение по токену).
    БОЕВОЙ контракт POST /api/auth/password-reset/confirm
-   (apps/api/src/authRoutes.ts) — мок зеркалит.
+   (apps/api/src/authRegistrationRoutes.ts) — мок зеркалит.
 
    Поля: Токен (64-hex из письма/демо-показа) + Новый пароль (PasswordField).
    Реальный submit идёт в мок через useAuth().confirmPasswordReset

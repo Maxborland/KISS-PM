@@ -1,7 +1,7 @@
 /* ============================================================
    Auth API client — тонкий типизированный клиент над REST-ручками
    /api/auth/{login,logout,me} + profile (правка) + боевые
-   register / password-reset/{request,confirm} (apps/api/src/authRoutes.ts).
+   register / password-reset/{request,confirm} (apps/api/src/authRegistrationRoutes.ts).
 
    Зеркало createCrmClient / createCommsClient: тот же приём с инъекцией
    fetchImpl, теми же credentials. Переключение на боевой API = передать
@@ -91,7 +91,7 @@ export type AuthSession = {
   current: boolean;
 };
 
-/* Боевой контракт register/reset (apps/api/src/authRoutes.ts + packages/domain/src/auth). */
+/* Боевой контракт register/reset (apps/api/src/authRegistrationRoutes.ts + packages/domain/src/auth). */
 export type RegisterRequest = { email: string; password: string; name: string };
 export type ResetRequestInput = { email: string };
 export type ResetConfirmInput = { token: string; password: string };
@@ -162,7 +162,7 @@ export function createAuthClient(options: AuthApiClientOptions) {
       return requestJson<{ status: "deleted" }>(`/api/auth/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
     },
 
-    /* ---- БОЕВЫЕ ручки register/reset (мок зеркалит, authRoutes.ts) ---- */
+    /* ---- БОЕВЫЕ ручки register/reset (мок зеркалит, authRegistrationRoutes.ts) ---- */
 
     // POST /api/auth/register — самрегистрация нового тенанта + авто-логин, 201 {user:TenantUser, workspace}.
     register(input: RegisterRequest) {

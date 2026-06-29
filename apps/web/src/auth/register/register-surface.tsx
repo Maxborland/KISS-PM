@@ -15,7 +15,7 @@ import { useAuth } from "@/auth/lib/use-auth";
 
    ЧЕСТНОСТЬ: реальный submit идёт в мок через useAuth().register
    (createAuthClient + in-memory fetchImpl, НЕ demoAction-заглушка).
-   Мок зеркалит боевой контракт (apps/api/src/authRoutes.ts):
+   Мок зеркалит боевой контракт (apps/api/src/authRegistrationRoutes.ts):
    создаётся свежий тенант + роль-владелец + пользователь.
    Переключение на боевой = смена apiOrigin + удаление fetchImpl.
    При ok бэк делает авто-логин: useAuth().refresh() →
