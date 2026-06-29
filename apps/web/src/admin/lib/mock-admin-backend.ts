@@ -17,7 +17,7 @@
    нет; «текущий пользователь» (ACTOR_ID) защищён self-гвардами.
    ============================================================ */
 
-import type { AccessProfile, Permission, Position, UserStatus, WorkspaceUser } from "./admin-client";
+import type { AccessProfile, Permission, Position, SecurityPolicy, UserStatus, WorkspaceUser } from "./admin-client";
 import { ALL_PERMISSIONS } from "./permissions-catalog";
 
 // Каталог прав живёт в permissions-catalog (статическая константа домена, не «мок»).
@@ -74,6 +74,7 @@ type Store = {
   accessRoles: AccessProfile[];
   users: WorkspaceUser[];
   positions: Position[];
+  securityPolicy: SecurityPolicy;
 };
 
 function seed(): Store {
@@ -131,7 +132,15 @@ function seed(): Store {
     user("user-oleg", "oleg@kiss-pm.dev", "Олег Деактивирован", "role-observer", "position-sales", "inactive")
   ];
 
-  return { accessRoles, users, positions };
+  // Политика безопасности: боевой DEFAULT_TENANT_SECURITY_POLICY, но с демо-allowlist для наглядности карточки.
+  const securityPolicy: SecurityPolicy = {
+    twoFactorRequired: true,
+    sessionTimeoutHours: 12,
+    ssoSamlEnabled: false,
+    domainAllowlist: ["kiss-pm.dev", "kiss-pm.local"]
+  };
+
+  return { accessRoles, users, positions, securityPolicy };
 }
 
 /* ---- Транспорт: fetchImpl, совместимый с createAdminClient ---- */
@@ -175,6 +184,26 @@ export function createMockAdminFetch(): typeof fetch {
     // Каталог прав (боевой GET /api/workspace/permission-catalog) — статический список access-control.
     if (path === "/api/workspace/permission-catalog" && method === "GET") {
       return json({ permissions: ALL_PERMISSIONS });
+    }
+
+    /* ---- security-policy (политика безопасности тенанта) ---- */
+    if (path === "/api/tenant/current/security-policy" && method === "GET") {
+      return json({ securityPolicy: db.securityPolicy });
+    }
+    if (path === "/api/tenant/current/security-policy" && method === "PUT") {
+      // Зеркало боевого parseSecurityPolicyBody: тело { securityPolicy: {...} }; booleans обязательны,
+      // timeout — целое 1..8760, allowlist — массив строк, нормализуется (trim/lowercase/dedup).
+      const record = body.securityPolicy;
+      if (!record || typeof record !== "object" || Array.isArray(record)) return err("security_policy_invalid", 400);
+      const c = record as Record<string, unknown>;
+      if (typeof c.twoFactorRequired !== "boolean" || typeof c.ssoSamlEnabled !== "boolean") return err("security_policy_invalid", 400);
+      const timeout = c.sessionTimeoutHours;
+      if (typeof timeout !== "number" || !Number.isInteger(timeout) || timeout < 1 || timeout > 8760) return err("security_policy_session_timeout_invalid", 400);
+      const rawList = c.domainAllowlist ?? [];
+      if (!Array.isArray(rawList) || rawList.some((e) => typeof e !== "string")) return err("security_policy_domain_allowlist_invalid", 400);
+      const domainAllowlist = Array.from(new Set((rawList as string[]).map((e) => e.trim().toLowerCase()).filter((e) => e.length > 0)));
+      db.securityPolicy = { twoFactorRequired: c.twoFactorRequired, sessionTimeoutHours: timeout, ssoSamlEnabled: c.ssoSamlEnabled, domainAllowlist };
+      return json({ securityPolicy: db.securityPolicy });
     }
     // Создание роли — POST /api/tenant/current/access-profiles (id обязателен; коды taken).
     if (path === "/api/tenant/current/access-profiles" && method === "POST") {

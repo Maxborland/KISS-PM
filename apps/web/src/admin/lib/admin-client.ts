@@ -49,6 +49,14 @@ export type WorkspaceUser = {
 // Позиция (должность). Боевой PositionRecord.
 export type Position = { id: string; tenantId: string; name: string; description: string | null };
 
+// Политика безопасности рабочей области (боевой TenantSecurityPolicy). Один экземпляр на тенант.
+export type SecurityPolicy = {
+  twoFactorRequired: boolean;
+  sessionTimeoutHours: number;
+  ssoSamlEnabled: boolean;
+  domainAllowlist: string[];
+};
+
 // Тело создания роли (POST /api/tenant/current/access-profiles). id обязателен (боевой parseAccessProfileCreateBody).
 export type AccessRoleCreateInput = { id: string; name: string; permissions: Permission[] };
 // Тело обновления роли (PATCH /api/workspace/access-roles/:roleId) — full-replace (id из URL).
@@ -109,7 +117,11 @@ export function createAdminClient(options: AdminApiClientOptions) {
     deactivateUser(userId: string) { return requestJson<{ user: WorkspaceUser }>(`/api/workspace/users/${enc(userId)}`, { method: "PATCH", body: JSON.stringify({ status: "inactive" }) }); },
 
     // позиции (должности) — справочник для назначения пользователю
-    listPositions() { return requestJson<{ positions: Position[] }>("/api/workspace/positions"); }
+    listPositions() { return requestJson<{ positions: Position[] }>("/api/workspace/positions"); },
+
+    // политика безопасности тенанта (GET/PUT /api/tenant/current/security-policy)
+    getSecurityPolicy() { return requestJson<{ securityPolicy: SecurityPolicy }>("/api/tenant/current/security-policy"); },
+    updateSecurityPolicy(input: SecurityPolicy) { return requestJson<{ securityPolicy: SecurityPolicy }>("/api/tenant/current/security-policy", { method: "PUT", body: JSON.stringify({ securityPolicy: input }) }); }
   };
 }
 

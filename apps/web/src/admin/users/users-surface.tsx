@@ -47,7 +47,7 @@ export function AdminUsersSurface() {
     >
       <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
         <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        <span>Реальный контракт админки: GET/POST/PATCH /api/workspace/users (createAdminClient + in-memory mock, swap = apiOrigin). Деактивация = PATCH status:&quot;inactive&quot;. Самого себя (текущий — Администратор) деактивировать или сменить себе роль нельзя (self_access_change_forbidden). Политики безопасности (2FA/SSO/whitelist) вне контракта — не показаны.</span>
+        <span>Реальный контракт админки: GET/POST/PATCH /api/workspace/users (createAdminClient + in-memory mock, swap = apiOrigin). Деактивация = PATCH status:&quot;inactive&quot;. Самого себя (текущий — Администратор) деактивировать или сменить себе роль нельзя (self_access_change_forbidden). Политики безопасности (2FA/SSO/whitelist) — во вкладке «Безопасность».</span>
       </div>
 
       <SurfaceState

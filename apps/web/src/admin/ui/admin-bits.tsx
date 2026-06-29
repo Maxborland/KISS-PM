@@ -31,6 +31,10 @@ const ERR: Record<string, string> = {
   invalid_access_profile_id: "Идентификатор роли: a-z, 0-9, _-, длина 3…120",
   invalid_access_profile_name: "Укажите название роли",
   invalid_permissions: "Некорректный набор прав",
+  // политика безопасности (400)
+  security_policy_invalid: "Некорректные данные политики безопасности",
+  security_policy_session_timeout_invalid: "Тайм-аут сессии — целое число от 1 до 8760 часов",
+  security_policy_domain_allowlist_invalid: "Список доменов: только строки",
   // not-found (404)
   user_not_found: "Пользователь не найден",
   access_role_not_found: "Роль не найдена"

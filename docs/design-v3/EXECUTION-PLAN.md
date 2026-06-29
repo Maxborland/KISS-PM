@@ -27,7 +27,7 @@ backend слайсы 1–4 готовы (PR #210, каждый e2e против 
 - **P2 ЗАКРЫТ** ✅ — delivery замкнут (revert), admin-роли на реальном каталоге.
 
 ## P3 — Backend с миграциями (M–L)  ·  PR #210
-- [ ] **P3.1** admin **security-policy**: новая таблица `tenant_security_policies` (миграция) + `GET`/`PUT /api/tenant/current/security-policy` {twoFactorRequired, sessionTimeoutHours, ssoSamlEnabled, domainAllowlist}. Фронт — карточка «Политики безопасности». M ⬩dep: drizzle migration + schema.
+- [x] **P3.1** admin **security-policy**: таблица `tenant_security_policies` (миграция 0044, идемпотентна) + `GET`/`PUT /api/tenant/current/security-policy` {twoFactorRequired, sessionTimeoutHours, ssoSamlEnabled, domainAllowlist} в `registerWorkspaceConfigRoutes` (гейт canRead/canManageWorkspaceConfig, audit, нормализация allowlist trim/lowercase/dedup, timeout 1..8760). Фронт — вкладка «Безопасность» + карточка «Политики безопасности» (Switch 2FA/SSO, число тайм-аута, tag-editor доменов; `useSecurityPolicy` + mock GET/PUT). ✅ tsc 0 (api+web) · openapi 6/6 · mock-admin 30/30 · миграция применена+идемпотентна · e2e :55433 GET defaults→PUT→GET (allowlist нормализован) · bad timeout→400 · no cookie→401 · Storybook: round-trip toggle→Save→«сохранена».
 - [ ] **P3.2** auth **active-sessions**: миграция (добавить `device/userAgent/ip/lastSeenAt` в `user_sessions`) + `GET /api/auth/sessions` (+ опц. `DELETE /api/auth/sessions/:id`). Фронт — avatar-menu «Активные сессии». M–L ⬩dep: migration.
 - [ ] **P3.3** auth **password-reset token policy**: подтвердить EmailProvider-проводку; dev-режим — отдать `devToken` под флагом для тестов (прод — письмо). S–M.
 - Приёмка: каждая миграция идемпотентна; e2e GET/PUT/list.
