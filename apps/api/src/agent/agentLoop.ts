@@ -41,6 +41,22 @@ export type AgentLoopEvent =
   | { type: "analyze"; tool: string; title: string; ok: boolean }
   | { type: "proposal"; tool: string; title: string };
 
+// Гонка промиса с реальным дедлайном: если время вышло — возвращаем сентинел, не дожидаясь
+// зависшего вызова (SDK без AbortSignal не отменить, но ждать дальше не будем).
+const DEADLINE_HIT = Symbol("deadline");
+async function awaitWithDeadline<T>(promise: Promise<T>, remainingMs: number): Promise<T | typeof DEADLINE_HIT> {
+  if (!Number.isFinite(remainingMs)) return promise;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<typeof DEADLINE_HIT>((resolve) => {
+    timer = setTimeout(() => resolve(DEADLINE_HIT), Math.max(0, remainingMs));
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function runAgentLoop(input: {
   provider: LlmProvider;
   system: string;
@@ -79,7 +95,14 @@ export async function runAgentLoop(input: {
     if (clock() >= deadline) { stopReason = "deadline"; break; }
     if (outputTokens >= maxTotalOutputTokens) { stopReason = "token_budget"; break; }
     iterations += 1;
-    const response = await input.provider.createMessage({ system: input.system, messages, tools: toolSchemas });
+    // Гонку с дедлайном применяем только на реальных часах (тесты с инъекцией now полагаются
+    // на проверку между итерациями — фейковое время не совпадает с реальным setTimeout).
+    const messagePromise = input.provider.createMessage({ system: input.system, messages, tools: toolSchemas });
+    const raced = !input.now && Number.isFinite(deadline)
+      ? await awaitWithDeadline(messagePromise, deadline - clock())
+      : await messagePromise;
+    if (raced === DEADLINE_HIT) { stopReason = "deadline"; break; }
+    const response = raced;
     outputTokens += response.usage?.outputTokens ?? 0;
     messages.push({ role: "assistant", content: response.content });
 
@@ -92,8 +115,8 @@ export async function runAgentLoop(input: {
 
     const toolUses = response.content.filter((block): block is Extract<LlmContentBlock, { type: "tool_use" }> => block.type === "tool_use");
     if (response.stopReason !== "tool_use" || toolUses.length === 0) { stopReason = "completed"; break; }
-    // Превышен бюджет токенов на этом ответе — не запускаем ещё одну итерацию.
-    if (outputTokens >= maxTotalOutputTokens) { stopReason = "token_budget"; break; }
+    // Бюджет токенов НЕ обрываем здесь: сначала фиксируем предложения/анализ текущего ответа
+    // (это не требует нового вызова LLM), а следующую итерацию остановит проверка наверху цикла.
 
     const toolResults: LlmToolResultBlock[] = [];
     for (const use of toolUses) {

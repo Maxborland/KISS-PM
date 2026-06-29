@@ -33,30 +33,58 @@ const ATTACH_MAX_TOTAL_CHARS = 50_000; // ponytail: inline-контекст дл
 // Текстовые типы, из которых извлекаем контент (brief/спека/данные). Бинарь не парсим.
 const TEXT_MIME_RE = /^(text\/|application\/(json|xml|csv|x-yaml|yaml|markdown))/i;
 
+// Имя файла из content-disposition. filename*=UTF-8''… percent-декодируем (безопасно, с
+// откатом на сырое при невалидном %); plain filename="…" берём как есть (литеральный %).
+function attachmentName(disposition: string, fallback: string): string {
+  const extended = /filename\*=(?:UTF-8'')?([^";]+)/i.exec(disposition);
+  if (extended?.[1]) { try { return decodeURIComponent(extended[1]); } catch { return extended[1]; } }
+  const plain = /filename="?([^";]+)"?/i.exec(disposition);
+  return plain?.[1] ?? fallback;
+}
+
+// Читаем поток не более maxChars символов (не материализуя весь файл — upload допускает 25 МиБ).
+async function readBoundedText(response: Response, maxChars: number): Promise<string> {
+  if (maxChars <= 0) return "";
+  if (!response.body) return (await response.text()).slice(0, maxChars);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    text += decoder.decode(value, { stream: true });
+    if (text.length >= maxChars) { await reader.cancel(); break; }
+  }
+  return text.slice(0, maxChars);
+}
+
 // Извлекаем содержимое приложенных файлов по id через ШТАТНЫЙ download-роут (внутренняя
 // переотправка): RBAC/хранилище/audit переиспользуются. Только текстовые типы, с обрезкой.
+// Сбой одного файла не валит весь батч.
 export async function resolveAttachments(app: ApiApp, cookie: string | null, ids: string[]): Promise<Array<{ name: string; content: string }>> {
   const out: Array<{ name: string; content: string }> = [];
   let total = 0;
   for (const id of ids.slice(0, ATTACH_MAX_COUNT)) {
     if (total >= ATTACH_MAX_TOTAL_CHARS) break;
-    const response = await app.request(`/api/workspace/attachments/${encodeURIComponent(id)}/download`, {
-      method: "GET",
-      headers: { "x-kiss-pm-action": "same-origin", ...(cookie ? { cookie } : {}) }
-    });
-    if (!response.ok) continue;
-    const mime = response.headers.get("content-type") ?? "";
-    const disposition = response.headers.get("content-disposition") ?? "";
-    const nameMatch = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
-    const name = nameMatch?.[1] ? decodeURIComponent(nameMatch[1]) : id;
-    if (!TEXT_MIME_RE.test(mime)) {
-      out.push({ name, content: `(нетекстовый файл ${mime || "?"} — содержимое не извлечено)` });
-      continue;
+    try {
+      const response = await app.request(`/api/workspace/attachments/${encodeURIComponent(id)}/download`, {
+        method: "GET",
+        headers: { "x-kiss-pm-action": "same-origin", ...(cookie ? { cookie } : {}) }
+      });
+      if (!response.ok) continue;
+      const mime = response.headers.get("content-type") ?? "";
+      const name = attachmentName(response.headers.get("content-disposition") ?? "", id);
+      if (!TEXT_MIME_RE.test(mime)) {
+        await response.body?.cancel();
+        out.push({ name, content: `(нетекстовый файл ${mime || "?"} — содержимое не извлечено)` });
+        continue;
+      }
+      const content = await readBoundedText(response, ATTACH_MAX_TOTAL_CHARS - total);
+      total += content.length;
+      out.push({ name, content });
+    } catch {
+      // битый файл/декод — пропускаем, не роняя propose
     }
-    let content = await response.text();
-    if (total + content.length > ATTACH_MAX_TOTAL_CHARS) content = content.slice(0, Math.max(0, ATTACH_MAX_TOTAL_CHARS - total));
-    total += content.length;
-    out.push({ name, content });
   }
   return out;
 }

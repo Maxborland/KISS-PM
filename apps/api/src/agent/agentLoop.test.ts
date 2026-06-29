@@ -88,6 +88,26 @@ describe("runAgentLoop", () => {
     expect(result.iterations).toBeLessThan(50);
   });
 
+  it("сохраняет предложение из ответа, превысившего бюджет токенов", async () => {
+    // Ответ с mutation-предложением сразу выбивает бюджет; предложение должно сохраниться,
+    // а остановка случиться на следующей итерации (запись proposal не требует нового вызова LLM).
+    const script: LlmResponse[] = [
+      { stopReason: "tool_use", content: [{ type: "tool_use", id: "m", name: "change_task_status", input: { projectId: "p", taskId: "t", statusId: "status-review" } }], usage: { inputTokens: 0, outputTokens: 2000 } },
+      { stopReason: "end_turn", content: [{ type: "text", text: "done" }] }
+    ];
+    const result = await runAgentLoop({
+      provider: createMockLlmProvider(script),
+      system: "s",
+      goal: "g",
+      tools: [changeStatus],
+      executeAnalyze: vi.fn(),
+      limits: { maxTotalOutputTokens: 1000, maxIterations: 50 }
+    });
+    expect(result.proposedActions).toHaveLength(1);
+    expect(result.proposedActions[0]!.tool).toBe("change_task_status");
+    expect(result.stopReason).toBe("token_budget");
+  });
+
   it("останавливается по дедлайну (stopReason=deadline)", async () => {
     let t = 0;
     const result = await runAgentLoop({

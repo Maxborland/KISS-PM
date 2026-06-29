@@ -117,8 +117,13 @@ export function AgentSurface() {
 
   async function onFilePicked(file: File) {
     const res = await uploadAttachment(file, "project", anchorId);
-    if (res.ok) setAttachments((list) => [...list, res.data]);
-    else addMessage("henry", `Не удалось загрузить файл: ${res.code}.`);
+    if (res.ok) { setAttachments((list) => [...list, res.data]); return; }
+    // Загрузка вложений требует прав на управление проектом (canManageProjects); для
+    // read-only/участника якорь недоступен — честно сообщаем, а не молча роняем.
+    const denied = res.code === "permission_missing" || res.code === "cross_tenant_denied" || res.code === "forbidden";
+    addMessage("henry", denied
+      ? "Нет прав на добавление файла в этот проект — выберите проект, которым вы управляете."
+      : `Не удалось загрузить файл: ${res.code}.`);
   }
 
   async function sendMessage() {
