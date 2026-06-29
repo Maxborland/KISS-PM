@@ -12,10 +12,10 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
-import { useCommsUsers, useConversation, useDirectMessages, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { useCommsUsers, useConversation, useDirectMessages, usePresence, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
-import { avatarColor, commsErr, initials, relTime, UnreadDot } from "@/communications/lib/comms-bits";
-import type { Conversation, DirectConversation, EntityType, Message, Reaction } from "@/communications/lib/comms-client";
+import { avatarColor, commsErr, initials, PresenceDot, relTime, UnreadDot } from "@/communications/lib/comms-bits";
+import type { Conversation, DirectConversation, EntityType, Message, PresenceStatus, Reaction } from "@/communications/lib/comms-client";
 
 /* ============================================================
    Поверхность ЧАТ блока «Коммуникации».
@@ -51,12 +51,15 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
   const users = useCommsUsers();
   // P4.2 DM: список личных бесед текущего пользователя (отдельная ось от бесед сущности).
   const dm = useDirectMessages();
+  // P4.3 presence: статусы пользователей (initial GET + live presence.changed).
+  const presence = usePresence();
 
-  // P4.1 realtime: в live-режиме новое сообщение в открытой беседе прилетает push'ем
-  // (SSE) → перечитываем ленту без поллинга. В mock (Storybook) хук — no-op.
+  // P4.1/P4.3 realtime: в live-режиме сообщение/присутствие прилетают push'ем (SSE).
+  // onMessage → перечитываем ленту; onPresence → обновляем карту присутствия. В mock — no-op.
   useWorkspaceRealtime({
     conversationId: data?.selectedConversationId ?? null,
-    onMessage: () => { void conv.reloadMessages(); }
+    onMessage: () => { void conv.reloadMessages(); },
+    onPresence: (event) => presence.apply(event.userId, event.status)
   });
 
   // Верхнеуровневый статус поверхности: forbidden (403) / error / loading / ready.
@@ -92,6 +95,7 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
                 <DirectMessageList
                   dms={dm.data?.conversations ?? []}
                   users={users}
+                  presenceOf={presence.status}
                   selectedId={data.selectedConversationId}
                   onSelect={(id) => void selectConversation(id)}
                   onOpen={async (userId) => {
@@ -101,7 +105,7 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
                 />
               </div>
               {selected ? (
-                <ChatPane key={selected.id} conv={conv} conversation={selected} messages={data.messages} users={users} />
+                <ChatPane key={selected.id} conv={conv} conversation={selected} messages={data.messages} users={users} presenceOf={presence.status} />
               ) : (
                 <div className="grid min-h-[480px] place-items-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
                   <EmptyState title="Нет бесед" description="У этой сущности пока нет бесед." />
@@ -204,12 +208,14 @@ function adaptDmToConversation(dmConv: DirectConversation, users: CommsUsersDir)
 function DirectMessageList({
   dms,
   users,
+  presenceOf,
   selectedId,
   onSelect,
   onOpen
 }: {
   dms: DirectConversation[];
   users: CommsUsersDir;
+  presenceOf: (userId: string | null) => PresenceStatus;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onOpen: (userId: string) => void;
@@ -237,7 +243,10 @@ function DirectMessageList({
                   : "border-transparent hover:border-[var(--border)] hover:bg-[var(--panel-subtle)]"
               )}
             >
-              <BemAvatar initials={initials(name)} color={avatarColor(c.counterpartUserIds[0] ?? c.id)} size="sm" title={name} />
+              <span className="relative inline-flex shrink-0">
+                <BemAvatar initials={initials(name)} color={avatarColor(c.counterpartUserIds[0] ?? c.id)} size="sm" title={name} />
+                <PresenceDot status={presenceOf(c.counterpartUserIds[0] ?? null)} className="absolute -bottom-0.5 -right-0.5" />
+              </span>
               <span className={cn("min-w-0 flex-1 truncate text-[length:var(--text-sm)] font-medium", active ? "text-[var(--accent-text)]" : "text-[var(--text-strong)]")}>
                 {name}
               </span>
@@ -291,12 +300,14 @@ function ChatPane({
   conv,
   conversation,
   messages,
-  users
+  users,
+  presenceOf
 }: {
   conv: ReturnType<typeof useConversation>;
   conversation: Conversation;
   messages: Message[];
   users: CommsUsersDir;
+  presenceOf: (userId: string | null) => PresenceStatus;
 }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -385,6 +396,7 @@ function ChatPane({
                 key={m.id}
                 message={m}
                 users={users}
+                presenceOf={presenceOf}
                 busy={busy}
                 onToggleReaction={(emoji) => toggleReaction(m, emoji)}
                 onEdit={(body) => void run(() => conv.editMessage(cid, m.id, { body }), "Сообщение изменено")}
@@ -413,6 +425,7 @@ function ChatPane({
 function MessageBubble({
   message,
   users,
+  presenceOf,
   busy,
   onToggleReaction,
   onEdit,
@@ -421,6 +434,7 @@ function MessageBubble({
 }: {
   message: Message;
   users: CommsUsersDir;
+  presenceOf: (userId: string | null) => PresenceStatus;
   busy: boolean;
   onToggleReaction: (emoji: string) => void;
   onEdit: (body: string) => void;
@@ -454,7 +468,10 @@ function MessageBubble({
 
   return (
     <div className="group flex gap-2.5">
-      <BemAvatar initials={initials(users.name(m.authorUserId))} color={avatarColor(m.authorUserId)} size="sm" title={users.name(m.authorUserId)} />
+      <span className="relative inline-flex shrink-0">
+        <BemAvatar initials={initials(users.name(m.authorUserId))} color={avatarColor(m.authorUserId)} size="sm" title={users.name(m.authorUserId)} />
+        <PresenceDot status={presenceOf(m.authorUserId)} className="absolute -bottom-0.5 -right-0.5" />
+      </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <strong className="text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{users.name(m.authorUserId)}</strong>

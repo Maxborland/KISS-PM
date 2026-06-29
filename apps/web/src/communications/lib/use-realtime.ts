@@ -18,18 +18,22 @@ import { useCommsRuntime } from "./comms-runtime";
  */
 export type MessageCreatedEvent = { type: "message.created"; conversationId: string; message: unknown };
 export type NotificationCreatedEvent = { type: "notification.created"; userId: string; notificationType: string };
+export type PresenceChangedEvent = { type: "presence.changed"; userId: string; status: "online" | "away" | "offline" };
 
 export function useWorkspaceRealtime(options: {
   conversationId?: string | null;
   onMessage?: (event: MessageCreatedEvent) => void;
   onNotification?: (event: NotificationCreatedEvent) => void;
+  onPresence?: (event: PresenceChangedEvent) => void;
 }) {
   const { live } = useCommsRuntime();
   const { conversationId } = options;
   const onMessageRef = useRef(options.onMessage);
   const onNotificationRef = useRef(options.onNotification);
+  const onPresenceRef = useRef(options.onPresence);
   onMessageRef.current = options.onMessage;
   onNotificationRef.current = options.onNotification;
+  onPresenceRef.current = options.onPresence;
 
   useEffect(() => {
     // mock/Storybook: SSE-сервера нет → не открываем соединение.
@@ -55,13 +59,22 @@ export function useWorkspaceRealtime(options: {
         /* игнорируем некорректный кадр */
       }
     };
+    const handlePresence = (event: MessageEvent) => {
+      try {
+        onPresenceRef.current?.(JSON.parse(event.data) as PresenceChangedEvent);
+      } catch {
+        /* игнорируем некорректный кадр */
+      }
+    };
 
     source.addEventListener("message.created", handleMessage);
     source.addEventListener("notification.created", handleNotification);
+    source.addEventListener("presence.changed", handlePresence);
 
     return () => {
       source.removeEventListener("message.created", handleMessage);
       source.removeEventListener("notification.created", handleNotification);
+      source.removeEventListener("presence.changed", handlePresence);
       source.close();
     };
   }, [live, conversationId]);

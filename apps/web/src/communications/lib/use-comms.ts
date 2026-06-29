@@ -23,6 +23,7 @@ import {
   type Conversation,
   type DirectConversation,
   type EntityType,
+  type PresenceStatus,
   type Meeting,
   type MeetingCreateInput,
   type MeetingExternalLinkProvider,
@@ -397,6 +398,30 @@ export function useUnreadSummary() {
   const client = useCommsClient();
   const fetcher = useCallback(() => client.getUnreadSummary(), [client]);
   return useCommsLoad(fetcher);
+}
+
+/* ============================================================
+   usePresence — присутствие пользователей (P4.3).
+   Начальный снимок = GET /api/workspace/presence; live-переходы применяются
+   через apply() (вызывается из useWorkspaceRealtime onPresence). status(id)
+   удобный геттер (неизвестный → offline).
+   ============================================================ */
+export function usePresence() {
+  const client = useCommsClient();
+  const [map, setMap] = useState<Record<string, PresenceStatus>>({});
+
+  useEffect(() => {
+    let active = true;
+    void client.getPresence().then((r) => { if (active) setMap(r.presence); }).catch(() => { if (active) setMap({}); });
+    return () => { active = false; };
+  }, [client]);
+
+  const apply = useCallback((userId: string, status: PresenceStatus) => {
+    setMap((current) => ({ ...current, [userId]: status }));
+  }, []);
+  const status = useCallback((userId: string | null): PresenceStatus => (userId ? map[userId] ?? "offline" : "offline"), [map]);
+
+  return { map, apply, status };
 }
 
 /* ============================================================

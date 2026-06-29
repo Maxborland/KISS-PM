@@ -135,6 +135,9 @@ export type DirectConversation = DirectConversationBase & {
   readState: ConversationReadState | null;
 };
 
+/* Присутствие (P4.3): online (есть открытое SSE), away (недавно отключился), offline. */
+export type PresenceStatus = "online" | "away" | "offline";
+
 export type Reaction = {
   id: string;
   tenantId: string;
@@ -466,6 +469,10 @@ export function createCommsClient(options: CommsApiClientOptions) {
         "/api/workspace/conversations/direct",
         { method: "POST", body: JSON.stringify({ userId }) }
       );
+    },
+    // 1d) Снимок присутствия пользователей тенанта (P4.3): { userId: online|away|offline }.
+    getPresence() {
+      return requestJson<{ presence: Record<string, PresenceStatus> }>("/api/workspace/presence");
     },
     // 2) Сообщения беседы (обратная курсорная пагинация: nextCursor = первый элемент).
     listMessages(conversationId: string, params?: { limit?: number; cursor?: string }) {

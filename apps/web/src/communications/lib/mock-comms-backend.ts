@@ -899,6 +899,18 @@ export function createMockCommsFetch(): typeof fetch {
       return json({ conversation: conv, memberUserIds: members, counterpartUserIds: members.filter((id) => id !== CURRENT_ACTOR_ID) }, 201);
     }
 
+    /* 1d) GET /presence — снимок присутствия (P4.3). Мок: статика (SSE-сервера нет). */
+    if (method === "GET" && path === "/api/workspace/presence") {
+      return json({
+        presence: {
+          "u-anna": "online",
+          "u-ivan": "online",
+          "u-sergey": "away",
+          "u-maria": "offline"
+        }
+      });
+    }
+
     /* 1) GET /conversations?entityType&entityId — беседы сущности (+readState, ensure default). */
     if (method === "GET" && path === "/api/workspace/conversations") {
       const typeParsed = parseCollaborationEntityType(query.get("entityType"));
