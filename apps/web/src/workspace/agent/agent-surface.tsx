@@ -134,6 +134,8 @@ export function AgentSurface() {
   async function sendMessage() {
     const goal = inputValue.trim();
     if (goal.length === 0) return;
+    // Историю собираем ДО добавления текущей реплики (память чата: прошлые ходы → контекст агента).
+    const history = messages.map((message) => ({ role: message.author === "user" ? ("user" as const) : ("assistant" as const), text: message.text }));
     addMessage("user", goal);
     setInputValue("");
     setPhase("thinking");
@@ -146,7 +148,7 @@ export function AgentSurface() {
         : event.type === "proposal" ? `Предложение: ${event.title}`
         : event.text.length > 80 ? `${event.text.slice(0, 80)}…` : event.text;
       setLiveSteps((steps) => [...steps, label]);
-    }, attachmentIds);
+    }, attachmentIds, history);
     if (!res.ok) {
       // НЕ стираем вложения при сбое — пользователь сможет повторить, не загружая файл заново.
       addMessage("henry", `Не удалось обработать запрос: ${res.code}`);

@@ -123,6 +123,31 @@ describe("runAgentLoop", () => {
     expect(result.iterations).toBeLessThan(50);
   });
 
+  it("память чата: history идёт ПЕРЕД текущей целью в сообщениях LLM", async () => {
+    let seen: Array<{ role: string; content: unknown }> = [];
+    const provider = {
+      model: "capture",
+      createMessage(input: { messages: Array<{ role: string; content: unknown }> }) {
+        if (seen.length === 0) seen = [...input.messages];
+        return Promise.resolve({ stopReason: "end_turn" as const, content: [{ type: "text" as const, text: "ок" }] });
+      }
+    };
+    await runAgentLoop({
+      provider,
+      system: "s",
+      goal: "теперь то же для проекта Б",
+      tools: [],
+      executeAnalyze: vi.fn(),
+      history: [
+        { role: "user", content: "продвинь задачи проекта А" },
+        { role: "assistant", content: "Продвинул А." }
+      ]
+    });
+    expect(seen.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+    expect(seen[0]!.content).toBe("продвинь задачи проекта А");
+    expect(seen[2]!.content).toBe("теперь то же для проекта Б");
+  });
+
   it("эмитит CoT-события onEvent в порядке: reasoning → analyze → proposal", async () => {
     const script: LlmResponse[] = [
       { stopReason: "tool_use", content: [{ type: "text", text: "Смотрю задачи." }, { type: "tool_use", id: "t1", name: "list_my_tasks", input: {} }] },

@@ -114,6 +114,22 @@ function parseAttachmentIds(value: unknown): string[] {
   return value.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 50);
 }
 
+const HISTORY_MAX_TURNS = 12; // память чата: последние N реплик (защита от раздувания контекста)
+// История треда из тела: [{role|author, text}] → реплики LLM. henry/assistant → assistant.
+function parseHistory(value: unknown): Array<{ role: "user" | "assistant"; content: string }> {
+  if (!Array.isArray(value)) return [];
+  const turns: Array<{ role: "user" | "assistant"; content: string }> = [];
+  for (const raw of value.slice(-HISTORY_MAX_TURNS)) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as { role?: unknown; author?: unknown; text?: unknown };
+    const text = typeof item.text === "string" ? item.text.slice(0, 4000) : "";
+    if (text.length === 0) continue;
+    const tag = typeof item.role === "string" ? item.role : typeof item.author === "string" ? item.author : "user";
+    turns.push({ role: tag === "assistant" || tag === "henry" ? "assistant" : "user", content: text });
+  }
+  return turns;
+}
+
 // Лимиты цикла из env (стоимость/время) с разумными дефолтами. 0/пусто → дефолт.
 function agentLimitsFromEnv(): { maxIterations: number; maxTotalOutputTokens: number; timeoutMs: number } {
   const num = (value: string | undefined, fallback: number) => {
@@ -246,7 +262,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
   // Общая преамбула /propose и /propose/stream (auth + разбор тела) — единый источник правды,
   // чтобы валидация не разъезжалась между JSON- и SSE-эндпоинтами. На ошибке отдаёт готовый Response.
-  type ProposeRequest = { cookie: string | null; actor: TenantUser; profile: AccessProfile; goal: string; attachmentIds: string[] };
+  type ProposeRequest = { cookie: string | null; actor: TenantUser; profile: AccessProfile; goal: string; attachmentIds: string[]; history: Array<{ role: "user" | "assistant"; content: string }> };
   async function parseProposeRequest(context: Context): Promise<{ ok: true; value: ProposeRequest } | { ok: false; response: Response }> {
     const cookie = context.req.header("cookie") ?? null;
     const actor = await deps.getSessionActorFromHeaders(cookie);
@@ -256,19 +272,17 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const goal = typeof (body.value as { goal?: unknown }).goal === "string" ? (body.value as { goal: string }).goal.trim() : "";
     if (goal.length === 0 || goal.length > 2000) return { ok: false, response: context.json({ error: "invalid_goal" }, 400) };
     const attachmentIds = parseAttachmentIds((body.value as { attachmentIds?: unknown }).attachmentIds);
+    const history = parseHistory((body.value as { history?: unknown }).history);
     const profile = await deps.getActorProfile(actor);
-    return { ok: true, value: { cookie, actor, profile, goal, attachmentIds } };
+    return { ok: true, value: { cookie, actor, profile, goal, attachmentIds, history } };
   }
 
   // Ядро предложения — общее для /propose (JSON) и /propose/stream (SSE).
   async function runProposeLoop(
-    cookie: string | null,
-    actor: TenantUser,
-    profile: AccessProfile,
-    goal: string,
-    attachmentIds: string[],
+    request: ProposeRequest,
     onEvent?: (event: AgentLoopEvent) => void | Promise<void>
   ) {
+    const { cookie, actor, profile, goal, attachmentIds, history } = request;
     const allowed = allowedToolsForActor(actor, profile);
     // LLM получает только то, что реально можно выполнить: исполнимые mutation + подключённые analyze.
     const offered = allowed.filter((tool) =>
@@ -283,6 +297,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       executeAnalyze: buildAnalyzeExecutor(deps, app, cookie, actor.tenantId, actor.id),
       limits: agentLimitsFromEnv(),
       ...(attachments.length > 0 ? { attachments } : {}),
+      ...(history.length > 0 ? { history } : {}),
       ...(onEvent ? { onEvent } : {})
     });
     // Аннотируем предложения грубым capability (точная проверка — при /execute).
@@ -306,8 +321,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/workspace/agent/propose", async (context) => {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
-    const { cookie, actor, profile, goal, attachmentIds } = parsed.value;
-    return context.json(await runProposeLoop(cookie, actor, profile, goal, attachmentIds));
+    return context.json(await runProposeLoop(parsed.value));
   });
 
   // То же предложение, но потоком (SSE): события reasoning/analyze/proposal по мере работы +
@@ -315,10 +329,9 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/workspace/agent/propose/stream", async (context) => {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
-    const { cookie, actor, profile, goal, attachmentIds } = parsed.value;
     return streamSSE(context, async (stream) => {
       try {
-        const result = await runProposeLoop(cookie, actor, profile, goal, attachmentIds, async (event) => {
+        const result = await runProposeLoop(parsed.value, async (event) => {
           await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
         });
         await stream.writeSSE({ event: "done", data: JSON.stringify(result) });

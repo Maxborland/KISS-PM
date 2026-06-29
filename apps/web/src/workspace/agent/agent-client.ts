@@ -39,6 +39,9 @@ export type AgentProposeResponse = {
   outputTokens?: number;
 };
 
+// Реплика истории треда (память чата) — отправляется в propose перед текущей целью.
+export type AgentHistoryTurn = { role: "user" | "assistant"; text: string };
+
 // События живого хода работы агента (SSE /propose/stream).
 export type AgentStreamEvent =
   | { type: "reasoning"; text: string }
@@ -78,8 +81,8 @@ export function createAgentClient(options: AgentApiClientOptions) {
     listTools() {
       return requestJson<{ tools: AgentToolAvailability[] }>("/api/workspace/agent/tools");
     },
-    propose(goal: string, attachmentIds: string[] = []) {
-      return requestJson<AgentProposeResponse>("/api/workspace/agent/propose", { method: "POST", body: JSON.stringify({ goal, attachmentIds }) });
+    propose(goal: string, attachmentIds: string[] = [], history: AgentHistoryTurn[] = []) {
+      return requestJson<AgentProposeResponse>("/api/workspace/agent/propose", { method: "POST", body: JSON.stringify({ goal, attachmentIds, history }) });
     },
     // Загрузка файла через ШТАТНУЮ ручку вложений (multipart), привязка к сущности-якорю.
     async uploadAttachment(file: File, entityType: string, entityId: string): Promise<{ id: string; name: string }> {
@@ -109,12 +112,12 @@ export function createAgentClient(options: AgentApiClientOptions) {
       return (body.projects ?? []).map((project) => ({ id: String(project.id ?? ""), label: String(project.title ?? project.name ?? project.id ?? "") })).filter((p) => p.id.length > 0);
     },
     // Потоковое предложение: вызывает onEvent на каждое SSE-событие, резолвится финальным `done`.
-    async proposeStream(goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = []): Promise<AgentProposeResponse> {
+    async proposeStream(goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = [], history: AgentHistoryTurn[] = []): Promise<AgentProposeResponse> {
       const response = await fetchImpl(`${options.apiOrigin}/api/workspace/agent/propose/stream`, {
         method: "POST",
         credentials,
         headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin" },
-        body: JSON.stringify({ goal, attachmentIds })
+        body: JSON.stringify({ goal, attachmentIds, history })
       });
       if (!response.ok) {
         const raw = await response.text();
