@@ -30,7 +30,7 @@ export interface LlmProvider {
 }
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
-const DEFAULT_OPENROUTER_MODEL = "anthropic/claude-3.7-sonnet"; // переопределяется KISS_PM_AGENT_MODEL
+const DEFAULT_OPENROUTER_MODEL = "anthropic/claude-sonnet-4.6"; // переопределяется KISS_PM_AGENT_MODEL
 
 // ---- боевой провайдер (Anthropic SDK) ----
 export function createAnthropicLlmProvider(opts: { apiKey: string; model?: string; maxTokens?: number }): LlmProvider {
