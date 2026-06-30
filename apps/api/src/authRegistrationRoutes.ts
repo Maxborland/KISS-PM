@@ -427,9 +427,11 @@ function deriveTenantName(ownerName: string, email: string): string {
 }
 
 // Ссылка на форму подтверждения сброса на фронте, относительно текущего origin запроса.
+// Реальный роут — /password-reset/confirm (группа (auth) в URL не участвует), токен читается
+// из ?token= на confirm-странице. Прежний /auth/reset-password 404-ил каждое письмо сброса.
 function buildResetUrl(context: Context, rawToken: string): string {
   const origin = new URL(context.req.url).origin;
-  return `${origin}/auth/reset-password?token=${rawToken}`;
+  return `${origin}/password-reset/confirm?token=${encodeURIComponent(rawToken)}`;
 }
 
 // Системные статусы задач нового тенанта — повторяют дефолты dev-seed

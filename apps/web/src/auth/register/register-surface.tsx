@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Loader2, UserPlus, CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +31,12 @@ import { useAuth } from "@/auth/lib/use-auth";
 
 export function RegisterSurface() {
   const { state, user, register } = useAuth();
+  const router = useRouter();
+
+  // Авто-логин после регистрации → ведём в рабочую область (в Storybook router замокан).
+  useEffect(() => {
+    if (state === "authenticated" && user !== null) router.replace("/dashboard");
+  }, [state, user, router]);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -83,9 +91,9 @@ export function RegisterSurface() {
         footer={
           <span className="text-[length:var(--text-sm)] text-[var(--muted)]">
             Уже есть аккаунт?{" "}
-            <a className="font-medium text-[var(--accent-text)] hover:underline" href="#login">
+            <Link className="font-medium text-[var(--accent-text)] hover:underline" href="/login">
               Войти
-            </a>
+            </Link>
           </span>
         }
       >

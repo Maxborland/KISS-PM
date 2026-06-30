@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ArrowRight, KeyRound, Loader2, MailCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -63,12 +64,12 @@ export function ResetRequestSurface() {
         subtitle="Укажите email рабочего пространства — мы отправим инструкции по сбросу пароля."
         onSubmit={submit}
         footer={
-          <a
-            href="?path=/story/auth-password-reset--confirm"
+          <Link
+            href="/password-reset/confirm"
             className="text-[length:var(--text-sm)] font-medium text-[var(--accent)] underline-offset-4 hover:underline"
           >
             Уже есть токен? Перейти к подтверждению
-          </a>
+          </Link>
         }
       >
         {/* Плашка-прототип: contract-mock боевого контракта password-reset/request. */}
@@ -140,8 +141,8 @@ function DevTokenPanel({ token }: { token: string }) {
         {token}
       </code>
       {/* Ссылка в Storybook на стори «Подтверждение» + копия токена в URL-параметр для удобства. */}
-      <a
-        href={`?path=/story/auth-password-reset--confirm&args=token:${token}`}
+      <Link
+        href={`/password-reset/confirm?token=${encodeURIComponent(token)}`}
         className={cn(
           "inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--accent-soft)] px-2.5 py-1.5",
           "text-[length:var(--text-xs)] font-medium text-[var(--accent-text)] transition-colors hover:bg-[var(--accent)] hover:text-white"
@@ -149,7 +150,7 @@ function DevTokenPanel({ token }: { token: string }) {
       >
         Перейти к подтверждению
         <ArrowRight className="size-3.5" aria-hidden />
-      </a>
+      </Link>
     </div>
   );
 }
