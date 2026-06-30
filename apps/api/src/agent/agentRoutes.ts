@@ -172,6 +172,23 @@ async function dispatchInternal(app: ApiApp, cookie: string | null, path: string
   return { status: response.status, body: parsed };
 }
 
+// Generic-исполнитель декларативных инструментов (binding): переотправляет в governed-роут
+// нужным методом/путём/телом. Один путь для всех CRM/comms/admin/projects-инструментов.
+async function dispatchBinding(app: ApiApp, cookie: string | null, binding: NonNullable<AgentTool["binding"]>, input: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
+  const hasBody = binding.method === "POST" || binding.method === "PATCH";
+  const response = await app.request(binding.path(input), {
+    method: binding.method,
+    headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin", ...(cookie ? { cookie } : {}) },
+    ...(hasBody ? { body: JSON.stringify(binding.body ? binding.body(input) : {}) } : {})
+  });
+  const text = await response.text();
+  let parsed: Record<string, unknown> = {};
+  if (text.length > 0) {
+    try { const json: unknown = JSON.parse(text); if (json && typeof json === "object" && !Array.isArray(json)) parsed = json as Record<string, unknown>; } catch { /* keep {} */ }
+  }
+  return { status: response.status, body: parsed };
+}
+
 async function resolvePlanVersion(deps: ApiRouteDeps, tenantId: string, projectId: string, given: unknown): Promise<number | undefined> {
   if (typeof given === "number") return given;
   if (!deps.dataSource.getPlanSnapshot) return undefined;
@@ -253,6 +270,13 @@ export function buildAnalyzeExecutor(deps: ApiRouteDeps, app: ApiApp, cookie: st
       };
     }
 
+    // Декларативные analyze-инструменты (CRM/comms/admin/projects-чтение) — generic-редиспатч.
+    if (tool.binding && tool.kind === "analyze") {
+      const res = await dispatchBinding(app, cookie, tool.binding, input);
+      if (res.status >= 400) return { note: "read_failed", status: res.status, error: res.body.error };
+      return res.body;
+    }
+
     throw new Error("analyze_tool_not_wired");
   };
 }
@@ -294,9 +318,12 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   ) {
     const { cookie, actor, profile, goal, attachmentIds, history } = request;
     const allowed = allowedToolsForActor(actor, profile);
-    // LLM получает только то, что реально можно выполнить: исполнимые mutation + подключённые analyze.
+    // LLM получает только реально исполнимое: декларативные (binding) + ручные исполнимые
+    // mutation + подключённые ручные analyze. Не-исполнимое (напр. update_task) не предлагается.
     const offered = allowed.filter((tool) =>
-      (tool.kind === "mutation" && EXECUTABLE_MUTATIONS.has(tool.name)) || WIRED_ANALYZE.has(tool.name)
+      Boolean(tool.binding) ||
+      (tool.kind === "mutation" && EXECUTABLE_MUTATIONS.has(tool.name)) ||
+      WIRED_ANALYZE.has(tool.name)
     );
     const attachments = attachmentIds.length > 0 ? await resolveAttachments(app, cookie, attachmentIds) : [];
     const result = await runAgentLoop({
@@ -465,6 +492,15 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
         const res = await dispatchInternal(app, cookie, path, { title, priority: "normal", ...(description ? { description } : {}) });
         if (res.status === 200 || res.status === 201) results.push({ tool: tool.name, ok: true, result: res.body });
         else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "create_failed" });
+        continue;
+      }
+
+      // Декларативные mutation-инструменты (CRM/comms/admin/projects) — generic-редиспатч в
+      // governed-роут. Точный RBAC/валидация — на самом роуте; грубый capability уже проверен выше.
+      if (tool.binding) {
+        const res = await dispatchBinding(app, cookie, tool.binding, input);
+        if (res.status >= 200 && res.status < 300) results.push({ tool: tool.name, ok: true, result: res.body });
+        else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "action_failed" });
         continue;
       }
 
