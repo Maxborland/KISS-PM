@@ -63,10 +63,6 @@ export function CrmFrame({
             </Link>
           );
         })}
-        <span className="ml-auto hidden items-center gap-1.5 pr-2 text-[length:var(--text-sm)] text-[var(--success-text)] md:flex">
-          <span className="v4-pulse size-1.5 rounded-full bg-[var(--success)]" />
-          Сохранено
-        </span>
       </nav>
 
       {/* Контент */}

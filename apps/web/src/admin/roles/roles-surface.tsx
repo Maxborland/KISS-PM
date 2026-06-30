@@ -10,6 +10,7 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { AdminFrame } from "@/admin/ui/admin-frame";
 import { adminErr } from "@/admin/ui/admin-bits";
 import { useAdmin } from "@/admin/lib/use-admin";
+import { useAdminRuntime } from "@/admin/lib/admin-runtime";
 import { ALL_PERMISSIONS } from "@/admin/lib/permissions-catalog";
 import type { AccessProfile, Permission } from "@/admin/lib/admin-client";
 
@@ -40,6 +41,7 @@ const slugify = (name: string): string => {
 };
 
 export function AdminRolesSurface() {
+  const { live } = useAdminRuntime();
   const admin = useAdmin();
   const { data, status, error, reload, createRole, updateRole, deleteRole } = admin;
   // Каталог прав из бэка (GET /permission-catalog); ALL_PERMISSIONS — типизированный fallback на время загрузки.
@@ -71,7 +73,7 @@ export function AdminRolesSurface() {
       subtitle="Роли доступа (access-profiles)"
       actions={<CreateRoleDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRole} groups={groups} />}
     >
-      <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+      <div style={{ display: live ? "none" : undefined }} className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
         <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         <span>Реальный контракт админки: GET/PATCH/DELETE /api/workspace/access-roles, POST /api/tenant/current/access-profiles (createAdminClient + in-memory mock, swap = apiOrigin). Права — полный перечень access-control, full-replace при правке. Назначенную роль удалить нельзя (access_role_assigned). Данные in-memory.</span>
       </div>

@@ -93,7 +93,7 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
     <SelfUserContext.Provider value={me}>
     <CommsFrame activeTab="Чат" subtitle={`Беседы · ${entityType} / ${entityId}`}>
       <div className="flex flex-col gap-3">
-        <PrototypeBanner />
+        {!live ? <PrototypeBanner /> : null}
         <SurfaceState
           status={surfaceStatus}
           error={error}
