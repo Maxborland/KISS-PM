@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, User } from "lucide-react";
 
+import { AuthRuntimeProvider } from "@/auth/lib/auth-runtime";
 import { useAuth } from "@/auth/lib/use-auth";
 
 function initials(name: string): string {
@@ -15,10 +16,18 @@ function initials(name: string): string {
 
 /**
  * Меню пользователя в топ-баре рабочей области: аватар → «Профиль» + «Выйти».
- * Реальный logout через useAuth (POST /api/auth/logout) + редирект на /login.
- * Заменяет прежнюю статичную заглушку-аватар (BemAvatar "КБ").
+ * Оборачиваем в AuthRuntimeProvider live, чтобы useAuth ходил в БОЕВОЙ /api/auth/me
+ * (cookie общая → реальная сессия), а не в mock — иначе имя/выход не работают в чроме.
  */
 export function ShellUserMenu() {
+  return (
+    <AuthRuntimeProvider live>
+      <ShellUserMenuInner />
+    </AuthRuntimeProvider>
+  );
+}
+
+function ShellUserMenuInner() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
