@@ -1,24 +1,24 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { Search } from "lucide-react";
 
-import { BemAvatar } from "@/components/domain/bem-avatar";
 import { cn } from "@/lib/cn";
+import { ShellUserMenu } from "@/auth/avatar-menu/shell-user-menu";
 
-const NAV: { title: string; items: { label: string; badge?: string }[] }[] = [
+// href задан → пункт кликабелен (реальный роут). Без href — пока не подключённый раздел.
+const NAV: { title: string; items: { label: string; href?: string }[] }[] = [
   {
     title: "Работа",
     items: [
-      { label: "Мои задачи", badge: "12" },
-      { label: "Проекты", badge: "8" },
-      { label: "Сделки", badge: "37" },
-      { label: "Ресурсы", badge: "42" }
+      { label: "Мои задачи", href: "/my-work" },
+      { label: "Проекты", href: "/projects" },
+      { label: "Сделки", href: "/crm/deals" },
+      { label: "Ресурсы" }
     ]
   },
-  { title: "Аналитика", items: [{ label: "Загрузка" }, { label: "KPI" }] },
-  // Аддитивная nav-группа «Коммуникации» (handoff-каркас): не меняет существующие active/badge.
-  { title: "Коммуникации", items: [{ label: "Коммуникации" }] },
-  // Аддитивная nav-группа «Администрирование» (handoff-каркас, ПОСЛЕ «Коммуникации»): один пункт, не трогает существующие active/badge.
-  { title: "Администрирование", items: [{ label: "Администрирование" }] }
+  { title: "Аналитика", items: [{ label: "Дашборд", href: "/dashboard" }, { label: "KPI" }] },
+  { title: "Коммуникации", items: [{ label: "Коммуникации", href: "/communications/chat" }] },
+  { title: "Администрирование", items: [{ label: "Администрирование", href: "/admin" }] }
 ];
 
 /**
@@ -42,18 +42,15 @@ export function WorkspaceShell({ activeNav, children }: { activeNav: string; chi
               <div className="px-2.5 pb-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.06em] text-[var(--muted-soft)]">{group.title}</div>
               {group.items.map((item) => {
                 const active = item.label === activeNav;
-                return (
-                  <span
-                    key={item.label}
-                    title="Демо-прототип: навигация подключится в рабочем приложении"
-                    className={cn(
-                      "flex cursor-default items-center justify-between rounded-[var(--radius-md)] px-2.5 py-1.5 text-[length:var(--text-sm)]",
-                      active ? "bg-[var(--accent-soft)] font-semibold text-[var(--accent)]" : "font-medium text-[var(--muted-strong)]"
-                    )}
-                  >
-                    {item.label}
-                    {item.badge ? <span className="v4-num text-[length:var(--text-xs)] font-semibold text-[var(--muted-soft)]">{item.badge}</span> : null}
-                  </span>
+                const cls = cn(
+                  "flex items-center justify-between rounded-[var(--radius-md)] px-2.5 py-1.5 text-[length:var(--text-sm)]",
+                  active ? "bg-[var(--accent-soft)] font-semibold text-[var(--accent)]" : "font-medium text-[var(--muted-strong)]",
+                  item.href ? "hover:bg-[var(--panel-subtle)]" : "cursor-default text-[var(--muted-soft)]"
+                );
+                return item.href ? (
+                  <Link key={item.label} href={item.href} className={cls}>{item.label}</Link>
+                ) : (
+                  <span key={item.label} className={cls} title="Раздел появится в приложении">{item.label}</span>
                 );
               })}
             </div>
@@ -73,7 +70,7 @@ export function WorkspaceShell({ activeNav, children }: { activeNav: string; chi
               title="Демо-прототип: поиск подключится к рабочему приложению"
             />
           </label>
-          <BemAvatar initials="КБ" color="c4" size="sm" />
+          <ShellUserMenu />
         </header>
         {children}
       </div>

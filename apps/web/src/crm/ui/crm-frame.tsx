@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { cn } from "@/lib/cn";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
+
+const CRM_TAB_HREF: Record<string, string> = {
+  "Сделки": "/crm/deals",
+  "Клиенты": "/crm/clients",
+  "Контакты": "/crm/contacts",
+  "Продукты": "/crm/products"
+};
 
 /**
  * CrmFrame — продуктовый каркас CRM-области (по образцу DeliveryFrame, но не
@@ -41,18 +49,18 @@ export function CrmFrame({
         {CRM_TABS.map((tab) => {
           const active = tab === activeTab;
           return (
-            <span
+            <Link
               key={tab}
+              href={CRM_TAB_HREF[tab] ?? "/crm/deals"}
               aria-current={active ? "page" : undefined}
-              title={active ? undefined : "Демо-прототип: переключение разделов появится в приложении"}
               className={cn(
-                "relative cursor-default whitespace-nowrap px-3 py-2.5 text-[length:var(--text-sm)] font-medium transition-colors duration-[var(--duration-fast)]",
+                "relative whitespace-nowrap px-3 py-2.5 text-[length:var(--text-sm)] font-medium transition-colors duration-[var(--duration-fast)]",
                 active ? "text-[var(--text-strong)]" : "text-[var(--muted)] hover:text-[var(--text-strong)]"
               )}
             >
               {tab}
               {active ? <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[var(--accent)]" /> : null}
-            </span>
+            </Link>
           );
         })}
         <span className="ml-auto hidden items-center gap-1.5 pr-2 text-[length:var(--text-sm)] text-[var(--success-text)] md:flex">
