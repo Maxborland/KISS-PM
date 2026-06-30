@@ -30,6 +30,11 @@ const summarize = (input: Record<string, unknown>): string =>
     .map(([k, v]) => `${k}: ${String(v)}`)
     .join(" · ");
 
+// Какое поле action редактируется ручной правкой в панели сверки. Структурные действия
+// (статус/ресурсы/план) сюда НЕ входят — их значение нельзя безопасно вывести из текста, поэтому
+// inline-правка для них блокируется (иначе apply молча слал бы оригинал — дыра доверия).
+const EDITABLE_FIELD: Record<string, string> = { comment_task: "body", create_task: "title" };
+
 const KIND_BY_TOOL: Record<string, DemoChange["kind"]> = {
   change_task_status: "status",
   update_task: "text",
@@ -54,6 +59,12 @@ function actionToChange(action: ProposedAction, index: number): DemoChange {
     before = "текущий план";
     const count = Array.isArray(action.input.commands) ? action.input.commands.length : 0;
     after = `${count} изменени${count === 1 ? "е" : "я"} плана`;
+  } else if (action.tool === "comment_task") {
+    before = "комментарий";
+    after = String(action.input.body ?? ""); // редактируемое поле = текст комментария
+  } else if (action.tool === "create_task") {
+    before = "новая задача";
+    after = String(action.input.title ?? ""); // редактируемое поле = название задачи
   }
   return {
     id: `chg-${index}`,
@@ -270,10 +281,23 @@ export function AgentSurface() {
           onRejectChange={(id) =>
             setChanges((cs) => cs.map((c) => (c.id === id ? { ...c, selected: false, status: "отклонено" } : c)))
           }
-          onEditChange={(id) => { setActiveChangeId(id); setEditingChangeId(id); }}
-          onUpdateChange={(id, value) =>
-            setChanges((cs) => cs.map((c) => (c.id === id ? { ...c, after: value, status: "изменено", selected: true } : c)))
-          }
+          onEditChange={(id) => {
+            // Правка возможна только для действий с явным редактируемым полем (текст).
+            if (!EDITABLE_FIELD[actionMap[id]?.tool ?? ""]) {
+              addMessage("henry", "Это действие нельзя отредактировать вручную — отклоните его и уточните запрос, и я предложу новый вариант.");
+              return;
+            }
+            setActiveChangeId(id);
+            setEditingChangeId(id);
+          }}
+          onUpdateChange={(id, value) => {
+            // Правка реально попадает в action (а не только в отображение) — закрывает дыру доверия.
+            const field = EDITABLE_FIELD[actionMap[id]?.tool ?? ""];
+            if (field) {
+              setActionMap((m) => (m[id] ? { ...m, [id]: { ...m[id]!, input: { ...m[id]!.input, [field]: value } } } : m));
+            }
+            setChanges((cs) => cs.map((c) => (c.id === id ? { ...c, after: value, status: "изменено", selected: true } : c)));
+          }}
           onApply={() => void applySelected()}
           onReset={resetDemo}
         />
