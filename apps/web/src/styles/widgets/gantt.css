@@ -9,7 +9,7 @@
   max-height: 70vh;
 }
 
-.gantt2__inner { min-width: max-content; }
+.gantt2__inner { min-width: max-content; position: relative; }
 
 /* shared row template:
    # | Реж | WBS | Название | Дл | % | Начало | Оконч | Предш | Ресурсы | Труд | chart
@@ -35,6 +35,15 @@
 }
 
 .gantt2__row:last-child { border-bottom: 0; }
+
+/* P0-6: нативная виртуализация — браузер пропускает рендер/лейаут строк вне вьюпорта.
+   Стрелки связей вынесены в overlay (.gantt2__deps), поэтому paint-контейнмент их НЕ режет.
+   contain-intrinsic-size резервирует высоту 28px → скролл и позиционирование overlay корректны.
+   ponytail: content-visibility вместо react-window (native, без JS-windowing). */
+.gantt2__row:not(.gantt2__row--head1):not(.gantt2__row--head2) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 28px;
+}
 .gantt2__row:hover .gantt2__cell:not(.gantt2__cell--chart) { background: var(--panel-subtle); }
 
 .gantt2__cell {

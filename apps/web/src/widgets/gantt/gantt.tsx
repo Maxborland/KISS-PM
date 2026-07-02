@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent
+} from "react";
 import { ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/cn";
@@ -52,26 +58,44 @@ export function computeDependencyArrows(rows: readonly GanttRow[], dayWidth: num
   return arrows;
 }
 
-/** Рисует входящие стрелки связей в чарт-ячейке строки-преемника (predecessor выше по списку). */
-function DependencyArrows({ arrows }: { arrows: DependencyArrow[] }) {
+/**
+ * Единый overlay-слой стрелок связей поверх всей чарт-области.
+ * P0-6: вынесен ИЗ строк, поэтому content-visibility на строках (виртуализация) не режет линии.
+ * Координаты — в системе .gantt2__inner: x = chartLeft + dayX, y = headerH + rowIndex·ROW_H + ROW_H/2.
+ */
+function DependencyOverlay({
+  arrows,
+  chartLeft,
+  headerH
+}: {
+  arrows: DependencyArrow[];
+  chartLeft: number;
+  headerH: number;
+}) {
   if (arrows.length === 0) return null;
-  const yMid = ROW_H / 2;
+  const yOf = (rowIndex: number) => headerH + rowIndex * ROW_H + ROW_H / 2;
   return (
-    <>
+    <svg
+      className="gantt2__deps"
+      style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible", zIndex: 2 }}
+      aria-hidden
+    >
       {arrows.map((arrow) => {
-        const rowDelta = arrow.toRow - arrow.fromRow; // >0 — предшественник выше
-        const yFrom = yMid - rowDelta * ROW_H;
+        const x1 = chartLeft + arrow.fromX;
+        const y1 = yOf(arrow.fromRow);
+        const x2 = chartLeft + arrow.toX;
+        const y2 = yOf(arrow.toRow);
         const gap = 8;
-        const elbowX = Math.max(arrow.fromX + gap, arrow.toX - gap);
-        const d = `M ${arrow.fromX} ${yFrom} H ${elbowX} V ${yMid} H ${arrow.toX}`;
+        const elbowX = Math.max(x1 + gap, x2 - gap);
+        const d = `M ${x1} ${y1} H ${elbowX} V ${y2} H ${x2}`;
         return (
-          <svg key={arrow.key} className="gdep" style={{ top: 0, left: 0, width: "var(--gantt-chart-w)", height: ROW_H, overflow: "visible" }} aria-hidden>
-            <path className="gdep__line" d={d} />
-            <path className="gdep__arrow" d={`M ${arrow.toX} ${yMid} l -5 -3 v 6 z`} />
-          </svg>
+          <g key={arrow.key}>
+            <path className="gdep__line" d={d} fill="none" />
+            <path className="gdep__arrow" d={`M ${x2} ${y2} l -5 -3 v 6 z`} />
+          </g>
         );
       })}
-    </>
+    </svg>
   );
 }
 
@@ -268,8 +292,7 @@ function DataRow({
   onSelect,
   onToggleCollapse,
   onMoveTask,
-  onResizeTask,
-  arrows
+  onResizeTask
 }: {
   row: GanttRow;
   index: number;
@@ -279,7 +302,6 @@ function DataRow({
   onToggleCollapse?: (id: string) => void;
   onMoveTask?: (id: string, dayDelta: number) => void;
   onResizeTask?: (id: string, dayDelta: number) => void;
-  arrows?: DependencyArrow[];
 }) {
   const resources = row.kind === "task" ? row.resourceName ?? "—" : "—";
   const labor =
@@ -324,7 +346,6 @@ function DataRow({
           />
         ) : null}
         <ChartBar row={row} {...(onMoveTask ? { onMoveTask } : {})} {...(onResizeTask ? { onResizeTask } : {})} />
-        {arrows && arrows.length > 0 ? <DependencyArrows arrows={arrows} /> : null}
       </div>
     </div>
   );
@@ -334,10 +355,33 @@ export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollap
   const totalDays = data.days.length;
   const chartWidth = totalDays * DAY_W;
   const todayIndex = data.days.findIndex((d) => d.today);
-  const arrowsByToRow = new Map<number, DependencyArrow[]>();
-  for (const arrow of computeDependencyArrows(data.rows, DAY_W)) {
-    arrowsByToRow.set(arrow.toRow, [...(arrowsByToRow.get(arrow.toRow) ?? []), arrow]);
-  }
+  const arrows = computeDependencyArrows(data.rows, DAY_W);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [geom, setGeom] = useState<{ chartLeft: number; headerH: number } | null>(null);
+
+  // Измеряем смещение чарт-области и высоту шапки в системе .gantt2__inner, чтобы позиционировать
+  // overlay стрелок независимо от гибкой ширины колонки «Название» и горизонтального скролла.
+  useLayoutEffect(() => {
+    const inner = innerRef.current;
+    if (!inner) return;
+    const measure = () => {
+      const innerRect = inner.getBoundingClientRect();
+      const headChart = inner.querySelector<HTMLElement>(".gantt2__row--head2 .gantt2__cell--chart");
+      const firstDataRow = inner.querySelector<HTMLElement>(
+        ".gantt2__row:not(.gantt2__row--head1):not(.gantt2__row--head2)"
+      );
+      if (!headChart || !firstDataRow) return;
+      const chartLeft = headChart.getBoundingClientRect().left - innerRect.left;
+      const headerH = firstDataRow.getBoundingClientRect().top - innerRect.top;
+      setGeom((prev) =>
+        prev && prev.chartLeft === chartLeft && prev.headerH === headerH ? prev : { chartLeft, headerH }
+      );
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [data.days.length, data.rows.length]);
 
   return (
     <div
@@ -352,7 +396,7 @@ export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollap
         } as CSSProperties
       }
     >
-      <div className="gantt2__inner">
+      <div className="gantt2__inner" ref={innerRef}>
         <div className="gantt2__row gantt2__row--head1" role="row">
           <div className="gantt2__cell gantt2__cell--num">#</div>
           <div className="gantt2__cell">Реж</div>
@@ -395,13 +439,13 @@ export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollap
             index={index}
             todayIndex={todayIndex}
             selected={selectedId === row.id}
-            arrows={arrowsByToRow.get(index) ?? []}
             {...(onSelectRow ? { onSelect: onSelectRow } : {})}
             {...(onToggleCollapse ? { onToggleCollapse } : {})}
             {...(onMoveTask ? { onMoveTask } : {})}
             {...(onResizeTask ? { onResizeTask } : {})}
           />
         ))}
+        {geom ? <DependencyOverlay arrows={arrows} chartLeft={geom.chartLeft} headerH={geom.headerH} /> : null}
       </div>
     </div>
   );
