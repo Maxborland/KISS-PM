@@ -87,24 +87,33 @@ function ChartHead2({ days }: { days: GanttDayHeader[] }) {
 function DataRow({
   row,
   index,
-  todayIndex
+  todayIndex,
+  selected,
+  onSelect
 }: {
   row: GanttRow;
   index: number;
   todayIndex: number;
+  selected?: boolean;
+  onSelect?: (id: string) => void;
 }) {
   const resources = row.kind === "task" ? row.resourceName ?? "—" : "—";
   const labor =
     row.kind === "task" && row.workMinutes != null ? `${Math.round(row.workMinutes / 60)}ч` : "—";
+  const interactive = Boolean(onSelect);
 
   return (
     <div
       className={cn(
         "gantt2__row",
         row.kind === "summary" && "gantt2__row--group",
-        row.critical && row.kind === "task" && "gantt2__row--selected"
+        ((row.critical && row.kind === "task") || selected) && "gantt2__row--selected",
+        interactive && "cursor-pointer"
       )}
       role="row"
+      {...(interactive
+        ? { onClick: () => onSelect?.(row.id), tabIndex: 0, "aria-selected": selected, "data-selected": selected ? "true" : undefined }
+        : {})}
     >
       <div className="gantt2__cell gantt2__cell--num">{index + 1}</div>
       <div className="gantt2__cell">
@@ -116,7 +125,7 @@ function DataRow({
       <div className="gantt2__cell gantt2__cell--center">{pctLabel(row.progress)}</div>
       <div className="gantt2__cell gantt2__cell--mono gantt2__cell--center">{row.startLabel ?? "—"}</div>
       <div className="gantt2__cell gantt2__cell--mono gantt2__cell--center">{row.finishLabel ?? "—"}</div>
-      <div className="gantt2__cell gantt2__cell--center gantt2__cell--muted">—</div>
+      <div className="gantt2__cell gantt2__cell--center gantt2__cell--muted">{row.predecessorLabel ?? "—"}</div>
       <div className="gantt2__cell">{resources}</div>
       <div className="gantt2__cell gantt2__cell--right">{labor}</div>
       <div className="gantt2__cell gantt2__cell--chart">
@@ -133,7 +142,7 @@ function DataRow({
   );
 }
 
-export function Gantt({ data, className }: { data: GanttData; className?: string }) {
+export function Gantt({ data, className, selectedId, onSelectRow }: { data: GanttData; className?: string; selectedId?: string | null; onSelectRow?: (id: string) => void }) {
   const totalDays = data.days.length;
   const chartWidth = totalDays * DAY_W;
   const todayIndex = data.days.findIndex((d) => d.today);
@@ -187,7 +196,14 @@ export function Gantt({ data, className }: { data: GanttData; className?: string
           </div>
         </div>
         {data.rows.map((row, index) => (
-          <DataRow key={row.id} row={row} index={index} todayIndex={todayIndex} />
+          <DataRow
+            key={row.id}
+            row={row}
+            index={index}
+            todayIndex={todayIndex}
+            selected={selectedId === row.id}
+            {...(onSelectRow ? { onSelect: onSelectRow } : {})}
+          />
         ))}
       </div>
     </div>

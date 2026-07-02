@@ -24,6 +24,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/cn";
 import { ApiError, apiFetch } from "@/lib/api";
 import { KanbanBoard, KanbanColumn } from "@/widgets/kanban/kanban-board";
@@ -88,7 +89,7 @@ type PlanningReadModel = {
   project: { id: string; title: string; plannedStart: string; plannedFinish: string };
   resources: Array<{ id: string; name: string }>;
   // API (createPlanningReadModel) отдаёт куда больше, чем web потреблял — ниже только поля, которые реально читаем.
-  authored: { tasks: PlanningTask[]; dependencies?: Array<{ id: string; predecessorTaskId: string; successorTaskId: string; type: string }>; assignments: Array<{ id: string; taskId: string; resourceId: string; role: string; workMinutes: number | null }> };
+  authored: { tasks: PlanningTask[]; dependencies?: Array<{ id: string; predecessorTaskId: string; successorTaskId: string; type: string }>; baselines?: Array<{ id: string; capturedAt: string }>; assignments: Array<{ id: string; taskId: string; resourceId: string; role: string; workMinutes: number | null }> };
   calculatedPlan?: { criticalPathTaskIds?: string[] };
   planVersion: number;
 };
@@ -417,6 +418,24 @@ function ProjectDetailRuntime({ id, me }: { id: string; me: AuthMe }) {
   );
 }
 
+type PlanCommand = { type: string; payload: Record<string, unknown> };
+const DEP_TYPES = [["FS", "Оконч.→Начало"], ["SS", "Начало→Начало"], ["FF", "Оконч.→Оконч."], ["SF", "Начало→Оконч."]] as const;
+function isSummaryTask(taskId: string, tasks: PlanningTask[]) { return tasks.some((task) => task.parentTaskId === taskId); }
+function orderedGanttSiblings(parentId: string | null, tasks: PlanningTask[]) { return tasks.filter((task) => (task.parentTaskId ?? null) === parentId).sort((left, right) => compareWbs(left.wbsCode ?? "", right.wbsCode ?? "")); }
+function indentCommand(task: PlanningTask, tasks: PlanningTask[]): PlanCommand | null {
+  const siblings = orderedGanttSiblings(task.parentTaskId ?? null, tasks);
+  const prev = siblings[siblings.findIndex((sibling) => sibling.id === task.id) - 1];
+  if (!prev) return null;
+  return { type: "task.move_wbs", payload: { taskId: task.id, parentTaskId: prev.id, sortOrder: orderedGanttSiblings(prev.id, tasks).length } };
+}
+function outdentCommand(task: PlanningTask, tasks: PlanningTask[]): PlanCommand | null {
+  const parentId = task.parentTaskId ?? null;
+  if (parentId === null) return null;
+  const grandParentId = tasks.find((candidate) => candidate.id === parentId)?.parentTaskId ?? null;
+  const parentIndex = orderedGanttSiblings(grandParentId, tasks).findIndex((sibling) => sibling.id === parentId);
+  return { type: "task.move_wbs", payload: { taskId: task.id, parentTaskId: grandParentId, sortOrder: parentIndex + 1 } };
+}
+
 function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
   const planning = usePlanning(id);
   const queryClient = useQueryClient();
@@ -424,13 +443,22 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
   // ponytail: zoom презентационный — виджет рисует фиксированную дневную сетку (как и Storybook-Гант). Ceiling: настоящая зум-гранулярность, если виджет начнёт её учитывать.
   const [zoom, setZoom] = useState<"hour" | "day" | "week" | "month">("day");
   const [showCritical, setShowCritical] = useState(true);
-  const data = useMemo(() => planning.data ? toGanttData(planning.data, showCritical) : undefined, [planning.data, showCritical]);
-  const command = planning.data ? nextScheduleCommand(planning.data) : null;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
   const reason = disabledReason(me, PERMISSIONS.manageProjectPlan);
+  const data = useMemo(() => (planning.data ? toGanttData(planning.data, showCritical) : undefined), [planning.data, showCritical]);
+  const shownData = useMemo(() => {
+    if (!data || !filter.trim()) return data;
+    const query = filter.trim().toLowerCase();
+    return { ...data, rows: data.rows.filter((row) => row.name.toLowerCase().includes(query)) };
+  }, [data, filter]);
+  const tasks = planning.data?.authored.tasks ?? [];
+  const selectedTask = tasks.find((task) => task.id === selectedId) ?? null;
+  const command = planning.data ? nextScheduleCommand(planning.data) : null;
   const ganttStats = useMemo(() => {
-    const tasks = planning.data?.authored.tasks ?? [];
-    const parentIds = new Set(tasks.map((task) => task.parentTaskId).filter(Boolean));
-    const leaves = tasks.filter((task) => !parentIds.has(task.id) && (task.workMinutes ?? 0) > 0);
+    const allTasks = planning.data?.authored.tasks ?? [];
+    const parentIds = new Set(allTasks.map((task) => task.parentTaskId).filter(Boolean));
+    const leaves = allTasks.filter((task) => !parentIds.has(task.id) && (task.workMinutes ?? 0) > 0);
     const totalWork = leaves.reduce((sum, task) => sum + (task.workMinutes ?? 0), 0);
     const earned = leaves.reduce((sum, task) => sum + (task.workMinutes ?? 0) * Math.max(0, Math.min(1, (task.percentComplete ?? 0) / 100)), 0);
     return {
@@ -439,37 +467,39 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
       criticalCount: planning.data?.calculatedPlan?.criticalPathTaskIds?.length ?? 0
     };
   }, [planning.data]);
-  // Действия редактирования плана требуют command-эндпоинтов (add/del/indent/link/baseline) — показываем структуру тулбара, но честно отключаем до их появления. Не фейк-контролы: видимо disabled с причиной.
-  const editSoon = "Редактирование плана появится после command-эндпоинтов";
+  const toolbarApply = useMutation({
+    mutationFn: (cmd: PlanCommand) => {
+      if (reason) throw new Error(reason);
+      if (!planning.data) throw new Error("План не загружен");
+      return apiFetch(`/api/workspace/projects/${id}/planning/apply-command`, { method: "POST", json: { command: cmd, clientPlanVersion: planning.data.planVersion, idempotencyKey: `gantt-${cmd.type}-${planning.data.planVersion}-${Math.random().toString(36).slice(2, 8)}` } });
+    },
+    onSuccess: async () => { toast.success("План изменён"); setSelectedId(null); await queryClient.invalidateQueries({ queryKey: ["planning", id] }); },
+    onError: (error) => toast.error(errorMessage(error))
+  });
+  const moveWbs = (direction: "in" | "out") => {
+    if (!selectedTask) return;
+    const cmd = direction === "in" ? indentCommand(selectedTask, tasks) : outdentCommand(selectedTask, tasks);
+    if (!cmd) { toast.error(direction === "in" ? "Нет предыдущей задачи того же уровня" : "Задача уже на верхнем уровне"); return; }
+    toolbarApply.mutate(cmd);
+  };
   const previewMutation = useMutation({
     mutationFn: () => {
       if (reason) throw new Error(reason);
       if (!planning.data || !command) throw new Error("Нет задачи для предпросмотра");
-      return apiFetch<PlanningPreview>(`/api/workspace/projects/${id}/planning/preview-command`, {
-        method: "POST",
-        json: { command, clientPlanVersion: planning.data.planVersion }
-      });
+      return apiFetch<PlanningPreview>(`/api/workspace/projects/${id}/planning/preview-command`, { method: "POST", json: { command, clientPlanVersion: planning.data.planVersion } });
     },
-    onSuccess: (payload) => {
-      setPreview(payload);
-      toast.success("Предпросмотр подготовлен");
-    }
+    onSuccess: (payload) => { setPreview(payload); toast.success("Предпросмотр подготовлен"); }
   });
   const applyMutation = useMutation({
     mutationFn: () => {
       if (reason) throw new Error(reason);
       if (!planning.data || !command) throw new Error("Сначала перечитайте план");
-      return apiFetch(`/api/workspace/projects/${id}/planning/apply-command`, {
-        method: "POST",
-        json: { command, clientPlanVersion: planning.data.planVersion, idempotencyKey: `runtime-shift-${planning.data.planVersion}-${command.payload.taskId}` }
-      });
+      return apiFetch(`/api/workspace/projects/${id}/planning/apply-command`, { method: "POST", json: { command, clientPlanVersion: planning.data.planVersion, idempotencyKey: `runtime-shift-${planning.data.planVersion}-${command.payload.taskId}` } });
     },
-    onSuccess: async () => {
-      toast.success("Изменение плана применено");
-      setPreview(null);
-      await queryClient.invalidateQueries({ queryKey: ["planning", id] });
-    }
+    onSuccess: async () => { toast.success("Изменение плана применено"); setPreview(null); await queryClient.invalidateQueries({ queryKey: ["planning", id] }); }
   });
+  const selectHint = reason ?? (!selectedTask ? "Выберите задачу в таблице" : undefined);
+  const rowOpsDisabled = !selectedTask || Boolean(reason) || toolbarApply.isPending;
   return (
     <>
       <PageIntro
@@ -481,22 +511,22 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
       <StateGate state={planning} empty="План проекта пока пуст.">
         <div className="gantt-toolbar" role="toolbar" aria-label="Действия Ганта">
           <div className="gantt-toolbar__group">
-            <Button variant="ghost" size="icon-sm" aria-label="Добавить" disabled title={editSoon}><Plus className="size-4" /></Button>
-            <Button variant="ghost" size="icon-sm" aria-label="Удалить" disabled title={editSoon}><Trash2 className="size-4" /></Button>
+            <GanttAddTaskDialog projectId={id} planning={planning.data} parentTask={selectedTask && isSummaryTask(selectedTask.id, tasks) ? selectedTask : null} reason={reason} />
+            <ConfirmIconButton icon={<Trash2 className="size-4" />} label="Удалить" disabled={rowOpsDisabled} title={selectHint} dialogTitle="Архивировать задачу?" dialogBody={selectedTask ? `Задача «${selectedTask.title}» будет перенесена в архив.` : ""} confirmLabel="Архивировать" onConfirm={() => selectedTask && toolbarApply.mutate({ type: "task.delete_or_archive", payload: { taskId: selectedTask.id, mode: "archive" } })} />
           </div>
           <div className="gantt-toolbar__group">
-            <Button variant="ghost" size="icon-sm" aria-label="Уровень выше" disabled title={editSoon}><ChevronUp className="size-4" /></Button>
-            <Button variant="ghost" size="icon-sm" aria-label="Уровень глубже" disabled title={editSoon}><ChevronDown className="size-4" /></Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Уровень выше" disabled={rowOpsDisabled} title={selectHint} onClick={() => moveWbs("out")}><ChevronUp className="size-4" /></Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Уровень глубже" disabled={rowOpsDisabled} title={selectHint} onClick={() => moveWbs("in")}><ChevronDown className="size-4" /></Button>
           </div>
           <div className="gantt-toolbar__group">
-            <Button variant="ghost" size="icon-sm" aria-label="Связать" disabled title={editSoon}><Link2 className="size-4" /></Button>
-            <Button variant="ghost" size="icon-sm" aria-label="Снять связь" disabled title={editSoon}><Unlink className="size-4" /></Button>
+            <GanttLinkDialog projectId={id} planning={planning.data} reason={reason} />
+            <GanttUnlinkDialog projectId={id} planning={planning.data} reason={reason} />
           </div>
           <span className="gantt-toolbar__sep" />
           <Button variant={showCritical ? "primary" : "ghost"} size="sm" aria-pressed={showCritical} onClick={() => setShowCritical((value) => !value)}>крит. путь</Button>
-          <Button variant="ghost" size="sm" disabled title="Сравнение с базовым планом — скоро">Базовый план</Button>
+          <GanttBaselineDialog projectId={id} planning={planning.data} reason={reason} />
           <span className="gantt-toolbar__sep" />
-          <Button variant="ghost" size="icon-sm" aria-label="Фильтр" disabled title="Фильтрация — скоро"><Filter className="size-4" /></Button>
+          <GanttFilterPopover value={filter} onChange={setFilter} />
           <div className="gantt-toolbar__spacer" />
           <Segmented name="gantt-zoom" value={zoom} onChange={setZoom} options={[{ value: "hour", label: "Час" }, { value: "day", label: "День" }, { value: "week", label: "Нед" }, { value: "month", label: "Мес" }]} />
         </div>
@@ -507,10 +537,156 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
           <span className="gantt-stats__item"><span className="gantt-stats__label">Версия</span><span className="gantt-stats__value">{planning.data?.planVersion ?? 0}</span></span>
         </div>
         {preview ? <CardPanel title="Сверка изменения" subtitle="До применения план не меняется"><p className="u-text-body">Будет изменено задач: {preview.planDelta.changedTaskIds.length}. Проверок: {preview.validationIssues.length}.</p></CardPanel> : null}
-        {data ? <Gantt data={data} /> : null}
+        {shownData ? <Gantt data={shownData} selectedId={selectedId} onSelectRow={setSelectedId} /> : null}
       </StateGate>
-      <MutationMessage error={previewMutation.error ?? applyMutation.error} />
+      <MutationMessage error={previewMutation.error ?? applyMutation.error ?? toolbarApply.error} />
     </>
+  );
+}
+
+function ConfirmIconButton({ icon, label, disabled, title, dialogTitle, dialogBody, confirmLabel, onConfirm }: { icon: ReactNode; label: string; disabled?: boolean; title?: string | undefined; dialogTitle: string; dialogBody: string; confirmLabel: string; onConfirm: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={label} disabled={disabled} title={title}>{icon}</Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{dialogTitle}</DialogTitle><DialogDescription>{dialogBody}</DialogDescription></DialogHeader>
+        <DialogFooter>
+          <Button variant="secondary" onClick={() => setOpen(false)}>Отмена</Button>
+          <Button variant="primary" onClick={() => { onConfirm(); setOpen(false); }}>{confirmLabel}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function usePlanApply(projectId: string, planning: PlanningReadModel | undefined, reason: string | null, onDone: () => void) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (cmd: PlanCommand) => {
+      if (reason) throw new Error(reason);
+      if (!planning) throw new Error("План не загружен");
+      return apiFetch(`/api/workspace/projects/${projectId}/planning/apply-command`, { method: "POST", json: { command: cmd, clientPlanVersion: planning.planVersion, idempotencyKey: `gantt-${cmd.type}-${planning.planVersion}-${Math.random().toString(36).slice(2, 8)}` } });
+    },
+    onSuccess: async () => { toast.success("План изменён"); onDone(); await queryClient.invalidateQueries({ queryKey: ["planning", projectId] }); },
+    onError: (error) => toast.error(errorMessage(error))
+  });
+}
+
+function GanttAddTaskDialog({ projectId, planning, parentTask, reason }: { projectId: string; planning: PlanningReadModel | undefined; parentTask: PlanningTask | null; reason: string | null }) {
+  const statuses = useTaskStatuses();
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [start, setStart] = useState(isoDate(new Date()));
+  const [finish, setFinish] = useState(isoDate(addDays(new Date(), 1)));
+  const [hours, setHours] = useState("8");
+  const apply = usePlanApply(projectId, planning, reason, () => setOpen(false));
+  const statusId = statuses.data?.taskStatuses[0]?.id;
+  const submit = () => {
+    if (!title.trim() || !statusId) { toast.error("Введите название"); return; }
+    apply.mutate({ type: "task.create", payload: { id: crypto.randomUUID(), projectId, parentTaskId: parentTask?.id ?? null, title: title.trim(), statusId, plannedStart: start, plannedFinish: finish, durationMinutes: null, workMinutes: Math.max(0, Math.round(Number(hours) * 60)), assignments: [] } });
+    setTitle("");
+  };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button variant="ghost" size="icon-sm" aria-label="Добавить" disabled={Boolean(reason)} title={reason ?? undefined}><Plus className="size-4" /></Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Новая задача</DialogTitle><DialogDescription>{parentTask ? `Внутри: ${parentTask.title}` : "На верхнем уровне плана"}</DialogDescription></DialogHeader>
+        <div className="flex flex-col gap-[var(--space-3)]">
+          <Field label="Название" htmlFor="gantt-add-title"><Input id="gantt-add-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Например: согласовать ТЗ" /></Field>
+          <div className="flex gap-[var(--space-3)]">
+            <Field label="Начало" htmlFor="gantt-add-start"><Input id="gantt-add-start" type="date" value={start} onChange={(event) => setStart(event.target.value)} /></Field>
+            <Field label="Окончание" htmlFor="gantt-add-finish"><Input id="gantt-add-finish" type="date" value={finish} onChange={(event) => setFinish(event.target.value)} /></Field>
+            <Field label="Труд., ч" htmlFor="gantt-add-hours"><Input id="gantt-add-hours" type="number" min={0} value={hours} onChange={(event) => setHours(event.target.value)} /></Field>
+          </div>
+          <MutationMessage error={apply.error} />
+        </div>
+        <DialogFooter>
+          <Button variant="secondary" onClick={() => setOpen(false)}>Отмена</Button>
+          <Button variant="primary" disabled={apply.isPending || !statusId} onClick={submit}>Создать</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GanttLinkDialog({ projectId, planning, reason }: { projectId: string; planning: PlanningReadModel | undefined; reason: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [predecessor, setPredecessor] = useState("");
+  const [successor, setSuccessor] = useState("");
+  const [type, setType] = useState<string>("FS");
+  const apply = usePlanApply(projectId, planning, reason, () => setOpen(false));
+  const tasks = planning?.authored.tasks ?? [];
+  const submit = () => {
+    if (!predecessor || !successor || predecessor === successor) { toast.error("Выберите две разные задачи"); return; }
+    apply.mutate({ type: "dependency.upsert", payload: { id: crypto.randomUUID(), predecessorTaskId: predecessor, successorTaskId: successor, dependencyType: type, lagMinutes: 0 } });
+  };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button variant="ghost" size="icon-sm" aria-label="Связать" disabled={Boolean(reason)} title={reason ?? undefined}><Link2 className="size-4" /></Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Связь задач</DialogTitle><DialogDescription>Предшественник → последователь, тип зависимости.</DialogDescription></DialogHeader>
+        <div className="flex flex-col gap-[var(--space-3)]">
+          <Field label="Предшественник" htmlFor="link-pred"><Select value={predecessor} onValueChange={setPredecessor}><SelectTrigger id="link-pred" className="w-full"><SelectValue placeholder="Задача" /></SelectTrigger><SelectContent>{tasks.map((task) => <SelectItem key={task.id} value={task.id}>{task.wbsCode ? `${task.wbsCode} · ` : ""}{task.title}</SelectItem>)}</SelectContent></Select></Field>
+          <Field label="Последователь" htmlFor="link-succ"><Select value={successor} onValueChange={setSuccessor}><SelectTrigger id="link-succ" className="w-full"><SelectValue placeholder="Задача" /></SelectTrigger><SelectContent>{tasks.map((task) => <SelectItem key={task.id} value={task.id}>{task.wbsCode ? `${task.wbsCode} · ` : ""}{task.title}</SelectItem>)}</SelectContent></Select></Field>
+          <Field label="Тип" htmlFor="link-type"><Select value={type} onValueChange={setType}><SelectTrigger id="link-type" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{DEP_TYPES.map(([value, text]) => <SelectItem key={value} value={value}>{value} · {text}</SelectItem>)}</SelectContent></Select></Field>
+          <MutationMessage error={apply.error} />
+        </div>
+        <DialogFooter><Button variant="secondary" onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" disabled={apply.isPending} onClick={submit}>Связать</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GanttUnlinkDialog({ projectId, planning, reason }: { projectId: string; planning: PlanningReadModel | undefined; reason: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [dependencyId, setDependencyId] = useState("");
+  const apply = usePlanApply(projectId, planning, reason, () => setOpen(false));
+  const dependencies = planning?.authored.dependencies ?? [];
+  const wbsById = new Map((planning?.authored.tasks ?? []).map((task) => [task.id, task.wbsCode || task.title]));
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button variant="ghost" size="icon-sm" aria-label="Снять связь" disabled={Boolean(reason) || dependencies.length === 0} title={reason ?? (dependencies.length === 0 ? "Связей нет" : undefined)}><Unlink className="size-4" /></Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Снять связь</DialogTitle><DialogDescription>Выберите зависимость для удаления.</DialogDescription></DialogHeader>
+        <div className="flex flex-col gap-[var(--space-3)]">
+          <Field label="Связь" htmlFor="unlink-dep"><Select value={dependencyId} onValueChange={setDependencyId}><SelectTrigger id="unlink-dep" className="w-full"><SelectValue placeholder="Зависимость" /></SelectTrigger><SelectContent>{dependencies.map((dependency) => <SelectItem key={dependency.id} value={dependency.id}>{wbsById.get(dependency.predecessorTaskId)} → {wbsById.get(dependency.successorTaskId)} ({dependency.type})</SelectItem>)}</SelectContent></Select></Field>
+          <MutationMessage error={apply.error} />
+        </div>
+        <DialogFooter><Button variant="secondary" onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" disabled={apply.isPending || !dependencyId} onClick={() => dependencyId && apply.mutate({ type: "dependency.delete", payload: { dependencyId } })}>Снять</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GanttBaselineDialog({ projectId, planning, reason }: { projectId: string; planning: PlanningReadModel | undefined; reason: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState("");
+  const apply = usePlanApply(projectId, planning, reason, () => setOpen(false));
+  const existing = planning?.authored.baselines?.length ?? 0;
+  return (
+    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (next) setLabel(`Базовый план ${existing + 1}`); }}>
+      <DialogTrigger asChild><Button variant="ghost" size="sm" disabled={Boolean(reason)} title={reason ?? undefined}>Базовый план</Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Зафиксировать базовый план</DialogTitle><DialogDescription>Снимок текущего плана для сравнения. Базовых планов сейчас: {existing}.</DialogDescription></DialogHeader>
+        <div className="flex flex-col gap-[var(--space-3)]">
+          <Field label="Название" htmlFor="baseline-label"><Input id="baseline-label" value={label} onChange={(event) => setLabel(event.target.value)} /></Field>
+          <MutationMessage error={apply.error} />
+        </div>
+        <DialogFooter><Button variant="secondary" onClick={() => setOpen(false)}>Отмена</Button><Button variant="primary" disabled={apply.isPending || !label.trim()} onClick={() => apply.mutate({ type: "baseline.capture", payload: { baselineId: crypto.randomUUID(), label: label.trim() } })}>Зафиксировать</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GanttFilterPopover({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild><Button variant={value ? "secondary" : "ghost"} size="icon-sm" aria-label="Фильтр"><Filter className="size-4" /></Button></PopoverTrigger>
+      <PopoverContent align="end" className="w-[16rem]">
+        <Field label="Фильтр по названию" htmlFor="gantt-filter"><Input id="gantt-filter" value={value} onChange={(event) => onChange(event.target.value)} placeholder="Поиск задачи" /></Field>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -1297,6 +1473,13 @@ function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
   }
   const criticalIds = new Set(showCritical ? model.calculatedPlan?.criticalPathTaskIds ?? [] : []);
   const taskById = new Map(model.authored.tasks.map((task) => [task.id, task]));
+  const wbsById = new Map(model.authored.tasks.map((task) => [task.id, task.wbsCode ?? ""]));
+  const predecessorsByTask = new Map<string, string[]>();
+  for (const dependency of model.authored.dependencies ?? []) {
+    const code = wbsById.get(dependency.predecessorTaskId);
+    if (!code) continue;
+    predecessorsByTask.set(dependency.successorTaskId, [...(predecessorsByTask.get(dependency.successorTaskId) ?? []), code]);
+  }
   const childrenByParent = new Map<string | null, PlanningTask[]>();
   for (const task of model.authored.tasks) {
     const parentId = task.parentTaskId ?? null;
@@ -1342,6 +1525,7 @@ function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
         startLabel: task.plannedStart ? formatDate(task.plannedStart) : "—",
         finishLabel: task.plannedFinish ? formatDate(task.plannedFinish) : "—",
         ...(criticalIds.has(task.id) ? { critical: true } : {}),
+        ...(predecessorsByTask.has(task.id) ? { predecessorLabel: predecessorsByTask.get(task.id)!.join(", ") } : {}),
         ...(summary ? { collapsible: true } : {}),
         ...(resourceName ? { resourceName, assignee: { initials: initials(resourceName), color: "c1" as const } } : {})
       });

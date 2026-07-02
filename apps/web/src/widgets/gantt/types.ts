@@ -31,6 +31,8 @@ export type GanttRow = {
   assignee?: { initials: string; color: "c1" | "c2" | "c3" | "c4" | "c5" | "c6" };
   /** Критический путь — рисуем красную рамку. */
   critical?: boolean;
+  /** Коды предшественников для колонки «Предш.» (напр. "1.1, 2"). */
+  predecessorLabel?: string;
   /** Признак свёрнутой ветки (отображает CaretDown). */
   collapsed?: boolean;
   /** Можно ли разворачивать (есть дети). */
