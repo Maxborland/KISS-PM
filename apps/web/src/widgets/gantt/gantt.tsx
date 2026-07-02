@@ -285,6 +285,8 @@ function DataRow({
   const labor =
     row.kind === "task" && row.workMinutes != null ? `${Math.round(row.workMinutes / 60)}ч` : "—";
   const interactive = Boolean(onSelect);
+  // UX-009: резерв времени (slack) в tooltip строки — 0 у критического пути.
+  const slackTitle = row.slackDays != null ? `Резерв: ${row.slackDays} дн.` : undefined;
 
   return (
     <div
@@ -295,6 +297,7 @@ function DataRow({
         interactive && "cursor-pointer"
       )}
       role="row"
+      {...(slackTitle ? { title: slackTitle } : {})}
       {...(interactive
         ? { onClick: () => onSelect?.(row.id), tabIndex: 0, "aria-selected": selected, "data-selected": selected ? "true" : undefined }
         : {})}

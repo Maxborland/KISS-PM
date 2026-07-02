@@ -35,6 +35,8 @@ export type GanttRow = {
   predecessorLabel?: string;
   /** Id задач-предшественников (для рисования стрелок связей). */
   predecessorIds?: string[];
+  /** Резерв времени (slack) в днях — для tooltip на баре (0 у критического пути). */
+  slackDays?: number;
   /** Признак свёрнутой ветки (отображает CaretDown). */
   collapsed?: boolean;
   /** Можно ли разворачивать (есть дети). */

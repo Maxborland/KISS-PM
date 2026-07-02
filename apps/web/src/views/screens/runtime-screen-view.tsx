@@ -91,7 +91,7 @@ type PlanningReadModel = {
   resources: Array<{ id: string; name: string }>;
   // API (createPlanningReadModel) отдаёт куда больше, чем web потреблял — ниже только поля, которые реально читаем.
   authored: { tasks: PlanningTask[]; dependencies?: Array<{ id: string; predecessorTaskId: string; successorTaskId: string; type: string }>; baselines?: Array<{ id: string; capturedAt: string }>; assignments: Array<{ id: string; taskId: string; resourceId: string; role: string; workMinutes: number | null }> };
-  calculatedPlan?: { criticalPathTaskIds?: string[] };
+  calculatedPlan?: { criticalPathTaskIds?: string[]; tasks?: Array<{ id: string; totalSlackMinutes?: number | null }> };
   planVersion: number;
 };
 type PlanningPreview = { planDelta: { changedTaskIds: string[]; changedAssignmentIds: string[]; changedDependencyIds: string[] }; validationIssues: Array<{ code: string; message: string; severity: string }> };
@@ -1540,6 +1540,11 @@ function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
     if (name) resourceNameByTask.set(assignment.taskId, name);
   }
   const criticalIds = new Set(showCritical ? model.calculatedPlan?.criticalPathTaskIds ?? [] : []);
+  // Резерв (slack) в днях по задаче: минуты / 480 (8ч-день). Для tooltip на баре (UX-009).
+  const slackDaysByTask = new Map<string, number>();
+  for (const calcTask of model.calculatedPlan?.tasks ?? []) {
+    if (calcTask.totalSlackMinutes != null) slackDaysByTask.set(calcTask.id, Math.round(calcTask.totalSlackMinutes / 480));
+  }
   const taskById = new Map(model.authored.tasks.map((task) => [task.id, task]));
   const wbsById = new Map(model.authored.tasks.map((task) => [task.id, task.wbsCode ?? ""]));
   const predecessorsByTask = new Map<string, string[]>();
@@ -1598,6 +1603,7 @@ function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
         ...(criticalIds.has(task.id) ? { critical: true } : {}),
         ...(predecessorsByTask.has(task.id) ? { predecessorLabel: predecessorsByTask.get(task.id)!.join(", ") } : {}),
         ...(predecessorIdsByTask.has(task.id) ? { predecessorIds: predecessorIdsByTask.get(task.id)! } : {}),
+        ...(slackDaysByTask.has(task.id) ? { slackDays: slackDaysByTask.get(task.id)! } : {}),
         ...(summary ? { collapsible: true } : {}),
         ...(resourceName ? { resourceName, assignee: { initials: initials(resourceName), color: "c1" as const } } : {})
       });
