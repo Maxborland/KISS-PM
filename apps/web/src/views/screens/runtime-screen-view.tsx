@@ -30,6 +30,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { KanbanBoard, KanbanColumn } from "@/widgets/kanban/kanban-board";
 import { KanbanCard } from "@/widgets/kanban/kanban-card";
 import { Gantt, applyCollapse } from "@/widgets/gantt";
+import { nextTaskStatus, type TaskStatusCategory } from "@/lib/task-status";
 import type { GanttData, GanttRow } from "@/widgets/gantt";
 import { ResourceMatrix, ResourceMatrixLegend, ResourceMatrixStats } from "@/widgets/resource-matrix";
 import type { DayCell, DayHeader, MatrixPercent, MatrixRow, ResourceMatrixData } from "@/widgets/resource-matrix";
@@ -1429,7 +1430,13 @@ function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice
 function isOverdue(task: Task) { return task.statusCategory !== "done" && new Date(task.plannedFinish).getTime() < Date.now(); }
 function stageName(stages: DealStage[], id: string | null) { return stages.find((stage) => stage.id === id)?.name ?? "Не указана"; }
 function nextStage(stages: DealStage[], current: string | null) { const ordered = [...stages].sort((left, right) => left.sortOrder - right.sortOrder); const index = ordered.findIndex((stage) => stage.id === current); return ordered[index + 1] ?? null; }
-function nextStatus(statuses: TaskStatus[], task: Task) { const active = statuses.filter((status) => status.status !== "archived").sort((left, right) => left.sortOrder - right.sortOrder); const index = active.findIndex((status) => status.id === task.statusId || status.category === task.statusCategory); return active[index + 1] ?? null; }
+// BUG-004: следующий статус выбираем по матрице переходов бэкенда (nextTaskStatus), а не по sortOrder —
+// иначе фронт предлагал переход, который бэк отклоняет 409.
+function nextStatus(statuses: TaskStatus[], task: Task): TaskStatus | null {
+  return nextTaskStatus(statuses as Array<TaskStatus & { category: TaskStatusCategory }>, {
+    statusCategory: task.statusCategory as TaskStatusCategory
+  });
+}
 function dateRange(start: string, finish: string) { return `${formatDate(start)} — ${formatDate(finish)}`; }
 function formatDate(value: string) { return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short" }).format(new Date(value)); }
 function money(value: number) { return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(value); }

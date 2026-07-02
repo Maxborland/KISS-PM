@@ -59,7 +59,14 @@ function ChartBar({ row, todayIndex }: { row: GanttRow; todayIndex: number }) {
         ? "gbar gbar--blocker"
         : "gbar gbar--task";
 
-  return <div className={barClass} style={col} aria-hidden />;
+  // UX-008: заливка прогресса прямо в баре (как в MS Project), а не только цифрой в колонке.
+  const progressPct = Math.round(Math.max(0, Math.min(1, row.progress ?? 0)) * 100);
+
+  return (
+    <div className={barClass} style={col} aria-hidden>
+      {progressPct > 0 ? <div className="gbar__progress" style={{ width: `${progressPct}%` }} /> : null}
+    </div>
+  );
 }
 
 function NameCell({ row, onToggleCollapse }: { row: GanttRow; onToggleCollapse?: (id: string) => void }) {
