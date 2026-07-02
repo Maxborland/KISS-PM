@@ -197,23 +197,27 @@ export function mergeWorkspaceDayBuckets(input: {
   return byUserDate;
 }
 
-function buildAbsenceKeySet(
-  absences: Array<{ userId: string; dateFrom: string; dateTo: string }>,
+function buildAbsencePortionByKey(
+  absences: Array<{ userId: string; dateFrom: string; dateTo: string; portion?: number }>,
   monthDates: ReadonlySet<string>
-): Set<string> {
-  const keys = new Set<string>();
+): Map<string, number> {
+  const portions = new Map<string, number>();
   for (const absence of absences) {
     const from = Date.parse(absence.dateFrom);
     const to = Date.parse(absence.dateTo);
     if (!Number.isFinite(from) || !Number.isFinite(to)) continue;
+    // portion — доля дня отсутствия (0..1); по умолчанию 1 = весь день (KPI-005: полдня возможно).
+    const portion = Math.max(0, Math.min(1, absence.portion ?? 1));
+    if (portion <= 0) continue;
     for (const date of monthDates) {
       const ms = Date.parse(date);
       if (ms >= from && ms <= to) {
-        keys.add(`${absence.userId}:${date}`);
+        const key = `${absence.userId}:${date}`;
+        portions.set(key, Math.max(portions.get(key) ?? 0, portion));
       }
     }
   }
-  return keys;
+  return portions;
 }
 
 function buildExceptionsByResourceDate(
@@ -273,12 +277,12 @@ export function buildEmployeeRows(input: {
   workspaceUsers: CapacityMatrixUser[];
   mergedByUserDate: Map<string, Map<string, MergedEmployeeDay>>;
   productionCalendar?: ProductionCalendarShape;
-  absences?: Array<{ userId: string; dateFrom: string; dateTo: string }>;
+  absences?: Array<{ userId: string; dateFrom: string; dateTo: string; portion?: number }>;
   projectFilterId?: string | null;
 }): { days: CapacityMatrixDayInfo[]; rows: CapacityMatrixRow[] } {
   const days = buildMonthDays(input.monthIso, input.productionCalendar);
   const monthDates = new Set(days.map((day) => day.date));
-  const absenceKeys = buildAbsenceKeySet(input.absences ?? [], monthDates);
+  const absencePortions = buildAbsencePortionByKey(input.absences ?? [], monthDates);
   const exceptionsByUser = buildExceptionsByResourceDate(input.productionCalendar?.exceptions ?? []);
   const baseCapacity = input.productionCalendar?.workingMinutesPerDay ?? 480;
 
@@ -291,13 +295,15 @@ export function buildEmployeeRows(input: {
       const merged = userMerged?.get(day.date);
       const totalWork = merged?.workMinutes ?? 0;
       const exceptionMinutes = userExceptions?.get(day.date);
-      const hasAbsence = absenceKeys.has(`${user.id}:${day.date}`);
+      const absentPortion = absencePortions.get(`${user.id}:${day.date}`) ?? 0;
+      const hasAbsence = absentPortion > 0;
       const baseDayCapacity =
         day.isWeekend || day.isHoliday ? 0 : (exceptionMinutes ?? baseCapacity);
       // Единый авторитетный источник ёмкости: произв. календарь + персональные исключения + отсутствия.
       // НЕ берём merged.capacityMinutes (календарь проекта, дефолт 480) — иначе частичная занятость и
       // выходной тенанта в день с нагрузкой скрывают перегруз (KPI-001).
-      const capacityMinutes = hasAbsence ? 0 : baseDayCapacity;
+      // Отсутствие режет ёмкость на свою долю дня (portion): полный день → 0, полдня → половина (KPI-005).
+      const capacityMinutes = Math.max(0, Math.round(baseDayCapacity * (1 - absentPortion)));
       const isOverload = totalWork > capacityMinutes && capacityMinutes >= 0;
       const freeMinutes = Math.max(0, capacityMinutes - totalWork);
       const overloadMinutes = Math.max(0, totalWork - capacityMinutes);

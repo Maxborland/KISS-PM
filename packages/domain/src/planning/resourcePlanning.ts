@@ -148,10 +148,10 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
         calendarExceptions
       );
       const occupancyLoad = calculateOccupancyLoadForDate(input, resource.id, date);
-      const capacityMinutes = workingMinutesForDate(
-        date,
-        calendar,
-        calendarExceptions
+      // KPI-006: «недоступность» (unavailable) режет доступную ёмкость дня, а не идёт в нагрузку.
+      const capacityMinutes = Math.max(
+        0,
+        workingMinutesForDate(date, calendar, calendarExceptions) - occupancyLoad.unavailableMinutes
       );
       const calendarExceptionIds = calendarExceptions
         .filter((exception) => exception.date === date)
@@ -428,15 +428,22 @@ function calculateOccupancyLoadForDate(
   date: PlanDate
 ): {
   occupiedMinutes: number;
+  unavailableMinutes: number;
   occupancyIds: string[];
   occupancyContributions: OccupancyContribution[];
 } {
   const occupancyContributions: OccupancyContribution[] = [];
+  let unavailableMinutes = 0;
   for (const window of input.occupancyWindows ?? []) {
     if (window.resourceId !== resourceId) continue;
     if (window.capacityImpact === "tentative") continue;
     const workMinutes = occupancyMinutesForDate(window, date);
     if (workMinutes <= 0) continue;
+    if (window.capacityImpact === "unavailable") {
+      // KPI-006: недоступность уменьшает ёмкость дня, а не добавляет нагрузку (иначе завышает ratio/heat).
+      unavailableMinutes += workMinutes;
+      continue;
+    }
     occupancyContributions.push({
       occupancyId: window.id,
       sourceType: window.sourceType,
@@ -448,6 +455,7 @@ function calculateOccupancyLoadForDate(
   const aggregated = aggregateOccupancyContributions(occupancyContributions);
   return {
     occupiedMinutes: aggregated.reduce((total, contribution) => total + contribution.workMinutes, 0),
+    unavailableMinutes,
     occupancyIds: aggregated.map((contribution) => contribution.occupancyId),
     occupancyContributions: aggregated
   };

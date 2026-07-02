@@ -21,7 +21,7 @@ function PercentCell({ p }: { p: MatrixPercent | undefined }) {
   return <div className={cn("rmatrix__cell rmatrix__cell--pct", tone)}>{p.value}%</div>;
 }
 
-function NameCell({ row }: { row: MatrixRow }) {
+function NameCell({ row, onToggleCollapse }: { row: MatrixRow; onToggleCollapse?: (id: string) => void }) {
   return (
     <div className={cn("rmatrix__cell rmatrix__cell--name")}>
       {row.indent ? (
@@ -31,9 +31,14 @@ function NameCell({ row }: { row: MatrixRow }) {
         <button
           type="button"
           className="rmatrix__toggle"
-          aria-label={`Свернуть ${row.name}`}
+          aria-label={row.collapsed ? `Развернуть ${row.name}` : `Свернуть ${row.name}`}
+          aria-expanded={!row.collapsed}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleCollapse?.(row.id);
+          }}
         >
-          <ChevronRight className="size-3" aria-hidden />
+          <ChevronRight className={cn("size-3", !row.collapsed && "rotate-90")} aria-hidden />
         </button>
       ) : null}
       {row.avatar ? (
@@ -49,9 +54,10 @@ function NameCell({ row }: { row: MatrixRow }) {
 export type ResourceMatrixProps = {
   data: ResourceMatrixData;
   className?: string;
+  onToggleCollapse?: (id: string) => void;
 };
 
-export function ResourceMatrix({ data, className }: ResourceMatrixProps) {
+export function ResourceMatrix({ data, className, onToggleCollapse }: ResourceMatrixProps) {
   const totalDays = data.days.length;
   const gridCols = `240px 56px repeat(${totalDays}, minmax(28px, 1fr))`;
   return (
@@ -79,7 +85,7 @@ export function ResourceMatrix({ data, className }: ResourceMatrixProps) {
             role="row"
             style={{ gridTemplateColumns: gridCols }}
           >
-            <NameCell row={row} />
+            <NameCell row={row} {...(onToggleCollapse ? { onToggleCollapse } : {})} />
             <PercentCell p={row.percent} />
             {row.cells.map((cell, idx) => {
               const day = data.days[idx];

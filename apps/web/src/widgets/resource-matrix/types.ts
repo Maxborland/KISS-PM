@@ -39,6 +39,10 @@ export type MatrixRow = {
   percent?: MatrixPercent;
   /** Можно ли свернуть (для group rows). */
   collapsible?: boolean;
+  /** Свёрнута ли ветка. */
+  collapsed?: boolean;
+  /** Id родительской строки (для сворачивания потомков). */
+  parentId?: string;
   /** Ячейки за каждый день месяца, длина равна `days.length`. */
   cells: DayCell[];
 };

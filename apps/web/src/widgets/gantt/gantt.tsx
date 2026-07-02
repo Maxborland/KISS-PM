@@ -12,10 +12,13 @@ const DAY_W = 28;
  * Скрывает строки, чей любой предок свёрнут (collapsedIds), и выставляет collapsed на свёрнутых.
  * Чистая функция — легко тестируется без рендера.
  */
-export function applyCollapse(rows: readonly GanttRow[], collapsedIds: ReadonlySet<string>): GanttRow[] {
+export function applyCollapse<T extends { id: string; parentId?: string; collapsed?: boolean }>(
+  rows: readonly T[],
+  collapsedIds: ReadonlySet<string>
+): T[] {
   if (collapsedIds.size === 0) return [...rows];
   const parentById = new Map(rows.map((row) => [row.id, row.parentId]));
-  const hiddenByCollapse = (row: GanttRow): boolean => {
+  const hiddenByCollapse = (row: T): boolean => {
     let ancestor = row.parentId;
     while (ancestor) {
       if (collapsedIds.has(ancestor)) return true;

@@ -717,10 +717,22 @@ function ProjectResourcesRuntime({ id, me }: { id: string; me: AuthMe }) {
   const [monthOverride, setMonthOverride] = useState<string | null>(null);
   const monthIso = monthOverride ?? planMonth ?? currentMonthIso();
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const toggleCollapse = (rowId: string) =>
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
+      return next;
+    });
   const capacity = useCapacitySummary(monthIso);
   const capacityTree = useCapacityTree(monthIso, id);
   const positions = useMemo(() => collectResourcePositions(capacityTree.data), [capacityTree.data]);
-  const matrix = useMemo(() => (capacityTree.data && capacity.data ? toResourceMatrix(capacityTree.data, capacity.data, positionFilter) : undefined), [capacityTree.data, capacity.data, positionFilter]);
+  const matrix = useMemo(() => {
+    if (!capacityTree.data || !capacity.data) return undefined;
+    const built = toResourceMatrix(capacityTree.data, capacity.data, positionFilter);
+    return { ...built, rows: applyCollapse(built.rows, collapsedIds) };
+  }, [capacityTree.data, capacity.data, positionFilter, collapsedIds]);
   const months = useMemo(() => monthRange(monthIso), [monthIso]);
   const activeRole = positions.find((position) => position.id === positionFilter)?.name;
   return (
@@ -754,7 +766,7 @@ function ProjectResourcesRuntime({ id, me }: { id: string; me: AuthMe }) {
           <>
             <ResourceMatrixStats stats={matrix.stats} />
             <div className="u-flex u-items-center u-justify-between u-gap-3 u-mb-3"><ResourceMatrixLegend /></div>
-            <ResourceMatrix data={matrix} />
+            <ResourceMatrix data={matrix} onToggleCollapse={toggleCollapse} />
           </>
         ) : null}
       </StateGate>
@@ -1352,20 +1364,23 @@ function toResourceMatrix(tree: CapacityTree, summary: CapacitySummary, position
   }));
   const rows: MatrixRow[] = [];
   let personSeq = 0;
-  const pushPerson = (row: CapacityEmployeeRow, indent: 0 | 1 | 2) => {
-    rows.push({ id: `emp-${row.user.id}`, kind: "person", indent, name: row.user.name, avatar: { initials: initials(row.user.name), color: MATRIX_AVATAR_COLORS[personSeq++ % MATRIX_AVATAR_COLORS.length] ?? "c1" }, percent: capacityMonthPercent(row.days), cells: row.days.map(capacityDayCell) });
+  const pushPerson = (row: CapacityEmployeeRow, indent: 0 | 1 | 2, parentId?: string) => {
+    rows.push({ id: `emp-${row.user.id}`, kind: "person", indent, ...(parentId ? { parentId } : {}), name: row.user.name, avatar: { initials: initials(row.user.name), color: MATRIX_AVATAR_COLORS[personSeq++ % MATRIX_AVATAR_COLORS.length] ?? "c1" }, percent: capacityMonthPercent(row.days), cells: row.days.map(capacityDayCell) });
   };
   for (const group of tree.orgGroups) {
     const showDirection = group.direction.id !== "__unplaced__" && !filtering;
-    if (showDirection) rows.push({ id: `dir-${group.direction.id}`, kind: "workshop", indent: 0, name: group.direction.name, collapsible: true, percent: capacityMonthPercent(group.directionDays), cells: group.directionDays.map(capacityDayCell) });
+    const directionRowId = `dir-${group.direction.id}`;
+    if (showDirection) rows.push({ id: directionRowId, kind: "workshop", indent: 0, name: group.direction.name, collapsible: true, percent: capacityMonthPercent(group.directionDays), cells: group.directionDays.map(capacityDayCell) });
     const unitIndent = (showDirection ? 1 : 0) as 0 | 1 | 2;
     const posIndent = (filtering ? 0 : Math.min(unitIndent + 1, 2)) as 0 | 1 | 2;
     for (const unit of group.units) {
-      if (!filtering) rows.push({ id: `unit-${unit.unit.id}`, kind: "sub", indent: unitIndent, name: unit.unit.name, collapsible: true, percent: capacityMonthPercent(unit.unitDays), cells: unit.unitDays.map(capacityDayCell) });
+      const unitRowId = `unit-${unit.unit.id}`;
+      if (!filtering) rows.push({ id: unitRowId, kind: "sub", indent: unitIndent, ...(showDirection ? { parentId: directionRowId } : {}), name: unit.unit.name, collapsible: true, percent: capacityMonthPercent(unit.unitDays), cells: unit.unitDays.map(capacityDayCell) });
       for (const position of unit.positions) {
         if (positionFilterId && position.position.id !== positionFilterId) continue;
-        rows.push({ id: `pos-${position.position.id}`, kind: "role", indent: posIndent, name: position.position.name, collapsible: true, percent: capacityMonthPercent(position.positionDays), cells: position.positionDays.map(capacityDayCell) });
-        for (const row of position.rows) pushPerson(row, filtering ? 1 : 2);
+        const positionRowId = `pos-${position.position.id}`;
+        rows.push({ id: positionRowId, kind: "role", indent: posIndent, ...(filtering ? {} : { parentId: unitRowId }), name: position.position.name, collapsible: true, percent: capacityMonthPercent(position.positionDays), cells: position.positionDays.map(capacityDayCell) });
+        for (const row of position.rows) pushPerson(row, filtering ? 1 : 2, positionRowId);
       }
     }
   }
