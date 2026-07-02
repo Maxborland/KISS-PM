@@ -56,10 +56,11 @@ function OrbitRing3D({
       material.opacity = targetOpacity;
       return;
     }
+    const start: number = startRef.current ?? elapsed;
     if (startRef.current === null) {
-      startRef.current = elapsed;
+      startRef.current = start;
     }
-    const progress = Math.min(1, (elapsed - startRef.current) / 1.1);
+    const progress = Math.min(1, (elapsed - start) / 1.1);
     const eased = 1 - Math.pow(1 - progress, 3);
     mesh.scale.setScalar(0.965 + eased * 0.035);
     material.opacity = targetOpacity * eased;
