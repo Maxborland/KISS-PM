@@ -50,17 +50,13 @@ type Row = {
   baseDur?: number;
 };
 
-type RMTask = { id: string; parentTaskId: string | null; wbsCode: string; title: string; schedulingMode: Mode; durationMinutes: number | null; workMinutes: number; percentComplete: number; customFields?: { resLabel?: string; kind?: Kind } };
-type RMCalc = { id: string; calculatedStart: string; calculatedFinish: string; totalSlackMinutes: number | null; isCritical: boolean };
-type RMDep = { id: string; predecessorTaskId: string; successorTaskId: string; type: string; lagMinutes: number };
-type RMBaseTask = { taskId: string; baselineStart: string | null; baselineFinish: string | null };
-
 function mapRows(rm: PlanningReadModel, resName: (id: string) => string): { rows: Row[]; deadlineDay: number | null; projectFinishDay: number } {
-  const authored = rm.authored as unknown as { tasks: RMTask[]; dependencies: RMDep[]; assignments: Array<{ taskId: string; resourceId: string }> };
-  const calc = (rm.calculatedPlan as unknown as { tasks: RMCalc[] }).tasks;
-  const baseCmp = (rm.baselineComparison as unknown as { tasks: RMBaseTask[] }).tasks ?? [];
-  const project = rm.project as unknown as { deadline: string | null; plannedFinish: string };
-  const issues = (rm.validationIssues ?? []) as Array<{ severity: string; message?: string; entity: { type: string; id: string } | null }>;
+  // Типизированный доступ к каноническому read-model (@kiss-pm/domain) — без прежних `as unknown as`.
+  const authored = rm.authored;
+  const calc = rm.calculatedPlan.tasks;
+  const baseCmp = rm.baselineComparison.tasks ?? [];
+  const project = rm.project;
+  const issues = rm.validationIssues ?? [];
 
   const calcById = new Map(calc.map((c) => [c.id, c]));
   const wbsById = new Map(authored.tasks.map((t) => [t.id, t.wbsCode]));
@@ -90,7 +86,8 @@ function mapRows(rm: PlanningReadModel, resName: (id: string) => string): { rows
     const finish = c?.calculatedFinish ?? "";
     const dayStart = start ? isoToDay(start) : 0;
     const dayDur = start && finish ? isoToDay(finish) - dayStart : 0;
-    const cf = t.customFields ?? {};
+    // customFields в домене — намеренно открытый Record<string,unknown>; типизируем ожидаемые ключи.
+    const cf = (t.customFields ?? {}) as { resLabel?: string; kind?: Kind };
     // веха: пользовательское поле kind=milestone (как в overview/inspector/settings) ИЛИ нулевая длительность
     const kind: Kind = cf.kind === "summary" ? "summary" : cf.kind === "milestone" || t.durationMinutes === 0 ? "milestone" : "task";
     const predList = predsBySucc.get(t.id) ?? [];
@@ -158,8 +155,12 @@ function mapRows(rm: PlanningReadModel, resName: (id: string) => string): { rows
 // summary-rollup пересчитает mapRows; полный каскад/критпуть вернёт бэк.
 function optimisticPatch(rm: PlanningReadModel, command: PlanningCommand): PlanningReadModel {
   const cmd = command as { type: string; payload: Record<string, unknown> };
-  const authored = rm.authored as unknown as { tasks: RMTask[] };
-  const calcPlan = rm.calculatedPlan as unknown as { tasks: RMCalc[] };
+  // optimisticPatch мутирует ЧАСТИЧНУЮ копию (только трогаемые поля) — авторитетную полную форму
+  // вернёт бэк, поэтому здесь узкие локальные типы, а не полный PlanTask/CalculatedTask.
+  type PatchTask = { id: string; parentTaskId: string | null; wbsCode: string; title: string; schedulingMode: Mode; durationMinutes: number | null; workMinutes: number; percentComplete: number; customFields?: Record<string, unknown> };
+  type PatchCalc = { id: string; calculatedStart: string; calculatedFinish: string; totalSlackMinutes: number | null; isCritical: boolean };
+  const authored = rm.authored as unknown as { tasks: PatchTask[] };
+  const calcPlan = rm.calculatedPlan as unknown as { tasks: PatchCalc[] };
   const tasks = authored.tasks.map((t) => ({ ...t }));
   const calc = calcPlan.tasks.map((c) => ({ ...c }));
   const id = cmd.payload.taskId as string;
@@ -386,7 +387,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
             { type: "task.update_schedule", payload: { taskId: cur.id, plannedStart: dayToIso(ns), plannedFinish: dayToIso(nf) } } as PlanningCommand,
             { type: "task.update_work_model", payload: { taskId: cur.id, taskType: "fixed_duration", effortDriven: false, durationMinutes: nd * MIN_PER_DAY, workMinutes: wm } } as PlanningCommand
           ];
-          const asgs = (readModelRef.current?.authored as unknown as { assignments: Array<{ id: string; taskId: string; resourceId: string; role?: string; unitsPermille?: number }> } | undefined)?.assignments;
+          const asgs = readModelRef.current?.authored.assignments;
           const asg = asgs?.find((x) => x.taskId === cur.id);
           if (asg) cmds.push({ type: "assignment.upsert", payload: { id: asg.id, taskId: cur.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } } as PlanningCommand);
           void runBatch(cmds);
@@ -399,7 +400,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           { type: "task.update_work_model", payload: { taskId: cur.id, taskType: "fixed_duration", effortDriven: false, durationMinutes: nd * MIN_PER_DAY, workMinutes: wm } } as PlanningCommand
         ];
         // синхронизируем труд назначения (загрузка ресурса считается из assignment.workMinutes)
-        const asgs = (readModelRef.current?.authored as unknown as { assignments: Array<{ id: string; taskId: string; resourceId: string; role?: string; unitsPermille?: number }> } | undefined)?.assignments;
+        const asgs = readModelRef.current?.authored.assignments;
         const asg = asgs?.find((x) => x.taskId === cur.id);
         if (asg) cmds.push({ type: "assignment.upsert", payload: { id: asg.id, taskId: cur.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } } as PlanningCommand);
         if (cmds.length > 1) void runBatch(cmds); else void applyCmd(cmds[0]!);
@@ -615,7 +616,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // Текущее назначение задачи из read-model (по taskId): нужен его id, чтобы upsert
   // обновлял существующее назначение, а не плодил второе (реальный редьюсер upsert-ит строго по id).
   type AsgRM = { id: string; taskId: string; resourceId: string; role?: string; unitsPermille?: number; workMinutes?: number | null };
-  const authoredAsgs = (readModel.authored as unknown as { assignments: AsgRM[] }).assignments;
+  const authoredAsgs = readModel.authored.assignments;
   const currentAsg = (taskId: string): AsgRM | undefined => authoredAsgs.find((x) => x.taskId === taskId);
   const workCmd = (taskId: string, durDays: number, workH: number): PlanningCommand =>
     ({ type: "task.update_work_model", payload: { taskId, taskType: "fixed_duration", effortDriven: false, durationMinutes: durDays * MIN_PER_DAY, workMinutes: Math.max(0, Math.round(workH * 60)) } }) as PlanningCommand;

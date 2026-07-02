@@ -12,14 +12,10 @@ import {
   ResourceLoadMatrix,
   type MatrixAssignment,
   type MatrixData,
-  type MatrixScope,
-  type RBucket
+  type MatrixScope
 } from "@/delivery/resources/resource-load-matrix";
 import { TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
 import type { PlanningCommand } from "@kiss-pm/domain";
-
-type RawTask = { id: string; wbsCode: string; title: string; durationMinutes: number | null; workMinutes: number; percentComplete: number };
-type RawAssignment = MatrixAssignment;
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
 const SCOPE: MatrixScope = { level: "project", groupLevels: ["team", "role", "person"], windowNoun: "проект" };
@@ -36,22 +32,25 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
 
   const model = useMemo(() => {
     if (!readModel) return null;
-    const rl = readModel.resourceLoad as unknown as { buckets: RBucket[]; acceptedOverloads: string[] };
-    const authored = readModel.authored as unknown as { tasks: RawTask[]; assignments: RawAssignment[] };
-    const calc = (readModel.calculatedPlan as unknown as { tasks: Array<{ id: string; calculatedStart: string }> }).tasks;
+    const authored = readModel.authored;
+    const calc = readModel.calculatedPlan.tasks;
     const rawById = new Map(authored.tasks.map((t) => [t.id, t]));
     // id календаря для команд отсутствия = реальный календарь плана (project.calendarId / первый из read-model),
     // а не литерал "cal-5x8": на live чужой calendarId не пройдёт precondition команды. Инвариант «live = смена apiOrigin».
-    const calendars = (readModel as unknown as { calendars: Array<{ id: string }> }).calendars ?? [];
-    const projCalId = (readModel.project as { calendarId?: unknown }).calendarId;
+    const calendars = readModel.calendars ?? [];
+    const projCalId = readModel.project.calendarId;
     const calendarId = (typeof projCalId === "string" ? calendars.find((c) => c.id === projCalId)?.id : undefined) ?? calendars[0]?.id ?? "cal-5x8";
     const data: MatrixData = {
-      buckets: rl.buckets ?? [],
+      buckets: readModel.resourceLoad.buckets ?? [],
       resources: resDir.list,
       taskById: new Map(authored.tasks.map((t) => [t.id, { id: t.id, wbsCode: t.wbsCode, title: t.title, workMinutes: t.workMinutes, percentComplete: t.percentComplete }])),
-      asgById: new Map(authored.assignments.map((x) => [x.id, x])),
-      calcStartById: new Map(calc.map((c) => [c.id, c.calculatedStart])),
-      accepted: new Set(rl.acceptedOverloads ?? [])
+      // asgById — VIEW-модель матрицы (MatrixAssignment.workMinutes: number); домен допускает workMinutes=null
+      // (неявное назначение → работа деривится из задачи), поэтому мапим в число с фолбэком 0.
+      asgById: new Map(authored.assignments.map((x): [string, MatrixAssignment] => [x.id, { id: x.id, taskId: x.taskId, resourceId: x.resourceId, unitsPermille: x.unitsPermille, workMinutes: x.workMinutes ?? 0, role: x.role }])),
+      calcStartById: new Map(calc.map((c) => [c.id, c.calculatedStart ?? ""])),
+      // read-model.resourceLoad (ResourceLoadMatrix домена) НЕ содержит acceptedOverloads — прежний
+      // `as unknown as { …acceptedOverloads }` читал несуществующее поле, accepted всегда был пуст.
+      accepted: new Set<string>()
     };
     return { data, rawById, calendarId };
   }, [readModel, resDir.list]);

@@ -13,12 +13,7 @@ import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
-import type { PlanningCommand } from "@kiss-pm/domain";
-
-type CalRaw = { id: string; workingWeekdays: number[]; workingMinutesPerDay: number };
-type ExcRaw = { id: string; calendarId: string; resourceId: string | null; date: string; workingMinutes: number; reason: string | null };
-type TaskRaw = { id: string; wbsCode: string; title: string; durationMinutes: number | null };
-type CalcRaw = { id: string; calculatedStart: string; calculatedFinish: string };
+import type { PlanningCommand, PlanCalendar, PlanCalendarException, PlanTask } from "@kiss-pm/domain";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
 const MONTHS_CAP = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
@@ -39,17 +34,17 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
 
   const model = useMemo(() => {
     if (!readModel) return null;
-    const calendars = (readModel as unknown as { calendars: CalRaw[] }).calendars ?? [];
+    const calendars = readModel.calendars ?? [];
     // календарь, по которому реально считается расписание = project.calendarId (а не просто первый из списка);
     // на live это может быть НЕ дефолтный тенантный календарь, поэтому праздники должны писаться именно сюда.
-    const projCalId = (readModel.project as { calendarId?: unknown }).calendarId;
-    const cal = (typeof projCalId === "string" ? calendars.find((c) => c.id === projCalId) : undefined) ?? calendars[0] ?? { id: "cal-5x8", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: MIN_PER_DAY };
-    const exns = (readModel as unknown as { calendarExceptions: ExcRaw[] }).calendarExceptions ?? [];
+    const projCalId = readModel.project.calendarId;
+    const cal: PlanCalendar = (typeof projCalId === "string" ? calendars.find((c) => c.id === projCalId) : undefined) ?? calendars[0] ?? { id: "cal-5x8", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: MIN_PER_DAY };
+    const exns = readModel.calendarExceptions ?? [];
     const full = cal.workingMinutesPerDay;
     // нерабочие исключения (workingMinutes < полного дня): праздники (resourceId=null) и отсутствия
     const active = exns.filter((x) => x.workingMinutes < full);
-    const holidayByDay = new Map<number, ExcRaw>();
-    const absByResDay = new Map<string, Map<number, ExcRaw>>();
+    const holidayByDay = new Map<number, PlanCalendarException>();
+    const absByResDay = new Map<string, Map<number, PlanCalendarException>>();
     for (const x of active) {
       const day = isoToDay(x.date);
       if (x.resourceId === null) holidayByDay.set(day, x);
@@ -57,28 +52,29 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     }
     // ВСЕ исключения календаря проекта (включая реактивированные workingMinutes=full): чтобы повторный тогл
     // off→on переиспользовал существующий id записи на эту дату/ресурс, а не плодил дубликат (десинк ёмкости).
-    const anyHolidayByDay = new Map<number, ExcRaw>();
-    const anyAbsByResDay = new Map<string, Map<number, ExcRaw>>();
+    const anyHolidayByDay = new Map<number, PlanCalendarException>();
+    const anyAbsByResDay = new Map<string, Map<number, PlanCalendarException>>();
     for (const x of exns) {
       if (x.calendarId !== cal.id) continue;
       const day = isoToDay(x.date);
       if (x.resourceId === null) anyHolidayByDay.set(day, x);
       else { let m = anyAbsByResDay.get(x.resourceId); if (!m) { m = new Map(); anyAbsByResDay.set(x.resourceId, m); } m.set(day, x); }
     }
-    const authored = readModel.authored as unknown as { tasks: TaskRaw[] };
-    const calc = (readModel.calculatedPlan as unknown as { tasks: CalcRaw[] }).tasks;
+    const authored = readModel.authored;
+    const calc = readModel.calculatedPlan.tasks;
     const calcById = new Map(calc.map((c) => [c.id, c]));
     const leafTasks = authored.tasks.filter((t) => t.durationMinutes != null);
     // конфликты: задача, чей интервал пересекает праздник (нерабочий день календаря)
     const conflicts = leafTasks.map((t) => {
       const c = calcById.get(t.id); if (!c) return null;
-      const es = isoToDay(c.calculatedStart), ef = isoToDay(c.calculatedFinish);
+      // расчётные границы у листовой задачи с расписанием всегда заполнены (движок их проставил);
+      const es = isoToDay(c.calculatedStart!), ef = isoToDay(c.calculatedFinish!);
       for (let d = es; d < Math.max(ef, es + 1); d++) if (holidayByDay.has(d)) return { task: t, day: d };
       return null;
-    }).filter((x): x is { task: TaskRaw; day: number } => x !== null);
+    }).filter((x): x is { task: PlanTask; day: number } => x !== null);
     // диапазон месяцев
     let maxDay = 34;
-    for (const c of calc) maxDay = Math.max(maxDay, isoToDay(c.calculatedFinish));
+    for (const c of calc) maxDay = Math.max(maxDay, isoToDay(c.calculatedFinish!));
     const monthsList = [...new Set(Array.from({ length: maxDay + 1 }, (_, i) => dayToIso(i).slice(0, 7)))].sort();
     return { cal, full, holidayByDay, absByResDay, anyHolidayByDay, anyAbsByResDay, leafTasks, conflicts, monthsList };
   }, [readModel]);
@@ -101,7 +97,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const monthLabel = focusMonth ? `${MONTHS_CAP[Number(focusMonth.slice(5, 7)) - 1]} ${focusMonth.slice(0, 4)}` : "";
   const isResourceView = selCal !== "project";
   const selRes = isResourceView ? resDir.of(selCal) : null;
-  const absMap = isResourceView ? model.absByResDay.get(selCal) ?? new Map<number, ExcRaw>() : new Map<number, ExcRaw>();
+  const absMap = isResourceView ? model.absByResDay.get(selCal) ?? new Map<number, PlanCalendarException>() : new Map<number, PlanCalendarException>();
 
   // сетка месяца: 6 недель × 7 дней, начиная с понедельника
   const grid: number[] = [];
@@ -140,7 +136,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       else { const existing = model.anyAbsByResDay.get(selCal)?.get(day); void applyCmd({ type: "calendar.exception.upsert", payload: { id: existing?.id ?? nid("ex"), calendarId: model.cal.id, resourceId: selCal, date: dayToIso(day), workingMinutes: 0, reason: "Отсутствие" } } as PlanningCommand, "Отсутствие добавлено"); }
     }
   };
-  const removeExc = (x: ExcRaw) => void applyCmd({ type: "calendar.exception.upsert", payload: { id: x.id, calendarId: x.calendarId, resourceId: x.resourceId, date: x.date, workingMinutes: model.full, reason: "" } } as PlanningCommand, "Исключение снято");
+  const removeExc = (x: PlanCalendarException) => void applyCmd({ type: "calendar.exception.upsert", payload: { id: x.id, calendarId: x.calendarId, resourceId: x.resourceId, date: x.date, workingMinutes: model.full, reason: "" } } as PlanningCommand, "Исключение снято");
 
   const doAbsence = async (resourceId: string, typeLabel: string, start: string, finish: string) => {
     const cmds: PlanningCommand[] = [];
@@ -158,7 +154,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   }
 
   // правый столбец: список исключений (праздники + отсутствия выбранного ресурса)
-  const listExc: ExcRaw[] = [
+  const listExc: PlanCalendarException[] = [
     ...[...model.holidayByDay.values()],
     ...(isResourceView ? [...absMap.values()] : [])
   ].sort((a, b) => isoToDay(a.date) - isoToDay(b.date));

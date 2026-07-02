@@ -1,8 +1,9 @@
 import {
+  buildBaselineComparison,
   buildResourceLoadMatrix,
   calculatePlan,
   comparePlanDates,
-  diffCalendarDays,
+  type PlanningReadModel,
   type PlanSnapshot
 } from "@kiss-pm/domain";
 
@@ -17,7 +18,7 @@ export type PlanningReadModelOptions = {
 export function createPlanningReadModel(
   snapshot: PlanSnapshot,
   options: PlanningReadModelOptions = {}
-) {
+): PlanningReadModel {
   // Fail-closed: по умолчанию НЕ раскрываем персональные ресурсные исключения (чужие отсутствия).
   // Актор-фейсинг роуты (read-model/preview/apply) передают флаг по фактическому праву на ресурсы;
   // матрица загрузки ниже всё равно считается по полному snapshot.calendarExceptions (ёмкость не зависит от права).
@@ -53,7 +54,7 @@ export function createPlanningReadModel(
       baselines: snapshot.baselines
     },
     calculatedPlan,
-    baselineComparison: createBaselineComparison(snapshot, calculatedPlan),
+    baselineComparison: buildBaselineComparison(snapshot, calculatedPlan),
     resourceLoad,
     // Производственный календарь(и) проекта + исключения (праздники resourceId=null / отсутствия).
     // Поверхности Календари/Настройки читают их top-level — раньше отдавал только mock,
@@ -70,52 +71,6 @@ export function createPlanningReadModel(
     planVersion: snapshot.planVersion,
     engineVersion: PLANNING_ENGINE_VERSION
   };
-}
-
-export function createBaselineComparison(
-  snapshot: PlanSnapshot,
-  calculatedPlan: ReturnType<typeof calculatePlan>
-) {
-  const baseline = [...snapshot.baselines].sort((left, right) =>
-    right.capturedAt.localeCompare(left.capturedAt) || right.id.localeCompare(left.id)
-  )[0];
-  if (!baseline) {
-    return {
-      baselineId: null,
-      capturedAt: null,
-      tasks: []
-    };
-  }
-
-  const calculatedTasksById = new Map(calculatedPlan.tasks.map((task) => [task.id, task]));
-  return {
-    baselineId: baseline.id,
-    capturedAt: baseline.capturedAt,
-    tasks: baseline.tasks.map((baselineTask) => {
-      const current = calculatedTasksById.get(baselineTask.taskId);
-      const currentStart = current?.calculatedStart ?? null;
-      const currentFinish = current?.calculatedFinish ?? null;
-      const currentWorkMinutes = current?.workMinutes ?? null;
-      return {
-        taskId: baselineTask.taskId,
-        baselineStart: baselineTask.plannedStart,
-        baselineFinish: baselineTask.plannedFinish,
-        baselineWorkMinutes: baselineTask.workMinutes,
-        currentStart,
-        currentFinish,
-        currentWorkMinutes,
-        startDeltaDays: dateDeltaDays(baselineTask.plannedStart, currentStart),
-        finishDeltaDays: dateDeltaDays(baselineTask.plannedFinish, currentFinish),
-        workDeltaMinutes:
-          currentWorkMinutes === null ? null : currentWorkMinutes - baselineTask.workMinutes
-      };
-    })
-  };
-}
-
-export function dateDeltaDays(baselineDate: string | null, currentDate: string | null): number | null {
-  if (!baselineDate || !currentDate) return null;
-  return diffCalendarDays(baselineDate, currentDate);
 }
 
 function latestDate(dates: Array<string | null>): string {
