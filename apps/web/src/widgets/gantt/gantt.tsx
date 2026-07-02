@@ -7,6 +7,67 @@ import { cn } from "@/lib/cn";
 import type { GanttData, GanttDayHeader, GanttRow } from "./types";
 
 const DAY_W = 28;
+const ROW_H = 28; // высота строки-данных (min-height .gantt2__row)
+
+export type DependencyArrow = {
+  key: string;
+  /** индекс строки-предшественника среди видимых */
+  fromRow: number;
+  /** индекс строки-преемника */
+  toRow: number;
+  /** X конца бара предшественника (px от левого края чарт-области) */
+  fromX: number;
+  /** X начала бара преемника (px) */
+  toX: number;
+};
+
+/**
+ * Геометрия стрелок связей FS: от конца бара предшественника к началу бара преемника.
+ * Предшественники вне видимых строк (свёрнуты) пропускаются. Чистая функция — тестируется без рендера.
+ */
+export function computeDependencyArrows(rows: readonly GanttRow[], dayWidth: number): DependencyArrow[] {
+  const indexById = new Map(rows.map((row, index) => [row.id, index]));
+  const arrows: DependencyArrow[] = [];
+  rows.forEach((row, toRow) => {
+    for (const predId of row.predecessorIds ?? []) {
+      const fromRow = indexById.get(predId);
+      if (fromRow === undefined) continue;
+      const pred = rows[fromRow];
+      if (!pred) continue;
+      arrows.push({
+        key: `${predId}->${row.id}`,
+        fromRow,
+        toRow,
+        fromX: (pred.startDay + Math.max(pred.durationDays, 1)) * dayWidth,
+        toX: row.startDay * dayWidth
+      });
+    }
+  });
+  return arrows;
+}
+
+/** Рисует входящие стрелки связей в чарт-ячейке строки-преемника (predecessor выше по списку). */
+function DependencyArrows({ arrows }: { arrows: DependencyArrow[] }) {
+  if (arrows.length === 0) return null;
+  const yMid = ROW_H / 2;
+  return (
+    <>
+      {arrows.map((arrow) => {
+        const rowDelta = arrow.toRow - arrow.fromRow; // >0 — предшественник выше
+        const yFrom = yMid - rowDelta * ROW_H;
+        const gap = 8;
+        const elbowX = Math.max(arrow.fromX + gap, arrow.toX - gap);
+        const d = `M ${arrow.fromX} ${yFrom} H ${elbowX} V ${yMid} H ${arrow.toX}`;
+        return (
+          <svg key={arrow.key} className="gdep" style={{ top: 0, left: 0, width: "var(--gantt-chart-w)", height: ROW_H, overflow: "visible" }} aria-hidden>
+            <path className="gdep__line" d={d} />
+            <path className="gdep__arrow" d={`M ${arrow.toX} ${yMid} l -5 -3 v 6 z`} />
+          </svg>
+        );
+      })}
+    </>
+  );
+}
 
 /**
  * Скрывает строки, чей любой предок свёрнут (collapsedIds), и выставляет collapsed на свёрнутых.
@@ -129,7 +190,8 @@ function DataRow({
   todayIndex,
   selected,
   onSelect,
-  onToggleCollapse
+  onToggleCollapse,
+  arrows
 }: {
   row: GanttRow;
   index: number;
@@ -137,6 +199,7 @@ function DataRow({
   selected?: boolean;
   onSelect?: (id: string) => void;
   onToggleCollapse?: (id: string) => void;
+  arrows?: DependencyArrow[];
 }) {
   const resources = row.kind === "task" ? row.resourceName ?? "—" : "—";
   const labor =
@@ -178,6 +241,7 @@ function DataRow({
           />
         ) : null}
         <ChartBar row={row} todayIndex={todayIndex} />
+        {arrows && arrows.length > 0 ? <DependencyArrows arrows={arrows} /> : null}
       </div>
     </div>
   );
@@ -187,6 +251,10 @@ export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollap
   const totalDays = data.days.length;
   const chartWidth = totalDays * DAY_W;
   const todayIndex = data.days.findIndex((d) => d.today);
+  const arrowsByToRow = new Map<number, DependencyArrow[]>();
+  for (const arrow of computeDependencyArrows(data.rows, DAY_W)) {
+    arrowsByToRow.set(arrow.toRow, [...(arrowsByToRow.get(arrow.toRow) ?? []), arrow]);
+  }
 
   return (
     <div
@@ -244,6 +312,7 @@ export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollap
             index={index}
             todayIndex={todayIndex}
             selected={selectedId === row.id}
+            arrows={arrowsByToRow.get(index) ?? []}
             {...(onSelectRow ? { onSelect: onSelectRow } : {})}
             {...(onToggleCollapse ? { onToggleCollapse } : {})}
           />

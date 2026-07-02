@@ -33,6 +33,8 @@ export type GanttRow = {
   critical?: boolean;
   /** Коды предшественников для колонки «Предш.» (напр. "1.1, 2"). */
   predecessorLabel?: string;
+  /** Id задач-предшественников (для рисования стрелок связей). */
+  predecessorIds?: string[];
   /** Признак свёрнутой ветки (отображает CaretDown). */
   collapsed?: boolean;
   /** Можно ли разворачивать (есть дети). */

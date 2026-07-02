@@ -1517,10 +1517,12 @@ function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
   const taskById = new Map(model.authored.tasks.map((task) => [task.id, task]));
   const wbsById = new Map(model.authored.tasks.map((task) => [task.id, task.wbsCode ?? ""]));
   const predecessorsByTask = new Map<string, string[]>();
+  const predecessorIdsByTask = new Map<string, string[]>();
   for (const dependency of model.authored.dependencies ?? []) {
     const code = wbsById.get(dependency.predecessorTaskId);
     if (!code) continue;
     predecessorsByTask.set(dependency.successorTaskId, [...(predecessorsByTask.get(dependency.successorTaskId) ?? []), code]);
+    predecessorIdsByTask.set(dependency.successorTaskId, [...(predecessorIdsByTask.get(dependency.successorTaskId) ?? []), dependency.predecessorTaskId]);
   }
   const childrenByParent = new Map<string | null, PlanningTask[]>();
   for (const task of model.authored.tasks) {
@@ -1569,6 +1571,7 @@ function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
         finishLabel: task.plannedFinish ? formatDate(task.plannedFinish) : "—",
         ...(criticalIds.has(task.id) ? { critical: true } : {}),
         ...(predecessorsByTask.has(task.id) ? { predecessorLabel: predecessorsByTask.get(task.id)!.join(", ") } : {}),
+        ...(predecessorIdsByTask.has(task.id) ? { predecessorIds: predecessorIdsByTask.get(task.id)! } : {}),
         ...(summary ? { collapsible: true } : {}),
         ...(resourceName ? { resourceName, assignee: { initials: initials(resourceName), color: "c1" as const } } : {})
       });
