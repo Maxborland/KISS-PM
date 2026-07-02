@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, Diamond, GitBranch, IndentDecrease, IndentIncrease, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { Diamond, IndentDecrease, IndentIncrease, Plus, Trash2, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { RESOURCES } from "@/delivery/lib/mock-planning-backend";
@@ -279,5 +279,3 @@ export function TaskModal({ open, mode, initial, onOpenChange, onSubmit }: { ope
     </Dialog.Root>
   );
 }
-
-export { Check, GitBranch, UserPlus };

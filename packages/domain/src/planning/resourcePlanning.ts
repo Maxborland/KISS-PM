@@ -358,15 +358,6 @@ export function distributeProportionalMinutes(
   return result;
 }
 
-/** Доля дня `date` из полного распределения (см. distributeProportionalMinutes). */
-export function allocateProportionalMinutes(
-  total: number,
-  capacities: ReadonlyArray<{ date: PlanDate; capacityMinutes: number }>,
-  date: PlanDate
-): number {
-  return distributeProportionalMinutes(total, capacities).get(date) ?? 0;
-}
-
 function taskWorkingOverlapForDate(
   task: CalculatedPlan["tasks"][number],
   date: PlanDate,

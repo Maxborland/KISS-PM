@@ -47,7 +47,7 @@ export function registerPlanningEventsRoute(app: Hono, deps: PlanningEventsRoute
         });
       };
 
-      const unsubscribe = subscribePlanningEvents(projectId, (event) => {
+      const unsubscribe = subscribePlanningEvents(actor.tenantId, projectId, (event) => {
         void send(event);
       });
 

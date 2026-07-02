@@ -334,6 +334,13 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // нужен, чтобы в момент отпускания резолвить текущее назначение задачи и синхронить его труд.
   const readModelRef = useRef(readModel);
   readModelRef.current = readModel;
+  // Актуальные геометрия строк и ширина дня для window-обработчика перетягивания связи:
+  // его эффект подписан на [link], поэтому без рефов up() резолвил бы край цели по устаревшим
+  // mapped/dayW (async-обновление read-model или смена зума в процессе жеста → неверный тип связи).
+  const mappedRef = useRef(mapped);
+  mappedRef.current = mapped;
+  const dayWRef = useRef(dayW);
+  dayWRef.current = dayW;
 
   // drag/resize баров: window-слушатели (надёжно, без устаревших замыканий)
   useEffect(() => {
@@ -366,9 +373,24 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         const ns = Math.max(0, cur.origStart + cur.deltaDays);
         void applyCmd({ type: "task.update_schedule", payload: { taskId: cur.id, plannedStart: dayToIso(ns), plannedFinish: dayToIso(ns + cur.origDur) } } as PlanningCommand);
       } else if (cur.mode === "resizeLeft") {
+        // Тяга левого края меняет старт И длительность → шлём update_schedule + update_work_model
+        // + синк назначения (как editFinish). Иначе WBS покажет новые часы, а Ресурсы/Сценарии —
+        // старую нагрузку (она считается из assignment.workMinutes).
         const ns = Math.max(0, cur.origStart + cur.deltaDays);
         const nf = cur.origStart + cur.origDur;
-        if (nf - ns >= 1) void applyCmd({ type: "task.update_schedule", payload: { taskId: cur.id, plannedStart: dayToIso(ns), plannedFinish: dayToIso(nf) } } as PlanningCommand);
+        const nd = nf - ns;
+        if (nd >= 1) {
+          const u = cur.origDur > 0 ? cur.origWorkH / (cur.origDur * HPD) : 1;
+          const wm = Math.max(0, Math.round(nd * HPD * u * 60));
+          const cmds: PlanningCommand[] = [
+            { type: "task.update_schedule", payload: { taskId: cur.id, plannedStart: dayToIso(ns), plannedFinish: dayToIso(nf) } } as PlanningCommand,
+            { type: "task.update_work_model", payload: { taskId: cur.id, taskType: "fixed_duration", effortDriven: false, durationMinutes: nd * MIN_PER_DAY, workMinutes: wm } } as PlanningCommand
+          ];
+          const asgs = (readModelRef.current?.authored as unknown as { assignments: Array<{ id: string; taskId: string; resourceId: string; role?: string; unitsPermille?: number }> } | undefined)?.assignments;
+          const asg = asgs?.find((x) => x.taskId === cur.id);
+          if (asg) cmds.push({ type: "assignment.upsert", payload: { id: asg.id, taskId: cur.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } } as PlanningCommand);
+          void runBatch(cmds);
+        }
       } else {
         const nd = Math.max(1, cur.origDur + cur.deltaDays);
         const u = cur.origDur > 0 ? cur.origWorkH / (cur.origDur * HPD) : 1;
@@ -422,10 +444,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       const targetId = target?.dataset.taskId;
       if (!targetId || targetId === lk.fromId) return;
       // тип связи = из какого края тянули → в какой край цели (по позиции курсора)
-      const tr = mapped?.rows.find((x) => x.id === targetId);
+      const tr = mappedRef.current?.rows.find((x) => x.id === targetId);
       const rect = ganttRef.current?.getBoundingClientRect();
       let toEdge: "start" | "finish" = "start";
-      if (tr && rect) { const x = e.clientX - rect.left; const mid = (tr.dayStart + tr.dayDur / 2) * dayW; toEdge = x < mid ? "start" : "finish"; }
+      if (tr && rect) { const x = e.clientX - rect.left; const mid = (tr.dayStart + tr.dayDur / 2) * dayWRef.current; toEdge = x < mid ? "start" : "finish"; }
       const type = lk.fromEdge === "finish" ? (toEdge === "start" ? "FS" : "FF") : toEdge === "start" ? "SS" : "SF";
       void applyCmd({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: lk.fromId, successorTaskId: targetId, dependencyType: type, lagMinutes: 0 } } as PlanningCommand);
     };
@@ -578,7 +600,9 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       const dDir = dToRight ? -1 : 1;
       const points = `${sx},${sy} ${ex},${sy} ${ex},${dy} ${dx},${dy}`;
       const head = dDir > 0 ? `${dx},${dy} ${dx - 5},${dy - 3} ${dx - 5},${dy + 3}` : `${dx},${dy} ${dx + 5},${dy - 3} ${dx + 5},${dy + 3}`;
-      links.push({ key: `${pred.id}->${succ.id}`, points, head, accent: sel != null && (succ.id === sel || pred.id === sel), depId: p.depId, predId: p.predId, succId: succ.id, type: p.type, lagDays: p.lagDays, mx: ex, my: (sy + dy) / 2 });
+      // Ключ по depId (уникален на связь): между одной парой задач допустимо несколько связей
+      // (напр. FS + SS через drag-to-link), pred->succ давал бы дубль-ключ React и правку не той связи.
+      links.push({ key: p.depId, points, head, accent: sel != null && (succ.id === sel || pred.id === sel), depId: p.depId, predId: p.predId, succId: succ.id, type: p.type, lagDays: p.lagDays, mx: ex, my: (sy + dy) / 2 });
     }
   });
   links.sort((a, b) => (a.accent ? 1 : 0) - (b.accent ? 1 : 0));

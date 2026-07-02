@@ -12,7 +12,9 @@ function lineCount(relativePath: string): number {
 
 describe("planning API route health budgets", () => {
   it.each([
-    { path: "registerPlanningRoutes.ts", maxLines: 930 },
+    // 942: +12 под аудит-паритет конфликта версий в batch-apply (SEC/observability-фикс). Правильная
+    // развязка — вынести дублирующиеся transaction→HTTP + conflict-audit блоки (арх. находка про god-file).
+    { path: "registerPlanningRoutes.ts", maxLines: 942 },
     { path: "planningRouteHelpers.ts", maxLines: 220 },
     { path: "planningReadModel.ts", maxLines: 140 },
     { path: "planningCommandCore.ts", maxLines: 90 },

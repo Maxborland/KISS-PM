@@ -125,6 +125,9 @@ export function maskOccupancyWindow(
 }
 
 function parseInstant(value: string): Date | undefined {
-  const parsed = new Date(value);
+  // ISO-строку без явного оффсета new Date() трактует как локальное время сервера, а бакеты дней
+  // строятся в UTC — минуты бы съезжали на соседний день на не-UTC хосте. Нормализуем к UTC.
+  const normalized = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value) ? `${value}Z` : value;
+  const parsed = new Date(normalized);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }

@@ -101,9 +101,14 @@ export function createOccupancyRepository(db: KissPmDatabase): OccupancyReposito
           updatedAt: now,
           archivedAt: null
         })
+        .onConflictDoNothing()
         .returning();
-      if (!row) throw new Error("occupancy_calendar_insert_failed");
-      return mapPersonalCalendar(row);
+      if (row) return mapPersonalCalendar(row);
+      // Гонка: параллельный первый запрос уже вставил календарь (PK personal-calendar-<userId>).
+      // onConflictDoNothing вернул пусто — идемпотентно перечитываем существующий вместо 500.
+      const raced = await findManualCalendar(db, input.tenantId, input.userId);
+      if (!raced) throw new Error("occupancy_calendar_insert_failed");
+      return raced;
     },
 
     async findPersonalCalendar(input) {

@@ -53,7 +53,7 @@ function emitPlanVersionFromBody(
 ) {
   if (typeof body.newPlanVersion === "number") {
     invalidateCapacityCacheForTenant(tenantId);
-    notifyPlanVersionChanged(projectId, body.newPlanVersion);
+    notifyPlanVersionChanged(tenantId, projectId, body.newPlanVersion);
   }
 }
 
@@ -451,6 +451,20 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
       if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
+        // Паритет с одиночным apply-command: фиксируем конфликт версий в аудите — иначе серия
+        // проигранных optimistic-гонок через batch-эндпоинт не оставляет следа.
+        await appendPlanningAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "planning.command_conflict",
+          sourceWorkflow: "planning",
+          sourceEntity: { type: "Project", id: projectId },
+          commandInput: { commands: parsed.value.commands, clientPlanVersion: parsed.value.clientPlanVersion },
+          beforeState: { planVersion: snapshot.planVersion },
+          afterState: null,
+          permissionResult: readDecision,
+          executionResult: { status: "conflict" }
+        }, transactionDataSource);
         return {
           ok: false as const,
           status: 409,
@@ -558,7 +572,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
       const projectId = parsedProjectId.value;
       const newPlanVersion = await deps.dataSource.incrementPlanVersion(actor.tenantId, projectId);
-      notifyPlanVersionChanged(projectId, newPlanVersion);
+      notifyPlanVersionChanged(actor.tenantId, projectId, newPlanVersion);
       return context.json({ newPlanVersion });
     });
   }
