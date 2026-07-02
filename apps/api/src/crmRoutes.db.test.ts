@@ -234,7 +234,11 @@ describe("Phase 3.1 CRM API", () => {
         id: "opportunity-alpha",
         clientName: "ООО Ромашка",
         contactName: "Ирина Клиент",
-        projectType: "Внедрение"
+        projectType: "Внедрение",
+        // Денежные поля обязаны корректно проходить round-trip через БД (тест-долг из аудита).
+        contractValue: 960000,
+        plannedHourlyRate: 6000,
+        plannedHours: 160 // 960000 / 6000
       }
     });
 
