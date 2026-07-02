@@ -502,6 +502,18 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
       }
     });
   };
+  // P0-2: растягивание правого края бара меняет длительность (сдвигает plannedFinish, start фикс).
+  const resizeTask = (taskId: string, dayDelta: number) => {
+    if (dayDelta === 0) return;
+    const target = (planning.data?.authored.tasks ?? []).find((task) => task.id === taskId);
+    if (!target?.plannedStart || !target.plannedFinish) return;
+    const newFinish = isoDate(addDays(new Date(target.plannedFinish), dayDelta));
+    if (new Date(newFinish).getTime() <= new Date(target.plannedStart).getTime()) return; // не короче 1 дня
+    toolbarApply.mutate({
+      type: "task.update_schedule",
+      payload: { taskId, plannedStart: target.plannedStart, plannedFinish: newFinish }
+    });
+  };
   const moveWbs = (direction: "in" | "out") => {
     if (!selectedTask) return;
     const cmd = direction === "in" ? indentCommand(selectedTask, tasks) : outdentCommand(selectedTask, tasks);
@@ -563,7 +575,7 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
           <span className="gantt-stats__item"><span className="gantt-stats__label">Версия</span><span className="gantt-stats__value">{planning.data?.planVersion ?? 0}</span></span>
         </div>
         {preview ? <CardPanel title="Сверка изменения" subtitle="До применения план не меняется"><p className="u-text-body">Будет изменено задач: {preview.planDelta.changedTaskIds.length}. Проверок: {preview.validationIssues.length}.</p></CardPanel> : null}
-        {shownData ? <Gantt data={shownData} selectedId={selectedId} onSelectRow={setSelectedId} onToggleCollapse={toggleCollapse} {...(reason ? {} : { onMoveTask: moveTask })} /> : null}
+        {shownData ? <Gantt data={shownData} selectedId={selectedId} onSelectRow={setSelectedId} onToggleCollapse={toggleCollapse} {...(reason ? {} : { onMoveTask: moveTask, onResizeTask: resizeTask })} /> : null}
       </StateGate>
       <MutationMessage error={previewMutation.error ?? applyMutation.error ?? toolbarApply.error} />
     </>

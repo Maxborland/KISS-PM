@@ -108,11 +108,20 @@ function durationLabel(row: GanttRow) {
   return `${row.durationDays}д`;
 }
 
-function ChartBar({ row, onMoveTask }: { row: GanttRow; onMoveTask?: (id: string, dayDelta: number) => void }) {
+function ChartBar({
+  row,
+  onMoveTask,
+  onResizeTask
+}: {
+  row: GanttRow;
+  onMoveTask?: (id: string, dayDelta: number) => void;
+  onResizeTask?: (id: string, dayDelta: number) => void;
+}) {
   const start = row.startDay + 1;
   const span = Math.max(row.durationDays, 1);
   const col = { gridColumn: `${start} / span ${span}` } as const;
   const [dragDx, setDragDx] = useState<number | null>(null);
+  const [resizeDx, setResizeDx] = useState<number | null>(null);
 
   if (row.kind === "milestone") {
     return <div className="gmile" style={col} aria-hidden />;
@@ -149,12 +158,34 @@ function ChartBar({ row, onMoveTask }: { row: GanttRow; onMoveTask?: (id: string
     window.addEventListener("pointerup", onUp);
   };
 
+  // P0-2: растягивание правого края бара меняет длительность (plannedFinish), start не трогаем.
+  const resizable = Boolean(onResizeTask) && row.kind === "task";
+  const handleResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!resizable) return;
+    event.stopPropagation(); // не двигаем весь бар
+    event.preventDefault();
+    const startX = event.clientX;
+    setResizeDx(0);
+    const onMove = (moveEvent: globalThis.PointerEvent) => setResizeDx(moveEvent.clientX - startX);
+    const onUp = (upEvent: globalThis.PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setResizeDx(null);
+      const delta = dayDeltaFromDrag(upEvent.clientX - startX, DAY_W);
+      if (delta !== 0) onResizeTask?.(row.id, delta);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
   const style: CSSProperties =
     dragDx !== null
       ? { ...col, transform: `translateX(${dragDx}px)`, cursor: "grabbing" }
-      : draggable
-        ? { ...col, cursor: "grab" }
-        : col;
+      : resizeDx !== null
+        ? { ...col, width: `calc(100% + ${resizeDx}px)` }
+        : draggable
+          ? { ...col, cursor: "grab" }
+          : col;
 
   return (
     <div
@@ -164,6 +195,13 @@ function ChartBar({ row, onMoveTask }: { row: GanttRow; onMoveTask?: (id: string
       {...(draggable ? { onPointerDown: handlePointerDown } : {})}
     >
       {progressPct > 0 ? <div className="gbar__progress" style={{ width: `${progressPct}%` }} /> : null}
+      {resizable ? (
+        <span
+          className="gbar__resize"
+          style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 6, cursor: "ew-resize" }}
+          onPointerDown={handleResizePointerDown}
+        />
+      ) : null}
     </div>
   );
 }
@@ -230,6 +268,7 @@ function DataRow({
   onSelect,
   onToggleCollapse,
   onMoveTask,
+  onResizeTask,
   arrows
 }: {
   row: GanttRow;
@@ -239,6 +278,7 @@ function DataRow({
   onSelect?: (id: string) => void;
   onToggleCollapse?: (id: string) => void;
   onMoveTask?: (id: string, dayDelta: number) => void;
+  onResizeTask?: (id: string, dayDelta: number) => void;
   arrows?: DependencyArrow[];
 }) {
   const resources = row.kind === "task" ? row.resourceName ?? "—" : "—";
@@ -280,14 +320,14 @@ function DataRow({
             aria-hidden
           />
         ) : null}
-        <ChartBar row={row} {...(onMoveTask ? { onMoveTask } : {})} />
+        <ChartBar row={row} {...(onMoveTask ? { onMoveTask } : {})} {...(onResizeTask ? { onResizeTask } : {})} />
         {arrows && arrows.length > 0 ? <DependencyArrows arrows={arrows} /> : null}
       </div>
     </div>
   );
 }
 
-export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollapse, onMoveTask }: { data: GanttData; className?: string; selectedId?: string | null; onSelectRow?: (id: string) => void; onToggleCollapse?: (id: string) => void; onMoveTask?: (id: string, dayDelta: number) => void }) {
+export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollapse, onMoveTask, onResizeTask }: { data: GanttData; className?: string; selectedId?: string | null; onSelectRow?: (id: string) => void; onToggleCollapse?: (id: string) => void; onMoveTask?: (id: string, dayDelta: number) => void; onResizeTask?: (id: string, dayDelta: number) => void }) {
   const totalDays = data.days.length;
   const chartWidth = totalDays * DAY_W;
   const todayIndex = data.days.findIndex((d) => d.today);
@@ -356,6 +396,7 @@ export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollap
             {...(onSelectRow ? { onSelect: onSelectRow } : {})}
             {...(onToggleCollapse ? { onToggleCollapse } : {})}
             {...(onMoveTask ? { onMoveTask } : {})}
+            {...(onResizeTask ? { onResizeTask } : {})}
           />
         ))}
       </div>
