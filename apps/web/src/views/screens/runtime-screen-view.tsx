@@ -488,6 +488,20 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
     onSuccess: async () => { toast.success("План изменён"); setSelectedId(null); await queryClient.invalidateQueries({ queryKey: ["planning", id] }); },
     onError: (error) => toast.error(errorMessage(error))
   });
+  // P0-2: drag бара сдвигает плановые даты задачи на N дней и применяет через apply-command.
+  const moveTask = (taskId: string, dayDelta: number) => {
+    if (dayDelta === 0) return;
+    const target = (planning.data?.authored.tasks ?? []).find((task) => task.id === taskId);
+    if (!target?.plannedStart || !target.plannedFinish) return;
+    toolbarApply.mutate({
+      type: "task.update_schedule",
+      payload: {
+        taskId,
+        plannedStart: isoDate(addDays(new Date(target.plannedStart), dayDelta)),
+        plannedFinish: isoDate(addDays(new Date(target.plannedFinish), dayDelta))
+      }
+    });
+  };
   const moveWbs = (direction: "in" | "out") => {
     if (!selectedTask) return;
     const cmd = direction === "in" ? indentCommand(selectedTask, tasks) : outdentCommand(selectedTask, tasks);
@@ -549,7 +563,7 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
           <span className="gantt-stats__item"><span className="gantt-stats__label">Версия</span><span className="gantt-stats__value">{planning.data?.planVersion ?? 0}</span></span>
         </div>
         {preview ? <CardPanel title="Сверка изменения" subtitle="До применения план не меняется"><p className="u-text-body">Будет изменено задач: {preview.planDelta.changedTaskIds.length}. Проверок: {preview.validationIssues.length}.</p></CardPanel> : null}
-        {shownData ? <Gantt data={shownData} selectedId={selectedId} onSelectRow={setSelectedId} onToggleCollapse={toggleCollapse} /> : null}
+        {shownData ? <Gantt data={shownData} selectedId={selectedId} onSelectRow={setSelectedId} onToggleCollapse={toggleCollapse} {...(reason ? {} : { onMoveTask: moveTask })} /> : null}
       </StateGate>
       <MutationMessage error={previewMutation.error ?? applyMutation.error ?? toolbarApply.error} />
     </>

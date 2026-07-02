@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/cn";
@@ -8,6 +8,12 @@ import type { GanttData, GanttDayHeader, GanttRow } from "./types";
 
 const DAY_W = 28;
 const ROW_H = 28; // высота строки-данных (min-height .gantt2__row)
+
+/** Смещение бара в днях при drag: пиксели / ширину дня, округлённо. Малый сдвиг (клик) → 0. */
+export function dayDeltaFromDrag(deltaX: number, dayWidth: number): number {
+  if (dayWidth <= 0) return 0;
+  return Math.round(deltaX / dayWidth) || 0; // `|| 0` нормализует -0 → 0
+}
 
 export type DependencyArrow = {
   key: string;
@@ -102,10 +108,11 @@ function durationLabel(row: GanttRow) {
   return `${row.durationDays}д`;
 }
 
-function ChartBar({ row, todayIndex }: { row: GanttRow; todayIndex: number }) {
+function ChartBar({ row, onMoveTask }: { row: GanttRow; onMoveTask?: (id: string, dayDelta: number) => void }) {
   const start = row.startDay + 1;
   const span = Math.max(row.durationDays, 1);
   const col = { gridColumn: `${start} / span ${span}` } as const;
+  const [dragDx, setDragDx] = useState<number | null>(null);
 
   if (row.kind === "milestone") {
     return <div className="gmile" style={col} aria-hidden />;
@@ -123,8 +130,39 @@ function ChartBar({ row, todayIndex }: { row: GanttRow; todayIndex: number }) {
   // UX-008: заливка прогресса прямо в баре (как в MS Project), а не только цифрой в колонке.
   const progressPct = Math.round(Math.max(0, Math.min(1, row.progress ?? 0)) * 100);
 
+  // P0-2: перетаскивание бара задачи по времени (только листовые задачи; сводные/вехи не двигаем).
+  const draggable = Boolean(onMoveTask) && row.kind === "task";
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!draggable) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    setDragDx(0);
+    const onMove = (moveEvent: globalThis.PointerEvent) => setDragDx(moveEvent.clientX - startX);
+    const onUp = (upEvent: globalThis.PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setDragDx(null);
+      const delta = dayDeltaFromDrag(upEvent.clientX - startX, DAY_W);
+      if (delta !== 0) onMoveTask?.(row.id, delta);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  const style: CSSProperties =
+    dragDx !== null
+      ? { ...col, transform: `translateX(${dragDx}px)`, cursor: "grabbing" }
+      : draggable
+        ? { ...col, cursor: "grab" }
+        : col;
+
   return (
-    <div className={barClass} style={col} aria-hidden>
+    <div
+      className={barClass}
+      style={style}
+      aria-hidden
+      {...(draggable ? { onPointerDown: handlePointerDown } : {})}
+    >
       {progressPct > 0 ? <div className="gbar__progress" style={{ width: `${progressPct}%` }} /> : null}
     </div>
   );
@@ -191,6 +229,7 @@ function DataRow({
   selected,
   onSelect,
   onToggleCollapse,
+  onMoveTask,
   arrows
 }: {
   row: GanttRow;
@@ -199,6 +238,7 @@ function DataRow({
   selected?: boolean;
   onSelect?: (id: string) => void;
   onToggleCollapse?: (id: string) => void;
+  onMoveTask?: (id: string, dayDelta: number) => void;
   arrows?: DependencyArrow[];
 }) {
   const resources = row.kind === "task" ? row.resourceName ?? "—" : "—";
@@ -240,14 +280,14 @@ function DataRow({
             aria-hidden
           />
         ) : null}
-        <ChartBar row={row} todayIndex={todayIndex} />
+        <ChartBar row={row} {...(onMoveTask ? { onMoveTask } : {})} />
         {arrows && arrows.length > 0 ? <DependencyArrows arrows={arrows} /> : null}
       </div>
     </div>
   );
 }
 
-export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollapse }: { data: GanttData; className?: string; selectedId?: string | null; onSelectRow?: (id: string) => void; onToggleCollapse?: (id: string) => void }) {
+export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollapse, onMoveTask }: { data: GanttData; className?: string; selectedId?: string | null; onSelectRow?: (id: string) => void; onToggleCollapse?: (id: string) => void; onMoveTask?: (id: string, dayDelta: number) => void }) {
   const totalDays = data.days.length;
   const chartWidth = totalDays * DAY_W;
   const todayIndex = data.days.findIndex((d) => d.today);
@@ -315,6 +355,7 @@ export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollap
             arrows={arrowsByToRow.get(index) ?? []}
             {...(onSelectRow ? { onSelect: onSelectRow } : {})}
             {...(onToggleCollapse ? { onToggleCollapse } : {})}
+            {...(onMoveTask ? { onMoveTask } : {})}
           />
         ))}
       </div>
