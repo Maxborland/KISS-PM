@@ -196,6 +196,48 @@ describe("resource planning", () => {
     });
   });
 
+  it("KPI-006: unavailable-occupancy режет ёмкость дня, а не добавляет нагрузку", () => {
+    const snapshot = createSnapshot();
+    const plan = calculatePlan(snapshot, {
+      calculatedAt: "2026-05-21T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+    const matrix = buildResourceLoadMatrix({
+      plan,
+      resources: snapshot.resources,
+      assignments: snapshot.assignments,
+      calendars: snapshot.calendars,
+      calendarExceptions: snapshot.calendarExceptions,
+      reservations: snapshot.reservations,
+      occupancyWindows: [
+        {
+          id: "occupancy-unavailable-a",
+          tenantId: "tenant-alpha",
+          resourceId: "resource-alpha",
+          sourceType: "personal_calendar_event",
+          sourceId: "pto-a",
+          startsAt: "2026-06-01T09:00:00.000Z",
+          finishesAt: "2026-06-01T11:00:00.000Z",
+          workMinutes: null,
+          capacityImpact: "unavailable",
+          visibility: "busy_only",
+          title: "Недоступен",
+          entityType: null,
+          entityId: null
+        }
+      ],
+      rangeStart: "2026-06-01",
+      rangeFinish: "2026-06-01",
+      granularities: ["day"]
+    });
+
+    expect(matrix.buckets[0]).toMatchObject({
+      capacityMinutes: 360, // 480 − 120 недоступности
+      occupiedMinutes: 0, // недоступность не идёт в нагрузку
+      occupancyContributions: []
+    });
+  });
+
   it("reports overload when occupancy consumes capacity beyond assignment load", () => {
     const snapshot = {
       ...createSnapshot(),
