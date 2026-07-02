@@ -108,11 +108,12 @@ function PlanetSystem({ config, node, nodeIndex, reducedMotion }: PlanetSystemPr
 
   useFrame(({ clock }) => {
     const elapsed = reducedMotion ? 0 : clock.getElapsedTime();
+    const startTime: number = startTimeRef.current ?? elapsed;
     if (startTimeRef.current === null) {
-      startTimeRef.current = elapsed;
+      startTimeRef.current = startTime;
     }
 
-    const introElapsed = reducedMotion || initiallyVisible ? 99 : elapsed - startTimeRef.current;
+    const introElapsed = reducedMotion || initiallyVisible ? 99 : elapsed - startTime;
     const reveal = easeOutCubic(revealValue(introElapsed, node, nodeIndex));
     const point = pointForNodeAt(config, node, elapsed);
     const lift = (1 - reveal) * 0.16;
