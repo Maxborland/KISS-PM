@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { PageIntro } from "@/views/layout/page-intro";
 import { GANTT_MOCK, Gantt, applyCollapse } from "@/widgets/gantt";
+import { useCollapsedIds } from "@/lib/use-collapsed-ids";
 
 export type GanttSliceBlockProps = {
   title: string;
@@ -25,14 +26,7 @@ export type GanttSliceBlockProps = {
 
 export function GanttSliceBlock({ title, lead }: GanttSliceBlockProps) {
   const [zoom, setZoom] = useState<"hour" | "day" | "week" | "month">("day");
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-  const toggleCollapse = (rowId: string) =>
-    setCollapsedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(rowId)) next.delete(rowId);
-      else next.add(rowId);
-      return next;
-    });
+  const { collapsedIds, toggleCollapse } = useCollapsedIds();
   const ganttData = { ...GANTT_MOCK, rows: applyCollapse(GANTT_MOCK.rows, collapsedIds) };
 
   return (

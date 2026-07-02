@@ -308,6 +308,22 @@ describe("employeeCapacity", () => {
     expect(cell?.hasAbsence).toBe(true);
   });
 
+  it("два полудневных отсутствия в одну дату суммируются в полный день (ёмкость 0)", () => {
+    const monthIso = "2026-06";
+    const date = "2026-06-02";
+    const { rows } = buildEmployeeRows({
+      monthIso,
+      workspaceUsers: [{ id: "u1", name: "User", positionId: null, positionName: null }],
+      mergedByUserDate: new Map(),
+      absences: [
+        { userId: "u1", dateFrom: date, dateTo: date, portion: 0.5 },
+        { userId: "u1", dateFrom: date, dateTo: date, portion: 0.5 }
+      ]
+    });
+    const cell = rows[0]?.days.find((day) => day.date === date);
+    expect(cell?.capacityMinutes).toBe(0); // 0.5 + 0.5 = 1 (потолок), не max(0.5,0.5)
+  });
+
   it("hides unreadable project ids in mix", () => {
     const monthIso = "2026-06-01".slice(0, 7);
     const monthDates = monthDateSet(monthIso);

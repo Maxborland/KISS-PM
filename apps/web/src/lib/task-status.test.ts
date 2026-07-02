@@ -34,6 +34,14 @@ test("любой предложенный переход проходит мат
   }
 });
 
+test("продвигает через отсутствующую категорию воронки (нет review → in_progress ведёт в done)", () => {
+  const withoutReview: Status[] = statuses.filter((s) => s.category !== "review");
+  expect(nextTaskStatus(withoutReview, { statusCategory: "in_progress" })?.category).toBe("done");
+  // new без waiting → сразу in_progress
+  const withoutWaiting: Status[] = statuses.filter((s) => s.category !== "waiting");
+  expect(nextTaskStatus(withoutWaiting, { statusCategory: "new" })?.category).toBe("in_progress");
+});
+
 test("матрица переходов совпадает с бэкендом", () => {
   expect(isTaskStatusTransitionAllowed("new", "review")).toBe(false); // старый sortOrder-баг предлагал это
   expect(isTaskStatusTransitionAllowed("in_progress", "done")).toBe(true);

@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -19,6 +21,38 @@ const ROW_H = 28; // высота строки-данных (min-height .gantt2_
 export function dayDeltaFromDrag(deltaX: number, dayWidth: number): number {
   if (dayWidth <= 0) return 0;
   return Math.round(deltaX / dayWidth) || 0; // `|| 0` нормализует -0 → 0
+}
+
+/**
+ * Общий pointer-drag: возвращает текущий сдвиг в px и onPointerDown. Слушатели window снимаются
+ * и на pointerup (тогда commit), и на РАЗМОНТИРОВАНИИ (без commit) — иначе при исчезновении строки
+ * во время перетаскивания оставались бы висящие слушатели + применялся бы чужой сдвиг задачи.
+ */
+function usePointerDragDx(onCommit: (dayDelta: number) => void) {
+  const [dx, setDx] = useState<number | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => cleanupRef.current?.(), []);
+  const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    setDx(0);
+    const onMove = (moveEvent: globalThis.PointerEvent) => setDx(moveEvent.clientX - startX);
+    const teardown = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      cleanupRef.current = null;
+      setDx(null);
+    };
+    const onUp = (upEvent: globalThis.PointerEvent) => {
+      teardown();
+      const delta = dayDeltaFromDrag(upEvent.clientX - startX, DAY_W);
+      if (delta !== 0) onCommit(delta);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    cleanupRef.current = teardown;
+  };
+  return { dx, onPointerDown };
 }
 
 export type DependencyArrow = {
@@ -144,8 +178,8 @@ function ChartBar({
   const start = row.startDay + 1;
   const span = Math.max(row.durationDays, 1);
   const col = { gridColumn: `${start} / span ${span}` } as const;
-  const [dragDx, setDragDx] = useState<number | null>(null);
-  const [resizeDx, setResizeDx] = useState<number | null>(null);
+  const move = usePointerDragDx((delta) => onMoveTask?.(row.id, delta));
+  const resize = usePointerDragDx((delta) => onResizeTask?.(row.id, delta));
 
   if (row.kind === "milestone") {
     return <div className="gmile" style={col} aria-hidden />;
@@ -163,50 +197,15 @@ function ChartBar({
   // UX-008: заливка прогресса прямо в баре (как в MS Project), а не только цифрой в колонке.
   const progressPct = Math.round(Math.max(0, Math.min(1, row.progress ?? 0)) * 100);
 
-  // P0-2: перетаскивание бара задачи по времени (только листовые задачи; сводные/вехи не двигаем).
+  // P0-2: перетаскивание — только листовые задачи; сводные/вехи не двигаем.
   const draggable = Boolean(onMoveTask) && row.kind === "task";
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!draggable) return;
-    event.preventDefault();
-    const startX = event.clientX;
-    setDragDx(0);
-    const onMove = (moveEvent: globalThis.PointerEvent) => setDragDx(moveEvent.clientX - startX);
-    const onUp = (upEvent: globalThis.PointerEvent) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      setDragDx(null);
-      const delta = dayDeltaFromDrag(upEvent.clientX - startX, DAY_W);
-      if (delta !== 0) onMoveTask?.(row.id, delta);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  };
-
-  // P0-2: растягивание правого края бара меняет длительность (plannedFinish), start не трогаем.
   const resizable = Boolean(onResizeTask) && row.kind === "task";
-  const handleResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!resizable) return;
-    event.stopPropagation(); // не двигаем весь бар
-    event.preventDefault();
-    const startX = event.clientX;
-    setResizeDx(0);
-    const onMove = (moveEvent: globalThis.PointerEvent) => setResizeDx(moveEvent.clientX - startX);
-    const onUp = (upEvent: globalThis.PointerEvent) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      setResizeDx(null);
-      const delta = dayDeltaFromDrag(upEvent.clientX - startX, DAY_W);
-      if (delta !== 0) onResizeTask?.(row.id, delta);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  };
 
   const style: CSSProperties =
-    dragDx !== null
-      ? { ...col, transform: `translateX(${dragDx}px)`, cursor: "grabbing" }
-      : resizeDx !== null
-        ? { ...col, width: `calc(100% + ${resizeDx}px)` }
+    move.dx !== null
+      ? { ...col, transform: `translateX(${move.dx}px)`, cursor: "grabbing" }
+      : resize.dx !== null
+        ? { ...col, width: `calc(100% + ${resize.dx}px)` }
         : draggable
           ? { ...col, cursor: "grab" }
           : col;
@@ -216,14 +215,17 @@ function ChartBar({
       className={barClass}
       style={style}
       aria-hidden
-      {...(draggable ? { onPointerDown: handlePointerDown } : {})}
+      {...(draggable ? { onPointerDown: move.onPointerDown } : {})}
     >
       {progressPct > 0 ? <div className="gbar__progress" style={{ width: `${progressPct}%` }} /> : null}
       {resizable ? (
         <span
           className="gbar__resize"
           style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 6, cursor: "ew-resize" }}
-          onPointerDown={handleResizePointerDown}
+          onPointerDown={(event) => {
+            event.stopPropagation(); // не двигаем весь бар
+            resize.onPointerDown(event);
+          }}
         />
       ) : null}
     </div>
@@ -355,7 +357,8 @@ export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollap
   const totalDays = data.days.length;
   const chartWidth = totalDays * DAY_W;
   const todayIndex = data.days.findIndex((d) => d.today);
-  const arrows = computeDependencyArrows(data.rows, DAY_W);
+  // useMemo: не пересчитывать все стрелки на ре-рендерах, где data.rows не менялся (клик/selectedId).
+  const arrows = useMemo(() => computeDependencyArrows(data.rows, DAY_W), [data.rows]);
   const innerRef = useRef<HTMLDivElement>(null);
   const [geom, setGeom] = useState<{ chartLeft: number; headerH: number } | null>(null);
 

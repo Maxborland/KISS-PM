@@ -21,23 +21,28 @@ type FeasibilityAssessmentDataSource = Pick<
 async function loadFeasibilityCalendar(
   dataSource: FeasibilityAssessmentDataSource,
   tenantId: string,
-  year: number
+  fromYear: number,
+  toYear: number
 ): Promise<FeasibilityCalendar | undefined> {
   const db = "db" in dataSource ? (dataSource as { db?: KissPmDatabase }).db : undefined;
   if (!db) return undefined;
-  const snapshot = await createTenantProductionCalendarRepository(db).getProductionCalendar(
-    tenantId,
-    year
-  );
+  const repo = createTenantProductionCalendarRepository(db);
+  // Кросс-годовой период: грузим календарь за КАЖДЫЙ год диапазона и объединяем праздники,
+  // иначе праздники следующего года (напр. новогодние) считались бы рабочими днями.
+  const years: number[] = [];
+  for (let year = fromYear; year <= toYear; year += 1) years.push(year);
+  const snapshots = await Promise.all(years.map((year) => repo.getProductionCalendar(tenantId, year)));
+  const holidays = new Set<string>();
+  for (const snapshot of snapshots) {
+    for (const item of snapshot.exceptions) {
+      if (item.resourceId === null && item.workingMinutes === 0) holidays.add(item.date);
+    }
+  }
+  const primary = snapshots[0]!; // рабочая неделя/минуты — из года начала (стабильны для тенанта)
   return {
-    workingWeekdays: snapshot.workingWeekdays,
-    workingMinutesPerDay: snapshot.workingMinutesPerDay,
-    // Праздники = tenant-wide исключения с нулём рабочих минут (как в buildMonthDays).
-    holidays: new Set(
-      snapshot.exceptions
-        .filter((item) => item.resourceId === null && item.workingMinutes === 0)
-        .map((item) => item.date)
-    )
+    workingWeekdays: primary.workingWeekdays,
+    workingMinutesPerDay: primary.workingMinutesPerDay,
+    holidays
   };
 }
 
@@ -49,11 +54,11 @@ export async function buildFeasibilityAssessment(
   const positions = await dataSource.listPositions?.(tenantId) ?? [];
   const users = await dataSource.listWorkspaceUsers?.(tenantId) ?? [];
   const projects = await dataSource.listProjects?.(tenantId) ?? [];
-  // Календарь года начала сделки (периоды feasibility короткие; кросс-год — приемлемое упрощение).
   const calendar = await loadFeasibilityCalendar(
     dataSource,
     tenantId,
-    opportunity.plannedStart.getUTCFullYear()
+    opportunity.plannedStart.getUTCFullYear(),
+    opportunity.plannedFinish.getUTCFullYear()
   );
 
   return assessOpportunityFeasibility({

@@ -31,6 +31,7 @@ import { KanbanBoard, KanbanColumn } from "@/widgets/kanban/kanban-board";
 import { KanbanCard } from "@/widgets/kanban/kanban-card";
 import { Gantt, applyCollapse } from "@/widgets/gantt";
 import { nextTaskStatus, type TaskStatusCategory } from "@/lib/task-status";
+import { useCollapsedIds } from "@/lib/use-collapsed-ids";
 import type { GanttData, GanttRow } from "@/widgets/gantt";
 import { ResourceMatrix, ResourceMatrixLegend, ResourceMatrixStats } from "@/widgets/resource-matrix";
 import type { DayCell, DayHeader, MatrixPercent, MatrixRow, ResourceMatrixData } from "@/widgets/resource-matrix";
@@ -446,14 +447,7 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
   const [showCritical, setShowCritical] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-  const toggleCollapse = (rowId: string) =>
-    setCollapsedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(rowId)) next.delete(rowId);
-      else next.add(rowId);
-      return next;
-    });
+  const { collapsedIds, toggleCollapse } = useCollapsedIds();
   const reason = disabledReason(me, PERMISSIONS.manageProjectPlan);
   const data = useMemo(() => (planning.data ? toGanttData(planning.data, showCritical) : undefined), [planning.data, showCritical]);
   const shownData = useMemo(() => {
@@ -744,14 +738,7 @@ function ProjectResourcesRuntime({ id, me }: { id: string; me: AuthMe }) {
   const [monthOverride, setMonthOverride] = useState<string | null>(null);
   const monthIso = monthOverride ?? planMonth ?? currentMonthIso();
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-  const toggleCollapse = (rowId: string) =>
-    setCollapsedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(rowId)) next.delete(rowId);
-      else next.add(rowId);
-      return next;
-    });
+  const { collapsedIds, toggleCollapse } = useCollapsedIds();
   const capacity = useCapacitySummary(monthIso);
   const capacityTree = useCapacityTree(monthIso, id);
   const positions = useMemo(() => collectResourcePositions(capacityTree.data), [capacityTree.data]);
@@ -1428,7 +1415,7 @@ function toResourceMatrix(tree: CapacityTree, summary: CapacitySummary, position
 }
 function addDays(value: Date, days: number) {
   const next = new Date(value);
-  next.setDate(next.getDate() + days);
+  next.setUTCDate(next.getUTCDate() + days); // UTC — консистентно с isoDate (toISOString) и date-only планом
   return next;
 }
 function isoDate(value: Date) {
@@ -1514,7 +1501,9 @@ function compareWbs(left: string, right: string): number {
 
 function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
   const dayMs = 86_400_000;
-  const midnight = (value: string | Date) => { const d = new Date(value); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
+  // UTC-полночь: плановые даты — date-only (парсятся как UTC), а UTC не имеет DST, поэтому
+  // startOfBase + index·dayMs всегда точная UTC-полночь дня N (без дрейфа на переводе часов).
+  const midnight = (value: string | Date) => { const d = new Date(value); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); };
   // Диапазон таймлайна = от самой ранней до самой поздней даты плана (не фиксированные 30 дней — иначе многомесячный проект обрезается).
   const times = [midnight(model.project.plannedStart), midnight(model.project.plannedFinish)];
   for (const task of model.authored.tasks) {
@@ -1529,8 +1518,9 @@ function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
   const spanDays = Math.max(30, Math.round((endOfRange - startOfBase) / dayMs) + 1);
   const days = Array.from({ length: spanDays }, (_, index) => {
     const day = new Date(startOfBase + index * dayMs);
-    const weekdayShort = new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(day).slice(0, 2);
-    return { iso: isoDate(day), day: day.getDate(), weekdayShort, weekend: day.getDay() === 0 || day.getDay() === 6, today: index === todayIndex };
+    const weekdayShort = new Intl.DateTimeFormat("ru-RU", { weekday: "short", timeZone: "UTC" }).format(day).slice(0, 2);
+    const weekday = day.getUTCDay();
+    return { iso: day.toISOString().slice(0, 10), day: day.getUTCDate(), weekdayShort, weekend: weekday === 0 || weekday === 6, today: index === todayIndex };
   });
   const resourceNameById = new Map(model.resources.map((resource) => [resource.id, resource.name]));
   const resourceNameByTask = new Map<string, string>();
@@ -1540,10 +1530,13 @@ function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
     if (name) resourceNameByTask.set(assignment.taskId, name);
   }
   const criticalIds = new Set(showCritical ? model.calculatedPlan?.criticalPathTaskIds ?? [] : []);
-  // Резерв (slack) в днях по задаче: минуты / 480 (8ч-день). Для tooltip на баре (UX-009).
+  // Резерв (slack) в днях по задаче для tooltip (UX-009).
+  // TODO: 8ч-день захардкожен; точный перевод требует per-task рабочих минут/день из календаря
+  // ресурса (read-model их пока не отдаёт) — иначе для нестандартного календаря дни резерва неточны.
+  const MINUTES_PER_WORKING_DAY = 480;
   const slackDaysByTask = new Map<string, number>();
   for (const calcTask of model.calculatedPlan?.tasks ?? []) {
-    if (calcTask.totalSlackMinutes != null) slackDaysByTask.set(calcTask.id, Math.round(calcTask.totalSlackMinutes / 480));
+    if (calcTask.totalSlackMinutes != null) slackDaysByTask.set(calcTask.id, Math.round(calcTask.totalSlackMinutes / MINUTES_PER_WORKING_DAY));
   }
   const taskById = new Map(model.authored.tasks.map((task) => [task.id, task]));
   const wbsById = new Map(model.authored.tasks.map((task) => [task.id, task.wbsCode ?? ""]));
@@ -1613,7 +1606,7 @@ function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
   walk(null, 0);
 
   return {
-    monthLabel: new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(base),
+    monthLabel: new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric", timeZone: "UTC" }).format(base),
     days,
     rows
   };

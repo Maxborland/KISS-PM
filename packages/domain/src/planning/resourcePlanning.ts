@@ -132,20 +132,25 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
   for (const resource of input.resources) {
     const calendar = selectCalendar(resource.calendarId, input.calendars);
     const calendarExceptions = selectResourceCalendarExceptions(input, calendar, resource.id);
+    // Кэши per-resource: распределение зависит от календаря ресурса, поэтому не переиспользуем между ними.
+    const taskDistCache = new Map<string, AssignmentDistEntry>();
+    const reservationDistCache = new Map<string, Map<PlanDate, number>>();
     for (const date of dates) {
       const taskLoad = calculateTaskLoadForDate(
         input,
         resource.id,
         date,
         calendar,
-        calendarExceptions
+        calendarExceptions,
+        taskDistCache
       );
       const reservationLoad = calculateReservationLoadForDate(
         input,
         resource.id,
         date,
         calendar,
-        calendarExceptions
+        calendarExceptions,
+        reservationDistCache
       );
       const occupancyLoad = calculateOccupancyLoadForDate(input, resource.id, date);
       // KPI-006: «недоступность» (unavailable) режет доступную ёмкость дня, а не идёт в нагрузку.
@@ -187,12 +192,23 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
   return buckets;
 }
 
+type AssignmentDistEntry = {
+  capacityByDate: Map<PlanDate, number>;
+  totalCapacity: number;
+  assignmentWork: number;
+  distribution: Map<PlanDate, number>;
+  startDate: PlanDate;
+};
+
 function calculateTaskLoadForDate(
   input: BuildResourceLoadMatrixInput,
   resourceId: string,
   date: PlanDate,
   calendar: PlanCalendar,
-  calendarExceptions: PlanCalendarException[]
+  calendarExceptions: PlanCalendarException[],
+  // Кэш распределения по assignment.id: строим полное распределение + ёмкости ОДИН раз на назначение,
+  // а не O(D) на каждую дату (иначе O(D²) на задачу, KPI-004-fix это усугублял сортировкой).
+  distCache: Map<string, AssignmentDistEntry>
 ): {
   assignedMinutes: number;
   taskIds: string[];
@@ -236,31 +252,42 @@ function calculateTaskLoadForDate(
       continue;
     }
 
-    const taskDates = enumerateDates(task.calculatedStart, task.calculatedFinish);
-    const capacities = taskDates.map((taskDate) => ({
-      date: taskDate,
-      capacityMinutes: taskWorkingOverlapForDate(task, taskDate, calendar, calendarExceptions)
-    }));
-    const totalCapacity = capacities.reduce((total, item) => total + item.capacityMinutes, 0);
-    const assignmentWork = resolveAssignmentWork(input.assignments, assignment, task.workMinutes);
-    if (totalCapacity <= 0) {
-      if (date === task.calculatedStart && assignmentWork > 0) {
-        assignedMinutes += assignmentWork;
+    let entry = distCache.get(assignment.id);
+    if (!entry) {
+      const capacities = enumerateDates(task.calculatedStart, task.calculatedFinish).map((taskDate) => ({
+        date: taskDate,
+        capacityMinutes: taskWorkingOverlapForDate(task, taskDate, calendar, calendarExceptions)
+      }));
+      const totalCapacity = capacities.reduce((total, item) => total + item.capacityMinutes, 0);
+      const assignmentWork = resolveAssignmentWork(input.assignments, assignment, task.workMinutes);
+      entry = {
+        capacityByDate: new Map(capacities.map((item) => [item.date, item.capacityMinutes])),
+        totalCapacity,
+        assignmentWork,
+        distribution: totalCapacity > 0 ? distributeProportionalMinutes(assignmentWork, capacities) : new Map(),
+        startDate: task.calculatedStart
+      };
+      distCache.set(assignment.id, entry);
+    }
+
+    if (entry.totalCapacity <= 0) {
+      if (date === entry.startDate && entry.assignmentWork > 0) {
+        assignedMinutes += entry.assignmentWork;
         taskIds.push(task.id);
         assignmentIds.push(assignment.id);
         assignmentContributions.push({
           taskId: task.id,
           assignmentId: assignment.id,
-          workMinutes: assignmentWork
+          workMinutes: entry.assignmentWork
         });
       }
       continue;
     }
 
-    const currentCapacity = capacities.find((item) => item.date === date)?.capacityMinutes ?? 0;
+    const currentCapacity = entry.capacityByDate.get(date) ?? 0;
     if (currentCapacity <= 0) continue;
 
-    const workMinutes = allocateProportionalMinutes(assignmentWork, capacities, date);
+    const workMinutes = entry.distribution.get(date) ?? 0;
     assignedMinutes += workMinutes;
     taskIds.push(task.id);
     assignmentIds.push(assignment.id);
@@ -305,13 +332,16 @@ function aggregateAssignmentContributions(
  * 100 мин на 3 равных дня → 33+33+33=99, минута терялась). Возвращает целую долю дня `date`.
  * Детерминированно: при равных дробных частях приоритет по порядку дней.
  */
-export function allocateProportionalMinutes(
+export function distributeProportionalMinutes(
   total: number,
-  capacities: ReadonlyArray<{ date: PlanDate; capacityMinutes: number }>,
-  date: PlanDate
-): number {
+  capacities: ReadonlyArray<{ date: PlanDate; capacityMinutes: number }>
+): Map<PlanDate, number> {
+  const result = new Map<PlanDate, number>();
   const totalCapacity = capacities.reduce((sum, item) => sum + item.capacityMinutes, 0);
-  if (totalCapacity <= 0 || total <= 0) return 0;
+  if (totalCapacity <= 0 || total <= 0) {
+    for (const item of capacities) result.set(item.date, 0);
+    return result;
+  }
   const shares = capacities.map((item, index) => {
     const exact = (total * item.capacityMinutes) / totalCapacity;
     const floor = Math.floor(exact);
@@ -324,9 +354,17 @@ export function allocateProportionalMinutes(
       .slice(0, Math.max(0, remainder))
       .map((share) => share.date)
   );
-  const share = shares.find((item) => item.date === date);
-  if (!share) return 0;
-  return share.floor + (bumped.has(date) ? 1 : 0);
+  for (const share of shares) result.set(share.date, share.floor + (bumped.has(share.date) ? 1 : 0));
+  return result;
+}
+
+/** Доля дня `date` из полного распределения (см. distributeProportionalMinutes). */
+export function allocateProportionalMinutes(
+  total: number,
+  capacities: ReadonlyArray<{ date: PlanDate; capacityMinutes: number }>,
+  date: PlanDate
+): number {
+  return distributeProportionalMinutes(total, capacities).get(date) ?? 0;
 }
 
 function taskWorkingOverlapForDate(
@@ -386,7 +424,9 @@ function calculateReservationLoadForDate(
   resourceId: string,
   date: PlanDate,
   calendar: PlanCalendar,
-  calendarExceptions: PlanCalendarException[]
+  calendarExceptions: PlanCalendarException[],
+  // Кэш распределения по reservation.id (как в calculateTaskLoadForDate — раз на резерв, не на дату).
+  distCache: Map<string, Map<PlanDate, number>>
 ): {
   reservedMinutes: number;
   reservationIds: string[];
@@ -400,16 +440,20 @@ function calculateReservationLoadForDate(
     if (comparePlanDates(date, reservation.start) < 0 || comparePlanDates(date, reservation.finish) > 0) {
       continue;
     }
-    const reservationDates = enumerateDates(reservation.start, reservation.finish);
-    const capacities = reservationDates.map((reservationDate) => ({
-      date: reservationDate,
-      capacityMinutes: workingMinutesForDate(reservationDate, calendar, calendarExceptions)
-    }));
-    const totalCapacity = capacities.reduce((total, item) => total + item.capacityMinutes, 0);
     const currentCapacity = workingMinutesForDate(date, calendar, calendarExceptions);
-    if (totalCapacity <= 0 || currentCapacity <= 0) continue;
+    if (currentCapacity <= 0) continue;
 
-    const workMinutes = allocateProportionalMinutes(reservation.workMinutes, capacities, date);
+    let distribution = distCache.get(reservation.id);
+    if (!distribution) {
+      const capacities = enumerateDates(reservation.start, reservation.finish).map((reservationDate) => ({
+        date: reservationDate,
+        capacityMinutes: workingMinutesForDate(reservationDate, calendar, calendarExceptions)
+      }));
+      distribution = distributeProportionalMinutes(reservation.workMinutes, capacities);
+      distCache.set(reservation.id, distribution);
+    }
+
+    const workMinutes = distribution.get(date) ?? 0;
     reservedMinutes += workMinutes;
     reservationIds.push(reservation.id);
     reservationContributions.push({ reservationId: reservation.id, workMinutes });
@@ -441,6 +485,8 @@ function calculateOccupancyLoadForDate(
     if (workMinutes <= 0) continue;
     if (window.capacityImpact === "unavailable") {
       // KPI-006: недоступность уменьшает ёмкость дня, а не добавляет нагрузку (иначе завышает ratio/heat).
+      // Намеренно НЕ попадает в occupancyContributions/occupiedMinutes — это срез доступности, а не
+      // «занятость»; в ёмкости она отражена (buildDayBuckets вычитает unavailableMinutes из capacity).
       unavailableMinutes += workMinutes;
       continue;
     }

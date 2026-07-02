@@ -108,7 +108,8 @@ export type OrgUnitInput = {
 
 type MergedEmployeeDay = {
   workMinutes: number;
-  capacityMinutes: number;
+  // capacityMinutes НЕ храним: личная дневная ёмкость берётся из произв. календаря + персональных
+  // исключений + отсутствий (KPI-001), а не из ёмкости бакета плана (проектный календарь).
   projectsMix: Map<string, number>;
 };
 
@@ -182,12 +183,10 @@ export function mergeWorkspaceDayBuckets(input: {
 
       const existing = userMap.get(bucket.date) ?? {
         workMinutes: 0,
-        capacityMinutes: 0,
         projectsMix: new Map<string, number>()
       };
 
       existing.workMinutes += committedMinutes;
-      existing.capacityMinutes = Math.max(existing.capacityMinutes, bucket.capacityMinutes);
       const mixMinutes = (existing.projectsMix.get(displayProjectId) ?? 0) + committedMinutes;
       existing.projectsMix.set(displayProjectId, mixMinutes);
       userMap.set(bucket.date, existing);
@@ -213,7 +212,9 @@ function buildAbsencePortionByKey(
       const ms = Date.parse(date);
       if (ms >= from && ms <= to) {
         const key = `${absence.userId}:${date}`;
-        portions.set(key, Math.max(portions.get(key) ?? 0, portion));
+        // Пересекающиеся частичные отсутствия за один день СУММИРУЮТСЯ (потолок 1 = весь день),
+        // а не берутся по max: два по 0.5 в одну дату = полный день отсутствия, а не половина.
+        portions.set(key, Math.min(1, (portions.get(key) ?? 0) + portion));
       }
     }
   }
