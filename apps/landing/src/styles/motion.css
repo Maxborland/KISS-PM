@@ -199,40 +199,6 @@ html:not(.kp-js) [data-text-reveal] .kp-word {
   animation: kp-dot-pulse 3.4s var(--ease-in-out) infinite;
 }
 
-/* -------- card spotlight --------
-   Mouse-tracked plasma glow. The parent must set
-   `--mx`/`--my` on pointermove (handled by reveal.ts). */
-.kp-spotlight-card {
-  position: relative;
-  isolation: isolate;
-}
-
-.kp-spotlight-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(
-    260px circle at var(--mx, 50%) var(--my, 0%),
-    var(--plasma-soft-violet),
-    transparent 60%
-  );
-  opacity: 0;
-  transition: opacity var(--duration-ui) var(--ease-ui);
-  z-index: 1;
-}
-
-.kp-spotlight-card:hover::before,
-.kp-spotlight-card:focus-within::before {
-  opacity: 1;
-}
-
-.kp-spotlight-card > * {
-  position: relative;
-  z-index: 2;
-}
-
 /* -------- noise overlay (very subtle, for dark surfaces) -------- */
 .kp-noise {
   position: relative;
@@ -249,3 +215,4 @@ html:not(.kp-js) [data-text-reveal] .kp-word {
   opacity: 0.35;
   mix-blend-mode: overlay;
 }
+

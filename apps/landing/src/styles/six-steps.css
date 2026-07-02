@@ -5,31 +5,36 @@
   --six-bg-2: #f7f8fc;
   --six-ink: #070b1a;
   --six-muted: #64748b;
-  --six-accent: #5b5cf6;
-  --six-accent-2: #7c3aed;
+  --six-accent: var(--accent);
+  --six-accent-2: var(--plasma-violet);
   --six-border: rgba(15, 23, 42, 0.08);
   --six-slide-w: clamp(860px, 72vw, 1120px);
   --six-slide-h: clamp(520px, 62vh, 680px);
   --six-gap: clamp(32px, 4vw, 48px);
   --six-fade: clamp(20px, 4vw, 72px);
   --six-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --six-sticky-top: 104px;
   position: relative;
   background:
     radial-gradient(70% 55% at 50% 0%, rgba(91, 92, 246, 0.06) 0%, transparent 55%),
     linear-gradient(180deg, var(--six-bg) 0%, var(--six-bg-2) 100%);
   min-height: max(760px, 100vh);
   padding: 0;
-  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-ui);
   overflow-x: clip;
   min-width: 0;
 }
 
 .horizontalScrollSection {
   position: relative;
+  scroll-margin-top: 116px;
   background: var(--six-bg);
 }
 
 .six-steps-head {
+  width: 100%;
+  display: grid;
+  place-items: center;
   text-align: center;
   padding-inline: clamp(20px, 4vw, 48px);
 }
@@ -38,7 +43,8 @@
   margin: 0 auto;
   max-width: 18ch;
   color: var(--six-ink);
-  font-weight: 700;
+  font-weight: var(--weight-heading);
+  font-variation-settings: "wght" var(--weight-heading);
   letter-spacing: -0.03em;
 }
 
@@ -63,13 +69,13 @@
 
 .stickyViewport {
   position: sticky;
-  top: 0;
-  height: 100vh;
-  min-height: 760px;
+  top: var(--six-sticky-top);
+  height: calc(100vh - var(--six-sticky-top));
+  min-height: min(760px, calc(100vh - var(--six-sticky-top)));
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: clamp(24px, 4vh, 40px);
   padding-block: clamp(48px, 7vh, 82px) clamp(28px, 5vh, 56px);
   background:
@@ -78,12 +84,19 @@
 }
 
 .sectionHeader {
+  position: relative;
+  top: auto;
+  left: auto;
+  z-index: 1;
+  max-width: none;
+  pointer-events: auto;
   flex: 0 0 auto;
+  align-self: stretch;
 }
 
 .carouselMask {
   position: relative;
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
   min-width: 0;
   display: flex;
@@ -114,8 +127,8 @@
 
 .six-steps__viewport {
   position: relative;
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: calc(var(--six-slide-h) + 28px);
   min-width: 0;
   width: 100%;
   container-type: inline-size;
@@ -223,7 +236,8 @@
 .six-steps__title {
   margin: 0;
   font-size: clamp(2rem, 3.2vw, 2.75rem);
-  font-weight: 700;
+  font-weight: var(--weight-heading);
+  font-variation-settings: "wght" var(--weight-heading);
   line-height: 1.12;
   letter-spacing: -0.03em;
   color: var(--six-ink);
@@ -250,6 +264,21 @@
   justify-content: center;
   gap: 8px;
   padding-inline: 20px;
+}
+
+.six-steps__access {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding-inline: 20px;
+}
+
+.six-steps__access .l-btn {
+  min-width: 172px;
+  justify-content: center;
+  box-shadow:
+    0 18px 42px -24px rgba(91, 92, 246, 0.48),
+    0 1px 0 rgba(255, 255, 255, 0.42) inset;
 }
 
 .six-steps__progress-bar {
@@ -327,12 +356,16 @@
 .six-deal {
   display: flex;
   align-items: center;
-  gap: clamp(12px, 2vw, 20px);
+  justify-content: center;
+  gap: clamp(10px, 1.2vw, 14px);
   width: 100%;
+  box-sizing: border-box;
+  padding-inline: clamp(10px, 1.8vw, 24px);
+  transform: translateX(clamp(-28px, -2vw, -18px));
 }
 
 .six-deal__form {
-  flex: 0 0 min(100%, 300px);
+  flex: 0 0 min(100%, 286px);
   display: grid;
   gap: 10px;
   padding: 16px 18px;
@@ -412,7 +445,8 @@
   height: 40px;
   border: 0;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--six-accent), var(--six-accent-2));
+  /* Primary в мок-экранах = продуктовый чёрный */
+  background: var(--text-strong);
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -427,6 +461,7 @@
 }
 
 .six-deal__arrow {
+  width: 48px;
   opacity: 0;
 }
 
@@ -435,7 +470,7 @@
 }
 
 .six-deal__lead {
-  flex: 0 0 200px;
+  flex: 0 0 178px;
   display: flex;
   gap: 12px;
   padding: 14px 16px;
@@ -464,7 +499,7 @@
 .six-deal__lead-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .six-deal__lead-title {
@@ -665,7 +700,7 @@
   height: 38px;
   border: 0;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--six-accent), var(--six-accent-2));
+  background: var(--text-strong);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
@@ -1582,6 +1617,7 @@
   .six-draft,
   .six-closure {
     flex-direction: column;
+    transform: none;
   }
 
   .six-deal__arrow,
@@ -1595,6 +1631,37 @@
 
   .six-closure__bridge-line {
     transform: rotate(90deg);
+  }
+}
+
+@media (min-width: 900px) and (max-height: 760px) {
+  .l-band--six-steps {
+    --six-slide-h: clamp(340px, 50vh, 380px);
+  }
+
+  .stickyViewport {
+    gap: clamp(12px, 2vh, 18px);
+    padding-block: clamp(22px, 4vh, 36px) clamp(16px, 3vh, 24px);
+  }
+
+  .six-steps-head__title {
+    font-size: clamp(2rem, 3.6vw, 2.6rem);
+  }
+
+  .six-steps__card {
+    padding: clamp(22px, 2.8vw, 34px);
+  }
+
+  .six-steps__number {
+    font-size: clamp(3.2rem, 7vw, 4.6rem);
+  }
+
+  .six-steps__title {
+    font-size: clamp(1.75rem, 2.7vw, 2.35rem);
+  }
+
+  .six-steps__description {
+    font-size: clamp(15px, 1.35vw, 17px);
   }
 }
 

@@ -46,7 +46,7 @@ export const CAPSULES_BY_STEP: Record<DemoStep, ReadonlyArray<Capsule>> = {
       id: "deal-1",
       kind: "comms",
       title: "Карточка сделки",
-      body: "Переписка и файлы остаются у DEAL-204 — контекст не теряется при переходе в проект.",
+      body: "Переписка и файлы остаются у сделки — контекст не теряется при переходе в проект.",
     },
     {
       id: "deal-2",

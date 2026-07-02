@@ -3,17 +3,30 @@
    ============================================================ */
 
 .sandbox {
+  --sandbox-page: #f4f6fa;
+  --sandbox-surface: #ffffff;
+  --sandbox-surface-subtle: #f9fafb;
+  --sandbox-border: #e4e7ec;
+  --sandbox-border-strong: #d0d5dd;
+  --sandbox-text: #101828;
+  --sandbox-muted: #667085;
+  --sandbox-blue: #2563eb;
+  --sandbox-blue-strong: #1d4ed8;
+  --sandbox-blue-soft: #eff5ff;
+  --sandbox-shadow-soft: 0 18px 54px rgba(16, 24, 40, 0.1);
+  --sandbox-shadow-card: 0 8px 20px rgba(16, 24, 40, 0.055);
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: auto;
   min-height: inherit;
   height: 100%;
-  background: #f7f8fb;
+  background: var(--sandbox-page);
+  color: var(--sandbox-text);
 }
 
 @media (min-width: 980px) {
   .sandbox {
-    grid-template-columns: 232px minmax(0, 1fr) 300px;
+    grid-template-columns: 232px minmax(0, 1fr) 320px;
   }
 }
 
@@ -24,8 +37,8 @@
   flex-direction: column;
   gap: 16px;
   padding: 18px 16px;
-  background: #fff;
-  border-bottom: 1px solid var(--border);
+  background: var(--sandbox-surface);
+  border-bottom: 1px solid var(--sandbox-border);
 }
 
 @media (min-width: 980px) {
@@ -36,11 +49,255 @@
 }
 
 .sandbox__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text-strong);
+}
+
+/* Как в продукте: чёрный квадрат с K */
+.sandbox__brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--text-strong);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* —— Продуктовый сайдбар (упрощённый реальный UI) —— */
+
+.sandbox__nav {
+  display: grid;
+  gap: 18px;
+}
+
+.sandbox__nav-section {
+  display: grid;
+  gap: 2px;
+}
+
+.sandbox__nav-label {
+  margin: 0 0 6px;
+  padding-inline: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-soft);
+}
+
+.sandbox__nav-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-ui),
+    color var(--duration-fast) var(--ease-ui);
+}
+
+.sandbox__nav-item:hover {
+  background: var(--sandbox-surface-subtle);
+  color: var(--text-strong);
+}
+
+.sandbox__nav-item.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-weight: 600;
+}
+
+.sandbox__nav-item.is-upcoming {
+  color: var(--muted);
+}
+
+.sandbox__nav-item:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.sandbox__rail-foot {
+  margin-top: auto;
+  display: grid;
+  gap: 10px;
+}
+
+/* —— Топбар продукта —— */
+
+.sandbox__topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px clamp(18px, 2vw, 24px);
+  background: var(--sandbox-surface);
+  border-bottom: 1px solid var(--sandbox-border);
+}
+
+.sandbox__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 440px;
+  height: 36px;
+  padding-inline: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sandbox-border);
+  background: var(--sandbox-surface-subtle);
+  color: var(--muted);
+  transition: border-color var(--duration-fast) var(--ease-ui);
+}
+
+.sandbox__search:focus-within {
+  border-color: var(--accent-muted);
+  box-shadow: var(--ring-focus);
+}
+
+.sandbox__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  cursor: default;
+}
+
+.sandbox__search input::placeholder {
+  color: var(--muted);
+}
+
+.sandbox__avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--prio-critical);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* —— Правая колонка: сценарий + контекст —— */
+
+.sandbox__side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--sandbox-surface);
+  border-top: 1px solid var(--sandbox-border);
+}
+
+@media (min-width: 980px) {
+  .sandbox__side {
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+}
+
+.sandbox__scenario {
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: grid;
+  gap: 12px;
+}
+
+.sandbox__scenario-head {
+  display: grid;
+  gap: 8px;
+}
+
+.sandbox__scenario-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.sandbox__scenario-step {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-ui);
+}
+
+.sandbox__scenario-step:hover:not(:disabled) {
+  background: var(--sandbox-surface-subtle);
+}
+
+.sandbox__scenario-step:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.sandbox__scenario-step.is-locked {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.sandbox__scenario-marker {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted-strong);
+}
+
+.sandbox__scenario-step.is-active .sandbox__scenario-marker {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.sandbox__scenario-step.is-complete .sandbox__scenario-marker {
+  background: var(--success-soft);
+  border-color: color-mix(in oklab, var(--success) 40%, var(--border));
+  color: var(--success-text);
+}
+
+.sandbox__scenario-title {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--muted-strong);
+}
+
+.sandbox__scenario-step.is-active .sandbox__scenario-title {
+  color: var(--text-strong);
+  font-weight: 600;
 }
 
 .sandbox__rail-head {
@@ -135,12 +392,16 @@
   text-align: left;
   cursor: pointer;
   transition:
-    background 0.2s var(--ease-ui),
-    border-color 0.2s var(--ease-ui);
+    color var(--duration-base) var(--ease-out),
+    background-color var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
 }
 
 .sandbox__step:hover:not(:disabled) {
-  background: var(--panel-subtle);
+  background: var(--sandbox-surface-subtle);
+  transform: translateY(-1px);
 }
 
 .sandbox__step.is-active {
@@ -253,7 +514,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: clamp(14px, 2vw, 20px);
+  padding: clamp(18px, 2vw, 24px);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -264,7 +525,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: min(520px, 65vh);
+  min-height: 0;
 }
 
 /* —— Shared demo screen frame —— */
@@ -274,12 +535,12 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  background: var(--sandbox-surface);
+  border: 1px solid var(--sandbox-border);
+  border-radius: 18px;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 16px 48px -36px rgba(15, 23, 42, 0.16);
+    var(--sandbox-shadow-card);
   overflow: hidden;
 }
 
@@ -448,6 +709,14 @@
   border-bottom: 0;
 }
 
+.demo-table__row {
+  transition: background var(--duration-fast) var(--ease-ui);
+}
+
+.demo-table__row:hover {
+  background: var(--panel-subtle);
+}
+
 .demo-table__row--hot {
   background: color-mix(in oklab, var(--accent-soft) 35%, #fff);
 }
@@ -525,6 +794,26 @@
 .demo-table__muted {
   font-size: 12px;
   color: var(--muted);
+}
+
+.demo-owner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Аватар как в продукте: круг с инициалами */
+.demo-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--prio-critical);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .demo-chip {
@@ -1217,8 +1506,8 @@
   justify-content: space-between;
   gap: 12px 20px;
   padding: 14px 18px;
-  background: #fff;
-  border-top: 1px solid var(--border);
+  background: var(--sandbox-surface);
+  border-top: 1px solid var(--sandbox-border);
   box-shadow: 0 -8px 24px -20px rgba(15, 23, 42, 0.2);
 }
 
@@ -1265,9 +1554,9 @@
 }
 
 .sandbox__dock-primary {
-  height: 38px;
+  height: 44px;
   padding-inline: 18px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 0;
   background: var(--text-strong);
   color: #fff;
@@ -1276,11 +1565,16 @@
   cursor: pointer;
   transition:
     background 0.2s var(--ease-ui),
-    box-shadow 0.2s var(--ease-ui);
+    box-shadow 0.2s var(--ease-ui),
+    transform var(--duration-micro) var(--ease-ui);
 }
 
 .sandbox__dock-primary:hover {
-  background: color-mix(in oklab, var(--text-strong) 90%, var(--accent) 10%);
+  background: var(--text);
+}
+
+.sandbox__dock-primary:active {
+  transform: scale(0.98);
 }
 
 .sandbox[data-demo-step="crm-deal"] .sandbox__dock-primary--emphasis,
@@ -1307,20 +1601,14 @@
 /* —— Right context panel —— */
 
 .demo-context {
-  padding: 18px 16px;
-  background: #fff;
-  border-top: 1px solid var(--border);
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  background: var(--sandbox-surface);
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-}
-
-@media (min-width: 980px) {
-  .demo-context {
-    border-top: 0;
-    border-left: 1px solid var(--border);
-  }
 }
 
 .demo-context__head {
@@ -1354,11 +1642,21 @@
 
 .demo-context__card {
   padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--panel-subtle);
+  border-radius: 14px;
+  border: 1px solid var(--sandbox-border);
+  background: var(--sandbox-surface-subtle);
   display: grid;
   gap: 6px;
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+}
+
+.demo-context__card:hover {
+  border-color: var(--sandbox-border-strong);
+  box-shadow: var(--sandbox-shadow-card);
+  transform: translateY(-1px);
 }
 
 .demo-context__card-title {
@@ -1517,12 +1815,12 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  background: var(--sandbox-surface);
+  border: 1px solid var(--sandbox-border);
+  border-radius: 18px;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.8) inset,
-    0 16px 48px -36px rgba(15, 23, 42, 0.18);
+    0 1px 0 rgba(255, 255, 255, 0.92) inset,
+    var(--sandbox-shadow-card);
   overflow: hidden;
 }
 
@@ -1640,54 +1938,87 @@
 .deal-workspace__body {
   padding: 16px 18px 18px;
   display: grid;
+  /* min-content: контент не давится в ноль — при нехватке высоты скроллится stage */
+  grid-template-rows: minmax(min-content, 1fr) auto;
   gap: 14px;
   min-height: 0;
+  flex: 1;
 }
 
 .deal-workspace__cols {
   display: grid;
   gap: 14px;
   grid-template-columns: minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
 }
 
 @media (min-width: 860px) {
   .deal-workspace__cols {
-    grid-template-columns: minmax(0, 0.44fr) minmax(0, 0.56fr);
-    align-items: start;
+    grid-template-columns: minmax(0, 0.46fr) minmax(0, 0.54fr);
+    align-items: stretch;
   }
 }
 
 .deal-workspace__side {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
+  height: 100%;
+  min-height: 0;
 }
 
 .deal-panel {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #fff;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--sandbox-border);
+  border-radius: 16px;
+  background: var(--sandbox-surface);
   overflow: hidden;
+  box-shadow: 0 3px 12px rgba(16, 24, 40, 0.035);
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+}
+
+.deal-panel:hover {
+  border-color: var(--sandbox-border-strong);
+  box-shadow: var(--sandbox-shadow-card);
+  transform: translateY(-1px);
 }
 
 .deal-panel--chat {
   display: flex;
   flex-direction: column;
-  min-height: 280px;
+  height: 100%;
+  min-height: 0;
 }
 
 .deal-panel__title {
   margin: 0;
-  padding: 12px 14px 0;
+  padding: 13px 14px 11px;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
+  border-bottom: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, #fff 0%, var(--sandbox-surface-subtle) 100%);
 }
 
 .deal-panel__body {
-  padding: 10px 14px 14px;
+  padding: 14px;
+  min-height: 0;
+}
+
+.deal-panel--chat .deal-panel__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .deal-panel__more {
@@ -1736,6 +2067,7 @@
   list-style: none;
   display: grid;
   gap: 12px;
+  overflow: auto;
 }
 
 .deal-activity__item {
@@ -1794,28 +2126,63 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 240px;
+  flex: 1;
+  /* Пол на высоту: чат не схлопывается, когда фрейму не хватает места */
+  min-height: 220px;
   overflow-y: auto;
-  padding-right: 4px;
+  padding: 2px 6px 2px 2px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sandbox-border-strong) transparent;
+}
+
+.deal-chat::-webkit-scrollbar {
+  width: 8px;
+}
+
+.deal-chat::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.deal-chat::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--sandbox-border-strong);
 }
 
 .deal-chat__msg {
   position: relative;
-  padding: 11px 13px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: #fff;
+  width: min(92%, 520px);
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--sandbox-border);
+  background: var(--sandbox-surface);
+  box-shadow: 0 3px 12px rgba(16, 24, 40, 0.035);
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    background-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
 }
 
 .deal-chat__msg--note {
-  background: color-mix(in oklab, var(--accent-soft) 35%, #fff);
-  border-color: color-mix(in oklab, var(--accent-muted) 50%, var(--border));
+  background: var(--sandbox-blue-soft);
+  border-color: color-mix(in oklab, var(--sandbox-blue) 25%, var(--sandbox-border));
 }
 
 .deal-chat__msg--fresh {
-  border-color: color-mix(in oklab, var(--accent) 35%, var(--border));
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent-soft) 60%, transparent);
+  align-self: flex-end;
+  background: color-mix(in oklab, var(--sandbox-blue-soft) 72%, #fff);
+  border-color: color-mix(in oklab, var(--sandbox-blue) 45%, var(--sandbox-border));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--sandbox-blue-soft) 60%, transparent),
+    var(--sandbox-shadow-card);
   animation: chat-fresh-in 0.5s var(--ease-out);
+}
+
+.deal-chat__msg:hover {
+  border-color: var(--sandbox-border-strong);
+  box-shadow: var(--sandbox-shadow-card);
+  transform: translateY(-1px);
 }
 
 @keyframes chat-fresh-in {
@@ -1864,21 +2231,23 @@
 }
 
 .deal-composer {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
   border-top: 1px solid var(--border-subtle);
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
 }
 
 .deal-composer__field {
-  flex: 1;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--panel-subtle);
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--sandbox-border-strong);
+  background: var(--sandbox-surface);
   font-size: 13px;
   color: var(--muted);
 }
@@ -1889,13 +2258,24 @@
 }
 
 .deal-composer__tool {
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--sandbox-border);
   font-size: 11px;
   font-weight: 600;
   color: var(--muted-strong);
-  background: #fff;
+  background: var(--sandbox-surface-subtle);
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    color var(--duration-base) var(--ease-out),
+    background-color var(--duration-base) var(--ease-out);
+}
+
+.deal-composer__tool:hover {
+  border-color: var(--sandbox-border-strong);
+  color: var(--sandbox-text);
+  background: var(--sandbox-surface);
 }
 
 .deal-related__title {
@@ -1916,19 +2296,21 @@
 
 .deal-related__card {
   padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--sandbox-border);
+  background: var(--sandbox-surface);
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.2s var(--ease-ui),
-    box-shadow 0.2s var(--ease-ui);
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
 }
 
 .deal-related__card:hover {
   border-color: color-mix(in oklab, var(--accent-muted) 60%, var(--border));
-  box-shadow: 0 8px 20px -16px rgba(37, 99, 235, 0.25);
+  box-shadow: var(--sandbox-shadow-card);
+  transform: translateY(-1px);
 }
 
 .deal-related__label {
@@ -1957,5 +2339,26 @@
 @media (prefers-reduced-motion: reduce) {
   .deal-chat__msg--fresh {
     animation: none;
+  }
+}
+
+@media (max-width: 859px) {
+  .deal-workspace__body,
+  .deal-workspace__cols,
+  .deal-workspace__side,
+  .deal-panel--chat {
+    height: auto;
+  }
+
+  .deal-chat {
+    max-height: 360px;
+  }
+
+  .deal-composer {
+    grid-template-columns: 1fr;
+  }
+
+  .deal-composer__tools {
+    justify-content: flex-end;
   }
 }

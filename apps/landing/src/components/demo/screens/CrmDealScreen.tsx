@@ -55,7 +55,7 @@ export function CrmDealScreen({ deal, onAdvance, onExplore }: Props) {
             variant="ghost"
             label="Обсудить"
             onClick={() =>
-              onExplore("Обсуждение ведётся на карточке — отдельный чат не нужен.")
+              onExplore("Обсуждение сделки открыто рядом со сводкой и активностью.")
             }
           />
           <Cta variant="primary" label="Проверить ёмкость →" emphasis onClick={onAdvance} />

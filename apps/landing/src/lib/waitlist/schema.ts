@@ -23,6 +23,7 @@ const workEmail = z
   .string()
   .transform(sanitizeText)
   .pipe(z.string().toLowerCase())
+  .pipe(z.string().min(1, "Укажите рабочий email"))
   .pipe(z.string().email("Похоже, в адресе опечатка"))
   .refine((addr) => !isConsumerEmailDomain(addr), { message: WORK_EMAIL_ERROR });
 
@@ -31,14 +32,10 @@ export const WaitlistSubmission = z.object({
   email: workEmail,
   company: boundedString(2, 120, "Укажите компанию"),
   role: boundedString(2, 80, "Укажите роль или должность"),
-  companySize: z.enum([
-    "solo",
-    "small",
-    "mid",
-    "large",
-    "enterprise",
-    "other",
-  ]),
+  companySize: z.enum(
+    ["solo", "small", "mid", "large", "enterprise", "other"],
+    { message: "Выберите диапазон проектов" },
+  ),
   context: z
     .string()
     .transform(sanitizeOptionalText)
@@ -46,7 +43,9 @@ export const WaitlistSubmission = z.object({
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
   consent: z
-    .union([z.literal(true), z.literal("on"), z.literal("true")])
+    .union([z.literal(true), z.literal("on"), z.literal("true")], {
+      message: "Нужно согласие с условиями альфы",
+    })
     .transform(() => true)
     .pipe(z.literal(true)),
   /** Honeypot — should always be empty. */

@@ -1,0 +1,86 @@
+.demo-band {
+  --demo-dim-progress: 0;
+  --demo-dim-scale-boost: 0;
+  position: relative;
+}
+
+.demo-dim-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 48;
+  pointer-events: none;
+  opacity: calc(var(--demo-dim-progress) * 0.995);
+  background: var(--plasma-ink);
+  transition: opacity 90ms linear;
+}
+
+.demo-band > .demo-band__wrap {
+  position: relative;
+  width: min(1480px, calc(100% - clamp(24px, 4vw, 48px)));
+  margin-inline: auto;
+}
+
+.demo-frame {
+  position: relative;
+  z-index: 52;
+  padding: 1px;
+  border-radius: 30px;
+  transform-origin: center center;
+  background: color-mix(in oklab, var(--border) 70%, var(--accent) 30%);
+  box-shadow:
+    0 42px 92px -58px rgba(15, 23, 42, 0.58),
+    0 calc(40px + var(--demo-dim-progress) * 28px) calc(90px + var(--demo-dim-progress) * 38px) -52px rgba(5, 5, 16, calc(0.16 + var(--demo-dim-progress) * 0.42)),
+    0 1px 0 rgba(255, 255, 255, 0.92) inset;
+  transition: transform 90ms linear;
+}
+
+.demo-frame[data-demo-dim-frame] {
+  transform: scale(calc(1 + var(--demo-dim-progress) * var(--demo-dim-scale-boost)));
+}
+
+.demo-band .section-head,
+.demo-controls {
+  position: relative;
+  z-index: 1;
+}
+
+.demo-frame__inner {
+  border-radius: 29px;
+  overflow: hidden;
+  background: #f4f6fa;
+  height: clamp(700px, 78vh, 860px);
+  min-height: 700px;
+}
+
+.demo-frame__inner .sandbox {
+  min-height: inherit;
+  height: 100%;
+}
+
+@media (max-width: 760px) {
+  .demo-frame__inner {
+    height: auto;
+    min-height: 760px;
+  }
+}
+
+.demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 20px;
+  margin-top: clamp(40px, 6vw, 72px);
+  padding-top: 8px;
+}
+
+.demo-controls .l-btn--primary {
+  height: 54px;
+  padding-inline: 30px;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+/* Demo sandbox + deal workspace — см. demo-sandbox.css */
+
+/* Scope — ink band + product kanban */

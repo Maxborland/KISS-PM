@@ -10,6 +10,7 @@ export default defineConfig({
   output: "server",
   adapter: node({ mode: "standalone" }),
   integrations: [react(), mdx()],
+  devToolbar: { enabled: false },
   server: { host: "127.0.0.1", port: 4321 },
   vite: {
     optimizeDeps: {
