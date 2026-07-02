@@ -16,9 +16,7 @@
   "scripts": {
     "dev:api": "pnpm --filter @kiss-pm/api dev",
     "dev:web": "pnpm --filter @kiss-pm/web dev",
-    "dev:web:lan": "pnpm --filter @kiss-pm/web dev:lan",
     "dev:landing": "pnpm --filter @kiss-pm/landing dev",
-    "dev:storybook:lan": "pnpm --filter @kiss-pm/web storybook:lan",
     "dev:compose": "docker compose up postgres api web",
     "dev:compose:detached": "docker compose up -d postgres api web",
     "db:up": "docker compose up -d postgres",
