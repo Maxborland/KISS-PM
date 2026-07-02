@@ -13,6 +13,7 @@ import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
+import { createPlanningCommand } from "@kiss-pm/domain";
 import type { PlanningCommand, PlanCalendar, PlanCalendarException, PlanTask } from "@kiss-pm/domain";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
@@ -127,16 +128,16 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     const st = dayState(day);
     if (st.weekend) return; // выходные задаются календарём (read-only)
     if (!isResourceView) {
-      if (st.holiday) void applyCmd({ type: "calendar.exception.upsert", payload: { id: st.holiday.id, calendarId: model.cal.id, resourceId: null, date: dayToIso(day), workingMinutes: model.full, reason: "" } } as PlanningCommand, "Праздник снят");
+      if (st.holiday) void applyCmd(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: st.holiday.id, calendarId: model.cal.id, resourceId: null, date: dayToIso(day), workingMinutes: model.full, reason: "" } }), "Праздник снят");
       // переиспользуем id уже существующей записи на эту дату (в т.ч. реактивированной), иначе минтим новую — без дубликата
-      else { const existing = model.anyHolidayByDay.get(day); void applyCmd({ type: "calendar.exception.upsert", payload: { id: existing?.id ?? nid("hol"), calendarId: model.cal.id, resourceId: null, date: dayToIso(day), workingMinutes: 0, reason: "Праздник" } } as PlanningCommand, "Праздник добавлен"); }
+      else { const existing = model.anyHolidayByDay.get(day); void applyCmd(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: existing?.id ?? nid("hol"), calendarId: model.cal.id, resourceId: null, date: dayToIso(day), workingMinutes: 0, reason: "Праздник" } }), "Праздник добавлен"); }
     } else {
       if (st.holiday) return; // праздник — общий, снимается в календаре проекта
-      if (st.absence) void applyCmd({ type: "calendar.exception.upsert", payload: { id: st.absence.id, calendarId: model.cal.id, resourceId: selCal, date: dayToIso(day), workingMinutes: model.full, reason: "" } } as PlanningCommand, "Отсутствие снято");
-      else { const existing = model.anyAbsByResDay.get(selCal)?.get(day); void applyCmd({ type: "calendar.exception.upsert", payload: { id: existing?.id ?? nid("ex"), calendarId: model.cal.id, resourceId: selCal, date: dayToIso(day), workingMinutes: 0, reason: "Отсутствие" } } as PlanningCommand, "Отсутствие добавлено"); }
+      if (st.absence) void applyCmd(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: st.absence.id, calendarId: model.cal.id, resourceId: selCal, date: dayToIso(day), workingMinutes: model.full, reason: "" } }), "Отсутствие снято");
+      else { const existing = model.anyAbsByResDay.get(selCal)?.get(day); void applyCmd(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: existing?.id ?? nid("ex"), calendarId: model.cal.id, resourceId: selCal, date: dayToIso(day), workingMinutes: 0, reason: "Отсутствие" } }), "Отсутствие добавлено"); }
     }
   };
-  const removeExc = (x: PlanCalendarException) => void applyCmd({ type: "calendar.exception.upsert", payload: { id: x.id, calendarId: x.calendarId, resourceId: x.resourceId, date: x.date, workingMinutes: model.full, reason: "" } } as PlanningCommand, "Исключение снято");
+  const removeExc = (x: PlanCalendarException) => void applyCmd(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: x.id, calendarId: x.calendarId, resourceId: x.resourceId, date: x.date, workingMinutes: model.full, reason: "" } }), "Исключение снято");
 
   const doAbsence = async (resourceId: string, typeLabel: string, start: string, finish: string) => {
     const cmds: PlanningCommand[] = [];
@@ -144,7 +145,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     for (let d = isoToDay(start); d <= end; d += 1) {
       // только рабочие дни диапазона: пропускаем выходные и праздники
       if (!model.cal.workingWeekdays.includes(new Date(BASE_MS + d * 86_400_000).getUTCDay()) || model.holidayByDay.has(d)) continue;
-      cmds.push({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: model.cal.id, resourceId, date: dayToIso(d), workingMinutes: 0, reason: typeLabel } } as PlanningCommand);
+      cmds.push(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: model.cal.id, resourceId, date: dayToIso(d), workingMinutes: 0, reason: typeLabel } }));
     }
     if (cmds.length === 0) return;
     setBusy(true);

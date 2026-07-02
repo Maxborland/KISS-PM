@@ -12,7 +12,8 @@ import { MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backe
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AddAssigneeDialog, distribute, presetWeights, ROLES, roleLabel } from "@/delivery/assignments/assignments-editors";
-import type { PlanningCommand } from "@kiss-pm/domain";
+import { createPlanningCommand } from "@kiss-pm/domain";
+import type { PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
 
 type Gran = "day" | "week";
 // AsgRaw — локальная VIEW-модель строки назначения: role сужен до string под нужды редактора ролей,
@@ -165,22 +166,22 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   const selTask = selMeta ? model.leafTasks.find((t) => t.id === selMeta.asg.taskId) ?? null : null;
 
   const upsert = (asg: AsgRaw, patch: Partial<Pick<AsgRaw, "resourceId" | "role" | "unitsPermille" | "workMinutes">>) =>
-    applyCmd({ type: "assignment.upsert", payload: { id: asg.id, taskId: asg.taskId, resourceId: patch.resourceId ?? asg.resourceId, role: patch.role ?? asg.role, unitsPermille: patch.unitsPermille ?? asg.unitsPermille, workMinutes: patch.workMinutes ?? asg.workMinutes } } as PlanningCommand, "Назначение обновлено").then(() => setDraft(null));
+    applyCmd(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: asg.taskId, resourceId: patch.resourceId ?? asg.resourceId, role: (patch.role ?? asg.role) as PlanAssignmentRole, unitsPermille: patch.unitsPermille ?? asg.unitsPermille, workMinutes: patch.workMinutes ?? asg.workMinutes } }), "Назначение обновлено").then(() => setDraft(null));
 
-  const removeAsg = (asg: AsgRaw) => { setSel(null); void applyCmd({ type: "assignment.delete", payload: { assignmentId: asg.id } } as PlanningCommand, "Исполнитель снят"); };
+  const removeAsg = (asg: AsgRaw) => { setSel(null); void applyCmd(createPlanningCommand({ type: "assignment.delete", payload: { assignmentId: asg.id } }), "Исполнитель снят"); };
 
   const addAssignee = (taskId: string, resourceId: string, role: string) => {
     const t = model.leafTasks.find((x) => x.id === taskId);
     const used = (model.asgByTask.get(taskId) ?? []).filter((a) => WORKING.has(a.role)).reduce((s, a) => s + a.workMinutes, 0);
     // новый исполнитель забирает НЕразложенный остаток труда задачи (без дублирования)
     const work = WORKING.has(role) ? Math.max(0, (t?.workMinutes ?? 0) - used) : 0;
-    void applyCmd({ type: "assignment.upsert", payload: { id: nid("a"), taskId, resourceId, role, unitsPermille: 1000, workMinutes: work } } as PlanningCommand, "Исполнитель добавлен");
+    void applyCmd(createPlanningCommand({ type: "assignment.upsert", payload: { id: nid("a"), taskId, resourceId, role: role as PlanAssignmentRole, unitsPermille: 1000, workMinutes: work } }), "Исполнитель добавлен");
   };
 
   // отправка кривой (assignment.allocations.replace) — оптимистично; сумма валидируется бэком
   async function applyCurve(m: AsgMeta, minutesByDay: Map<number, number>) {
     const allocations = [...minutesByDay.entries()].filter(([, mm]) => mm > 0).sort((a, b) => a[0] - b[0]).map(([day, mm]) => ({ date: dayToIso(day), workMinutes: mm }));
-    const res = await applyCmd({ type: "assignment.allocations.replace", payload: { assignmentId: m.asg.id, allocations } } as PlanningCommand, "Кривая распределения применена");
+    const res = await applyCmd(createPlanningCommand({ type: "assignment.allocations.replace", payload: { assignmentId: m.asg.id, allocations } }), "Кривая распределения применена");
     if (res.ok || res.conflict) { setDraft(null); setCurveErr(null); } // успех или перезагрузка после конфликта — берём данные из модели
     else setCurveErr(res.issues?.[0]?.message ?? `Сумма распределения должна равняться ${h1(m.asg.workMinutes)} ч`);
   }
@@ -188,7 +189,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
     const mins = distribute(m.asg.workMinutes, presetWeights(m.days.length, kind));
     void applyCurve(m, new Map(m.days.map((d, i) => [d, mins[i] ?? 0])));
   };
-  const resetCurve = (m: AsgMeta) => { void applyCmd({ type: "assignment.allocations.replace", payload: { assignmentId: m.asg.id, allocations: [] } } as PlanningCommand, "Кривая сброшена к равномерной").then(() => setDraft(null)); };
+  const resetCurve = (m: AsgMeta) => { void applyCmd(createPlanningCommand({ type: "assignment.allocations.replace", payload: { assignmentId: m.asg.id, allocations: [] } }), "Кривая сброшена к равномерной").then(() => setDraft(null)); };
 
   // дни для редактора кривой = рабочие дни расписания ∪ дни уже заданной кривой (на случай сдвига расписания)
   const editDaysOf = (m: AsgMeta): number[] => [...new Set([...m.days, ...m.explicit.keys()])].sort((x, y) => x - y);

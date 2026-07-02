@@ -13,6 +13,7 @@ import { PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { demoAction } from "@/views/lib/demo";
+import { createPlanningCommand } from "@kiss-pm/domain";
 import type { PlanningCommand, PlanCalendar } from "@kiss-pm/domain";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
@@ -106,7 +107,7 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }
 
   const openDeadlineEdit = () => { setDraftDeadline(project.deadline ?? ""); setReason(""); setEditDeadline(true); setNotice(null); };
-  const submitDeadline = () => void applyCmd({ type: "project.deadline.move", payload: { deadline: draftDeadline, reason: reason.trim() } } as PlanningCommand, "Дедлайн перенесён", () => { setEditDeadline(false); setReason(""); });
+  const submitDeadline = () => void applyCmd(createPlanningCommand({ type: "project.deadline.move", payload: { deadline: draftDeadline, reason: reason.trim() } }), "Дедлайн перенесён", () => { setEditDeadline(false); setReason(""); });
 
   return (
     <DeliveryFrame project={projectMeta} activeTab="Настройки">

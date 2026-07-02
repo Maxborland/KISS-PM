@@ -13,7 +13,8 @@ import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/d
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu, TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
-import type { PlanningCommand } from "@kiss-pm/domain";
+import { createPlanningCommand } from "@kiss-pm/domain";
+import type { DependencyType, PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
 import { buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/planning-client";
 
 const HPD = 8; // часов в рабочем дне
@@ -366,13 +367,13 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       setDrag(null);
       if (!cur) return;
       if (cur.mode === "progress") {
-        if (cur.curPct !== cur.origPct) void applyCmd({ type: "task.update_progress", payload: { taskId: cur.id, percentComplete: cur.curPct } } as PlanningCommand);
+        if (cur.curPct !== cur.origPct) void applyCmd(createPlanningCommand({ type: "task.update_progress", payload: { taskId: cur.id, percentComplete: cur.curPct } }));
         return;
       }
       if (cur.deltaDays === 0) return;
       if (cur.mode === "move") {
         const ns = Math.max(0, cur.origStart + cur.deltaDays);
-        void applyCmd({ type: "task.update_schedule", payload: { taskId: cur.id, plannedStart: dayToIso(ns), plannedFinish: dayToIso(ns + cur.origDur) } } as PlanningCommand);
+        void applyCmd(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: cur.id, plannedStart: dayToIso(ns), plannedFinish: dayToIso(ns + cur.origDur) } }));
       } else if (cur.mode === "resizeLeft") {
         // Тяга левого края меняет старт И длительность → шлём update_schedule + update_work_model
         // + синк назначения (как editFinish). Иначе WBS покажет новые часы, а Ресурсы/Сценарии —
@@ -384,12 +385,12 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           const u = cur.origDur > 0 ? cur.origWorkH / (cur.origDur * HPD) : 1;
           const wm = Math.max(0, Math.round(nd * HPD * u * 60));
           const cmds: PlanningCommand[] = [
-            { type: "task.update_schedule", payload: { taskId: cur.id, plannedStart: dayToIso(ns), plannedFinish: dayToIso(nf) } } as PlanningCommand,
-            { type: "task.update_work_model", payload: { taskId: cur.id, taskType: "fixed_duration", effortDriven: false, durationMinutes: nd * MIN_PER_DAY, workMinutes: wm } } as PlanningCommand
+            createPlanningCommand({ type: "task.update_schedule", payload: { taskId: cur.id, plannedStart: dayToIso(ns), plannedFinish: dayToIso(nf) } }),
+            createPlanningCommand({ type: "task.update_work_model", payload: { taskId: cur.id, taskType: "fixed_duration", effortDriven: false, durationMinutes: nd * MIN_PER_DAY, workMinutes: wm } })
           ];
           const asgs = readModelRef.current?.authored.assignments;
           const asg = asgs?.find((x) => x.taskId === cur.id);
-          if (asg) cmds.push({ type: "assignment.upsert", payload: { id: asg.id, taskId: cur.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } } as PlanningCommand);
+          if (asg) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: cur.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } }));
           void runBatch(cmds);
         }
       } else {
@@ -397,12 +398,12 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         const u = cur.origDur > 0 ? cur.origWorkH / (cur.origDur * HPD) : 1;
         const wm = Math.max(0, Math.round(nd * HPD * u * 60));
         const cmds: PlanningCommand[] = [
-          { type: "task.update_work_model", payload: { taskId: cur.id, taskType: "fixed_duration", effortDriven: false, durationMinutes: nd * MIN_PER_DAY, workMinutes: wm } } as PlanningCommand
+          createPlanningCommand({ type: "task.update_work_model", payload: { taskId: cur.id, taskType: "fixed_duration", effortDriven: false, durationMinutes: nd * MIN_PER_DAY, workMinutes: wm } })
         ];
         // синхронизируем труд назначения (загрузка ресурса считается из assignment.workMinutes)
         const asgs = readModelRef.current?.authored.assignments;
         const asg = asgs?.find((x) => x.taskId === cur.id);
-        if (asg) cmds.push({ type: "assignment.upsert", payload: { id: asg.id, taskId: cur.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } } as PlanningCommand);
+        if (asg) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: cur.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } }));
         if (cmds.length > 1) void runBatch(cmds); else void applyCmd(cmds[0]!);
       }
     };
@@ -450,7 +451,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       let toEdge: "start" | "finish" = "start";
       if (tr && rect) { const x = e.clientX - rect.left; const mid = (tr.dayStart + tr.dayDur / 2) * dayWRef.current; toEdge = x < mid ? "start" : "finish"; }
       const type = lk.fromEdge === "finish" ? (toEdge === "start" ? "FS" : "FF") : toEdge === "start" ? "SS" : "SF";
-      void applyCmd({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: lk.fromId, successorTaskId: targetId, dependencyType: type, lagMinutes: 0 } } as PlanningCommand);
+      void applyCmd(createPlanningCommand({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: lk.fromId, successorTaskId: targetId, dependencyType: type, lagMinutes: 0 } }));
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -615,11 +616,11 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // --- команды ---
   // Текущее назначение задачи из read-model (по taskId): нужен его id, чтобы upsert
   // обновлял существующее назначение, а не плодил второе (реальный редьюсер upsert-ит строго по id).
-  type AsgRM = { id: string; taskId: string; resourceId: string; role?: string; unitsPermille?: number; workMinutes?: number | null };
+  type AsgRM = { id: string; taskId: string; resourceId: string; role?: PlanAssignmentRole; unitsPermille?: number; workMinutes?: number | null };
   const authoredAsgs = readModel.authored.assignments;
   const currentAsg = (taskId: string): AsgRM | undefined => authoredAsgs.find((x) => x.taskId === taskId);
   const workCmd = (taskId: string, durDays: number, workH: number): PlanningCommand =>
-    ({ type: "task.update_work_model", payload: { taskId, taskType: "fixed_duration", effortDriven: false, durationMinutes: durDays * MIN_PER_DAY, workMinutes: Math.max(0, Math.round(workH * 60)) } }) as PlanningCommand;
+    createPlanningCommand({ type: "task.update_work_model", payload: { taskId, taskType: "fixed_duration", effortDriven: false, durationMinutes: durDays * MIN_PER_DAY, workMinutes: Math.max(0, Math.round(workH * 60)) } });
   // Правка труда/длительности должна синхронизировать ТРУД назначения: загрузка ресурса
   // считается из assignment.workMinutes, иначе WBS покажет новые часы, а Ресурсы/Сценарии —
   // старую нагрузку. Шлём task.update_work_model + assignment.upsert (по id текущего назначения).
@@ -627,15 +628,15 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     const wm = Math.max(0, Math.round(workH * 60));
     const cmds: PlanningCommand[] = [workCmd(r.id, durDays, workH)];
     const asg = currentAsg(r.id);
-    if (asg) cmds.push({ type: "assignment.upsert", payload: { id: asg.id, taskId: r.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } } as PlanningCommand);
+    if (asg) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: r.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } }));
     void runBatch(cmds);
   };
   const editDuration = (r: Row, days: number) => { const u = r.durDays > 0 ? r.workH / (r.durDays * HPD) : 1; workEdit(r, days, Math.round(days * HPD * u)); };
   const editWork = (r: Row, workH: number) => workEdit(r, r.durDays, workH);
   const editUnits = (r: Row, pct: number) => workEdit(r, r.durDays, Math.round(r.durDays * HPD * (pct / 100)));
-  const editName = (r: Row, title: string) => void applyCmd({ type: "task.update_identity", payload: { taskId: r.id, title } } as PlanningCommand);
-  const editPct = (r: Row, pct: number) => void applyCmd({ type: "task.update_progress", payload: { taskId: r.id, percentComplete: Math.max(0, Math.min(100, pct)) } } as PlanningCommand);
-  const editDate = (r: Row, iso: string) => void applyCmd({ type: "task.update_schedule", payload: { taskId: r.id, plannedStart: iso, plannedFinish: dayToIso(isoToDay(iso) + r.dayDur) } } as PlanningCommand);
+  const editName = (r: Row, title: string) => void applyCmd(createPlanningCommand({ type: "task.update_identity", payload: { taskId: r.id, title } }));
+  const editPct = (r: Row, pct: number) => void applyCmd(createPlanningCommand({ type: "task.update_progress", payload: { taskId: r.id, percentComplete: Math.max(0, Math.min(100, pct)) } }));
+  const editDate = (r: Row, iso: string) => void applyCmd(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: r.id, plannedStart: iso, plannedFinish: dayToIso(isoToDay(iso) + r.dayDur) } }));
   // Перенос окончания = изменение длительности: помимо update_schedule (авторские даты)
   // шлём update_work_model с новой длительностью + синхроним труд назначения, иначе на живом
   // read-model длина бара (она идёт от durationMinutes движка) осталась бы прежней.
@@ -646,22 +647,22 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     const u = r.durDays > 0 ? r.workH / (r.durDays * HPD) : 1;
     const workH = Math.round(newDur * HPD * u);
     const cmds: PlanningCommand[] = [
-      { type: "task.update_schedule", payload: { taskId: r.id, plannedStart: startIso, plannedFinish: iso } } as PlanningCommand,
+      createPlanningCommand({ type: "task.update_schedule", payload: { taskId: r.id, plannedStart: startIso, plannedFinish: iso } }),
       workCmd(r.id, newDur, workH)
     ];
     const asg = currentAsg(r.id);
-    if (asg) cmds.push({ type: "assignment.upsert", payload: { id: asg.id, taskId: r.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: Math.max(0, Math.round(workH * 60)) } } as PlanningCommand);
+    if (asg) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: r.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: Math.max(0, Math.round(workH * 60)) } }));
     void runBatch(cmds);
   };
   // Переназначение ресурса: переиспользуем id текущего назначения (если есть), иначе genId —
   // реальный редьюсер upsert-ит строго по payload.id, новый id добавил бы второе назначение.
-  const assignRes = (taskId: string, resourceId: string) => { const asg = currentAsg(taskId); void applyCmd({ type: "assignment.upsert", payload: { id: asg?.id ?? genId("a"), taskId, resourceId, role: asg?.role ?? "executor", unitsPermille: asg?.unitsPermille ?? 1000, workMinutes: null } } as PlanningCommand); };
-  const depAdd = (succId: string, predId: string, type: string, lagDays: number) => void applyCmd({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: predId, successorTaskId: succId, dependencyType: type, lagMinutes: lagDays * MIN_PER_DAY } } as PlanningCommand);
-  const depRemove = (depId: string) => void applyCmd({ type: "dependency.delete", payload: { dependencyId: depId } } as PlanningCommand);
-  const depUpsert = (depId: string, predId: string, succId: string, type: string, lagDays: number) => void applyCmd({ type: "dependency.upsert", payload: { id: depId, predecessorTaskId: predId, successorTaskId: succId, dependencyType: type, lagMinutes: lagDays * MIN_PER_DAY } } as PlanningCommand);
+  const assignRes = (taskId: string, resourceId: string) => { const asg = currentAsg(taskId); void applyCmd(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg?.id ?? genId("a"), taskId, resourceId, role: asg?.role ?? "executor", unitsPermille: asg?.unitsPermille ?? 1000, workMinutes: null } })); };
+  const depAdd = (succId: string, predId: string, type: string, lagDays: number) => void applyCmd(createPlanningCommand({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: predId, successorTaskId: succId, dependencyType: type as DependencyType, lagMinutes: lagDays * MIN_PER_DAY } }));
+  const depRemove = (depId: string) => void applyCmd(createPlanningCommand({ type: "dependency.delete", payload: { dependencyId: depId } }));
+  const depUpsert = (depId: string, predId: string, succId: string, type: string, lagDays: number) => void applyCmd(createPlanningCommand({ type: "dependency.upsert", payload: { id: depId, predecessorTaskId: predId, successorTaskId: succId, dependencyType: type as DependencyType, lagMinutes: lagDays * MIN_PER_DAY } }));
   // Веха = пользовательское поле kind=milestone (как читают overview/inspector/settings),
   // а НЕ durationMinutes:0 — домен отклоняет нулевую длительность (validateWorkModelPayload).
-  const makeMilestone = (r: Row) => void applyCmd({ type: "task.update_custom_field", payload: { taskId: r.id, fieldKey: "kind", value: "milestone" } } as PlanningCommand);
+  const makeMilestone = (r: Row) => void applyCmd(createPlanningCommand({ type: "task.update_custom_field", payload: { taskId: r.id, fieldKey: "kind", value: "milestone" } }));
   const deleteTask = (r: Row) => {
     // Удаление summary: реальный редьюсер сносит только саму задачу и оставляет детей сиротами.
     // Шлём явный пакет удаления всего поддерева (summary + потомки по wbs), а не один delete.
@@ -669,14 +670,14 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       const subtree = rows.filter((x) => x.id === r.id || x.wbs.startsWith(r.wbs + "."));
       // снизу вверх (сначала листья), чтобы не удалять родителя раньше детей
       const ordered = subtree.slice().sort((a, b) => b.wbs.length - a.wbs.length);
-      void runBatch(ordered.map((x) => ({ type: "task.delete_or_archive", payload: { taskId: x.id, mode: "delete" } }) as PlanningCommand));
+      void runBatch(ordered.map((x) => createPlanningCommand({ type: "task.delete_or_archive", payload: { taskId: x.id, mode: "delete" } })));
       return;
     }
-    void applyCmd({ type: "task.delete_or_archive", payload: { taskId: r.id, mode: "delete" } } as PlanningCommand);
+    void applyCmd(createPlanningCommand({ type: "task.delete_or_archive", payload: { taskId: r.id, mode: "delete" } }));
   };
   // sortOrder = целевой индекс среди детей нового родителя (реальный редьюсер вставляет по нему;
   // 0 всегда ставил бы строку перед всеми сиблингами). Мок sortOrder игнорирует — паритет сохраняется.
-  const moveCmd = (taskId: string, parentTaskId: string | null, sortOrder: number): PlanningCommand => ({ type: "task.move_wbs", payload: { taskId, parentTaskId, sortOrder } }) as PlanningCommand;
+  const moveCmd = (taskId: string, parentTaskId: string | null, sortOrder: number): PlanningCommand => createPlanningCommand({ type: "task.move_wbs", payload: { taskId, parentTaskId, sortOrder } });
   const childrenOf = (parentId: string | null) => rows.filter((x) => x.parentId === parentId);
   const prevSibling = (r: Row): Row | null => { const sibs = childrenOf(r.parentId); const i = sibs.findIndex((x) => x.id === r.id); return i > 0 ? sibs[i - 1]! : null; };
   const canIndent = (r: Row) => prevSibling(r) !== null;
@@ -723,18 +724,18 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     const cmds: PlanningCommand[] = [];
     if (m.mode === "create") {
       const id = genId("t");
-      cmds.push({ type: "task.create", payload: { id, projectId, parentTaskId: m.parentId, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? addFinish(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } } as PlanningCommand);
-      if (v.startIso) cmds.push({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: addFinish(v.startIso, v.durDays) } } as PlanningCommand);
-      if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: genId("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
-      if (v.pct > 0) cmds.push({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } } as PlanningCommand);
+      cmds.push(createPlanningCommand({ type: "task.create", payload: { id, projectId, parentTaskId: m.parentId, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? addFinish(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } }));
+      if (v.startIso) cmds.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: addFinish(v.startIso, v.durDays) } }));
+      if (v.assigneeId) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: genId("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } }));
+      if (v.pct > 0) cmds.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } }));
     } else if (m.taskId) {
       const id = m.taskId;
-      cmds.push({ type: "task.update_identity", payload: { taskId: id, title: v.title } } as PlanningCommand);
-      cmds.push({ type: "task.update_work_model", payload: { taskId: id, taskType: "fixed_duration", effortDriven: false, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60 } } as PlanningCommand);
-      if (v.startIso) cmds.push({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: addFinish(v.startIso, v.durDays) } } as PlanningCommand);
-      cmds.push({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } } as PlanningCommand);
+      cmds.push(createPlanningCommand({ type: "task.update_identity", payload: { taskId: id, title: v.title } }));
+      cmds.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId: id, taskType: "fixed_duration", effortDriven: false, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60 } }));
+      if (v.startIso) cmds.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: addFinish(v.startIso, v.durDays) } }));
+      cmds.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } }));
       // переиспользуем id текущего назначения (если было) — иначе upsert добавит второе и удвоит нагрузку
-      if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: m.asgId ?? genId("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
+      if (v.assigneeId) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: m.asgId ?? genId("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } }));
     }
     void runBatch(cmds);
   }
@@ -748,7 +749,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   function createInline(title: string, parentId: string | null = null): boolean {
     const t = title.trim();
     if (t.length < 3) { setNotice("Название задачи: минимум 3 символа"); return false; } // домен: title 3–160
-    void applyCmd({
+    void applyCmd(createPlanningCommand({
       type: "task.create",
       payload: {
         id: genId("t"),
@@ -762,7 +763,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         workMinutes: 40 * 60,
         assignments: []
       }
-    } as PlanningCommand);
+    }));
     return true;
   }
 
