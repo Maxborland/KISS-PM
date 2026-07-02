@@ -164,11 +164,12 @@ export async function buildWorkspaceCapacityAggregation(
   // Снапшоты тянем параллельно (I/O), а тяжёлый CPM-пересчёт делаем с уступкой event loop между
   // проектами — чтобы холодный промах кэша не морозил API для других тенантов на всё время расчёта.
   // ponytail: потолок — кэш read-model per-project по planVersion либо вынос CPM в worker; апгрейд, когда CPU станет узким.
-  const loadSnapshot = dataSource.getPlanSnapshot;
+  // Зовём как метод (dataSource.getPlanSnapshot!), а не через извлечённую ссылку — иначе теряется
+  // this-биндинг репозитория (реальный DB-datasource использует this → 500).
   const snapshots = await Promise.all(
     projects.map(async (project) => ({
       project,
-      snapshot: await loadSnapshot(input.tenantId, project.id)
+      snapshot: await dataSource.getPlanSnapshot!(input.tenantId, project.id)
     }))
   );
 
