@@ -60,7 +60,12 @@ function emitPlanVersionFromBody(
 export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
   registerPlanningEventsRoute(app, {
     getSessionActorFromHeaders: deps.getSessionActorFromHeaders,
-    getActorProfile: deps.getActorProfile
+    getActorProfile: deps.getActorProfile,
+    projectExistsInTenant: async (tenantId, projectId) => {
+      // Нет persistence → не можем подтвердить принадлежность → отказываем (secure-by-default).
+      if (!deps.dataSource.getPlanSnapshot) return false;
+      return (await deps.dataSource.getPlanSnapshot(tenantId, projectId)) != null;
+    }
   });
   registerPlanningAutoSolverRoutes(app, deps);
   registerPlanningSavedViewRoutes(app, deps);

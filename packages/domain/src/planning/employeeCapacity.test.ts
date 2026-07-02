@@ -294,6 +294,36 @@ describe("employeeCapacity", () => {
     expect(cell?.isFreeDay).toBe(false);
   });
 
+  it("KPI-005: отсутствие на полдня (portion 0.5) режет ёмкость наполовину", () => {
+    const monthIso = "2026-06";
+    const date = "2026-06-02"; // будний день
+    const { rows } = buildEmployeeRows({
+      monthIso,
+      workspaceUsers: [{ id: "u1", name: "User", positionId: null, positionName: null }],
+      mergedByUserDate: new Map(),
+      absences: [{ userId: "u1", dateFrom: date, dateTo: date, portion: 0.5 }]
+    });
+    const cell = rows[0]?.days.find((day) => day.date === date);
+    expect(cell?.capacityMinutes).toBe(240); // 480 × (1 − 0.5)
+    expect(cell?.hasAbsence).toBe(true);
+  });
+
+  it("два полудневных отсутствия в одну дату суммируются в полный день (ёмкость 0)", () => {
+    const monthIso = "2026-06";
+    const date = "2026-06-02";
+    const { rows } = buildEmployeeRows({
+      monthIso,
+      workspaceUsers: [{ id: "u1", name: "User", positionId: null, positionName: null }],
+      mergedByUserDate: new Map(),
+      absences: [
+        { userId: "u1", dateFrom: date, dateTo: date, portion: 0.5 },
+        { userId: "u1", dateFrom: date, dateTo: date, portion: 0.5 }
+      ]
+    });
+    const cell = rows[0]?.days.find((day) => day.date === date);
+    expect(cell?.capacityMinutes).toBe(0); // 0.5 + 0.5 = 1 (потолок), не max(0.5,0.5)
+  });
+
   it("hides unreadable project ids in mix", () => {
     const monthIso = "2026-06-01".slice(0, 7);
     const monthDates = monthDateSet(monthIso);
@@ -322,5 +352,42 @@ describe("employeeCapacity", () => {
     const days = buildMonthDays("2026-06-01");
     expect(days.length).toBe(30);
     expect(days.some((day) => day.isWeekend)).toBe(true);
+  });
+
+  // KPI-001: в день С нагрузкой ёмкость берётся из произв. календаря + персонального исключения,
+  // а НЕ из merged.capacityMinutes (календарь проекта, 480). Иначе полставки скрывает перегруз.
+  it("частичная занятость в день с нагрузкой не скрывает перегруз", () => {
+    const monthIso = "2026-07";
+    const date = "2026-07-06"; // понедельник, рабочий день
+    const merged = mergeWorkspaceDayBuckets({
+      monthDates: monthDateSet(monthIso),
+      readableProjectIds: null,
+      projects: [
+        {
+          projectId: "p-a",
+          // Бакет плана «думает» ёмкость 480 (календарь проекта).
+          buckets: [dayBucket({ resourceId: "u1", projectId: "p-a", date, assignedMinutes: 300, capacityMinutes: 480 })]
+        }
+      ]
+    });
+
+    const { rows } = buildEmployeeRows({
+      monthIso,
+      workspaceUsers: [{ id: "u1", name: "Иван", positionId: null, positionName: null }],
+      mergedByUserDate: merged,
+      // Персональное исключение: полставки 240 мин на этот день.
+      productionCalendar: {
+        workingWeekdays: [1, 2, 3, 4, 5],
+        workingMinutesPerDay: 480,
+        exceptions: [{ date, workingMinutes: 240, resourceId: "u1" }]
+      }
+    });
+
+    const cell = rows[0]?.days.find((day) => day.date === date);
+    expect(cell?.capacityMinutes).toBe(240); // не 480
+    expect(cell?.workMinutes).toBe(300);
+    expect(cell?.overloadMinutes).toBe(60);
+    expect(cell?.isOverload).toBe(true);
+    expect(cell?.heat).toBe(3); // 300/240 = 1.25 → красный
   });
 });
