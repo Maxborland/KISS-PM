@@ -18,7 +18,7 @@
     "db:migrate": "pnpm --filter @kiss-pm/persistence db:migrate",
     "db:seed:dev": "tsx scripts/seed-dev.ts",
     "db:reset:dev": "pnpm db:migrate && pnpm db:seed:dev",
-    "test": "vitest run",
+    "test": "vitest run && pnpm --filter @kiss-pm/landing test",
     "test:db": "vitest run --config vitest.db.config.ts",
     "test:e2e:smoke": "pnpm db:migrate && pnpm db:seed:dev && playwright test --config playwright.config.ts",
     "typecheck": "tsc -b --pretty false",
