@@ -29,7 +29,7 @@ import { cn } from "@/lib/cn";
 import { ApiError, apiFetch } from "@/lib/api";
 import { KanbanBoard, KanbanColumn } from "@/widgets/kanban/kanban-board";
 import { KanbanCard } from "@/widgets/kanban/kanban-card";
-import { Gantt } from "@/widgets/gantt";
+import { Gantt, applyCollapse } from "@/widgets/gantt";
 import type { GanttData, GanttRow } from "@/widgets/gantt";
 import { ResourceMatrix, ResourceMatrixLegend, ResourceMatrixStats } from "@/widgets/resource-matrix";
 import type { DayCell, DayHeader, MatrixPercent, MatrixRow, ResourceMatrixData } from "@/widgets/resource-matrix";
@@ -445,13 +445,24 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
   const [showCritical, setShowCritical] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const toggleCollapse = (rowId: string) =>
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
+      return next;
+    });
   const reason = disabledReason(me, PERMISSIONS.manageProjectPlan);
   const data = useMemo(() => (planning.data ? toGanttData(planning.data, showCritical) : undefined), [planning.data, showCritical]);
   const shownData = useMemo(() => {
-    if (!data || !filter.trim()) return data;
+    if (!data) return data;
     const query = filter.trim().toLowerCase();
-    return { ...data, rows: data.rows.filter((row) => row.name.toLowerCase().includes(query)) };
-  }, [data, filter]);
+    const rows = applyCollapse(data.rows, collapsedIds).filter(
+      (row) => !query || row.name.toLowerCase().includes(query)
+    );
+    return { ...data, rows };
+  }, [data, filter, collapsedIds]);
   const tasks = planning.data?.authored.tasks ?? [];
   const selectedTask = tasks.find((task) => task.id === selectedId) ?? null;
   const command = planning.data ? nextScheduleCommand(planning.data) : null;
@@ -537,7 +548,7 @@ function ProjectGanttRuntime({ id, me }: { id: string; me: AuthMe }) {
           <span className="gantt-stats__item"><span className="gantt-stats__label">Версия</span><span className="gantt-stats__value">{planning.data?.planVersion ?? 0}</span></span>
         </div>
         {preview ? <CardPanel title="Сверка изменения" subtitle="До применения план не меняется"><p className="u-text-body">Будет изменено задач: {preview.planDelta.changedTaskIds.length}. Проверок: {preview.validationIssues.length}.</p></CardPanel> : null}
-        {shownData ? <Gantt data={shownData} selectedId={selectedId} onSelectRow={setSelectedId} /> : null}
+        {shownData ? <Gantt data={shownData} selectedId={selectedId} onSelectRow={setSelectedId} onToggleCollapse={toggleCollapse} /> : null}
       </StateGate>
       <MutationMessage error={previewMutation.error ?? applyMutation.error ?? toolbarApply.error} />
     </>
@@ -1522,6 +1533,7 @@ function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
       const progress = summary ? (() => { const r = rollup(task.id); return r.work > 0 ? r.earned / r.work : 0; })() : Math.max(0, Math.min(1, (task.percentComplete ?? 0) / 100));
       rows.push({
         id: task.id,
+        ...(parentId ? { parentId } : {}),
         level: Math.min(level, 3) as 0 | 1 | 2 | 3,
         kind: summary ? "summary" : milestone ? "milestone" : "task",
         name: task.title,

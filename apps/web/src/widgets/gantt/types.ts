@@ -37,6 +37,8 @@ export type GanttRow = {
   collapsed?: boolean;
   /** Можно ли разворачивать (есть дети). */
   collapsible?: boolean;
+  /** Id родительской строки WBS (для сворачивания потомков). */
+  parentId?: string;
 };
 
 export type GanttDayHeader = {

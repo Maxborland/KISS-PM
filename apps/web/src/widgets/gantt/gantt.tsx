@@ -8,6 +8,26 @@ import type { GanttData, GanttDayHeader, GanttRow } from "./types";
 
 const DAY_W = 28;
 
+/**
+ * Скрывает строки, чей любой предок свёрнут (collapsedIds), и выставляет collapsed на свёрнутых.
+ * Чистая функция — легко тестируется без рендера.
+ */
+export function applyCollapse(rows: readonly GanttRow[], collapsedIds: ReadonlySet<string>): GanttRow[] {
+  if (collapsedIds.size === 0) return [...rows];
+  const parentById = new Map(rows.map((row) => [row.id, row.parentId]));
+  const hiddenByCollapse = (row: GanttRow): boolean => {
+    let ancestor = row.parentId;
+    while (ancestor) {
+      if (collapsedIds.has(ancestor)) return true;
+      ancestor = parentById.get(ancestor);
+    }
+    return false;
+  };
+  return rows
+    .filter((row) => !hiddenByCollapse(row))
+    .map((row) => (collapsedIds.has(row.id) ? { ...row, collapsed: true } : row));
+}
+
 function pctLabel(progress: number | undefined) {
   const p = Math.round((progress ?? 0) * 100);
   return `${p}%`;
@@ -39,13 +59,22 @@ function ChartBar({ row, todayIndex }: { row: GanttRow; todayIndex: number }) {
   return <div className={barClass} style={col} aria-hidden />;
 }
 
-function NameCell({ row }: { row: GanttRow }) {
+function NameCell({ row, onToggleCollapse }: { row: GanttRow; onToggleCollapse?: (id: string) => void }) {
   const indent = row.level > 0 ? Math.min(row.level, 6) : 0;
   return (
     <div className="gantt2__cell gantt2__cell--name">
       {indent > 0 ? <span className={cn("wbs-indent", `wbs-indent--${indent}`)} aria-hidden /> : null}
       {row.collapsible ? (
-        <button type="button" className="wbs-toggle" aria-label={row.collapsed ? "Развернуть" : "Свернуть"}>
+        <button
+          type="button"
+          className="wbs-toggle"
+          aria-label={row.collapsed ? "Развернуть" : "Свернуть"}
+          aria-expanded={!row.collapsed}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleCollapse?.(row.id);
+          }}
+        >
           <ChevronRight className={cn("size-3", !row.collapsed && "rotate-90")} aria-hidden />
         </button>
       ) : null}
@@ -89,13 +118,15 @@ function DataRow({
   index,
   todayIndex,
   selected,
-  onSelect
+  onSelect,
+  onToggleCollapse
 }: {
   row: GanttRow;
   index: number;
   todayIndex: number;
   selected?: boolean;
   onSelect?: (id: string) => void;
+  onToggleCollapse?: (id: string) => void;
 }) {
   const resources = row.kind === "task" ? row.resourceName ?? "—" : "—";
   const labor =
@@ -120,7 +151,7 @@ function DataRow({
         <span className="wbs-mode">{row.mode ?? "Авто"}</span>
       </div>
       <div className="gantt2__cell gantt2__cell--mono gantt2__cell--muted">{row.wbs ?? "—"}</div>
-      <NameCell row={row} />
+      <NameCell row={row} {...(onToggleCollapse ? { onToggleCollapse } : {})} />
       <div className="gantt2__cell gantt2__cell--center">{durationLabel(row)}</div>
       <div className="gantt2__cell gantt2__cell--center">{pctLabel(row.progress)}</div>
       <div className="gantt2__cell gantt2__cell--mono gantt2__cell--center">{row.startLabel ?? "—"}</div>
@@ -142,7 +173,7 @@ function DataRow({
   );
 }
 
-export function Gantt({ data, className, selectedId, onSelectRow }: { data: GanttData; className?: string; selectedId?: string | null; onSelectRow?: (id: string) => void }) {
+export function Gantt({ data, className, selectedId, onSelectRow, onToggleCollapse }: { data: GanttData; className?: string; selectedId?: string | null; onSelectRow?: (id: string) => void; onToggleCollapse?: (id: string) => void }) {
   const totalDays = data.days.length;
   const chartWidth = totalDays * DAY_W;
   const todayIndex = data.days.findIndex((d) => d.today);
@@ -204,6 +235,7 @@ export function Gantt({ data, className, selectedId, onSelectRow }: { data: Gant
             todayIndex={todayIndex}
             selected={selectedId === row.id}
             {...(onSelectRow ? { onSelect: onSelectRow } : {})}
+            {...(onToggleCollapse ? { onToggleCollapse } : {})}
           />
         ))}
       </div>
