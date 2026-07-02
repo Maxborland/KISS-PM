@@ -35,6 +35,7 @@ const rows: GanttRow[] = [
     kind: "task",
     name: "Воркшоп с заказчиком",
     wbs: "1.1",
+    parentId: "p-1",
     startDay: 0,
     durationDays: 2,
     progress: 1,
@@ -46,9 +47,12 @@ const rows: GanttRow[] = [
     kind: "task",
     name: "Бизнес-кейсы",
     wbs: "1.2",
+    parentId: "p-1",
     startDay: 1,
     durationDays: 4,
     progress: 1,
+    predecessorLabel: "1.1",
+    predecessorIds: ["t-1-1"],
     assignee: { initials: "АП", color: "c2" }
   },
   {
@@ -57,9 +61,12 @@ const rows: GanttRow[] = [
     kind: "task",
     name: "Согласование scope",
     wbs: "1.3",
+    parentId: "p-1",
     startDay: 4,
     durationDays: 4,
     progress: 0.8,
+    predecessorLabel: "1.2",
+    predecessorIds: ["t-1-2"],
     assignee: { initials: "КБ", color: "c4" }
   },
   {
@@ -69,7 +76,9 @@ const rows: GanttRow[] = [
     name: "Scope зафиксирован",
     wbs: "M1",
     startDay: 8,
-    durationDays: 0
+    durationDays: 0,
+    predecessorLabel: "1.3",
+    predecessorIds: ["t-1-3"]
   },
   {
     id: "p-2",
@@ -89,10 +98,13 @@ const rows: GanttRow[] = [
     kind: "task",
     name: "Дизайн БД",
     wbs: "2.1",
+    parentId: "p-2",
     startDay: 8,
     durationDays: 5,
     progress: 0.7,
     critical: true,
+    predecessorLabel: "M1",
+    predecessorIds: ["m-1"],
     assignee: { initials: "АП", color: "c2" }
   },
   {
@@ -101,6 +113,7 @@ const rows: GanttRow[] = [
     kind: "task",
     name: "API-контракт",
     wbs: "2.2",
+    parentId: "p-2",
     startDay: 9,
     durationDays: 6,
     progress: 0.6,
@@ -113,6 +126,7 @@ const rows: GanttRow[] = [
     kind: "task",
     name: "UI mockups",
     wbs: "2.3",
+    parentId: "p-2",
     startDay: 11,
     durationDays: 8,
     progress: 0.4,
@@ -124,9 +138,12 @@ const rows: GanttRow[] = [
     kind: "task",
     name: "Прототип ключевых экранов",
     wbs: "2.4",
+    parentId: "p-2",
     startDay: 14,
     durationDays: 6,
     progress: 0.2,
+    predecessorLabel: "2.3",
+    predecessorIds: ["t-2-3"],
     assignee: { initials: "ЛА", color: "c5" }
   },
   {
@@ -146,9 +163,12 @@ const rows: GanttRow[] = [
     kind: "task",
     name: "Backend каркас",
     wbs: "3.1",
+    parentId: "p-3",
     startDay: 15,
     durationDays: 7,
     progress: 0.3,
+    predecessorLabel: "2.1",
+    predecessorIds: ["t-2-1"],
     assignee: { initials: "ВЮ", color: "c3" }
   },
   {
@@ -157,6 +177,7 @@ const rows: GanttRow[] = [
     kind: "task",
     name: "Frontend shell",
     wbs: "3.2",
+    parentId: "p-3",
     startDay: 17,
     durationDays: 8,
     progress: 0.2,
@@ -168,9 +189,12 @@ const rows: GanttRow[] = [
     kind: "task",
     name: "Интеграция CRM",
     wbs: "3.3",
+    parentId: "p-3",
     startDay: 21,
     durationDays: 6,
     progress: 0,
+    predecessorLabel: "3.1",
+    predecessorIds: ["t-3-1"],
     assignee: { initials: "АД", color: "c3" }
   },
   {
