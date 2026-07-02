@@ -8,53 +8,35 @@ function createHeroPreset(reducedMotion: boolean): PresetConfig {
         type: "Plasma",
         id: "base_zdxps6",
         props: {
-          colorA: "#050510",
-          colorB: "#f45bff",
-          contrast: 1.11,
-          density: 2.52,
-          intensity: 2.5,
-          speed: reducedMotion ? 0 : 4.55,
+          colorA: "#edf0f7",
+          colorB: "#3f57d4",
+          contrast: 1.02,
+          density: 1.12,
+          intensity: 1.12,
+          speed: reducedMotion ? 0 : 1.8,
           transform: {
             edges: "wrap",
             scale: 1.06,
             rotation: 0.07,
           },
           visible: true,
-          warp: 0.78,
-        },
-      },
-      {
-        type: "ColorWheel",
-        id: "wheel_1dbxhpm",
-        props: {
-          angle: 0.44,
-          colorA: "#6665ff",
-          colorB: "#f45bff",
-          colorC: "#8ef6ff",
-          colorSpace: "oklab",
-          maskSource: "base_zdxps6",
-          maskType: "luminanceInverted",
-          mode: "custom",
-          opacity: 0.87,
-          scale: 1.29,
-          speed: reducedMotion ? 0 : 0.08,
-          visible: true,
+          warp: 0.42,
         },
       },
       {
         type: "ChromaFlow",
         id: "flow_1qlpuc7",
         props: {
-          baseColor: "#050510",
-          downColor: "#6665ff",
-          intensity: 1.25,
-          leftColor: "#6665ff",
+          baseColor: "#edf0f7",
+          downColor: "#4f46e5",
+          intensity: 1.1,
+          leftColor: "#4f46e5",
           maskSource: "base_zdxps6",
           momentum: 44,
-          opacity: 0.74,
+          opacity: 0.65,
           radius: 4.14,
-          rightColor: "#f45bff",
-          upColor: "#8ef6ff",
+          rightColor: "#2563eb",
+          upColor: "#a5d8ff",
         },
       },
       {
@@ -63,21 +45,10 @@ function createHeroPreset(reducedMotion: boolean): PresetConfig {
         props: {
           density: 122,
           dotSize: 0.37,
-          maskSource: "wheel_1dbxhpm",
+          maskSource: "base_zdxps6",
           maskType: "luminanceInverted",
-          opacity: 0.76,
-          twinkle: reducedMotion ? 0 : 1.01,
-        },
-      },
-      {
-        type: "ChromaticAberration",
-        id: "aberration_ujvgso",
-        props: {
-          angle: -0.25,
-          blueOffset: 1.26,
-          redOffset: -1.26,
-          strength: 0.57,
-          visible: true,
+          opacity: 0.3,
+          twinkle: reducedMotion ? 0 : 0.4,
         },
       },
     ],
@@ -106,11 +77,27 @@ export default function HeroShader() {
       }
 
       shader = instance;
+
+      const syncSize = () => {
+        const rect = host.getBoundingClientRect();
+        instance.resize(rect.width, rect.height);
+      };
+
+      syncSize();
+      requestAnimationFrame(syncSize);
       host.dataset.shaderReady = "true";
     });
 
+    const resizeObserver = new ResizeObserver(() => {
+      const rect = host.getBoundingClientRect();
+      shader?.resize(rect.width, rect.height);
+    });
+
+    resizeObserver.observe(host);
+
     return () => {
       cancelled = true;
+      resizeObserver.disconnect();
       shader?.destroy();
     };
   }, []);

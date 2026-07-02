@@ -13,7 +13,7 @@ export function ActionScreen({ action, onAdvance, onExplore }: Props) {
   return (
     <DemoScreenFrame
       title={action.title}
-      meta="DEAL-204 · ведущий инженер · сбалансированный сценарий"
+      meta="Сделка «ГК Север» · ведущий инженер · сбалансированный сценарий"
       status="Ожидает подтверждения"
       statusTone="info"
       toolbar={

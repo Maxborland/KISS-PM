@@ -45,7 +45,7 @@ export const STEP_META: Record<DemoStep, DemoStepMeta> = {
     id: "crm-list",
     badge: "Шаг 1 · CRM",
     title: "147 проектов в работе",
-    hint: "Откройте сделку DEAL-204 в списке",
+    hint: "Откройте сделку «ГК Север» в списке",
   },
   "crm-deal": {
     id: "crm-deal",

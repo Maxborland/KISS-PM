@@ -66,7 +66,18 @@ export function CrmListScreen({ deals, onAdvance, onExplore }: Props) {
                       <span className={`demo-chip${isHot ? " demo-chip--accent" : ""}`}>{d.stage}</span>
                     </td>
                     <td className="demo-table__mono">{d.amount}</td>
-                    <td>{d.owner}</td>
+                    <td>
+                      <span className="demo-owner">
+                        <span className="demo-avatar" aria-hidden="true">
+                          {d.owner
+                            .split(" ")
+                            .map((part) => part[0])
+                            .join("")
+                            .replace(".", "")}
+                        </span>
+                        {d.owner}
+                      </span>
+                    </td>
                     <td className="demo-table__actions">
                       {isHot ? (
                         <Cta label="Открыть" emphasis onClick={onAdvance} />

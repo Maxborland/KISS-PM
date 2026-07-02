@@ -13,7 +13,7 @@ const CAPACITY_ROWS = [
 ] as const;
 
 const AFFECTED = [
-  "ГК Север · DEAL-204",
+  "ГК Север · новая сделка",
   "Портал Pixel Bank",
   "Интеграция Logistica+",
   "Внутренний релиз Q3",
@@ -23,7 +23,7 @@ export function IntakeScreen({ intake, onAdvance }: Props) {
   return (
     <DemoScreenFrame
       title="Проверка ресурсной ёмкости"
-      meta="DEAL-204 · ГК Север · ₽ 8.4 млн"
+      meta="Сделка «ГК Север» · ₽ 8.4 млн"
       status="Перегруз 112%"
       statusTone="warning"
       syncNote="расчёт 11:48"

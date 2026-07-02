@@ -31,7 +31,7 @@ export function AuditScreen({ audit }: Props) {
         </div>
         <div className="demo-audit__row">
           <span className="demo-audit__k">Контур</span>
-          <span className="demo-audit__v">DEAL-204 → портфель · ведущий инженер</span>
+          <span className="demo-audit__v">Сделка «ГК Север» → портфель · ведущий инженер</span>
         </div>
 
         <p className="demo-audit__seal">

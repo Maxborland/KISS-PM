@@ -228,20 +228,28 @@ export default function SixStepsHorizontalScroll() {
     >
       <div className="stickyViewport six-steps" ref={stickyRef}>
         <header className="sectionHeader six-steps-head">
-          <h2 id="loop-title" className="l-display six-steps-head__title" data-text-reveal>
+          {/* без data-text-reveal: скрипт реврайтит DOM до гидрации React и ломает hydration */}
+          <h2 id="loop-title" className="l-display six-steps-head__title">
             Шесть шагов · один язык
           </h2>
         </header>
 
-        <div className="carouselMask" ref={maskRef}>
-          <div className="cardsTrack six-steps__track" ref={trackRef}>
-            {SIX_STEPS.map((step, index) => (
-              <StepCard key={step.id} step={step} active={index === activeIndex} />
-            ))}
+        <div className="carouselMask">
+          <div className="six-steps__viewport" ref={maskRef}>
+            <div className="cardsTrack six-steps__track" ref={trackRef}>
+              {SIX_STEPS.map((step, index) => (
+                <StepCard key={step.id} step={step} active={index === activeIndex} />
+              ))}
+            </div>
           </div>
         </div>
 
         <StepProgress active={activeIndex} onSelect={scrollToIndex} />
+        <div className="six-steps__access">
+          <a className="l-btn l-btn--primary" href="#waitlist">
+            Запросить доступ
+          </a>
+        </div>
       </div>
     </section>
   );

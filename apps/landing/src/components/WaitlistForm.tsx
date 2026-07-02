@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { FocusEvent, FormEvent } from "react";
+import type { ComponentProps, FocusEvent } from "react";
 import { z } from "zod";
 import {
   COMPANY_SIZE_LABELS,
@@ -21,6 +21,9 @@ type Status =
     };
 
 type FieldIssues = Record<string, string | undefined>;
+type FormSubmitEvent = Parameters<
+  NonNullable<ComponentProps<"form">["onSubmit"]>
+>[0];
 
 const SIZE_ENTRIES = Object.entries(COMPANY_SIZE_LABELS) as Array<
   [keyof typeof COMPANY_SIZE_LABELS, string]
@@ -30,7 +33,7 @@ export default function WaitlistForm() {
   const [status, setStatus] = useState<Status>({ phase: "idle" });
   const [fieldIssues, setFieldIssues] = useState<FieldIssues>({});
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
+  async function onSubmit(e: FormSubmitEvent): Promise<void> {
     e.preventDefault();
     const form = e.currentTarget;
     const payload = waitlistPayloadFromFormData(new FormData(form));

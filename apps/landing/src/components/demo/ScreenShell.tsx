@@ -100,21 +100,23 @@ export function Cta({ label, onClick, variant = "primary", emphasis = false }: C
           transition:
             background var(--duration-ui) var(--ease-ui),
             border-color var(--duration-ui) var(--ease-ui),
-            box-shadow var(--duration-ui) var(--ease-ui);
+            box-shadow var(--duration-ui) var(--ease-ui),
+            transform var(--duration-micro) var(--ease-ui);
           border: 1px solid transparent;
         }
         .cta--primary {
-          background: var(--accent);
+          background: var(--text-strong);
           color: #fff;
-          box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.35);
+          box-shadow: 0 4px 12px -4px rgba(2, 6, 23, 0.4);
         }
-        .cta--primary:hover { background: var(--accent-hover); }
+        .cta--primary:hover { background: var(--text); }
+        .cta:active { transform: scale(0.97); }
         .cta--emphasis {
           animation: cta-emphasis 2.8s ease-in-out infinite;
         }
         @keyframes cta-emphasis {
-          0%, 100% { box-shadow: 0 4px 14px -2px rgba(37, 99, 235, 0.35); }
-          50% { box-shadow: 0 6px 20px -2px rgba(37, 99, 235, 0.5); }
+          0%, 100% { box-shadow: 0 4px 14px -4px rgba(2, 6, 23, 0.4); }
+          50% { box-shadow: 0 6px 20px -4px rgba(2, 6, 23, 0.55); }
         }
         @media (prefers-reduced-motion: reduce) {
           .cta--emphasis { animation: none; }

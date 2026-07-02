@@ -64,44 +64,44 @@
     from 220deg at 50% 50%,
     #6366f1 0deg,
     #0ea5e9 90deg,
-    #a855f7 180deg,
-    #f472b6 270deg,
+    #4f46e5 180deg,
+    #38bdf8 270deg,
     #6366f1 360deg
   );
 
-  /* Hero plasma echoes — used as subtle accents across the page */
-  --plasma-violet: #6665ff;
-  --plasma-magenta: #f45bff;
-  --plasma-cyan: #8ef6ff;
-  --plasma-ink: #050510;
+  /* Hero echoes — cool ink/indigo/ice, mirrors product accent (no magenta) */
+  --plasma-violet: #4f46e5;
+  --plasma-magenta: #2563eb;
+  --plasma-cyan: #7dd3fc;
+  --plasma-ink: #060a16;
 
-  --plasma-soft-violet: rgba(102, 101, 255, 0.12);
-  --plasma-soft-magenta: rgba(244, 91, 255, 0.10);
-  --plasma-soft-cyan: rgba(142, 246, 255, 0.18);
+  --plasma-soft-violet: rgba(79, 70, 229, 0.10);
+  --plasma-soft-magenta: rgba(37, 99, 235, 0.08);
+  --plasma-soft-cyan: rgba(125, 211, 252, 0.16);
 
   --gradient-plasma-line: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(102, 101, 255, 0) 8%,
-    rgba(102, 101, 255, 0.55) 28%,
-    rgba(244, 91, 255, 0.7) 50%,
-    rgba(142, 246, 255, 0.55) 72%,
-    rgba(142, 246, 255, 0) 92%,
+    rgba(79, 70, 229, 0) 8%,
+    rgba(79, 70, 229, 0.5) 28%,
+    rgba(37, 99, 235, 0.6) 50%,
+    rgba(125, 211, 252, 0.5) 72%,
+    rgba(125, 211, 252, 0) 92%,
     transparent 100%
   );
 
   --gradient-plasma-border: linear-gradient(
     135deg,
-    rgba(102, 101, 255, 0.55) 0%,
-    rgba(244, 91, 255, 0.35) 45%,
-    rgba(142, 246, 255, 0.45) 100%
+    rgba(79, 70, 229, 0.5) 0%,
+    rgba(37, 99, 235, 0.32) 45%,
+    rgba(125, 211, 252, 0.42) 100%
   );
 
   --gradient-section-seam: linear-gradient(
     180deg,
     rgba(238, 240, 244, 0) 0%,
     rgba(238, 240, 244, 0) 45%,
-    rgba(102, 101, 255, 0.08) 100%
+    rgba(79, 70, 229, 0.07) 100%
   );
 
   /* Spacing */
@@ -143,6 +143,7 @@
   --lh-tight: 1.2;
   --lh-display: 1.05;
   --letter-eyebrow: 0.12em;
+  --weight-heading: 650;
 
   /* Radii */
   --radius-sm: 6px;
