@@ -46,7 +46,17 @@ const faqs = [
           <details class="faq__item">
             <summary class="faq__summary">
               <span>{item.q}</span>
-              <span class="faq__chev" aria-hidden="true">↓</span>
+              <span class="faq__chev" aria-hidden="true">
+                <svg viewBox="0 0 16 16" width="14" height="14">
+                  <path
+                    d="M4 6l4 4 4-4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"></path>
+                </svg>
+              </span>
             </summary>
             <p class="faq__answer">{item.a}</p>
           </details>

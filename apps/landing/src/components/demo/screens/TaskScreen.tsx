@@ -14,7 +14,7 @@ export function TaskScreen({ task, onAdvance, onExplore }: Props) {
       meta={`${task.id} · ${task.owner} · срок ${task.due}`}
       status="Сигнал активен"
       statusTone="warning"
-      syncNote="DEAL-204 · ведущий инженер"
+      syncNote="сделка «ГК Север» · ведущий инженер"
       toolbar={
         <>
           <Cta variant="ghost" label="Обсуждение" onClick={() => onExplore("Тред задачи связан с проектом и сделкой.")} />

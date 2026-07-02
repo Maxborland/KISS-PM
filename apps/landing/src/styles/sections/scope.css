@@ -1,0 +1,11 @@
+.scope-stage {
+  display: grid;
+  gap: var(--bento-gap);
+}
+
+@media (min-width: 1000px) {
+  .scope-stage {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}

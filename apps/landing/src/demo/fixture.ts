@@ -40,7 +40,7 @@ export type DemoDeal = {
 export const DEMO_FIXTURE = {
   deals: [
     {
-      id: "DEAL-204",
+      id: "opportunity-gk-sever",
       name: "Новый проект: ГК Север",
       stage: "Готова к оценке",
       amount: "₽ 8.4 млн",
@@ -80,7 +80,7 @@ export const DEMO_FIXTURE = {
             author: "Анна К.",
             role: "Sales Manager",
             when: "11:24",
-            text: "Перед переносом в проект — проверить ёмкость: сделка DEAL-204 на ₽ 8.4 млн.",
+            text: "Перед переносом в проект — проверить ёмкость: сделка «ГК Север» на ₽ 8.4 млн.",
           },
           {
             author: "Михаил Б.",
@@ -100,7 +100,7 @@ export const DEMO_FIXTURE = {
         related: [
           { label: "Клиент", title: "ГК Север", meta: "B2B · Север-Запад" },
           { label: "Контакт", title: "Алексей Сергеев", meta: "Директор ИТ" },
-          { label: "Сделка", title: "DEAL-204", meta: "₽ 8.4 млн" },
+          { label: "Сделка", title: "opportunity-gk-sever", meta: "₽ 8.4 млн" },
         ],
         team: [
           { initials: "АК", name: "Анна К.", role: "PM", online: true },
@@ -110,7 +110,7 @@ export const DEMO_FIXTURE = {
       },
     },
     {
-      id: "DEAL-198",
+      id: "opportunity-pixel-portal",
       name: "Расширение портала — Pixel Bank",
       stage: "В оценке",
       amount: "₽ 2.1 млн",
@@ -118,7 +118,7 @@ export const DEMO_FIXTURE = {
       hot: false,
     },
     {
-      id: "DEAL-187",
+      id: "opportunity-logistica-sklad",
       name: "Интеграция склада — Logistica+",
       stage: "Квалификация",
       amount: "₽ 4.7 млн",
@@ -178,7 +178,7 @@ export const DEMO_FIXTURE = {
     description:
       "Сместить часть работ так, чтобы снять перегруз с ведущего инженера без срыва критичных сроков.",
     activity: [
-      { who: "Анна К.", what: "Привязала сделку DEAL-204 к задаче", when: "12:14" },
+      { who: "Анна К.", what: "Привязала сделку «ГК Север» к задаче", when: "12:14" },
       { who: "KISS PM", what: "Нашёл конфликт по роли «ведущий инженер»", when: "13:02" },
       { who: "Портфельный сигнал", what: "Перегруз через 3 недели", when: "16:18" },
     ],
@@ -189,7 +189,7 @@ export const DEMO_FIXTURE = {
     current: "112%",
     severity: "warning",
     rationale:
-      "Через три недели загрузка ведущего инженера — 112%. Давление дают 4 активных проекта и сделка DEAL-204.",
+      "Через три недели загрузка ведущего инженера — 112%. Давление дают 4 активных проекта и сделка «ГК Север».",
     options: [
       {
         id: "reassign",

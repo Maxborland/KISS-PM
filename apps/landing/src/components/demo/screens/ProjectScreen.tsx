@@ -40,7 +40,7 @@ export function ProjectScreen({ project, onAdvance, onExplore }: Props) {
           </div>
           <div className="demo-kpi">
             <span className="demo-kpi__label">Связь</span>
-            <span className="demo-kpi__value">DEAL-204</span>
+            <span className="demo-kpi__value">ГК Север</span>
           </div>
         </div>
 

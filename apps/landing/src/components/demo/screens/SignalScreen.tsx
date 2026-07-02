@@ -14,7 +14,7 @@ export function SignalScreen({ signal, onAdvance }: Props) {
   return (
     <DemoScreenFrame
       title={signal.name}
-      meta="Сигнал · ведущий инженер · DEAL-204"
+      meta="Сигнал · ведущий инженер · сделка «ГК Север»"
       status={signal.current}
       statusTone="warning"
       syncNote={`порог ${signal.threshold}`}

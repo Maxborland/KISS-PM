@@ -31,7 +31,8 @@ body::after {
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(2.1rem, 4.8vw, 3.45rem);
-  font-weight: 650;
+  font-weight: var(--weight-heading);
+  font-variation-settings: "wght" var(--weight-heading);
   line-height: 1.02;
   letter-spacing: -0.035em;
   color: var(--text-strong);
@@ -141,8 +142,8 @@ body::after {
   --ink-text: #f1f5f9;
   --ink-muted: #94a3b8;
   background:
-    radial-gradient(90% 70% at 0% 0%, rgba(102, 101, 255, 0.2) 0%, transparent 55%),
-    radial-gradient(70% 60% at 100% 20%, rgba(244, 91, 255, 0.14) 0%, transparent 50%),
+    radial-gradient(90% 70% at 0% 0%, rgba(79, 70, 229, 0.2) 0%, transparent 55%),
+    radial-gradient(70% 60% at 100% 20%, rgba(37, 99, 235, 0.14) 0%, transparent 50%),
     linear-gradient(168deg, #050510 0%, #0c101f 42%, #12182b 100%);
   color: var(--ink-text);
 }

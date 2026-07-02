@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import type { DemoStep } from "../../demo/machine";
 import { STEP_META } from "../../demo/machine";
 import { CAPSULES_BY_STEP, KIND_LABEL, type Capsule } from "../../demo/capsules";
@@ -49,7 +48,7 @@ export function DemoContextPanel({ step, fixture, onExplore }: Props) {
         </ContextCard>
         <ContextChecklist
           title="Следующее действие"
-          items={[{ label: "Открыть DEAL-204 · ГК Север", active: true }]}
+          items={[{ label: "Открыть сделку «ГК Север»", active: true }]}
         />
       </ContextShell>
     );
@@ -57,13 +56,13 @@ export function DemoContextPanel({ step, fixture, onExplore }: Props) {
 
   if (step === "intake") {
     return (
-      <ContextShell eyebrow="Шаг 3 · Ёмкость · DEAL-204">
+      <ContextShell eyebrow="Шаг 3 · Ёмкость · ГК Север">
         <ContextCard title="Результат проверки" body="Ведущий инженер 112% на неделях 7–9. Без сдвига — риск для 4 проектов.">
           <ContextStat label="Порог" value="≤ 95%" />
           <ContextStat label="Сейчас" value="112%" warn />
         </ContextCard>
         <ContextCard title="Связь со сделкой" body="Проверка запущена из карточки ГК Север после согласования в обсуждении.">
-          <ContextLink onClick={() => onExplore("Вернёт к карточке сделки.")}>DEAL-204 →</ContextLink>
+          <ContextLink onClick={() => onExplore("Вернёт к карточке сделки.")}>К сделке →</ContextLink>
         </ContextCard>
         <ContextChecklist
           title="Что дальше"
@@ -79,7 +78,7 @@ export function DemoContextPanel({ step, fixture, onExplore }: Props) {
   if (step === "project") {
     return (
       <ContextShell eyebrow="Шаг 4 · Портфель · контекст">
-        <ContextCard title="Источник напряжения" body="Задача T-1041 связана с переносом слота ведущего инженера по DEAL-204.">
+        <ContextCard title="Источник напряжения" body="Задача T-1041 связана с переносом слота ведущего инженера по сделке «ГК Север».">
           <ContextLink onClick={() => onExplore("Откроется карточка задачи.")}>T-1041 →</ContextLink>
         </ContextCard>
         <ContextCard title="Сигналы" body="3 открытых сигнала по портфелю, один — по этой роли.">
@@ -96,7 +95,7 @@ export function DemoContextPanel({ step, fixture, onExplore }: Props) {
   if (step === "task") {
     return (
       <ContextShell eyebrow="Шаг 5 · Задача · T-1041">
-        <ContextCard title="Почему сейчас" body="Система связала перегруз роли с этой задачей и сделкой DEAL-204.">
+        <ContextCard title="Почему сейчас" body="Система связала перегруз роли с этой задачей и сделкой «ГК Север».">
           <ContextStat label="Загрузка" value="112%" warn />
         </ContextCard>
         <ContextCard title="Обсуждение" body="Комментарии задачи наследуют контекст проекта — отдельный чат не нужен.">
@@ -156,7 +155,7 @@ export function DemoContextPanel({ step, fixture, onExplore }: Props) {
         <ContextCard title="Неизменяемая запись" body="Фиксирует актора, действие, цель и причину — для ретроспективы и комплаенса.">
           <ContextStat label="Запись" value="#4128" />
         </ContextCard>
-        <ContextCard title="Связь с контуром" body="DEAL-204 → проверка ёмкости → сценарий → 112% → 94%.">
+        <ContextCard title="Связь с контуром" body="Сделка «ГК Север» → проверка ёмкости → сценарий → 112% → 94%.">
           <ContextLink onClick={() => onExplore("Цепочка событий в ленте аудита.")}>Цепочка событий →</ContextLink>
         </ContextCard>
         <ContextCard title="Сценарий завершён" body="Можно начать демо сначала или вернуться к списку сделок.">

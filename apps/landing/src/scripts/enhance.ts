@@ -6,12 +6,13 @@
  * - Stagger groups (`data-reveal-group`) animate children in DOM order.
  * - `data-text-reveal` — пословное появление заголовков и подзаголовков.
  * - Tracks pointer position on `.kp-spotlight-card` to drive `--mx`/`--my`.
- * - Tracks pointer position on primary CTA buttons to drive cursor-bound glow.
+ * - Tracks pointer position on landing buttons to drive cursor-bound glow.
  *
  * Reduced-motion users get instant visibility (no animation).
  */
 
 import { initHorizontalScroll } from "./horizontal-scroll";
+import { initInteractionMaterial } from "./interaction-material";
 import { initSmoothScroll } from "./smooth-scroll";
 import { initTextReveal } from "./text-reveal";
 
@@ -110,6 +111,71 @@ if (notifyShell && heroSection) {
   window.addEventListener("resize", syncNotifyVisibility, { passive: true });
 }
 
+const demoDimSection = document.querySelector<HTMLElement>("[data-demo-dim-section]");
+const demoDimFrame = document.querySelector<HTMLElement>("[data-demo-dim-frame]");
+const siteHeader = document.querySelector<HTMLElement>("[data-site-header]");
+
+if (demoDimSection && demoDimFrame) {
+  let demoDimFramePending = false;
+
+  const getDemoDimScaleBoost = () => {
+    const frameWidth = demoDimFrame.offsetWidth;
+    if (frameWidth <= 0) {
+      return 0;
+    }
+
+    const viewportWidth = window.innerWidth;
+    const safeMargin =
+      viewportWidth < 760 ? 16 : viewportWidth < 1100 ? 28 : 56;
+    const availableWidth = Math.max(0, viewportWidth - safeMargin * 2);
+    const maxScale = availableWidth / frameWidth;
+
+    return Math.max(0, Math.min(0.2, maxScale - 1));
+  };
+
+  const syncDemoDim = () => {
+    demoDimFramePending = false;
+
+    if (prefersReducedMotion) {
+      demoDimSection.style.setProperty("--demo-dim-progress", "0");
+      demoDimSection.style.setProperty("--demo-dim-scale-boost", "0");
+      siteHeader?.removeAttribute("data-demo-dimmed");
+      return;
+    }
+
+    const rect = demoDimFrame.getBoundingClientRect();
+    const viewportCenter = window.innerHeight / 2;
+    const frameCenter = rect.top + rect.height / 2;
+    const frameHeight = demoDimFrame.offsetHeight || rect.height;
+    const maxDistance = Math.max(window.innerHeight * 1.08, frameHeight * 0.72);
+    const distance = Math.abs(frameCenter - viewportCenter);
+    const rawProgress = Math.max(0, Math.min(1, 1 - distance / maxDistance));
+    const progress = Math.pow(rawProgress, 0.68);
+    const scaleBoost = getDemoDimScaleBoost();
+
+    demoDimSection.style.setProperty("--demo-dim-progress", progress.toFixed(3));
+    demoDimSection.style.setProperty("--demo-dim-scale-boost", scaleBoost.toFixed(4));
+    if (progress > 0.12) {
+      siteHeader?.setAttribute("data-demo-dimmed", "true");
+    } else {
+      siteHeader?.removeAttribute("data-demo-dimmed");
+    }
+  };
+
+  const requestDemoDimSync = () => {
+    if (demoDimFramePending) {
+      return;
+    }
+
+    demoDimFramePending = true;
+    requestAnimationFrame(syncDemoDim);
+  };
+
+  syncDemoDim();
+  window.addEventListener("scroll", requestDemoDimSync, { passive: true });
+  window.addEventListener("resize", requestDemoDimSync, { passive: true });
+}
+
 const revealTargets = document.querySelectorAll<HTMLElement>(
   "[data-reveal], [data-reveal-group], [data-bento-group]"
 );
@@ -189,48 +255,4 @@ if (revealTargets.length) {
   }
 }
 
-const spotlightCards = document.querySelectorAll<HTMLElement>(
-  ".kp-spotlight-card"
-);
-
-if (spotlightCards.length && !prefersReducedMotion) {
-  spotlightCards.forEach((card) => {
-    card.addEventListener(
-      "pointermove",
-      (event) => {
-        const rect = card.getBoundingClientRect();
-        const mx = ((event.clientX - rect.left) / rect.width) * 100;
-        const my = ((event.clientY - rect.top) / rect.height) * 100;
-        card.style.setProperty("--mx", `${mx}%`);
-        card.style.setProperty("--my", `${my}%`);
-      },
-      { passive: true }
-    );
-    card.addEventListener("pointerleave", () => {
-      card.style.setProperty("--mx", `50%`);
-      card.style.setProperty("--my", `-20%`);
-    });
-  });
-}
-
-const primaryButtons = document.querySelectorAll<HTMLElement>(".l-btn--primary");
-
-if (primaryButtons.length && !prefersReducedMotion) {
-  primaryButtons.forEach((button) => {
-    button.addEventListener(
-      "pointermove",
-      (event) => {
-        const rect = button.getBoundingClientRect();
-        const mx = ((event.clientX - rect.left) / rect.width) * 100;
-        const my = ((event.clientY - rect.top) / rect.height) * 100;
-        button.style.setProperty("--btn-mx", `${mx}%`);
-        button.style.setProperty("--btn-my", `${my}%`);
-      },
-      { passive: true }
-    );
-    button.addEventListener("pointerleave", () => {
-      button.style.setProperty("--btn-mx", "50%");
-      button.style.setProperty("--btn-my", "50%");
-    });
-  });
-}
+initInteractionMaterial({ prefersReducedMotion });
