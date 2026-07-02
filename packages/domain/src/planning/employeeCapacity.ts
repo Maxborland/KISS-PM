@@ -294,7 +294,10 @@ export function buildEmployeeRows(input: {
       const hasAbsence = absenceKeys.has(`${user.id}:${day.date}`);
       const baseDayCapacity =
         day.isWeekend || day.isHoliday ? 0 : (exceptionMinutes ?? baseCapacity);
-      const capacityMinutes = hasAbsence ? 0 : (merged?.capacityMinutes ?? baseDayCapacity);
+      // Единый авторитетный источник ёмкости: произв. календарь + персональные исключения + отсутствия.
+      // НЕ берём merged.capacityMinutes (календарь проекта, дефолт 480) — иначе частичная занятость и
+      // выходной тенанта в день с нагрузкой скрывают перегруз (KPI-001).
+      const capacityMinutes = hasAbsence ? 0 : baseDayCapacity;
       const isOverload = totalWork > capacityMinutes && capacityMinutes >= 0;
       const freeMinutes = Math.max(0, capacityMinutes - totalWork);
       const overloadMinutes = Math.max(0, totalWork - capacityMinutes);

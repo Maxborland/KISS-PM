@@ -25,7 +25,6 @@ export function LoginScreenView() {
                   id="login-email"
                   type="email"
                   name="email"
-                  defaultValue="admin@kiss-pm.local"
                   autoComplete="email"
                   required
                 />

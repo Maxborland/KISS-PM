@@ -152,8 +152,23 @@ export function buildProjectKpiMetrics(input: {
   const projectFinish = input.calculatedPlan.projectFinish;
   const deadline = input.snapshot.project.deadline;
   const latestBaselineFinish = latestBaselineProjectFinish(input.snapshot);
-  const finishedTasks = input.snapshot.tasks.filter((task) => task.percentComplete >= 100).length;
   const totalTasks = input.snapshot.tasks.length;
+  // Взвешенный прогресс: Σ(percentComplete·workMinutes) / Σ(workMinutes). Если труд нигде не задан —
+  // среднее по percentComplete (равный вес). НЕ «закрытые/всего» — иначе 9 задач по 99% дают 0%.
+  let earnedWork = 0;
+  let totalWork = 0;
+  let percentSum = 0;
+  for (const task of input.snapshot.tasks) {
+    const pct = Math.max(0, Math.min(100, task.percentComplete));
+    const work = Math.max(0, task.workMinutes);
+    earnedWork += (pct / 100) * work;
+    totalWork += work;
+    percentSum += pct;
+  }
+  const progressPercent =
+    totalTasks === 0
+      ? 0
+      : Math.round(totalWork > 0 ? (earnedWork / totalWork) * 100 : percentSum / totalTasks);
 
   return {
     deadline_delta_days: projectFinish && deadline ? Math.max(0, dateDeltaDays(deadline, projectFinish)) : 0,
@@ -161,7 +176,7 @@ export function buildProjectKpiMetrics(input: {
       .filter((overload) => overload.granularity === "day")
       .reduce((total, overload) => total + overload.overloadMinutes, 0),
     critical_task_count: input.calculatedPlan.criticalPathTaskIds.length,
-    progress_percent: totalTasks === 0 ? 0 : Math.round((finishedTasks / totalTasks) * 100),
+    progress_percent: progressPercent,
     baseline_finish_slip_days:
       latestBaselineFinish && projectFinish ? Math.max(0, dateDeltaDays(latestBaselineFinish, projectFinish)) : 0
   };

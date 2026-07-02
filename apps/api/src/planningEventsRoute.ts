@@ -10,6 +10,8 @@ import { parseProjectIdParam } from "./routeParamParsers";
 type PlanningEventsRouteDeps = {
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
+  /** Принадлежит ли проект тенанту актора. Без подтверждения подписку не открываем (SEC-001). */
+  projectExistsInTenant(tenantId: string, projectId: string): Promise<boolean>;
 };
 
 export function registerPlanningEventsRoute(app: Hono, deps: PlanningEventsRouteDeps) {
@@ -31,6 +33,11 @@ export function registerPlanningEventsRoute(app: Hono, deps: PlanningEventsRoute
     }
 
     const projectId = parsedProjectId.value;
+
+    // SEC-001: событийная шина ключуется только по projectId (без тенанта), поэтому проверяем,
+    // что проект принадлежит тенанту актора — иначе получили бы события чужого тенанта.
+    const belongsToTenant = await deps.projectExistsInTenant(actor.tenantId, projectId);
+    if (!belongsToTenant) return context.json({ error: "project_not_found" }, 404);
 
     return streamSSE(context, async (stream) => {
       const send = async (event: PlanRealtimeEvent) => {

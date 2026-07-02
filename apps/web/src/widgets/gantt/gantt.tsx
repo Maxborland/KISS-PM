@@ -72,9 +72,9 @@ function ChartHead1({ days, monthLabel }: { days: GanttDayHeader[]; monthLabel?:
 function ChartHead2({ days }: { days: GanttDayHeader[] }) {
   return (
     <>
-      {days.map((d) => (
+      {days.map((d, index) => (
         <div
-          key={d.day}
+          key={d.iso ?? index}
           className={cn("gantt2__chart-day", d.weekend && "gantt2__chart-day--weekend")}
         >
           {d.day}
@@ -155,7 +155,8 @@ export function Gantt({ data, className, selectedId, onSelectRow }: { data: Gant
       style={
         {
           "--gantt-chart-w": `${chartWidth}px`,
-          "--gantt-day-w": `${DAY_W}px`
+          "--gantt-day-w": `${DAY_W}px`,
+          "--gantt-days": `${totalDays}`
         } as CSSProperties
       }
     >

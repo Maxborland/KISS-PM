@@ -75,6 +75,65 @@ describe("Phase 3 project intake domain", () => {
     ]);
   });
 
+  it("исключает праздники и учитывает нестандартную рабочую неделю (произв. календарь)", () => {
+    const start = new Date("2026-06-01T00:00:00.000Z"); // Пн
+    const finish = new Date("2026-06-07T00:00:00.000Z"); // Вс
+    // Праздник 03.06 убирает один рабочий день из 5.
+    expect(
+      countWorkingDays(start, finish, {
+        workingWeekdays: [1, 2, 3, 4, 5],
+        workingMinutesPerDay: 480,
+        holidays: new Set(["2026-06-03"])
+      })
+    ).toBe(4);
+    // Шестидневка (Сб рабочая) даёт 6 дней (исключается только Вс).
+    expect(
+      countWorkingDays(start, finish, {
+        workingWeekdays: [1, 2, 3, 4, 5, 6],
+        workingMinutesPerDay: 480,
+        holidays: new Set()
+      })
+    ).toBe(6);
+  });
+
+  it("KPI-002: праздники в периоде переводят feasibility из ok в conflict", () => {
+    const opportunity = {
+      id: "opportunity-holiday",
+      plannedStart: new Date("2026-06-01T00:00:00.000Z"), // Пн
+      plannedFinish: new Date("2026-06-05T00:00:00.000Z"), // Пт
+      contractValue: 240_000,
+      plannedHourlyRate: 6_000 // plannedHours = 40
+    };
+    const demand = [{ positionId: "position-engineer", requiredHours: 40 }];
+    const positions = [{ id: "position-engineer", name: "Инженер", activeUsers: 1 }];
+
+    // Без календаря: 5 раб. дней × 8ч × 1 чел = 40ч → спрос покрыт, ok.
+    const noCalendar = assessOpportunityFeasibility({
+      opportunity,
+      demand,
+      positions,
+      activeProjectReservations: []
+    });
+    expect(noCalendar.workingDays).toBe(5);
+    expect(noCalendar.status).toBe("ok");
+
+    // С двумя праздниками: 3 раб. дня × 8ч = 24ч < 40ч → нехватка → conflict.
+    const withHolidays = assessOpportunityFeasibility({
+      opportunity,
+      demand,
+      positions,
+      activeProjectReservations: [],
+      calendar: {
+        workingWeekdays: [1, 2, 3, 4, 5],
+        workingMinutesPerDay: 480,
+        holidays: new Set(["2026-06-03", "2026-06-04"])
+      }
+    });
+    expect(withHolidays.workingDays).toBe(3);
+    expect(withHolidays.status).toBe("conflict");
+    expect(withHolidays.rows[0]?.shortageHours).toBe(16);
+  });
+
   it("reports missing position capacity as a blocker", () => {
     const assessment = assessOpportunityFeasibility({
       opportunity: {

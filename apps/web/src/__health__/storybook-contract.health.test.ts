@@ -54,10 +54,14 @@ describe("design-v3 Storybook contract smoke (batch 10–15)", () => {
     }
   });
 
-  it("WorkspaceChrome default topbar actions are disabled with reason (batch 13g)", () => {
+  it("WorkspaceChrome default topbar actions use real UserMenu, not fake demo buttons (batch 13g → Phase 1)", () => {
     const source = read("src/views/layout/workspace-chrome.tsx");
-    expect(source).toMatch(/disabled title="Демо Storybook: экспорт подключится к API"/);
-    expect(source).toMatch(/disabled title="Демо Storybook: создание сущности в продукте"/);
+    // Phase 1 (c6efd9bf) намеренно заменил disabled-заглушки «Экспорт/Создать» реальным меню
+    // пользователя (прод) и аватар-стеком (Storybook). Контракт: никаких фейковых действий в топбаре.
+    expect(source).toContain("UserMenu");
+    expect(source).toContain("BemAvatarStack");
+    expect(source).not.toMatch(/Демо Storybook: экспорт/);
+    expect(source).not.toMatch(/Демо Storybook: создание/);
   });
 
   it("views have no welcome-hero and blocks use PageIntro (batch 14)", () => {

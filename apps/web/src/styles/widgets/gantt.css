@@ -304,9 +304,9 @@
 .gw-21{grid-column-end:span 21}.gw-22{grid-column-end:span 22}.gw-23{grid-column-end:span 23}.gw-24{grid-column-end:span 24}.gw-25{grid-column-end:span 25}
 .gw-30{grid-column-end:span 30}.gw-35{grid-column-end:span 35}
 
-/* row chart grid: auto-fill 35 cols of day-width */
+/* row chart grid: одна колонка на каждый день диапазона (--gantt-days), ширины --gantt-day-w */
 .gantt2__cell--chart {
-  grid-template-columns: repeat(35, var(--gantt-day-w, 28px));
+  grid-template-columns: repeat(var(--gantt-days, 35), var(--gantt-day-w, 28px));
 }
 
 /* month spans in head1 */

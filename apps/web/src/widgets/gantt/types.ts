@@ -40,6 +40,8 @@ export type GanttRow = {
 };
 
 export type GanttDayHeader = {
+  /** ISO-дата (YYYY-MM-DD) — стабильный key, т.к. номер дня повторяется на диапазоне >1 месяца. */
+  iso?: string;
   day: number; // 1..31
   weekdayShort: string; // Пн..Вс
   weekend?: boolean;

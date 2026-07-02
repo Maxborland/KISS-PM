@@ -357,7 +357,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: actor.tenantId,
           userId: actor.id,
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async findUserById(userId) {
@@ -988,7 +988,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-db",
           userId: "user-requester",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async findTaskById() {
@@ -1091,7 +1091,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async listKpiDefinitions() {
@@ -1160,7 +1160,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async upsertKpiDefinition(input) {
@@ -1236,7 +1236,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async upsertKpiDefinition(input) {
@@ -1309,7 +1309,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async listKpiDefinitions() {
@@ -1401,7 +1401,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async listKpiDefinitions() {
@@ -1534,7 +1534,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async listKpiDefinitions() {
@@ -1627,7 +1627,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async listKpiDefinitions() {
@@ -1706,7 +1706,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async listKpiDefinitions() {
@@ -1782,7 +1782,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async upsertKpiDefinition(input) {
@@ -1850,7 +1850,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async listKpiDefinitions() {
@@ -1913,7 +1913,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async listKpiDefinitions() {
@@ -1982,7 +1982,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async withTransaction(operation) {
@@ -2188,7 +2188,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-alpha",
           userId: "user-alpha-limited",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async findUserById(userId) {
@@ -2310,7 +2310,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-alpha",
           userId: "user-alpha-limited",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async findUserById(userId) {
@@ -2546,7 +2546,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-alpha",
           userId: "user-alpha-admin",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async findUserById(userId) {
@@ -2673,7 +2673,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-alpha",
           userId: "user-alpha-admin",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async findUserById(userId) {
@@ -2748,7 +2748,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-alpha",
           userId: "user-alpha-admin",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async findUserById(userId) {
@@ -3158,7 +3158,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async withTransaction(operation) {
@@ -3289,7 +3289,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async withTransaction(operation) {
@@ -3463,7 +3463,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async withTransaction(operation) {
@@ -3622,7 +3622,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async withTransaction(operation) {
@@ -3765,7 +3765,7 @@ describe("KISS PM API Phase 1 shell", () => {
           tenantId: "tenant-control",
           userId: "user-control",
           tokenHash: "ignored",
-          expiresAt: new Date("2026-07-01T00:00:00.000Z")
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         };
       },
       async withTransaction(operation) {

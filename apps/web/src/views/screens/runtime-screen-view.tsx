@@ -876,8 +876,8 @@ function SettingsRuntime() {
 }
 
 function RuntimeLogin() {
-  const [email, setEmail] = useState("admin@kiss-pm.local");
-  const [password, setPassword] = useState("admin12345");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const queryClient = useQueryClient();
   const router = useRouter();
   const login = useMutation({ mutationFn: () => apiFetch("/api/auth/login", { method: "POST", json: { email, password } }), onSuccess: async () => { await queryClient.invalidateQueries(); router.push("/dashboard"); } });
@@ -1454,15 +1454,24 @@ function compareWbs(left: string, right: string): number {
 }
 
 function toGanttData(model: PlanningReadModel, showCritical = true): GanttData {
-  const base = new Date(model.project.plannedStart);
-  const startOfBase = new Date(base.getFullYear(), base.getMonth(), base.getDate()).getTime();
+  const dayMs = 86_400_000;
+  const midnight = (value: string | Date) => { const d = new Date(value); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
+  // Диапазон таймлайна = от самой ранней до самой поздней даты плана (не фиксированные 30 дней — иначе многомесячный проект обрезается).
+  const times = [midnight(model.project.plannedStart), midnight(model.project.plannedFinish)];
+  for (const task of model.authored.tasks) {
+    if (task.plannedStart) times.push(midnight(task.plannedStart));
+    if (task.plannedFinish) times.push(midnight(task.plannedFinish));
+  }
+  const startOfBase = Math.min(...times);
+  const endOfRange = Math.max(...times);
+  const base = new Date(startOfBase);
   const now = new Date();
-  const todayIndex = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - startOfBase) / 86_400_000);
-  const days = Array.from({ length: 30 }, (_, index) => {
-    const day = new Date(base);
-    day.setDate(base.getDate() + index);
+  const todayIndex = Math.round((midnight(now) - startOfBase) / dayMs);
+  const spanDays = Math.max(30, Math.round((endOfRange - startOfBase) / dayMs) + 1);
+  const days = Array.from({ length: spanDays }, (_, index) => {
+    const day = new Date(startOfBase + index * dayMs);
     const weekdayShort = new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(day).slice(0, 2);
-    return { day: day.getDate(), weekdayShort, weekend: day.getDay() === 0 || day.getDay() === 6, today: index === todayIndex };
+    return { iso: isoDate(day), day: day.getDate(), weekdayShort, weekend: day.getDay() === 0 || day.getDay() === 6, today: index === todayIndex };
   });
   const resourceNameById = new Map(model.resources.map((resource) => [resource.id, resource.name]));
   const resourceNameByTask = new Map<string, string>();

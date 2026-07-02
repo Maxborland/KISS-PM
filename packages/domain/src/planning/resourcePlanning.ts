@@ -260,7 +260,7 @@ function calculateTaskLoadForDate(
     const currentCapacity = capacities.find((item) => item.date === date)?.capacityMinutes ?? 0;
     if (currentCapacity <= 0) continue;
 
-    const workMinutes = Math.round((assignmentWork * currentCapacity) / totalCapacity);
+    const workMinutes = allocateProportionalMinutes(assignmentWork, capacities, date);
     assignedMinutes += workMinutes;
     taskIds.push(task.id);
     assignmentIds.push(assignment.id);
@@ -297,6 +297,36 @@ function aggregateAssignmentContributions(
       left.taskId.localeCompare(right.taskId) ||
       left.assignmentId.localeCompare(right.assignmentId)
   );
+}
+
+/**
+ * KPI-004: распределяет `total` минут по дням пропорционально дневной ёмкости методом наибольшего
+ * остатка, чтобы Σ по дням ТОЧНО равнялась `total` (независимое поминутное округление давало дрейф:
+ * 100 мин на 3 равных дня → 33+33+33=99, минута терялась). Возвращает целую долю дня `date`.
+ * Детерминированно: при равных дробных частях приоритет по порядку дней.
+ */
+export function allocateProportionalMinutes(
+  total: number,
+  capacities: ReadonlyArray<{ date: PlanDate; capacityMinutes: number }>,
+  date: PlanDate
+): number {
+  const totalCapacity = capacities.reduce((sum, item) => sum + item.capacityMinutes, 0);
+  if (totalCapacity <= 0 || total <= 0) return 0;
+  const shares = capacities.map((item, index) => {
+    const exact = (total * item.capacityMinutes) / totalCapacity;
+    const floor = Math.floor(exact);
+    return { date: item.date, index, floor, frac: exact - floor };
+  });
+  const remainder = total - shares.reduce((sum, share) => sum + share.floor, 0);
+  const bumped = new Set(
+    [...shares]
+      .sort((left, right) => right.frac - left.frac || left.index - right.index)
+      .slice(0, Math.max(0, remainder))
+      .map((share) => share.date)
+  );
+  const share = shares.find((item) => item.date === date);
+  if (!share) return 0;
+  return share.floor + (bumped.has(date) ? 1 : 0);
 }
 
 function taskWorkingOverlapForDate(
@@ -371,14 +401,15 @@ function calculateReservationLoadForDate(
       continue;
     }
     const reservationDates = enumerateDates(reservation.start, reservation.finish);
-    const capacities = reservationDates.map((reservationDate) =>
-      workingMinutesForDate(reservationDate, calendar, calendarExceptions)
-    );
-    const totalCapacity = capacities.reduce((total, capacity) => total + capacity, 0);
+    const capacities = reservationDates.map((reservationDate) => ({
+      date: reservationDate,
+      capacityMinutes: workingMinutesForDate(reservationDate, calendar, calendarExceptions)
+    }));
+    const totalCapacity = capacities.reduce((total, item) => total + item.capacityMinutes, 0);
     const currentCapacity = workingMinutesForDate(date, calendar, calendarExceptions);
     if (totalCapacity <= 0 || currentCapacity <= 0) continue;
 
-    const workMinutes = Math.round((reservation.workMinutes * currentCapacity) / totalCapacity);
+    const workMinutes = allocateProportionalMinutes(reservation.workMinutes, capacities, date);
     reservedMinutes += workMinutes;
     reservationIds.push(reservation.id);
     reservationContributions.push({ reservationId: reservation.id, workMinutes });
