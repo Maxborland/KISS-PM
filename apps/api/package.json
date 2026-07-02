@@ -17,12 +17,12 @@
     "@kiss-pm/persistence": "workspace:*",
     "@kiss-pm/tenant-org-structure": "workspace:*",
     "@kiss-pm/test-fixtures": "workspace:*",
-    "@scalar/hono-api-reference": "^0.10.19",
-    "hono": "^4.7.10",
+    "@scalar/hono-api-reference": "^0.10.20",
+    "hono": "^4.12.27",
     "redis": "^5.12.1"
   },
   "devDependencies": {
     "esbuild": "^0.25.12",
-    "tsx": "^4.19.4"
+    "tsx": "^4.22.4"
   }
 }
