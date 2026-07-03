@@ -38,10 +38,33 @@
   transform: scale(calc(1 + var(--demo-dim-progress) * var(--demo-dim-scale-boost)));
 }
 
-.demo-band .section-head,
-.demo-controls {
+/* Заголовок живёт НАД затенением и приподнят от демо; при затемнении
+   плавно светлеет, чтобы оставаться читаемым на инковом оверлее. */
+.demo-band .section-head {
   position: relative;
-  z-index: 1;
+  z-index: 52;
+  margin-bottom: clamp(48px, 7vw, 88px);
+}
+
+.demo-band .section-head .l-display,
+.demo-band .section-head__copy {
+  transition: color 90ms linear;
+}
+
+.demo-band .section-head .l-display {
+  color: color-mix(
+    in oklab,
+    var(--text-strong) calc(100% - var(--demo-dim-progress) * 100%),
+    #f2f5ff
+  );
+}
+
+.demo-band .section-head__copy {
+  color: color-mix(
+    in oklab,
+    var(--muted-strong) calc(100% - var(--demo-dim-progress) * 100%),
+    #c6cdea
+  );
 }
 
 .demo-frame__inner {
@@ -62,23 +85,6 @@
     height: auto;
     min-height: 760px;
   }
-}
-
-.demo-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 14px 20px;
-  margin-top: clamp(40px, 6vw, 72px);
-  padding-top: 8px;
-}
-
-.demo-controls .l-btn--primary {
-  height: 54px;
-  padding-inline: 30px;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
 }
 
 /* Demo sandbox + deal workspace — см. demo-sandbox.css */
