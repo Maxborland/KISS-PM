@@ -1,4 +1,5 @@
 import { addDays, comparePlanDates, diffCalendarDays } from "./calendar";
+import { computeCapacityBalance } from "./capacityBalance";
 import {
   addWorkingMinutesToInstant,
   compareWorkingInstants,
@@ -36,6 +37,10 @@ export type ResourceLoadBucket = {
   assignedMinutes: number;
   reservedMinutes: number;
   occupiedMinutes: number;
+  // capacity/free — от календаря ПРОЕКТА (авторитетно для single-project/KPI/scenario/auto-solver путей).
+  // Для cross-project workspace-вида это НЕ авторитет: employeeCapacity переопределяет ёмкость по
+  // производственному календарю + исключениям + отсутствиям (KPI-001). free/overload выводятся единой
+  // computeCapacityBalance(used, capacity).
   capacityMinutes: number;
   freeMinutes: number;
   taskIds: string[];
@@ -107,10 +112,11 @@ export function buildResourceLoadMatrix(
   return {
     buckets,
     overloads: buckets
-      .filter((bucket) => committedMinutes(bucket) > bucket.capacityMinutes)
-      .map((bucket) => ({
+      .map((bucket) => ({ bucket, balance: computeCapacityBalance(committedMinutes(bucket), bucket.capacityMinutes) }))
+      .filter((entry) => entry.balance.isOverload)
+      .map(({ bucket, balance }) => ({
         ...bucket,
-        overloadMinutes: committedMinutes(bucket) - bucket.capacityMinutes,
+        overloadMinutes: balance.overloadMinutes,
         reasons: [
           ...bucket.taskIds.map((id) => ({ type: "task" as const, id })),
           ...bucket.assignmentIds.map((id) => ({ type: "assignment" as const, id })),
@@ -176,7 +182,7 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
         reservedMinutes: reservationLoad.reservedMinutes,
         occupiedMinutes: occupancyLoad.occupiedMinutes,
         capacityMinutes,
-        freeMinutes: Math.max(0, capacityMinutes - totalCommittedMinutes),
+        freeMinutes: computeCapacityBalance(totalCommittedMinutes, capacityMinutes).freeMinutes,
         taskIds: taskLoad.taskIds,
         assignmentIds: taskLoad.assignmentIds,
         assignmentContributions: taskLoad.assignmentContributions,
@@ -537,10 +543,10 @@ function aggregateBuckets(
     current.reservedMinutes += bucket.reservedMinutes;
     current.occupiedMinutes += bucket.occupiedMinutes;
     current.capacityMinutes += bucket.capacityMinutes;
-    current.freeMinutes = Math.max(
-      0,
-      current.capacityMinutes - committedMinutes(current)
-    );
+    current.freeMinutes = computeCapacityBalance(
+      committedMinutes(current),
+      current.capacityMinutes
+    ).freeMinutes;
     current.taskIds = [...new Set([...current.taskIds, ...bucket.taskIds])].sort();
     current.assignmentIds = [...new Set([...current.assignmentIds, ...bucket.assignmentIds])].sort();
     current.assignmentContributions = aggregateAssignmentContributions([
