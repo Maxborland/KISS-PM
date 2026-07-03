@@ -2,9 +2,8 @@ AddDefaultCharset utf-8
 
 RewriteEngine On
 
-# https принудительно
-RewriteCond %{HTTPS} !=on
-RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+# https-редирект здесь НЕ делаем: за Cloudflare Apache видит http и
+# правило зацикливается. «Always Use HTTPS» включается на стороне CF.
 
 # Форма постит на /api/waitlist — маршрутизируем в PHP-эндпоинт
 RewriteRule ^api/waitlist/?$ api/waitlist.php [L,QSA]
