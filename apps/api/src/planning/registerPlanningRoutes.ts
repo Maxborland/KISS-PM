@@ -26,6 +26,7 @@ import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { createPlanningReadModel } from "./planningReadModel";
 import { canReadPlanningReadModel, includeResourceExceptionsFor, permissionForCommand } from "./planningRouteAuth";
 import { denyPlanningAction, respondFromFailedResult } from "./planningRouteResponders";
+import { requireCapabilities } from "../dataSourceCapabilities";
 import {
   appendPlanningAuditIfConfigured,
   auditActionForCommand,
@@ -199,13 +200,16 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       });
     }
 
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.getPlanSnapshot ||
-        !transactionDataSource.applyPlanningCommand ||
-        !transactionDataSource.incrementPlanVersion ||
-        !transactionDataSource.appendAuditEvent
-      ) {
+    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+      // Один вызов вместо цепочки `!ds.a || !ds.b`; возвращает store с этими методами как обязательными,
+      // downstream больше не нуждается в non-null-ассершенах.
+      const transactionDataSource = requireCapabilities(rawStore, [
+        "getPlanSnapshot",
+        "applyPlanningCommand",
+        "incrementPlanVersion",
+        "appendAuditEvent"
+      ]);
+      if (!transactionDataSource) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
       if (
@@ -390,13 +394,14 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       });
     }
 
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.getPlanSnapshot ||
-        !transactionDataSource.applyPlanningCommand ||
-        !transactionDataSource.incrementPlanVersion ||
-        !transactionDataSource.appendAuditEvent
-      ) {
+    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+      const transactionDataSource = requireCapabilities(rawStore, [
+        "getPlanSnapshot",
+        "applyPlanningCommand",
+        "incrementPlanVersion",
+        "appendAuditEvent"
+      ]);
+      if (!transactionDataSource) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
       if (
@@ -733,15 +738,16 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       });
     }
 
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.getPlanSnapshot ||
-        !transactionDataSource.findPlanningScenarioRun ||
-        !transactionDataSource.applyPlanningCommand ||
-        !transactionDataSource.incrementPlanVersion ||
-        !transactionDataSource.markPlanningScenarioRunApplied ||
-        !transactionDataSource.appendAuditEvent
-      ) {
+    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+      const transactionDataSource = requireCapabilities(rawStore, [
+        "getPlanSnapshot",
+        "findPlanningScenarioRun",
+        "applyPlanningCommand",
+        "incrementPlanVersion",
+        "markPlanningScenarioRunApplied",
+        "appendAuditEvent"
+      ]);
+      if (!transactionDataSource) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
 
