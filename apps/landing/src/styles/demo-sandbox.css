@@ -168,19 +168,24 @@
   box-shadow: var(--ring-focus);
 }
 
-.sandbox__search input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  font-size: 13px;
-  color: var(--text);
-  outline: none;
-  cursor: default;
+.sandbox__search {
+  cursor: pointer;
+  text-align: left;
 }
 
-.sandbox__search input::placeholder {
+.sandbox__search span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
   color: var(--muted);
+}
+
+.sandbox__search:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
 }
 
 .sandbox__avatar {
@@ -2360,5 +2365,147 @@
 
   .deal-composer__tools {
     justify-content: flex-end;
+  }
+}
+
+/* —— Мобильная раскладка: сайдбар и сценарий — горизонтальные ленты —— */
+
+@media (max-width: 979px) {
+  .sandbox {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sandbox__rail {
+    order: -2;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+    padding: 12px 14px;
+  }
+
+  .sandbox__brand {
+    flex: 0 0 auto;
+  }
+
+  .sandbox__rail-foot {
+    margin-top: 0;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Дублирует баннер «147 активных проектов» на первом экране */
+  .sandbox__rail-foot .sandbox__portfolio-chip {
+    display: none;
+  }
+
+  .sandbox__reset {
+    padding: 7px 10px;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  .sandbox__nav {
+    order: 3;
+    flex: 1 0 100%;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sandbox__nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sandbox__nav-section {
+    display: contents;
+  }
+
+  .sandbox__nav-label {
+    display: none;
+  }
+
+  .sandbox__nav-item {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--panel);
+    font-size: 12.5px;
+  }
+
+  .sandbox__nav-item.is-active {
+    border-color: var(--accent-muted);
+  }
+
+  /* Правая колонка распадается: сценарий — над экраном, контекст — после */
+  .sandbox__side {
+    display: contents;
+  }
+
+  .sandbox__scenario {
+    order: -1;
+    background: var(--sandbox-surface);
+    border-bottom: 1px solid var(--sandbox-border);
+    padding: 10px 14px 12px;
+    gap: 8px;
+  }
+
+  .sandbox__scenario-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .sandbox__scenario-head .sandbox__rail-eyebrow {
+    display: none;
+  }
+
+  .sandbox__scenario-head .sandbox__rail-progress {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .sandbox__scenario-head .sandbox__rail-progress span {
+    font-size: 16px;
+  }
+
+  .sandbox__scenario-head .sandbox__progress-bar {
+    flex: 1;
+  }
+
+  .sandbox__scenario-steps {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sandbox__scenario-steps::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sandbox__scenario-step {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    background: var(--panel);
+  }
+
+  .sandbox__scenario-title {
+    white-space: nowrap;
+    font-size: 11.5px;
+  }
+
+  .demo-context {
+    border-top: 1px solid var(--sandbox-border);
   }
 }
