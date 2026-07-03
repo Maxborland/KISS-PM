@@ -11,6 +11,7 @@ import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib
 import { demoAction } from "@/views/lib/demo";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { usePointerDrag } from "@/delivery/lib/use-pointer-drag";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu, TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
 import { createPlanningCommand } from "@kiss-pm/domain";
@@ -313,7 +314,6 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [errors, setErrors] = useState<Map<string, string>>(() => new Map());
-  const [drag, setDrag] = useState<DragState | null>(null);
   const [batchMode, setBatchMode] = useState(false);
   const [staged, setStaged] = useState<PlanningCommand[]>([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -321,14 +321,9 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // обновлял его (а не плодил второе назначение, удваивая нагрузку — реальный редьюсер upsert-ит по id).
   const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; parentId: string | null; taskId?: string; asgId?: string; initial: TaskModalValues } | null>(null);
   const [colW, setColW] = useState<number[]>(() => [...DEFAULT_COLW]);
-  const [colDrag, setColDrag] = useState<ColDrag | null>(null);
-  const [link, setLink] = useState<LinkDrag | null>(null);
 
   const mapped = useMemo(() => (readModel ? mapRows(readModel, resDir.name) : null), [readModel, resDir.name]);
   const dayW = ZOOM_DAY_W[zoom];
-  const dragRef = useRef<DragState | null>(null);
-  const colDragRef = useRef<ColDrag | null>(null);
-  const linkRef = useRef<{ fromId: string; fromEdge: "start" | "finish" } | null>(null);
   const lastCommitRef = useRef<{ commands: PlanningCommand[]; before: PlanningReadModel } | null>(null);
   const batchBaseRef = useRef<PlanningReadModel | null>(null);
   const ganttRef = useRef<HTMLDivElement>(null);
@@ -337,35 +332,29 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const readModelRef = useRef(readModel);
   readModelRef.current = readModel;
   // Актуальные геометрия строк и ширина дня для window-обработчика перетягивания связи:
-  // его эффект подписан на [link], поэтому без рефов up() резолвил бы край цели по устаревшим
-  // mapped/dayW (async-обновление read-model или смена зума в процессе жеста → неверный тип связи).
+  // жест usePointerDrag переподписывается лишь при старте/финише, поэтому без рефов up() резолвил
+  // бы край цели по устаревшим mapped/dayW (async-обновление read-model или смена зума в процессе
+  // жеста → неверный тип связи).
   const mappedRef = useRef(mapped);
   mappedRef.current = mapped;
   const dayWRef = useRef(dayW);
   dayWRef.current = dayW;
 
-  // drag/resize баров: window-слушатели (надёжно, без устаревших замыканий)
-  useEffect(() => {
-    if (!drag) return;
-    const move = (e: PointerEvent) => {
-      const cur = dragRef.current;
-      if (!cur) return;
+  // drag/resize баров: общий window-жест (usePointerDrag: зеркало-реф + слушатели + очистка)
+  const barDrag = usePointerDrag<DragState>({
+    onMove: (e, cur, set) => {
       if (cur.mode === "progress") {
         const rect = ganttRef.current?.getBoundingClientRect();
         if (!rect) return;
         const x = e.clientX - rect.left;
         const pct = Math.max(0, Math.min(100, Math.round(((x - cur.origStart * dayW) / Math.max(1, cur.origDur * dayW)) * 100)));
-        if (pct !== cur.curPct) { const u = { ...cur, curPct: pct }; dragRef.current = u; setDrag(u); }
+        if (pct !== cur.curPct) set({ ...cur, curPct: pct });
         return;
       }
       const nd = Math.round((e.clientX - cur.startX) / dayW);
-      if (nd !== cur.deltaDays) { const u = { ...cur, deltaDays: nd }; dragRef.current = u; setDrag(u); }
-    };
-    const up = () => {
-      const cur = dragRef.current;
-      dragRef.current = null;
-      setDrag(null);
-      if (!cur) return;
+      if (nd !== cur.deltaDays) set({ ...cur, deltaDays: nd });
+    },
+    onUp: (_e, cur) => {
       if (cur.mode === "progress") {
         if (cur.curPct !== cur.origPct) void applyCmd(createPlanningCommand({ type: "task.update_progress", payload: { taskId: cur.id, percentComplete: cur.curPct } }));
         return;
@@ -406,58 +395,41 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         if (asg) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: cur.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } }));
         if (cmds.length > 1) void runBatch(cmds); else void applyCmd(cmds[0]!);
       }
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drag !== null, dayW]);
+    }
+  });
+  const drag = barDrag.state;
 
-  // resize колонок
-  useEffect(() => {
-    if (!colDrag) return;
-    const move = (e: PointerEvent) => {
-      const cur = colDragRef.current;
-      if (!cur) return;
+  // resize колонок: тот же общий жест
+  const colResize = usePointerDrag<ColDrag>({
+    onMove: (e, cur) => {
       const w = Math.max(36, Math.round(cur.origW + (e.clientX - cur.startX)));
       setColW((prev) => { const n = [...prev]; n[cur.index] = w; return n; });
-    };
-    const up = () => { colDragRef.current = null; setColDrag(null); };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
-  }, [colDrag !== null]);
+    },
+    onUp: () => {}
+  });
 
-  // перетягивание связи между барами (создание зависимости)
-  useEffect(() => {
-    if (!link) return;
-    const move = (e: PointerEvent) => {
+  // перетягивание связи между барами (создание зависимости): тот же общий жест
+  const linkDrag = usePointerDrag<LinkDrag>({
+    onMove: (e, cur, set) => {
       const rect = ganttRef.current?.getBoundingClientRect();
       if (!rect) return;
-      setLink((cur) => (cur ? { ...cur, curX: e.clientX - rect.left, curY: e.clientY - rect.top - HEADER_H } : cur));
-    };
-    const up = (e: PointerEvent) => {
-      const lk = linkRef.current;
-      linkRef.current = null;
-      setLink(null);
-      if (!lk) return;
+      set({ ...cur, curX: e.clientX - rect.left, curY: e.clientY - rect.top - HEADER_H });
+    },
+    onUp: (e, cur) => {
       const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
       const target = el?.closest("[data-task-id]") as HTMLElement | null;
       const targetId = target?.dataset.taskId;
-      if (!targetId || targetId === lk.fromId) return;
+      if (!targetId || targetId === cur.fromId) return;
       // тип связи = из какого края тянули → в какой край цели (по позиции курсора)
       const tr = mappedRef.current?.rows.find((x) => x.id === targetId);
       const rect = ganttRef.current?.getBoundingClientRect();
       let toEdge: "start" | "finish" = "start";
       if (tr && rect) { const x = e.clientX - rect.left; const mid = (tr.dayStart + tr.dayDur / 2) * dayWRef.current; toEdge = x < mid ? "start" : "finish"; }
-      const type = lk.fromEdge === "finish" ? (toEdge === "start" ? "FS" : "FF") : toEdge === "start" ? "SS" : "SF";
-      void applyCmd(createPlanningCommand({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: lk.fromId, successorTaskId: targetId, dependencyType: type, lagMinutes: 0 } }));
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [link !== null]);
+      const type = cur.fromEdge === "finish" ? (toEdge === "start" ? "FS" : "FF") : toEdge === "start" ? "SS" : "SF";
+      void applyCmd(createPlanningCommand({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: cur.fromId, successorTaskId: targetId, dependencyType: type, lagMinutes: 0 } }));
+    }
+  });
+  const link = linkDrag.state;
 
   // Фокус на позиционированную инлайн-строку (из ПКМ): autoFocus перехватывает Radix
   // ContextMenu (возврат фокуса на строку при закрытии), поэтому фокусируем с задержкой.
@@ -845,23 +817,18 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // --- drag/resize/link ---
   const startDrag = (e: ReactPointerEvent, r: Row, mode: DragMode) => {
     e.stopPropagation();
-    const d: DragState = { id: r.id, mode, startX: e.clientX, origStart: r.dayStart, origDur: r.dayDur, origWorkH: r.workH, origPct: r.pct, deltaDays: 0, curPct: r.pct };
-    dragRef.current = d;
-    setDrag(d);
+    barDrag.begin({ id: r.id, mode, startX: e.clientX, origStart: r.dayStart, origDur: r.dayDur, origWorkH: r.workH, origPct: r.pct, deltaDays: 0, curPct: r.pct });
   };
   const startColResize = (e: ReactPointerEvent, index: number) => {
     e.stopPropagation();
     e.preventDefault();
-    const cd: ColDrag = { index, startX: e.clientX, origW: colW[index] ?? 80 };
-    colDragRef.current = cd;
-    setColDrag(cd);
+    colResize.begin({ index, startX: e.clientX, origW: colW[index] ?? 80 });
   };
   const startLink = (e: ReactPointerEvent, r: Row, edge: "start" | "finish") => {
     e.stopPropagation();
     const fromX = (edge === "finish" ? r.dayStart + r.dayDur : r.dayStart) * dayW;
     const fromY = (indexById.get(r.id) ?? 0) * ROW_H + ROW_H / 2;
-    linkRef.current = { fromId: r.id, fromEdge: edge };
-    setLink({ fromId: r.id, fromEdge: edge, fromX, fromY, curX: fromX, curY: fromY });
+    linkDrag.begin({ fromId: r.id, fromEdge: edge, fromX, fromY, curX: fromX, curY: fromY });
   };
 
   return (

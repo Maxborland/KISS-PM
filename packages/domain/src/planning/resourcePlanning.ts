@@ -21,7 +21,7 @@ import type {
 } from "./types";
 import {
   aggregateOccupancyContributions,
-  occupancyMinutesForDate,
+  classifyOccupancyForDate,
   type OccupancyContribution,
   type OccupancyWindow
 } from "./occupancy";
@@ -471,21 +471,22 @@ function calculateOccupancyLoadForDate(
   let unavailableMinutes = 0;
   for (const window of input.occupancyWindows ?? []) {
     if (window.resourceId !== resourceId) continue;
-    if (window.capacityImpact === "tentative") continue;
-    const workMinutes = occupancyMinutesForDate(window, date);
-    if (workMinutes <= 0) continue;
-    if (window.capacityImpact === "unavailable") {
-      // KPI-006: недоступность уменьшает ёмкость дня, а не добавляет нагрузку (иначе завышает ratio/heat).
+    // KPI-006: политику трёх значений capacityImpact держит occupancy.ts (classifyOccupancyForDate).
+    // Здесь только маршрутизация классифицированного результата, без повторного кодирования правил.
+    const classified = classifyOccupancyForDate(window, date);
+    if (classified.kind === "ignored") continue;
+    if (classified.kind === "unavailable") {
+      // Недоступность уменьшает ёмкость дня, а не добавляет нагрузку (иначе завышает ratio/heat).
       // Намеренно НЕ попадает в occupancyContributions/occupiedMinutes — это срез доступности, а не
       // «занятость»; в ёмкости она отражена (buildDayBuckets вычитает unavailableMinutes из capacity).
-      unavailableMinutes += workMinutes;
+      unavailableMinutes += classified.workMinutes;
       continue;
     }
     occupancyContributions.push({
       occupancyId: window.id,
       sourceType: window.sourceType,
       sourceId: window.sourceId,
-      workMinutes
+      workMinutes: classified.workMinutes
     });
   }
 
