@@ -132,7 +132,7 @@ export function AgentChatPanel({
   const isThinking = phase === "thinking" || phase === "activity" || phase === "second-thinking";
 
   return (
-    <section className="lad-chat" aria-label="Чат с Генри Ганттом">
+    <section className="lad-chat" aria-label="Чат с проектным агентом">
       <header className="lad-chat__header">
         <button className="lad-icon-button lad-mobile-only" type="button" onClick={onOpenMobileLeft}>
           <Icon name="menu" />
@@ -143,8 +143,8 @@ export function AgentChatPanel({
             <Icon name="agent" />
           </div>
           <div>
-            <h2>Генри Гантт</h2>
-            <span>Агент аккаунта</span>
+            <h2>Проектный агент</h2>
+            <span>Агент проекта</span>
           </div>
         </div>
         <div className="lad-chat__header-actions">
@@ -165,7 +165,7 @@ export function AgentChatPanel({
         {messages.length === 0 ? (
           <div className="lad-chat__empty">
             <Icon name="message" />
-            <span>Запрос уже набран. Отправьте его Генри.</span>
+            <span>Запрос уже набран. Отправьте его агенту.</span>
           </div>
         ) : null}
         {messages.map((message) => (
@@ -191,14 +191,14 @@ export function AgentChatPanel({
           className="lad-input"
           value={inputValue}
           onChange={(event) => onInputChange(event.target.value)}
-          placeholder="Спросите Генри или попросите изменить проект..."
-          aria-label="Сообщение Генри Гантту"
+          placeholder="Опишите цель или попросите изменить проект..."
+          aria-label="Сообщение проектному агенту"
         />
         <button
           className="lad-icon-button lad-attach-button"
           type="button"
           aria-label="Прикрепить файл"
-          onClick={() => onNote?.("Вложения доступны в продукте — в демо Генри работает с планом недели.")}
+          onClick={() => onNote?.("Вложения доступны в продукте — в демо агент работает с планом недели.")}
         >
           <Icon name="paperclip" />
         </button>
@@ -223,7 +223,7 @@ function MessageBubble({ message }: { message: DemoMessage }) {
       <div className="lad-message__avatar">{message.author === "henry" ? <Icon name="agent" /> : "Вы"}</div>
       <div className="lad-message__content">
         <div className="lad-message__meta">
-          <span>{message.author === "henry" ? "Генри Гантт" : "Вы"}</span>
+          <span>{message.author === "henry" ? "Проектный агент" : "Вы"}</span>
           <time>{message.time}</time>
         </div>
         <p>{message.text}</p>
@@ -243,7 +243,7 @@ function MessageBubble({ message }: { message: DemoMessage }) {
 
 export function AgentActivitySteps({ visibleSteps }: { visibleSteps: number }) {
   return (
-    <div className="lad-steps" aria-label="Действия Генри">
+    <div className="lad-steps" aria-label="Действия проектного агента">
       {ACTIVITY_STEPS.map((step, index) => (
         <div key={step} className={cx("lad-step", index < visibleSteps && "is-visible")}>
           <span className="lad-step__icon">
@@ -260,8 +260,8 @@ export function AgentStatusMenu({ onNote }: { onNote?: (note: string) => void })
   return (
     <div className="lad-agent-menu">
       <div className="lad-agent-menu__head">
-        <strong>Генри Гантт</strong>
-        <span>Агент аккаунта</span>
+        <strong>Проектный агент</strong>
+        <span>Агент проекта</span>
       </div>
       <dl>
         <div>
