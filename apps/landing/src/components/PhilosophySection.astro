@@ -1,39 +1,19 @@
 ---
-const principles = [
-  {
-    term: "Одно следующее действие",
-    detail: "Система всегда подсказывает один ясный шаг — не сто досок и фильтров.",
-  },
-  {
-    term: "Агент готовит — человек решает",
-    detail: "Генри собирает изменения в сверку; применяется только одобренное.",
-  },
-  {
-    term: "Каждое решение оставляет след",
-    detail: "Действия записываются в аудит — «кто и почему» видно и через месяц.",
-  },
-] as const;
+import PhilosophyShader from "./PhilosophyShader.tsx";
 ---
 
-<section id="philosophy" class="l-band l-band--panel philosophy" aria-labelledby="philosophy-title">
-  <div class="l-container">
-    <div class="philosophy__inner">
-      <p class="philosophy__eyebrow">Философия</p>
-      <h2 id="philosophy-title" class="philosophy__display" data-text-reveal>
-        Keep it simple. Seriously.
-      </h2>
-      <p class="philosophy__copy" data-text-reveal>
-        Название обязывает: KISS PM убирает из управления всё, что не помогает решать.
-      </p>
+<section id="philosophy" class="philosophy" aria-labelledby="philosophy-title">
+  <PhilosophyShader client:visible />
 
-      <dl class="philosophy__rows" data-reveal-group>
-        {principles.map((p) => (
-          <div class="philosophy__row">
-            <dt>{p.term}</dt>
-            <dd>{p.detail}</dd>
-          </div>
-        ))}
-      </dl>
+  <div class="l-container philosophy__inner">
+    <h2 id="philosophy-title" class="philosophy__display" data-text-reveal>
+      Keep it simple. Seriously.
+    </h2>
+
+    <div class="philosophy__lines" data-reveal-group>
+      <p class="philosophy__line">Одно следующее действие.</p>
+      <p class="philosophy__line">Агент готовит — человек решает.</p>
+      <p class="philosophy__line">Каждое решение оставляет след.</p>
     </div>
   </div>
 </section>
