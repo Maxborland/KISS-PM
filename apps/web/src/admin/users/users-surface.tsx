@@ -10,12 +10,14 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { AdminFrame } from "@/admin/ui/admin-frame";
 import { UserStatusChip, adminErr } from "@/admin/ui/admin-bits";
 import { useAdmin } from "@/admin/lib/use-admin";
+import { useAdminRuntime } from "@/admin/lib/admin-runtime";
 import type { AccessProfile, Position, WorkspaceUser } from "@/admin/lib/admin-client";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
 export function AdminUsersSurface() {
+  const { live } = useAdminRuntime();
   const admin = useAdmin();
   const { data, status, error, reload, createUser, updateUser, deactivateUser } = admin;
   const [busy, setBusy] = useState(false);
@@ -45,10 +47,12 @@ export function AdminUsersSurface() {
       subtitle="Пользователи рабочей области"
       actions={data ? <CreateUserDialog roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createUser} /> : undefined}
     >
-      <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        <span>Реальный контракт админки: GET/POST/PATCH /api/workspace/users (createAdminClient + in-memory mock, swap = apiOrigin). Деактивация = PATCH status:&quot;inactive&quot;. Самого себя (текущий — Администратор) деактивировать или сменить себе роль нельзя (self_access_change_forbidden). Политики безопасности (2FA/SSO/whitelist) — во вкладке «Безопасность».</span>
-      </div>
+      {!live ? (
+        <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          <span>Реальный контракт админки: GET/POST/PATCH /api/workspace/users (createAdminClient + in-memory mock, swap = apiOrigin). Деактивация = PATCH status:&quot;inactive&quot;. Самого себя (текущий — Администратор) деактивировать или сменить себе роль нельзя (self_access_change_forbidden). Политики безопасности (2FA/SSO/whitelist) — во вкладке «Безопасность».</span>
+        </div>
+      ) : null}
 
       <SurfaceState
         status={surfaceStatus}

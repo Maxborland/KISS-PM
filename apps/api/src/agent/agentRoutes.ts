@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
 
@@ -31,6 +33,9 @@ const AGENT_SYSTEM_PROMPT = [
 // исполняется вживую через governed-эндпоинт scenarios/preview (он стейджит сценарные run'ы,
 // плана не меняет) — агент получает их id, чтобы предложить применение.
 const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_resource_overloads", "preview_resource_resolution"]);
+// mutation-инструменты, которые /execute РЕАЛЬНО применяет. LLM предлагают только их — иначе
+// агент мог бы предложить действие, которое при подтверждении вернёт 501 (сломанное обещание).
+const EXECUTABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "create_task", "apply_resource_resolution", "apply_plan_commands"]);
 
 const OVERLOAD_CAP = 30; // ponytail: режем payload до топ-N перегрузок (по минутам), upgrade — пагинация если мало
 
@@ -116,6 +121,30 @@ function parseAttachmentIds(value: unknown): string[] {
   return value.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 50);
 }
 
+// Сущность-якорь для провенанс-аудита агента: из входа действия.
+function agentSourceEntity(input: Record<string, unknown>): { type: string; id: string } {
+  if (typeof input.taskId === "string") return { type: "Task", id: input.taskId };
+  if (typeof input.scenarioId === "string") return { type: "PlanningScenario", id: input.scenarioId };
+  if (typeof input.projectId === "string") return { type: "Project", id: input.projectId };
+  return { type: "AgentAction", id: "n/a" };
+}
+
+const HISTORY_MAX_TURNS = 12; // память чата: последние N реплик (защита от раздувания контекста)
+// История треда из тела: [{role|author, text}] → реплики LLM. henry/assistant → assistant.
+function parseHistory(value: unknown): Array<{ role: "user" | "assistant"; content: string }> {
+  if (!Array.isArray(value)) return [];
+  const turns: Array<{ role: "user" | "assistant"; content: string }> = [];
+  for (const raw of value.slice(-HISTORY_MAX_TURNS)) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as { role?: unknown; author?: unknown; text?: unknown };
+    const text = typeof item.text === "string" ? item.text.slice(0, 4000) : "";
+    if (text.length === 0) continue;
+    const tag = typeof item.role === "string" ? item.role : typeof item.author === "string" ? item.author : "user";
+    turns.push({ role: tag === "assistant" || tag === "henry" ? "assistant" : "user", content: text });
+  }
+  return turns;
+}
+
 // Лимиты цикла из env (стоимость/время) с разумными дефолтами. 0/пусто → дефолт.
 function agentLimitsFromEnv(): { maxIterations: number; maxTotalOutputTokens: number; timeoutMs: number } {
   const num = (value: string | undefined, fallback: number) => {
@@ -139,6 +168,23 @@ async function dispatchInternal(app: ApiApp, cookie: string | null, path: string
     method: "POST",
     headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin", ...(cookie ? { cookie } : {}) },
     body: JSON.stringify(body)
+  });
+  const text = await response.text();
+  let parsed: Record<string, unknown> = {};
+  if (text.length > 0) {
+    try { const json: unknown = JSON.parse(text); if (json && typeof json === "object" && !Array.isArray(json)) parsed = json as Record<string, unknown>; } catch { /* keep {} */ }
+  }
+  return { status: response.status, body: parsed };
+}
+
+// Generic-исполнитель декларативных инструментов (binding): переотправляет в governed-роут
+// нужным методом/путём/телом. Один путь для всех CRM/comms/admin/projects-инструментов.
+async function dispatchBinding(app: ApiApp, cookie: string | null, binding: NonNullable<AgentTool["binding"]>, input: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
+  const hasBody = binding.method === "POST" || binding.method === "PATCH";
+  const response = await app.request(binding.path(input), {
+    method: binding.method,
+    headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin", ...(cookie ? { cookie } : {}) },
+    ...(hasBody ? { body: JSON.stringify(binding.body ? binding.body(input) : {}) } : {})
   });
   const text = await response.text();
   let parsed: Record<string, unknown> = {};
@@ -229,6 +275,13 @@ export function buildAnalyzeExecutor(deps: ApiRouteDeps, app: ApiApp, cookie: st
       };
     }
 
+    // Декларативные analyze-инструменты (CRM/comms/admin/projects-чтение) — generic-редиспатч.
+    if (tool.binding && tool.kind === "analyze") {
+      const res = await dispatchBinding(app, cookie, tool.binding, input);
+      if (res.status >= 400) return { note: "read_failed", status: res.status, error: res.body.error };
+      return res.body;
+    }
+
     throw new Error("analyze_tool_not_wired");
   };
 }
@@ -248,7 +301,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
   // Общая преамбула /propose и /propose/stream (auth + разбор тела) — единый источник правды,
   // чтобы валидация не разъезжалась между JSON- и SSE-эндпоинтами. На ошибке отдаёт готовый Response.
-  type ProposeRequest = { cookie: string | null; actor: TenantUser; profile: AccessProfile; goal: string; attachmentIds: string[] };
+  type ProposeRequest = { cookie: string | null; actor: TenantUser; profile: AccessProfile; goal: string; attachmentIds: string[]; history: Array<{ role: "user" | "assistant"; content: string }> };
   async function parseProposeRequest(context: Context): Promise<{ ok: true; value: ProposeRequest } | { ok: false; response: Response }> {
     const cookie = context.req.header("cookie") ?? null;
     const actor = await deps.getSessionActorFromHeaders(cookie);
@@ -258,22 +311,25 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const goal = typeof (body.value as { goal?: unknown }).goal === "string" ? (body.value as { goal: string }).goal.trim() : "";
     if (goal.length === 0 || goal.length > 2000) return { ok: false, response: context.json({ error: "invalid_goal" }, 400) };
     const attachmentIds = parseAttachmentIds((body.value as { attachmentIds?: unknown }).attachmentIds);
+    const history = parseHistory((body.value as { history?: unknown }).history);
     const profile = await deps.getActorProfile(actor);
-    return { ok: true, value: { cookie, actor, profile, goal, attachmentIds } };
+    return { ok: true, value: { cookie, actor, profile, goal, attachmentIds, history } };
   }
 
   // Ядро предложения — общее для /propose (JSON) и /propose/stream (SSE).
   async function runProposeLoop(
-    cookie: string | null,
-    actor: TenantUser,
-    profile: AccessProfile,
-    goal: string,
-    attachmentIds: string[],
+    request: ProposeRequest,
     onEvent?: (event: AgentLoopEvent) => void | Promise<void>
   ) {
+    const { cookie, actor, profile, goal, attachmentIds, history } = request;
     const allowed = allowedToolsForActor(actor, profile);
-    // LLM получает: разрешённые mutation-инструменты (как предлагаемые) + подключённые analyze.
-    const offered = allowed.filter((tool) => tool.kind === "mutation" || WIRED_ANALYZE.has(tool.name));
+    // LLM получает только реально исполнимое: декларативные (binding) + ручные исполнимые
+    // mutation + подключённые ручные analyze. Не-исполнимое (напр. update_task) не предлагается.
+    const offered = allowed.filter((tool) =>
+      Boolean(tool.binding) ||
+      (tool.kind === "mutation" && EXECUTABLE_MUTATIONS.has(tool.name)) ||
+      WIRED_ANALYZE.has(tool.name)
+    );
     const attachments = attachmentIds.length > 0 ? await resolveAttachments(app, cookie, attachmentIds) : [];
     const result = await runAgentLoop({
       provider: createAgentLlmProviderFromEnv(),
@@ -283,6 +339,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       executeAnalyze: buildAnalyzeExecutor(deps, app, cookie, actor.tenantId, actor.id),
       limits: agentLimitsFromEnv(),
       ...(attachments.length > 0 ? { attachments } : {}),
+      ...(history.length > 0 ? { history } : {}),
       ...(onEvent ? { onEvent } : {})
     });
     // Аннотируем предложения грубым capability (точная проверка — при /execute).
@@ -306,11 +363,11 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/workspace/agent/propose", async (context) => {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
-    const { cookie, actor, profile, goal, attachmentIds } = parsed.value;
+    const { actor } = parsed.value;
     const slot = agentLlmConcurrency.tryAcquire(`${actor.tenantId}:${actor.id}`);
     if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
     try {
-      return context.json(await runProposeLoop(cookie, actor, profile, goal, attachmentIds));
+      return context.json(await runProposeLoop(parsed.value));
     } finally {
       slot.release();
     }
@@ -321,12 +378,12 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/workspace/agent/propose/stream", async (context) => {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
-    const { cookie, actor, profile, goal, attachmentIds } = parsed.value;
+    const { actor } = parsed.value;
     const slot = agentLlmConcurrency.tryAcquire(`${actor.tenantId}:${actor.id}`);
     if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
     return streamSSE(context, async (stream) => {
       try {
-        const result = await runProposeLoop(cookie, actor, profile, goal, attachmentIds, async (event) => {
+        const result = await runProposeLoop(parsed.value, async (event) => {
           await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
         });
         await stream.writeSSE({ event: "done", data: JSON.stringify(result) });
@@ -425,8 +482,77 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
         continue;
       }
 
-      // Остальные mutation (update/create/comment) подключаются отдельно.
+      // Комментарий к задаче — переотправка в governed POST /tasks/:id/comments.
+      if (tool.name === "comment_task") {
+        const taskId = typeof input.taskId === "string" ? input.taskId : "";
+        const commentBody = typeof input.body === "string" ? input.body : "";
+        if (!taskId || !commentBody) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
+          continue;
+        }
+        const res = await dispatchInternal(app, cookie, `/api/workspace/tasks/${taskId}/comments`, { body: commentBody });
+        if (res.status === 200 || res.status === 201) results.push({ tool: tool.name, ok: true, result: res.body });
+        else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "comment_failed" });
+        continue;
+      }
+
+      // Создание задачи — переотправка в governed POST [/projects/:id]/tasks.
+      if (tool.name === "create_task") {
+        const title = typeof input.title === "string" ? input.title : "";
+        const description = typeof input.description === "string" ? input.description : "";
+        const projectId = typeof input.projectId === "string" ? input.projectId : "";
+        if (!title) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
+          continue;
+        }
+        const path = projectId ? `/api/workspace/projects/${projectId}/tasks` : "/api/workspace/tasks";
+        const res = await dispatchInternal(app, cookie, path, { title, priority: "normal", ...(description ? { description } : {}) });
+        if (res.status === 200 || res.status === 201) results.push({ tool: tool.name, ok: true, result: res.body });
+        else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "create_failed" });
+        continue;
+      }
+
+      // Декларативные mutation-инструменты (CRM/comms/admin/projects) — generic-редиспатч в
+      // governed-роут. Точный RBAC/валидация — на самом роуте; грубый capability уже проверен выше.
+      if (tool.binding) {
+        const res = await dispatchBinding(app, cookie, tool.binding, input);
+        if (res.status >= 200 && res.status < 300) results.push({ tool: tool.name, ok: true, result: res.body });
+        else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "action_failed" });
+        continue;
+      }
+
+      // update_task пока НЕ исполняем: PATCH требует полное тело + clientUpdatedAt (риск затирания
+      // участников при сборке из частичных fields). До безопасного частичного апдейта он не
+      // предлагается LLM (см. EXECUTABLE_MUTATIONS), так что сюда штатно не попадаем.
       results.push({ tool: tool.name, ok: false, status: 501, error: "tool_not_executable_yet" });
+    }
+
+    // Провенанс агента: на каждое применённое действие — ОТДЕЛЬНОЕ audit-событие
+    // sourceWorkflow:"agent" (сверх штатного аудита governed-команды, который тегает свой workflow),
+    // чтобы действие агента было отличимо от ручного. results[i] выровнен с actions[i].
+    if (deps.dataSource.appendAuditEvent) {
+      const correlationId = `agent-execute-${randomUUID()}`;
+      for (let i = 0; i < results.length; i += 1) {
+        const item = results[i]!;
+        if (!item.ok) continue;
+        const action = (actions[i] ?? {}) as { input?: unknown };
+        const input = (action.input && typeof action.input === "object" ? action.input : {}) as Record<string, unknown>;
+        await deps.dataSource.appendAuditEvent({
+          id: `agent-action-${randomUUID()}`,
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: `agent.${item.tool}.applied`,
+          sourceWorkflow: "agent",
+          sourceEntity: agentSourceEntity(input),
+          input: { tool: item.tool, input },
+          beforeState: null,
+          afterState: (item.result ?? null) as Record<string, unknown> | null,
+          permissionResult: { allowed: true, via: "agent" },
+          executionResult: { status: "succeeded" },
+          correlationId,
+          createdAt: new Date()
+        });
+      }
     }
 
     const anyApplied = results.some((r) => r.ok);

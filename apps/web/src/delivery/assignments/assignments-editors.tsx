@@ -5,7 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 
 export const ROLES: Array<[string, string]> = [
   ["executor", "Исполнитель"],
@@ -46,7 +46,8 @@ export function presetWeights(n: number, kind: "even" | "front" | "back"): numbe
 /** Диалог добавления исполнителя на задачу. */
 export function AddAssigneeDialog({ taskTitle, excludeIds, onSubmit, children }: { taskTitle: string; excludeIds: string[]; onSubmit: (resourceId: string, role: string) => void; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const avail = RESOURCES.filter((r) => !excludeIds.includes(r.id));
+  const resources = useResourceDirectory().list; // live: /api/workspace/users; mock: статичный RESOURCES
+  const avail = resources.filter((r) => !excludeIds.includes(r.id));
   const [resourceId, setResourceId] = useState<string>(avail[0]?.id ?? "");
   const [role, setRole] = useState<string>("co_executor");
   const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";

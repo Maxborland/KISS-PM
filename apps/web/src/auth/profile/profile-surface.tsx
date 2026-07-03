@@ -302,6 +302,15 @@ function ProfileForm({
     setAccentColor(user.accentColor);
   }, [user]);
 
+  // Живое применение к документу: акцент → CSS-переменная --accent (раньше контрол был placebo),
+  // тема → атрибут data-theme (минимальная тёмная палитра в tokens.css). Сохранение персистит
+  // через updateTheme; на других страницах применяется при их загрузке из сохранённого профиля.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    if (/^#[0-9a-fA-F]{6}$/.test(accentColor)) root.style.setProperty("--accent", accentColor);
+  }, [theme, accentColor]);
+
   // Дельта профиля (PATCH /api/profile): name/phone/telegram (пустая строка → null).
   const profileDiff = useMemo<ProfileUpdateInput>(() => {
     const out: ProfileUpdateInput = {};
@@ -399,6 +408,28 @@ function ProfileForm({
             />
           </span>
           {!accentValid ? <span className="text-[length:var(--text-2xs)] text-[var(--danger-text)]">Формат: #RRGGBB</span> : null}
+        </label>
+
+        <label className={cn(labelCls, "sm:col-span-2")}>
+          Тема оформления
+          <span className="flex gap-2">
+            {(Object.keys(THEME_LABEL) as WorkspaceUser["theme"][]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTheme(t)}
+                aria-pressed={theme === t}
+                className={cn(
+                  "flex-1 rounded-[var(--radius-md)] border px-3 py-1.5 text-[length:var(--text-sm)] font-medium transition-colors",
+                  theme === t
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                    : "border-[var(--border)] text-[var(--muted-strong)] hover:bg-[var(--panel-subtle)]"
+                )}
+              >
+                {THEME_LABEL[t]}
+              </button>
+            ))}
+          </span>
         </label>
       </div>
 

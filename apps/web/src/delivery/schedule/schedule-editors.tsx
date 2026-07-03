@@ -7,7 +7,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Diamond, IndentDecrease, IndentIncrease, Plus, Trash2, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 
 const POP = "z-50 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--panel)] p-2 shadow-[var(--shadow-pop)] text-[length:var(--text-sm)] text-[var(--text)]";
 const MENU = "z-50 min-w-[200px] rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--panel)] p-1 shadow-[var(--shadow-pop)] text-[length:var(--text-sm)]";
@@ -49,6 +49,7 @@ export function DateEditor({ valueIso, onPick, title = "Начало задач�
 
 /* ---- Resource editor (выпадающий список сотрудников) ---- */
 export function ResourceEditor({ onPick, children }: { onPick: (resourceId: string) => void; children: ReactNode }) {
+  const resources = useResourceDirectory().list; // live: /api/workspace/users; mock: статичный RESOURCES
   return (
     <Popover.Root>
       <Popover.Trigger asChild>{children}</Popover.Trigger>
@@ -56,7 +57,7 @@ export function ResourceEditor({ onPick, children }: { onPick: (resourceId: stri
         <Popover.Content className={POP} sideOffset={4} align="start">
           <div className="flex max-h-[260px] w-[220px] flex-col gap-0.5 overflow-auto">
             <div className="px-1 pb-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Назначить сотрудника</div>
-            {RESOURCES.map((r) => (
+            {resources.map((r) => (
               <Popover.Close
                 key={r.id}
                 onClick={() => onPick(r.id)}
@@ -232,6 +233,7 @@ export function TaskModal({ open, mode, initial, onOpenChange, onSubmit }: { ope
   const [durDays, setDurDays] = useState(String(initial.durDays));
   const [workH, setWorkH] = useState(String(initial.workH));
   const [pct, setPct] = useState(String(initial.pct));
+  const resources = useResourceDirectory().list; // live: /api/workspace/users; mock: статичный RESOURCES
   useEffect(() => {
     if (open) { setTitle(initial.title); setAssigneeId(initial.assigneeId); setStartIso(initial.startIso); setDurDays(String(initial.durDays)); setWorkH(String(initial.workH)); setPct(String(initial.pct)); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -257,7 +259,7 @@ export function TaskModal({ open, mode, initial, onOpenChange, onSubmit }: { ope
             <label className="flex flex-col gap-1"><span className={LBL}>Исполнитель</span>
               <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className={FIELD}>
                 <option value="">— не назначен —</option>
-                {RESOURCES.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                {resources.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </label>
             <div className="grid grid-cols-3 gap-3">
