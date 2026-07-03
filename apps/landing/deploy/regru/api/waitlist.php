@@ -24,8 +24,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     respond(405, ['ok' => false, 'error' => 'method_not_allowed']);
 }
 
-$docroot = $_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__);
-$dataDir = dirname($docroot, 2) . '/kisspm-data';
+// Путь от САМОГО файла (…/data/www/<site>/api → …/data/kisspm-data):
+// DOCUMENT_ROOT на reg.ru отдаёт фантомный подкаталог и врёт.
+$dataDir = dirname(__DIR__, 3) . '/kisspm-data';
 $config = is_file($dataDir . '/config.php') ? require $dataDir . '/config.php' : [];
 
 $allowedOrigins = isset($config['allowed_origins']) && is_array($config['allowed_origins'])
@@ -188,19 +189,31 @@ if ($token !== '' && $chatId !== '') {
         ['chat_id' => $chatId, 'text' => implode("\n", $lines)],
         JSON_UNESCAPED_UNICODE
     );
-    $streamContext = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => "content-type: application/json\r\n",
-            'content' => $payload,
-            'timeout' => 6,
-        ],
-    ]);
-    $response = @file_get_contents(
-        'https://api.telegram.org/bot' . $token . '/sendMessage',
-        false,
-        $streamContext
-    );
+    $url = 'https://api.telegram.org/bot' . $token . '/sendMessage';
+    $response = false;
+    if (function_exists('curl_init')) {
+        // На reg.ru http-обёртки (file_get_contents) наружу не ходят, curl — работает.
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => ['content-type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 8,
+            CURLOPT_CONNECTTIMEOUT => 6,
+        ]);
+        $response = curl_exec($ch);
+    } else {
+        $streamContext = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => "content-type: application/json\r\n",
+                'content' => $payload,
+                'timeout' => 6,
+            ],
+        ]);
+        $response = @file_get_contents($url, false, $streamContext);
+    }
     if ($response === false) {
         error_log('[waitlist] telegram notify failed');
     }
