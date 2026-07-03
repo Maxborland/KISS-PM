@@ -6,7 +6,7 @@ import node from "@astrojs/node";
 // KISS PM Landing — SSR with node adapter so /api/waitlist can write SQLite.
 // Static-only pages are still pre-rendered via `export const prerender = true`.
 export default defineConfig({
-  site: "https://kiss-pm.app",
+  site: "https://kisspm.app",
   output: "server",
   adapter: node({ mode: "standalone" }),
   integrations: [react(), mdx()],

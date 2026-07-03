@@ -1,13 +1,14 @@
 import type { APIRoute } from "astro";
 import { WaitlistSubmission } from "../../lib/waitlist/schema";
 import { insertSubmission } from "../../lib/waitlist/db";
+import { readEnv } from "../../lib/waitlist/env";
 import { notifyTeam } from "../../lib/waitlist/notify";
 import { rateLimit } from "../../lib/waitlist/ratelimit";
 import { hashIp } from "../../lib/waitlist/hash";
 
 export const prerender = false;
 
-const ALLOWED_ORIGINS = (process.env["WAITLIST_ALLOWED_ORIGINS"] || "")
+const ALLOWED_ORIGINS = (readEnv("WAITLIST_ALLOWED_ORIGINS") || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);

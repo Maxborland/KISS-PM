@@ -1,0 +1,17 @@
+AddDefaultCharset utf-8
+
+RewriteEngine On
+
+# https принудительно
+RewriteCond %{HTTPS} !=on
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+# Форма постит на /api/waitlist — маршрутизируем в PHP-эндпоинт
+RewriteRule ^api/waitlist/?$ api/waitlist.php [L,QSA]
+
+# Долгий кеш для хешированных ассетов Astro
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>

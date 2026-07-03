@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import Database, { type Database as DB } from "better-sqlite3";
+import { readEnv } from "./env";
 import type { WaitlistSubmissionParsed } from "./schema";
 
 let cached: DB | null = null;
@@ -10,7 +11,7 @@ let cached: DB | null = null;
  * survives restarts. In Docker the path should be on a mounted volume.
  */
 export function resolveDbPath(): string {
-  const raw = process.env["WAITLIST_DB_PATH"]?.trim() || "./data/waitlist.sqlite";
+  const raw = readEnv("WAITLIST_DB_PATH") || "./data/waitlist.sqlite";
   return isAbsolute(raw) ? raw : resolve(process.cwd(), raw);
 }
 
