@@ -1,9 +1,17 @@
 ---
 import LandingAgentDemo from "./landing-agent-demo/LandingAgentDemo";
+import type { LandingLocale } from "../lib/landing-i18n";
+
+interface Props {
+  locale?: LandingLocale;
+}
+
+const { locale = "ru" } = Astro.props;
+const ariaLabel = locale === "en" ? "Project agent demo" : "Демо проектного агента";
 ---
 
-<section id="agent-demo" class="agent-demo-section" aria-label="Демо проектного агента">
+<section id="agent-demo" class="agent-demo-section" aria-label={ariaLabel}>
   <div class="agent-demo-section__inner">
-    <LandingAgentDemo preset="reset-demo" client:load />
+    <LandingAgentDemo preset="reset-demo" locale={locale} client:load />
   </div>
 </section>

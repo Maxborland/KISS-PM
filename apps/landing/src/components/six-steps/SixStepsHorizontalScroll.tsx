@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { LandingLocale } from "../../lib/landing-i18n";
+import { copyFor } from "../../lib/landing-i18n";
 import { StepCard } from "./StepCard";
 import { StepProgress } from "./StepProgress";
-import { SIX_STEPS } from "./steps";
+import { SIX_STEPS_BY_LOCALE } from "./steps";
 
 const MOBILE_FALLBACK_QUERY = "(max-width: 767px)";
 
@@ -15,7 +17,9 @@ function clamp(value: number, min = 0, max = 1): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export default function SixStepsHorizontalScroll() {
+export default function SixStepsHorizontalScroll({ locale = "ru" }: { locale?: LandingLocale }) {
+  const steps = useMemo(() => SIX_STEPS_BY_LOCALE[locale], [locale]);
+  const copy = copyFor(locale).sixSteps;
   const sectionRef = useRef<HTMLElement>(null);
   const stickyRef = useRef<HTMLDivElement>(null);
   const maskRef = useRef<HTMLDivElement>(null);
@@ -55,9 +59,9 @@ export default function SixStepsHorizontalScroll() {
     const translateX = -progress * maxTranslate;
     track.style.transform = `translate3d(${translateX}px, 0, 0)`;
 
-    const nextIndex = Math.round(progress * (SIX_STEPS.length - 1));
+    const nextIndex = Math.round(progress * (steps.length - 1));
     setActiveIndexIfChanged(nextIndex);
-  }, [mobileFallback, setActiveIndexIfChanged]);
+  }, [mobileFallback, setActiveIndexIfChanged, steps.length]);
 
   const requestUpdate = useCallback(() => {
     if (rafRef.current !== null) {
@@ -112,10 +116,9 @@ export default function SixStepsHorizontalScroll() {
       return;
     }
 
-    const targetY =
-      sectionTop + maxTranslate * (index / Math.max(1, SIX_STEPS.length - 1));
+    const targetY = sectionTop + maxTranslate * (index / Math.max(1, steps.length - 1));
     window.scrollTo({ top: targetY, behavior: "smooth" });
-  }, [mobileFallback]);
+  }, [mobileFallback, steps.length]);
 
   useEffect(() => {
     const mobileQuery = window.matchMedia(MOBILE_FALLBACK_QUERY);
@@ -172,7 +175,7 @@ export default function SixStepsHorizontalScroll() {
 
       if (event.key === "ArrowRight") {
         event.preventDefault();
-        scrollToIndex(Math.min(activeIndexRef.current + 1, SIX_STEPS.length - 1));
+        scrollToIndex(Math.min(activeIndexRef.current + 1, steps.length - 1));
       }
 
       if (event.key === "ArrowLeft") {
@@ -183,7 +186,7 @@ export default function SixStepsHorizontalScroll() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [scrollToIndex]);
+  }, [scrollToIndex, steps.length]);
 
   useEffect(() => {
     if (!mobileFallback) {
@@ -223,31 +226,30 @@ export default function SixStepsHorizontalScroll() {
       id="loop"
       className="horizontalScrollSection l-band--six-steps"
       ref={sectionRef}
-      aria-label="От цели к проверяемому изменению KISS PM"
+      aria-label={copy.ariaLabel}
       data-native-vertical-scroll
     >
       <div className="stickyViewport six-steps" ref={stickyRef}>
         <header className="sectionHeader six-steps-head">
-          {/* без data-text-reveal: скрипт реврайтит DOM до гидрации React и ломает hydration */}
           <h2 id="loop-title" className="l-display six-steps-head__title">
-            От цели к проверяемому изменению
+            {copy.title}
           </h2>
         </header>
 
         <div className="carouselMask">
           <div className="six-steps__viewport" ref={maskRef}>
             <div className="cardsTrack six-steps__track" ref={trackRef}>
-              {SIX_STEPS.map((step, index) => (
-                <StepCard key={step.id} step={step} active={index === activeIndex} />
+              {steps.map((step, index) => (
+                <StepCard key={step.id} step={step} active={index === activeIndex} locale={locale} />
               ))}
             </div>
           </div>
         </div>
 
-        <StepProgress active={activeIndex} onSelect={scrollToIndex} />
+        <StepProgress active={activeIndex} steps={steps} locale={locale} onSelect={scrollToIndex} />
         <div className="six-steps__access">
           <a className="l-btn l-btn--primary" href="#waitlist">
-            Запросить доступ
+            {copy.cta}
           </a>
         </div>
       </div>

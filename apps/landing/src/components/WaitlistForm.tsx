@@ -9,6 +9,7 @@ import {
 } from "../lib/waitlist/schema";
 import { sanitizeText } from "../lib/waitlist/sanitize";
 import { isConsumerEmailDomain, WORK_EMAIL_ERROR } from "../lib/waitlist/work-email";
+import type { LandingLocale } from "../lib/landing-i18n";
 
 type Status =
   | { phase: "idle" }
@@ -25,18 +26,129 @@ type FormSubmitEvent = Parameters<
   NonNullable<ComponentProps<"form">["onSubmit"]>
 >[0];
 
-const SIZE_ENTRIES = Object.entries(COMPANY_SIZE_LABELS) as Array<
-  [keyof typeof COMPANY_SIZE_LABELS, string]
->;
+type SizeKey = keyof typeof COMPANY_SIZE_LABELS;
+
+const SIZE_LABELS: Record<LandingLocale, Record<SizeKey, string>> = {
+  ru: COMPANY_SIZE_LABELS,
+  en: {
+    solo: "Up to 10 projects",
+    small: "10-30 projects",
+    mid: "30-50 projects",
+    large: "50-100 projects",
+    enterprise: "100+ projects",
+    other: "Other",
+  },
+};
+
+const FORM_COPY = {
+  ru: {
+    intro: (
+      <>
+        Оставьте рабочую почту, если хотите посмотреть agent-first управление проектами как код.
+        <br />
+        Ответим письмом, без звонков и рассылок.
+      </>
+    ),
+    successTitle: "Заявка принята",
+    successCopy: "Мы свяжемся с вами по email, когда откроем следующий набор в закрытую альфу. Обычно это 3–7 рабочих дней.",
+    again: "Отправить ещё одну заявку",
+    validationMessage: "Проверьте поля формы и попробуйте снова.",
+    networkError: "Не удалось отправить. Проверьте интернет и попробуйте снова.",
+    fields: {
+      fullName: { label: "Имя и фамилия", placeholder: "Анна Каренина" },
+      email: { label: "Рабочий email", placeholder: "anna@company.ru" },
+      role: { label: "Роль или должность", placeholder: "PMO Lead, Head of Delivery" },
+      company: { label: "Компания", placeholder: "Север Девелопмент" },
+      size: {
+        label: "Активных проектов одновременно",
+        hint: "Помогает подобрать формат альфы под масштаб портфеля.",
+        empty: "Выберите диапазон",
+      },
+      context: {
+        label: "Контекст",
+        optional: "опционально",
+        placeholder: "Что хотите проверить: агент, сверка изменений, ресурсы, сроки, CRM или аудит.",
+      },
+    },
+    consent: (
+      <>
+        Я согласен(а) с <a href="/privacy">политикой конфиденциальности</a> и{" "}
+        <a href="/terms">условиями закрытой альфы</a>.
+      </>
+    ),
+    honeypot: "Не заполняйте",
+    submitting: "Отправляем…",
+    submit: "Запросить доступ",
+    footnote: "Ручная модерация · без рассылок · ответ на указанный email",
+    errors: {
+      requiredEmail: "Укажите рабочий email",
+      typoEmail: "Похоже, в адресе опечатка",
+      workEmail: WORK_EMAIL_ERROR,
+      tooMany: "Слишком много попыток. Подождите минуту и попробуйте снова.",
+      origin: "Отправка с этого источника запрещена.",
+      later: "Не удалось отправить. Попробуйте позже.",
+    },
+  },
+  en: {
+    intro: (
+      <>
+        Leave a work email if you want to see agent-first project management as code.
+        <br />
+        We will reply by email, no calls or newsletters.
+      </>
+    ),
+    successTitle: "Request received",
+    successCopy: "We will email you when the next closed alpha batch opens. Usually within 3-7 business days.",
+    again: "Send another request",
+    validationMessage: "Check the form fields and try again.",
+    networkError: "Could not send the request. Check your connection and try again.",
+    fields: {
+      fullName: { label: "Full name", placeholder: "Anna Karenina" },
+      email: { label: "Work email", placeholder: "anna@company.com" },
+      role: { label: "Role or title", placeholder: "PMO Lead, Head of Delivery" },
+      company: { label: "Company", placeholder: "Northstar Digital" },
+      size: {
+        label: "Active projects at once",
+        hint: "Helps us match the alpha format to your portfolio scale.",
+        empty: "Choose a range",
+      },
+      context: {
+        label: "Context",
+        optional: "optional",
+        placeholder: "What do you want to test: agent, project diff, resources, dates, CRM or audit?",
+      },
+    },
+    consent: (
+      <>
+        I agree to the <a href="/en/privacy/">privacy policy</a> and{" "}
+        <a href="/en/terms/">closed alpha terms</a>.
+      </>
+    ),
+    honeypot: "Do not fill this in",
+    submitting: "Sending…",
+    submit: "Request access",
+    footnote: "Manual review · no newsletters · reply to the email above",
+    errors: {
+      requiredEmail: "Enter your work email",
+      typoEmail: "This email looks misspelled",
+      workEmail: "Use a company email, not a personal Gmail, Mail.ru, Yandex, etc.",
+      tooMany: "Too many attempts. Wait a minute and try again.",
+      origin: "Requests from this origin are not allowed.",
+      later: "Could not send the request. Try again later.",
+    },
+  },
+} as const;
 
 /* Node-SSR обслуживает /api/waitlist; статический деплой на PHP-хостинг
    собирается с PUBLIC_WAITLIST_ENDPOINT=/api/waitlist.php */
 const WAITLIST_ENDPOINT: string =
   import.meta.env.PUBLIC_WAITLIST_ENDPOINT || "/api/waitlist";
 
-export default function WaitlistForm() {
+export default function WaitlistForm({ locale = "ru" }: { locale?: LandingLocale }) {
   const [status, setStatus] = useState<Status>({ phase: "idle" });
   const [fieldIssues, setFieldIssues] = useState<FieldIssues>({});
+  const copy = FORM_COPY[locale];
+  const sizeEntries = Object.entries(SIZE_LABELS[locale]) as Array<[SizeKey, string]>;
 
   async function onSubmit(e: FormSubmitEvent): Promise<void> {
     e.preventDefault();
@@ -45,15 +157,15 @@ export default function WaitlistForm() {
     const parsed = WaitlistSubmission.safeParse(payload);
 
     if (!parsed.success) {
-      const issues = formatWaitlistIssues(parsed.error.issues);
+      const issues = translateIssues(formatWaitlistIssues(parsed.error.issues), locale);
       const next: FieldIssues = {};
       for (const [key, messages] of Object.entries(issues)) {
-        next[key] = messages[0];
+        next[key] = messages?.[0];
       }
       setFieldIssues(next);
       setStatus({
         phase: "error",
-        message: "Проверьте поля формы и попробуйте снова.",
+        message: copy.validationMessage,
         issues,
       });
       return;
@@ -87,18 +199,18 @@ export default function WaitlistForm() {
         error?: string;
         issues?: Record<string, string[]>;
       } | null;
-      const message = errorMessage(json?.error, res.status);
-      setStatus({ phase: "error", message, issues: json?.issues });
+      const message = errorMessage(json?.error, res.status, locale);
+      setStatus({ phase: "error", message, issues: json?.issues ? translateIssues(json.issues, locale) : undefined });
     } catch {
       setStatus({
         phase: "error",
-        message: "Не удалось отправить. Проверьте интернет и попробуйте снова.",
+        message: copy.networkError,
       });
     }
   }
 
   function onEmailBlur(value: string): void {
-    const message = validateWorkEmailInput(value);
+    const message = validateWorkEmailInput(value, locale);
     setFieldIssues((prev) => ({ ...prev, email: message }));
   }
 
@@ -106,11 +218,8 @@ export default function WaitlistForm() {
     return (
       <div className="wl wl--success" role="status">
         <span className="wl__success-mark" aria-hidden="true" />
-        <h3 className="wl__success-title">Заявка принята</h3>
-        <p className="wl__success-copy">
-          Мы свяжемся с вами по email, когда откроем следующий набор в закрытую
-          альфу. Обычно это 3–7 рабочих дней.
-        </p>
+        <h3 className="wl__success-title">{copy.successTitle}</h3>
+        <p className="wl__success-copy">{copy.successCopy}</p>
         <button
           type="button"
           className="wl__again"
@@ -119,7 +228,7 @@ export default function WaitlistForm() {
             setFieldIssues({});
           }}
         >
-          Отправить ещё одну заявку
+          {copy.again}
         </button>
       </div>
     );
@@ -129,30 +238,26 @@ export default function WaitlistForm() {
 
   return (
     <form className="wl" onSubmit={onSubmit} noValidate>
-      <p className="wl__intro">
-        Оставьте рабочую почту, если хотите посмотреть agent-first управление проектами как код.
-        <br />
-        Ответим письмом, без звонков и рассылок.
-      </p>
+      <p className="wl__intro">{copy.intro}</p>
 
       <div className="wl__row">
         <Field
           id="wl-fullName"
-          label="Имя и фамилия"
+          label={copy.fields.fullName.label}
           name="fullName"
           required
           autoComplete="name"
-          placeholder="Анна Каренина"
+          placeholder={copy.fields.fullName.placeholder}
           error={resolveError("fullName", fieldIssues, status)}
         />
         <Field
           id="wl-email"
-          label="Рабочий email"
+          label={copy.fields.email.label}
           name="email"
           type="email"
           required
           autoComplete="email"
-          placeholder="anna@company.ru"
+          placeholder={copy.fields.email.placeholder}
           error={resolveError("email", fieldIssues, status)}
           onBlur={(e) => onEmailBlur(e.currentTarget.value)}
         />
@@ -161,33 +266,33 @@ export default function WaitlistForm() {
       <div className="wl__row">
         <Field
           id="wl-role"
-          label="Роль или должность"
+          label={copy.fields.role.label}
           name="role"
           required
           autoComplete="organization-title"
-          placeholder="PMO Lead, Head of Delivery"
+          placeholder={copy.fields.role.placeholder}
           error={resolveError("role", fieldIssues, status)}
         />
         <Field
           id="wl-company"
-          label="Компания"
+          label={copy.fields.company.label}
           name="company"
           required
           autoComplete="organization"
-          placeholder="Север Девелопмент"
+          placeholder={copy.fields.company.placeholder}
           error={resolveError("company", fieldIssues, status)}
         />
       </div>
 
       <div className="wl__field wl__field--full">
         <label htmlFor="wl-size">
-          Активных проектов одновременно
+          {copy.fields.size.label}
           <span className="wl__req" aria-hidden="true">
             *
           </span>
         </label>
         <p className="wl__hint" id="wl-size-hint">
-          Помогает подобрать формат альфы под масштаб портфеля.
+          {copy.fields.size.hint}
         </p>
         <div className="wl__select-wrap">
           <select
@@ -199,9 +304,9 @@ export default function WaitlistForm() {
             aria-describedby="wl-size-hint"
           >
             <option value="" disabled>
-              Выберите диапазон
+              {copy.fields.size.empty}
             </option>
-            {SIZE_ENTRIES.map(([value, label]) => (
+            {sizeEntries.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
@@ -215,14 +320,14 @@ export default function WaitlistForm() {
 
       <div className="wl__field wl__field--full">
         <label htmlFor="wl-context">
-          Контекст
-          <span className="wl__optional">опционально</span>
+          {copy.fields.context.label}
+          <span className="wl__optional">{copy.fields.context.optional}</span>
         </label>
         <textarea
           id="wl-context"
           name="context"
           rows={3}
-          placeholder="Что хотите проверить: агент, сверка изменений, ресурсы, сроки, CRM или аудит."
+          placeholder={copy.fields.context.placeholder}
           maxLength={600}
           aria-invalid={Boolean(resolveError("context", fieldIssues, status))}
         />
@@ -234,18 +339,14 @@ export default function WaitlistForm() {
       <div className="wl__footer">
         <label className="wl__consent">
           <input type="checkbox" name="consent" required />
-          <span>
-            Я согласен(а) с{" "}
-            <a href="/privacy">политикой конфиденциальности</a> и{" "}
-            <a href="/terms">условиями закрытой альфы</a>.
-          </span>
+          <span>{copy.consent}</span>
         </label>
         {resolveError("consent", fieldIssues, status) && (
           <p className="wl__error">{resolveError("consent", fieldIssues, status)}</p>
         )}
 
         <div className="wl__hp" aria-hidden="true">
-          <label htmlFor="wl-hp">Не заполняйте</label>
+          <label htmlFor="wl-hp">{copy.honeypot}</label>
           <input id="wl-hp" name="hp" type="text" tabIndex={-1} autoComplete="off" />
         </div>
 
@@ -257,13 +358,11 @@ export default function WaitlistForm() {
 
         <button type="submit" className="wl__submit" disabled={submitting}>
           <span className="wl__submit-label">
-            {submitting ? "Отправляем…" : "Запросить доступ"}
+            {submitting ? copy.submitting : copy.submit}
           </span>
         </button>
 
-        <p className="wl__footnote">
-          Ручная модерация · без рассылок · ответ на указанный email
-        </p>
+        <p className="wl__footnote">{copy.footnote}</p>
       </div>
     </form>
   );
@@ -334,21 +433,47 @@ function resolveError(
   return undefined;
 }
 
-function validateWorkEmailInput(raw: string): string | undefined {
+function validateWorkEmailInput(raw: string, locale: LandingLocale): string | undefined {
+  const copy = FORM_COPY[locale].errors;
   const value = sanitizeText(raw).toLowerCase();
-  if (!value) return "Укажите рабочий email";
+  if (!value) return copy.requiredEmail;
   if (!z.string().email().safeParse(value).success) {
-    return "Похоже, в адресе опечатка";
+    return copy.typoEmail;
   }
-  if (isConsumerEmailDomain(value)) return WORK_EMAIL_ERROR;
+  if (isConsumerEmailDomain(value)) return copy.workEmail;
   return undefined;
 }
 
-function errorMessage(code: string | undefined, httpStatus: number): string {
-  if (httpStatus === 429) {
-    return "Слишком много попыток. Подождите минуту и попробуйте снова.";
-  }
-  if (code === "validation_error") return "Проверьте поля формы и попробуйте снова.";
-  if (code === "origin_not_allowed") return "Отправка с этого источника запрещена.";
-  return "Не удалось отправить. Попробуйте позже.";
+function errorMessage(code: string | undefined, httpStatus: number, locale: LandingLocale): string {
+  const copy = FORM_COPY[locale].errors;
+  if (httpStatus === 429) return copy.tooMany;
+  if (code === "validation_error") return FORM_COPY[locale].validationMessage;
+  if (code === "origin_not_allowed") return copy.origin;
+  return copy.later;
+}
+
+function translateIssues(
+  issues: Record<string, string[] | undefined>,
+  locale: LandingLocale,
+): Record<string, string[] | undefined> {
+  if (locale === "ru") return issues;
+  return Object.fromEntries(
+    Object.entries(issues).map(([key, messages]) => [
+      key,
+      messages?.map((message) => translateIssue(message)),
+    ]),
+  );
+}
+
+function translateIssue(message: string): string {
+  if (message.includes("Укажите имя")) return "Enter your full name";
+  if (message.includes("Укажите рабочий email")) return "Enter your work email";
+  if (message.includes("Похоже")) return "This email looks misspelled";
+  if (message.includes("Укажите компанию")) return "Enter your company";
+  if (message.includes("Укажите роль")) return "Enter your role or title";
+  if (message.includes("Выберите диапазон")) return "Choose a project range";
+  if (message.includes("Нужно согласие")) return "Consent is required";
+  if (message.includes("Слишком длинно")) return "Too long";
+  if (message === WORK_EMAIL_ERROR) return FORM_COPY.en.errors.workEmail;
+  return message;
 }

@@ -1,5 +1,13 @@
 ---
 import PhilosophyShader from "./PhilosophyShader.tsx";
+import { copyFor, type LandingLocale } from "../lib/landing-i18n";
+
+interface Props {
+  locale?: LandingLocale;
+}
+
+const { locale = "ru" } = Astro.props;
+const copy = copyFor(locale).philosophy;
 ---
 
 <section id="philosophy" class="philosophy" aria-labelledby="philosophy-title">
@@ -7,13 +15,13 @@ import PhilosophyShader from "./PhilosophyShader.tsx";
 
   <div class="l-container philosophy__inner">
     <h2 id="philosophy-title" class="philosophy__display" data-text-reveal>
-      Keep it simple. Seriously.
+      {copy.title}
     </h2>
 
     <div class="philosophy__lines" data-reveal-group>
-      <p class="philosophy__line" data-text-reveal>Вы описываете, что нужно изменить в проекте.</p>
-      <p class="philosophy__line" data-text-reveal>Агент показывает сверку: что было и что станет.</p>
-      <p class="philosophy__line" data-text-reveal>Человек применяет выбранное, аудит сохраняет решение.</p>
+      {copy.lines.map((line) => (
+        <p class="philosophy__line" data-text-reveal>{line}</p>
+      ))}
     </div>
   </div>
 </section>

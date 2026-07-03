@@ -1,16 +1,25 @@
 ---
-const items: Array<{ href: string; label: string; id: string }> = [
-  { href: "#agent-demo", label: "Агент", id: "agent-demo" },
-  { href: "#loop", label: "Как работает", id: "loop" },
-  { href: "#demo", label: "Сценарий", id: "demo" },
-  { href: "#faq", label: "Вопросы", id: "faq" },
-  { href: "#waitlist", label: "Ранний доступ", id: "waitlist" },
-];
+import { copyFor, type LandingLocale } from "../lib/landing-i18n";
+
+interface Props {
+  locale?: LandingLocale;
+  sectionHrefPrefix?: string;
+  ctaHref?: string;
+  localeHref?: string;
+}
+
+const { locale = "ru", sectionHrefPrefix = "", ctaHref, localeHref } = Astro.props;
+const copy = copyFor(locale).header;
+const items = copy.items;
+const sectionHref = (href: string) =>
+  sectionHrefPrefix && href.startsWith("#") ? `${sectionHrefPrefix}${href}` : href;
+const resolvedCtaHref = ctaHref ?? sectionHref("#waitlist");
+const resolvedLocaleHref = localeHref ?? copy.localeHref;
 ---
 
 <header class="site-header" data-site-header>
   <div class="l-container site-header__inner">
-    <a class="site-header__brand" href="/">
+    <a class="site-header__brand" href={copy.brandHref}>
       <span class="site-header__mark" aria-hidden="true">
         <svg viewBox="0 0 32 32" width="22" height="22">
           <rect x="2" y="2" width="28" height="28" rx="8" fill="currentColor" />
@@ -23,17 +32,20 @@ const items: Array<{ href: string; label: string; id: string }> = [
       <span class="site-header__name">KISS PM</span>
     </a>
 
-    <nav class="site-header__nav" aria-label="Навигация по разделам">
+    <nav class="site-header__nav" aria-label={copy.navLabel}>
       {items.map((item) => (
-        <a href={item.href} class="site-header__link" data-section-link={item.id}>
+        <a href={sectionHref(item.href)} class="site-header__link" data-section-link={item.id}>
           <span>{item.label}</span>
         </a>
       ))}
     </nav>
 
     <div class="site-header__cta">
-      <a class="l-btn l-btn--ghost site-header__cta-btn" href="#waitlist">
-        <span>Запросить доступ</span>
+      <a class="site-header__locale" href={resolvedLocaleHref} hreflang={locale === "ru" ? "en" : "ru"}>
+        {copy.localeLabel}
+      </a>
+      <a class="l-btn l-btn--ghost site-header__cta-btn" href={resolvedCtaHref}>
+        <span>{copy.cta}</span>
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
           <path d="M3 8h9m0 0L8.5 4.5M12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
@@ -63,7 +75,6 @@ const items: Array<{ href: string; label: string; id: string }> = [
       box-shadow var(--duration-ui) var(--ease-out);
   }
 
-  /* Весь header скрыт на hero — появляется со второго блока */
   .site-header:not([data-past-hero="true"]) {
     opacity: 0;
     visibility: hidden;
@@ -207,26 +218,6 @@ const items: Array<{ href: string; label: string; id: string }> = [
     letter-spacing: -0.01em;
   }
 
-  .site-header__badge {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted-strong);
-    padding: 3px 8px;
-    border-radius: var(--radius-full);
-    background: var(--panel);
-    border: 1px solid var(--border);
-    transition:
-      color var(--duration-ui) var(--ease-ui),
-      border-color var(--duration-ui) var(--ease-ui);
-  }
-
-  .site-header__brand:hover .site-header__badge {
-    color: var(--text-strong);
-    border-color: var(--border-strong);
-  }
-
   .site-header__nav {
     z-index: 1;
     display: none;
@@ -306,7 +297,28 @@ const items: Array<{ href: string; label: string; id: string }> = [
     z-index: 1;
     margin-left: auto;
     display: inline-flex;
-    gap: 12px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .site-header__locale {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    min-width: 38px;
+    padding-inline: 10px;
+    border-radius: var(--radius-md);
+    color: var(--muted-strong);
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.42);
+  }
+
+  .site-header__locale:hover {
+    color: var(--text-strong);
+    border-color: rgba(15, 23, 42, 0.16);
   }
 
   .site-header__cta-btn {
@@ -350,7 +362,6 @@ const items: Array<{ href: string; label: string; id: string }> = [
 </style>
 
 <script>
-  // Past-hero nav reveal + scroll chrome + active section underline.
   const header = document.querySelector<HTMLElement>("[data-site-header]");
   if (header) {
     const hero = document.getElementById("hero");
@@ -361,8 +372,6 @@ const items: Array<{ href: string; label: string; id: string }> = [
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
 
-    // Hidden only while hero is on screen. Once you scroll past hero, nav stays
-    // visible for all following blocks (it must not re-hide when philosophy scrolls away).
     if (hero) {
       const heroObserver = new IntersectionObserver(
         ([entry]) => {

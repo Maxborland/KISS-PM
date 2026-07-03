@@ -1,13 +1,35 @@
+import type { LandingLocale } from "../../../lib/landing-i18n";
 import { DemoShell } from "./DemoShell";
 import { DottedConnector } from "./DottedConnector";
 
-const INPUTS = [
-  { icon: "building", label: "Объект", value: "ЖК Север, корпус 1" },
-  { icon: "calendar", label: "Срок", value: "7–9 недель" },
-  { icon: "team", label: "Команда", value: "avatars" },
-  { icon: "list", label: "Этапы", value: "Аналитика → Запуск" },
-  { icon: "budget", label: "Бюджет", value: "₽ 8 400 000" },
-] as const;
+const COPY = {
+  ru: {
+    resultTitle: "Черновик проекта",
+    badge: "Черновик",
+    cta: "Открыть черновик",
+    avatars: ["ИП", "АС", "ДК", "ЕВ"],
+    inputs: [
+      { icon: "building", label: "Объект", value: "ЖК Север, корпус 1" },
+      { icon: "calendar", label: "Срок", value: "7–9 недель" },
+      { icon: "team", label: "Команда", value: "avatars" },
+      { icon: "list", label: "Этапы", value: "Аналитика → Запуск" },
+      { icon: "budget", label: "Бюджет", value: "₽ 8 400 000" },
+    ],
+  },
+  en: {
+    resultTitle: "Project draft",
+    badge: "Draft",
+    cta: "Open draft",
+    avatars: ["IP", "AS", "DK", "EV"],
+    inputs: [
+      { icon: "building", label: "Scope", value: "North site, phase 1" },
+      { icon: "calendar", label: "Timeline", value: "7-9 weeks" },
+      { icon: "team", label: "Team", value: "avatars" },
+      { icon: "list", label: "Stages", value: "Discovery → Launch" },
+      { icon: "budget", label: "Budget", value: "$120,000" },
+    ],
+  },
+} as const;
 
 function InputIcon({ kind }: { kind: string }) {
   const paths: Record<string, string> = {
@@ -24,12 +46,12 @@ function InputIcon({ kind }: { kind: string }) {
   );
 }
 
-function TeamAvatars() {
+function TeamAvatars({ initials }: { initials: ReadonlyArray<string> }) {
   return (
     <span className="six-draft__avatars">
-      {["ИП", "АС", "ДК", "ЕВ"].map((initials) => (
-        <span key={initials} className="six-draft__avatar">
-          {initials}
+      {initials.map((item) => (
+        <span key={item} className="six-draft__avatar">
+          {item}
         </span>
       ))}
       <span className="six-draft__avatar six-draft__avatar--more">+2</span>
@@ -37,12 +59,13 @@ function TeamAvatars() {
   );
 }
 
-export function ProjectDraftDemo({ active }: { active: boolean }) {
+export function ProjectDraftDemo({ active, locale = "ru" }: { active: boolean; locale?: LandingLocale }) {
+  const copy = COPY[locale];
   return (
     <DemoShell active={active}>
       <div className="six-draft">
         <ul className="six-draft__inputs">
-          {INPUTS.map((item, i) => (
+          {copy.inputs.map((item, i) => (
             <li key={item.label} className={`six-draft__input six-draft__input--${i + 1}`}>
               <span className="six-draft__input-icon">
                 <InputIcon kind={item.icon} />
@@ -50,7 +73,7 @@ export function ProjectDraftDemo({ active }: { active: boolean }) {
               <div className="six-draft__input-text">
                 <span className="six-draft__input-label">{item.label}</span>
                 <span className="six-draft__input-value">
-                  {item.value === "avatars" ? <TeamAvatars /> : item.value}
+                  {item.value === "avatars" ? <TeamAvatars initials={copy.avatars} /> : item.value}
                 </span>
               </div>
             </li>
@@ -69,35 +92,19 @@ export function ProjectDraftDemo({ active }: { active: boolean }) {
             </svg>
           </span>
           <div className="six-draft__result-head">
-            <h4 className="six-draft__result-title">Черновик проекта</h4>
-            <span className="six-draft__badge">Черновик</span>
+            <h4 className="six-draft__result-title">{copy.resultTitle}</h4>
+            <span className="six-draft__badge">{copy.badge}</span>
           </div>
           <dl className="six-draft__result-lines">
-            <div>
-              <dt>Объект</dt>
-              <dd>ЖК Север, корпус 1</dd>
-            </div>
-            <div>
-              <dt>Срок</dt>
-              <dd>7–9 недель</dd>
-            </div>
-            <div>
-              <dt>Команда</dt>
-              <dd>
-                <TeamAvatars />
-              </dd>
-            </div>
-            <div>
-              <dt>Этапы</dt>
-              <dd>Аналитика → Запуск</dd>
-            </div>
-            <div>
-              <dt>Бюджет</dt>
-              <dd>₽ 8 400 000</dd>
-            </div>
+            {copy.inputs.map((item) => (
+              <div key={item.label}>
+                <dt>{item.label}</dt>
+                <dd>{item.value === "avatars" ? <TeamAvatars initials={copy.avatars} /> : item.value}</dd>
+              </div>
+            ))}
           </dl>
           <button type="button" className="six-draft__cta" tabIndex={-1}>
-            Открыть черновик
+            {copy.cta}
           </button>
         </article>
       </div>

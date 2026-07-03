@@ -1,5 +1,12 @@
 ---
 import SixStepsHorizontalScroll from "./six-steps/SixStepsHorizontalScroll.tsx";
+import type { LandingLocale } from "../lib/landing-i18n";
+
+interface Props {
+  locale?: LandingLocale;
+}
+
+const { locale = "ru" } = Astro.props;
 ---
 
-<SixStepsHorizontalScroll client:load />
+<SixStepsHorizontalScroll locale={locale} client:load />

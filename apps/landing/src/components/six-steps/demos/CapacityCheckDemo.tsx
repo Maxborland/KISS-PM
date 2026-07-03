@@ -1,20 +1,43 @@
 import type { CSSProperties } from "react";
+import type { LandingLocale } from "../../../lib/landing-i18n";
 import { DemoShell } from "./DemoShell";
 
-const ROWS = [
-  { initials: "ИП", name: "Иван Петров", role: "Руководитель проекта", pct: 82, status: "ok" },
-  { initials: "АС", name: "Анна Смирнова", role: "Бизнес-аналитик", pct: 67, status: "ok" },
-  { initials: "ДК", name: "Дмитрий Кузнецов", role: "Разработчик", pct: 54, status: "ok" },
-  { initials: "ЕВ", name: "Екатерина Волкова", role: "Дизайнер", pct: 91, status: "warn", hot: true },
-  { initials: "МК", name: "Маркетинг-команда", role: "Ресурс", pct: 65, status: "ok" },
-] as const;
+const COPY = {
+  ru: {
+    title: "Загрузка команды",
+    period: "7–9 недель",
+    forecastTitle: "Прогноз: в рамках плана",
+    forecastSub: "Перегрузок по команде не ожидается.",
+    rows: [
+      { initials: "ИП", name: "Иван Петров", role: "Руководитель проекта", pct: 82, status: "ok" },
+      { initials: "АС", name: "Анна Смирнова", role: "Бизнес-аналитик", pct: 67, status: "ok" },
+      { initials: "ДК", name: "Дмитрий Кузнецов", role: "Разработчик", pct: 54, status: "ok" },
+      { initials: "ЕВ", name: "Екатерина Волкова", role: "Дизайнер", pct: 91, status: "warn", hot: true },
+      { initials: "МК", name: "Маркетинг-команда", role: "Ресурс", pct: 65, status: "ok" },
+    ],
+  },
+  en: {
+    title: "Team load",
+    period: "7-9 weeks",
+    forecastTitle: "Forecast: inside the plan",
+    forecastSub: "No team overload expected.",
+    rows: [
+      { initials: "IP", name: "Ivan Petrov", role: "Project lead", pct: 82, status: "ok" },
+      { initials: "AS", name: "Anna Smirnova", role: "Business analyst", pct: 67, status: "ok" },
+      { initials: "DK", name: "Dmitry Kuznetsov", role: "Developer", pct: 54, status: "ok" },
+      { initials: "EV", name: "Ekaterina Volkova", role: "Designer", pct: 91, status: "warn", hot: true },
+      { initials: "MK", name: "Marketing team", role: "Resource", pct: 65, status: "ok" },
+    ],
+  },
+} as const;
 
-export function CapacityCheckDemo({ active }: { active: boolean }) {
+export function CapacityCheckDemo({ active, locale = "ru" }: { active: boolean; locale?: LandingLocale }) {
+  const copy = COPY[locale];
   return (
     <DemoShell active={active}>
       <article className="six-capacity">
         <header className="six-capacity__head">
-          <h4 className="six-capacity__title">Загрузка команды</h4>
+          <h4 className="six-capacity__title">{copy.title}</h4>
           <span className="six-capacity__period">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
@@ -22,11 +45,11 @@ export function CapacityCheckDemo({ active }: { active: boolean }) {
                 fill="currentColor"
               />
             </svg>
-            7–9 недель
+            {copy.period}
           </span>
         </header>
         <ul className="six-capacity__list">
-          {ROWS.map((row, i) => (
+          {copy.rows.map((row, i) => (
             <li
               key={row.name}
               className={`six-capacity__row six-capacity__row--${i + 1}${"hot" in row && row.hot ? " six-capacity__row--hot" : ""}`}
@@ -65,8 +88,8 @@ export function CapacityCheckDemo({ active }: { active: boolean }) {
             </svg>
           </span>
           <div>
-            <p className="six-capacity__forecast-title">Прогноз: в рамках плана</p>
-            <p className="six-capacity__forecast-sub">Перегрузок по команде не ожидается.</p>
+            <p className="six-capacity__forecast-title">{copy.forecastTitle}</p>
+            <p className="six-capacity__forecast-sub">{copy.forecastSub}</p>
           </div>
         </footer>
       </article>

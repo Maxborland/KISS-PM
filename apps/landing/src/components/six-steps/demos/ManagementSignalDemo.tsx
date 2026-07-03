@@ -1,10 +1,32 @@
+import type { LandingLocale } from "../../../lib/landing-i18n";
 import { DemoShell } from "./DemoShell";
 
-const ACTIONS = [
-  { id: "move", label: "Перенести срок", primary: true, icon: "calendar" },
-  { id: "resource", label: "Добавить ресурс", icon: "user" },
-  { id: "risk", label: "Согласовать риск", icon: "flag" },
-] as const;
+const COPY = {
+  ru: {
+    cardTitle: "Сигнал",
+    risk: "Высокий риск срыва срока по сделке «ГК Север» — вероятность",
+    causeLabel: "Причина",
+    cause: "Задержка согласования и занятость ключевого ресурса.",
+    actionsTitle: "Рекомендуемые действия",
+    actions: [
+      { id: "move", label: "Перенести срок", primary: true, icon: "calendar" },
+      { id: "resource", label: "Добавить ресурс", icon: "user" },
+      { id: "risk", label: "Согласовать риск", icon: "flag" },
+    ],
+  },
+  en: {
+    cardTitle: "Signal",
+    risk: "High delivery risk for the Northstar opportunity — probability",
+    causeLabel: "Cause",
+    cause: "Approval delay and a busy key resource.",
+    actionsTitle: "Recommended actions",
+    actions: [
+      { id: "move", label: "Move date", primary: true, icon: "calendar" },
+      { id: "resource", label: "Add resource", icon: "user" },
+      { id: "risk", label: "Accept risk", icon: "flag" },
+    ],
+  },
+} as const;
 
 function ActionIcon({ kind }: { kind: string }) {
   if (kind === "calendar") {
@@ -31,7 +53,8 @@ function ActionIcon({ kind }: { kind: string }) {
   );
 }
 
-export function ManagementSignalDemo({ active }: { active: boolean }) {
+export function ManagementSignalDemo({ active, locale = "ru" }: { active: boolean; locale?: LandingLocale }) {
+  const copy = COPY[locale];
   return (
     <DemoShell active={active}>
       <div className="six-signal">
@@ -47,22 +70,21 @@ export function ManagementSignalDemo({ active }: { active: boolean }) {
                 />
               </svg>
             </span>
-            <span className="six-signal__card-title">Сигнал</span>
+            <span className="six-signal__card-title">{copy.cardTitle}</span>
             <time className="six-signal__time">11:24</time>
           </header>
           <p className="six-signal__risk">
-            Высокий риск срыва срока по сделке «ГК Север» — вероятность{" "}
-            <strong className="six-signal__prob">72%</strong>.
+            {copy.risk} <strong className="six-signal__prob">72%</strong>.
           </p>
           <div className="six-signal__cause">
-            <span className="six-signal__cause-label">Причина</span>
-            <p>Задержка согласования и занятость ключевого ресурса.</p>
+            <span className="six-signal__cause-label">{copy.causeLabel}</span>
+            <p>{copy.cause}</p>
           </div>
         </article>
         <div className="six-signal__actions">
-          <h5 className="six-signal__actions-title">Рекомендуемые действия</h5>
+          <h5 className="six-signal__actions-title">{copy.actionsTitle}</h5>
           <div className="six-signal__actions-row">
-            {ACTIONS.map((action, i) => (
+            {copy.actions.map((action, i) => (
               <button
                 key={action.id}
                 type="button"

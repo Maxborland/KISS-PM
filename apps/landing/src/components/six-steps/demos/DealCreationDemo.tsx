@@ -1,21 +1,48 @@
+import type { LandingLocale } from "../../../lib/landing-i18n";
 import { DemoShell } from "./DemoShell";
 import { DottedConnector } from "./DottedConnector";
 
-const FIELDS = [
-  { label: "Клиент", value: "ООО «Альфа»" },
-  { label: "Контакт", value: "Анна Смирнова" },
-  { label: "Сумма", value: "1 250 000 ₽", accent: true },
-  { label: "Этап", value: "Первичный контакт", select: true },
-  { label: "Ответственный", value: "Иван Петров", avatar: "ИП" },
-] as const;
+const COPY = {
+  ru: {
+    title: "Новая сделка",
+    cta: "Создать сделку",
+    leadTitle: "Новый лид",
+    badge: "Новый",
+    leadClient: "ООО «Альфа»",
+    leadSum: "1 250 000 ₽",
+    fields: [
+      { label: "Клиент", value: "ООО «Альфа»" },
+      { label: "Контакт", value: "Анна Смирнова" },
+      { label: "Сумма", value: "1 250 000 ₽", accent: true },
+      { label: "Этап", value: "Первичный контакт", select: true },
+      { label: "Ответственный", value: "Иван Петров", avatar: "ИП" },
+    ],
+  },
+  en: {
+    title: "New opportunity",
+    cta: "Create opportunity",
+    leadTitle: "New lead",
+    badge: "New",
+    leadClient: "Alpha LLC",
+    leadSum: "$18,000",
+    fields: [
+      { label: "Client", value: "Alpha LLC" },
+      { label: "Contact", value: "Anna Smirnova" },
+      { label: "Value", value: "$18,000", accent: true },
+      { label: "Stage", value: "First contact", select: true },
+      { label: "Owner", value: "Ivan Petrov", avatar: "IP" },
+    ],
+  },
+} as const;
 
-export function DealCreationDemo({ active }: { active: boolean }) {
+export function DealCreationDemo({ active, locale = "ru" }: { active: boolean; locale?: LandingLocale }) {
+  const copy = COPY[locale];
   return (
     <DemoShell active={active}>
       <div className="six-deal">
         <div className="six-deal__form">
-          <h4 className="six-deal__form-title">Новая сделка</h4>
-          {FIELDS.map((field, i) => (
+          <h4 className="six-deal__form-title">{copy.title}</h4>
+          {copy.fields.map((field, i) => (
             <div key={field.label} className={`six-deal__field six-deal__field--${i + 1}`}>
               <span className="six-deal__field-label">{field.label}</span>
               <span
@@ -33,7 +60,7 @@ export function DealCreationDemo({ active }: { active: boolean }) {
             </div>
           ))}
           <button type="button" className="six-deal__cta" tabIndex={-1}>
-            Создать сделку
+            {copy.cta}
           </button>
         </div>
         <DottedConnector className="six-deal__arrow" variant="horizontal-long" />
@@ -48,11 +75,11 @@ export function DealCreationDemo({ active }: { active: boolean }) {
           </span>
           <div className="six-deal__lead-body">
             <div className="six-deal__lead-head">
-              <span className="six-deal__lead-title">Новый лид</span>
-              <span className="six-deal__badge">Новый</span>
+              <span className="six-deal__lead-title">{copy.leadTitle}</span>
+              <span className="six-deal__badge">{copy.badge}</span>
             </div>
-            <p className="six-deal__lead-client">ООО «Альфа»</p>
-            <p className="six-deal__lead-sum">1 250 000 ₽</p>
+            <p className="six-deal__lead-client">{copy.leadClient}</p>
+            <p className="six-deal__lead-sum">{copy.leadSum}</p>
           </div>
         </article>
       </div>

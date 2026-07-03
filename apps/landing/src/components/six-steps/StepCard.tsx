@@ -1,12 +1,15 @@
+import type { LandingLocale } from "../../lib/landing-i18n";
 import type { StepDefinition } from "./steps";
 import { StepMiniDemo } from "./demos";
 
 export function StepCard({
   step,
   active,
+  locale = "ru",
 }: {
   step: StepDefinition;
   active: boolean;
+  locale?: LandingLocale;
 }) {
   return (
     <article
@@ -23,7 +26,7 @@ export function StepCard({
           <p className="six-steps__description">{step.description}</p>
         </div>
         <div className="six-steps__stage">
-          <StepMiniDemo demoType={step.demoType} active={active} />
+          <StepMiniDemo demoType={step.demoType} active={active} locale={locale} />
         </div>
       </div>
     </article>

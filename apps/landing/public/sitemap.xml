@@ -4,9 +4,18 @@
     <loc>https://kisspm.app/</loc>
   </url>
   <url>
+    <loc>https://kisspm.app/en/</loc>
+  </url>
+  <url>
     <loc>https://kisspm.app/privacy/</loc>
   </url>
   <url>
     <loc>https://kisspm.app/terms/</loc>
+  </url>
+  <url>
+    <loc>https://kisspm.app/en/privacy/</loc>
+  </url>
+  <url>
+    <loc>https://kisspm.app/en/terms/</loc>
   </url>
 </urlset>
