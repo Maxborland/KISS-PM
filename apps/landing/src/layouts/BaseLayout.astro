@@ -6,14 +6,18 @@ interface Props {
   title: string;
   description?: string;
   prerender?: boolean;
+  structuredData?: Array<Record<string, unknown>>;
 }
 
 const {
   title,
   description = "KISS PM — управление проектами, ресурсами и сигналами без хаоса. Закрытая альфа.",
+  structuredData = [],
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://kisspm.app").toString();
+const ogImage = new URL("/og-image.png", Astro.site ?? "https://kisspm.app").toString();
+const structuredDataJson = structuredData.map((item) => JSON.stringify(item));
 ---
 
 <!doctype html>
@@ -36,7 +40,17 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://kisspm.app"
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical} />
+    <meta property="og:site_name" content="KISS PM" />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    {structuredDataJson.map((json) => (
+      <script is:inline type="application/ld+json" set:html={json}></script>
+    ))}
   </head>
   <body>
     <a class="sr-only" href="#main">Перейти к содержимому</a>

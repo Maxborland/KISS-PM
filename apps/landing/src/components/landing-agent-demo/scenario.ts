@@ -1,19 +1,19 @@
 import type { DemoChange, LandingAgentDemoPreset, LandingAgentDemoState } from "./types";
 
-export const FIRST_PROMPT = "Генри, проверь задержку по дизайну и подготовь план на неделю.";
+export const FIRST_PROMPT = "Генри, проверь задержку по дизайну, сделай сверку изменений и подготовь план на неделю.";
 export const SECOND_PROMPT = "Проверь, что сказать клиенту перед встречей.";
 
 export const ACTIVITY_STEPS = [
-  "Читает задачи",
+  "Читает проект и задачи",
   "Проверяет сроки",
   "Смотрит зависимости",
-  "Сверяет загрузку",
-  "Готовит сверку",
+  "Сверяет загрузку ресурсов",
+  "Готовит сверку изменений",
 ];
 
-export const HISTORY_ITEMS = ["План недели", "Задержка дизайна", "Риски перед звонком", "Передача проекта"];
+export const HISTORY_ITEMS = ["План недели", "Задержка дизайна", "Риски перед встречей", "Передача проекта"];
 
-export const NAV_ITEMS = ["Агент", "Проекты", "Задачи", "Команда", "Календарь", "Журнал", "Настройки"];
+export const NAV_ITEMS = ["Агент", "Проекты", "Задачи", "Команда", "Календарь", "Аудит", "Настройки"];
 
 export const INITIAL_CHANGES: DemoChange[] = [
   {
@@ -81,7 +81,7 @@ const appliedMessage = {
   id: "henry-2",
   author: "henry" as const,
   time: "10:44",
-  text: "Готово. Применил 4 изменения и оставил запись в журнале. Одно изменение осталось отклоненным.",
+  text: "Готово. Применил 4 изменения и оставил запись в аудите. Одно изменение осталось отклоненным.",
 };
 
 const secondMessage = {
@@ -96,7 +96,7 @@ export const SECOND_ANSWER_MESSAGE = {
   author: "henry" as const,
   time: "10:46",
   variant: "client-note" as const,
-  text: "Перед встречей скажите клиенту: задержка дизайна уже отражена в плане недели, новый срок демо - 16 июня, владелец макетов назначен.",
+  text: "Перед встречей скажите клиенту: задержка дизайна уже отражена в плане недели, новый срок демо — 16 июня, владелец макетов назначен.",
 };
 
 export function createLandingAgentDemoState(preset: LandingAgentDemoPreset): LandingAgentDemoState {

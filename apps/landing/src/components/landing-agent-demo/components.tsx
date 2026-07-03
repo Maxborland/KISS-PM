@@ -266,8 +266,8 @@ export function AgentStatusMenu({ onNote }: { onNote?: (note: string) => void })
       <dl>
         <div>
           <dt>Память</dt>
-          <dd>Контекст демо-проектов</dd>
-          <dd>История решений в примере</dd>
+          <dd>Контекст проектов и задач</dd>
+          <dd>История решений в аудите</dd>
         </div>
         <div>
           <dt>Доступ</dt>
@@ -275,7 +275,7 @@ export function AgentStatusMenu({ onNote }: { onNote?: (note: string) => void })
         </div>
         <div>
           <dt>Поведение</dt>
-          <dd>Спрашивает перед применением</dd>
+          <dd>Показывает сверку перед применением</dd>
         </div>
       </dl>
       <button
@@ -357,7 +357,7 @@ export function ChangeReviewPanel({
       </header>
       <div className="lad-review__summary">
         <span className="is-active">{selectedCount} выбрано</span>
-        <span>Готово к проверке</span>
+        <span>Готово к ревью</span>
         <button
           type="button"
           onClick={onToggleFilter}
@@ -388,7 +388,7 @@ export function ChangeReviewPanel({
           <Icon name="shield" />
           <div>
             <strong>4 изменения применены</strong>
-            <span>запись в журнале создана</span>
+            <span>запись в аудите создана</span>
           </div>
         </div>
       ) : null}

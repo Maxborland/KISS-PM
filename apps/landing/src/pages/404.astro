@@ -1,0 +1,57 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+
+export const prerender = true;
+---
+
+<BaseLayout
+  title="Страница не найдена · KISS PM"
+  description="404: такой страницы KISS PM нет. Вернитесь на лендинг закрытой альфы."
+>
+  <SiteHeader slot="header" />
+
+  <section class="not-found l-section" aria-labelledby="not-found-title">
+    <div class="l-container l-container--narrow not-found__inner">
+      <span class="l-eyebrow">404</span>
+      <h1 id="not-found-title" class="l-h1">Страница не найдена</h1>
+      <p class="l-lead">
+        Здесь нет управленческого действия. Вернитесь на лендинг KISS PM или
+        отправьте заявку в закрытую альфу.
+      </p>
+      <div class="not-found__actions">
+        <a class="l-btn l-btn--primary" href="/">На главную</a>
+        <a class="l-btn l-btn--ghost" href="/#waitlist">Запросить доступ</a>
+      </div>
+    </div>
+  </section>
+
+  <SiteFooter slot="footer" />
+</BaseLayout>
+
+<style>
+  .not-found {
+    min-height: 72svh;
+    display: grid;
+    align-items: center;
+    background:
+      radial-gradient(circle at 50% 24%, color-mix(in oklab, var(--accent-soft) 52%, transparent), transparent 34%),
+      var(--canvas);
+  }
+
+  .not-found__inner {
+    display: grid;
+    gap: 18px;
+    text-align: center;
+    justify-items: center;
+  }
+
+  .not-found__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 10px;
+  }
+</style>
