@@ -8,6 +8,7 @@ import {
   isWorkspaceTheme
 } from "./parseHelpers";
 import { readLimitedJsonBody } from "./jsonBody";
+import { withActor } from "./withActor";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 
 export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
@@ -97,11 +98,9 @@ export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
     return context.json({ user });
   });
 
-  app.patch("/api/profile/theme", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
+  // withActor: актор резолвится в combinator, 401 короткозамыкается там. Профиль/501 — как раньше (лениво,
+  // fail-closed на persistence ДО профиля сохраняется).
+  app.patch("/api/profile/theme", withActor(deps, async (context, actor) => {
     if (
       !dataSource.updateWorkspaceUser ||
       !dataSource.listWorkspaceUsers ||
@@ -170,7 +169,7 @@ export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
     });
 
     return context.json({ user });
-  });
+  }));
 }
 
 type ProfileTextFieldParseResult =
