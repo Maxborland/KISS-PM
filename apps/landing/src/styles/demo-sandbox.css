@@ -2453,8 +2453,8 @@
     order: -1;
     background: var(--sandbox-surface);
     border-bottom: 1px solid var(--sandbox-border);
-    padding: 10px 14px 12px;
-    gap: 8px;
+    padding: 8px 14px 10px;
+    gap: 6px;
   }
 
   .sandbox__scenario-head {
@@ -2505,7 +2505,49 @@
     font-size: 11.5px;
   }
 
+  /* ponytail: панель-нарратор на мобилке скрыта — следующий шаг и подсказки
+     уже даёт док + notice; вернуть можно drawer'ом по образцу «Сверки» */
   .demo-context {
-    border-top: 1px solid var(--sandbox-border);
+    display: none;
+  }
+
+  /* Поиск декоративный — на мобилке топбар не окупает свои 60px */
+  .sandbox__topbar {
+    display: none;
+  }
+
+  /* Компактный низ: демо целиком ~ в один экран */
+  .sandbox__stage {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .sandbox__dock {
+    padding: 10px 14px 12px;
+    gap: 8px 14px;
+  }
+
+  .sandbox__dock-hint {
+    font-size: 12px;
+  }
+
+  .sandbox__dock-actions {
+    flex: 1 0 100%;
+  }
+
+  .sandbox__dock-actions .sandbox__dock-primary {
+    flex: 1;
+  }
+
+  .demo-screen__head {
+    padding: 12px 14px;
+  }
+
+  .demo-screen__body {
+    padding: 12px 14px;
+  }
+
+  .demo-table__row td {
+    padding: 10px 8px;
   }
 }

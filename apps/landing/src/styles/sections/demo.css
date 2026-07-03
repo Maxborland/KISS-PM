@@ -80,10 +80,12 @@
   height: 100%;
 }
 
-@media (max-width: 760px) {
+/* Совпадает с брейкпоинтом мобильной раскладки сэндбокса (979px):
+   в стековом режиме высота фрейма — от контента, без искусственного запаса */
+@media (max-width: 979px) {
   .demo-frame__inner {
     height: auto;
-    min-height: 760px;
+    min-height: 0;
   }
 }
 
