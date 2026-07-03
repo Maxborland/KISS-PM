@@ -29,6 +29,11 @@ const SIZE_ENTRIES = Object.entries(COMPANY_SIZE_LABELS) as Array<
   [keyof typeof COMPANY_SIZE_LABELS, string]
 >;
 
+/* Node-SSR обслуживает /api/waitlist; статический деплой на PHP-хостинг
+   собирается с PUBLIC_WAITLIST_ENDPOINT=/api/waitlist.php */
+const WAITLIST_ENDPOINT: string =
+  import.meta.env.PUBLIC_WAITLIST_ENDPOINT || "/api/waitlist";
+
 export default function WaitlistForm() {
   const [status, setStatus] = useState<Status>({ phase: "idle" });
   const [fieldIssues, setFieldIssues] = useState<FieldIssues>({});
@@ -68,7 +73,7 @@ export default function WaitlistForm() {
     body.set("hp", "");
 
     try {
-      const res = await fetch("/api/waitlist", {
+      const res = await fetch(WAITLIST_ENDPOINT, {
         method: "POST",
         body,
         headers: { accept: "application/json" },
