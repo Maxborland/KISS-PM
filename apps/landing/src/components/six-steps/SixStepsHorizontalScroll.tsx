@@ -223,14 +223,14 @@ export default function SixStepsHorizontalScroll() {
       id="loop"
       className="horizontalScrollSection l-band--six-steps"
       ref={sectionRef}
-      aria-label="Шесть шагов процесса KISS PM"
+      aria-label="От цели к проверяемому изменению KISS PM"
       data-native-vertical-scroll
     >
       <div className="stickyViewport six-steps" ref={stickyRef}>
         <header className="sectionHeader six-steps-head">
           {/* без data-text-reveal: скрипт реврайтит DOM до гидрации React и ломает hydration */}
           <h2 id="loop-title" className="l-display six-steps-head__title">
-            Шесть шагов · один контур
+            От цели к проверяемому изменению
           </h2>
         </header>
 

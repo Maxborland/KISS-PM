@@ -21,7 +21,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "01",
     category: "CRM",
     title: "Новая сделка",
-    description: "Фиксируйте входящие запросы и держите CRM рядом с будущим проектом.",
+    description: "Сохраняйте входящий запрос там, где он сразу может стать проектом.",
     demoType: "deal",
   },
   {
@@ -29,7 +29,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "02",
     category: "ПРИЁМКА",
     title: "Черновик проекта",
-    description: "Собирайте вводные, роли и сроки до обещаний клиенту.",
+    description: "Превращайте вводные в черновик с ролями, сроками и ограничениями.",
     demoType: "draft",
   },
   {
@@ -37,7 +37,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "03",
     category: "ЁМКОСТЬ",
     title: "Проверка загрузки",
-    description: "Проверяйте ресурсную загрузку до активации проекта.",
+    description: "Проверяйте загрузку команды до того, как обещать сроки.",
     demoType: "capacity",
   },
   {
@@ -45,7 +45,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "04",
     category: "ПЛАН",
     title: "Живой график",
-    description: "Видите, как изменения влияют на задачи, сроки и Gantt.",
+    description: "Видите, какие задачи, сроки и зависимости изменит новый план.",
     demoType: "gantt",
   },
   {
@@ -53,7 +53,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "05",
     category: "СИГНАЛ",
     title: "Управленческое действие",
-    description: "Сигнал ведёт к разрешённому действию, а не к ещё одному отчёту.",
+    description: "Агент предлагает действие, которое можно проверить и применить.",
     demoType: "signal",
   },
   {
@@ -61,7 +61,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "06",
     category: "ЗАКРЫТИЕ",
     title: "Уроки в шаблон",
-    description: "Закрытие проекта улучшает шаблоны для следующих запусков.",
+    description: "Решения и итоги остаются в аудите и улучшают следующие шаблоны.",
     demoType: "closure",
   },
 ];

@@ -1,6 +1,6 @@
 import type { DemoChange, LandingAgentDemoPreset, LandingAgentDemoState } from "./types";
 
-export const FIRST_PROMPT = "Генри, проверь задержку по дизайну, сделай сверку изменений и подготовь план на неделю.";
+export const FIRST_PROMPT = "Проверь задержку по дизайну, покажи сверку изменений и подготовь план на неделю.";
 export const SECOND_PROMPT = "Проверь, что сказать клиенту перед встречей.";
 
 export const ACTIVITY_STEPS = [

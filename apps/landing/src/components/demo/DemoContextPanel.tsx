@@ -155,7 +155,7 @@ export function DemoContextPanel({ step, fixture, onExplore }: Props) {
         <ContextCard title="Неизменяемая запись" body="Фиксирует актора, действие, цель и причину — для ретроспективы и комплаенса.">
           <ContextStat label="Запись" value="#4128" />
         </ContextCard>
-        <ContextCard title="Связь с контуром" body="Сделка «ГК Север» → проверка ёмкости → сценарий → 112% → 94%.">
+        <ContextCard title="Почему это важно" body="Сделка «ГК Север» → проверка ёмкости → сценарий → 112% → 94%.">
           <ContextLink onClick={() => onExplore("Цепочка событий в ленте аудита.")}>Цепочка событий →</ContextLink>
         </ContextCard>
         <ContextCard title="Сценарий завершён" body="Можно начать демо сначала или вернуться к списку сделок.">

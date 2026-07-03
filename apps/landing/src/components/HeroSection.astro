@@ -6,7 +6,11 @@ import HeroShader from "./HeroShader.tsx";
   <HeroShader client:load />
 
   <div class="l-container hero__inner">
-    <h1 id="hero-title" class="hero__title">Управление проектами.<br />Переосмыслено.</h1>
+    <h1 id="hero-title" class="hero__title">Управление проектами<br />как код.</h1>
+    <p class="hero__copy">
+      Опишите цель обычным языком. Агент предложит сверку изменений по задачам, срокам и ресурсам.
+      Вы применяете только выбранное.
+    </p>
     <a class="hero__access l-btn l-btn--primary" href="#waitlist">Запросить доступ</a>
   </div>
 </section>
@@ -87,10 +91,22 @@ import HeroShader from "./HeroShader.tsx";
   }
 
 
+  .hero__copy {
+    max-width: min(720px, calc(100vw - 48px));
+    margin: clamp(18px, 3vh, 28px) 0 0;
+    color: color-mix(in oklab, var(--text-strong) 70%, var(--muted) 30%);
+    font-size: clamp(16px, 1.45vw, 20px);
+    font-weight: 500;
+    line-height: 1.55;
+    text-align: center;
+    text-wrap: balance;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.56);
+  }
+
   .hero__access {
     position: relative;
     z-index: 4;
-    margin-top: clamp(24px, 3.5vh, 44px);
+    margin-top: clamp(22px, 3.4vh, 38px);
     min-width: 172px;
     justify-content: center;
     box-shadow:
@@ -102,6 +118,11 @@ import HeroShader from "./HeroShader.tsx";
     .hero__title {
       font-size: clamp(28px, 10vw, 40px);
       white-space: normal;
+    }
+
+    .hero__copy {
+      font-size: 15.5px;
+      line-height: 1.5;
     }
   }
 
