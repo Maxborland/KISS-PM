@@ -64,6 +64,7 @@
 }
 
 .philosophy__line {
+  --line-delay: 250ms;
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(1.35rem, 3vw, 2.2rem);
@@ -71,6 +72,19 @@
   letter-spacing: -0.02em;
   line-height: 1.2;
   color: rgba(214, 221, 248, 0.78);
+}
+
+/* Волна после заголовка: строки подхватывают пословный каскад по очереди */
+.philosophy__line .kp-word {
+  transition-delay: calc(var(--word-i, 0) * var(--word-reveal-stagger) + var(--line-delay));
+}
+
+.philosophy__line:nth-child(2) {
+  --line-delay: 600ms;
+}
+
+.philosophy__line:nth-child(3) {
+  --line-delay: 950ms;
 }
 
 /* Лесенка: каждая строка сдвигается на шаг, вторая ловит accent-подсветку */
