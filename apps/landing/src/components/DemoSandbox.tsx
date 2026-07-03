@@ -159,21 +159,19 @@ export default function DemoSandbox() {
 
       <div className="sandbox__main">
         <div className="sandbox__topbar">
-          <div className="sandbox__search">
+          <button
+            type="button"
+            className="sandbox__search"
+            onClick={() =>
+              onExplore("Поиск работает по всему портфелю — в демо навигацию ведёт сценарий.")
+            }
+          >
             <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
               <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
               <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
-            <input
-              type="text"
-              placeholder="Поиск: проекты, задачи, сделки, CRM"
-              aria-label="Поиск по продукту"
-              onFocus={() =>
-                onExplore("Поиск работает по всему портфелю — в демо навигацию ведёт сценарий.")
-              }
-              readOnly
-            />
-          </div>
+            <span>Поиск: проекты, задачи, сделки, CRM</span>
+          </button>
           <span className="sandbox__avatar" aria-hidden="true">
             АК
           </span>
