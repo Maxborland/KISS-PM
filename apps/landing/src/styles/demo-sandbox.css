@@ -2412,6 +2412,17 @@
     white-space: nowrap;
   }
 
+  /* Демо = мобильное приложение: ровно один экран, хром всегда виден,
+     скроллится только содержимое стейджа */
+  .demo-frame__inner {
+    height: max(560px, calc(100svh - 16px));
+  }
+
+  .sandbox__main {
+    flex: 1;
+    min-height: 0;
+  }
+
   /* Разделы — за бургером: выезжающая панель поверх демо */
   .sandbox {
     position: relative;
@@ -2564,6 +2575,13 @@
 
   .demo-screen__body {
     padding: 12px 14px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .deal-workspace__body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .demo-table__row td {
