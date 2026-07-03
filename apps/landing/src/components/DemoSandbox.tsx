@@ -59,6 +59,7 @@ const NAV_SECTIONS: ReadonlyArray<{
 export default function DemoSandbox() {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
   const [notice, setNotice] = useState<string | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
   const meta = STEP_META[state.step];
   const currentIdx = ORDER.indexOf(state.step);
   const progress = useMemo(
@@ -112,6 +113,23 @@ export default function DemoSandbox() {
   return (
     <div className="sandbox" data-demo-step={state.step}>
       <aside className="sandbox__rail" aria-label="Навигация продукта">
+        <button
+          type="button"
+          className="sandbox__burger"
+          aria-label={navOpen ? "Закрыть меню разделов" : "Открыть меню разделов"}
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen((value) => !value)}
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <path
+              d="M2 4h12M2 8h12M2 12h12"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+
         <div className="sandbox__brand">
           <span className="sandbox__brand-mark" aria-hidden="true">
             K
@@ -119,7 +137,16 @@ export default function DemoSandbox() {
           KISS PM
         </div>
 
-        <nav className="sandbox__nav">
+        {navOpen ? (
+          <button
+            type="button"
+            className="sandbox__nav-backdrop"
+            aria-label="Закрыть меню разделов"
+            onClick={() => setNavOpen(false)}
+          />
+        ) : null}
+
+        <nav className={`sandbox__nav${navOpen ? " is-open" : ""}`}>
           {NAV_SECTIONS.map((section) => (
             <div key={section.label} className="sandbox__nav-section">
               <p className="sandbox__nav-label">{section.label}</p>
@@ -136,7 +163,10 @@ export default function DemoSandbox() {
                       isUnlocked ? "" : " is-upcoming"
                     }`}
                     aria-current={isActive ? "page" : undefined}
-                    onClick={() => onNavClick(item)}
+                    onClick={() => {
+                      setNavOpen(false);
+                      onNavClick(item);
+                    }}
                   >
                     {item.label}
                   </button>
