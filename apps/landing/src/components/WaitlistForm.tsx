@@ -130,9 +130,9 @@ export default function WaitlistForm() {
   return (
     <form className="wl" onSubmit={onSubmit} noValidate>
       <p className="wl__intro">
-        Короткая форма — без звонков и «менеджера по продажам».
+        Оставьте рабочую почту, если хотите посмотреть agent-first управление проектами как код.
         <br />
-        Ответ только на рабочую почту.
+        Ответим письмом, без звонков и рассылок.
       </p>
 
       <div className="wl__row">
@@ -222,7 +222,7 @@ export default function WaitlistForm() {
           id="wl-context"
           name="context"
           rows={3}
-          placeholder="Где сейчас давление: ресурсы, сроки, новые сделки, отчёты или решения."
+          placeholder="Что хотите проверить: агент, сверка изменений, ресурсы, сроки, CRM или аудит."
           maxLength={600}
           aria-invalid={Boolean(resolveError("context", fieldIssues, status))}
         />
