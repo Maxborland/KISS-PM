@@ -100,7 +100,7 @@ function renderTelegramText(s: WaitlistSubmissionParsed): string {
 function resendConfig(): { key: string; to: string; from: string } | null {
   const key = readEnv("RESEND_API_KEY");
   const to = readEnv("RESEND_NOTIFY_TO");
-  const from = readEnv("RESEND_FROM") || "KISS PM <noreply@kiss-pm.app>";
+  const from = readEnv("RESEND_FROM") || "KISS PM <noreply@kisspm.app>";
   return key && to ? { key, to, from } : null;
 }
 
