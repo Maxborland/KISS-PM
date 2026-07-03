@@ -49,7 +49,23 @@ export type OpportunityFeasibilityAssessment = {
   rows: OpportunityFeasibilityRow[];
 };
 
-const hoursPerDay = 8;
+const DEFAULT_HOURS_PER_DAY = 8;
+const DEFAULT_WORKING_WEEKDAYS = [1, 2, 3, 4, 5] as const; // ISO Пн..Пт
+
+/** Производственный календарь для оценки реализуемости. workingWeekdays — ISO 1..7 (Пн..Вс). */
+export type FeasibilityCalendar = {
+  workingWeekdays: readonly number[];
+  workingMinutesPerDay: number;
+  /** Нерабочие даты (праздники/переносы), ISO YYYY-MM-DD. */
+  holidays: ReadonlySet<string>;
+};
+
+function hoursPerDayOf(calendar?: FeasibilityCalendar): number {
+  if (!calendar || !Number.isFinite(calendar.workingMinutesPerDay) || calendar.workingMinutesPerDay <= 0) {
+    return DEFAULT_HOURS_PER_DAY;
+  }
+  return calendar.workingMinutesPerDay / 60;
+}
 
 export function calculatePlannedHours(
   contractValue: number,
@@ -63,16 +79,19 @@ export function calculatePlannedHours(
   return Math.floor(contractValue / plannedHourlyRate);
 }
 
-export function countWorkingDays(start: Date, finish: Date): number {
+export function countWorkingDays(start: Date, finish: Date, calendar?: FeasibilityCalendar): number {
   if (finish.getTime() < start.getTime()) return 0;
 
+  const workingSet = new Set<number>(calendar?.workingWeekdays ?? DEFAULT_WORKING_WEEKDAYS);
   let count = 0;
   const cursor = startOfUtcDay(start);
   const end = startOfUtcDay(finish);
 
   while (cursor.getTime() <= end.getTime()) {
-    const day = cursor.getUTCDay();
-    if (day !== 0 && day !== 6) count += 1;
+    const isoWeekday = cursor.getUTCDay() === 0 ? 7 : cursor.getUTCDay(); // 1..7 (Пн..Вс)
+    const dateIso = cursor.toISOString().slice(0, 10);
+    const isHoliday = calendar?.holidays.has(dateIso) ?? false;
+    if (workingSet.has(isoWeekday) && !isHoliday) count += 1;
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
@@ -90,6 +109,8 @@ export function assessOpportunityFeasibility(input: {
   demand: readonly OpportunityFeasibilityDemandLine[];
   positions: readonly OpportunityFeasibilityPosition[];
   activeProjectReservations: readonly OpportunityFeasibilityReservation[];
+  /** Произв. календарь тенанта. Без него — Пн-Пт по 8ч (обратная совместимость). */
+  calendar?: FeasibilityCalendar;
 }): OpportunityFeasibilityAssessment {
   const plannedHours = calculatePlannedHours(
     input.opportunity.contractValue,
@@ -97,10 +118,15 @@ export function assessOpportunityFeasibility(input: {
   );
   const workingDays = countWorkingDays(
     input.opportunity.plannedStart,
-    input.opportunity.plannedFinish
+    input.opportunity.plannedFinish,
+    input.calendar
   );
+  const hoursPerDay = hoursPerDayOf(input.calendar);
+  // Number.isFinite-гард: NaN/Infinity в requiredHours иначе обходит все проверки (сравнения с NaN
+  // всегда false) и инфизибл-возможность репортится "ok" с NaN-итогами. Не-конечный спрос = 0.
+  const requiredHoursOf = (hours: number) => (Number.isFinite(hours) ? hours : 0);
   const totalRequiredHours = input.demand.reduce(
-    (sum, line) => sum + line.requiredHours,
+    (sum, line) => sum + requiredHoursOf(line.requiredHours),
     0
   );
   const blockers = new Set<OpportunityFeasibilityBlocker>();
@@ -117,17 +143,19 @@ export function assessOpportunityFeasibility(input: {
   }
 
   const rows = input.demand.map<OpportunityFeasibilityRow>((line) => {
+    const required = requiredHoursOf(line.requiredHours);
     const position = input.positions.find((item) => item.id === line.positionId);
     const reservedHours = calculateReservedHours({
       reservations: input.activeProjectReservations.filter(
         (reservation) => reservation.positionId === line.positionId
       ),
       requestedStart: input.opportunity.plannedStart,
-      requestedFinish: input.opportunity.plannedFinish
+      requestedFinish: input.opportunity.plannedFinish,
+      ...(input.calendar ? { calendar: input.calendar } : {})
     });
     const grossHours = (position?.activeUsers ?? 0) * workingDays * hoursPerDay;
     const availableHours = Math.max(0, grossHours - reservedHours);
-    const shortageHours = Math.max(0, line.requiredHours - availableHours);
+    const shortageHours = Math.max(0, required - availableHours);
 
     if (!position || position.activeUsers <= 0) {
       blockers.add("missing_position_capacity");
@@ -136,7 +164,7 @@ export function assessOpportunityFeasibility(input: {
     return {
       positionId: line.positionId,
       positionName: position?.name ?? "Должность не найдена",
-      requiredHours: line.requiredHours,
+      requiredHours: required,
       availableHours,
       reservedHours,
       shortageHours,
@@ -167,15 +195,18 @@ function calculateReservedHours(input: {
   reservations: readonly OpportunityFeasibilityReservation[];
   requestedStart: Date;
   requestedFinish: Date;
+  calendar?: FeasibilityCalendar;
 }): number {
   return input.reservations.reduce((sum, reservation) => {
     const reservationDays = countWorkingDays(
       reservation.plannedStart,
-      reservation.plannedFinish
+      reservation.plannedFinish,
+      input.calendar
     );
     const overlapDays = countWorkingDays(
       maxDate(input.requestedStart, reservation.plannedStart),
-      minDate(input.requestedFinish, reservation.plannedFinish)
+      minDate(input.requestedFinish, reservation.plannedFinish),
+      input.calendar
     );
 
     if (reservationDays <= 0 || overlapDays <= 0) return sum;

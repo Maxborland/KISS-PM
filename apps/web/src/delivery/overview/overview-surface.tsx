@@ -14,10 +14,11 @@ import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend"
 import { usePlanning, type CommitMetaView } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { demoAction } from "@/views/lib/demo";
+import type { PlanTask } from "@kiss-pm/domain";
 
-type RawTask = { id: string; wbsCode: string; title: string; percentComplete: number; statusId: string; plannedStart: string; plannedFinish: string; workMinutes: number; durationMinutes: number | null; customFields?: { kind?: string; resLabel?: string } };
-type CalcTask = { id: string; calculatedStart: string; calculatedFinish: string; isCritical: boolean; totalSlackMinutes: number | null };
-type BcTask = { taskId: string; baselineFinish: string | null; finishDeltaDays: number | null };
+// customFields — типизированный открытый мешок (Record<string,unknown>) в домене; на этой поверхности
+// читаем два конкретных ключа, поэтому узкий локальный каст ключей (это не `as unknown as`, а сужение).
+const cfOf = (t: PlanTask) => (t.customFields ?? {}) as { kind?: string; resLabel?: string };
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const TODAY = "2026-06-23"; // фиксированная «сегодня» прототипа (для просрочек/резерва — детерминированно)
@@ -45,17 +46,19 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
   const model = useMemo(() => {
     if (!readModel) return null;
-    const authored = (readModel.authored as unknown as { tasks: RawTask[] }).tasks;
-    const cp = readModel.calculatedPlan as unknown as { tasks: CalcTask[]; projectFinish: string; criticalPathTaskIds: string[] };
+    const authored = readModel.authored.tasks;
+    const cp = readModel.calculatedPlan;
     const calcById = new Map(cp.tasks.map((c) => [c.id, c]));
-    const milestones = authored.filter((t) => t.customFields?.kind === "milestone");
+    const milestones = authored.filter((t) => cfOf(t).kind === "milestone");
     // листья = задачи с длительностью, но БЕЗ вех (у вехи durationMinutes == 0, не null) —
     // иначе веха попадает в прогресс/doneCount/«ключевые» с бессмысленным 100%-баром.
-    const leaves = authored.filter((t) => t.durationMinutes != null && t.customFields?.kind !== "milestone");
-    const overloads = ((readModel.resourceLoad as unknown as { overloads: Array<{ resourceId: string; date: string; granularity?: string }> }).overloads ?? []).filter((o) => o.granularity === undefined || o.granularity === "day");
-    const bc = (readModel.baselineComparison as unknown as { tasks: BcTask[] }).tasks ?? [];
-    const issues = (readModel.validationIssues as unknown as unknown[]) ?? [];
-    const deadline = (readModel.project as unknown as { deadline: string | null }).deadline;
+    const leaves = authored.filter((t) => t.durationMinutes != null && cfOf(t).kind !== "milestone");
+    // granularity в домене — обязательный BucketGranularity, поэтому оставляем только дневные overloads
+    // (прежняя ветка `=== undefined` в рантайме никогда не срабатывала — форма всегда её заполняет).
+    const overloads = (readModel.resourceLoad.overloads ?? []).filter((o) => o.granularity === "day");
+    const bc = readModel.baselineComparison.tasks ?? [];
+    const issues = readModel.validationIssues ?? [];
+    const deadline = readModel.project.deadline;
     return { authored, leaves, milestones, calcById, projectFinish: cp.projectFinish, criticalIds: new Set(cp.criticalPathTaskIds), overloads, bc, issues, deadline };
   }, [readModel]);
 
@@ -77,14 +80,21 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const progress = totalWork > 0 ? Math.round(model.leaves.reduce((s, t) => s + t.workMinutes * t.percentComplete, 0) / totalWork) : 0;
   const doneCount = model.leaves.filter((t) => t.statusId === "done").length;
   const inProgress = model.leaves.filter((t) => t.statusId === "in_progress").length;
-  const finishDay = isoToDay(model.projectFinish);
+  // projectFinish/plannedFinish/calculatedFinish в домене nullable (live: проект/задачи без расчётной даты) —
+  // guard'им, иначе isoToDay(null)=NaN каскадит в резерв/сорт/сетку.
+  const finishDay = model.projectFinish ? isoToDay(model.projectFinish) : null;
   // дедлайн в домене nullable — без него считать резерв/«за дедлайном» нельзя (иначе NaN в шапке/сигналах)
   const deadlineDay = model.deadline ? isoToDay(model.deadline) : null;
-  const reserveDays = deadlineDay != null ? deadlineDay - finishDay : null;
+  const reserveDays = deadlineDay != null && finishDay != null ? deadlineDay - finishDay : null;
   const baseFinishDay = model.bc.filter((t) => t.baselineFinish).length ? Math.max(...model.bc.filter((t) => t.baselineFinish).map((t) => isoToDay(t.baselineFinish!))) : 0;
-  const projDelta = baseFinishDay ? finishDay - baseFinishDay : 0;
+  const projDelta = baseFinishDay && finishDay != null ? finishDay - baseFinishDay : 0;
   const overloadResources = [...new Set(model.overloads.map((o) => o.resourceId))];
-  const overdue = model.leaves.filter((t) => t.statusId !== "done" && isoToDay(t.plannedFinish) < isoToDay(TODAY));
+  const overdue = model.leaves.filter((t) => {
+    if (t.statusId === "done") return false;
+    // effective finish: расчётная дата (auto-задачи) или авторская (manual); обе nullable — guard от NaN.
+    const fin = model.calcById.get(t.id)?.calculatedFinish ?? t.plannedFinish;
+    return fin != null && isoToDay(fin) < isoToDay(TODAY);
+  });
   const critNoSlack = model.leaves.filter((t) => { const c = model.calcById.get(t.id); return c?.isCritical && (c.totalSlackMinutes ?? 0) <= 0; });
 
   const signals: Array<{ tone: "danger" | "warning" | "info"; icon: typeof Zap; title: string; detail: string; action: string }> = [];
@@ -97,7 +107,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
   // вехи: milestone-задачи + внешний дедлайн, по дате
   const milestoneRows = [
-    ...model.milestones.map((m) => { const c = model.calcById.get(m.id); const iso = c?.calculatedFinish ?? m.plannedFinish; return { key: m.id, day: isoToDay(iso), date: ddmmyyyy(iso), name: m.title, wbs: m.wbsCode, done: m.percentComplete >= 100 }; }),
+    ...model.milestones.map((m) => { const c = model.calcById.get(m.id); const iso = c?.calculatedFinish ?? m.plannedFinish; return { key: m.id, day: iso ? isoToDay(iso) : Number.MAX_SAFE_INTEGER, date: ddmmyyyy(iso), name: m.title, wbs: m.wbsCode, done: m.percentComplete >= 100 }; }),
     ...(model.deadline ? [{ key: "deadline", day: deadlineDay ?? Infinity, date: ddmmyyyy(model.deadline), name: "Дедлайн релиза", wbs: "—", done: false }] : [])
   ].sort((a, b) => a.day - b.day);
 
@@ -105,7 +115,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // закрытые исключаем — иначе наверх всплывают рано завершённые критические задачи
   const keyTasks = model.leaves
     .filter((t) => t.statusId !== "done")
-    .map((t) => { const c = model.calcById.get(t.id); return { t, c, crit: model.criticalIds.has(t.id), fin: c ? isoToDay(c.calculatedFinish) : 0 }; })
+    .map((t) => { const c = model.calcById.get(t.id); const iso = c?.calculatedFinish ?? t.plannedFinish; return { t, c, crit: model.criticalIds.has(t.id), fin: iso ? isoToDay(iso) : Number.MAX_SAFE_INTEGER }; })
     .sort((a, b) => (a.crit === b.crit ? a.fin - b.fin : a.crit ? -1 : 1))
     .slice(0, 5);
 
@@ -186,7 +196,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                   <td className="w-32 py-2.5 pr-3 align-middle">
                     <div className="flex items-center gap-2"><ProgressBar value={row.t.percentComplete} critical={row.crit} /><span className="v4-num w-8 shrink-0 text-right text-[length:var(--text-xs)] text-[var(--muted)]">{row.t.percentComplete}%</span></div>
                   </td>
-                  <td className="py-2.5 pr-2 align-middle"><BemAvatar initials={initials(row.t.customFields?.resLabel ?? "—")} color={AV[i % AV.length]!} size="sm" /></td>
+                  <td className="py-2.5 pr-2 align-middle"><BemAvatar initials={initials(cfOf(row.t).resLabel ?? "—")} color={AV[i % AV.length]!} size="sm" /></td>
                   <td className="v4-num py-2.5 pr-4 align-middle text-right text-[length:var(--text-sm)] text-[var(--muted-strong)]">{ddmm(row.c?.calculatedFinish ?? null)}</td>
                 </tr>
               ))}

@@ -98,10 +98,16 @@ export function workingMinutesForDate(
   calendar: PlanCalendar,
   exceptions: PlanCalendarException[]
 ): number {
-  const exception = exceptions.find(
+  // Наиболее ограничительное правило: среди всех совпадений на дату (глобальное + персональные) берём
+  // МИНИМУМ workingMinutes, независимо от порядка массива. Так личное отсутствие (0) перекрывает глобальный
+  // короткий день, И праздник компании (0) НЕ перекрывается реактивированной full-day персональной записью
+  // (workingMinutes=480) — не «personal-always-wins», а «restrictive-wins».
+  const matching = exceptions.filter(
     (candidate) => candidate.calendarId === calendar.id && candidate.date === date
   );
-  if (exception) return Math.max(0, exception.workingMinutes);
+  if (matching.length > 0) {
+    return Math.max(0, Math.min(...matching.map((candidate) => candidate.workingMinutes)));
+  }
 
   const day = new Date(`${date}T00:00:00.000Z`).getUTCDay();
   return calendar.workingWeekdays.includes(day) ? Math.max(0, calendar.workingMinutesPerDay) : 0;

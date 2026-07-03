@@ -6,12 +6,19 @@ export type KpiUnit = "days" | "minutes" | "percent" | "count";
 export type KpiSeverity = "ok" | "warning" | "critical";
 export type KpiStatus = "active" | "archived";
 
-export type BuiltInKpiMetricKey =
-  | "deadline_delta_days"
-  | "resource_overload_minutes"
-  | "critical_task_count"
-  | "progress_percent"
-  | "baseline_finish_slip_days";
+// Единственный источник истины по встроенным KPI-метрикам. Ключи описаны РОВНО здесь; тип-объединение
+// ключей (BuiltInKpiMetricKey) и рантайм-список (builtInMetricKeys в kpiExpressions) выводятся отсюда,
+// а buildProjectKpiMetrics типизирован возвратом KpiMetricValues и потому обязан вернуть ровно эти ключи.
+// Добавление метрики = одно поле в этом типе; любое расхождение трёх мест становится ошибкой компиляции.
+export type KpiMetricValues = {
+  deadline_delta_days: number;
+  resource_overload_minutes: number;
+  critical_task_count: number;
+  progress_percent: number;
+  baseline_finish_slip_days: number;
+};
+
+export type BuiltInKpiMetricKey = keyof KpiMetricValues;
 
 export type KpiExpression =
   | { type: "number"; value: number }

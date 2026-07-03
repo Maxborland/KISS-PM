@@ -7,12 +7,17 @@ import type { AccessProfile } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 
 import type { ApiApp, ApiRouteDeps } from "../routeTypes";
+import { createUploadConcurrencyLimiter } from "../attachmentUploadRequest";
 import { readLimitedJsonBody } from "../jsonBody";
 import { createPlanningReadModel } from "../planning/planningReadModel";
 import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
 import { runAgentLoop, type AgentLoopEvent, type AnalyzeExecutor } from "./agentLoop";
 import { createAgentLlmProviderFromEnv } from "./llmProvider";
 import { AGENT_TOOLS, allowedToolsForActor, findAgentTool, listToolAvailability, type AgentTool } from "./toolRegistry";
+
+// Лимит одновременных LLM-циклов на (тенант:пользователь): без него аутентифицированный юзер
+// скриптует параллельные /propose и жжёт платный LLM-бюджет (denial-of-wallet). 2 одновременно.
+const agentLlmConcurrency = createUploadConcurrencyLimiter(2);
 
 const AGENT_SYSTEM_PROMPT = [
   "Ты — ассистент-агент в системе управления проектами KISS-PM.",
@@ -358,7 +363,14 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/workspace/agent/propose", async (context) => {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
-    return context.json(await runProposeLoop(parsed.value));
+    const { actor } = parsed.value;
+    const slot = agentLlmConcurrency.tryAcquire(`${actor.tenantId}:${actor.id}`);
+    if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
+    try {
+      return context.json(await runProposeLoop(parsed.value));
+    } finally {
+      slot.release();
+    }
   });
 
   // То же предложение, но потоком (SSE): события reasoning/analyze/proposal по мере работы +
@@ -366,6 +378,9 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/workspace/agent/propose/stream", async (context) => {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
+    const { actor } = parsed.value;
+    const slot = agentLlmConcurrency.tryAcquire(`${actor.tenantId}:${actor.id}`);
+    if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
     return streamSSE(context, async (stream) => {
       try {
         const result = await runProposeLoop(parsed.value, async (event) => {
@@ -374,6 +389,8 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
         await stream.writeSSE({ event: "done", data: JSON.stringify(result) });
       } catch (error) {
         await stream.writeSSE({ event: "error", data: JSON.stringify({ error: error instanceof Error ? error.message : "agent_failed" }) });
+      } finally {
+        slot.release();
       }
     });
   });

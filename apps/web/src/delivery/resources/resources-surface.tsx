@@ -12,14 +12,11 @@ import {
   ResourceLoadMatrix,
   type MatrixAssignment,
   type MatrixData,
-  type MatrixScope,
-  type RBucket
+  type MatrixScope
 } from "@/delivery/resources/resource-load-matrix";
 import { TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
-import type { PlanningCommand } from "@kiss-pm/domain";
-
-type RawTask = { id: string; wbsCode: string; title: string; durationMinutes: number | null; workMinutes: number; percentComplete: number };
-type RawAssignment = MatrixAssignment;
+import { createPlanningCommand } from "@kiss-pm/domain";
+import type { PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
 const SCOPE: MatrixScope = { level: "project", groupLevels: ["team", "role", "person"], windowNoun: "проект" };
@@ -36,22 +33,26 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
 
   const model = useMemo(() => {
     if (!readModel) return null;
-    const rl = readModel.resourceLoad as unknown as { buckets: RBucket[]; acceptedOverloads: string[] };
-    const authored = readModel.authored as unknown as { tasks: RawTask[]; assignments: RawAssignment[] };
-    const calc = (readModel.calculatedPlan as unknown as { tasks: Array<{ id: string; calculatedStart: string }> }).tasks;
+    const authored = readModel.authored;
+    const calc = readModel.calculatedPlan.tasks;
     const rawById = new Map(authored.tasks.map((t) => [t.id, t]));
     // id календаря для команд отсутствия = реальный календарь плана (project.calendarId / первый из read-model),
     // а не литерал "cal-5x8": на live чужой calendarId не пройдёт precondition команды. Инвариант «live = смена apiOrigin».
-    const calendars = (readModel as unknown as { calendars: Array<{ id: string }> }).calendars ?? [];
-    const projCalId = (readModel.project as { calendarId?: unknown }).calendarId;
+    const calendars = readModel.calendars ?? [];
+    const projCalId = readModel.project.calendarId;
     const calendarId = (typeof projCalId === "string" ? calendars.find((c) => c.id === projCalId)?.id : undefined) ?? calendars[0]?.id ?? "cal-5x8";
     const data: MatrixData = {
-      buckets: rl.buckets ?? [],
+      buckets: readModel.resourceLoad.buckets ?? [],
       resources: resDir.list,
       taskById: new Map(authored.tasks.map((t) => [t.id, { id: t.id, wbsCode: t.wbsCode, title: t.title, workMinutes: t.workMinutes, percentComplete: t.percentComplete }])),
-      asgById: new Map(authored.assignments.map((x) => [x.id, x])),
-      calcStartById: new Map(calc.map((c) => [c.id, c.calculatedStart])),
-      accepted: new Set(rl.acceptedOverloads ?? [])
+      // asgById — VIEW-модель матрицы (MatrixAssignment.workMinutes: number); домен допускает workMinutes=null
+      // (неявное назначение → работа деривится из задачи), поэтому мапим в число с фолбэком 0.
+      asgById: new Map(authored.assignments.map((x): [string, MatrixAssignment] => [x.id, { id: x.id, taskId: x.taskId, resourceId: x.resourceId, unitsPermille: x.unitsPermille, workMinutes: x.workMinutes ?? 0, role: x.role }])),
+      calcStartById: new Map(calc.map((c) => [c.id, c.calculatedStart ?? ""])),
+      // acceptedOverloads — mock-only поле бэкенда (в каноническом ResourceLoadMatrix домена его нет,
+      // поэтому узкий каст). scenarios-surface читает так же; без него контрол «принять перегруз» мёртв
+      // в mock/Storybook (KPI не падают, ✓ не рендерится).
+      accepted: new Set((readModel.resourceLoad as { acceptedOverloads?: string[] }).acceptedOverloads ?? [])
     };
     return { data, rawById, calendarId };
   }, [readModel, resDir.list]);
@@ -92,11 +93,13 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const acceptOverload = (resourceId: string, dateIso: string) =>
     // канонический ключ перегрузки домена — `${resourceId}:${dateIso}` (ISO), как в scenarioPlanning/commandReducer;
     // payload пишется в acceptedRiskIds дословно, поэтому отправляем именно каноничную форму, а не resourceId|day.
-    void applyCmd({ type: "risk.accept_overload", payload: { overloadId: `${resourceId}:${dateIso}`, acceptedRiskReason: "Подтверждено на ресурсной матрице" } } as PlanningCommand);
+    void applyCmd(createPlanningCommand({ type: "risk.accept_overload", payload: { overloadId: `${resourceId}:${dateIso}`, acceptedRiskReason: "Подтверждено на ресурсной матрице" } }));
 
   const editUnits = (asg: MatrixAssignment, hours: number) => {
     const wm = Math.round(hours * 60);
-    if (wm !== asg.workMinutes) void applyCmd({ type: "assignment.upsert", payload: { id: asg.id, taskId: asg.taskId, resourceId: asg.resourceId, role: asg.role, unitsPermille: asg.unitsPermille, workMinutes: wm } } as PlanningCommand);
+    // MatrixAssignment.role — VIEW-модель (string), но значение приходит из PlanAssignment.role (PlanAssignmentRole);
+    // сужаем только этот лист, т.к. createPlanningCommand требует точный enum, а рантайм-значение уже валидная роль.
+    if (wm !== asg.workMinutes) void applyCmd(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: asg.taskId, resourceId: asg.resourceId, role: asg.role as PlanAssignmentRole, unitsPermille: asg.unitsPermille, workMinutes: wm } }));
   };
 
   async function submitTaskModal(v: TaskModalValues) {
@@ -107,18 +110,18 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     const cmds: PlanningCommand[] = [];
     if (m.mode === "create") {
       const id = nid("t");
-      cmds.push({ type: "task.create", payload: { id, projectId, parentTaskId: null, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? fin(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } } as PlanningCommand);
-      if (v.startIso) cmds.push({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: fin(v.startIso, v.durDays) } } as PlanningCommand);
-      if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: nid("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
-      if (v.pct > 0) cmds.push({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } } as PlanningCommand);
+      cmds.push(createPlanningCommand({ type: "task.create", payload: { id, projectId, parentTaskId: null, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? fin(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } }));
+      if (v.startIso) cmds.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: fin(v.startIso, v.durDays) } }));
+      if (v.assigneeId) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: nid("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } }));
+      if (v.pct > 0) cmds.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } }));
     } else if (m.taskId) {
       const id = m.taskId;
-      cmds.push({ type: "task.update_identity", payload: { taskId: id, title: v.title } } as PlanningCommand);
-      cmds.push({ type: "task.update_work_model", payload: { taskId: id, taskType: "fixed_duration", effortDriven: false, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60 } } as PlanningCommand);
-      if (v.startIso) cmds.push({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: fin(v.startIso, v.durDays) } } as PlanningCommand);
-      cmds.push({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } } as PlanningCommand);
+      cmds.push(createPlanningCommand({ type: "task.update_identity", payload: { taskId: id, title: v.title } }));
+      cmds.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId: id, taskType: "fixed_duration", effortDriven: false, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60 } }));
+      if (v.startIso) cmds.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: fin(v.startIso, v.durDays) } }));
+      cmds.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } }));
       // upsert по id СУЩЕСТВУЮЩЕГО назначения (reduceAssignmentUpsert ключ — payload.id), новый id только когда назначения ещё нет
-      if (v.assigneeId) cmds.push({ type: "assignment.upsert", payload: { id: m.asgId ?? nid("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } } as PlanningCommand);
+      if (v.assigneeId) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: m.asgId ?? nid("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } }));
     }
     if (!cmds.length) return;
     setBusy(true);
@@ -134,7 +137,7 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     for (let d = isoToDay(start); d <= end; d += 1) {
       const dow = new Date(Date.UTC(2026, 2, 2) + d * 86_400_000).getUTCDay();
       if (dow === 0 || dow === 6) continue; // только рабочие дни диапазона (пропускаем выходные)
-      cmds.push({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: model.calendarId, resourceId, date: dayToIso(d), workingMinutes: 0, reason: typeLabel } } as PlanningCommand);
+      cmds.push(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: model.calendarId, resourceId, date: dayToIso(d), workingMinutes: 0, reason: typeLabel } }));
     }
     if (cmds.length === 0) return;
     setBusy(true);

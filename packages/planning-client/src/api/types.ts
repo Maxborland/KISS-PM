@@ -1,22 +1,9 @@
-import type { PlanningCommand, ValidationIssue } from "@kiss-pm/domain";
+import type { PlanningCommand, PlanningReadModel, ValidationIssue } from "@kiss-pm/domain";
 
-export type PlanningReadModel = {
-  project: Record<string, unknown>;
-  authored: {
-    tasks: Array<Record<string, unknown>>;
-    dependencies: Array<Record<string, unknown>>;
-    assignments: Array<Record<string, unknown>>;
-    baselines: Array<Record<string, unknown>>;
-  };
-  calculatedPlan: Record<string, unknown>;
-  baselineComparison: Record<string, unknown>;
-  resourceLoad: Record<string, unknown>;
-  calendars: Array<Record<string, unknown>>;
-  calendarExceptions: Array<Record<string, unknown>>;
-  validationIssues: ValidationIssue[];
-  planVersion: number;
-  engineVersion: string;
-};
+// Канонический тип read-model живёт в @kiss-pm/domain (владелец проекции). planning-client лишь
+// ре-экспортит его, чтобы web и api видели одну форму — раньше здесь был Record<string,unknown>×8,
+// стиравший тип на границе пакета.
+export type { PlanningReadModel };
 
 export type PlanningPreviewResponse = {
   before: PlanningReadModel;

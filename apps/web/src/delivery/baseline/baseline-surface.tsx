@@ -10,11 +10,7 @@ import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
 import { usePlanning } from "@/delivery/lib/use-planning";
-import type { PlanningCommand } from "@kiss-pm/domain";
-
-type BcTask = { taskId: string; baselineStart: string | null; baselineFinish: string | null; baselineWorkMinutes: number | null; currentStart: string | null; currentFinish: string | null; currentWorkMinutes: number | null; startDeltaDays: number | null; finishDeltaDays: number | null; workDeltaMinutes: number | null };
-type Bl = { id: string; label?: string; capturedAt: string; tasks: unknown[] };
-type RawTask = { id: string; wbsCode: string; title: string };
+import { createPlanningCommand } from "@kiss-pm/domain";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
 const h = (min: number) => Math.round(min / 60);
@@ -37,11 +33,11 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
   const model = useMemo(() => {
     if (!readModel) return null;
-    const bc = readModel.baselineComparison as unknown as { baselineId: string | null; capturedAt: string | null; tasks: BcTask[] };
-    const baselines = ((readModel.authored as unknown as { baselines: Bl[] }).baselines ?? []).slice().sort((a, b) => (a.capturedAt < b.capturedAt ? 1 : -1));
-    const taskById = new Map((readModel.authored as unknown as { tasks: RawTask[] }).tasks.map((t) => [t.id, t]));
-    const critical = new Set(((readModel.calculatedPlan as unknown as { criticalPathTaskIds: string[] }).criticalPathTaskIds ?? []));
-    const projectFinish = (readModel.calculatedPlan as unknown as { projectFinish: string }).projectFinish;
+    const bc = readModel.baselineComparison;
+    const baselines = (readModel.authored.baselines ?? []).slice().sort((a, b) => (a.capturedAt < b.capturedAt ? 1 : -1));
+    const taskById = new Map(readModel.authored.tasks.map((t) => [t.id, t]));
+    const critical = new Set(readModel.calculatedPlan.criticalPathTaskIds ?? []);
+    const projectFinish = readModel.calculatedPlan.projectFinish;
     return { bc, baselines, taskById, critical, projectFinish };
   }, [readModel]);
 
@@ -61,7 +57,8 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const tasks = model.bc.tasks;
   const withBase = tasks.filter((t) => t.baselineFinish !== null);
   const baseFinishDay = withBase.length ? Math.max(...withBase.map((t) => isoToDay(t.baselineFinish!))) : 0;
-  const curFinishDay = isoToDay(model.projectFinish);
+  // projectFinish в типизированном контракте — PlanDate | null; при отсутствии финиша считаем 0 (нет базы для дельты)
+  const curFinishDay = model.projectFinish ? isoToDay(model.projectFinish) : 0;
   const projFinishDelta = baseFinishDay ? curFinishDay - baseFinishDay : 0;
   // изменена = сдвиг по сроку/труду ИЛИ удалена после фиксации (current* = null)
   const changed = tasks.filter((t) => t.currentFinish === null || (t.finishDeltaDays ?? 0) !== 0 || (t.workDeltaMinutes ?? 0) !== 0);
@@ -78,7 +75,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
   const onCapture = async () => {
     setBusy(true); setNotice(null);
-    const res = await apply({ type: "baseline.capture", payload: { baselineId: nid("baseline"), label: label.trim() || "Снимок плана" } } as PlanningCommand);
+    const res = await apply(createPlanningCommand({ type: "baseline.capture", payload: { baselineId: nid("baseline"), label: label.trim() || "Снимок плана" } }));
     setBusy(false); setCapturing(false); setLabel("");
     setNotice(res.ok ? `Базовый план зафиксирован · коммит v${res.planVersion}` : res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
   };
@@ -124,7 +121,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 <div key={b.id} className={cn("flex items-start gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0", active && "bg-[var(--info-soft)]")}>
                   <GitCommitVertical className={cn("mt-0.5 size-4 shrink-0", active ? "text-[var(--info)]" : "text-[var(--muted-soft)]")} aria-hidden />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5"><span className="truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{b.label ?? "Снимок плана"}</span>
+                    <div className="flex items-center gap-1.5">{/* PlanBaseline не хранит label: команда baseline.capture принимает label, но редьюсер его не сохраняет — снимок всегда безымянный. */}<span className="truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Снимок плана</span>
                       <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", active ? "bg-[var(--info-soft)] text-[var(--info)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{active ? "активный" : "архив"}</span>
                     </div>
                     <div className="mono mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{dt(b.capturedAt)} · {b.tasks.length} задач</div>

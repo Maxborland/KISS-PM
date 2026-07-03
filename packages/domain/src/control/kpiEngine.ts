@@ -84,10 +84,14 @@ export function evaluateProjectKpis(input: EvaluateProjectKpisInput): KpiEvaluat
   return input.definitions
     .filter((definition) => definition.status === "active" && definition.entityType === "project")
     .map((definition) => {
-      const calculatedValue =
+      const rawValue =
         definition.formula.type === "builtin"
           ? metrics[definition.formula.key]
           : evaluateKpiExpression(definition.formula.expression, metrics);
+      // Не-конечное значение (NaN/Infinity из битого входа) обошло бы все пороги — сравнения с NaN
+      // всегда false, severity молча стал бы "ok", а NaN осел бы в sourceData. Приводим к 0, чтобы
+      // пороги срабатывали детерминированно (builtin-путь раньше, в отличие от expression, не санитайзил).
+      const calculatedValue = Number.isFinite(rawValue) ? rawValue : 0;
       const threshold = selectThreshold(definition.thresholdRules, calculatedValue);
       const severity = threshold?.severity ?? "ok";
 
@@ -152,8 +156,25 @@ export function buildProjectKpiMetrics(input: {
   const projectFinish = input.calculatedPlan.projectFinish;
   const deadline = input.snapshot.project.deadline;
   const latestBaselineFinish = latestBaselineProjectFinish(input.snapshot);
-  const finishedTasks = input.snapshot.tasks.filter((task) => task.percentComplete >= 100).length;
   const totalTasks = input.snapshot.tasks.length;
+  // Взвешенный прогресс: Σ(percentComplete·workMinutes) / Σ(workMinutes). Если труд нигде не задан —
+  // среднее по percentComplete (равный вес). НЕ «закрытые/всего» — иначе 9 задач по 99% дают 0%.
+  let earnedWork = 0;
+  let totalWork = 0;
+  let percentSum = 0;
+  for (const task of input.snapshot.tasks) {
+    // Number.isFinite-гард: одна задача с percentComplete/workMinutes = NaN (undefined/битый импорт)
+    // иначе отравляет весь агрегат проекта (Math.min(100, NaN) = NaN → progressPercent = NaN).
+    const pct = Number.isFinite(task.percentComplete) ? Math.max(0, Math.min(100, task.percentComplete)) : 0;
+    const work = Number.isFinite(task.workMinutes) ? Math.max(0, task.workMinutes) : 0;
+    earnedWork += (pct / 100) * work;
+    totalWork += work;
+    percentSum += pct;
+  }
+  const progressPercent =
+    totalTasks === 0
+      ? 0
+      : Math.round(totalWork > 0 ? (earnedWork / totalWork) * 100 : percentSum / totalTasks);
 
   return {
     deadline_delta_days: projectFinish && deadline ? Math.max(0, dateDeltaDays(deadline, projectFinish)) : 0,
@@ -161,7 +182,7 @@ export function buildProjectKpiMetrics(input: {
       .filter((overload) => overload.granularity === "day")
       .reduce((total, overload) => total + overload.overloadMinutes, 0),
     critical_task_count: input.calculatedPlan.criticalPathTaskIds.length,
-    progress_percent: totalTasks === 0 ? 0 : Math.round((finishedTasks / totalTasks) * 100),
+    progress_percent: progressPercent,
     baseline_finish_slip_days:
       latestBaselineFinish && projectFinish ? Math.max(0, dateDeltaDays(latestBaselineFinish, projectFinish)) : 0
   };
@@ -215,15 +236,20 @@ function buildSourceData(
 }
 
 function latestBaselineProjectFinish(snapshot: PlanSnapshot): string | null {
-  const baseline = [...snapshot.baselines].sort((left, right) =>
+  // Новейший baseline первым; если у него все finish=null (снят до планирования дат) — откат
+  // к более раннему baseline с реальными датами, иначе baseline_finish_slip_days молча = 0.
+  const byRecency = [...snapshot.baselines].sort((left, right) =>
     right.capturedAt.localeCompare(left.capturedAt)
-  )[0];
-  if (!baseline) return null;
-  return baseline.tasks
-    .map((task) => task.plannedFinish)
-    .filter((finish): finish is string => Boolean(finish))
-    .sort()
-    .at(-1) ?? null;
+  );
+  for (const baseline of byRecency) {
+    const finish = baseline.tasks
+      .map((task) => task.plannedFinish)
+      .filter((value): value is string => Boolean(value))
+      .sort()
+      .at(-1);
+    if (finish) return finish;
+  }
+  return null;
 }
 
 export function dateDeltaDays(left: string, right: string): number {

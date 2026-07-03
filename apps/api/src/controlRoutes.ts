@@ -731,7 +731,7 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
 
       invalidateCapacityCacheForTenant(actor.tenantId);
-      notifyPlanVersionChanged(projectId, result.body.newPlanVersion);
+      notifyPlanVersionChanged(actor.tenantId, projectId, result.body.newPlanVersion);
       return context.json(result.body);
     }
   );

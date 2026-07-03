@@ -30,7 +30,7 @@ import {
 } from "@kiss-pm/tenant-org-structure";
 
 import type { ApiTenantDataSource, ProjectRecord } from "../apiTypes";
-import { createPlanningReadModel } from "../planning/planningReadModel";
+import { buildSnapshotResourceLoad } from "../planning/planningReadModel";
 
 export const OCCUPANCY_BUCKET_PROJECT_ID = "__occupancy__";
 const OCCUPANCY_BUCKET_PROJECT_TITLE = "Календарь и встречи";
@@ -161,12 +161,26 @@ export async function buildWorkspaceCapacityAggregation(
     }))
   };
 
-  for (const project of projects) {
-    const snapshot = await dataSource.getPlanSnapshot(input.tenantId, project.id);
+  // Снапшоты тянем параллельно (I/O), а тяжёлый CPM-пересчёт делаем с уступкой event loop между
+  // проектами — чтобы холодный промах кэша не морозил API для других тенантов на всё время расчёта.
+  // ponytail: потолок — кэш read-model per-project по planVersion либо вынос CPM в worker; апгрейд, когда CPU станет узким.
+  // Зовём как метод (dataSource.getPlanSnapshot!), а не через извлечённую ссылку — иначе теряется
+  // this-биндинг репозитория (реальный DB-datasource использует this → 500).
+  const snapshots = await Promise.all(
+    projects.map(async (project) => ({
+      project,
+      snapshot: await dataSource.getPlanSnapshot!(input.tenantId, project.id)
+    }))
+  );
+
+  let processedProjects = 0;
+  for (const { project, snapshot } of snapshots) {
     if (!snapshot) continue;
-    const readModel = createPlanningReadModel({ ...snapshot, occupancyWindows: [] });
+    if (processedProjects > 0) await new Promise((resolve) => setImmediate(resolve));
+    processedProjects += 1;
+    const { resourceLoad } = buildSnapshotResourceLoad({ ...snapshot, occupancyWindows: [] });
     const tasksById = new Map(snapshot.tasks.map((task) => [task.id, task]));
-    const dayBuckets = readModel.resourceLoad.buckets.filter(
+    const dayBuckets = resourceLoad.buckets.filter(
       (bucket) => bucket.granularity === "day" && monthDates.has(bucket.date)
     );
     const loadBuckets = dayBuckets.filter(hasCommittedLoad);
