@@ -74,6 +74,11 @@
 
 /* —— Продуктовый сайдбар (упрощённый реальный UI) —— */
 
+.sandbox__burger,
+.sandbox__nav-backdrop {
+  display: none;
+}
+
 .sandbox__nav {
   display: grid;
   gap: 18px;
@@ -2407,41 +2412,55 @@
     white-space: nowrap;
   }
 
-  .sandbox__nav {
-    order: 3;
-    flex: 1 0 100%;
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+  /* Разделы — за бургером: выезжающая панель поверх демо */
+  .sandbox {
+    position: relative;
   }
 
-  .sandbox__nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .sandbox__nav-section {
-    display: contents;
-  }
-
-  .sandbox__nav-label {
-    display: none;
-  }
-
-  .sandbox__nav-item {
-    flex: 0 0 auto;
-    width: auto;
-    white-space: nowrap;
-    padding: 7px 12px;
+  .sandbox__burger {
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
     border: 1px solid var(--border);
-    border-radius: 999px;
+    border-radius: 10px;
     background: var(--panel);
-    font-size: 12.5px;
+    color: var(--text-strong);
+    cursor: pointer;
   }
 
-  .sandbox__nav-item.is-active {
-    border-color: var(--accent-muted);
+  .sandbox__nav-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    border: 0;
+    background: rgba(5, 7, 15, 0.42);
+    cursor: pointer;
+  }
+
+  .sandbox__nav {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 31;
+    width: min(260px, 78vw);
+    padding: 16px 14px;
+    align-content: start;
+    overflow-y: auto;
+    background: var(--sandbox-surface);
+    box-shadow: 24px 0 48px -32px rgba(15, 23, 42, 0.4);
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition:
+      transform var(--duration-base) var(--ease-out),
+      visibility var(--duration-base) var(--ease-out);
+  }
+
+  .sandbox__nav.is-open {
+    transform: none;
+    visibility: visible;
   }
 
   /* Правая колонка распадается: сценарий — над экраном, контекст — после */
