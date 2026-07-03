@@ -3,26 +3,24 @@ import {
   buildResourceLoadMatrix,
   calculatePlan,
   comparePlanDates,
+  type CalculatedPlan,
   type PlanningReadModel,
-  type PlanSnapshot
+  type PlanSnapshot,
+  type ResourceLoadMatrix
 } from "@kiss-pm/domain";
 
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 
-export type PlanningReadModelOptions = {
-  // Доступ к ресурсным исключениям календаря (персональные отсутствия resourceId!=null).
-  // false → план-ридер без права на ресурсы; отдаём только общепроектные праздники.
-  includeResourceExceptions?: boolean;
-};
-
-export function createPlanningReadModel(
-  snapshot: PlanSnapshot,
-  options: PlanningReadModelOptions = {}
-): PlanningReadModel {
-  // Fail-closed: по умолчанию НЕ раскрываем персональные ресурсные исключения (чужие отсутствия).
-  // Актор-фейсинг роуты (read-model/preview/apply) передают флаг по фактическому праву на ресурсы;
-  // матрица загрузки ниже всё равно считается по полному snapshot.calendarExceptions (ёмкость не зависит от права).
-  const includeResourceExceptions = options.includeResourceExceptions ?? false;
+/**
+ * Узкий шов: только CPM-решение + матрица загрузки ресурсов из снапшота, БЕЗ упаковки полного read-model
+ * (baselineComparison, маскирование calendarExceptions, packaging). capacityService считает загрузку по каждому
+ * проекту тенанта и использует лишь resourceLoad.buckets — раньше он звал широкий createPlanningReadModel и
+ * выбрасывал baseline-diff + маскирование на каждый запрос ёмкости. createPlanningReadModel теперь тоже строится
+ * поверх этого шва (без двойного calculatePlan).
+ */
+export function buildSnapshotResourceLoad(
+  snapshot: PlanSnapshot
+): { calculatedPlan: CalculatedPlan; resourceLoad: ResourceLoadMatrix } {
   const calculatedPlan = calculatePlan(snapshot, {
     calculatedAt: snapshot.capturedAt,
     engineVersion: PLANNING_ENGINE_VERSION
@@ -43,6 +41,24 @@ export function createPlanningReadModel(
       snapshot.project.deadline
     ])
   });
+  return { calculatedPlan, resourceLoad };
+}
+
+export type PlanningReadModelOptions = {
+  // Доступ к ресурсным исключениям календаря (персональные отсутствия resourceId!=null).
+  // false → план-ридер без права на ресурсы; отдаём только общепроектные праздники.
+  includeResourceExceptions?: boolean;
+};
+
+export function createPlanningReadModel(
+  snapshot: PlanSnapshot,
+  options: PlanningReadModelOptions = {}
+): PlanningReadModel {
+  // Fail-closed: по умолчанию НЕ раскрываем персональные ресурсные исключения (чужие отсутствия).
+  // Актор-фейсинг роуты (read-model/preview/apply) передают флаг по фактическому праву на ресурсы;
+  // матрица загрузки ниже всё равно считается по полному snapshot.calendarExceptions (ёмкость не зависит от права).
+  const includeResourceExceptions = options.includeResourceExceptions ?? false;
+  const { calculatedPlan, resourceLoad } = buildSnapshotResourceLoad(snapshot);
 
   return {
     project: snapshot.project,
