@@ -2,22 +2,25 @@ import type { WaitlistSubmissionParsed } from "./schema";
 import { COMPANY_SIZE_LABELS } from "./schema";
 
 /**
- * Notification side of the waitlist pipeline. Falls back to console logging
- * when RESEND_API_KEY is empty so local dev never depends on the network.
+ * Notification side of the waitlist pipeline. Channels are independent:
+ * Telegram and Resend fire in parallel when configured; with neither
+ * configured we fall back to console logging so local dev never depends
+ * on the network. The SQLite insert stays the source of truth.
  */
 
 export interface NotifyResult {
-  channel: "resend" | "console";
+  channel: "resend" | "console" | "telegram";
   ok: boolean;
   detail?: string;
 }
 
-export async function notifyTeam(input: WaitlistSubmissionParsed): Promise<NotifyResult> {
-  const key = process.env["RESEND_API_KEY"]?.trim();
-  const to = process.env["RESEND_NOTIFY_TO"]?.trim();
-  const from = process.env["RESEND_FROM"]?.trim() || "KISS PM <noreply@kiss-pm.app>";
+export async function notifyTeam(input: WaitlistSubmissionParsed): Promise<NotifyResult[]> {
+  const tasks: Array<Promise<NotifyResult>> = [];
 
-  if (!key || !to) {
+  if (telegramConfig()) tasks.push(notifyTelegram(input));
+  if (resendConfig()) tasks.push(notifyResend(input));
+
+  if (tasks.length === 0) {
     console.info("[waitlist] new submission (console fallback)", {
       email: input.email,
       fullName: input.fullName,
@@ -25,15 +28,91 @@ export async function notifyTeam(input: WaitlistSubmissionParsed): Promise<Notif
       role: input.role,
       companySize: input.companySize,
     });
-    return { channel: "console", ok: true };
+    return [{ channel: "console", ok: true }];
   }
+
+  return Promise.all(tasks);
+}
+
+/* -------- Telegram -------- */
+
+function telegramConfig(): { token: string; chatId: string } | null {
+  const token = process.env["TELEGRAM_BOT_TOKEN"]?.trim();
+  const chatId = process.env["TELEGRAM_CHAT_ID"]?.trim();
+  return token && chatId ? { token, chatId } : null;
+}
+
+async function notifyTelegram(input: WaitlistSubmissionParsed): Promise<NotifyResult> {
+  const config = telegramConfig();
+  if (!config) return { channel: "telegram", ok: false, detail: "not configured" };
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        chat_id: config.chatId,
+        text: renderTelegramText(input),
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+
+    const json = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      description?: string;
+    } | null;
+
+    if (!res.ok || json?.ok === false) {
+      return {
+        channel: "telegram",
+        ok: false,
+        detail: json?.description ?? `HTTP ${res.status}`,
+      };
+    }
+    return { channel: "telegram", ok: true };
+  } catch (err: unknown) {
+    return {
+      channel: "telegram",
+      ok: false,
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+function renderTelegramText(s: WaitlistSubmissionParsed): string {
+  return [
+    "🆕 Заявка в альфу KISS PM",
+    "",
+    `Имя: ${s.fullName}`,
+    `Email: ${s.email}`,
+    `Компания: ${s.company}`,
+    `Роль: ${s.role}`,
+    `Портфель: ${COMPANY_SIZE_LABELS[s.companySize]}`,
+    s.context ? `Контекст: ${s.context}` : null,
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
+}
+
+/* -------- Resend -------- */
+
+function resendConfig(): { key: string; to: string; from: string } | null {
+  const key = process.env["RESEND_API_KEY"]?.trim();
+  const to = process.env["RESEND_NOTIFY_TO"]?.trim();
+  const from = process.env["RESEND_FROM"]?.trim() || "KISS PM <noreply@kiss-pm.app>";
+  return key && to ? { key, to, from } : null;
+}
+
+async function notifyResend(input: WaitlistSubmissionParsed): Promise<NotifyResult> {
+  const config = resendConfig();
+  if (!config) return { channel: "resend", ok: false, detail: "not configured" };
 
   try {
     const { Resend } = await import("resend");
-    const resend = new Resend(key);
+    const resend = new Resend(config.key);
     const result = await resend.emails.send({
-      from,
-      to,
+      from: config.from,
+      to: config.to,
       subject: `KISS PM · заявка в альфу: ${input.fullName}`,
       text: renderText(input),
       html: renderHtml(input),

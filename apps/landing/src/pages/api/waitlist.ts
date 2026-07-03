@@ -66,9 +66,21 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   }
 
   // Fire-and-forget; the database insertion is the source of truth.
-  notifyTeam(parsed.data).catch((err: unknown) => {
-    console.warn("[waitlist] notify failed", err);
-  });
+  // Каналы резолвятся { ok: false } при сбое (не реджектятся) — логируем каждый.
+  notifyTeam(parsed.data)
+    .then((results) => {
+      for (const result of results) {
+        if (!result.ok) {
+          console.warn("[waitlist] notify failed", {
+            channel: result.channel,
+            detail: result.detail,
+          });
+        }
+      }
+    })
+    .catch((err: unknown) => {
+      console.warn("[waitlist] notify failed", err);
+    });
 
   return json({ ok: true, status: "received" });
 };
