@@ -66,11 +66,16 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   }
 
   // Fire-and-forget; the database insertion is the source of truth.
-  // notifyTeam resolves { ok: false } on failure (never rejects) — log both paths.
+  // Каналы резолвятся { ok: false } при сбое (не реджектятся) — логируем каждый.
   notifyTeam(parsed.data)
-    .then((result) => {
-      if (!result.ok) {
-        console.warn("[waitlist] notify failed", { channel: result.channel, detail: result.detail });
+    .then((results) => {
+      for (const result of results) {
+        if (!result.ok) {
+          console.warn("[waitlist] notify failed", {
+            channel: result.channel,
+            detail: result.detail,
+          });
+        }
       }
     })
     .catch((err: unknown) => {
