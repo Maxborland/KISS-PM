@@ -1598,9 +1598,29 @@
 
 @media (max-width: 899px) {
   .l-band--six-steps {
-    --six-slide-w: min(90vw, 520px);
+    --six-slide-w: min(94vw, 560px);
     --six-slide-h: clamp(480px, 78vh, 620px);
     min-height: auto;
+  }
+
+  .six-steps__card {
+    padding: clamp(16px, 4vw, 28px);
+    border-radius: 24px;
+  }
+
+  .six-demo {
+    width: 100%;
+    min-height: 0;
+  }
+
+  .six-deal__form {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .six-capacity,
+  .six-gantt {
+    width: 100%;
   }
 
   .six-steps__slide {
