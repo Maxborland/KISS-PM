@@ -252,9 +252,16 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: parsed.error }, 400);
     }
 
-    // Privilege ceiling (как в create): нельзя выдать роли права сверх собственных прав актора.
+    // Privilege ceiling: нельзя ДОБАВИТЬ роли право сверх собственных прав актора. Проверяем только
+    // ДЕЛЬТУ (новые права относительно beforeState) — иначе rename/правка роли, уже содержащей право,
+    // которого нет у админа, ложно блокировалась бы 403 (право не добавляется, лишь сохраняется).
     const grantorPermissions = new Set<string>(actorProfile.permissions);
-    if (parsed.value.permissions.some((permission) => !grantorPermissions.has(permission))) {
+    const existingPermissions = new Set<string>(beforeState.permissions);
+    if (
+      parsed.value.permissions.some(
+        (permission) => !existingPermissions.has(permission) && !grantorPermissions.has(permission)
+      )
+    ) {
       return context.json({ error: "permissions_exceed_grantor" }, 403);
     }
 

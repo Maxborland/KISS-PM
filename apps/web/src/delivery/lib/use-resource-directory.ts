@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { usePlanningRuntime } from "./planning-runtime";
 import { createDeliveryPlanningClient } from "./planning-client";
-import { type Resource } from "./mock-planning-backend";
+import { RESOURCES, type Resource } from "./mock-planning-backend";
 
 /**
  * Справочник ресурсов (id → имя/позиция). Источник берётся из единого шва клиента
@@ -24,15 +24,17 @@ export function useResourceDirectory(): {
 } {
   const { live } = usePlanningRuntime();
   const clientRef = useRef<ReturnType<typeof createDeliveryPlanningClient> | null>(null);
-  if (clientRef.current === null) clientRef.current = createDeliveryPlanningClient(live);
+  // Клиент нужен ТОЛЬКО для live-фетча справочника (/api/workspace/users). В mock директория статична
+  // (RESOURCES), поэтому НЕ конструируем весь мок-бэкенд (createMockPlanningFetch) ради константы.
+  if (live && clientRef.current === null) clientRef.current = createDeliveryPlanningClient(live);
   const client = clientRef.current;
 
-  // синхронный старт (mock → RESOURCES сразу; live → пусто до ответа), затем обновление из шва.
-  const [list, setList] = useState<Resource[]>(() => client.resourceDirectorySeed());
+  // синхронный старт (mock → RESOURCES сразу; live → пусто до ответа), затем обновление из шва (live).
+  const [list, setList] = useState<Resource[]>(() => (client ? client.resourceDirectorySeed() : RESOURCES));
   const requested = useRef(false);
 
   useEffect(() => {
-    if (requested.current) return;
+    if (!client || requested.current) return;
     requested.current = true;
     let active = true;
     void client.getResourceDirectory().then((rs) => {

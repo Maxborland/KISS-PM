@@ -127,7 +127,9 @@ export async function createRedisPlanningEventPublisher(
         void subscriber.subscribe(channel, handler).catch(markDisconnected);
         return () => {
           localUnsub();
-          void subscriber.unsubscribe(channel).catch(markDisconnected);
+          // Снимаем ТОЛЬКО свой listener (не весь канал): несколько подписчиков одного (tenant,project)
+          // мультиплексируются на один Redis-канал; unsubscribe(channel) без handler оборвал бы всех.
+          void subscriber.unsubscribe(channel, handler).catch(markDisconnected);
         };
       },
       async close() {
