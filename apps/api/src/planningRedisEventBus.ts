@@ -1,3 +1,4 @@
+import { planningEventKey } from "./planningEventBus";
 import type { PlanRealtimeEvent, PlanningEventPublisher } from "./planningEventBus";
 import { setPlanningRealtimeStatusProvider, type PlanningRealtimeStatus } from "./planningRealtimeHealth";
 import { requireSecureRedisUrl } from "./redisSecurity";
@@ -93,7 +94,8 @@ export async function createRedisPlanningEventPublisher(
     };
     setPlanningRealtimeStatusProvider(() => lastStatus);
 
-    const channelFor = (projectId: string) => `${CHANNEL_PREFIX}${projectId}`;
+    const channelFor = (tenantId: string, projectId: string) =>
+      `${CHANNEL_PREFIX}${planningEventKey(tenantId, projectId)}`;
     const markDisconnected = () => {
       lastStatus = {
         backend: "redis",
@@ -108,16 +110,16 @@ export async function createRedisPlanningEventPublisher(
       publish(event: PlanRealtimeEvent) {
         local.publish(event);
         void publisher
-          .publish(channelFor(event.projectId), JSON.stringify(event))
+          .publish(channelFor(event.tenantId, event.projectId), JSON.stringify(event))
           .catch(markDisconnected);
       },
-      subscribe(projectId: string, listener: (event: PlanRealtimeEvent) => void) {
-        const localUnsub = local.subscribe(projectId, listener);
-        const channel = channelFor(projectId);
+      subscribe(tenantId: string, projectId: string, listener: (event: PlanRealtimeEvent) => void) {
+        const localUnsub = local.subscribe(tenantId, projectId, listener);
+        const channel = channelFor(tenantId, projectId);
         const handler = (message: string) => {
           try {
             const parsed = JSON.parse(message) as PlanRealtimeEvent;
-            if (parsed.projectId === projectId) listener(parsed);
+            if (parsed.tenantId === tenantId && parsed.projectId === projectId) listener(parsed);
           } catch {
             // ignore malformed payloads
           }

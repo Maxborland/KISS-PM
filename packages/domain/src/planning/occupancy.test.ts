@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { maskOccupancyWindow, occupancyMinutesForDate, type OccupancyWindow } from "./occupancy";
+import {
+  classifyOccupancyForDate,
+  maskOccupancyWindow,
+  occupancyMinutesForDate,
+  type OccupancyWindow
+} from "./occupancy";
 
 describe("occupancy", () => {
   it("calculates minute overlap per UTC day", () => {
@@ -36,6 +41,60 @@ describe("occupancy", () => {
       title: "Занято",
       entityType: null,
       entityId: null
+    });
+  });
+
+  describe("classifyOccupancyForDate (KPI-006 policy)", () => {
+    it("treats busy windows as load-bearing", () => {
+      const window = createWindow({
+        startsAt: "2026-06-01T09:00:00.000Z",
+        finishesAt: "2026-06-01T10:00:00.000Z",
+        capacityImpact: "busy"
+      });
+
+      expect(classifyOccupancyForDate(window, "2026-06-01")).toEqual({
+        kind: "load",
+        workMinutes: 60
+      });
+    });
+
+    it("treats unavailable windows as capacity reduction, not load", () => {
+      const window = createWindow({
+        startsAt: "2026-06-01T09:00:00.000Z",
+        finishesAt: "2026-06-01T10:00:00.000Z",
+        capacityImpact: "unavailable"
+      });
+
+      expect(classifyOccupancyForDate(window, "2026-06-01")).toEqual({
+        kind: "unavailable",
+        workMinutes: 60
+      });
+    });
+
+    it("ignores tentative windows entirely", () => {
+      const window = createWindow({
+        startsAt: "2026-06-01T09:00:00.000Z",
+        finishesAt: "2026-06-01T10:00:00.000Z",
+        capacityImpact: "tentative"
+      });
+
+      expect(classifyOccupancyForDate(window, "2026-06-01")).toEqual({
+        kind: "ignored",
+        workMinutes: 0
+      });
+    });
+
+    it("ignores windows that do not overlap the date", () => {
+      const window = createWindow({
+        startsAt: "2026-06-01T09:00:00.000Z",
+        finishesAt: "2026-06-01T10:00:00.000Z",
+        capacityImpact: "busy"
+      });
+
+      expect(classifyOccupancyForDate(window, "2026-06-05")).toEqual({
+        kind: "ignored",
+        workMinutes: 0
+      });
     });
   });
 });

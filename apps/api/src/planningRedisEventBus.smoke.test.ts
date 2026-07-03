@@ -15,14 +15,14 @@ describe("planning Redis event bus smoke", () => {
     expect(redisB).not.toBeNull();
 
     const received: string[] = [];
-    const unsubscribe = redisB!.subscribe("project-smoke", (event) => {
+    const unsubscribe = redisB!.subscribe("tenant-smoke", "project-smoke", (event) => {
       if (event.type === "planVersionChanged") {
         received.push(`${event.projectId}:${event.planVersion}`);
       }
     });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
-    redisA!.publish({ type: "planVersionChanged", projectId: "project-smoke", planVersion: 7 });
+    redisA!.publish({ type: "planVersionChanged", tenantId: "tenant-smoke", projectId: "project-smoke", planVersion: 7 });
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     unsubscribe();

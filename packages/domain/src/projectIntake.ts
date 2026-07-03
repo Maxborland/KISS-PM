@@ -122,8 +122,11 @@ export function assessOpportunityFeasibility(input: {
     input.calendar
   );
   const hoursPerDay = hoursPerDayOf(input.calendar);
+  // Number.isFinite-гард: NaN/Infinity в requiredHours иначе обходит все проверки (сравнения с NaN
+  // всегда false) и инфизибл-возможность репортится "ok" с NaN-итогами. Не-конечный спрос = 0.
+  const requiredHoursOf = (hours: number) => (Number.isFinite(hours) ? hours : 0);
   const totalRequiredHours = input.demand.reduce(
-    (sum, line) => sum + line.requiredHours,
+    (sum, line) => sum + requiredHoursOf(line.requiredHours),
     0
   );
   const blockers = new Set<OpportunityFeasibilityBlocker>();
@@ -140,6 +143,7 @@ export function assessOpportunityFeasibility(input: {
   }
 
   const rows = input.demand.map<OpportunityFeasibilityRow>((line) => {
+    const required = requiredHoursOf(line.requiredHours);
     const position = input.positions.find((item) => item.id === line.positionId);
     const reservedHours = calculateReservedHours({
       reservations: input.activeProjectReservations.filter(
@@ -151,7 +155,7 @@ export function assessOpportunityFeasibility(input: {
     });
     const grossHours = (position?.activeUsers ?? 0) * workingDays * hoursPerDay;
     const availableHours = Math.max(0, grossHours - reservedHours);
-    const shortageHours = Math.max(0, line.requiredHours - availableHours);
+    const shortageHours = Math.max(0, required - availableHours);
 
     if (!position || position.activeUsers <= 0) {
       blockers.add("missing_position_capacity");
@@ -160,7 +164,7 @@ export function assessOpportunityFeasibility(input: {
     return {
       positionId: line.positionId,
       positionName: position?.name ?? "Должность не найдена",
-      requiredHours: line.requiredHours,
+      requiredHours: required,
       availableHours,
       reservedHours,
       shortageHours,

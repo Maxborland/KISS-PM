@@ -25,6 +25,8 @@ import { previewPlanningCommand, previewPlanningCommands } from "./planningComma
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { createPlanningReadModel } from "./planningReadModel";
 import { canReadPlanningReadModel, includeResourceExceptionsFor, permissionForCommand } from "./planningRouteAuth";
+import { denyPlanningAction, respondFromFailedResult } from "./planningRouteResponders";
+import { requireCapabilities } from "../dataSourceCapabilities";
 import {
   appendPlanningAuditIfConfigured,
   auditActionForCommand,
@@ -53,7 +55,7 @@ function emitPlanVersionFromBody(
 ) {
   if (typeof body.newPlanVersion === "number") {
     invalidateCapacityCacheForTenant(tenantId);
-    notifyPlanVersionChanged(projectId, body.newPlanVersion);
+    notifyPlanVersionChanged(tenantId, projectId, body.newPlanVersion);
   }
 }
 
@@ -179,44 +181,35 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     const decision = permissionForCommand(parsed.value.command, actor, profile);
     if (!decision.allowed) {
-      await appendPlanningAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
+      return await denyPlanningAction(deps, context, {
+        actor,
+        projectId: parsedProjectId.value,
         actionType: "planning.command_denied",
-        sourceWorkflow: "planning",
-        sourceEntity: { type: "Project", id: parsedProjectId.value },
-        commandInput: { command: parsed.value.command },
-        beforeState: null,
-        afterState: null,
-        permissionResult: decision,
-        executionResult: { status: "denied" }
+        decision,
+        commandInput: { command: parsed.value.command }
       });
-      return context.json({ error: decision.reason }, 403);
     }
     const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) {
-      await appendPlanningAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
+      return await denyPlanningAction(deps, context, {
+        actor,
+        projectId: parsedProjectId.value,
         actionType: "planning.command_denied",
-        sourceWorkflow: "planning",
-        sourceEntity: { type: "Project", id: parsedProjectId.value },
-        commandInput: { command: parsed.value.command },
-        beforeState: null,
-        afterState: null,
-        permissionResult: readDecision,
-        executionResult: { status: "denied" }
+        decision: readDecision,
+        commandInput: { command: parsed.value.command }
       });
-      return context.json({ error: readDecision.reason }, 403);
     }
 
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.getPlanSnapshot ||
-        !transactionDataSource.applyPlanningCommand ||
-        !transactionDataSource.incrementPlanVersion ||
-        !transactionDataSource.appendAuditEvent
-      ) {
+    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+      // Один вызов вместо цепочки `!ds.a || !ds.b`; возвращает store с этими методами как обязательными,
+      // downstream больше не нуждается в non-null-ассершенах.
+      const transactionDataSource = requireCapabilities(rawStore, [
+        "getPlanSnapshot",
+        "applyPlanningCommand",
+        "incrementPlanVersion",
+        "appendAuditEvent"
+      ]);
+      if (!transactionDataSource) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
       if (
@@ -350,12 +343,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       };
     });
 
-    if (!result.ok) {
-      if (result.status === 501) return context.json({ error: result.error }, 501);
-      if (result.status === 404) return context.json({ error: result.error }, 404);
-      if (result.status === 409) return context.json(errorResponseBody(result), 409);
-      return context.json({ error: result.error }, 400);
-    }
+    if (!result.ok) return respondFromFailedResult(context, result);
 
     emitPlanVersionFromBody(
       actor.tenantId,
@@ -385,33 +373,35 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     for (const command of parsed.value.commands) {
       const decision = permissionForCommand(command, actor, profile);
       if (!decision.allowed) {
-        await appendPlanningAuditIfConfigured(deps, {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
+        return await denyPlanningAction(deps, context, {
+          actor,
+          projectId,
           actionType: "planning.command_denied",
-          sourceWorkflow: "planning",
-          sourceEntity: { type: "Project", id: projectId },
-          commandInput: { commands: parsed.value.commands, command },
-          beforeState: null,
-          afterState: null,
-          permissionResult: decision,
-          executionResult: { status: "denied" }
+          decision,
+          commandInput: { commands: parsed.value.commands, command }
         });
-        return context.json({ error: decision.reason }, 403);
       }
     }
     const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) {
-      return context.json({ error: readDecision.reason }, 403);
+      // Комплаенс-паритет с одиночным apply-command: batch read-deny раньше НЕ писал аудит.
+      return await denyPlanningAction(deps, context, {
+        actor,
+        projectId,
+        actionType: "planning.command_denied",
+        decision: readDecision,
+        commandInput: { commands: parsed.value.commands }
+      });
     }
 
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.getPlanSnapshot ||
-        !transactionDataSource.applyPlanningCommand ||
-        !transactionDataSource.incrementPlanVersion ||
-        !transactionDataSource.appendAuditEvent
-      ) {
+    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+      const transactionDataSource = requireCapabilities(rawStore, [
+        "getPlanSnapshot",
+        "applyPlanningCommand",
+        "incrementPlanVersion",
+        "appendAuditEvent"
+      ]);
+      if (!transactionDataSource) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
       if (
@@ -451,6 +441,20 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
       if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
+        // Паритет с одиночным apply-command: фиксируем конфликт версий в аудите — иначе серия
+        // проигранных optimistic-гонок через batch-эндпоинт не оставляет следа.
+        await appendPlanningAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "planning.command_conflict",
+          sourceWorkflow: "planning",
+          sourceEntity: { type: "Project", id: projectId },
+          commandInput: { commands: parsed.value.commands, clientPlanVersion: parsed.value.clientPlanVersion },
+          beforeState: { planVersion: snapshot.planVersion },
+          afterState: null,
+          permissionResult: readDecision,
+          executionResult: { status: "conflict" }
+        }, transactionDataSource);
         return {
           ok: false as const,
           status: 409,
@@ -532,12 +536,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       return { ok: true as const, body: responseBody };
     });
 
-    if (!result.ok) {
-      if (result.status === 501) return context.json({ error: result.error }, 501);
-      if (result.status === 404) return context.json({ error: result.error }, 404);
-      if (result.status === 409) return context.json(errorResponseBody(result), 409);
-      return context.json({ error: result.error }, 400);
-    }
+    if (!result.ok) return respondFromFailedResult(context, result);
 
     emitPlanVersionFromBody(actor.tenantId, projectId, result.body as { newPlanVersion?: number });
     return context.json(result.body);
@@ -558,7 +557,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
       const projectId = parsedProjectId.value;
       const newPlanVersion = await deps.dataSource.incrementPlanVersion(actor.tenantId, projectId);
-      notifyPlanVersionChanged(projectId, newPlanVersion);
+      notifyPlanVersionChanged(actor.tenantId, projectId, newPlanVersion);
       return context.json({ newPlanVersion });
     });
   }
@@ -715,53 +714,40 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       profile,
       targetTenantId: actor.tenantId
     });
+    const scenarioDenyInput = {
+      scenarioRunId: parsedScenarioRunId.value,
+      clientPlanVersion: parsed.value.clientPlanVersion
+    };
     if (!decision.allowed) {
-      await appendPlanningAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
+      return await denyPlanningAction(deps, context, {
+        actor,
+        projectId: parsedProjectId.value,
         actionType: "planning.scenario_denied",
-        sourceWorkflow: "planning",
-        sourceEntity: { type: "Project", id: parsedProjectId.value },
-        commandInput: {
-          scenarioRunId: parsedScenarioRunId.value,
-          clientPlanVersion: parsed.value.clientPlanVersion
-        },
-        beforeState: null,
-        afterState: null,
-        permissionResult: decision,
-        executionResult: { status: "denied" }
+        decision,
+        commandInput: scenarioDenyInput
       });
-      return context.json({ error: decision.reason }, 403);
     }
     const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) {
-      await appendPlanningAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
+      return await denyPlanningAction(deps, context, {
+        actor,
+        projectId: parsedProjectId.value,
         actionType: "planning.scenario_denied",
-        sourceWorkflow: "planning",
-        sourceEntity: { type: "Project", id: parsedProjectId.value },
-        commandInput: {
-          scenarioRunId: parsedScenarioRunId.value,
-          clientPlanVersion: parsed.value.clientPlanVersion
-        },
-        beforeState: null,
-        afterState: null,
-        permissionResult: readDecision,
-        executionResult: { status: "denied" }
+        decision: readDecision,
+        commandInput: scenarioDenyInput
       });
-      return context.json({ error: readDecision.reason }, 403);
     }
 
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.getPlanSnapshot ||
-        !transactionDataSource.findPlanningScenarioRun ||
-        !transactionDataSource.applyPlanningCommand ||
-        !transactionDataSource.incrementPlanVersion ||
-        !transactionDataSource.markPlanningScenarioRunApplied ||
-        !transactionDataSource.appendAuditEvent
-      ) {
+    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+      const transactionDataSource = requireCapabilities(rawStore, [
+        "getPlanSnapshot",
+        "findPlanningScenarioRun",
+        "applyPlanningCommand",
+        "incrementPlanVersion",
+        "markPlanningScenarioRunApplied",
+        "appendAuditEvent"
+      ]);
+      if (!transactionDataSource) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
 

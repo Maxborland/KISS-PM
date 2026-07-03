@@ -559,7 +559,7 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
         return context.json({ error: result.error }, 400);
       }
       invalidateCapacityCacheForTenant(actor.tenantId);
-      notifyPlanVersionChanged(projectId, result.body.newPlanVersion);
+      notifyPlanVersionChanged(actor.tenantId, projectId, result.body.newPlanVersion);
       return context.json(result.body);
     }
   );

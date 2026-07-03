@@ -30,7 +30,7 @@ import {
 } from "@kiss-pm/tenant-org-structure";
 
 import type { ApiTenantDataSource, ProjectRecord } from "../apiTypes";
-import { createPlanningReadModel } from "../planning/planningReadModel";
+import { buildSnapshotResourceLoad } from "../planning/planningReadModel";
 
 export const OCCUPANCY_BUCKET_PROJECT_ID = "__occupancy__";
 const OCCUPANCY_BUCKET_PROJECT_TITLE = "Календарь и встречи";
@@ -178,9 +178,9 @@ export async function buildWorkspaceCapacityAggregation(
     if (!snapshot) continue;
     if (processedProjects > 0) await new Promise((resolve) => setImmediate(resolve));
     processedProjects += 1;
-    const readModel = createPlanningReadModel({ ...snapshot, occupancyWindows: [] });
+    const { resourceLoad } = buildSnapshotResourceLoad({ ...snapshot, occupancyWindows: [] });
     const tasksById = new Map(snapshot.tasks.map((task) => [task.id, task]));
-    const dayBuckets = readModel.resourceLoad.buckets.filter(
+    const dayBuckets = resourceLoad.buckets.filter(
       (bucket) => bucket.granularity === "day" && monthDates.has(bucket.date)
     );
     const loadBuckets = dayBuckets.filter(hasCommittedLoad);

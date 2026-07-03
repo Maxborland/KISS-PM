@@ -1,4 +1,5 @@
 import { addDays, comparePlanDates, diffCalendarDays } from "./calendar";
+import { computeCapacityBalance } from "./capacityBalance";
 import {
   addWorkingMinutesToInstant,
   compareWorkingInstants,
@@ -21,7 +22,7 @@ import type {
 } from "./types";
 import {
   aggregateOccupancyContributions,
-  occupancyMinutesForDate,
+  classifyOccupancyForDate,
   type OccupancyContribution,
   type OccupancyWindow
 } from "./occupancy";
@@ -36,6 +37,10 @@ export type ResourceLoadBucket = {
   assignedMinutes: number;
   reservedMinutes: number;
   occupiedMinutes: number;
+  // capacity/free — от календаря ПРОЕКТА (авторитетно для single-project/KPI/scenario/auto-solver путей).
+  // Для cross-project workspace-вида это НЕ авторитет: employeeCapacity переопределяет ёмкость по
+  // производственному календарю + исключениям + отсутствиям (KPI-001). free/overload выводятся единой
+  // computeCapacityBalance(used, capacity).
   capacityMinutes: number;
   freeMinutes: number;
   taskIds: string[];
@@ -107,10 +112,11 @@ export function buildResourceLoadMatrix(
   return {
     buckets,
     overloads: buckets
-      .filter((bucket) => committedMinutes(bucket) > bucket.capacityMinutes)
-      .map((bucket) => ({
+      .map((bucket) => ({ bucket, balance: computeCapacityBalance(committedMinutes(bucket), bucket.capacityMinutes) }))
+      .filter((entry) => entry.balance.isOverload)
+      .map(({ bucket, balance }) => ({
         ...bucket,
-        overloadMinutes: committedMinutes(bucket) - bucket.capacityMinutes,
+        overloadMinutes: balance.overloadMinutes,
         reasons: [
           ...bucket.taskIds.map((id) => ({ type: "task" as const, id })),
           ...bucket.assignmentIds.map((id) => ({ type: "assignment" as const, id })),
@@ -176,7 +182,7 @@ function buildDayBuckets(input: BuildResourceLoadMatrixInput): ResourceLoadBucke
         reservedMinutes: reservationLoad.reservedMinutes,
         occupiedMinutes: occupancyLoad.occupiedMinutes,
         capacityMinutes,
-        freeMinutes: Math.max(0, capacityMinutes - totalCommittedMinutes),
+        freeMinutes: computeCapacityBalance(totalCommittedMinutes, capacityMinutes).freeMinutes,
         taskIds: taskLoad.taskIds,
         assignmentIds: taskLoad.assignmentIds,
         assignmentContributions: taskLoad.assignmentContributions,
@@ -358,15 +364,6 @@ export function distributeProportionalMinutes(
   return result;
 }
 
-/** Доля дня `date` из полного распределения (см. distributeProportionalMinutes). */
-export function allocateProportionalMinutes(
-  total: number,
-  capacities: ReadonlyArray<{ date: PlanDate; capacityMinutes: number }>,
-  date: PlanDate
-): number {
-  return distributeProportionalMinutes(total, capacities).get(date) ?? 0;
-}
-
 function taskWorkingOverlapForDate(
   task: CalculatedPlan["tasks"][number],
   date: PlanDate,
@@ -480,21 +477,22 @@ function calculateOccupancyLoadForDate(
   let unavailableMinutes = 0;
   for (const window of input.occupancyWindows ?? []) {
     if (window.resourceId !== resourceId) continue;
-    if (window.capacityImpact === "tentative") continue;
-    const workMinutes = occupancyMinutesForDate(window, date);
-    if (workMinutes <= 0) continue;
-    if (window.capacityImpact === "unavailable") {
-      // KPI-006: недоступность уменьшает ёмкость дня, а не добавляет нагрузку (иначе завышает ratio/heat).
+    // KPI-006: политику трёх значений capacityImpact держит occupancy.ts (classifyOccupancyForDate).
+    // Здесь только маршрутизация классифицированного результата, без повторного кодирования правил.
+    const classified = classifyOccupancyForDate(window, date);
+    if (classified.kind === "ignored") continue;
+    if (classified.kind === "unavailable") {
+      // Недоступность уменьшает ёмкость дня, а не добавляет нагрузку (иначе завышает ratio/heat).
       // Намеренно НЕ попадает в occupancyContributions/occupiedMinutes — это срез доступности, а не
       // «занятость»; в ёмкости она отражена (buildDayBuckets вычитает unavailableMinutes из capacity).
-      unavailableMinutes += workMinutes;
+      unavailableMinutes += classified.workMinutes;
       continue;
     }
     occupancyContributions.push({
       occupancyId: window.id,
       sourceType: window.sourceType,
       sourceId: window.sourceId,
-      workMinutes
+      workMinutes: classified.workMinutes
     });
   }
 
@@ -545,10 +543,10 @@ function aggregateBuckets(
     current.reservedMinutes += bucket.reservedMinutes;
     current.occupiedMinutes += bucket.occupiedMinutes;
     current.capacityMinutes += bucket.capacityMinutes;
-    current.freeMinutes = Math.max(
-      0,
-      current.capacityMinutes - committedMinutes(current)
-    );
+    current.freeMinutes = computeCapacityBalance(
+      committedMinutes(current),
+      current.capacityMinutes
+    ).freeMinutes;
     current.taskIds = [...new Set([...current.taskIds, ...bucket.taskIds])].sort();
     current.assignmentIds = [...new Set([...current.assignmentIds, ...bucket.assignmentIds])].sort();
     current.assignmentContributions = aggregateAssignmentContributions([

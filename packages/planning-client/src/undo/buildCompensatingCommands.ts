@@ -87,6 +87,31 @@ export function buildCompensatingCommands(
         }
       ];
     }
+    case "assignment.upsert": {
+      // Правки труда/длительности шлют [task.update_work_model, assignment.upsert] пакетом,
+      // поэтому откат task-модели без отката назначения возвращал бы тот самый рассинхрон
+      // WBS↔Ресурсы (нагрузка считается из assignment.workMinutes). Восстанавливаем прежнее
+      // назначение по id; если его не было до правки — компенсируем удалением.
+      const existing = before.authored.assignments.find(
+        (assignment) => String((assignment as { id?: unknown }).id) === command.payload.id
+      ) as Record<string, unknown> | undefined;
+      if (existing) {
+        return [
+          {
+            type: "assignment.upsert",
+            payload: {
+              id: command.payload.id,
+              taskId: String(existing.taskId),
+              resourceId: String(existing.resourceId),
+              role: (existing.role as string | undefined) ?? "executor",
+              unitsPermille: Number(existing.unitsPermille ?? 1000),
+              workMinutes: existing.workMinutes == null ? null : Number(existing.workMinutes)
+            }
+          } as PlanningCommand
+        ];
+      }
+      return [{ type: "assignment.delete", payload: { assignmentId: command.payload.id } }];
+    }
     case "dependency.upsert": {
       const existing = before.authored.dependencies.find((dep) => String(dep.id) === command.payload.id);
       if (existing) {

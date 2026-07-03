@@ -71,6 +71,35 @@ export type OccupancyContribution = {
 
 export type OccupancyMaskPolicy = "full" | "busy_only";
 
+// KPI-006: политика трёх значений capacityImpact — ядро этого модуля, а не деталь resourcePlanning.
+//   "busy"        → минуты несут нагрузку (occupied),
+//   "unavailable" → минуты режут доступную ёмкость дня (не нагрузка),
+//   "tentative"   → окно игнорируется целиком.
+// "ignored" также возвращается, когда пересечение с днём даёт 0 минут (нечего учитывать).
+export type OccupancyLoadKind = "load" | "unavailable" | "ignored";
+
+export type OccupancyClassification = {
+  kind: OccupancyLoadKind;
+  workMinutes: number;
+};
+
+export function classifyOccupancyForDate(
+  window: OccupancyWindow,
+  date: PlanDate
+): OccupancyClassification {
+  if (window.capacityImpact === "tentative") {
+    return { kind: "ignored", workMinutes: 0 };
+  }
+  const workMinutes = occupancyMinutesForDate(window, date);
+  if (workMinutes <= 0) {
+    return { kind: "ignored", workMinutes: 0 };
+  }
+  if (window.capacityImpact === "unavailable") {
+    return { kind: "unavailable", workMinutes };
+  }
+  return { kind: "load", workMinutes };
+}
+
 export function occupancyMinutesForDate(window: OccupancyWindow, date: PlanDate): number {
   const start = parseInstant(window.startsAt);
   const finish = parseInstant(window.finishesAt);
@@ -125,6 +154,9 @@ export function maskOccupancyWindow(
 }
 
 function parseInstant(value: string): Date | undefined {
-  const parsed = new Date(value);
+  // ISO-строку без явного оффсета new Date() трактует как локальное время сервера, а бакеты дней
+  // строятся в UTC — минуты бы съезжали на соседний день на не-UTC хосте. Нормализуем к UTC.
+  const normalized = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value) ? `${value}Z` : value;
+  const parsed = new Date(normalized);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }

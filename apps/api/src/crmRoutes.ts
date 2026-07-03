@@ -708,6 +708,12 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
         throw new Error("transactional_deal_stage_create_not_configured");
       }
       const created = await transactionDataSource.createDealStage(stageInput);
+      // Денормализованный crm_pipelines.lifecycle_graph_metadata читает first-class CRM API
+      // (transition-guard / final-stage / feasibility). Пересобираем в той же транзакции, иначе новая
+      // стадия невидима графу до несвязанной first-class мутации (read-model drift).
+      if (transactionDataSource.refreshCrmPipelineLifecycleGraph) {
+        await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, stageInput.pipelineId);
+      }
       await appendManagementAuditEvent(
         auditInput({
           actor,
@@ -781,6 +787,9 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
         throw new Error("transactional_deal_stage_update_not_configured");
       }
       const updated = await transactionDataSource.updateDealStage(parsed.value);
+      if (transactionDataSource.refreshCrmPipelineLifecycleGraph && beforeState.pipelineId) {
+        await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, beforeState.pipelineId);
+      }
       await appendManagementAuditEvent(
         auditInput({
           actor,
@@ -1062,6 +1071,9 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
         throw new Error("transactional_stage_transition_create_not_configured");
       }
       const created = await transactionDataSource.createStageTransition(parsed.value);
+      if (transactionDataSource.refreshCrmPipelineLifecycleGraph) {
+        await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
+      }
       await appendManagementAuditEvent(
         auditInput({
           actor,

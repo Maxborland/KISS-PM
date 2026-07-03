@@ -98,9 +98,13 @@ export function workingMinutesForDate(
   calendar: PlanCalendar,
   exceptions: PlanCalendarException[]
 ): number {
-  const exception = exceptions.find(
+  // Персональное исключение (resourceId != null) приоритетнее глобального (resourceId == null)
+  // на ту же дату, независимо от порядка массива — иначе глобальный короткий день затеняет
+  // личный отпуск ресурса (или наоборот) в зависимости от сортировки входа.
+  const matching = exceptions.filter(
     (candidate) => candidate.calendarId === calendar.id && candidate.date === date
   );
+  const exception = matching.find((candidate) => candidate.resourceId != null) ?? matching[0];
   if (exception) return Math.max(0, exception.workingMinutes);
 
   const day = new Date(`${date}T00:00:00.000Z`).getUTCDay();

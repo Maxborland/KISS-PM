@@ -99,6 +99,14 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: parsed.error }, 400);
     }
 
+    // Privilege ceiling: актор не может выдать роли права, которых нет у него самого — иначе
+    // держатель tenant.access_profiles.manage эскалирует привилегии через подставную роль/аккаунт
+    // (parseAccessProfileCreateBody валидирует лишь принадлежность каталогу, не подмножество прав актора).
+    const grantorPermissions = new Set<string>(actorProfile.permissions);
+    if (parsed.value.permissions.some((permission) => !grantorPermissions.has(permission))) {
+      return context.json({ error: "permissions_exceed_grantor" }, 403);
+    }
+
     const existingProfiles = await dataSource.listAccessProfilesByTenantId(
       actor.tenantId
     );
@@ -242,6 +250,12 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     if (!parsed.ok) {
       return context.json({ error: parsed.error }, 400);
+    }
+
+    // Privilege ceiling (как в create): нельзя выдать роли права сверх собственных прав актора.
+    const grantorPermissions = new Set<string>(actorProfile.permissions);
+    if (parsed.value.permissions.some((permission) => !grantorPermissions.has(permission))) {
+      return context.json({ error: "permissions_exceed_grantor" }, 403);
     }
 
     const duplicateName = (

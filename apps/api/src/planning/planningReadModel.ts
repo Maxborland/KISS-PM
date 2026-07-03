@@ -1,27 +1,26 @@
 import {
+  buildBaselineComparison,
   buildResourceLoadMatrix,
   calculatePlan,
   comparePlanDates,
-  diffCalendarDays,
-  type PlanSnapshot
+  type CalculatedPlan,
+  type PlanningReadModel,
+  type PlanSnapshot,
+  type ResourceLoadMatrix
 } from "@kiss-pm/domain";
 
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 
-export type PlanningReadModelOptions = {
-  // Доступ к ресурсным исключениям календаря (персональные отсутствия resourceId!=null).
-  // false → план-ридер без права на ресурсы; отдаём только общепроектные праздники.
-  includeResourceExceptions?: boolean;
-};
-
-export function createPlanningReadModel(
-  snapshot: PlanSnapshot,
-  options: PlanningReadModelOptions = {}
-) {
-  // Fail-closed: по умолчанию НЕ раскрываем персональные ресурсные исключения (чужие отсутствия).
-  // Актор-фейсинг роуты (read-model/preview/apply) передают флаг по фактическому праву на ресурсы;
-  // матрица загрузки ниже всё равно считается по полному snapshot.calendarExceptions (ёмкость не зависит от права).
-  const includeResourceExceptions = options.includeResourceExceptions ?? false;
+/**
+ * Узкий шов: только CPM-решение + матрица загрузки ресурсов из снапшота, БЕЗ упаковки полного read-model
+ * (baselineComparison, маскирование calendarExceptions, packaging). capacityService считает загрузку по каждому
+ * проекту тенанта и использует лишь resourceLoad.buckets — раньше он звал широкий createPlanningReadModel и
+ * выбрасывал baseline-diff + маскирование на каждый запрос ёмкости. createPlanningReadModel теперь тоже строится
+ * поверх этого шва (без двойного calculatePlan).
+ */
+export function buildSnapshotResourceLoad(
+  snapshot: PlanSnapshot
+): { calculatedPlan: CalculatedPlan; resourceLoad: ResourceLoadMatrix } {
   const calculatedPlan = calculatePlan(snapshot, {
     calculatedAt: snapshot.capturedAt,
     engineVersion: PLANNING_ENGINE_VERSION
@@ -42,6 +41,24 @@ export function createPlanningReadModel(
       snapshot.project.deadline
     ])
   });
+  return { calculatedPlan, resourceLoad };
+}
+
+export type PlanningReadModelOptions = {
+  // Доступ к ресурсным исключениям календаря (персональные отсутствия resourceId!=null).
+  // false → план-ридер без права на ресурсы; отдаём только общепроектные праздники.
+  includeResourceExceptions?: boolean;
+};
+
+export function createPlanningReadModel(
+  snapshot: PlanSnapshot,
+  options: PlanningReadModelOptions = {}
+): PlanningReadModel {
+  // Fail-closed: по умолчанию НЕ раскрываем персональные ресурсные исключения (чужие отсутствия).
+  // Актор-фейсинг роуты (read-model/preview/apply) передают флаг по фактическому праву на ресурсы;
+  // матрица загрузки ниже всё равно считается по полному snapshot.calendarExceptions (ёмкость не зависит от права).
+  const includeResourceExceptions = options.includeResourceExceptions ?? false;
+  const { calculatedPlan, resourceLoad } = buildSnapshotResourceLoad(snapshot);
 
   return {
     project: snapshot.project,
@@ -53,7 +70,7 @@ export function createPlanningReadModel(
       baselines: snapshot.baselines
     },
     calculatedPlan,
-    baselineComparison: createBaselineComparison(snapshot, calculatedPlan),
+    baselineComparison: buildBaselineComparison(snapshot, calculatedPlan),
     resourceLoad,
     // Производственный календарь(и) проекта + исключения (праздники resourceId=null / отсутствия).
     // Поверхности Календари/Настройки читают их top-level — раньше отдавал только mock,
@@ -70,52 +87,6 @@ export function createPlanningReadModel(
     planVersion: snapshot.planVersion,
     engineVersion: PLANNING_ENGINE_VERSION
   };
-}
-
-export function createBaselineComparison(
-  snapshot: PlanSnapshot,
-  calculatedPlan: ReturnType<typeof calculatePlan>
-) {
-  const baseline = [...snapshot.baselines].sort((left, right) =>
-    right.capturedAt.localeCompare(left.capturedAt) || right.id.localeCompare(left.id)
-  )[0];
-  if (!baseline) {
-    return {
-      baselineId: null,
-      capturedAt: null,
-      tasks: []
-    };
-  }
-
-  const calculatedTasksById = new Map(calculatedPlan.tasks.map((task) => [task.id, task]));
-  return {
-    baselineId: baseline.id,
-    capturedAt: baseline.capturedAt,
-    tasks: baseline.tasks.map((baselineTask) => {
-      const current = calculatedTasksById.get(baselineTask.taskId);
-      const currentStart = current?.calculatedStart ?? null;
-      const currentFinish = current?.calculatedFinish ?? null;
-      const currentWorkMinutes = current?.workMinutes ?? null;
-      return {
-        taskId: baselineTask.taskId,
-        baselineStart: baselineTask.plannedStart,
-        baselineFinish: baselineTask.plannedFinish,
-        baselineWorkMinutes: baselineTask.workMinutes,
-        currentStart,
-        currentFinish,
-        currentWorkMinutes,
-        startDeltaDays: dateDeltaDays(baselineTask.plannedStart, currentStart),
-        finishDeltaDays: dateDeltaDays(baselineTask.plannedFinish, currentFinish),
-        workDeltaMinutes:
-          currentWorkMinutes === null ? null : currentWorkMinutes - baselineTask.workMinutes
-      };
-    })
-  };
-}
-
-export function dateDeltaDays(baselineDate: string | null, currentDate: string | null): number | null {
-  if (!baselineDate || !currentDate) return null;
-  return diffCalendarDays(baselineDate, currentDate);
 }
 
 function latestDate(dates: Array<string | null>): string {

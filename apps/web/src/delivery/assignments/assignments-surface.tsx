@@ -12,15 +12,13 @@ import { MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backe
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AddAssigneeDialog, distribute, presetWeights, ROLES, roleLabel } from "@/delivery/assignments/assignments-editors";
-import type { PlanningCommand } from "@kiss-pm/domain";
+import { createPlanningCommand } from "@kiss-pm/domain";
+import type { PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
 
 type Gran = "day" | "week";
+// AsgRaw — локальная VIEW-модель строки назначения: role сужен до string под нужды редактора ролей,
+// а workMinutes нормализован к числу (в домене PlanAssignment.workMinutes может быть null). Маппится из PlanAssignment.
 type AsgRaw = { id: string; taskId: string; resourceId: string; role: string; unitsPermille: number; workMinutes: number };
-type AllocRaw = { assignmentId: string; taskId: string; resourceId: string; date: string; workMinutes: number };
-type TaskRaw = { id: string; wbsCode: string; title: string; workMinutes: number; durationMinutes: number | null };
-type CalcRaw = { id: string; calculatedStart: string; calculatedFinish: string };
-type ExcRaw = { id: string; calendarId: string; resourceId: string | null; date: string; workingMinutes: number; reason: string | null };
-type CalRaw = { id: string; workingWeekdays: number[]; workingMinutesPerDay: number };
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
 const MONTHS_CAP = ["", "Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
@@ -64,7 +62,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
 
   // origin таймлайна = плановый старт проекта из read-model (на live меняется автоматически)
   const baseMs = useMemo(() => {
-    const start = (readModel?.project as { plannedStart?: unknown } | undefined)?.plannedStart;
+    const start = readModel?.project.plannedStart;
     return typeof start === "string" ? Date.parse(start + "T00:00:00Z") : Date.UTC(2026, 2, 2);
   }, [readModel]);
   const dayToIso = (day: number) => dayToIsoAt(baseMs, day);
@@ -72,20 +70,22 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
 
   const model = useMemo(() => {
     if (!readModel) return null;
-    const authored = readModel.authored as unknown as { tasks: TaskRaw[]; assignments: AsgRaw[]; assignmentAllocations: AllocRaw[] };
-    const calc = (readModel.calculatedPlan as unknown as { tasks: CalcRaw[] }).tasks;
+    const authored = readModel.authored;
+    const calc = readModel.calculatedPlan.tasks;
     const calcById = new Map(calc.map((c) => [c.id, c]));
     const leafTasks = authored.tasks.filter((t) => t.durationMinutes != null);
+    // маппинг доменных PlanAssignment → view-модель AsgRaw (нормализуем workMinutes к числу)
+    const assignments: AsgRaw[] = authored.assignments.map((a) => ({ id: a.id, taskId: a.taskId, resourceId: a.resourceId, role: a.role, unitsPermille: a.unitsPermille, workMinutes: a.workMinutes ?? 0 }));
     const asgByTask = new Map<string, AsgRaw[]>();
-    for (const a of authored.assignments) { const arr = asgByTask.get(a.taskId) ?? []; arr.push(a); asgByTask.set(a.taskId, arr); }
+    for (const a of assignments) { const arr = asgByTask.get(a.taskId) ?? []; arr.push(a); asgByTask.set(a.taskId, arr); }
     const allocByAsg = new Map<string, Map<number, number>>();
     for (const al of authored.assignmentAllocations) { let m = allocByAsg.get(al.assignmentId); if (!m) { m = new Map(); allocByAsg.set(al.assignmentId, m); } m.set(isoToDayAt(baseMs, al.date), (m.get(isoToDayAt(baseMs, al.date)) ?? 0) + al.workMinutes); }
 
     // нерабочие дни календаря: праздники (resourceId=null) и отсутствия по ресурсу (workingMinutes < полного дня) —
     // тот же фильтр, что на вкладке «Календари». Пресеты не должны раскладывать труд на праздник/отсутствие (нулевая ёмкость).
-    const cal = ((readModel as unknown as { calendars: CalRaw[] }).calendars ?? [])[0];
+    const cal = (readModel.calendars ?? [])[0];
     const full = cal?.workingMinutesPerDay ?? MIN_PER_DAY;
-    const exns = ((readModel as unknown as { calendarExceptions: ExcRaw[] }).calendarExceptions ?? []).filter((x) => x.workingMinutes < full);
+    const exns = (readModel.calendarExceptions ?? []).filter((x) => x.workingMinutes < full);
     const holidayDays = new Set<number>();
     const absenceByRes = new Map<string, Set<number>>();
     for (const x of exns) {
@@ -96,10 +96,11 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
     const isWorkingFor = (resourceId: string, day: number) => isWeekdayAt(baseMs, day) && !holidayDays.has(day) && !(absenceByRes.get(resourceId)?.has(day) ?? false);
 
     const metaByAsg = new Map<string, AsgMeta>();
-    for (const a of authored.assignments) {
+    for (const a of assignments) {
       const c = calcById.get(a.taskId);
-      const es = c ? isoToDayAt(baseMs, c.calculatedStart) : 0;
-      const ef = c ? isoToDayAt(baseMs, c.calculatedFinish) : es;
+      // calculatedStart/Finish в домене nullable — при отсутствии дат падаем в 0 (мок всегда считает листья)
+      const es = c?.calculatedStart ? isoToDayAt(baseMs, c.calculatedStart) : 0;
+      const ef = c?.calculatedFinish ? isoToDayAt(baseMs, c.calculatedFinish) : es;
       const days: number[] = [];
       for (let d = es; d < Math.max(ef, es + 1); d++) if (isWorkingFor(a.resourceId, d)) days.push(d);
       const explicit = allocByAsg.get(a.id) ?? new Map<number, number>();
@@ -165,22 +166,22 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   const selTask = selMeta ? model.leafTasks.find((t) => t.id === selMeta.asg.taskId) ?? null : null;
 
   const upsert = (asg: AsgRaw, patch: Partial<Pick<AsgRaw, "resourceId" | "role" | "unitsPermille" | "workMinutes">>) =>
-    applyCmd({ type: "assignment.upsert", payload: { id: asg.id, taskId: asg.taskId, resourceId: patch.resourceId ?? asg.resourceId, role: patch.role ?? asg.role, unitsPermille: patch.unitsPermille ?? asg.unitsPermille, workMinutes: patch.workMinutes ?? asg.workMinutes } } as PlanningCommand, "Назначение обновлено").then(() => setDraft(null));
+    applyCmd(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: asg.taskId, resourceId: patch.resourceId ?? asg.resourceId, role: (patch.role ?? asg.role) as PlanAssignmentRole, unitsPermille: patch.unitsPermille ?? asg.unitsPermille, workMinutes: patch.workMinutes ?? asg.workMinutes } }), "Назначение обновлено").then(() => setDraft(null));
 
-  const removeAsg = (asg: AsgRaw) => { setSel(null); void applyCmd({ type: "assignment.delete", payload: { assignmentId: asg.id } } as PlanningCommand, "Исполнитель снят"); };
+  const removeAsg = (asg: AsgRaw) => { setSel(null); void applyCmd(createPlanningCommand({ type: "assignment.delete", payload: { assignmentId: asg.id } }), "Исполнитель снят"); };
 
   const addAssignee = (taskId: string, resourceId: string, role: string) => {
     const t = model.leafTasks.find((x) => x.id === taskId);
     const used = (model.asgByTask.get(taskId) ?? []).filter((a) => WORKING.has(a.role)).reduce((s, a) => s + a.workMinutes, 0);
     // новый исполнитель забирает НЕразложенный остаток труда задачи (без дублирования)
     const work = WORKING.has(role) ? Math.max(0, (t?.workMinutes ?? 0) - used) : 0;
-    void applyCmd({ type: "assignment.upsert", payload: { id: nid("a"), taskId, resourceId, role, unitsPermille: 1000, workMinutes: work } } as PlanningCommand, "Исполнитель добавлен");
+    void applyCmd(createPlanningCommand({ type: "assignment.upsert", payload: { id: nid("a"), taskId, resourceId, role: role as PlanAssignmentRole, unitsPermille: 1000, workMinutes: work } }), "Исполнитель добавлен");
   };
 
   // отправка кривой (assignment.allocations.replace) — оптимистично; сумма валидируется бэком
   async function applyCurve(m: AsgMeta, minutesByDay: Map<number, number>) {
     const allocations = [...minutesByDay.entries()].filter(([, mm]) => mm > 0).sort((a, b) => a[0] - b[0]).map(([day, mm]) => ({ date: dayToIso(day), workMinutes: mm }));
-    const res = await applyCmd({ type: "assignment.allocations.replace", payload: { assignmentId: m.asg.id, allocations } } as PlanningCommand, "Кривая распределения применена");
+    const res = await applyCmd(createPlanningCommand({ type: "assignment.allocations.replace", payload: { assignmentId: m.asg.id, allocations } }), "Кривая распределения применена");
     if (res.ok || res.conflict) { setDraft(null); setCurveErr(null); } // успех или перезагрузка после конфликта — берём данные из модели
     else setCurveErr(res.issues?.[0]?.message ?? `Сумма распределения должна равняться ${h1(m.asg.workMinutes)} ч`);
   }
@@ -188,7 +189,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
     const mins = distribute(m.asg.workMinutes, presetWeights(m.days.length, kind));
     void applyCurve(m, new Map(m.days.map((d, i) => [d, mins[i] ?? 0])));
   };
-  const resetCurve = (m: AsgMeta) => { void applyCmd({ type: "assignment.allocations.replace", payload: { assignmentId: m.asg.id, allocations: [] } } as PlanningCommand, "Кривая сброшена к равномерной").then(() => setDraft(null)); };
+  const resetCurve = (m: AsgMeta) => { void applyCmd(createPlanningCommand({ type: "assignment.allocations.replace", payload: { assignmentId: m.asg.id, allocations: [] } }), "Кривая сброшена к равномерной").then(() => setDraft(null)); };
 
   // дни для редактора кривой = рабочие дни расписания ∪ дни уже заданной кривой (на случай сдвига расписания)
   const editDaysOf = (m: AsgMeta): number[] => [...new Set([...m.days, ...m.explicit.keys()])].sort((x, y) => x - y);
