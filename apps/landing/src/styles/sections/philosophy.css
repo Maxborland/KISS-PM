@@ -4,6 +4,9 @@
 .philosophy {
   position: relative;
   margin-top: clamp(48px, 7vw, 96px);
+  min-height: 100svh;
+  display: grid;
+  align-content: center;
   padding-block: clamp(72px, 9vw, 128px);
   background: linear-gradient(180deg, #05070f 0%, #081026 55%, #05070f 100%);
   color: #f2f5ff;
