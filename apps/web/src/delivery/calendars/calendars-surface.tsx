@@ -67,15 +67,17 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     const leafTasks = authored.tasks.filter((t) => t.durationMinutes != null);
     // конфликты: задача, чей интервал пересекает праздник (нерабочий день календаря)
     const conflicts = leafTasks.map((t) => {
-      const c = calcById.get(t.id); if (!c) return null;
-      // расчётные границы у листовой задачи с расписанием всегда заполнены (движок их проставил);
-      const es = isoToDay(c.calculatedStart!), ef = isoToDay(c.calculatedFinish!);
+      const c = calcById.get(t.id); if (!c || !c.calculatedStart || !c.calculatedFinish) return null;
+      // calculatedStart/Finish nullable (задача без расписания) — пропускаем, иначе NaN-границы цикла молча
+      // отключают детекцию конфликтов.
+      const es = isoToDay(c.calculatedStart), ef = isoToDay(c.calculatedFinish);
       for (let d = es; d < Math.max(ef, es + 1); d++) if (holidayByDay.has(d)) return { task: t, day: d };
       return null;
     }).filter((x): x is { task: PlanTask; day: number } => x !== null);
     // диапазон месяцев
     let maxDay = 34;
-    for (const c of calc) maxDay = Math.max(maxDay, isoToDay(c.calculatedFinish!));
+    // calculatedFinish nullable — null дал бы NaN maxDay → пустая сетка месяцев; пропускаем недатированные.
+    for (const c of calc) if (c.calculatedFinish) maxDay = Math.max(maxDay, isoToDay(c.calculatedFinish));
     const monthsList = [...new Set(Array.from({ length: maxDay + 1 }, (_, i) => dayToIso(i).slice(0, 7)))].sort();
     return { cal, full, holidayByDay, absByResDay, anyHolidayByDay, anyAbsByResDay, leafTasks, conflicts, monthsList };
   }, [readModel]);
