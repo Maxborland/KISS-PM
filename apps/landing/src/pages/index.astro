@@ -9,13 +9,75 @@ import PathSection from "../components/PathSection.astro";
 import DemoSection from "../components/DemoSection.astro";
 import WaitlistSection from "../components/WaitlistSection.astro";
 import FaqSection from "../components/FaqSection.astro";
+import { faqs } from "../lib/landing-faq";
 
 export const prerender = true;
+
+const siteUrl = "https://kisspm.app/";
+const description =
+  "KISS PM — управление проектами и портфелем через ИИ-агента: CRM, ресурсы, сверка изменений, управленческие действия и аудит в одном контуре.";
+
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "KISS PM",
+    url: siteUrl,
+    logo: "https://kisspm.app/favicon.svg",
+    description,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "KISS PM",
+    url: siteUrl,
+    inLanguage: "ru-RU",
+    description,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "KISS PM",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: siteUrl,
+    description,
+    softwareVersion: "closed alpha",
+    isAccessibleForFree: true,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "RUB",
+      availability: "https://schema.org/PreOrder",
+      description: "Закрытая альфа по заявке.",
+    },
+    additionalProperty: [
+      {
+        "@type": "PropertyValue",
+        name: "Product status",
+        value: "pre-release / closed alpha",
+      },
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.a,
+      },
+    })),
+  },
+];
 ---
 
 <BaseLayout
-  title="KISS PM — управляйте проектами через агента"
-  description="KISS PM — агентная система управления проектами: цель, proposed project diff, ревью, применение выбранного и audit trail."
+  title="KISS PM — управление проектами через ИИ-агента"
+  description={description}
+  structuredData={structuredData}
 >
   <SiteHeader slot="header" />
 

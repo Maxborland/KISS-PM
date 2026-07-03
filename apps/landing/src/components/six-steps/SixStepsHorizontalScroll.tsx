@@ -230,7 +230,7 @@ export default function SixStepsHorizontalScroll() {
         <header className="sectionHeader six-steps-head">
           {/* без data-text-reveal: скрипт реврайтит DOM до гидрации React и ломает hydration */}
           <h2 id="loop-title" className="l-display six-steps-head__title">
-            Шесть шагов · один язык
+            Шесть шагов · один контур
           </h2>
         </header>
 

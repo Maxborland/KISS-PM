@@ -21,7 +21,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "01",
     category: "CRM",
     title: "Новая сделка",
-    description: "Фиксируйте входящие запросы и создавайте сделки в CRM за несколько секунд.",
+    description: "Фиксируйте входящие запросы и держите CRM рядом с будущим проектом.",
     demoType: "deal",
   },
   {
@@ -29,7 +29,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "02",
     category: "ПРИЁМКА",
     title: "Черновик проекта",
-    description: "Собирайте входные данные и формируйте понятный черновик проекта.",
+    description: "Собирайте вводные, роли и сроки до обещаний клиенту.",
     demoType: "draft",
   },
   {
@@ -37,7 +37,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "03",
     category: "ЁМКОСТЬ",
     title: "Проверка загрузки",
-    description: "Оценивайте загрузку команды и ресурсов на выбранные сроки.",
+    description: "Проверяйте ресурсную загрузку до активации проекта.",
     demoType: "capacity",
   },
   {
@@ -45,7 +45,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "04",
     category: "ПЛАН",
     title: "Живой график",
-    description: "План перестраивается при изменениях и сразу показывает влияние на сроки.",
+    description: "Видите, как изменения влияют на задачи, сроки и Gantt.",
     demoType: "gantt",
   },
   {
@@ -53,7 +53,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "05",
     category: "СИГНАЛ",
     title: "Управленческое действие",
-    description: "Система подсказывает, когда пора вмешаться и что сделать дальше.",
+    description: "Сигнал ведёт к разрешённому действию, а не к ещё одному отчёту.",
     demoType: "signal",
   },
   {
@@ -61,7 +61,7 @@ export const SIX_STEPS: ReadonlyArray<StepDefinition> = [
     number: "06",
     category: "ЗАКРЫТИЕ",
     title: "Уроки в шаблон",
-    description: "Результаты проекта сохраняются в шаблон и помогают запускать следующие проекты быстрее.",
+    description: "Закрытие проекта улучшает шаблоны для следующих запусков.",
     demoType: "closure",
   },
 ];
