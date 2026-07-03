@@ -210,7 +210,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
                 id: "henry-applied",
                 author: "henry",
                 time: "10:44",
-                text: "Готово. Применил 4 изменения и оставил запись в журнале. Одно изменение осталось отклоненным.",
+                text: "Готово. Применил 4 изменения и оставил запись в аудите. Одно изменение осталось отклоненным.",
               },
             ],
         changes: current.changes.map((change) =>

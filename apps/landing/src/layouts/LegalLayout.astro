@@ -3,23 +3,30 @@ import BaseLayout from "./BaseLayout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 
-interface Props {
-  title: string;
-  updated: string;
+interface LegalFrontmatter {
+  title?: string;
+  updated?: string;
   description?: string;
 }
 
-const { title, updated, description } = Astro.props;
+interface Props extends LegalFrontmatter {
+  frontmatter?: LegalFrontmatter;
+}
+
+const frontmatter = Astro.props.frontmatter ?? {};
+const title = Astro.props.title ?? frontmatter.title ?? "Юридическая страница";
+const updated = Astro.props.updated ?? frontmatter.updated ?? "";
+const description = Astro.props.description ?? frontmatter.description ?? title;
 ---
 
-<BaseLayout title={`${title} · KISS PM`} description={description ?? title}>
+<BaseLayout title={`${title} · KISS PM`} description={description}>
   <SiteHeader slot="header" />
 
   <article class="l-section legal">
     <div class="l-container l-container--narrow">
       <span class="l-eyebrow">Юридическая страница</span>
       <h1 class="l-h2 legal__title">{title}</h1>
-      <p class="l-muted legal__updated">Обновлено: {updated}</p>
+      {updated ? <p class="l-muted legal__updated">Обновлено: {updated}</p> : null}
 
       <div class="legal__body">
         <slot />
