@@ -1,0 +1,19 @@
+---
+import PhilosophyShader from "./PhilosophyShader.tsx";
+---
+
+<section id="philosophy" class="philosophy" aria-labelledby="philosophy-title">
+  <PhilosophyShader client:visible />
+
+  <div class="l-container philosophy__inner">
+    <h2 id="philosophy-title" class="philosophy__display" data-text-reveal>
+      Keep it simple. Seriously.
+    </h2>
+
+    <div class="philosophy__lines" data-reveal-group>
+      <p class="philosophy__line" data-text-reveal>Одно следующее действие.</p>
+      <p class="philosophy__line" data-text-reveal>Агент готовит — человек решает.</p>
+      <p class="philosophy__line" data-text-reveal>Каждое решение оставляет след.</p>
+    </div>
+  </div>
+</section>

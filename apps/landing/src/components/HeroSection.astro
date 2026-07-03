@@ -1,0 +1,115 @@
+---
+import HeroShader from "./HeroShader.tsx";
+---
+
+<section id="hero" class="hero" aria-labelledby="hero-title">
+  <HeroShader client:load />
+
+  <div class="l-container hero__inner">
+    <h1 id="hero-title" class="hero__title">Управление проектами.<br />Переосмыслено.</h1>
+    <a class="hero__access l-btn l-btn--primary" href="#waitlist">Запросить доступ</a>
+  </div>
+</section>
+
+<style>
+  .hero {
+    position: relative;
+    width: 100%;
+    min-width: 100%;
+    min-height: 100svh;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    background: var(--canvas);
+    isolation: isolate;
+    margin-bottom: 0;
+  }
+
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 46% 28% at 50% 48%, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.42) 38%, rgba(255, 255, 255, 0) 72%),
+      linear-gradient(
+        180deg,
+        rgba(238, 240, 244, 0.12) 0%,
+        rgba(238, 240, 244, 0) 52%,
+        rgba(238, 240, 244, 0) 100%
+      );
+  }
+
+  .hero__inner {
+    position: relative;
+    z-index: 2;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-block: clamp(96px, 12vw, 156px);
+  }
+
+  :global(.hero-shader) {
+    position: absolute;
+    inset: 0;
+    width: 100vw;
+    min-width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: auto;
+    /* ponytail: насыщенность глушим прозрачностью поверх --canvas, а не параметрами шейдера */
+    opacity: 0.42;
+  }
+
+  :global(.hero-shader__canvas) {
+    width: 100vw;
+    min-width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .hero__title {
+    max-width: min(980px, calc(100vw - 36px));
+    margin: 0;
+    color: color-mix(in oklab, var(--text-strong) 86%, var(--accent) 14%);
+    font-family: var(--font-display);
+    font-size: clamp(34px, 3.8vw, 56px);
+    font-weight: var(--weight-heading);
+    font-variation-settings: "wght" var(--weight-heading);
+    line-height: 1.1;
+    letter-spacing: 0;
+    text-align: center;
+    white-space: nowrap;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6), 0 12px 40px rgba(255, 255, 255, 0.55);
+  }
+
+
+  .hero__access {
+    position: relative;
+    z-index: 4;
+    margin-top: clamp(24px, 3.5vh, 44px);
+    min-width: 172px;
+    justify-content: center;
+    box-shadow:
+      0 18px 42px -22px rgba(37, 99, 235, 0.55),
+      0 1px 0 rgba(255, 255, 255, 0.42) inset;
+  }
+
+  @media (max-width: 520px) {
+    .hero__title {
+      font-size: clamp(28px, 10vw, 40px);
+      white-space: normal;
+    }
+  }
+
+  @media (min-width: 521px) and (max-width: 920px) {
+    .hero__title {
+      font-size: clamp(34px, 7vw, 52px);
+      white-space: normal;
+      text-wrap: balance;
+    }
+  }
+</style>

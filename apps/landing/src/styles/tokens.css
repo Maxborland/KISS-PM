@@ -1,0 +1,203 @@
+/* KISS PM Landing — design-v3 tokens (marketing subset).
+   Mirrors apps/web/src/styles/tokens.css for visual continuity. */
+:root {
+  /* Surface */
+  --canvas: #eef0f4;
+  --canvas-tint: #f4f5f8;
+  --panel: #ffffff;
+  --panel-subtle: #fafbfc;
+  --panel-strong: #f3f5f8;
+  --panel-elevated: #ffffff;
+  --border: #e6e8ee;
+  --border-strong: #d4d8e0;
+  --border-subtle: #eef0f4;
+
+  /* Text */
+  --text: #0f172a;
+  --text-strong: #020617;
+  --muted: #64748b;
+  --muted-strong: #475569;
+  --muted-soft: #94a3b8;
+
+  /* Brand & accents */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #eef4ff;
+  --accent-muted: #dbeafe;
+  --accent-ring: rgba(37, 99, 235, 0.18);
+
+  --prio-critical: #b91c1c;
+  --success-text: #047857;
+  --warning-text: #b45309;
+
+  --success: #10b981;
+  --success-soft: #ecfdf5;
+  --warning: #f59e0b;
+  --warning-soft: #fffbeb;
+  --danger: #ef4444;
+  --danger-soft: #fef2f2;
+  --info: #0ea5e9;
+  --info-soft: #f0f9ff;
+  --violet: #8b5cf6;
+  --violet-soft: #f5f3ff;
+
+  /* Marketing-only accents (liquid-glass hero) */
+  --marketing-stage: radial-gradient(
+      120% 80% at 15% 0%,
+      rgba(99, 102, 241, 0.22) 0%,
+      rgba(99, 102, 241, 0) 60%
+    ),
+    radial-gradient(
+      100% 70% at 95% 10%,
+      rgba(14, 165, 233, 0.18) 0%,
+      rgba(14, 165, 233, 0) 55%
+    ),
+    radial-gradient(
+      90% 60% at 50% 110%,
+      rgba(168, 85, 247, 0.18) 0%,
+      rgba(168, 85, 247, 0) 60%
+    ),
+    linear-gradient(180deg, #f8fafc 0%, #eef0f4 100%);
+
+  --marketing-grad-deep: linear-gradient(135deg, #0f172a 0%, #1e293b 52%, #312e81 100%);
+  --marketing-grad-aurora: conic-gradient(
+    from 220deg at 50% 50%,
+    #6366f1 0deg,
+    #0ea5e9 90deg,
+    #4f46e5 180deg,
+    #38bdf8 270deg,
+    #6366f1 360deg
+  );
+
+  /* Hero echoes — cool ink/indigo/ice, mirrors product accent (no magenta) */
+  --plasma-violet: #4f46e5;
+  --plasma-magenta: #2563eb;
+  --plasma-cyan: #7dd3fc;
+  --plasma-ink: #060a16;
+
+  --plasma-soft-violet: rgba(79, 70, 229, 0.10);
+  --plasma-soft-magenta: rgba(37, 99, 235, 0.08);
+  --plasma-soft-cyan: rgba(125, 211, 252, 0.16);
+
+  --gradient-plasma-line: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(79, 70, 229, 0) 8%,
+    rgba(79, 70, 229, 0.5) 28%,
+    rgba(37, 99, 235, 0.6) 50%,
+    rgba(125, 211, 252, 0.5) 72%,
+    rgba(125, 211, 252, 0) 92%,
+    transparent 100%
+  );
+
+  --gradient-plasma-border: linear-gradient(
+    135deg,
+    rgba(79, 70, 229, 0.5) 0%,
+    rgba(37, 99, 235, 0.32) 45%,
+    rgba(125, 211, 252, 0.42) 100%
+  );
+
+  --gradient-section-seam: linear-gradient(
+    180deg,
+    rgba(238, 240, 244, 0) 0%,
+    rgba(238, 240, 244, 0) 45%,
+    rgba(79, 70, 229, 0.07) 100%
+  );
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* Bento / showcase */
+  --bento-gap: clamp(12px, 2vw, 16px);
+  --bento-radius: var(--radius-xl);
+  --hscroll-fade: 48px;
+
+  /* Typography — editorial display + operational UI */
+  --font-ui: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Bricolage Grotesque", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-h3: 22px;
+  --text-h2: 28px;
+  --text-h1: 42px;
+  --text-display: 64px;
+  --header-offset: 72px;
+
+  --lh-base: 1.55;
+  --lh-tight: 1.2;
+  --lh-display: 1.05;
+  --letter-eyebrow: 0.12em;
+  --weight-heading: 650;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-full: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 6px 16px -4px rgba(15, 23, 42, 0.08), 0 2px 6px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 18px 36px -12px rgba(15, 23, 42, 0.18), 0 6px 14px -4px rgba(15, 23, 42, 0.08);
+  --shadow-glass: 0 24px 56px -20px rgba(15, 23, 42, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --ring-focus: 0 0 0 3px var(--accent-ring);
+
+  /* Motion — единый ритм UI (~300ms ease-out, как primary CTA) */
+  --duration-micro: 150ms;
+  --duration-fast: 150ms;
+  --duration-ui: 300ms;
+  --duration-base: 300ms;
+  --duration-slow: 420ms;
+  --duration-slower: 560ms;
+  --duration-reveal: 820ms;
+  --reveal-offset: 14px;
+  --reveal-stagger: 72ms;
+  --word-reveal-duration: 520ms;
+  --word-reveal-stagger: 38ms;
+  --word-reveal-offset: 0.38em;
+  --ease-reveal: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-scroll: 1000ms;
+  --duration-scroll-min: 900ms;
+  --duration-scroll-max: 1800ms;
+  --scroll-distance-ms: 0.55;
+  --scroll-lerp: 0.075;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-ui: ease-out;
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Layout */
+  --content-max: 1180px;
+  --content-narrow: 720px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

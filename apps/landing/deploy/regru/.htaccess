@@ -1,0 +1,16 @@
+AddDefaultCharset utf-8
+
+RewriteEngine On
+
+# https-редирект здесь НЕ делаем: за Cloudflare Apache видит http и
+# правило зацикливается. «Always Use HTTPS» включается на стороне CF.
+
+# Форма постит на /api/waitlist — маршрутизируем в PHP-эндпоинт
+RewriteRule ^api/waitlist/?$ api/waitlist.php [L,QSA]
+
+# Долгий кеш для хешированных ассетов Astro
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>

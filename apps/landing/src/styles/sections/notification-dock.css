@@ -1,0 +1,188 @@
+.notify-dock-shell {
+  position: fixed;
+  right: clamp(10px, 2vw, 22px);
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  z-index: 45;
+  width: min(360px, calc(100vw - 20px));
+  pointer-events: none;
+}
+
+.notify-dock {
+  position: relative;
+  width: 100%;
+  min-height: 200px;
+  pointer-events: auto;
+}
+
+@media (max-width: 640px) {
+  .notify-dock-shell {
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+
+  .notify-dock {
+    min-height: 176px;
+  }
+}
+
+.notify {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--notify-i, 0) * 12px);
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in oklab, var(--border) 70%, #fff 30%);
+  background: color-mix(in oklab, var(--panel) 88%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.65) inset,
+    0 22px 48px -28px rgba(15, 23, 42, 0.45);
+  transform: scale(calc(1 - var(--notify-i, 0) * 0.04));
+  transform-origin: bottom right;
+  opacity: calc(1 - var(--notify-i, 0) * 0.22);
+  z-index: calc(10 - var(--notify-i, 0));
+  transition:
+    transform 0.45s var(--ease-reveal),
+    opacity 0.45s var(--ease-reveal),
+    bottom 0.45s var(--ease-reveal);
+}
+
+.notify--front {
+  animation: notify-in 0.42s var(--ease-out) both;
+}
+
+.notify::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--notify-accent, var(--plasma-violet));
+}
+
+.notify--system {
+  --notify-accent: var(--warning);
+}
+.notify--signal {
+  --notify-accent: var(--plasma-magenta);
+}
+.notify--chat {
+  --notify-accent: var(--accent);
+}
+.notify--audit {
+  --notify-accent: var(--success);
+}
+.notify--task {
+  --notify-accent: var(--accent);
+}
+.notify--approval {
+  --notify-accent: var(--plasma-violet);
+}
+
+.notify--approval .notify__icon {
+  background: color-mix(in oklab, var(--plasma-violet) 18%, var(--panel-strong));
+  color: var(--plasma-violet);
+}
+
+.notify--task .notify__icon {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+.notify-dock-shell[data-hero-visible="true"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(16px);
+  transition:
+    opacity 0.28s var(--ease-out),
+    visibility 0.28s var(--ease-out),
+    transform 0.28s var(--ease-out);
+}
+
+.notify__icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  background: var(--panel-strong);
+  color: var(--text-strong);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+}
+
+.notify--signal .notify__icon {
+  background: linear-gradient(145deg, var(--plasma-violet), var(--plasma-magenta));
+  color: #fff;
+}
+
+.notify--system .notify__icon {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.notify--audit .notify__icon {
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.notify__body {
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.notify__app {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-soft);
+  margin-bottom: 2px;
+}
+
+.notify__title {
+  font-size: 13.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+  line-height: 1.25;
+}
+
+.notify__text {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted-strong);
+}
+
+.notify__time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted-soft);
+  white-space: nowrap;
+  padding-top: 4px;
+}
+
+@keyframes notify-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}

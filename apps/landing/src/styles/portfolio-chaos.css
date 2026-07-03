@@ -1,0 +1,278 @@
+/* Portfolio orbit — KISS PM as the gravity center of portfolio control. */
+
+.l-band--portfolio-chaos {
+  --orbit-ink: var(--text-strong);
+  --orbit-muted: var(--muted);
+  --orbit-border: var(--border);
+  --orbit-blue: var(--accent);
+  --orbit-violet: var(--plasma-violet);
+  --orbit-cyan: var(--plasma-cyan);
+  --orbit-magenta: var(--plasma-magenta);
+  --orbit-warn: var(--warning-text);
+  --orbit-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  z-index: 1;
+  padding-block: 0;
+  overflow: hidden;
+  color: var(--orbit-ink);
+  background: linear-gradient(180deg, transparent 0%, transparent 54%, rgba(255, 255, 255, 0.5) 82%, var(--panel) 100%);
+  min-height: clamp(760px, 96vh, 980px);
+}
+
+.l-band--portfolio-chaos::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  height: clamp(260px, 32vh, 420px);
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.82) 70%, var(--panel) 100%);
+}
+
+#philosophy.l-band--panel {
+  position: relative;
+  z-index: 0;
+  margin-top: -112px;
+  padding-top: calc(var(--section-pad-y) + 112px);
+  border-block: 0;
+  box-shadow: none;
+}
+
+.portfolioChaosSection__grid {
+  display: none;
+}
+
+.sectionInner {
+  position: relative;
+  width: 100%;
+  min-height: inherit;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.l-band--portfolio-chaos .sectionHeader {
+  position: absolute;
+  top: clamp(58px, 8vw, 92px);
+  left: clamp(20px, 6vw, 88px);
+  z-index: 5;
+  max-width: min(680px, calc(100% - 40px));
+  margin: 0;
+  text-align: left;
+  pointer-events: none;
+}
+
+.l-band--portfolio-chaos .sectionHeader h2 {
+  margin: 0;
+  color: var(--orbit-ink);
+  font-family: var(--font-display);
+  font-size: clamp(34px, 4vw, 50px);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  font-weight: var(--weight-heading);
+  font-variation-settings: "wght" var(--weight-heading);
+  text-wrap: balance;
+}
+
+.l-band--portfolio-chaos .sectionHeader p {
+  max-width: 580px;
+  margin: 16px 0 0;
+  color: var(--muted-strong);
+  font-size: clamp(16px, 1.45vw, 18px);
+  line-height: 1.62;
+}
+
+.orbitSceneShell {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  min-height: inherit;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  isolation: isolate;
+}
+
+.orbitSceneShell::before {
+  content: none;
+}
+
+.orbitSceneCanvas {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
+
+.orbitChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 19px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--orbit-ink);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.12);
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 690;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+  user-select: none;
+}
+
+.orbitChip::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.58;
+}
+
+.orbitChip--project {
+  color: var(--accent);
+}
+
+.orbitChip--resource {
+  color: var(--info);
+  background: rgba(240, 249, 255, 0.92);
+}
+
+.orbitChip--signal {
+  color: var(--orbit-warn);
+  background: rgba(255, 247, 238, 0.94);
+}
+
+.orbitChip--decision {
+  color: #fff;
+  border-color: rgba(79, 70, 229, 0.3);
+  background: linear-gradient(135deg, var(--plasma-violet), var(--accent));
+}
+
+.orbitChip--scenario {
+  color: var(--violet);
+  background: rgba(245, 243, 255, 0.92);
+}
+
+.orbitChip[data-priority="quiet"] {
+  opacity: 0.72;
+}
+
+.orbitChip[data-priority="hot"] {
+  box-shadow:
+    0 12px 28px rgba(37, 99, 235, 0.16),
+    0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+}
+
+.zoomControls,
+.orbitSceneHint {
+  position: absolute;
+  z-index: 4;
+}
+
+.zoomControls button:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.zoomControls {
+  right: 22px;
+  bottom: 22px;
+  display: grid;
+  gap: 8px;
+}
+
+.zoomControls button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--orbit-ink);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+  font-size: 20px;
+  font-weight: 560;
+  backdrop-filter: blur(14px);
+  transition:
+    transform 220ms var(--orbit-ease),
+    background 220ms var(--orbit-ease);
+}
+
+.zoomControls button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.orbitSceneHint {
+  left: 24px;
+  bottom: 24px;
+  max-width: 260px;
+  margin: 0;
+  color: rgba(21, 21, 21, 0.56);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbitChip,
+  .zoomControls button {
+    transition-duration: 0.01ms;
+  }
+}
+
+@media (max-width: 1024px) {
+  .l-band--portfolio-chaos {
+    min-height: 780px;
+  }
+}
+
+@media (max-width: 767px) {
+  .l-band--portfolio-chaos {
+    min-height: 720px;
+  }
+
+  .l-band--portfolio-chaos .sectionHeader {
+    top: 46px;
+    left: 20px;
+    right: 20px;
+    max-width: none;
+  }
+
+  .l-band--portfolio-chaos .sectionHeader h2 {
+    font-size: clamp(32px, 9vw, 42px);
+  }
+
+  .l-band--portfolio-chaos .sectionHeader p {
+    font-size: 16px;
+  }
+
+  .zoomControls {
+    right: 16px;
+    bottom: 16px;
+    grid-auto-flow: column;
+  }
+
+  .orbitSceneHint {
+    left: 16px;
+    right: 96px;
+    bottom: 20px;
+    max-width: none;
+    font-size: 11px;
+  }
+
+  .orbitChip {
+    min-height: 19px;
+    padding-inline: 6px;
+    font-size: 8px;
+  }
+}
