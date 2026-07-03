@@ -1,43 +1,37 @@
 ---
+import { copyFor, type LandingLocale } from "../lib/landing-i18n";
+
+interface Props {
+  locale?: LandingLocale;
+}
+
+const { locale = "ru" } = Astro.props;
 const year = new Date().getFullYear();
-
-const productLinks = [
-  { href: "#agent-demo", label: "Агент" },
-  { href: "#loop", label: "Как работает" },
-  { href: "#demo", label: "Сценарий" },
-  { href: "#waitlist", label: "Ранний доступ" },
-] as const;
-
-const legalLinks = [
-  { href: "/privacy", label: "Конфиденциальность" },
-  { href: "/terms", label: "Условия альфы" },
-] as const;
+const copy = copyFor(locale).footer;
 ---
 
 <footer class="site-footer">
   <div class="l-container">
     <div class="site-footer__panel">
       <div class="site-footer__brand-block">
-        <a class="site-footer__brand" href="#hero" aria-label="KISS PM — наверх">
+        <a class="site-footer__brand" href="#hero" aria-label={copy.topLabel}>
           <span class="site-footer__mark">K</span>
           <span>KISS PM</span>
         </a>
-        <p class="site-footer__tag">
-          Агент готовит сверку изменений проекта. Человек применяет выбранное, KISS PM пишет аудит.
-        </p>
+        <p class="site-footer__tag">{copy.tag}</p>
       </div>
 
       <div class="site-footer__groups">
-        <nav class="site-footer__group" aria-label="Разделы лендинга">
-          <p class="site-footer__heading">Лендинг</p>
-          {productLinks.map((link) => (
+        <nav class="site-footer__group" aria-label={copy.landingHeading}>
+          <p class="site-footer__heading">{copy.landingHeading}</p>
+          {copy.productLinks.map((link) => (
             <a href={link.href}>{link.label}</a>
           ))}
         </nav>
 
-        <nav class="site-footer__group" aria-label="Юридические документы">
-          <p class="site-footer__heading">Документы</p>
-          {legalLinks.map((link) => (
+        <nav class="site-footer__group" aria-label={copy.docsHeading}>
+          <p class="site-footer__heading">{copy.docsHeading}</p>
+          {copy.legalLinks.map((link) => (
             <a href={link.href}>{link.label}</a>
           ))}
         </nav>
@@ -46,7 +40,7 @@ const legalLinks = [
       <div class="site-footer__meta">
         <a class="site-footer__mail" href="mailto:hello@kisspm.app">hello@kisspm.app</a>
         <p class="site-footer__copy">© {year} KISS PM</p>
-        <p class="site-footer__status">Закрытая альфа</p>
+        <p class="site-footer__status">{copy.status}</p>
       </div>
     </div>
   </div>

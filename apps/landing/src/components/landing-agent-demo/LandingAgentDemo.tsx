@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import type { LandingLocale } from "../../lib/landing-i18n";
 import {
   AgentChatPanel,
   AgentConversationList,
@@ -8,7 +9,7 @@ import {
   CollapsedAppNav,
   MobileDrawerBackdrop,
 } from "./components";
-import { createLandingAgentDemoState, SECOND_ANSWER_MESSAGE, SECOND_PROMPT } from "./scenario";
+import { createLandingAgentDemoState, getLandingAgentDemoCopy } from "./scenario";
 import type { LandingAgentDemoPreset, LandingAgentDemoState } from "./types";
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -18,10 +19,12 @@ function cx(...classes: Array<string | false | null | undefined>) {
 export type LandingAgentDemoProps = {
   preset?: LandingAgentDemoPreset;
   mobile?: boolean;
+  locale?: LandingLocale;
 };
 
-export function LandingAgentDemo({ preset = "initial", mobile = false }: LandingAgentDemoProps) {
-  const initialState = useMemo(() => createLandingAgentDemoState(preset), [preset]);
+export function LandingAgentDemo({ preset = "initial", mobile = false, locale = "ru" }: LandingAgentDemoProps) {
+  const copy = getLandingAgentDemoCopy(locale);
+  const initialState = useMemo(() => createLandingAgentDemoState(preset, locale), [preset, locale]);
   const [state, setState] = useState<LandingAgentDemoState>(initialState);
   const [note, setNote] = useState<string | null>(null);
   const [filterSelected, setFilterSelected] = useState(false);
@@ -51,7 +54,6 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
 
   const hostRef = useRef<HTMLDivElement | null>(null);
 
-  // Автозапуск сценария, когда демо видно: пустой чат не встречает посетителя.
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -77,7 +79,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
           });
         }, 700);
       },
-      { threshold: 0.55 }
+      { threshold: 0.55 },
     );
     io.observe(host);
 
@@ -95,7 +97,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
     const stepTimers = [1, 2, 3, 4, 5].map((step) =>
       window.setTimeout(() => {
         setState((current) => ({ ...current, visibleSteps: step }));
-      }, step * 360)
+      }, step * 360),
     );
     const answerTimer = window.setTimeout(() => {
       setState((current) => ({
@@ -110,7 +112,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
                 id: "henry-live",
                 author: "henry",
                 time: "10:42",
-                text: "Проверил. Задержка затронула две задачи и клиентскую демонстрацию. Подготовил сверку из 5 изменений.",
+                text: copy.messages.answer,
               },
             ],
       }));
@@ -124,7 +126,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
       window.clearTimeout(answerTimer);
       window.clearTimeout(openTimer);
     };
-  }, [state.phase]);
+  }, [state.phase, copy.messages.answer]);
 
   useEffect(() => {
     if (state.phase !== "second-thinking") {
@@ -134,14 +136,14 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
     const timers = [1, 2, 3, 4, 5].map((step) =>
       window.setTimeout(() => {
         setState((current) => ({ ...current, visibleSteps: step }));
-      }, step * 320)
+      }, step * 320),
     );
     const answerTimer = window.setTimeout(() => {
       setState((current) => ({
         ...current,
-        messages: current.messages.some((message) => message.id === SECOND_ANSWER_MESSAGE.id)
+        messages: current.messages.some((message) => message.id === copy.messages.secondAnswer.id)
           ? current.messages
-          : [...current.messages, SECOND_ANSWER_MESSAGE],
+          : [...current.messages, copy.messages.secondAnswer],
       }));
     }, 2050);
 
@@ -149,7 +151,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
       timers.forEach((timer) => window.clearTimeout(timer));
       window.clearTimeout(answerTimer);
     };
-  }, [state.phase]);
+  }, [state.phase, copy.messages.secondAnswer]);
 
   function sendMessage() {
     const text = state.inputValue.trim();
@@ -199,7 +201,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
       setState((current) => ({
         ...current,
         phase: "applied",
-        inputValue: SECOND_PROMPT,
+        inputValue: copy.prompts.second,
         reviewVisible: true,
         mobileReviewDrawer: false,
         messages: current.messages.some((message) => message.id === "henry-applied")
@@ -210,38 +212,40 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
                 id: "henry-applied",
                 author: "henry",
                 time: "10:44",
-                text: "Готово. Применил 4 изменения и оставил запись в аудите. Одно изменение осталось отклоненным.",
+                text: copy.messages.applied,
               },
             ],
         changes: current.changes.map((change) =>
-          change.selected ? { ...change, status: "применено" } : change
+          change.selected ? { ...change, status: copy.statuses.applied } : change,
         ),
       }));
     }, 650);
   }
 
   function resetDemo() {
-    setState(createLandingAgentDemoState("reset-demo"));
+    setState(createLandingAgentDemoState("reset-demo", locale));
   }
 
   return (
-    <AgentWorkspaceFrame mobile={mobile}>
+    <AgentWorkspaceFrame mobile={mobile} locale={locale}>
       <div
         ref={hostRef}
         className={cx(
           "lad-layout",
           state.navExpanded && "lad-layout--nav-expanded",
-          reviewPending && "lad-layout--review-open"
+          reviewPending && "lad-layout--review-open",
         )}
       >
         <CollapsedAppNav
           expanded={state.navExpanded}
           mobileOpen={state.mobileLeftDrawer}
+          locale={locale}
           onToggle={() => setState((current) => ({ ...current, navExpanded: !current.navExpanded }))}
           onNote={showNote}
         />
         <MobileDrawerBackdrop
           visible={state.mobileLeftDrawer || state.mobileReviewDrawer}
+          locale={locale}
           onClick={() =>
             setState((current) => ({
               ...current,
@@ -250,7 +254,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
             }))
           }
         />
-        <AgentConversationList onNote={showNote} />
+        <AgentConversationList locale={locale} onNote={showNote} />
         <AgentChatPanel
           messages={state.messages}
           inputValue={state.inputValue}
@@ -258,6 +262,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
           phase={state.phase}
           agentMenuOpen={state.agentMenuOpen}
           reviewVisible={reviewPending}
+          locale={locale}
           note={note}
           onNote={showNote}
           onInputChange={(value) => setState((current) => ({ ...current, inputValue: value }))}
@@ -279,11 +284,12 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
         <ChangeReviewPanel
           changes={state.changes}
           filterSelected={filterSelected}
+          locale={locale}
           onToggleFilter={() => setFilterSelected((value) => !value)}
           visible={reviewPending}
           opening={state.phase === "review-opening"}
           applying={state.phase === "applying"}
-          applied={state.phase === "applied" || state.changes.some((change) => change.status === "применено")}
+          applied={state.phase === "applied" || state.changes.some((change) => change.status === copy.statuses.applied)}
           activeChangeId={state.activeChangeId}
           editingChangeId={state.editingChangeId}
           mobileOpen={reviewPending && state.mobileReviewDrawer}
@@ -297,9 +303,9 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
                   ? {
                       ...change,
                       selected: !change.selected,
-                      status: change.selected ? "отклонено" : "выбрано",
+                      status: change.selected ? copy.statuses.rejected : copy.statuses.selected,
                     }
-                  : change
+                  : change,
               ),
             }))
           }
@@ -309,7 +315,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
               ...current,
               activeChangeId: id,
               changes: current.changes.map((change) =>
-                change.id === id ? { ...change, selected: false, status: "отклонено" } : change
+                change.id === id ? { ...change, selected: false, status: copy.statuses.rejected } : change,
               ),
             }))
           }
@@ -320,7 +326,7 @@ export function LandingAgentDemo({ preset = "initial", mobile = false }: Landing
             setState((current) => ({
               ...current,
               changes: current.changes.map((change) =>
-                change.id === id ? { ...change, after: value, status: "изменено", selected: true } : change
+                change.id === id ? { ...change, after: value, status: copy.statuses.edited, selected: true } : change,
               ),
             }))
           }

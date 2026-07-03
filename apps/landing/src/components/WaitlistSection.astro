@@ -1,5 +1,13 @@
 ---
 import WaitlistForm from "./WaitlistForm.tsx";
+import { copyFor, type LandingLocale } from "../lib/landing-i18n";
+
+interface Props {
+  locale?: LandingLocale;
+}
+
+const { locale = "ru" } = Astro.props;
+const copy = copyFor(locale).waitlist;
 ---
 
 <section id="waitlist" class="l-band l-band--canvas" aria-labelledby="waitlist-title">
@@ -7,16 +15,13 @@ import WaitlistForm from "./WaitlistForm.tsx";
     <div class="waitlist">
       <header class="waitlist__head section-head section-head--tight">
         <h2 id="waitlist-title" class="l-display" data-text-reveal>
-          Ранний доступ
+          {copy.title}
         </h2>
-        <p class="section-head__copy" data-text-reveal>
-          Закрытая альфа для команд, которые хотят управлять проектами через агента,
-          а не собирать статус и правки вручную. Оставьте рабочую почту — ответим письмом.
-        </p>
+        <p class="section-head__copy" data-text-reveal>{copy.copy}</p>
       </header>
 
       <div class="waitlist__panel kp-spotlight-card" data-reveal>
-        <WaitlistForm client:visible />
+        <WaitlistForm locale={locale} client:visible />
       </div>
     </div>
   </div>

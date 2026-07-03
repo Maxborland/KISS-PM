@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useReducer, useState } from "react";
-import { DEMO_FIXTURE } from "../demo/fixture";
+import type { LandingLocale } from "../lib/landing-i18n";
+import { DEMO_FIXTURE_BY_LOCALE } from "../demo/fixture";
+import { DEMO_SANDBOX_COPY } from "../demo/sandbox-copy";
 import {
   ORDER,
-  STEP_META,
+  STEP_META_BY_LOCALE,
   type DemoState,
   type DemoStep,
   goTo,
@@ -29,38 +31,14 @@ function reducer(state: DemoState, action: Action): DemoState {
   }
 }
 
-/* Упрощённый сайдбар продукта: раздел ← текущий шаг сценария */
-const NAV_SECTIONS: ReadonlyArray<{
-  label: string;
-  items: ReadonlyArray<{ label: string; steps: ReadonlyArray<DemoStep> }>;
-}> = [
-  {
-    label: "Работа",
-    items: [
-      { label: "Мои задачи", steps: ["task"] },
-      { label: "Проекты", steps: ["project"] },
-      { label: "Сделки", steps: ["crm-list", "crm-deal"] },
-      { label: "Ресурсы", steps: ["intake"] },
-    ],
-  },
-  {
-    label: "Аналитика",
-    items: [
-      { label: "Дашборд", steps: ["action"] },
-      { label: "KPI", steps: ["signal"] },
-    ],
-  },
-  {
-    label: "Администрирование",
-    items: [{ label: "Аудит", steps: ["audit"] }],
-  },
-];
-
-export default function DemoSandbox() {
+export default function DemoSandbox({ locale = "ru" }: { locale?: LandingLocale }) {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
   const [notice, setNotice] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
-  const meta = STEP_META[state.step];
+  const copy = DEMO_SANDBOX_COPY[locale];
+  const fixture = DEMO_FIXTURE_BY_LOCALE[locale];
+  const metaByStep = STEP_META_BY_LOCALE[locale];
+  const meta = metaByStep[state.step];
   const currentIdx = ORDER.indexOf(state.step);
   const progress = useMemo(
     () => Math.round(((currentIdx + 1) / ORDER.length) * 100),
@@ -82,7 +60,6 @@ export default function DemoSandbox() {
     dispatch({ type: "goto", step });
   }, []);
 
-  /* Клик по разделу: открыт хотя бы один его шаг → навигируем, иначе честная подсказка */
   const onNavClick = useCallback(
     (item: { label: string; steps: ReadonlyArray<DemoStep> }) => {
       const unlocked = item.steps.filter(
@@ -93,30 +70,21 @@ export default function DemoSandbox() {
         return;
       }
       const firstIdx = Math.min(...item.steps.map((s) => ORDER.indexOf(s)));
-      setNotice(`Раздел «${item.label}» откроется на шаге ${firstIdx + 1} сценария.`);
+      setNotice(copy.lockedNotice(item.label, firstIdx + 1));
     },
-    [currentIdx, state.visited, goToStep],
+    [copy, currentIdx, state.visited, goToStep],
   );
 
-  const dockPrimaryLabel: Partial<Record<DemoStep, string>> = {
-    "crm-list": "Открыть «ГК Север» →",
-    "crm-deal": "Проверить ёмкость →",
-    intake: "К задаче T-1041 →",
-    project: "Открыть задачу →",
-    task: "Открыть сигнал →",
-    signal: "Перейти к действию →",
-    action: "Подтвердить и записать →",
-  };
-  const dockPrimary = dockPrimaryLabel[state.step];
+  const dockPrimary = copy.dockPrimary[state.step];
   const dockEmphasis = state.step !== "audit";
 
   return (
     <div className="sandbox" data-demo-step={state.step}>
-      <aside className="sandbox__rail" aria-label="Навигация продукта">
+      <aside className="sandbox__rail" aria-label={copy.navLabel}>
         <button
           type="button"
           className="sandbox__burger"
-          aria-label={navOpen ? "Закрыть меню разделов" : "Открыть меню разделов"}
+          aria-label={navOpen ? copy.closeMenu : copy.openMenu}
           aria-expanded={navOpen}
           onClick={() => setNavOpen((value) => !value)}
         >
@@ -141,13 +109,13 @@ export default function DemoSandbox() {
           <button
             type="button"
             className="sandbox__nav-backdrop"
-            aria-label="Закрыть меню разделов"
+            aria-label={copy.closeBackdrop}
             onClick={() => setNavOpen(false)}
           />
         ) : null}
 
         <nav className={`sandbox__nav${navOpen ? " is-open" : ""}`}>
-          {NAV_SECTIONS.map((section) => (
+          {copy.navSections.map((section) => (
             <div key={section.label} className="sandbox__nav-section">
               <p className="sandbox__nav-label">{section.label}</p>
               {section.items.map((item) => {
@@ -179,38 +147,33 @@ export default function DemoSandbox() {
         <div className="sandbox__rail-foot">
           <p className="sandbox__portfolio-chip">
             <span className="sandbox__portfolio-dot" aria-hidden="true" />
-            147 проектов в работе
+            {copy.portfolioChip}
           </p>
           <button type="button" className="sandbox__reset" onClick={onReset}>
-            ↺ Начать сценарий сначала
+            {copy.reset}
           </button>
         </div>
       </aside>
 
       <div className="sandbox__main">
         <div className="sandbox__topbar">
-          <button
-            type="button"
-            className="sandbox__search"
-            onClick={() =>
-              onExplore("Поиск работает по всему портфелю — в демо навигацию ведёт сценарий.")
-            }
-          >
+          <button type="button" className="sandbox__search" onClick={() => onExplore(copy.searchNotice)}>
             <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
               <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
               <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
-            <span>Поиск: проекты, задачи, сделки, CRM</span>
+            <span>{copy.search}</span>
           </button>
           <span className="sandbox__avatar" aria-hidden="true">
-            АК
+            {copy.avatar}
           </span>
         </div>
 
         <section className="sandbox__stage" aria-live="polite">
           <DemoStage
             step={state.step}
-            fixture={DEMO_FIXTURE}
+            fixture={fixture}
+            locale={locale}
             onAdvance={onAdvance}
             onExplore={onExplore}
           />
@@ -229,14 +192,8 @@ export default function DemoSandbox() {
             <p className="sandbox__dock-hint">{meta.hint}</p>
           </div>
           <div className="sandbox__dock-actions">
-            <button
-              type="button"
-              className="sandbox__dock-secondary"
-              onClick={() =>
-                onExplore("Сценарий сохраняется автоматически — можно продолжить с текущего шага.")
-              }
-            >
-              Сохранить черновик
+            <button type="button" className="sandbox__dock-secondary" onClick={() => onExplore(copy.draftNotice)}>
+              {copy.draft}
             </button>
             {dockPrimary ? (
               <button
@@ -252,11 +209,11 @@ export default function DemoSandbox() {
       </div>
 
       <div className="sandbox__side">
-        <div className="sandbox__scenario" aria-label="Сценарий демо">
+        <div className="sandbox__scenario" aria-label={copy.scenarioLabel}>
           <div className="sandbox__scenario-head">
-            <span className="sandbox__rail-eyebrow">Сценарий · 8 шагов</span>
+            <span className="sandbox__rail-eyebrow">{copy.scenarioTitle}</span>
             <p className="sandbox__rail-progress">
-              <span>{progress}%</span> пройдено
+              <span>{progress}%</span> {copy.progressDone}
             </p>
             <div className="sandbox__progress-bar" aria-hidden="true">
               <span className="sandbox__progress-fill" style={{ width: `${progress}%` }} />
@@ -264,7 +221,7 @@ export default function DemoSandbox() {
           </div>
           <ol className="sandbox__scenario-steps">
             {ORDER.map((step, idx) => {
-              const m = STEP_META[step];
+              const m = metaByStep[step];
               const isActive = step === state.step;
               const isLocked = idx > currentIdx && !state.visited.includes(step);
               const isComplete = !isActive && state.visited.includes(step);
@@ -293,7 +250,7 @@ export default function DemoSandbox() {
           </ol>
         </div>
 
-        <DemoContextPanel step={state.step} fixture={DEMO_FIXTURE} onExplore={onExplore} />
+        <DemoContextPanel step={state.step} fixture={fixture} locale={locale} onExplore={onExplore} />
       </div>
     </div>
   );

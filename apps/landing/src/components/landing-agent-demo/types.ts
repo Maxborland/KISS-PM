@@ -26,7 +26,13 @@ export type ChangeStatus =
   | "отклонено"
   | "требует прав"
   | "устарело"
-  | "применено";
+  | "применено"
+  | "selected"
+  | "edited"
+  | "rejected"
+  | "needs permission"
+  | "stale"
+  | "applied";
 
 export type ChangeKind = "date" | "owner" | "text" | "status";
 

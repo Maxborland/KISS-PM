@@ -1,5 +1,13 @@
 ---
 import DemoSandbox from "./DemoSandbox.tsx";
+import { copyFor, type LandingLocale } from "../lib/landing-i18n";
+
+interface Props {
+  locale?: LandingLocale;
+}
+
+const { locale = "ru" } = Astro.props;
+const copy = copyFor(locale).demoSection;
 ---
 
 <section
@@ -13,16 +21,16 @@ import DemoSandbox from "./DemoSandbox.tsx";
   <div class="demo-band__wrap">
     <header class="section-head section-head--tight">
       <h2 id="demo-title" class="l-display" data-text-reveal>
-        Интерактивный сценарий
+        {copy.title}
       </h2>
       <p class="section-head__copy section-head__copy--visible" data-text-reveal>
-        Живой пример: цель превращается в сверку изменений проекта — задачи, сроки, ресурсы, применение и аудит.
+        {copy.copy}
       </p>
     </header>
 
     <div class="demo-frame" data-reveal data-demo-dim-frame>
       <div class="demo-frame__inner">
-        <DemoSandbox client:visible />
+        <DemoSandbox locale={locale} client:visible />
       </div>
     </div>
   </div>

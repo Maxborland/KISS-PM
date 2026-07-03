@@ -1,29 +1,32 @@
+import type { LandingLocale } from "../../../lib/landing-i18n";
 import { DemoShell } from "./DemoShell";
 
-const LESSONS = [
-  {
-    kind: "risk",
-    label: "Риск",
-    text: "Смещение сроков из-за зависимостей с поставщиками",
+const COPY = {
+  ru: {
+    title: "Уроки проекта",
+    templateTitle: "Шаблон проекта",
+    badge: "Новый",
+    add: "+ Добавить пункт",
+    lessons: [
+      { kind: "risk", label: "Риск", text: "Смещение сроков из-за зависимостей с поставщиками" },
+      { kind: "solution", label: "Решение", text: "Раннее подключение поставщиков и буфер в плане" },
+      { kind: "repeat", label: "Повторить", text: "Еженедельная синхронизация и единый источник данных" },
+    ],
+    templateItems: ["Планирование поставок", "Буфер по срокам", "Еженедельные синки", "Единый источник данных"],
   },
-  {
-    kind: "solution",
-    label: "Решение",
-    text: "Раннее подключение поставщиков и буфер в плане",
+  en: {
+    title: "Project lessons",
+    templateTitle: "Project template",
+    badge: "New",
+    add: "+ Add item",
+    lessons: [
+      { kind: "risk", label: "Risk", text: "Schedule shifted because supplier dependencies were late" },
+      { kind: "solution", label: "Decision", text: "Bring suppliers in earlier and keep a plan buffer" },
+      { kind: "repeat", label: "Repeat", text: "Weekly sync and one source of truth" },
+    ],
+    templateItems: ["Supplier planning", "Schedule buffer", "Weekly syncs", "One source of truth"],
   },
-  {
-    kind: "repeat",
-    label: "Повторить",
-    text: "Еженедельная синхронизация и единый источник данных",
-  },
-] as const;
-
-const TEMPLATE_ITEMS = [
-  "Планирование поставок",
-  "Буфер по срокам",
-  "Еженедельные синки",
-  "Единый источник данных",
-] as const;
+} as const;
 
 function LessonIcon({ kind }: { kind: string }) {
   if (kind === "risk") {
@@ -57,7 +60,8 @@ function LessonIcon({ kind }: { kind: string }) {
   );
 }
 
-export function LessonsTemplateDemo({ active }: { active: boolean }) {
+export function LessonsTemplateDemo({ active, locale = "ru" }: { active: boolean; locale?: LandingLocale }) {
+  const copy = COPY[locale];
   return (
     <DemoShell active={active}>
       <div className="six-closure">
@@ -72,10 +76,10 @@ export function LessonsTemplateDemo({ active }: { active: boolean }) {
                 />
               </svg>
             </span>
-            Уроки проекта
+            {copy.title}
           </h4>
           <ul className="six-closure__lesson-list">
-            {LESSONS.map((item, i) => (
+            {copy.lessons.map((item, i) => (
               <li key={item.label} className={`six-closure__lesson six-closure__lesson--${i + 1}`}>
                 <span className={`six-closure__lesson-icon six-closure__lesson-icon--${item.kind}`}>
                   <LessonIcon kind={item.kind} />
@@ -107,11 +111,11 @@ export function LessonsTemplateDemo({ active }: { active: boolean }) {
         </div>
         <article className="six-closure__template">
           <header className="six-closure__template-head">
-            <h4>Шаблон проекта</h4>
-            <span className="six-closure__badge">Новый</span>
+            <h4>{copy.templateTitle}</h4>
+            <span className="six-closure__badge">{copy.badge}</span>
           </header>
           <ul className="six-closure__checklist">
-            {TEMPLATE_ITEMS.map((item, i) => (
+            {copy.templateItems.map((item, i) => (
               <li key={item} className={`six-closure__check six-closure__check--${i + 1}`}>
                 <span className="six-closure__checkbox" aria-hidden="true">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
@@ -126,7 +130,7 @@ export function LessonsTemplateDemo({ active }: { active: boolean }) {
             ))}
           </ul>
           <button type="button" className="six-closure__add" tabIndex={-1}>
-            + Добавить пункт
+            {copy.add}
           </button>
         </article>
       </div>
