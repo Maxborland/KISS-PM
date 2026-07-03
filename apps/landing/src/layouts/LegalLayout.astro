@@ -2,11 +2,15 @@
 import BaseLayout from "./BaseLayout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
+import type { LandingLocale } from "../lib/landing-i18n";
 
 interface LegalFrontmatter {
   title?: string;
   updated?: string;
   description?: string;
+  lang?: LandingLocale;
+  eyebrow?: string;
+  updatedLabel?: string;
 }
 
 interface Props extends LegalFrontmatter {
@@ -17,16 +21,31 @@ const frontmatter = Astro.props.frontmatter ?? {};
 const title = Astro.props.title ?? frontmatter.title ?? "Юридическая страница";
 const updated = Astro.props.updated ?? frontmatter.updated ?? "";
 const description = Astro.props.description ?? frontmatter.description ?? title;
+const locale = Astro.props.lang ?? frontmatter.lang ?? "ru";
+const eyebrow = Astro.props.eyebrow ?? frontmatter.eyebrow ?? (locale === "en" ? "Legal page" : "Юридическая страница");
+const updatedLabel = Astro.props.updatedLabel ?? frontmatter.updatedLabel ?? (locale === "en" ? "Updated" : "Обновлено");
+const skipLink = locale === "en" ? "Skip to content" : "Перейти к содержимому";
+const sectionHrefPrefix = locale === "en" ? "/en/" : "/";
+const ctaHref = `${sectionHrefPrefix}#waitlist`;
+const currentPath = Astro.url.pathname;
+const translatedPath = locale === "en"
+  ? currentPath.replace(/^\/en/, "") || "/"
+  : `/en${currentPath}`;
+const localeHref = translatedPath;
+const alternates = [
+  { hrefLang: locale, href: `https://kisspm.app${currentPath}` },
+  { hrefLang: locale === "en" ? "ru" : "en", href: `https://kisspm.app${translatedPath}` },
+];
 ---
 
-<BaseLayout title={`${title} · KISS PM`} description={description}>
-  <SiteHeader slot="header" />
+<BaseLayout title={`${title} · KISS PM`} description={description} lang={locale} skipLink={skipLink} alternates={alternates}>
+  <SiteHeader slot="header" locale={locale} sectionHrefPrefix={sectionHrefPrefix} ctaHref={ctaHref} localeHref={localeHref} />
 
   <article class="l-section legal">
     <div class="l-container l-container--narrow">
-      <span class="l-eyebrow">Юридическая страница</span>
+      <span class="l-eyebrow">{eyebrow}</span>
       <h1 class="l-h2 legal__title">{title}</h1>
-      {updated ? <p class="l-muted legal__updated">Обновлено: {updated}</p> : null}
+      {updated ? <p class="l-muted legal__updated">{updatedLabel}: {updated}</p> : null}
 
       <div class="legal__body">
         <slot />
@@ -34,7 +53,7 @@ const description = Astro.props.description ?? frontmatter.description ?? title;
     </div>
   </article>
 
-  <SiteFooter slot="footer" />
+  <SiteFooter slot="footer" locale={locale} />
 </BaseLayout>
 
 <style is:global>

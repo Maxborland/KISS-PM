@@ -2,17 +2,28 @@
 import "../styles/base.css";
 import "../styles/glass.css";
 
+interface AlternateLink {
+  hrefLang: string;
+  href: string;
+}
+
 interface Props {
   title: string;
   description?: string;
   prerender?: boolean;
   structuredData?: Array<Record<string, unknown>>;
+  lang?: string;
+  skipLink?: string;
+  alternates?: ReadonlyArray<AlternateLink>;
 }
 
 const {
   title,
   description = "KISS PM — управление проектами, ресурсами и сигналами без хаоса. Закрытая альфа.",
   structuredData = [],
+  lang = "ru",
+  skipLink = "Перейти к содержимому",
+  alternates = [],
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://kisspm.app").toString();
@@ -21,7 +32,7 @@ const structuredDataJson = structuredData.map((item) => JSON.stringify(item));
 ---
 
 <!doctype html>
-<html lang="ru">
+<html lang={lang}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -29,6 +40,9 @@ const structuredDataJson = structuredData.map((item) => JSON.stringify(item));
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="canonical" href={canonical} />
+    {alternates.map((alternate) => (
+      <link rel="alternate" hreflang={alternate.hrefLang} href={alternate.href} />
+    ))}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -53,7 +67,7 @@ const structuredDataJson = structuredData.map((item) => JSON.stringify(item));
     ))}
   </head>
   <body>
-    <a class="sr-only" href="#main">Перейти к содержимому</a>
+    <a class="sr-only" href="#main">{skipLink}</a>
     <slot name="header" />
     <slot name="notifications" />
     <main id="main">

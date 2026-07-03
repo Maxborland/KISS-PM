@@ -1,5 +1,14 @@
 ---
-import { faqs } from "../lib/landing-faq";
+import { copyFor, type LandingLocale } from "../lib/landing-i18n";
+import { faqsByLocale } from "../lib/landing-faq";
+
+interface Props {
+  locale?: LandingLocale;
+}
+
+const { locale = "ru" } = Astro.props;
+const copy = copyFor(locale);
+const faqs = faqsByLocale[locale];
 ---
 
 <section id="faq" class="l-band l-band--panel" aria-labelledby="faq-title">
@@ -12,7 +21,7 @@ import { faqs } from "../lib/landing-faq";
           style="font-size:clamp(1.8rem, 3.4vw, 2.4rem)"
           data-text-reveal
         >
-          Вопросы
+          {copy.faqTitle}
         </h2>
       </header>
 
