@@ -1,3 +1,4 @@
+import { readEnv } from "./env";
 import type { WaitlistSubmissionParsed } from "./schema";
 import { COMPANY_SIZE_LABELS } from "./schema";
 
@@ -37,8 +38,8 @@ export async function notifyTeam(input: WaitlistSubmissionParsed): Promise<Notif
 /* -------- Telegram -------- */
 
 function telegramConfig(): { token: string; chatId: string } | null {
-  const token = process.env["TELEGRAM_BOT_TOKEN"]?.trim();
-  const chatId = process.env["TELEGRAM_CHAT_ID"]?.trim();
+  const token = readEnv("TELEGRAM_BOT_TOKEN");
+  const chatId = readEnv("TELEGRAM_CHAT_ID");
   return token && chatId ? { token, chatId } : null;
 }
 
@@ -97,9 +98,9 @@ function renderTelegramText(s: WaitlistSubmissionParsed): string {
 /* -------- Resend -------- */
 
 function resendConfig(): { key: string; to: string; from: string } | null {
-  const key = process.env["RESEND_API_KEY"]?.trim();
-  const to = process.env["RESEND_NOTIFY_TO"]?.trim();
-  const from = process.env["RESEND_FROM"]?.trim() || "KISS PM <noreply@kiss-pm.app>";
+  const key = readEnv("RESEND_API_KEY");
+  const to = readEnv("RESEND_NOTIFY_TO");
+  const from = readEnv("RESEND_FROM") || "KISS PM <noreply@kiss-pm.app>";
   return key && to ? { key, to, from } : null;
 }
 

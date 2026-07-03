@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readEnv } from "./env";
 
 let warnedMissingSalt = false;
 
@@ -11,7 +12,7 @@ let warnedMissingSalt = false;
  */
 export function hashIp(ip: string | null): string | null {
   if (!ip) return null;
-  const salt = process.env["WAITLIST_IP_SALT"]?.trim();
+  const salt = readEnv("WAITLIST_IP_SALT");
   if (salt) {
     return createHash("sha256").update(`${salt}:${ip}`).digest("hex").slice(0, 32);
   }
