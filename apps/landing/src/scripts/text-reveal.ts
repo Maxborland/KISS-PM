@@ -64,15 +64,38 @@ export function playTextReveal(el: HTMLElement): void {
 }
 
 function scheduleTextRevealDone(el: HTMLElement): void {
-  const words = Number(el.dataset.wordCount ?? 0);
-  const styles = getComputedStyle(document.documentElement);
-  const duration = Number.parseFloat(styles.getPropertyValue("--word-reveal-duration")) || 520;
-  const stagger = Number.parseFloat(styles.getPropertyValue("--word-reveal-stagger")) || 38;
-  const waitMs = duration + stagger * Math.max(0, words - 1) + 60;
+  const waitMs = getTextRevealTransitionMs(el) + 80;
 
   window.setTimeout(() => {
     el.dataset.textRevealDone = "true";
   }, waitMs);
+}
+
+function parseTransitionTimeMs(value: string): number {
+  const trimmed = value.trim();
+  if (!trimmed) return 0;
+  if (trimmed.endsWith("ms")) return Number.parseFloat(trimmed) || 0;
+  if (trimmed.endsWith("s")) return (Number.parseFloat(trimmed) || 0) * 1000;
+  return Number.parseFloat(trimmed) || 0;
+}
+
+function maxTransitionTimeMs(value: string): number {
+  return Math.max(0, ...value.split(",").map(parseTransitionTimeMs));
+}
+
+function getTextRevealTransitionMs(el: HTMLElement): number {
+  const words = [...el.querySelectorAll<HTMLElement>(".kp-word")];
+  if (!words.length) return 0;
+
+  return Math.max(
+    ...words.map((word) => {
+      const styles = getComputedStyle(word);
+      return (
+        maxTransitionTimeMs(styles.transitionDelay) +
+        maxTransitionTimeMs(styles.transitionDuration)
+      );
+    }),
+  );
 }
 
 export type TextRevealController = {

@@ -2,6 +2,10 @@
    только заголовки лесенкой, никаких карточек и пояснений. */
 
 .philosophy {
+  --philosophy-word-duration: 780ms;
+  --philosophy-word-stagger: 32ms;
+  --philosophy-word-ease: cubic-bezier(0.32, 0.72, 0.18, 1);
+  --word-reveal-offset: 0.2em;
   position: relative;
   margin-top: clamp(48px, 7vw, 96px);
   min-height: 100svh;
@@ -75,8 +79,18 @@
 }
 
 /* Волна после заголовка: строки подхватывают пословный каскад по очереди */
+.philosophy [data-text-reveal] .kp-word {
+  filter: blur(2px);
+  transition-duration: var(--philosophy-word-duration);
+  transition-timing-function: var(--philosophy-word-ease);
+}
+
 .philosophy__line .kp-word {
-  transition-delay: calc(var(--word-i, 0) * var(--word-reveal-stagger) + var(--line-delay));
+  transition-delay: calc(var(--word-i, 0) * var(--philosophy-word-stagger) + var(--line-delay));
+}
+
+.philosophy [data-text-reveal][data-text-reveal-in] .kp-word {
+  filter: blur(0);
 }
 
 .philosophy__line:nth-child(2) {
