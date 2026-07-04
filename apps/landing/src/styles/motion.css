@@ -116,6 +116,26 @@ html:not(.kp-js) [data-text-reveal] .kp-word {
   filter: blur(0);
 }
 
+/* Section headings use the softer manifesto reveal profile. */
+.l-display[data-text-reveal],
+.philosophy__display[data-text-reveal] {
+  --word-reveal-duration: 780ms;
+  --word-reveal-stagger: 32ms;
+  --word-reveal-offset: 0.2em;
+  --heading-reveal-ease: cubic-bezier(0.32, 0.72, 0.18, 1);
+}
+
+.l-display[data-text-reveal] .kp-word,
+.philosophy__display[data-text-reveal] .kp-word {
+  filter: blur(2px);
+  transition-timing-function: var(--heading-reveal-ease);
+}
+
+.l-display[data-text-reveal][data-text-reveal-in] .kp-word,
+.philosophy__display[data-text-reveal][data-text-reveal-in] .kp-word {
+  filter: blur(0);
+}
+
 [data-text-reveal][data-text-reveal-done] .kp-word {
   will-change: auto;
   transition: none;
