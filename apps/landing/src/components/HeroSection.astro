@@ -29,7 +29,14 @@ const copy = copyFor(locale).hero;
     display: grid;
     place-items: center;
     overflow: hidden;
-    background: var(--canvas);
+    background:
+      linear-gradient(
+        118deg,
+        rgba(223, 232, 255, 0.94) 0%,
+        rgba(248, 251, 255, 0.98) 46%,
+        rgba(232, 239, 255, 0.94) 100%
+      ),
+      var(--canvas);
     isolation: isolate;
     margin-bottom: 0;
   }
@@ -38,21 +45,59 @@ const copy = copyFor(locale).hero;
     content: "";
     position: absolute;
     inset: 0;
-    z-index: 1;
+    z-index: 2;
     pointer-events: none;
     background:
-      radial-gradient(ellipse 46% 28% at 50% 48%, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.42) 38%, rgba(255, 255, 255, 0) 72%),
+      radial-gradient(ellipse 52% 32% at 50% 48%, rgba(255, 255, 255, 0.68) 0%, rgba(255, 255, 255, 0.36) 42%, rgba(255, 255, 255, 0) 74%),
       linear-gradient(
         180deg,
-        rgba(238, 240, 244, 0.12) 0%,
+        rgba(238, 240, 244, 0.08) 0%,
         rgba(238, 240, 244, 0) 52%,
         rgba(238, 240, 244, 0) 100%
       );
   }
 
+  .hero::after {
+    content: "";
+    position: absolute;
+    inset: -12%;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      conic-gradient(
+        from 218deg at 52% 46%,
+        rgba(37, 99, 235, 0.22),
+        rgba(125, 211, 252, 0.22),
+        rgba(255, 255, 255, 0.5),
+        rgba(79, 70, 229, 0.18),
+        rgba(37, 99, 235, 0.22)
+      ),
+      linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.64),
+        rgba(219, 234, 254, 0.34) 45%,
+        rgba(238, 240, 244, 0.08)
+      );
+    background-position: 45% 48%, 50% 50%;
+    background-size: 136% 136%, 100% 100%;
+    opacity: 0.78;
+    animation: kp-hero-atmosphere-drift 18s var(--ease-in-out) infinite alternate;
+  }
+
+  @keyframes kp-hero-atmosphere-drift {
+    from {
+      background-position: 42% 46%, 50% 50%;
+      transform: translate3d(-1.5%, -1%, 0) scale(1.01);
+    }
+    to {
+      background-position: 58% 54%, 50% 50%;
+      transform: translate3d(1.5%, 1%, 0) scale(1.03);
+    }
+  }
+
   .hero__inner {
     position: relative;
-    z-index: 2;
+    z-index: 3;
     min-height: 100svh;
     display: flex;
     flex-direction: column;
@@ -67,10 +112,21 @@ const copy = copyFor(locale).hero;
     width: 100vw;
     min-width: 100%;
     height: 100%;
-    z-index: 0;
+    z-index: 1;
     pointer-events: auto;
-    /* ponytail: насыщенность глушим прозрачностью поверх --canvas, а не параметрами шейдера */
-    opacity: 0.42;
+    opacity: 0;
+    transform: scale(1.025);
+    filter: blur(8px) saturate(1.08);
+    transition:
+      opacity 1200ms var(--ease-reveal),
+      transform 1400ms var(--ease-reveal),
+      filter 1400ms var(--ease-reveal);
+  }
+
+  :global(.hero-shader[data-shader-ready="true"]) {
+    opacity: 0.56;
+    transform: scale(1);
+    filter: blur(0) saturate(1.08);
   }
 
   :global(.hero-shader__canvas) {
@@ -116,6 +172,23 @@ const copy = copyFor(locale).hero;
     box-shadow:
       0 18px 42px -22px rgba(37, 99, 235, 0.55),
       0 1px 0 rgba(255, 255, 255, 0.42) inset;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero::after {
+      animation: none;
+    }
+
+    :global(.hero-shader) {
+      transition: none;
+      transform: none;
+      filter: saturate(1.04);
+    }
+
+    :global(.hero-shader[data-shader-ready="true"]) {
+      opacity: 0.48;
+      filter: saturate(1.04);
+    }
   }
 
   @media (max-width: 520px) {
