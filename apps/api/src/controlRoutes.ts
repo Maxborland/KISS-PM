@@ -1,7 +1,6 @@
 import {
   canExecuteManagementActions,
   canManageControlSignals,
-  canManageKpiDefinitions,
   canReadControlSignals,
   canReadKpiDefinitions,
   canReadProjectPlan,
@@ -15,7 +14,6 @@ import {
   createDefaultProjectKpiDefinitions,
   evaluateProjectKpis,
   proposeManagementActions,
-  validateKpiFormula,
   type ControlSignal,
   type KpiDefinition,
   type TenantUser
@@ -38,6 +36,7 @@ import {
   executeUpdateCorrectiveAction
 } from "./control/correctiveActionCommandHandlers";
 import { executeUpdateControlSignalStatus } from "./control/controlSignalCommandHandlers";
+import { executeUpsertKpiDefinition } from "./control/kpiDefinitionCommandHandlers";
 import { includeResourceExceptionsFor } from "./planning/planningRouteAuth";
 import { summarizeSnapshot } from "./planning/planningRouteHelpers";
 import {
@@ -69,55 +68,24 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!deps.dataSource.upsertKpiDefinition || !deps.dataSource.appendAuditEvent) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageKpiDefinitions({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await deps.appendManagementAuditEvent({
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: "kpi.definition.upsert_denied",
-        sourceWorkflow: "control",
-        sourceEntity: { type: "KpiDefinition", id: "__unknown__" },
-        commandInput: { route: "/api/tenant/current/kpi-definitions" },
-        beforeState: null,
-        afterState: null,
-        permissionResult: decision,
-        executionResult: { status: "denied" }
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseKpiDefinitionBody(body.value, actor.tenantId);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    if (!deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.upsertKpiDefinition || !transactionDataSource.appendAuditEvent) {
-        return { ok: false as const };
+    const result = await executeUpsertKpiDefinition({
+      actor,
+      profile: await deps.getActorProfile(actor),
+      readBody: () => readLimitedJsonBody(context),
+      deps: {
+        dataSource: deps.dataSource,
+        appendManagementAuditEvent: deps.appendManagementAuditEvent,
+        runDataSourceTransaction: (operation) =>
+          deps.runDataSourceTransaction((transactionDataSource) => operation(transactionDataSource))
       }
-      const definition = await transactionDataSource.upsertKpiDefinition(parsed.value);
-      const auditEventId = await appendControlAuditIfConfigured(
-        deps,
-        {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
-          actionType: "kpi.definition.upserted",
-          sourceWorkflow: "control",
-          sourceEntity: { type: "KpiDefinition", id: definition.id },
-          commandInput: { definition },
-          beforeState: null,
-          afterState: { definition },
-          permissionResult: decision,
-          executionResult: { status: "succeeded" }
-        },
-        transactionDataSource
-      );
-      return { ok: true as const, definition, auditEventId };
     });
-    if (!result.ok) return context.json({ error: "persistence_not_configured" }, 501);
+    if (!result.ok) {
+      if (result.status === 501) return context.json({ error: result.error }, 501);
+      if (result.status === 403) return context.json({ error: result.error }, 403);
+      if (result.status === 413) return context.json({ error: result.error }, 413);
+      if (result.status === 415) return context.json({ error: result.error }, 415);
+      return context.json({ error: result.error }, 400);
+    }
     const { definition, auditEventId } = result;
     return context.json({ definition, auditEventId });
   });
@@ -656,108 +624,6 @@ async function ensureDefinitionsOrDefaults(
 
 function withUniqueEvaluationIds<T extends { id: string }>(evaluations: T[]): T[] {
   return evaluations.map((evaluation) => ({ ...evaluation, id: `kpi-eval-${randomUUID()}` }));
-}
-
-function parseKpiDefinitionBody(
-  input: unknown,
-  tenantId: string
-): { ok: true; value: KpiDefinition } | { ok: false; error: string } {
-  if (!isObject(input)) return { ok: false, error: "kpi_definition_invalid" };
-  const id = stringField(input, "id") ?? `kpi-${randomUUID()}`;
-  const code = stringField(input, "code");
-  const label = stringField(input, "label");
-  const unit = stringField(input, "unit") ?? "count";
-  const period = stringField(input, "period") ?? "snapshot";
-  const status = stringField(input, "status") ?? "active";
-  const version = integerField(input, "version") ?? 1;
-  if (
-    !code ||
-    !label ||
-    !validateKpiFormula(input.formula) ||
-    !Array.isArray(input.thresholdRules) ||
-    !isValidThresholdRules(input.thresholdRules) ||
-    !isValidKpiUnit(unit) ||
-    !isValidKpiPeriod(period) ||
-    !isValidKpiStatus(status) ||
-    version <= 0 ||
-    !isValidAllowedActions(input.allowedActions)
-  ) {
-    return { ok: false, error: "kpi_definition_invalid" };
-  }
-  return {
-    ok: true,
-    value: {
-      id,
-      tenantId,
-      entityType: "project",
-      code,
-      label,
-      formula: input.formula,
-      unit,
-      period,
-      thresholdRules: input.thresholdRules as KpiDefinition["thresholdRules"],
-      ownerRole: stringField(input, "ownerRole"),
-      allowedActions: Array.isArray(input.allowedActions)
-        ? (input.allowedActions as KpiDefinition["allowedActions"])
-        : ["create_corrective_action"],
-      version,
-      status
-    }
-  };
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function stringField(input: Record<string, unknown>, field: string): string | null {
-  const value = input[field];
-  return typeof value === "string" && value.trim().length > 0 ? value : null;
-}
-
-function integerField(input: Record<string, unknown>, field: string): number | null {
-  const value = input[field];
-  return typeof value === "number" && Number.isInteger(value) ? value : null;
-}
-
-function isValidThresholdRules(value: unknown[]): value is KpiDefinition["thresholdRules"] {
-  return value.every(
-    (item) =>
-      isObject(item) &&
-      (item.severity === "warning" || item.severity === "critical") &&
-      (item.operator === "gt" ||
-        item.operator === "gte" ||
-        item.operator === "lt" ||
-        item.operator === "lte" ||
-        item.operator === "eq") &&
-      typeof item.value === "number" &&
-      Number.isFinite(item.value)
-  );
-}
-
-function isValidAllowedActions(value: unknown): value is KpiDefinition["allowedActions"] | undefined {
-  if (value === undefined) return true;
-  const actions = [
-    "create_corrective_action",
-    "generate_planning_solution",
-    "apply_planning_delta",
-    "accept_risk",
-    "move_deadline",
-    "open_gantt"
-  ];
-  return Array.isArray(value) && value.every((item) => typeof item === "string" && actions.includes(item));
-}
-
-function isValidKpiUnit(value: string): value is KpiDefinition["unit"] {
-  return ["days", "minutes", "percent", "count"].includes(value);
-}
-
-function isValidKpiPeriod(value: string): value is KpiDefinition["period"] {
-  return ["snapshot", "day", "week", "month"].includes(value);
-}
-
-function isValidKpiStatus(value: string): value is KpiDefinition["status"] {
-  return ["active", "archived"].includes(value);
 }
 
 async function appendControlAuditIfConfigured(
