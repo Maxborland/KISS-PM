@@ -116,7 +116,8 @@ html:not(.kp-js) [data-text-reveal] .kp-word {
   filter: blur(0);
 }
 
-/* Section headings use the softer manifesto reveal profile. */
+/* Hero and section headings use the softer manifesto reveal profile. */
+.hero__title[data-text-reveal],
 .l-display[data-text-reveal],
 .philosophy__display[data-text-reveal] {
   --word-reveal-duration: 780ms;
@@ -125,12 +126,25 @@ html:not(.kp-js) [data-text-reveal] .kp-word {
   --heading-reveal-ease: cubic-bezier(0.32, 0.72, 0.18, 1);
 }
 
+.hero__title[data-text-reveal] {
+  --word-reveal-duration: 900ms;
+  --word-reveal-stagger: 58ms;
+  --word-reveal-offset: 0.24em;
+}
+
+.hero__title[data-text-reveal] .kp-word,
 .l-display[data-text-reveal] .kp-word,
 .philosophy__display[data-text-reveal] .kp-word {
   filter: blur(2px);
   transition-timing-function: var(--heading-reveal-ease);
 }
 
+.hero__title[data-text-reveal] .kp-word {
+  filter: blur(3px);
+  transition-delay: calc(120ms + var(--word-i, 0) * var(--word-reveal-stagger));
+}
+
+.hero__title[data-text-reveal][data-text-reveal-in] .kp-word,
 .l-display[data-text-reveal][data-text-reveal-in] .kp-word,
 .philosophy__display[data-text-reveal][data-text-reveal-in] .kp-word {
   filter: blur(0);
