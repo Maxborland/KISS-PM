@@ -10,8 +10,10 @@ import {
 
 import type { ApiTenantDataSource } from "./apiTypes";
 
+type NotificationDataPort = Pick<ApiTenantDataSource, "createUserNotification">;
+
 export async function persistPlanningNotifications(input: {
-  dataSource: ApiTenantDataSource;
+  dataSource: NotificationDataPort;
   tenantId: string;
   actorUserId: string;
   beforeSnapshot: PlanSnapshot;
@@ -35,7 +37,7 @@ export async function persistPlanningNotifications(input: {
 }
 
 export async function persistControlSignalNotifications(input: {
-  dataSource: ApiTenantDataSource;
+  dataSource: NotificationDataPort;
   tenantId: string;
   actorUserId: string;
   snapshot: PlanSnapshot;

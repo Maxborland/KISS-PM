@@ -5,12 +5,16 @@ on:
     paths:
       - "apps/web/**"
       - "packages/domain/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - ".github/workflows/design-v3-storybook-contract.yml"
   pull_request:
     paths:
       - "apps/web/**"
       - "packages/domain/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - ".github/workflows/design-v3-storybook-contract.yml"
 

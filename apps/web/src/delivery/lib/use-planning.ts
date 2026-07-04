@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlanningCommand } from "@kiss-pm/domain";
 import {
   createPlanningApiClient,
@@ -9,7 +9,6 @@ import {
   type PlanningReadModel
 } from "@kiss-pm/planning-client";
 
-import { createMockPlanningFetch } from "./mock-planning-backend";
 import { usePlanningRuntime } from "./planning-runtime";
 
 // "forbidden" — 403 при загрузке read-model (нет права на проект). В моке теоретичен
@@ -57,26 +56,21 @@ const PLAN_COMMAND_SUMMARY: Record<string, string> = {
   "baseline.capture": "Зафиксирован базовый план",
   "risk.accept_overload": "Принят перегруз"
 };
+type PlanningClient = ReturnType<typeof createPlanningApiClient>;
 
 /**
- * Работает через настоящий @kiss-pm/planning-client. Транспорт —
- * contract-mock (createMockPlanningFetch), отдельный на каждый монтаж
- * (изолированное состояние сессии). Переключение на боевой API = смена
- * apiOrigin и удаление fetchImpl.
+ * Работает через настоящий @kiss-pm/planning-client. Product runtime ходит только в live API;
+ * Storybook/demo передают contract-mock fetchImpl извне, чтобы production hook не импортировал mock backend.
  */
 export function usePlanning(projectId: string) {
-  const { live } = usePlanningRuntime();
-  // mock: contract-mock fetch (Storybook). live: боевой клиент без fetchImpl → глобальный fetch
-  // на /api/* (проксируется в Hono next.config'ом, cookie-сессия автоматически).
-  const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null && !live) fetchRef.current = createMockPlanningFetch();
-  const clientRef = useRef<ReturnType<typeof createPlanningApiClient> | null>(null);
-  if (clientRef.current === null) {
-    clientRef.current = live
-      ? createPlanningApiClient({ apiOrigin: "" })
-      : createPlanningApiClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
-  }
-  const client = clientRef.current;
+  const { live, fetchImpl } = usePlanningRuntime();
+  const mockFetch = live ? null : fetchImpl;
+  const client = useMemo<PlanningClient | null>(() => {
+    if (!live && !mockFetch) return null;
+    return mockFetch
+      ? createPlanningApiClient({ apiOrigin: "", fetchImpl: mockFetch })
+      : createPlanningApiClient({ apiOrigin: "" });
+  }, [live, mockFetch]);
 
   const [readModel, setReadModel] = useState<PlanningReadModel | null>(null);
   const [status, setStatus] = useState<PlanningStatus>("loading");
@@ -85,7 +79,19 @@ export function usePlanning(projectId: string) {
   // Держим before в памяти клиента, т.к. audit.beforeState (только счётчики) недостаточен для отката.
   const lastApplyRef = useRef<{ afterVersion: number; commands: PlanningCommand[]; before: PlanningReadModel } | null>(null);
 
+  useEffect(() => {
+    setStatus("loading");
+    setError(null);
+    setReadModel(null);
+    lastApplyRef.current = null;
+  }, [live, mockFetch, projectId]);
+
   const load = useCallback(async () => {
+    if (!client) {
+      setStatus("error");
+      setError(live ? "planning_client_not_configured" : "planning_mock_transport_not_configured");
+      return;
+    }
     setStatus("loading");
     try {
       const rm = await client.getPlanReadModel(projectId);
@@ -102,7 +108,7 @@ export function usePlanning(projectId: string) {
       setStatus("error");
       setError(e instanceof Error ? e.message : "load_failed");
     }
-  }, [client, projectId]);
+  }, [client, live, projectId]);
 
   useEffect(() => {
     void load();
@@ -110,7 +116,7 @@ export function usePlanning(projectId: string) {
 
   const preview = useCallback(
     async (command: PlanningCommand): Promise<PlanningPreviewResponse | null> => {
-      if (!readModel) return null;
+      if (!client || !readModel) return null;
       return client.previewCommand(projectId, { command, clientPlanVersion: readModel.planVersion });
     },
     [client, projectId, readModel]
@@ -118,7 +124,7 @@ export function usePlanning(projectId: string) {
 
   const apply = useCallback(
     async (command: PlanningCommand): Promise<ApplyResult> => {
-      if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
+      if (!client || !readModel) return { ok: false, conflict: false, message: "no_read_model" };
       try {
         const res = await client.applyCommand(projectId, { command, clientPlanVersion: readModel.planVersion });
         lastApplyRef.current = { afterVersion: res.newPlanVersion, commands: [command], before: readModel };
@@ -144,7 +150,7 @@ export function usePlanning(projectId: string) {
 
   const applyBatch = useCallback(
     async (commands: PlanningCommand[]): Promise<ApplyResult> => {
-      if (!readModel || commands.length === 0) return { ok: false, conflict: false, message: "empty_batch" };
+      if (!client || !readModel || commands.length === 0) return { ok: false, conflict: false, message: "empty_batch" };
       try {
         const res = await client.applyCommandBatch(projectId, { commands, clientPlanVersion: readModel.planVersion });
         lastApplyRef.current = { afterVersion: res.newPlanVersion, commands, before: readModel };
@@ -170,7 +176,7 @@ export function usePlanning(projectId: string) {
 
   const previewScenarios = useCallback(
     async (target: Record<string, unknown>): Promise<ScenarioPreviewResult> => {
-      if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
+      if (!client || !readModel) return { ok: false, conflict: false, message: "no_read_model" };
       try {
         const res = await client.previewScenarios(projectId, { target, clientPlanVersion: readModel.planVersion });
         return { ok: true, proposals: res.proposals, expiresAt: res.expiresAt };
@@ -187,7 +193,7 @@ export function usePlanning(projectId: string) {
 
   const applyScenario = useCallback(
     async (scenarioId: string, acceptedRiskReason?: string): Promise<ScenarioApplyResult> => {
-      if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
+      if (!client || !readModel) return { ok: false, conflict: false, message: "no_read_model" };
       try {
         const res = await client.applyScenario(projectId, scenarioId, { clientPlanVersion: readModel.planVersion, ...(acceptedRiskReason ? { acceptedRiskReason } : {}) });
         setReadModel(res.readModel);
@@ -210,7 +216,8 @@ export function usePlanning(projectId: string) {
   const loadCommits = useCallback(async (): Promise<CommitsView> => {
     // mock: contract-mock /planning/commits (с откатом latestRevert). live: журнал из audit-events.
     if (!live) {
-      const res = await fetchRef.current!("/planning/commits");
+      if (!mockFetch) return { commits: [], latestRevert: null };
+      const res = await mockFetch("/planning/commits");
       return (await res.json()) as CommitsView;
     }
     // live: GET /api/tenant/current/audit-events — planning-события проекта. Откат доступен ТОЛЬКО
@@ -237,7 +244,7 @@ export function usePlanning(projectId: string) {
         ? { auditEventId: commits[0].auditEventId, commands: last.commands, before: last.before }
         : null;
     return { commits, latestRevert };
-  }, [live, projectId]);
+  }, [live, mockFetch, projectId]);
 
   return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch, previewScenarios, applyScenario, loadCommits };
 }

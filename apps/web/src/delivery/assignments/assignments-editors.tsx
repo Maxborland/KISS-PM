@@ -5,7 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { RESOURCES } from "@/delivery/lib/planning-demo-data";
 
 export const ROLES: Array<[string, string]> = [
   ["executor", "Исполнитель"],

@@ -10,6 +10,7 @@ import { createAuthRateLimiterFromEnv } from "./authRateLimit";
 import { createDefaultBackgroundJobRegistry } from "./backgroundJobs/jobHandlers";
 import { createSerializedBackgroundJobPoller } from "./backgroundJobs/backgroundJobWorker";
 import { createLiveKitEgressProviderFromEnv } from "./communications/recording/livekitEgressProvider";
+import { createEmailProviderFromEnv } from "./emailProvider";
 import { bootstrapPlanningEventPublisher, setPlanningEventPublisher } from "./planningEventBus";
 import { readServerRuntimeConfig } from "./serverConfig";
 import { createServerReadinessChecks } from "./serverReadiness";
@@ -30,6 +31,7 @@ const dataSource = postgresClient
   : undefined;
 const enableDevTenantRoutes = runtimeConfig.enableDevTenantRoutes;
 const storageProvider = createStorageProviderFromEnv();
+const emailProvider = createEmailProviderFromEnv();
 const authRateLimiter = await createAuthRateLimiterFromEnv();
 const readinessChecks = createServerReadinessChecks({
   planningEventsBackend: runtimeConfig.planningEventsBackend,
@@ -46,6 +48,7 @@ setPlanningEventPublisher(publisher);
 const appOptions: CreateAppOptions = {
   authRateLimiter,
   enableDevTenantRoutes,
+  emailProvider,
   readinessChecks,
   storageProvider
 };

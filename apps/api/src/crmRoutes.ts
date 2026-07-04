@@ -1,5 +1,4 @@
 import {
-  canManageClients,
   canManageContacts,
   canManageDealStages,
   canManageProducts,
@@ -19,7 +18,6 @@ import type {
   ManagementAuditEventInput
 } from "./apiTypes";
 import {
-  parseClientBody,
   parseContactBody,
   parseDealStageBody,
   parsePipelineBody,
@@ -37,6 +35,10 @@ import {
   parseProjectTypeIdParam,
   parseStageTransitionIdParam
 } from "./routeParamParsers";
+import {
+  executeCreateClientCommand,
+  executeUpdateClientCommand
+} from "./crm/clientCommandHandlers";
 
 type CrmRouteDeps = {
   dataSource: ApiTenantDataSource;
@@ -84,51 +86,19 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const decision = canManageClients({
+    const result = await executeCreateClientCommand({
       actor,
       profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "client.create_denied",
-        sourceEntity: { type: "Client", id: "unknown" },
-        commandInput: { endpoint: "createClient" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
-
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseClientBody(body.value, actor.tenantId);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
-    const client = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createClient) {
-        throw new Error("transactional_client_create_not_configured");
+      readBody: () => readLimitedJsonBody(context),
+      deps: {
+        appendManagementAuditEvent,
+        runDataSourceTransaction: (operation) =>
+          runDataSourceTransaction((transactionDataSource) => operation(transactionDataSource))
       }
-      const created = await transactionDataSource.createClient(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "client.created",
-          sourceEntity: { type: "Client", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
     });
 
-    return context.json({ client }, 201);
+    return context.json(result.body, result.status);
   });
-
   app.patch("/api/workspace/clients/:clientId", async (context) => {
     const parsedClientId = parseClientIdParam(context.req.param("clientId"));
     if (!parsedClientId.ok) {
@@ -146,55 +116,21 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const decision = canManageClients({
+    const result = await executeUpdateClientCommand({
       actor,
       profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    const clientId = parsedClientId.value;
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "client.update_denied",
-        sourceEntity: { type: "Client", id: clientId },
-        commandInput: { endpoint: "updateClient", clientId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
-
-    const beforeState = await dataSource.findClientById(actor.tenantId, clientId);
-    if (!beforeState) return context.json({ error: "client_not_found" }, 404);
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
-    const parsed = parseClientBody({ ...body.value, id: clientId }, actor.tenantId);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
-    const client = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateClient) {
-        throw new Error("transactional_client_update_not_configured");
+      clientId: parsedClientId.value,
+      dataSource,
+      readBody: () => readLimitedJsonBody(context),
+      deps: {
+        appendManagementAuditEvent,
+        runDataSourceTransaction: (operation) =>
+          runDataSourceTransaction((transactionDataSource) => operation(transactionDataSource))
       }
-      const updated = await transactionDataSource.updateClient(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "client.updated",
-          sourceEntity: { type: "Client", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
     });
 
-    return context.json({ client });
+    return context.json(result.body, result.status);
   });
-
   app.get("/api/workspace/contacts", async (context) => {
     const actor = await getActor(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -644,7 +580,25 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
 
-    return context.json({ dealStages: await dataSource.listDealStages(actor.tenantId) });
+    const dealStages = await dataSource.listDealStages(actor.tenantId);
+    if (!dataSource.listPipelines) {
+      return context.json({ dealStages });
+    }
+    const defaultPipelineId = `${actor.tenantId}-pipeline-default`;
+    const pipelines = await dataSource.listPipelines(actor.tenantId);
+    const defaultPipeline =
+      pipelines.find((pipeline) => pipeline.isDefault) ??
+      pipelines.find((pipeline) => pipeline.id === defaultPipelineId);
+    if (!defaultPipeline) {
+      return context.json({
+        dealStages: dealStages.filter((stage) => stage.pipelineId === null)
+      });
+    }
+    return context.json({
+      dealStages: dealStages.filter(
+        (stage) => stage.pipelineId === null || stage.pipelineId === defaultPipeline.id
+      )
+    });
   });
 
   app.post("/api/workspace/deal-stages", async (context) => {
@@ -680,32 +634,58 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseDealStageBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    // Мультиворонки: новая стадия должна попасть в реальную воронку, иначе она
-    // выпадает из всех колонок Deals (фильтр по pipelineId). Если pipelineId передан
-    // явно — он должен ссылаться на существующую воронку; если опущен (контрактный
-    // клиент его прислать не может) — берём дефолтную воронку тенанта.
-    let resolvedPipelineId = parsed.value.pipelineId;
-    if (resolvedPipelineId !== null) {
+    // Legacy clients may still create deal stages without a pipelineId. The canonical
+    // storage needs one, so use the tenant default pipeline and create it atomically
+    // when old DB fixtures or clean tenants do not have it yet.
+    if (parsed.value.pipelineId !== null) {
       if (!dataSource.findPipelineById) {
         return context.json({ error: "persistence_not_configured" }, 501);
       }
-      const pipeline = await dataSource.findPipelineById(actor.tenantId, resolvedPipelineId);
+      const pipeline = await dataSource.findPipelineById(actor.tenantId, parsed.value.pipelineId);
       if (!pipeline) return context.json({ error: "pipeline_not_found" }, 404);
-    } else {
-      if (!dataSource.listPipelines) {
-        return context.json({ error: "persistence_not_configured" }, 501);
-      }
-      const pipelines = await dataSource.listPipelines(actor.tenantId);
-      const defaultPipeline =
-        pipelines.find((pipeline) => pipeline.isDefault) ?? pipelines[0];
-      if (!defaultPipeline) return context.json({ error: "pipeline_not_found" }, 404);
-      resolvedPipelineId = defaultPipeline.id;
+    } else if (!dataSource.listPipelines || !dataSource.createPipeline) {
+      return context.json({ error: "persistence_not_configured" }, 501);
     }
-    const stageInput = { ...parsed.value, pipelineId: resolvedPipelineId };
 
     const dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.createDealStage) {
         throw new Error("transactional_deal_stage_create_not_configured");
+      }
+      let stageInput = parsed.value;
+      if (stageInput.pipelineId === null) {
+        if (!transactionDataSource.listPipelines || !transactionDataSource.createPipeline) {
+          throw new Error("transactional_default_pipeline_not_configured");
+        }
+        const defaultPipelineId = `${actor.tenantId}-pipeline-default`;
+        const pipelines = await transactionDataSource.listPipelines(actor.tenantId);
+        let defaultPipeline =
+          pipelines.find((pipeline) => pipeline.isDefault) ??
+          pipelines.find((pipeline) => pipeline.id === defaultPipelineId);
+        if (!defaultPipeline) {
+          const pipelineInput = {
+            id: defaultPipelineId,
+            tenantId: actor.tenantId,
+            name: "Основная воронка",
+            description: null,
+            isDefault: true,
+            sortOrder: 1,
+            status: "active" as const
+          };
+          defaultPipeline = await transactionDataSource.createPipeline(pipelineInput);
+          await appendManagementAuditEvent(
+            auditInput({
+              actor,
+              actionType: "pipeline.created",
+              sourceEntity: { type: "Pipeline", id: defaultPipeline.id },
+              commandInput: { ...pipelineInput, reason: "legacy_deal_stage_default_pipeline" },
+              beforeState: null,
+              afterState: defaultPipeline,
+              permissionResult: decision
+            }),
+            transactionDataSource
+          );
+        }
+        stageInput = { ...stageInput, pipelineId: defaultPipeline.id };
       }
       const created = await transactionDataSource.createDealStage(stageInput);
       await appendManagementAuditEvent(
@@ -766,12 +746,16 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     if (!isObjectBody(body.value)) return context.json({ error: "invalid_body" }, 400);
-    // Мультиворонки: сохраняем существующую воронку стадии (тело её не несёт).
-    // pipelineId/status ставятся ПОСЛЕ спреда тела: случайный pipelineId в body не сможет
-    // переместить стадию в другую воронку, а отсутствие status в частичном PATCH не
-    // реактивирует архивную стадию (parser дефолтит status в 'active').
+    // Мультиворонки: сохраняем существующую воронку стадии. Явный status из body
+    // применяем, а при отсутствии поля сохраняем прежний status вместо parser default.
+    const patch = body.value;
     const parsed = parseDealStageBody(
-      { ...body.value, pipelineId: beforeState.pipelineId, status: beforeState.status, id: stageId },
+      {
+        ...patch,
+        pipelineId: beforeState.pipelineId,
+        status: patch.status ?? beforeState.status,
+        id: stageId
+      },
       actor.tenantId
     );
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);

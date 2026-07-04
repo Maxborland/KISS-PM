@@ -18,7 +18,8 @@ import { parsePlanningCommand, parseScenarioApplyEnvelope } from "../planningPar
 import { previewPlanningCommands } from "./planningCommandCore";
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { createPlanningReadModel } from "./planningReadModel";
-import { canReadPlanningReadModel, includeResourceExceptionsFor, permissionForCommand } from "./planningRouteAuth";
+import { permissionForCommand } from "./planningCommandPermissions";
+import { canReadPlanningReadModel, includeResourceExceptionsFor } from "./planningRouteAuth";
 import {
   appendPlanningAuditIfConfigured,
   errorResponseBody,

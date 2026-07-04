@@ -6,6 +6,7 @@ import {
 } from "./serverConfig";
 import { setPlanningRealtimeStatusProvider } from "./planningRealtimeHealth";
 import { createServerReadinessChecks } from "./serverReadiness";
+import { createEmailProviderFromEnv, readEmailProviderRuntimeConfig } from "./emailProvider";
 import type { StorageProvider } from "./storageProvider";
 
 describe("server readiness checks", () => {
@@ -17,10 +18,21 @@ describe("server readiness checks", () => {
     ).toThrow("database_url_required_in_production");
   });
 
-  it("allows production startup configuration when DATABASE_URL is configured", () => {
+  it("fails production startup configuration when SMTP email delivery is not configured", () => {
     expect(() =>
       assertServerRuntimeConfig({
         DATABASE_URL: "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm",
+        NODE_ENV: "production"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("kiss_pm_smtp_host_required");
+  });
+
+  it("allows production startup configuration when DATABASE_URL and SMTP are configured", () => {
+    expect(() =>
+      assertServerRuntimeConfig({
+        DATABASE_URL: "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm",
+        KISS_PM_SMTP_FROM: "KISS PM <noreply@example.com>",
+        KISS_PM_SMTP_HOST: "smtp.example.com",
         NODE_ENV: "production"
       } as NodeJS.ProcessEnv)
     ).not.toThrow();
@@ -57,6 +69,43 @@ describe("server readiness checks", () => {
     ).toThrow("redis_url_insecure_in_production");
   });
 
+  it("selects in-memory email provider outside production and forbids it in production", () => {
+    expect(readEmailProviderRuntimeConfig({} as NodeJS.ProcessEnv)).toEqual({ provider: "memory" });
+    expect(createEmailProviderFromEnv({} as NodeJS.ProcessEnv)).toMatchObject({
+      provider: "memory",
+      lastPasswordReset: null
+    });
+    expect(() =>
+      readEmailProviderRuntimeConfig({
+        KISS_PM_EMAIL_PROVIDER: "memory",
+        NODE_ENV: "production"
+      } as NodeJS.ProcessEnv)
+    ).toThrow("email_provider_memory_forbidden_in_production");
+  });
+
+  it("parses SMTP email provider configuration", () => {
+    expect(
+      readEmailProviderRuntimeConfig({
+        KISS_PM_EMAIL_PROVIDER: "smtp",
+        KISS_PM_SMTP_FROM: "KISS PM <noreply@example.com>",
+        KISS_PM_SMTP_HOST: "smtp.example.com",
+        KISS_PM_SMTP_PASSWORD: "secret",
+        KISS_PM_SMTP_PORT: "2525",
+        KISS_PM_SMTP_USERNAME: "apikey"
+      } as NodeJS.ProcessEnv)
+    ).toMatchObject({
+      provider: "smtp",
+      host: "smtp.example.com",
+      port: 2525,
+      envelopeFrom: "noreply@example.com",
+      username: "apikey"
+    });
+    expect(createEmailProviderFromEnv({
+      KISS_PM_EMAIL_PROVIDER: "smtp",
+      KISS_PM_SMTP_FROM: "noreply@example.com",
+      KISS_PM_SMTP_HOST: "smtp.example.com"
+    } as NodeJS.ProcessEnv)).toMatchObject({ provider: "smtp" });
+  });
   it("rejects malformed server port and host configuration", () => {
     expect(() =>
       readServerRuntimeConfig({
@@ -98,7 +147,9 @@ describe("server readiness checks", () => {
       planningEventsBackend: "redis",
       planningEventsRedisUrl: "redis://127.0.0.1:6379",
       port: 4100,
-      production: false
+      production: false,
+      videoProvider: undefined,
+      mediaReadinessUrl: undefined
     });
     expect(readServerRuntimeConfig({} as NodeJS.ProcessEnv)).toEqual({
       backgroundJobsEnabled: false,
@@ -109,7 +160,9 @@ describe("server readiness checks", () => {
       planningEventsBackend: "memory",
       planningEventsRedisUrl: undefined,
       port: 4000,
-      production: false
+      production: false,
+      videoProvider: undefined,
+      mediaReadinessUrl: undefined
     });
   });
 

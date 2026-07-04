@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -8,7 +10,7 @@ import {
 } from "@kiss-pm/persistence";
 
 import { createApp } from "./app";
-import type { ApiTenantDataSource } from "./apiTypes";
+import type { ApiTenantDataSource, ManagementAuditDataSource, ManagementAuditEventInput } from "./apiTypes";
 import { createDefaultBackgroundJobRegistry } from "./backgroundJobs/jobHandlers";
 import type { LiveKitEgressProvider } from "./communications/recording/livekitEgressProvider";
 import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
@@ -23,6 +25,29 @@ import {
 } from "./communicationRealtimeTestFixture";
 import type { VideoProvider } from "./videoProvider";
 
+async function appendRecordingTestAuditEvent(
+  input: ManagementAuditEventInput,
+  auditDataSource: ManagementAuditDataSource
+) {
+  const auditEventId = input.auditEventId ?? `audit-${randomUUID()}`;
+  await auditDataSource.appendAuditEvent!({
+    id: auditEventId,
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    actionType: input.actionType,
+    sourceSurfaceId: null,
+    sourceWorkflow: input.sourceWorkflow,
+    sourceEntity: input.sourceEntity,
+    input: input.commandInput,
+    beforeState: input.beforeState,
+    afterState: input.afterState,
+    permissionResult: input.permissionResult,
+    executionResult: input.executionResult ?? { status: "succeeded" },
+    correlationId: randomUUID(),
+    createdAt: new Date()
+  });
+  return auditEventId;
+}
 describe("communications realtime API", () => {
   let client: PostgresClient;
   let app: ReturnType<typeof createApp>;
@@ -638,13 +663,14 @@ describe("communications realtime API", () => {
     const workspace = createCommunicationRecordingWorkspace({
       dataSource,
       egressProvider: null,
-      appendManagementAuditEvent: async () => "audit-id"
+      appendManagementAuditEvent: (input, auditDataSource = dataSource) => appendRecordingTestAuditEvent(input, auditDataSource)
     });
 
+    const storageKey = `recordings/${tenantId}/${room.id}/${session.id}/call-rec-group-rec/user-alpha-admin/track-1.webm`;
     const result = await workspace.reconcileEgressEnded({
       tenantId,
       egressId: "egress-rec-1",
-      storageKey: `recordings/${tenantId}/${room.id}/${session.id}/call-rec-group-rec/user-alpha-admin/track-1.webm`,
+      storageKey,
       sizeBytes: 2048,
       durationSeconds: 42
     });
@@ -667,17 +693,185 @@ describe("communications realtime API", () => {
       durationSeconds: 42
     });
 
+    const assetRows = await client`
+      SELECT checksum_sha256
+      FROM file_assets
+      WHERE tenant_id = ${tenantId}
+        AND storage_key = ${storageKey}
+    `;
+    expect(assetRows[0]?.checksum_sha256).toBeNull();
+
+    const auditEvents = await dataSource.listAuditEventsByTenantId("tenant-alpha");
+    expect(auditEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        actionType: "communications.call_recording_webhook_completed",
+        actorUserId: "user-alpha-admin",
+        sourceWorkflow: "livekit_webhook",
+        permissionResult: expect.objectContaining({ via: "livekit_webhook" }),
+        afterState: expect.objectContaining({ checksumStatus: "unknown" }),
+        executionResult: expect.objectContaining({ trigger: "livekit_webhook", checksumStatus: "unknown" })
+      })
+    ]));
+
     // Idempotent: a retried webhook delivery must not emit a second completion event.
     const retry = await workspace.reconcileEgressEnded({
       tenantId,
       egressId: "egress-rec-1",
-      storageKey: `recordings/${tenantId}/${room.id}/${session.id}/call-rec-group-rec/user-alpha-admin/track-1.webm`,
+      storageKey,
       sizeBytes: 2048,
       durationSeconds: 42
     });
     expect(retry.reconciled).toBe(true);
     const eventsAfter = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
     expect(eventsAfter.filter((event) => event.eventType === "recording_track_completed")).toHaveLength(1);
+  });
+
+  it("reconcileEgressEnded rolls back recording mutations when webhook audit fails", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+
+    const room = await dataSource.createCallRoom({
+      id: "call-room-rec-audit-fail",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Запись",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-rec-audit-fail",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-rec-audit-fail",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    await dataSource.createCallRecording({
+      id: "call-recording-rec-audit-fail",
+      tenantId,
+      roomId: room.id,
+      sessionId: session.id,
+      recordingGroupId: "call-rec-group-rec-audit-fail",
+      attachmentId: null,
+      egressId: "egress-rec-audit-fail-1",
+      participantId: "user-alpha-admin",
+      trackId: "track-audit-fail",
+      kind: "video",
+      status: "recording",
+      durationSeconds: null,
+      endedAt: null,
+      title: "Запись · user-alpha-admin",
+      createdByUserId: "user-alpha-admin"
+    });
+
+    const workspace = createCommunicationRecordingWorkspace({
+      dataSource,
+      egressProvider: null,
+      appendManagementAuditEvent: async () => {
+        throw new Error("audit_write_failed");
+      }
+    });
+    const storageKey = `recordings/${tenantId}/${room.id}/${session.id}/call-rec-group-rec-audit-fail/user-alpha-admin/track-audit-fail.webm`;
+
+    await expect(workspace.reconcileEgressEnded({
+      tenantId,
+      egressId: "egress-rec-audit-fail-1",
+      storageKey,
+      sizeBytes: 4096,
+      durationSeconds: 12
+    })).rejects.toThrow("audit_write_failed");
+
+    const recordings = await dataSource.listCallRecordingsByGroup({
+      tenantId,
+      recordingGroupId: "call-rec-group-rec-audit-fail"
+    });
+    expect(recordings[0]).toMatchObject({ status: "recording", attachmentId: null });
+
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    expect(events.filter((event) => event.eventType === "recording_track_completed")).toHaveLength(0);
+    const assetRows = await client`
+      SELECT id
+      FROM file_assets
+      WHERE tenant_id = ${tenantId}
+        AND storage_key = ${storageKey}
+    `;
+    expect(assetRows).toHaveLength(0);
+  });
+
+  it("rejects invalid LiveKit webhook signatures without mutating recordings", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-invalid-webhook",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Запись",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-invalid-webhook",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-invalid-webhook",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+    await dataSource.createCallRecording({
+      id: "call-recording-invalid-webhook",
+      tenantId,
+      roomId: room.id,
+      sessionId: session.id,
+      recordingGroupId: "call-rec-group-invalid-webhook",
+      attachmentId: null,
+      egressId: "egress-invalid-webhook-1",
+      participantId: "user-alpha-admin",
+      trackId: "track-invalid-webhook",
+      kind: "video",
+      status: "recording",
+      durationSeconds: null,
+      endedAt: null,
+      title: "Запись · invalid webhook",
+      createdByUserId: "user-alpha-admin"
+    });
+    const egress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [];
+      },
+      async startTrackEgress() {
+        return "egress-invalid-webhook-1";
+      },
+      async stopEgress() {},
+      async receiveWebhook() {
+        throw new Error("signature_invalid");
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, egress);
+
+    const response = await recApp.request("/integrations/livekit/webhook", {
+      method: "POST",
+      headers: { Authorization: "bad-signature", "content-type": "application/json" },
+      body: JSON.stringify({ event: "egress_ended" })
+    });
+    expect(response.status).toBe(401);
+
+    const recordings = await dataSource.listCallRecordingsByGroup({
+      tenantId,
+      recordingGroupId: "call-rec-group-invalid-webhook"
+    });
+    expect(recordings[0]).toMatchObject({ status: "recording", attachmentId: null });
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    expect(events).toHaveLength(0);
   });
 
   it("callRecordingJanitor fails stale in-progress recordings and logs recording_failed", async () => {
@@ -1109,7 +1303,7 @@ describe("communications realtime API", () => {
     const workspace = createCommunicationRecordingWorkspace({
       dataSource,
       egressProvider: null,
-      appendManagementAuditEvent: async () => "audit-id"
+      appendManagementAuditEvent: (input, auditDataSource = dataSource) => appendRecordingTestAuditEvent(input, auditDataSource)
     });
     const result = await workspace.failRecordingByEgress({ tenantId, egressId: "egress-fail-1" });
     expect(result.failed).toBe(true);
@@ -1127,5 +1321,16 @@ describe("communications realtime API", () => {
       recordingId: "call-recording-fail",
       reason: "egress_failed"
     });
+
+    const auditEvents = await dataSource.listAuditEventsByTenantId("tenant-alpha");
+    expect(auditEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        actionType: "communications.call_recording_webhook_failed",
+        actorUserId: "user-alpha-admin",
+        sourceWorkflow: "livekit_webhook",
+        permissionResult: expect.objectContaining({ via: "livekit_webhook" }),
+        executionResult: expect.objectContaining({ trigger: "livekit_webhook", reason: "egress_failed" })
+      })
+    ]));
   });
 });

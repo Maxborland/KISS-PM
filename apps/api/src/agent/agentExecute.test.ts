@@ -37,7 +37,7 @@ function overloadedSnapshot(): PlanSnapshot {
   };
 }
 
-function createHarness() {
+function createHarness(options: { failAuditActionType?: string } = {}) {
   let snapshot = overloadedSnapshot();
   const runs = new Map<string, PlanningScenarioRunRecord>();
   const appliedCommandTypes: string[] = [];
@@ -62,9 +62,24 @@ function createHarness() {
     async listUsersByTenantId() { return []; },
     async listWorkspaceUsers() { return []; },
     async findSessionByTokenHash() {
-      return { id: "s", tenantId: "tenant-1", userId: "user-planner", tokenHash: "ignored", expiresAt: new Date("2026-07-01T00:00:00.000Z") };
+      return { id: "s", tenantId: "tenant-1", userId: "user-planner", tokenHash: "ignored", expiresAt: new Date("2027-07-01T00:00:00.000Z") };
     },
-    async withTransaction(operation) { return operation(dataSource as ApiTenantDataSource); },
+    async withTransaction(operation) {
+      const snapshotBefore = structuredClone(snapshot);
+      const runsBefore = new Map(Array.from(runs.entries()).map(([id, run]) => [id, structuredClone(run)]));
+      const appliedCommandTypesBefore = [...appliedCommandTypes];
+      const auditActionTypesBefore = [...auditActionTypes];
+      try {
+        return await operation(dataSource as ApiTenantDataSource);
+      } catch (error) {
+        snapshot = snapshotBefore;
+        runs.clear();
+        for (const [id, run] of runsBefore) runs.set(id, run);
+        appliedCommandTypes.splice(0, appliedCommandTypes.length, ...appliedCommandTypesBefore);
+        auditActionTypes.splice(0, auditActionTypes.length, ...auditActionTypesBefore);
+        throw error;
+      }
+    },
     async lockTenantResourcePlanning() { return; },
     async getPlanSnapshot() { return snapshot; },
     async createPlanningScenarioRun(run) {
@@ -82,7 +97,12 @@ function createHarness() {
       snapshot = reducePlanningCommand(snapshot, command).nextSnapshot;
     },
     async incrementPlanVersion() { snapshot = { ...snapshot, planVersion: snapshot.planVersion + 1 }; return snapshot.planVersion; },
-    async appendAuditEvent(input) { auditActionTypes.push(input.actionType); }
+    async appendAuditEvent(input) {
+      if (input.actionType === options.failAuditActionType) {
+        throw new Error("forced_audit_failure");
+      }
+      auditActionTypes.push(input.actionType);
+    }
   };
 
   return { app: createApp({ dataSource: dataSource as ApiTenantDataSource }), appliedCommandTypes, auditActionTypes, get planVersion() { return snapshot.planVersion; } };
@@ -123,6 +143,7 @@ describe("agent /execute → governed scenario apply (internal re-dispatch)", ()
     expect(harness.appliedCommandTypes.length).toBeGreaterThan(0);
     expect(harness.planVersion).toBe(6);
     expect(harness.auditActionTypes).toContain("planning.scenario.applied");
+    expect(harness.auditActionTypes.some((actionType) => actionType.startsWith("agent."))).toBe(false);
   });
 
   it("rejects apply when the actor lacks scenario-apply permission (RBAC at the governed route)", async () => {
@@ -144,5 +165,24 @@ describe("agent /execute → governed scenario apply (internal re-dispatch)", ()
     expect(results[0]!.ok).toBe(false);
     expect(results[0]!.error).toBe("plan_version_conflict");
     expect(harness.appliedCommandTypes).toEqual([]);
+  });
+
+  it("does not commit a scenario apply when the governed audit write fails", async () => {
+    const harness = createHarness({ failAuditActionType: "planning.scenario.applied" });
+    const overload = createPlanningReadModel(overloadedSnapshot()).resourceLoad.overloads[0]!;
+    const target = { type: "resource_overload", resourceId: overload.resourceId, date: overload.date, overloadMinutes: overload.overloadMinutes, taskIds: overload.taskIds };
+
+    const preview = await post(harness.app, "/api/workspace/projects/project-1/planning/scenarios/preview", { clientPlanVersion: 5, target });
+    expect(preview.status).toBe(200);
+    const scenarioId = (preview.body.proposals as Array<{ id: string }>)[0]!.id;
+
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "apply_resource_resolution", input: { projectId: "project-1", scenarioId, clientPlanVersion: 5, acceptedRiskReason: "e2e" } }]
+    });
+
+    expect(execute.status).not.toBe(200);
+    expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.planVersion).toBe(5);
+    expect(harness.auditActionTypes).not.toContain("planning.scenario.applied");
   });
 });

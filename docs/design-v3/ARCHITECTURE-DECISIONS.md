@@ -331,9 +331,7 @@ docs/design-v3/TOKENS.md → apps/web/src/styles/{tokens,tokens.planning,bem}.cs
 
 ## Поправка в AGENTS.md §5 (Phase 1)
 
-В §5 указан путь `docs/references/references/planning-ui-approved/` (двойное `references`). Исправить на `docs/references/planning-ui-approved/`.
-
-Аналогично в файле плана rebuild — все 16 упоминаний.
+Ранее в §5 был указан путь с двойным сегментом `references`; канонический каталог: `docs/references/planning-ui-approved/`. Дублирующий подкаталог удалён.
 
 ---
 

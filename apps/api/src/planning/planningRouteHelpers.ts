@@ -3,7 +3,8 @@ import type { PlanningCommand, ScenarioProposal, TenantUser, ValidationIssue } f
 import type { Handler } from "hono";
 import { createHash } from "node:crypto";
 
-import type { ApiTenantDataSource, ManagementAuditEventInput } from "../apiTypes";
+import type { PlanningReadDataPort } from "../apiDataPorts";
+import type { ApiTenantDataSource, ManagementAuditDataSource, ManagementAuditEventInput } from "../apiTypes";
 import {
   parsePlanningScenarioRunIdParam,
   parsePlanningSolverProposalIdParam,
@@ -22,7 +23,7 @@ export type PlanningRouteDeps = {
   ): Promise<T>;
   appendManagementAuditEvent(
     input: ManagementAuditEventInput,
-    auditDataSource?: ApiTenantDataSource
+    auditDataSource?: ManagementAuditDataSource
   ): Promise<string>;
 };
 
@@ -98,7 +99,7 @@ function stableStringify(value: unknown): string {
 export async function appendPlanningAuditIfConfigured(
   deps: PlanningRouteDeps,
   input: ManagementAuditEventInput,
-  auditDataSource?: ApiTenantDataSource
+  auditDataSource?: ManagementAuditDataSource
 ): Promise<string> {
   if (!(auditDataSource ?? deps.dataSource).appendAuditEvent) {
     throw new Error("audit_not_configured");
@@ -153,7 +154,7 @@ export function summarizeSnapshot(snapshot: {
 }
 
 export async function validateCommandDataSourcePreconditions(
-  dataSource: ApiTenantDataSource,
+  dataSource: PlanningReadDataPort,
   tenantId: string,
   command: PlanningCommand
 ): Promise<ValidationIssue[]> {

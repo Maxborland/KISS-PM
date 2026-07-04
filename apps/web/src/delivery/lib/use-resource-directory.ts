@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { usePlanningRuntime } from "./planning-runtime";
-import { RESOURCES, type Resource } from "./mock-planning-backend";
+import { RESOURCES, type Resource } from "./planning-demo-data";
 
 type ApiUser = { id: string; name: string; positionId?: string | null; positionName?: string | null };
 
@@ -11,8 +11,8 @@ type ApiUser = { id: string; name: string; positionId?: string | null; positionN
  * Справочник ресурсов (id → имя/позиция). Источник:
  * - mock (Storybook): статический RESOURCES — его id совпадают с мок-назначениями плана;
  * - live (прод-route): GET /api/workspace/users — id = реальные resourceId назначений read-model.
- * Привязка mock/live — к тому же usePlanningRuntime().live, что и planning-транспорт, поэтому
- * stories не ломаются (дефолт mock). team/capacity на проде — из позиции/дефолта: полная
+ * Привязка mock/live — к тому же usePlanningRuntime().live, что и planning-транспорт; Storybook
+ * явно инжектит demo runtime. team/capacity на проде — из позиции/дефолта: полная
  * оргструктура (tenant_org_nodes) появится с дополнением сидов (SEED-AUGMENTATION-TASK.md).
  */
 export function useResourceDirectory(): {

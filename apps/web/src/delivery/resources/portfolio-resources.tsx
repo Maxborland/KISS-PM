@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 
-import { buildPortfolioModel, RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { buildPortfolioModel } from "@/delivery/lib/mock-planning-backend";
+import { RESOURCES } from "@/delivery/lib/planning-demo-data";
 import { ReportingFrame } from "@/delivery/ui/reporting-frame";
 import { ResourceLoadMatrix, type MatrixData, type MatrixScope } from "@/delivery/resources/resource-load-matrix";
 

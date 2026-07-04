@@ -33,7 +33,7 @@ import {
   parseReferenceTitle,
   sanitizeFileName
 } from "./attachmentValidation";
-import { createAttachmentCommand } from "./attachments/attachmentCommand";
+import { createAttachmentWorkspace } from "./attachments/attachmentWorkspace";
 import { readLimitedJsonBody } from "./jsonBody";
 import type { StorageProvider } from "./storageProvider";
 
@@ -56,7 +56,7 @@ type AttachmentRouteDeps = {
 };
 
 export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
-  const attachmentCommand = createAttachmentCommand(deps);
+  const attachmentWorkspace = createAttachmentWorkspace(deps);
 
   app.get("/api/workspace/attachments", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
@@ -68,7 +68,7 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
     if (!entityId.ok) return context.json({ error: entityId.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const result = await attachmentCommand.listAttachments({
+    const result = await attachmentWorkspace.listAttachments({
       actor,
       entityId: entityId.value,
       entityType: entityType.value,
@@ -88,7 +88,7 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const result = await attachmentCommand.attachExternalReference({
+    const result = await attachmentWorkspace.attachExternalReference({
       actor,
       profile,
       ...parsed.value
@@ -125,7 +125,7 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
       if (!parsedForm.ok) return context.json({ error: parsedForm.error }, parsedForm.status);
 
       const profile = await deps.getActorProfile(actor);
-      const result = await attachmentCommand.attachFile({
+      const result = await attachmentWorkspace.attachFile({
         actor,
         profile,
         ...parsedForm.value
@@ -144,7 +144,7 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
     if (!attachmentId.ok) return context.json({ error: attachmentId.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const result = await attachmentCommand.archiveAttachment({
+    const result = await attachmentWorkspace.archiveAttachment({
       actor,
       attachmentId: attachmentId.value,
       profile
@@ -160,7 +160,7 @@ export function registerAttachmentRoutes(app: Hono, deps: AttachmentRouteDeps) {
     if (!attachmentId.ok) return context.json({ error: attachmentId.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const result = await attachmentCommand.prepareDownload({
+    const result = await attachmentWorkspace.prepareDownload({
       actor,
       attachmentId: attachmentId.value,
       profile

@@ -40,7 +40,9 @@ import { notifyPlanVersionChanged } from "./planningEventBus";
 import { previewPlanningCommands } from "./planning/planningCommandCore";
 import { PLANNING_ENGINE_VERSION } from "./planning/planningConstants";
 import { createPlanningReadModel } from "./planning/planningReadModel";
-import { includeResourceExceptionsFor, permissionForCommand } from "./planning/planningRouteAuth";
+import { permissionForCommand } from "./planning/planningCommandPermissions";
+import { executeUpdateControlSignalStatus } from "./control/controlSignalCommandHandlers";
+import { includeResourceExceptionsFor } from "./planning/planningRouteAuth";
 import { summarizeSnapshot } from "./planning/planningRouteHelpers";
 import {
   parseControlSignalIdParam,
@@ -745,68 +747,37 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (
       !deps.dataSource.listControlSignals ||
       !deps.dataSource.upsertControlSignal ||
-      !deps.dataSource.appendAuditEvent
+      !deps.dataSource.appendAuditEvent ||
+      !deps.dataSource.withTransaction
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseSignalStatusBody(body.value);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageControlSignals({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-    const { projectId, signalId } = routeIds.value;
-    if (!deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
 
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.listControlSignals ||
-        !transactionDataSource.upsertControlSignal ||
-        !transactionDataSource.appendAuditEvent
-      ) {
-        return { ok: false as const, status: 501, error: "persistence_not_configured" };
+    const { projectId, signalId } = routeIds.value;
+    const result = await executeUpdateControlSignalStatus({
+      actor,
+      profile: await deps.getActorProfile(actor),
+      projectId,
+      signalId,
+      body: body.value,
+      deps: {
+        auditDataSource: deps.dataSource,
+        appendManagementAuditEvent: deps.appendManagementAuditEvent,
+        runDataSourceTransaction: (operation) =>
+          deps.runDataSourceTransaction((transactionDataSource) => operation(transactionDataSource))
       }
-      const signal = (await transactionDataSource.listControlSignals(actor.tenantId, projectId)).find(
-        (candidate) => candidate.id === signalId
-      );
-      if (!signal) return { ok: false as const, status: 404, error: "control_signal_not_found" };
-      const updated = await transactionDataSource.upsertControlSignal({
-        ...signal,
-        status: parsed.value.status,
-        updatedAt: new Date().toISOString()
-      });
-      const auditEventId = await appendControlAuditIfConfigured(
-        deps,
-        {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
-          actionType:
-            parsed.value.status === "accepted_risk"
-              ? "control_signal.risk_accepted"
-              : "control_signal.status_changed",
-          sourceWorkflow: "control",
-          sourceEntity: { type: "ControlSignal", id: signalId },
-          commandInput: parsed.value,
-          beforeState: { signal },
-          afterState: { signal: updated },
-          permissionResult: decision,
-          executionResult: { status: "succeeded" }
-        },
-        transactionDataSource
-      );
-      return { ok: true as const, signal: updated, auditEventId };
     });
     if (!result.ok) {
       if (result.status === 501) return context.json({ error: result.error }, 501);
-      return context.json({ error: result.error }, 404);
+      if (result.status === 403) return context.json({ error: result.error }, 403);
+      if (result.status === 404) return context.json({ error: result.error }, 404);
+      return context.json({ error: result.error }, 400);
     }
 
     return context.json({ signal: result.signal, auditEventId: result.auditEventId });
   });
-
   app.post("/api/workspace/projects/:projectId/control/signals/:signalId/corrective-actions", async (context) => {
     const routeIds = parseControlSignalRouteParams(context);
     if (!routeIds.ok) return context.json({ error: routeIds.error }, 400);
@@ -1101,29 +1072,6 @@ function nullableStringField(input: Record<string, unknown>, field: string): str
   const value = input[field];
   if (value === null) return null;
   return typeof value === "string" && value.trim().length > 0 ? value : null;
-}
-
-function parseSignalStatusBody(
-  input: unknown
-): { ok: true; value: { status: ControlSignal["status"]; acceptedRiskReason?: string } } | { ok: false; error: string } {
-  if (!isObject(input)) return { ok: false, error: "control_signal_status_invalid" };
-  const status = stringField(input, "status");
-  if (
-    status !== "open" &&
-    status !== "acknowledged" &&
-    status !== "resolved" &&
-    status !== "accepted_risk"
-  ) {
-    return { ok: false, error: "control_signal_status_invalid" };
-  }
-  const acceptedRiskReason = stringField(input, "acceptedRiskReason") ?? undefined;
-  if (status === "accepted_risk" && !acceptedRiskReason) {
-    return { ok: false, error: "accepted_risk_reason_required" };
-  }
-  return {
-    ok: true,
-    value: acceptedRiskReason ? { status, acceptedRiskReason } : { status }
-  };
 }
 
 function parseCorrectiveActionPatchBody(

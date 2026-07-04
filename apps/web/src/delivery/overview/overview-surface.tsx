@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import { Bento, BentoCard, StatTile } from "@/delivery/ui/bento";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
-import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
+import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type CommitMetaView } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { demoAction } from "@/views/lib/demo";

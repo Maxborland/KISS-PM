@@ -7,7 +7,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Diamond, GitBranch, IndentDecrease, IndentIncrease, Plus, Trash2, UserPlus, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { RESOURCES } from "@/delivery/lib/planning-demo-data";
 
 const POP = "z-50 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--panel)] p-2 shadow-[var(--shadow-pop)] text-[length:var(--text-sm)] text-[var(--text)]";
 const MENU = "z-50 min-w-[200px] rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--panel)] p-1 shadow-[var(--shadow-pop)] text-[length:var(--text-sm)]";

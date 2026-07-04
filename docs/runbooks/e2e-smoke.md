@@ -6,7 +6,7 @@
 
 ## Предусловия
 
-- Node 22+, pnpm 10.33+
+- Node 22+, pnpm 10.33.2 через Corepack (`corepack pnpm ...` или `corepack prepare pnpm@10.33.2 --activate`)
 - PostgreSQL на `127.0.0.1:55432` (или `DATABASE_URL`)
 - Опционально Redis на `6379` для smoke realtime (`REDIS_URL`)
 

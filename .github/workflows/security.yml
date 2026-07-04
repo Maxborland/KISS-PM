@@ -7,6 +7,7 @@ on:
       - "packages/**"
       - "scripts/security-scan.mjs"
       - "package.json"
+      - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - ".github/workflows/security.yml"
   pull_request:
@@ -15,6 +16,7 @@ on:
       - "packages/**"
       - "scripts/security-scan.mjs"
       - "package.json"
+      - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - ".github/workflows/security.yml"
 

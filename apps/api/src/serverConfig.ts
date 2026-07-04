@@ -1,3 +1,4 @@
+import { readEmailProviderRuntimeConfig } from "./emailProvider";
 import { readRuntimeSecurityConfig } from "./runtimeSecurityConfig";
 
 const defaultPort = 4000;
@@ -53,6 +54,7 @@ export function assertServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env) 
       throw new Error("egress_requires_s3_storage");
     }
   }
+  readEmailProviderRuntimeConfig(env);
 }
 
 export function readServerRuntimeConfig(

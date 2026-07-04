@@ -15,9 +15,17 @@
 
 import type { PlanningCommand } from "@kiss-pm/domain";
 
-const MIN_PER_DAY = 480; // 8 рабочих часов = «день» длительности
-const PROJECT_START_ISO = "2026-03-02"; // понедельник
-const PROJECT_ID = "proj-prod-portal-r2";
+import {
+  dayToIso,
+  isoToDay,
+  MIN_PER_DAY,
+  MOCK_PROJECT_ID,
+  PROJECT_START_ISO,
+  RESOURCES,
+  type Resource
+} from "./planning-demo-data";
+
+const PROJECT_ID = MOCK_PROJECT_ID;
 const DEFAULT_CALENDAR = "cal-5x8";
 
 type Kind = "summary" | "task" | "milestone";
@@ -77,18 +85,6 @@ const SEED_DEPS: SeedDep[] = [
 ];
 
 /* Ростер: роль (position) + команда (team) + дневная ёмкость */
-export type Resource = { id: string; name: string; positionId: string; positionName: string; teamId: string; teamName: string; capacityMinPerDay: number };
-export const RESOURCES: Resource[] = [
-  { id: "u-petrov", name: "Петров А.", positionId: "pm", positionName: "Менеджер проекта", teamId: "team-core", teamName: "Управление", capacityMinPerDay: 480 },
-  { id: "u-ivanova", name: "Иванова М.", positionId: "design", positionName: "Дизайнер", teamId: "team-product", teamName: "Продукт", capacityMinPerDay: 480 },
-  { id: "u-orlova", name: "Орлова Д.", positionId: "design", positionName: "Дизайнер", teamId: "team-product", teamName: "Продукт", capacityMinPerDay: 480 },
-  { id: "u-lebedeva", name: "Лебедева Е.", positionId: "analyst", positionName: "Аналитик", teamId: "team-product", teamName: "Продукт", capacityMinPerDay: 480 },
-  { id: "u-sergeev", name: "Сергеев П.", positionId: "backend", positionName: "Backend-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 },
-  { id: "u-dmitriev", name: "Дмитриев К.", positionId: "backend", positionName: "Backend-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 },
-  { id: "u-fedorov", name: "Фёдоров И.", positionId: "backend", positionName: "Backend-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 },
-  { id: "u-mikhail", name: "Михаил К.", positionId: "frontend", positionName: "Frontend-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 },
-  { id: "u-kuznetsov", name: "Кузнецов Н.", positionId: "qa", positionName: "QA-инженер", teamId: "team-eng", teamName: "Инженерия", capacityMinPerDay: 480 }
-];
 // Нагрузку на ресурс создают только исполнители; контролёр/согласующий/наблюдатель — нет (как в контракте).
 const WORKING_ROLES = new Set(["executor", "co_executor"]);
 const resName = (id: string) => RESOURCES.find((r) => r.id === id)?.name ?? id;
@@ -99,14 +95,6 @@ const idOf = (wbs: string) => `t-${wbs}`;
 const levelOf = (wbs: string) => wbs.split(".").length - 1;
 
 const BASE = Date.UTC(2026, 2, 2);
-export function dayToIso(day: number): string {
-  return new Date(BASE + day * 86_400_000).toISOString().slice(0, 10);
-}
-export function isoToDay(iso: string): number {
-  const t = Date.parse(iso + "T00:00:00Z");
-  return Math.round((t - BASE) / 86_400_000);
-}
-
 /* ---- Авторская модель (то, что реально редактируется) ---- */
 type Authored = {
   tasks: Array<{
@@ -1432,5 +1420,5 @@ export function buildPortfolioModel(): PortfolioModel {
   };
 }
 
-export const MOCK_PROJECT_ID = PROJECT_ID;
-export { MIN_PER_DAY, PROJECT_START_ISO };
+export { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, PROJECT_START_ISO, RESOURCES };
+export type { Resource };

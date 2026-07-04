@@ -3,6 +3,8 @@ import { ThemeProvider } from "next-themes";
 import React from "react";
 
 import { TooltipProvider } from "../src/components/ui/tooltip";
+import { createMockPlanningFetch } from "../src/delivery/lib/mock-planning-backend";
+import { PlanningRuntimeProvider } from "../src/delivery/lib/planning-runtime";
 import "../src/app/globals.css";
 import "./storybook-fonts.css";
 
@@ -14,6 +16,15 @@ function ForceMotion() {
     document.documentElement.setAttribute("data-force-motion", "");
   }, []);
   return null;
+}
+
+function StoryRuntime({ children }: { children: React.ReactNode }) {
+  const planningFetch = React.useMemo(() => createMockPlanningFetch(), []);
+  return (
+    <PlanningRuntimeProvider live={false} fetchImpl={planningFetch}>
+      {children}
+    </PlanningRuntimeProvider>
+  );
 }
 
 const preview: Preview = {
@@ -34,13 +45,15 @@ const preview: Preview = {
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <ForceMotion />
           <TooltipProvider delayDuration={200}>
-            {fullscreen ? (
-              <Story />
-            ) : (
-              <div className="app-canvas app-content">
+            <StoryRuntime>
+              {fullscreen ? (
                 <Story />
-              </div>
-            )}
+              ) : (
+                <div className="app-canvas app-content">
+                  <Story />
+                </div>
+              )}
+            </StoryRuntime>
           </TooltipProvider>
         </ThemeProvider>
       );

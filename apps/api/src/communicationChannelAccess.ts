@@ -45,13 +45,14 @@ export async function resolveCommunicationChannelAccess(input: {
     channelId: input.channel.id
   }) ?? [];
   const membership = members.find((member) => member.userId === input.actor.id);
-  const canManage =
-    managerDecision.allowed || membership?.role === "owner" || membership?.role === "moderator";
-  const canRead =
-    input.channel.channelType === "workspace_general" ||
-    Boolean(membership) ||
-    canManage ||
-    await canReadScopedProjectChannel(input, policyInput);
+  const scopedProjectRead = await canReadScopedProjectChannel(input, policyInput);
+  const isProjectGeneral = input.channel.channelType === "project_general";
+  const membershipManage =
+    !isProjectGeneral && (membership?.role === "owner" || membership?.role === "moderator");
+  const policyManage = managerDecision.allowed && (!isProjectGeneral || scopedProjectRead);
+  const canManage = policyManage || membershipManage;
+  const canRead = input.channel.channelType === "workspace_general" ||
+    (isProjectGeneral ? scopedProjectRead : Boolean(membership) || canManage);
 
   return {
     readDecision: canRead ? grantedDecision : missingDecision,

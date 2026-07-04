@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   canManageCommunications,
   canReadCommunications,
+  canReadProjects,
   type PolicyDecision
 } from "@kiss-pm/access-control";
 import {
@@ -176,21 +177,31 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseChannelPatchBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const updated = await deps.dataSource.updateCommunicationChannel?.({
-      tenantId: actor.tenantId,
-      channelId: resolved.value.channel.id,
-      ...parsed.value
+    if (!deps.dataSource.updateCommunicationChannel) {
+      return context.json({ error: "communications_not_configured" }, 501);
+    }
+    const updated = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const channel = await transactionDataSource.updateCommunicationChannel!({
+        tenantId: actor.tenantId,
+        channelId: resolved.value.channel.id,
+        ...parsed.value
+      });
+      if (!channel) return null;
+      await deps.appendManagementAuditEvent(
+        communicationAudit({
+          actionType: "communications.channel_updated",
+          actor,
+          commandInput: { channelId: channel.id, ...parsed.value },
+          permissionResult: resolved.value.access.manageDecision,
+          sourceEntity: { type: "CommunicationChannel", id: channel.id },
+          beforeState: serializeChannel(resolved.value.channel, resolved.value.access),
+          afterState: serializeChannel(channel, resolved.value.access)
+        }),
+        transactionDataSource
+      );
+      return channel;
     });
     if (!updated) return context.json({ error: "communication_channel_not_found" }, 404);
-    await deps.appendManagementAuditEvent(communicationAudit({
-      actionType: "communications.channel_updated",
-      actor,
-      commandInput: { channelId: updated.id, ...parsed.value },
-      permissionResult: resolved.value.access.manageDecision,
-      sourceEntity: { type: "CommunicationChannel", id: updated.id },
-      beforeState: serializeChannel(resolved.value.channel, resolved.value.access),
-      afterState: serializeChannel(updated, resolved.value.access)
-    }));
     return context.json({ channel: serializeChannel(updated, resolved.value.access) });
   });
 
@@ -247,25 +258,44 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseMemberBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const userExists = (await deps.dataSource.listUsersByTenantId(actor.tenantId))
-      .some((user) => user.id === parsed.value.userId);
-    if (!userExists) return context.json({ error: "tenant_user_not_found" }, 404);
-    const member = await deps.dataSource.upsertCommunicationChannelMember?.({
-      tenantId: actor.tenantId,
-      channelId: resolved.value.channel.id,
-      userId: parsed.value.userId,
-      role: parsed.value.role,
-      createdByUserId: actor.id
+    const targetUser = (await deps.dataSource.listUsersByTenantId(actor.tenantId))
+      .find((user) => user.id === parsed.value.userId);
+    if (!targetUser) return context.json({ error: "tenant_user_not_found" }, 404);
+    if (!(await canTargetUserJoinChannel(targetUser, resolved.value.channel, deps))) {
+      await appendDeniedAudit(deps, actor, {
+        action: "channel.member.add_target",
+        channelId: resolved.value.channel.id,
+        permissionResult: {
+          allowed: false,
+          reason: "permission_missing"
+        }
+      });
+      return context.json({ error: "permission_missing" }, 403);
+    }
+    if (!deps.dataSource.upsertCommunicationChannelMember) {
+      return context.json({ error: "communications_not_configured" }, 501);
+    }
+    const member = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const upserted = await transactionDataSource.upsertCommunicationChannelMember!({
+        tenantId: actor.tenantId,
+        channelId: resolved.value.channel.id,
+        userId: parsed.value.userId,
+        role: parsed.value.role,
+        createdByUserId: actor.id
+      });
+      await deps.appendManagementAuditEvent(
+        communicationAudit({
+          actionType: "communications.channel_member_added",
+          actor,
+          commandInput: { channelId: resolved.value.channel.id, userId: upserted.userId, role: upserted.role },
+          permissionResult: resolved.value.access.manageDecision,
+          sourceEntity: { type: "CommunicationChannel", id: resolved.value.channel.id },
+          afterState: { userId: upserted.userId, role: upserted.role }
+        }),
+        transactionDataSource
+      );
+      return upserted;
     });
-    if (!member) return context.json({ error: "communications_not_configured" }, 501);
-    await deps.appendManagementAuditEvent(communicationAudit({
-      actionType: "communications.channel_member_added",
-      actor,
-      commandInput: { channelId: resolved.value.channel.id, userId: member.userId, role: member.role },
-      permissionResult: resolved.value.access.manageDecision,
-      sourceEntity: { type: "CommunicationChannel", id: resolved.value.channel.id },
-      afterState: { userId: member.userId, role: member.role }
-    }));
     return context.json({ member: serializeMember(member) }, 201);
   });
 
@@ -284,20 +314,30 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
     }
     const userId = parseCollaborationId(context.req.param("userId"), "tenant_user_id_invalid");
     if (!userId.ok) return context.json({ error: userId.error }, 400);
-    const member = await deps.dataSource.archiveCommunicationChannelMember?.({
-      tenantId: actor.tenantId,
-      channelId: resolved.value.channel.id,
-      userId: userId.value
+    if (!deps.dataSource.archiveCommunicationChannelMember) {
+      return context.json({ error: "communications_not_configured" }, 501);
+    }
+    const member = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const archived = await transactionDataSource.archiveCommunicationChannelMember!({
+        tenantId: actor.tenantId,
+        channelId: resolved.value.channel.id,
+        userId: userId.value
+      });
+      if (!archived) return null;
+      await deps.appendManagementAuditEvent(
+        communicationAudit({
+          actionType: "communications.channel_member_removed",
+          actor,
+          commandInput: { channelId: resolved.value.channel.id, userId: archived.userId },
+          permissionResult: resolved.value.access.manageDecision,
+          sourceEntity: { type: "CommunicationChannel", id: resolved.value.channel.id },
+          afterState: { archivedAt: archived.archivedAt?.toISOString() ?? null }
+        }),
+        transactionDataSource
+      );
+      return archived;
     });
     if (!member) return context.json({ error: "channel_member_not_found" }, 404);
-    await deps.appendManagementAuditEvent(communicationAudit({
-      actionType: "communications.channel_member_removed",
-      actor,
-      commandInput: { channelId: resolved.value.channel.id, userId: member.userId },
-      permissionResult: resolved.value.access.manageDecision,
-      sourceEntity: { type: "CommunicationChannel", id: resolved.value.channel.id },
-      afterState: { archivedAt: member.archivedAt?.toISOString() ?? null }
-    }));
     return context.json({ member: serializeMember(member) });
   });
 
@@ -356,24 +396,32 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseStickerPackBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const pack = await deps.dataSource.createStickerPack?.({
-      id: `sticker-pack-${randomUUID()}`,
-      tenantId: actor.tenantId,
-      title: parsed.value.title,
-      description: parsed.value.description,
-      source: parsed.value.source,
-      status: "ready",
-      createdByUserId: actor.id
+    if (!deps.dataSource.createStickerPack) {
+      return context.json({ error: "communications_not_configured" }, 501);
+    }
+    const pack = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const created = await transactionDataSource.createStickerPack!({
+        id: `sticker-pack-${randomUUID()}`,
+        tenantId: actor.tenantId,
+        title: parsed.value.title,
+        description: parsed.value.description,
+        source: parsed.value.source,
+        status: "ready",
+        createdByUserId: actor.id
+      });
+      await deps.appendManagementAuditEvent(
+        communicationAudit({
+          actionType: "communications.sticker_pack_created",
+          actor,
+          commandInput: { source: created.source, title: created.title },
+          permissionResult: decision,
+          sourceEntity: { type: "StickerPack", id: created.id },
+          afterState: { packId: created.id }
+        }),
+        transactionDataSource
+      );
+      return created;
     });
-    if (!pack) return context.json({ error: "communications_not_configured" }, 501);
-    await deps.appendManagementAuditEvent(communicationAudit({
-      actionType: "communications.sticker_pack_created",
-      actor,
-      commandInput: { source: pack.source, title: pack.title },
-      permissionResult: decision,
-      sourceEntity: { type: "StickerPack", id: pack.id },
-      afterState: { packId: pack.id }
-    }));
     return context.json({ stickerPack: serializeStickerPack(pack) }, 201);
   });
 
@@ -424,19 +472,29 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
     }
     const packId = parseCollaborationId(context.req.param("packId"), "sticker_pack_id_invalid");
     if (!packId.ok) return context.json({ error: packId.error }, 400);
-    const pack = await deps.dataSource.archiveStickerPack?.({
-      tenantId: actor.tenantId,
-      packId: packId.value
+    if (!deps.dataSource.archiveStickerPack) {
+      return context.json({ error: "communications_not_configured" }, 501);
+    }
+    const pack = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const archived = await transactionDataSource.archiveStickerPack!({
+        tenantId: actor.tenantId,
+        packId: packId.value
+      });
+      if (!archived) return null;
+      await deps.appendManagementAuditEvent(
+        communicationAudit({
+          actionType: "communications.sticker_pack_archived",
+          actor,
+          commandInput: { packId: archived.id },
+          permissionResult: decision,
+          sourceEntity: { type: "StickerPack", id: archived.id },
+          afterState: { archivedAt: archived.archivedAt?.toISOString() ?? null }
+        }),
+        transactionDataSource
+      );
+      return archived;
     });
     if (!pack) return context.json({ error: "sticker_pack_not_found" }, 404);
-    await deps.appendManagementAuditEvent(communicationAudit({
-      actionType: "communications.sticker_pack_archived",
-      actor,
-      commandInput: { packId: pack.id },
-      permissionResult: decision,
-      sourceEntity: { type: "StickerPack", id: pack.id },
-      afterState: { archivedAt: pack.archivedAt?.toISOString() ?? null }
-    }));
     return context.json({ stickerPack: serializeStickerPack(pack) });
   });
 
@@ -481,19 +539,29 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
     }
     const stickerId = parseCollaborationId(context.req.param("stickerId"), "sticker_id_invalid");
     if (!stickerId.ok) return context.json({ error: stickerId.error }, 400);
-    const sticker = await deps.dataSource.archiveStickerAsset?.({
-      tenantId: actor.tenantId,
-      stickerAssetId: stickerId.value
+    if (!deps.dataSource.archiveStickerAsset) {
+      return context.json({ error: "communications_not_configured" }, 501);
+    }
+    const sticker = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const archived = await transactionDataSource.archiveStickerAsset!({
+        tenantId: actor.tenantId,
+        stickerAssetId: stickerId.value
+      });
+      if (!archived) return null;
+      await deps.appendManagementAuditEvent(
+        communicationAudit({
+          actionType: "communications.sticker_archived",
+          actor,
+          commandInput: { stickerAssetId: archived.id, packId: archived.packId },
+          permissionResult: decision,
+          sourceEntity: { type: "StickerAsset", id: archived.id },
+          afterState: { archivedAt: archived.archivedAt?.toISOString() ?? null }
+        }),
+        transactionDataSource
+      );
+      return archived;
     });
     if (!sticker) return context.json({ error: "sticker_not_found" }, 404);
-    await deps.appendManagementAuditEvent(communicationAudit({
-      actionType: "communications.sticker_archived",
-      actor,
-      commandInput: { stickerAssetId: sticker.id, packId: sticker.packId },
-      permissionResult: decision,
-      sourceEntity: { type: "StickerAsset", id: sticker.id },
-      afterState: { archivedAt: sticker.archivedAt?.toISOString() ?? null }
-    }));
     return context.json({ sticker: serializeStickerAsset(sticker) });
   });
 }
@@ -919,6 +987,28 @@ function isUploadFile(value: FormDataEntryValue | null): value is File {
     "size" in value &&
     "type" in value
   );
+}
+
+async function canTargetUserJoinChannel(
+  targetUser: TenantUser,
+  channel: CommunicationChannel,
+  deps: ApiRouteDeps
+): Promise<boolean> {
+  if (channel.channelType !== "project_general") return true;
+  if (channel.scopeEntityType !== "project" || !channel.scopeEntityId) return false;
+  const profile = await deps.dataSource.findAccessProfileById?.(
+    targetUser.tenantId,
+    targetUser.accessProfileId
+  );
+  if (!profile) return false;
+  const decision = canReadProjects({
+    actor: targetUser,
+    profile,
+    targetTenantId: targetUser.tenantId
+  });
+  if (!decision.allowed) return false;
+  const projects = await deps.dataSource.listProjects?.(targetUser.tenantId) ?? [];
+  return projects.some((project) => project.id === channel.scopeEntityId);
 }
 
 function serializeChannel(channel: CommunicationChannel, access: CommunicationChannelAccess) {

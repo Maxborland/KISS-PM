@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { permissionForCommand } from "../planning/planningCommandPermissions";
 import { buildCreateTaskPlanningCommand } from "../planningTaskCompatibility";
 import {
   appendCreatedTaskActivity,
@@ -77,6 +78,10 @@ export async function createWorkspaceInboxTask(
       body: input.body,
       participants
     });
+    const planningPermission = permissionForCommand(planningCommand, input.actor, input.profile);
+    if (!planningPermission.allowed) {
+      return { ok: false as const, status: 403, error: planningPermission.reason };
+    }
     await transactionDataSource.applyPlanningCommand({
       tenantId: input.actor.tenantId,
       projectId: inboxProject.id,
@@ -212,6 +217,14 @@ export async function createProjectTask(
       body: input.body,
       participants
     });
+    const planningPermission = permissionForCommand(
+      currentPlanningCommand,
+      input.actor,
+      input.profile
+    );
+    if (!planningPermission.allowed) {
+      return { ok: false as const, status: 403, error: planningPermission.reason };
+    }
     await transactionDataSource.applyPlanningCommand({
       tenantId: input.actor.tenantId,
       projectId: currentProject.id,

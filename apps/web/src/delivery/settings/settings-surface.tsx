@@ -10,7 +10,7 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
-import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
+import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { demoAction } from "@/views/lib/demo";
 import type { PlanningCommand } from "@kiss-pm/domain";
