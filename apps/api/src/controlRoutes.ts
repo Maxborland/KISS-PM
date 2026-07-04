@@ -1,6 +1,5 @@
 import {
   canExecuteManagementActions,
-  canManageCorrectiveActions,
   canManageControlSignals,
   canManageKpiDefinitions,
   canReadControlSignals,
@@ -18,7 +17,6 @@ import {
   proposeManagementActions,
   validateKpiFormula,
   type ControlSignal,
-  type CorrectiveAction,
   type KpiDefinition,
   type TenantUser
 } from "@kiss-pm/domain";
@@ -35,6 +33,10 @@ import { PLANNING_ENGINE_VERSION } from "./planning/planningConstants";
 import { createPlanningReadModel } from "./planning/planningReadModel";
 import { executeApplyManagementAction } from "./control/managementActionApplyHandler";
 import { decisionForActionPermissions } from "./control/managementActionPermissions";
+import {
+  executeCreateCorrectiveAction,
+  executeUpdateCorrectiveAction
+} from "./control/correctiveActionCommandHandlers";
 import { executeUpdateControlSignalStatus } from "./control/controlSignalCommandHandlers";
 import { includeResourceExceptionsFor } from "./planning/planningRouteAuth";
 import { summarizeSnapshot } from "./planning/planningRouteHelpers";
@@ -49,6 +51,7 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.get("/api/tenant/current/kpi-definitions", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
+
     const profile = await deps.getActorProfile(actor);
     const decision = canReadKpiDefinitions({ actor, profile, targetTenantId: actor.tenantId });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
@@ -125,6 +128,7 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
+
     const profile = await deps.getActorProfile(actor);
     const readPlanDecision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
     if (!readPlanDecision.allowed) return context.json({ error: readPlanDecision.reason }, 403);
@@ -526,64 +530,28 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
     const profile = await deps.getActorProfile(actor);
-    const decision = canManageCorrectiveActions({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const { projectId, signalId } = routeIds.value;
-    const parsed = parseCorrectiveActionBody(body.value, actor.tenantId, projectId, signalId);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    if (!deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
 
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.listControlSignals ||
-        !transactionDataSource.createCorrectiveAction ||
-        !transactionDataSource.appendAuditEvent
-      ) {
-        return { ok: false as const, status: 501, error: "persistence_not_configured" };
+    const result = await executeCreateCorrectiveAction({
+      actor,
+      profile,
+      projectId,
+      signalId,
+      body: body.value,
+      deps: {
+        dataSource: deps.dataSource,
+        appendManagementAuditEvent: deps.appendManagementAuditEvent,
+        runDataSourceTransaction: (operation) =>
+          deps.runDataSourceTransaction((transactionDataSource) => operation(transactionDataSource))
       }
-      const signal = (await transactionDataSource.listControlSignals(actor.tenantId, projectId)).find(
-        (candidate) => candidate.id === signalId
-      );
-      if (!signal) return { ok: false as const, status: 404, error: "control_signal_not_found" };
-      const correctiveAction = await transactionDataSource.createCorrectiveAction(parsed.value);
-      const auditEventId = await appendControlAuditIfConfigured(
-        deps,
-        {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
-          actionType: "corrective_action.created",
-          sourceWorkflow: "control",
-          sourceEntity: { type: "ControlSignal", id: signalId },
-          commandInput: { correctiveAction },
-          beforeState: { signal },
-          afterState: { correctiveAction },
-          permissionResult: decision,
-          executionResult: { status: "succeeded" }
-        },
-        transactionDataSource
-      );
-      const execution = await transactionDataSource.createActionExecution?.({
-        id: `action-exec-${randomUUID()}`,
-        tenantId: actor.tenantId,
-        projectId,
-        actionType: "create_corrective_action",
-        targetEntity: { type: "ControlSignal", id: signalId },
-        actorUserId: actor.id,
-        input: { correctiveAction },
-        previewPayload: null,
-        resultPayload: { correctiveAction },
-        status: "succeeded",
-        auditEventId
-      });
-      return { ok: true as const, correctiveAction, actionExecution: execution ?? null, auditEventId };
     });
     if (!result.ok) {
       if (result.status === 501) return context.json({ error: result.error }, 501);
-      return context.json({ error: result.error }, 404);
+      if (result.status === 403) return context.json({ error: result.error }, 403);
+      if (result.status === 404) return context.json({ error: result.error }, 404);
+      return context.json({ error: result.error }, 400);
     }
     return context.json({
       correctiveAction: result.correctiveAction,
@@ -610,47 +578,23 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const profile = await deps.getActorProfile(actor);
-    const decision = canManageCorrectiveActions({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-    if (!deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
 
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.listCorrectiveActions ||
-        !transactionDataSource.updateCorrectiveAction ||
-        !transactionDataSource.appendAuditEvent
-      ) {
-        return { ok: false as const, status: 501, error: "persistence_not_configured" };
+    const result = await executeUpdateCorrectiveAction({
+      actor,
+      profile,
+      projectId: projectId.value,
+      correctiveActionId: correctiveActionId.value,
+      body: body.value,
+      deps: {
+        dataSource: deps.dataSource,
+        appendManagementAuditEvent: deps.appendManagementAuditEvent,
+        runDataSourceTransaction: (operation) =>
+          deps.runDataSourceTransaction((transactionDataSource) => operation(transactionDataSource))
       }
-      const existing = (await transactionDataSource.listCorrectiveActions(actor.tenantId, projectId.value)).find(
-        (candidate) => candidate.id === correctiveActionId.value
-      );
-      if (!existing) return { ok: false as const, status: 404, error: "corrective_action_not_found" };
-      const parsed = parseCorrectiveActionPatchBody(body.value, existing);
-      if (!parsed.ok) return { ok: false as const, status: 400, error: parsed.error };
-      const correctiveAction = await transactionDataSource.updateCorrectiveAction(parsed.value);
-      const auditEventId = await appendControlAuditIfConfigured(
-        deps,
-        {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
-          actionType: "corrective_action.updated",
-          sourceWorkflow: "control",
-          sourceEntity: { type: "CorrectiveAction", id: correctiveAction.id },
-          commandInput: { correctiveAction },
-          beforeState: { correctiveAction: existing },
-          afterState: { correctiveAction },
-          permissionResult: decision,
-          executionResult: { status: "succeeded" }
-        },
-        transactionDataSource
-      );
-      return { ok: true as const, correctiveAction, auditEventId };
     });
     if (!result.ok) {
       if (result.status === 501) return context.json({ error: result.error }, 501);
+      if (result.status === 403) return context.json({ error: result.error }, 403);
       if (result.status === 404) return context.json({ error: result.error }, 404);
       return context.json({ error: result.error }, 400);
     }
@@ -762,32 +706,6 @@ function parseKpiDefinitionBody(
   };
 }
 
-function parseCorrectiveActionBody(
-  input: unknown,
-  tenantId: string,
-  projectId: string,
-  controlSignalId: string
-): { ok: true; value: CorrectiveAction } | { ok: false; error: string } {
-  if (!isObject(input)) return { ok: false, error: "corrective_action_invalid" };
-  const title = stringField(input, "title");
-  if (!title) return { ok: false, error: "corrective_action_invalid" };
-  return {
-    ok: true,
-    value: {
-      id: stringField(input, "id") ?? `corrective-action-${randomUUID()}`,
-      tenantId,
-      projectId,
-      controlSignalId,
-      title,
-      description: stringField(input, "description"),
-      responsibleUserId: stringField(input, "responsibleUserId"),
-      dueDate: stringField(input, "dueDate"),
-      status: "open",
-      result: null
-    }
-  };
-}
-
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -800,34 +718,6 @@ function stringField(input: Record<string, unknown>, field: string): string | nu
 function integerField(input: Record<string, unknown>, field: string): number | null {
   const value = input[field];
   return typeof value === "number" && Number.isInteger(value) ? value : null;
-}
-
-function nullableStringField(input: Record<string, unknown>, field: string): string | null {
-  const value = input[field];
-  if (value === null) return null;
-  return typeof value === "string" && value.trim().length > 0 ? value : null;
-}
-
-function parseCorrectiveActionPatchBody(
-  input: unknown,
-  existing: CorrectiveAction
-): { ok: true; value: CorrectiveAction } | { ok: false; error: string } {
-  if (!isObject(input)) return { ok: false, error: "corrective_action_invalid" };
-  const status = stringField(input, "status") ?? existing.status;
-  if (!isValidCorrectiveActionStatus(status)) return { ok: false, error: "corrective_action_invalid" };
-  return {
-    ok: true,
-    value: {
-      ...existing,
-      title: stringField(input, "title") ?? existing.title,
-      description: "description" in input ? nullableStringField(input, "description") : existing.description,
-      responsibleUserId:
-        "responsibleUserId" in input ? nullableStringField(input, "responsibleUserId") : existing.responsibleUserId,
-      dueDate: "dueDate" in input ? nullableStringField(input, "dueDate") : existing.dueDate,
-      status,
-      result: "result" in input ? nullableStringField(input, "result") : existing.result
-    }
-  };
 }
 
 function isValidThresholdRules(value: unknown[]): value is KpiDefinition["thresholdRules"] {
@@ -868,10 +758,6 @@ function isValidKpiPeriod(value: string): value is KpiDefinition["period"] {
 
 function isValidKpiStatus(value: string): value is KpiDefinition["status"] {
   return ["active", "archived"].includes(value);
-}
-
-function isValidCorrectiveActionStatus(value: string): value is CorrectiveAction["status"] {
-  return ["open", "in_progress", "done", "cancelled"].includes(value);
 }
 
 async function appendControlAuditIfConfigured(
