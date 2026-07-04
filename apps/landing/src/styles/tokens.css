@@ -176,10 +176,10 @@
   --word-reveal-offset: 0.38em;
   --ease-reveal: cubic-bezier(0.22, 1, 0.36, 1);
   --duration-scroll: 1000ms;
-  --duration-scroll-min: 900ms;
-  --duration-scroll-max: 1800ms;
-  --scroll-distance-ms: 0.55;
-  --scroll-lerp: 0.075;
+  --duration-scroll-min: 640ms;
+  --duration-scroll-max: 1400ms;
+  --scroll-distance-ms: 0.36;
+  --scroll-lerp: 0.13;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-ui: ease-out;
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
