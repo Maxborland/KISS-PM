@@ -1,8 +1,9 @@
 /**
- * Плавный скролл только для якорей.
+ * Плавный скролл страницы для wheel + отдельная easing-анимация для якорей.
  *
- * Колёсико/трекпад не перехватываем: sticky storytelling sections должны
- * получать нативный scrollY без stale targetY и без preventDefault.
+ * Не перехватываем touch/keyboard, reduced-motion, внутренние scrollable панели,
+ * горизонтальные rail'ы и редактируемые поля. Так sticky storytelling sections
+ * продолжают получать обычный window.scrollY, только с мягким rAF-шагом.
  */
 
 export type SmoothScrollController = {
@@ -10,7 +11,13 @@ export type SmoothScrollController = {
   sync: () => void;
 };
 
-function readPxVar(name: string, fallback: number): number {
+const LINE_DELTA_PX = 16;
+const MIN_WHEEL_DELTA_PX = 0.5;
+const SCROLLABLE_OVERFLOW = /auto|scroll|overlay/;
+const EDITABLE_SELECTOR =
+  'input, textarea, select, [contenteditable="true"], [contenteditable=""], [role="textbox"]';
+
+function readNumberVar(name: string, fallback: number): number {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parsed = Number.parseFloat(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -18,6 +25,68 @@ function readPxVar(name: string, fallback: number): number {
 
 function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+function normalizeWheelDelta(event: WheelEvent): { x: number; y: number } {
+  const multiplier =
+    event.deltaMode === WheelEvent.DOM_DELTA_LINE
+      ? LINE_DELTA_PX
+      : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+        ? window.innerHeight
+        : 1;
+
+  return {
+    x: event.deltaX * multiplier,
+    y: event.deltaY * multiplier,
+  };
+}
+
+function canScrollElement(el: HTMLElement, deltaY: number): boolean {
+  const styles = getComputedStyle(el);
+  if (!SCROLLABLE_OVERFLOW.test(styles.overflowY)) {
+    return false;
+  }
+
+  if (el.scrollHeight <= el.clientHeight + 1) {
+    return false;
+  }
+
+  if (deltaY < 0) {
+    return el.scrollTop > 0;
+  }
+
+  if (deltaY > 0) {
+    return el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+  }
+
+  return false;
+}
+
+function shouldUseNativeWheel(event: WheelEvent, delta: { x: number; y: number }): boolean {
+  if (event.defaultPrevented || !event.cancelable || event.ctrlKey || event.metaKey) {
+    return true;
+  }
+
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  if (target.closest(EDITABLE_SELECTOR)) {
+    return true;
+  }
+
+  if (Math.abs(delta.x) > Math.abs(delta.y) && target.closest("[data-hscroll]")) {
+    return true;
+  }
+
+  for (let el: Element | null = target; el && el !== document.body; el = el.parentElement) {
+    if (el instanceof HTMLElement && canScrollElement(el, delta.y)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function initSmoothScroll(): SmoothScrollController | null {
@@ -41,10 +110,13 @@ export function initSmoothScroll(): SmoothScrollController | null {
 
   const clamp = (y: number) => Math.max(0, Math.min(y, getMaxScroll()));
 
+  const getScrollLerp = () =>
+    Math.max(0.04, Math.min(readNumberVar("--scroll-lerp", 0.13), 0.28));
+
   const getAnchorDuration = (delta: number) => {
-    const min = readPxVar("--duration-scroll-min", 900);
-    const max = readPxVar("--duration-scroll-max", 1600);
-    const perPx = readPxVar("--scroll-distance-ms", 0.5);
+    const min = readNumberVar("--duration-scroll-min", 640);
+    const max = readNumberVar("--duration-scroll-max", 1400);
+    const perPx = readNumberVar("--scroll-distance-ms", 0.36);
     return Math.min(max, Math.max(min, min + Math.abs(delta) * perPx));
   };
 
@@ -76,6 +148,7 @@ export function initSmoothScroll(): SmoothScrollController | null {
       return;
     }
 
+    targetY = clamp(targetY);
     const diff = targetY - currentY;
     if (Math.abs(diff) < 0.6) {
       currentY = targetY;
@@ -84,7 +157,7 @@ export function initSmoothScroll(): SmoothScrollController | null {
       return;
     }
 
-    currentY += diff;
+    currentY += diff * getScrollLerp();
     window.scrollTo(0, currentY);
     rafId = requestAnimationFrame(tick);
   };
@@ -112,6 +185,28 @@ export function initSmoothScroll(): SmoothScrollController | null {
     };
     startLoop();
   };
+
+  const onWheel = (event: WheelEvent) => {
+    const delta = normalizeWheelDelta(event);
+    const deltaY = delta.y;
+
+    if (Math.abs(deltaY) < MIN_WHEEL_DELTA_PX || shouldUseNativeWheel(event, delta)) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (rafId == null) {
+      currentY = window.scrollY;
+      targetY = currentY;
+    }
+
+    anchorAnim = null;
+    targetY = clamp(targetY + deltaY);
+    startLoop();
+  };
+
+  window.addEventListener("wheel", onWheel, { passive: false });
 
   window.addEventListener("resize", () => {
     targetY = clamp(targetY);
