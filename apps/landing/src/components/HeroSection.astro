@@ -14,7 +14,7 @@ const copy = copyFor(locale).hero;
   <HeroShader client:load />
 
   <div class="l-container hero__inner">
-    <h1 id="hero-title" class="hero__title">{copy.title[0]}<br />{copy.title[1]}</h1>
+    <h1 id="hero-title" class="hero__title" data-text-reveal>{copy.title[0]}<br />{copy.title[1]}</h1>
     <p class="hero__copy">{copy.copy}</p>
     <a class="hero__access l-btn l-btn--primary" href="#waitlist">{copy.cta}</a>
   </div>
