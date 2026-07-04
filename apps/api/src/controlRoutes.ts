@@ -1,10 +1,7 @@
 import {
-  canApplyPlanningScenarios,
   canExecuteManagementActions,
   canManageCorrectiveActions,
   canManageControlSignals,
-  canManageProjectPlan,
-  canManageProjectResources,
   canManageKpiDefinitions,
   canReadControlSignals,
   canReadKpiDefinitions,
@@ -18,29 +15,26 @@ import {
   createControlSignalsFromEvaluations,
   createDefaultProjectKpiDefinitions,
   evaluateProjectKpis,
-  isBlockingValidationIssue,
   proposeManagementActions,
   validateKpiFormula,
   type ControlSignal,
   type CorrectiveAction,
   type KpiDefinition,
-  type ManagementActionCandidate,
   type TenantUser
 } from "@kiss-pm/domain";
 import { randomUUID } from "node:crypto";
 
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import {
-  persistControlSignalNotifications,
-  persistPlanningNotifications
+  persistControlSignalNotifications
 } from "./collaborationNotificationService";
 import { readLimitedJsonBody } from "./jsonBody";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { notifyPlanVersionChanged } from "./planningEventBus";
-import { previewPlanningCommands } from "./planning/planningCommandCore";
 import { PLANNING_ENGINE_VERSION } from "./planning/planningConstants";
 import { createPlanningReadModel } from "./planning/planningReadModel";
-import { permissionForCommand } from "./planning/planningCommandPermissions";
+import { executeApplyManagementAction } from "./control/managementActionApplyHandler";
+import { decisionForActionPermissions } from "./control/managementActionPermissions";
 import { executeUpdateControlSignalStatus } from "./control/controlSignalCommandHandlers";
 import { includeResourceExceptionsFor } from "./planning/planningRouteAuth";
 import { summarizeSnapshot } from "./planning/planningRouteHelpers";
@@ -438,306 +432,46 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
       ) {
         return context.json({ error: "persistence_not_configured" }, 501);
       }
+
       const { projectId, signalId, actionId } = routeIds.value;
-
       const profile = await deps.getActorProfile(actor);
-      const executeDecision = canExecuteManagementActions({
+      const result = await executeApplyManagementAction({
         actor,
         profile,
-        targetTenantId: actor.tenantId
-      });
-      if (!executeDecision.allowed) {
-        await appendManagementActionDeniedAudit(deps, {
-          actor,
-          projectId,
-          signalId,
-          actionId,
-          permissionResult: executeDecision,
-          stage: "apply"
-        });
-        return context.json({ error: executeDecision.reason }, 403);
-      }
-      const controlReadDecision = canReadControlSignals({
-        actor,
-        profile,
-        targetTenantId: actor.tenantId
-      });
-      if (!controlReadDecision.allowed) {
-        await appendManagementActionDeniedAudit(deps, {
-          actor,
-          projectId,
-          signalId,
-          actionId,
-          permissionResult: controlReadDecision,
-          stage: "apply"
-        });
-        return context.json({ error: controlReadDecision.reason }, 403);
-      }
-
-      const body = await readLimitedJsonBody(context);
-      if (!body.ok) return context.json({ error: body.error }, body.status);
-      const parsed = parseActionApplyBody(body.value);
-      if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
-      const signal = (await deps.dataSource.listControlSignals(actor.tenantId, projectId)).find(
-        (candidate) => candidate.id === signalId
-      );
-      const action = signal?.scenarioProposals.find((candidate) => candidate.id === actionId);
-      if (!signal || !action) return context.json({ error: "action_candidate_not_found" }, 404);
-      if (!action.planDelta || action.planDelta.commands.length === 0) {
-        return context.json({ error: "action_candidate_has_no_plan_delta" }, 400);
-      }
-
-      const requiredDecision = decisionForActionPermissions(action, actor, profile);
-      if (!requiredDecision.allowed) {
-        const deniedResult = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-          if (!transactionDataSource.appendAuditEvent || !transactionDataSource.createActionExecution) {
-            return { ok: false as const, status: 501, error: "persistence_not_configured" };
-          }
-          const auditEventId = await appendControlAuditIfConfigured(deps, {
-            tenantId: actor.tenantId,
-            actorUserId: actor.id,
-            actionType: "management_action.denied",
-            sourceWorkflow: "control",
-            sourceEntity: { type: "ControlSignal", id: signalId },
-            commandInput: { actionId, requiredPermissions: action.requiredPermissions },
-            beforeState: { signal },
-            afterState: null,
-            permissionResult: requiredDecision,
-            executionResult: { status: "denied" }
-          }, transactionDataSource);
-          await transactionDataSource.createActionExecution({
-            id: `action-exec-${randomUUID()}`,
-            tenantId: actor.tenantId,
-            projectId,
-            actionType: action.type,
-            targetEntity: action.targetEntity,
-            actorUserId: actor.id,
-            input: action.input,
-            previewPayload: { action },
-            resultPayload: { error: requiredDecision.reason },
-            status: "denied",
-            auditEventId
-          });
-          return { ok: true as const };
-        });
-        if (!deniedResult.ok) return context.json({ error: deniedResult.error }, 501);
-        return context.json({ error: requiredDecision.reason }, 403);
-      }
-
-      const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-        if (
-          !transactionDataSource.listControlSignals ||
-          !transactionDataSource.getPlanSnapshot ||
-          !transactionDataSource.applyPlanningCommand ||
-          !transactionDataSource.incrementPlanVersion ||
-          !transactionDataSource.appendAuditEvent ||
-          !transactionDataSource.createActionExecution
-        ) {
-          return { ok: false as const, status: 501, error: "persistence_not_configured" };
+        projectId,
+        signalId,
+        actionId,
+        readBody: () => readLimitedJsonBody(context),
+        deps: {
+          dataSource: deps.dataSource,
+          auditDataSource: deps.dataSource,
+          appendManagementAuditEvent: deps.appendManagementAuditEvent,
+          runDataSourceTransaction: (operation) =>
+            deps.runDataSourceTransaction((transactionDataSource) => operation(transactionDataSource))
         }
-
-        await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
-        const lockedSignal = (
-          await transactionDataSource.listControlSignals(actor.tenantId, projectId)
-        ).find((candidate) => candidate.id === signalId);
-        const lockedAction = lockedSignal?.scenarioProposals.find(
-          (candidate) => candidate.id === actionId
-        );
-        if (!lockedSignal || !lockedAction?.planDelta) {
-          return { ok: false as const, status: 404, error: "action_candidate_not_found" };
-        }
-        if (lockedAction.planDelta.commands.length === 0) {
-          return { ok: false as const, status: 400, error: "action_candidate_has_no_plan_delta" };
-        }
-        const lockedDecision = decisionForActionPermissions(lockedAction, actor, profile);
-        if (!lockedDecision.allowed) {
-          const auditEventId = await appendControlAuditIfConfigured(deps, {
-            tenantId: actor.tenantId,
-            actorUserId: actor.id,
-            actionType: "management_action.denied",
-            sourceWorkflow: "control",
-            sourceEntity: { type: "ControlSignal", id: signalId },
-            commandInput: { actionId, requiredPermissions: lockedAction.requiredPermissions },
-            beforeState: { signal: lockedSignal },
-            afterState: null,
-            permissionResult: lockedDecision,
-            executionResult: { status: "denied" }
-          }, transactionDataSource);
-          await transactionDataSource.createActionExecution({
-            id: `action-exec-${randomUUID()}`,
-            tenantId: actor.tenantId,
-            projectId,
-            actionType: lockedAction.type,
-            targetEntity: lockedAction.targetEntity,
-            actorUserId: actor.id,
-            input: lockedAction.input,
-            previewPayload: { action: lockedAction },
-            resultPayload: { error: lockedDecision.reason },
-            status: "denied",
-            auditEventId
-          });
-          return { ok: false as const, status: 403, error: lockedDecision.reason };
-        }
-
-        const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
-        if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
-        if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
-          const auditEventId = await appendControlAuditIfConfigured(deps, {
-            tenantId: actor.tenantId,
-            actorUserId: actor.id,
-            actionType: "management_action.conflict",
-            sourceWorkflow: "control",
-            sourceEntity: { type: "ControlSignal", id: signalId },
-            commandInput: { actionId, clientPlanVersion: parsed.value.clientPlanVersion },
-            beforeState: { planVersion: snapshot.planVersion },
-            afterState: null,
-            permissionResult: lockedDecision,
-            executionResult: { status: "conflict" }
-          }, transactionDataSource);
-          await transactionDataSource.createActionExecution({
-            id: `action-exec-${randomUUID()}`,
-            tenantId: actor.tenantId,
-            projectId,
-            actionType: lockedAction.type,
-            targetEntity: lockedAction.targetEntity,
-            actorUserId: actor.id,
-            input: lockedAction.input,
-            previewPayload: { action: lockedAction },
-            resultPayload: {
-              error: "plan_version_conflict",
-              currentPlanVersion: snapshot.planVersion
-            },
-            status: "failed",
-            auditEventId
-          });
-          return {
-            ok: false as const,
-            status: 409,
-            error: "plan_version_conflict",
-            currentPlanVersion: snapshot.planVersion
-          };
-        }
-
-        const preview = await previewPlanningCommands(
-          snapshot,
-          lockedAction.planDelta.commands,
-          transactionDataSource,
-          actor.tenantId
-        );
-        if (preview.validationIssues.some(isBlockingValidationIssue)) {
-          const auditEventId = await appendControlAuditIfConfigured(deps, {
-            tenantId: actor.tenantId,
-            actorUserId: actor.id,
-            actionType: "management_action.precondition_failed",
-            sourceWorkflow: "control",
-            sourceEntity: { type: "ControlSignal", id: signalId },
-            commandInput: { actionId, commands: lockedAction.planDelta.commands },
-            beforeState: summarizeSnapshot(snapshot),
-            afterState: null,
-            permissionResult: lockedDecision,
-            executionResult: { status: "failed", validationIssues: preview.validationIssues }
-          }, transactionDataSource);
-          await transactionDataSource.createActionExecution({
-            id: `action-exec-${randomUUID()}`,
-            tenantId: actor.tenantId,
-            projectId,
-            actionType: lockedAction.type,
-            targetEntity: lockedAction.targetEntity,
-            actorUserId: actor.id,
-            input: lockedAction.input,
-            previewPayload: { action: lockedAction },
-            resultPayload: { validationIssues: preview.validationIssues },
-            status: "failed",
-            auditEventId
-          });
-          return {
-            ok: false as const,
-            status: 409,
-            error: "planning_precondition_failed",
-            validationIssues: preview.validationIssues
-          };
-        }
-
-        for (const command of lockedAction.planDelta.commands) {
-          await transactionDataSource.applyPlanningCommand({
-            tenantId: actor.tenantId,
-            projectId,
-            actorUserId: actor.id,
-            command
-          });
-        }
-        const newPlanVersion = await transactionDataSource.incrementPlanVersion(actor.tenantId, projectId);
-        const auditEventId = await appendControlAuditIfConfigured(deps, {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
-          actionType: "management_action.applied",
-          sourceWorkflow: "control",
-          sourceEntity: { type: "ControlSignal", id: signalId },
-          commandInput: { action: lockedAction, clientPlanVersion: parsed.value.clientPlanVersion },
-          beforeState: summarizeSnapshot(snapshot),
-          afterState: {
-            planVersion: newPlanVersion,
-            changedTaskIds: preview.planDelta.changedTaskIds,
-            changedAssignmentIds: preview.planDelta.changedAssignmentIds,
-            changedDependencyIds: preview.planDelta.changedDependencyIds
-          },
-          permissionResult: lockedDecision,
-          executionResult: { status: "succeeded", validationIssues: preview.validationIssues }
-        }, transactionDataSource);
-        const execution = await transactionDataSource.createActionExecution({
-          id: `action-exec-${randomUUID()}`,
-          tenantId: actor.tenantId,
-          projectId,
-          actionType: lockedAction.type,
-          targetEntity: lockedAction.targetEntity,
-          actorUserId: actor.id,
-          input: lockedAction.input,
-          previewPayload: { action: lockedAction, validationIssues: preview.validationIssues },
-          resultPayload: { planDelta: preview.planDelta, newPlanVersion },
-          status: "succeeded",
-          auditEventId
-        });
-        const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
-        if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
-        await persistPlanningNotifications({
-          dataSource: transactionDataSource,
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
-          beforeSnapshot: snapshot,
-          afterSnapshot: appliedSnapshot,
-          commands: lockedAction.planDelta.commands
-        });
-
-        return {
-          ok: true as const,
-          body: {
-            applied: preview.planDelta,
-            newPlanVersion,
-            auditEventId,
-            actionExecution: execution,
-            readModel: createPlanningReadModel(appliedSnapshot, { includeResourceExceptions: includeResourceExceptionsFor({ actor, profile }) })
-          }
-        };
       });
 
-      if (!result.ok) {
-        if (result.status === 501) return context.json({ error: result.error }, 501);
-        if (result.status === 404) return context.json({ error: result.error }, 404);
-        if (result.status === 403) return context.json({ error: result.error }, 403);
-        if (result.status === 409) {
-          const { status: _status, ok: _ok, ...responseBody } = result;
-          return context.json(responseBody, 409);
-        }
-        return context.json({ error: result.error }, 400);
+      if (result.status !== 200) {
+        if (result.status === 501) return context.json(result.body, 501);
+        if (result.status === 404) return context.json(result.body, 404);
+        if (result.status === 403) return context.json(result.body, 403);
+        if (result.status === 409) return context.json(result.body, 409);
+        if (result.status === 413) return context.json(result.body, 413);
+        if (result.status === 415) return context.json(result.body, 415);
+        return context.json(result.body, 400);
       }
 
       invalidateCapacityCacheForTenant(actor.tenantId);
       notifyPlanVersionChanged(projectId, result.body.newPlanVersion);
-      return context.json(result.body);
+      const { appliedSnapshot, ...responseBody } = result.body;
+      return context.json({
+        ...responseBody,
+        readModel: createPlanningReadModel(appliedSnapshot, {
+          includeResourceExceptions: includeResourceExceptionsFor({ actor, profile })
+        })
+      });
     }
   );
-
   app.post("/api/workspace/projects/:projectId/control/signals/:signalId/status", async (context) => {
     const routeIds = parseControlSignalRouteParams(context);
     if (!routeIds.ok) return context.json({ error: routeIds.error }, 400);
@@ -1138,51 +872,6 @@ function isValidKpiStatus(value: string): value is KpiDefinition["status"] {
 
 function isValidCorrectiveActionStatus(value: string): value is CorrectiveAction["status"] {
   return ["open", "in_progress", "done", "cancelled"].includes(value);
-}
-
-function parseActionApplyBody(
-  input: unknown
-): { ok: true; value: { clientPlanVersion: number } } | { ok: false; error: string } {
-  if (!isObject(input)) return { ok: false, error: "management_action_input_invalid" };
-  const clientPlanVersion = integerField(input, "clientPlanVersion");
-  if (clientPlanVersion === null || clientPlanVersion < 1) {
-    return { ok: false, error: "management_action_input_invalid" };
-  }
-  return { ok: true, value: { clientPlanVersion } };
-}
-
-function decisionForActionPermissions(
-  action: ManagementActionCandidate,
-  actor: TenantUser,
-  profile: AccessProfile
-): PolicyDecision {
-  for (const permission of action.requiredPermissions) {
-    const decision = decisionForPermission(permission, actor, profile);
-    if (!decision.allowed) return decision;
-  }
-  for (const command of action.planDelta?.commands ?? []) {
-    const decision = permissionForCommand(command, actor, profile);
-    if (!decision.allowed) return decision;
-  }
-  return {
-    allowed: true,
-    reason: "same_tenant_permission_granted"
-  };
-}
-
-function decisionForPermission(
-  permission: string,
-  actor: TenantUser,
-  profile: AccessProfile
-): PolicyDecision {
-  const input = { actor, profile, targetTenantId: actor.tenantId };
-  if (permission === "tenant.project_plan.manage") return canManageProjectPlan(input);
-  if (permission === "tenant.project_resources.manage") return canManageProjectResources(input);
-  if (permission === "tenant.planning_scenarios.apply") return canApplyPlanningScenarios(input);
-  return {
-    allowed: false,
-    reason: "permission_missing"
-  };
 }
 
 async function appendControlAuditIfConfigured(
