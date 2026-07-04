@@ -1,6 +1,5 @@
 import {
   canExecuteManagementActions,
-  canManageControlSignals,
   canReadControlSignals,
   canReadKpiDefinitions,
   canReadProjectPlan,
@@ -8,12 +7,7 @@ import {
   type PolicyDecision
 } from "@kiss-pm/access-control";
 import {
-  buildResourceLoadMatrix,
-  calculatePlan,
-  createControlSignalsFromEvaluations,
   createDefaultProjectKpiDefinitions,
-  evaluateProjectKpis,
-  proposeManagementActions,
   type ControlSignal,
   type KpiDefinition,
   type TenantUser
@@ -21,13 +15,11 @@ import {
 import { randomUUID } from "node:crypto";
 
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
-import {
-  persistControlSignalNotifications
-} from "./collaborationNotificationService";
+
 import { readLimitedJsonBody } from "./jsonBody";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { notifyPlanVersionChanged } from "./planningEventBus";
-import { PLANNING_ENGINE_VERSION } from "./planning/planningConstants";
+
 import { createPlanningReadModel } from "./planning/planningReadModel";
 import { executeApplyManagementAction } from "./control/managementActionApplyHandler";
 import { decisionForActionPermissions } from "./control/managementActionPermissions";
@@ -36,6 +28,7 @@ import {
   executeUpdateCorrectiveAction
 } from "./control/correctiveActionCommandHandlers";
 import { executeUpdateControlSignalStatus } from "./control/controlSignalCommandHandlers";
+import { executeControlEvaluation } from "./control/controlEvaluationCommandHandler";
 import { executeUpsertKpiDefinition } from "./control/kpiDefinitionCommandHandlers";
 import { includeResourceExceptionsFor } from "./planning/planningRouteAuth";
 import { summarizeSnapshot } from "./planning/planningRouteHelpers";
@@ -148,113 +141,27 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     ) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
-    const profile = await deps.getActorProfile(actor);
-    const readPlanDecision = canReadProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
-    if (!readPlanDecision.allowed) return context.json({ error: readPlanDecision.reason }, 403);
-    const controlDecision = canReadControlSignals({ actor, profile, targetTenantId: actor.tenantId });
-    if (!controlDecision.allowed) return context.json({ error: controlDecision.reason }, 403);
-    const controlManageDecision = canManageControlSignals({ actor, profile, targetTenantId: actor.tenantId });
-    if (!controlManageDecision.allowed) return context.json({ error: controlManageDecision.reason }, 403);
-    if (!deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
+    const result = await executeControlEvaluation({
+      actor,
+      profile: await deps.getActorProfile(actor),
+      projectId: projectId.value,
+      deps: {
+        dataSource: deps.dataSource,
+        appendManagementAuditEvent: deps.appendManagementAuditEvent,
+        runDataSourceTransaction: (operation) =>
+          deps.runDataSourceTransaction((transactionDataSource) => operation(transactionDataSource))
+      }
+    });
+    if (!result.ok) {
+      if (result.status === 501) return context.json({ error: result.error }, 501);
+      if (result.status === 404) return context.json({ error: result.error }, 404);
+      return context.json({ error: result.error }, 403);
     }
-    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId.value);
-    if (!snapshot) return context.json({ error: "project_not_found" }, 404);
-
-    const now = new Date().toISOString();
-    const definitions = await deps.runDataSourceTransaction((transactionDataSource) =>
-      ensureDefinitionsOrDefaults(deps, actor.tenantId, transactionDataSource)
-    );
-    const calculatedPlan = calculatePlan(snapshot, {
-      calculatedAt: now,
-      engineVersion: PLANNING_ENGINE_VERSION
-    });
-    const resourceLoad = buildResourceLoadMatrix({
-      plan: calculatedPlan,
-      resources: snapshot.resources,
-      assignments: snapshot.assignments,
-      assignmentAllocations: snapshot.assignmentAllocations,
-      calendars: snapshot.calendars,
-      calendarExceptions: snapshot.calendarExceptions,
-      reservations: snapshot.reservations,
-      rangeStart: snapshot.project.plannedStart,
-      rangeFinish: calculatedPlan.projectFinish ?? snapshot.project.plannedFinish,
-      granularities: ["day"]
-    });
-    const evaluations = withUniqueEvaluationIds(
-      evaluateProjectKpis({ definitions, snapshot, calculatedPlan, resourceLoad, evaluatedAt: now })
-    );
-    const rawSignals = createControlSignalsFromEvaluations({
-      definitions,
-      evaluations,
-      snapshot,
-      now
-    });
-    const proposals = proposeManagementActions({
-      snapshot,
-      calculatedPlan,
-      resourceLoad,
-      signals: rawSignals,
-      calculatedAt: now
-    });
-    const signals = rawSignals.map((signal) => ({
-      ...signal,
-      scenarioProposals: proposals.filter((proposal) => proposal.targetEntity.id === signal.id)
-    }));
-
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.createKpiEvaluation ||
-        !transactionDataSource.upsertControlSignal ||
-        !transactionDataSource.appendAuditEvent
-      ) {
-        return { ok: false as const };
-      }
-      const previousSignals =
-        await transactionDataSource.listControlSignals?.(actor.tenantId, projectId.value) ?? [];
-      const persistedEvaluations = [];
-      for (const evaluation of evaluations) {
-        persistedEvaluations.push(await transactionDataSource.createKpiEvaluation(evaluation));
-      }
-      const persistedSignals = [];
-      for (const signal of signals) {
-        persistedSignals.push(await transactionDataSource.upsertControlSignal(signal));
-      }
-      await persistControlSignalNotifications({
-        dataSource: transactionDataSource,
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        snapshot,
-        signals: persistedSignals,
-        previousSignals
-      });
-      const auditEventId = await appendControlAuditIfConfigured(
-        deps,
-        {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
-          actionType: "kpi.evaluated",
-          sourceWorkflow: "control",
-          sourceEntity: { type: "Project", id: projectId.value },
-          commandInput: { projectId: projectId.value, planVersion: snapshot.planVersion },
-          beforeState: null,
-          afterState: {
-            evaluationIds: persistedEvaluations.map((evaluation) => evaluation.id),
-            signalIds: persistedSignals.map((signal) => signal.id)
-          },
-          permissionResult: controlManageDecision,
-          executionResult: { status: "succeeded" }
-        },
-        transactionDataSource
-      );
-      return { ok: true as const, persistedEvaluations, persistedSignals, auditEventId };
-    });
-    if (!result.ok) return context.json({ error: "persistence_not_configured" }, 501);
 
     return context.json({
-      evaluations: result.persistedEvaluations,
-      signals: result.persistedSignals,
-      actionCandidates: proposals,
+      evaluations: result.evaluations,
+      signals: result.signals,
+      actionCandidates: result.actionCandidates,
       auditEventId: result.auditEventId
     });
   });
@@ -603,27 +510,6 @@ function parseControlActionRouteParams(
 async function listDefinitionsOrDefaults(deps: ApiRouteDeps, tenantId: string): Promise<KpiDefinition[]> {
   const definitions = (await deps.dataSource.listKpiDefinitions?.(tenantId)) ?? [];
   return definitions.length > 0 ? definitions : createDefaultProjectKpiDefinitions(tenantId);
-}
-
-async function ensureDefinitionsOrDefaults(
-  deps: ApiRouteDeps,
-  tenantId: string,
-  dataSource: ApiRouteDeps["dataSource"] = deps.dataSource
-): Promise<KpiDefinition[]> {
-  const definitions = await dataSource.listKpiDefinitions?.(tenantId);
-  if (!definitions || definitions.length > 0) return definitions ?? createDefaultProjectKpiDefinitions(tenantId);
-  const defaults = createDefaultProjectKpiDefinitions(tenantId);
-  const persisted: KpiDefinition[] = [];
-  for (const definition of defaults) {
-    const upserted = await dataSource.upsertKpiDefinition?.(definition);
-    if (!upserted) throw new Error("kpi_definition_persistence_not_configured");
-    persisted.push(upserted);
-  }
-  return persisted;
-}
-
-function withUniqueEvaluationIds<T extends { id: string }>(evaluations: T[]): T[] {
-  return evaluations.map((evaluation) => ({ ...evaluation, id: `kpi-eval-${randomUUID()}` }));
 }
 
 async function appendControlAuditIfConfigured(
