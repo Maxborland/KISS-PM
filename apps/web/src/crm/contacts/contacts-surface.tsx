@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { Archive, Plus, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
@@ -15,10 +17,19 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 
+// Ошибка внутри модалки — по месту действия (раньше рендерилась строкой внизу страницы).
+function DialogError({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
+      {text}
+    </p>
+  );
+}
+
 export function ProjectContacts() {
   const { data, status, error, reload, createContact, updateContact } = useCrm();
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const clientById = useMemo(() => new Map((data?.clients ?? []).map((c) => [c.id, c])), [data]);
 
@@ -38,15 +49,15 @@ export function ProjectContacts() {
   const clientLabel = (id: string) => { const cl = clientById.get(id); return cl ? `${cl.name}${cl.status === "archived" ? " (архив)" : ""}` : id; };
   // архив/восстановление шлёт ПОЛНУЮ запись (боевой PATCH — full-replace, требует name)
   const toggleArchive = async (c: Contact, to: "active" | "archived") => {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await updateContact(c.id, { clientId: c.clientId, name: c.name, email: c.email, phone: c.phone, telegram: c.telegram, role: c.role, status: to });
     setBusy(false);
-    if (res.ok) setNotice(to === "archived" ? "Контакт в архиве" : "Контакт восстановлен");
-    else setNotice(`Отклонено: ${crmErr(res.code, res.message)}`);
+    if (res.ok) toast.success(to === "archived" ? "Контакт в архиве" : "Контакт восстановлен");
+    else toast.error(`Отклонено: ${crmErr(res.code, res.message)}`);
   };
 
   return (
-    <CrmFrame activeTab="Контакты" subtitle="Справочник контактов" actions={data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createContact} /> : null}>
+    <CrmFrame activeTab="Контакты" subtitle="Справочник контактов" actions={data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} create={createContact} /> : null}>
       {prototypeNotesEnabled && (
         <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
@@ -63,7 +74,7 @@ export function ProjectContacts() {
         empty={{
           title: "Нет контактов",
           description: "Справочник контактов пуст — создайте первый контакт (нужен активный клиент).",
-          action: data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createContact} /> : undefined
+          action: data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} create={createContact} /> : undefined
         }}
         forbidden={{ title: "Доступ к контактам ограничен", description: "У вас нет прав на просмотр справочника контактов." }}
       >
@@ -83,7 +94,17 @@ export function ProjectContacts() {
                   <td className="px-3 py-2"><StatusChip status={c.status} /></td>
                   <td className="px-3 py-2 text-right">
                     {c.status === "active"
-                      ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                      ? (
+                        // Архивирование — только через подтверждение (G4-19).
+                        <ConfirmDialog
+                          title={`Архивировать «${c.name}»?`}
+                          description="Запись будет перенесена в архив."
+                          confirmLabel="В архив"
+                          onConfirm={() => toggleArchive(c, "archived")}
+                        >
+                          <Button variant="ghost" size="sm" disabled={busy} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                        </ConfirmDialog>
+                      )
                       : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
                   </td>
                 </tr>
@@ -92,30 +113,31 @@ export function ProjectContacts() {
           </table>
         </div>
       </SurfaceState>
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CrmFrame>
   );
 }
 
-function CreateContactDialog({ data, busy, setBusy, setNotice, create }: { data: NonNullable<ReturnType<typeof useCrm>["data"]>; busy: boolean; setBusy: (v: boolean) => void; setNotice: (v: string | null) => void; create: ReturnType<typeof useCrm>["createContact"] }) {
+function CreateContactDialog({ data, busy, setBusy, create }: { data: NonNullable<ReturnType<typeof useCrm>["data"]>; busy: boolean; setBusy: (v: boolean) => void; create: ReturnType<typeof useCrm>["createContact"] }) {
   const [open, setOpen] = useState(false);
   const [clientId, setClientId] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   const clients = data.clients.filter((c) => c.status === "active");
   const valid = clientId && name.trim();
   const submit = async () => {
     if (!valid) return;
-    setBusy(true); setNotice(null);
+    setBusy(true); setFormError(null);
     const res = await create({ clientId, name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, role: role.trim() || null });
     setBusy(false);
-    if (res.ok) { setNotice("Контакт создан"); setOpen(false); setClientId(""); setName(""); setEmail(""); setPhone(""); setRole(""); }
-    else setNotice(`Отклонено: ${crmErr(res.code, res.message)}`);
+    if (res.ok) { toast.success("Контакт создан"); setOpen(false); setClientId(""); setName(""); setEmail(""); setPhone(""); setRole(""); }
+    // Ошибка остаётся В модалке — раньше уходила строкой внизу страницы.
+    else setFormError(crmErr(res.code, res.message));
   };
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) setFormError(null); }}>
       <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Контакт</Button></DialogTrigger>
       <DialogContent className="max-w-[500px]">
         <DialogHeader><DialogTitle>Новый контакт</DialogTitle></DialogHeader>
@@ -128,6 +150,7 @@ function CreateContactDialog({ data, busy, setBusy, setNotice, create }: { data:
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Телефон<Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7…" /></label>
           <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Должность<Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Директор по ИТ" /></label>
         </div>
+        <DialogError text={formError} />
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
           <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>

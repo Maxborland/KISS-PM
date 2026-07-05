@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Circle, FlaskConical, Loader2, Lock, Rocket, Save, Send, Square, Trophy, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -135,7 +137,6 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   const [comment, setComment] = useState("");
   const [riskReason, setRiskReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const locked = isFinal(opp);
   const stages = useMemo(() => [...data.dealStages].filter((s) => s.pipelineId === opp.pipelineId).sort((a, b) => a.sortOrder - b.sortOrder), [data.dealStages, opp.pipelineId]);
@@ -155,7 +156,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   const plannedHours = (() => { const v = Number(form.contractValue), r = Number(form.plannedHourlyRate); return r > 0 && v > 0 ? Math.floor(v / r) : 0; })();
 
   async function save() {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.updateOpportunity(opp.id, {
       clientId: opp.clientId ?? "", primaryContactId: opp.primaryContactId ?? "", projectTypeId: opp.projectTypeId ?? "",
       stageId: form.stageId, title: form.title.trim(), description: form.description.trim() || null,
@@ -164,47 +165,49 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
       probability: Math.round(Number(form.probability)), demand: opp.demand, ownerUserId: form.ownerUserId || null
     });
     setBusy(false);
-    setNotice(res.ok ? "Сделка сохранена" : `Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) toast.success("Сделка сохранена");
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   async function check() {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.checkFeasibility(opp.id);
     setBusy(false);
-    if (res.ok) { setFeasibility(res.data); setNotice(`Осуществимость: ${FEAS_LABEL[res.data.status] ?? res.data.status}`); }
-    else setNotice(`Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) { setFeasibility(res.data); toast.success(`Осуществимость: ${FEAS_LABEL[res.data.status] ?? res.data.status}`); }
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   async function activate() {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.activate(opp.id, riskReason.trim() ? { acceptedRiskReason: riskReason.trim() } : undefined);
     setBusy(false);
-    if (res.ok) { setRiskReason(""); setNotice(`Создан проект ${res.data.id} — сделка выиграна`); }
-    else setNotice(`Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) { setRiskReason(""); toast.success(`Создан проект ${res.data.id} — сделка выиграна`); }
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   async function finalize(stt: "won_closed" | "lost_rejected") {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.finalize(opp.id, stt, stt === "won_closed" ? "Закрыта вручную" : "Отказ клиента");
     setBusy(false);
-    setNotice(res.ok ? (stt === "won_closed" ? "Сделка выиграна" : "Сделка проиграна") : `Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) toast.success(stt === "won_closed" ? "Сделка выиграна" : "Сделка проиграна");
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   async function sendComment() {
     if (!comment.trim()) return;
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.createComment("opportunity", opp.id, comment.trim());
     setBusy(false);
     if (res.ok) { setActivities((a) => [res.data, ...(a ?? [])]); setComment(""); }
-    else setNotice(`Отклонено: ${ruErr(res.code, res.message)}`);
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   async function toggleTask(a: CrmActivity) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.updateTaskStatus("opportunity", opp.id, a.id, a.status === "done" ? "todo" : "done");
     setBusy(false);
     if (res.ok) setActivities((list) => (list ?? []).map((x) => (x.id === a.id ? res.data : x)));
-    else setNotice(`Отклонено: ${ruErr(res.code, res.message)}`);
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   return (
@@ -312,8 +315,23 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
                 ) : null}
                 <Button variant="default" disabled={busy || opp.feasibilityStatus == null} onClick={() => void activate()} title={opp.feasibilityStatus == null ? "Сначала проверьте осуществимость" : undefined}><Rocket className="size-3.5" aria-hidden />Активировать в проект</Button>
                 <div className="flex gap-2">
-                  <Button variant="secondary" size="sm" className="flex-1" disabled={busy} onClick={() => void finalize("won_closed")}><Trophy className="size-3.5" aria-hidden />Выиграна</Button>
-                  <Button variant="ghost" size="sm" className="flex-1" disabled={busy} onClick={() => void finalize("lost_rejected")}><XCircle className="size-3.5" aria-hidden />Проиграна</Button>
+                  {/* Необратимое закрытие сделки — только через подтверждение (G4-06). */}
+                  <ConfirmDialog
+                    title="Закрыть сделку как выигранную?"
+                    description="Сделка будет закрыта, переоткрыть её нельзя."
+                    confirmLabel="Выиграна"
+                    onConfirm={() => finalize("won_closed")}
+                  >
+                    <Button variant="secondary" size="sm" className="flex-1" disabled={busy}><Trophy className="size-3.5" aria-hidden />Выиграна</Button>
+                  </ConfirmDialog>
+                  <ConfirmDialog
+                    title="Закрыть сделку как проигранную?"
+                    description="Сделка будет закрыта, переоткрыть её нельзя."
+                    confirmLabel="Проиграна"
+                    onConfirm={() => finalize("lost_rejected")}
+                  >
+                    <Button variant="ghost" size="sm" className="flex-1" disabled={busy}><XCircle className="size-3.5" aria-hidden />Проиграна</Button>
+                  </ConfirmDialog>
                 </div>
                 {opp.feasibilityStatus == null ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Активация требует пройденной проверки осуществимости (400 feasibility_required).</p> : null}
               </div>
@@ -327,8 +345,6 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
           </section>
         </div>
       </div>
-
-      {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </div>
   );
 }

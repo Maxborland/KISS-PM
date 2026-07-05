@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, TriangleAlert, UserPlus, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
@@ -32,7 +33,6 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const [selCal, setSelCal] = useState<string>("project"); // "project" | resourceId
   const [monthOffset, setMonthOffset] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const model = useMemo(() => {
     if (!readModel) return null;
@@ -120,10 +120,11 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   };
 
   async function applyCmd(command: PlanningCommand, okMsg: string) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await apply(command);
     setBusy(false);
-    setNotice(res.ok ? `${okMsg} · коммит v${res.planVersion}` : res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
+    if (res.ok) toast.success(`${okMsg} · коммит v${res.planVersion}`);
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
   }
 
   // клик по дню: тогл праздника (вид проекта) или отсутствия (вид ресурса). Восстановление = рабочие минуты.
@@ -154,7 +155,8 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     setBusy(true);
     const res = await applyBatch(cmds);
     setBusy(false);
-    setNotice(res.ok ? `${typeLabel} добавлен · коммит v${res.planVersion}` : `Отклонено: ${res.message}`);
+    if (res.ok) toast.success(`${typeLabel} добавлен · коммит v${res.planVersion}`);
+    else toast.error(`Отклонено: ${res.message}`);
   }
 
   // правый столбец: список исключений (праздники + отсутствия выбранного ресурса)
@@ -269,7 +271,6 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
         </div>
       </div>
 
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </DeliveryFrame>
   );
 }

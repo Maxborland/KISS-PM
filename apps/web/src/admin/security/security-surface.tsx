@@ -3,6 +3,7 @@
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Save, ShieldCheck, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,6 @@ export function AdminSecuritySurface() {
   const [form, setForm] = useState<SecurityPolicy | null>(null);
   const [domainDraft, setDomainDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   // Синхронизируем локальную форму при загрузке/перезагрузке политики.
   useEffect(() => {
@@ -62,11 +62,10 @@ export function AdminSecuritySurface() {
   const submit = async () => {
     if (!form || !timeoutValid) return;
     setBusy(true);
-    setNotice(null);
     const res = await save({ ...form, domainAllowlist: normalizeList(form.domainAllowlist) });
     setBusy(false);
-    if (res.ok) setNotice("Политика безопасности сохранена");
-    else setNotice(`Отклонено: ${adminErr(res.code, res.message)}`);
+    if (res.ok) toast.success("Политика безопасности сохранена");
+    else toast.error(`Отклонено: ${adminErr(res.code, res.message)}`);
   };
 
   return (
@@ -173,7 +172,6 @@ export function AdminSecuritySurface() {
           </div>
         ) : null}
       </SurfaceState>
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </AdminFrame>
   );
 }

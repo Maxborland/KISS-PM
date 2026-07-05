@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -16,6 +17,16 @@ import { ALL_PERMISSIONS } from "@/admin/lib/permissions-catalog";
 import type { AccessProfile, Permission } from "@/admin/lib/admin-client";
 
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
+
+// Ошибка внутри модалки — по месту действия (раньше рендерилась строкой ПОЗАДИ модалки, G6-02).
+function DialogError({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
+      {text}
+    </p>
+  );
+}
 
 // Группировка прав по префиксу (первый dot-сегмент): tenant.* / profile.* / workspace.*.
 const GROUP_LABEL: Record<string, string> = { tenant: "Рабочая область (tenant.*)", profile: "Профиль (profile.*)", workspace: "Настройки (workspace.*)" };
@@ -48,7 +59,6 @@ export function AdminRolesSurface() {
   // Каталог прав из бэка (GET /permission-catalog); ALL_PERMISSIONS — типизированный fallback на время загрузки.
   const groups = useMemo(() => buildPermissionGroups(data?.permissions ?? ALL_PERMISSIONS), [data?.permissions]);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   // число пользователей на каждую роль (для колонки «Назначено»)
   const assigned = useMemo(() => {
@@ -60,19 +70,19 @@ export function AdminRolesSurface() {
   const surfaceStatus = status === "loading" ? "loading" : status === "error" ? "error" : !data ? "error" : data.roles.length === 0 ? "empty" : "ready";
 
   const remove = async (role: AccessProfile) => {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     // назначенная роль не удаляется → access_role_assigned; роль актора → self_access_role_delete_forbidden.
     const res = await deleteRole(role.id);
     setBusy(false);
-    if (res.ok) setNotice(`Роль «${role.name}» удалена`);
-    else setNotice(`Отклонено: ${adminErr(res.code, res.message)}`);
+    if (res.ok) toast.success(`Роль «${role.name}» удалена`);
+    else toast.error(`Отклонено: ${adminErr(res.code, res.message)}`);
   };
 
   return (
     <AdminFrame
       activeTab="Роли"
       subtitle="Роли доступа (access-profiles)"
-      actions={<CreateRoleDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRole} groups={groups} />}
+      actions={<CreateRoleDialog busy={busy} setBusy={setBusy} create={createRole} groups={groups} />}
     >
       <div style={{ display: live ? "none" : undefined }} className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
         <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
@@ -102,7 +112,7 @@ export function AdminRolesSurface() {
                       <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{count}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center justify-end gap-1">
-                          <EditRoleDialog role={r} assignedCount={count} busy={busy} setBusy={setBusy} setNotice={setNotice} update={updateRole} groups={groups} />
+                          <EditRoleDialog role={r} assignedCount={count} busy={busy} setBusy={setBusy} update={updateRole} groups={groups} />
                           <ConfirmDialog
                             title={`Удалить роль «${r.name}»?`}
                             description={count > 0
@@ -123,7 +133,6 @@ export function AdminRolesSurface() {
           </div>
         ) : null}
       </SurfaceState>
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </AdminFrame>
   );
 }
@@ -149,26 +158,28 @@ function PermissionChecklist({ selected, toggle, groups }: { selected: Set<Permi
   );
 }
 
-function CreateRoleDialog({ busy, setBusy, setNotice, create, groups }: {
-  busy: boolean; setBusy: (v: boolean) => void; setNotice: (v: string | null) => void;
+function CreateRoleDialog({ busy, setBusy, create, groups }: {
+  busy: boolean; setBusy: (v: boolean) => void;
   create: ReturnType<typeof useAdmin>["createRole"]; groups: PermissionGroup[];
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<Set<Permission>>(() => new Set());
+  const [formError, setFormError] = useState<string | null>(null);
   const toggle = (p: Permission) => setSelected((prev) => { const next = new Set(prev); if (next.has(p)) next.delete(p); else next.add(p); return next; });
 
-  const onOpenChange = (v: boolean) => { if (v) { setName(""); setSelected(new Set()); } setOpen(v); };
+  const onOpenChange = (v: boolean) => { if (v) { setName(""); setSelected(new Set()); setFormError(null); } setOpen(v); };
   const valid = name.trim().length > 0;
   const submit = async () => {
     if (!valid) return;
-    setBusy(true); setNotice(null);
+    setBusy(true); setFormError(null);
     // id обязателен — генерируем слаг из названия (боевой route-id формат).
     const permissions = [...selected];
     const res = await create({ id: slugify(name), name: name.trim(), permissions });
     setBusy(false);
-    if (res.ok) { setNotice(`Роль «${name.trim()}» создана`); setOpen(false); }
-    else setNotice(`Отклонено: ${adminErr(res.code, res.message)}`);
+    if (res.ok) { toast.success(`Роль «${name.trim()}» создана`); setOpen(false); }
+    // Ошибка остаётся В модалке — раньше уходила строкой позади оверлея (G6-02).
+    else setFormError(adminErr(res.code, res.message));
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -178,6 +189,7 @@ function CreateRoleDialog({ busy, setBusy, setNotice, create, groups }: {
         <div className="flex flex-col gap-3">
           <label className={labelCls}>Название<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Координатор" /></label>
           <div className={labelCls}>Права ({selected.size})<PermissionChecklist selected={selected} toggle={toggle} groups={groups} /></div>
+          <DialogError text={formError} />
         </div>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
@@ -188,17 +200,18 @@ function CreateRoleDialog({ busy, setBusy, setNotice, create, groups }: {
   );
 }
 
-function EditRoleDialog({ role, assignedCount, busy, setBusy, setNotice, update, groups }: {
-  role: AccessProfile; assignedCount: number; busy: boolean; setBusy: (v: boolean) => void; setNotice: (v: string | null) => void;
+function EditRoleDialog({ role, assignedCount, busy, setBusy, update, groups }: {
+  role: AccessProfile; assignedCount: number; busy: boolean; setBusy: (v: boolean) => void;
   update: ReturnType<typeof useAdmin>["updateRole"]; groups: PermissionGroup[];
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(role.name);
   const [selected, setSelected] = useState<Set<Permission>>(() => new Set(role.permissions));
   const [confirmedEmpty, setConfirmedEmpty] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const toggle = (p: Permission) => setSelected((prev) => { const next = new Set(prev); if (next.has(p)) next.delete(p); else next.add(p); setConfirmedEmpty(false); return next; });
 
-  const onOpenChange = (v: boolean) => { if (v) { setName(role.name); setSelected(new Set(role.permissions)); setConfirmedEmpty(false); } setOpen(v); };
+  const onOpenChange = (v: boolean) => { if (v) { setName(role.name); setSelected(new Set(role.permissions)); setConfirmedEmpty(false); setFormError(null); } setOpen(v); };
   const valid = name.trim().length > 0;
   // ADM-02: обнуление прав назначенной роли лишает доступа всех её пользователей —
   // требуем явного подтверждения, а не молчаливого сохранения.
@@ -207,13 +220,14 @@ function EditRoleDialog({ role, assignedCount, busy, setBusy, setNotice, update,
   const submit = async () => {
     if (!valid) return;
     if (needsConfirm) { setConfirmedEmpty(true); return; }
-    setBusy(true); setNotice(null);
+    setBusy(true); setFormError(null);
     // full-replace: name + полный набор permissions. Роль актора → self_access_role_update_forbidden.
     const permissions = [...selected];
     const res = await update(role.id, { name: name.trim(), permissions });
     setBusy(false);
-    if (res.ok) { setNotice(`Роль «${name.trim()}» обновлена`); setOpen(false); }
-    else setNotice(`Отклонено: ${adminErr(res.code, res.message)}`);
+    if (res.ok) { toast.success(`Роль «${name.trim()}» обновлена`); setOpen(false); }
+    // Ошибка остаётся В модалке — раньше уходила строкой позади оверлея (G6-02).
+    else setFormError(adminErr(res.code, res.message));
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -229,6 +243,7 @@ function EditRoleDialog({ role, assignedCount, busy, setBusy, setNotice, update,
               <span>Роль назначена {assignedCount} польз.: без единого права они потеряют доступ. Нажмите «Сохранить» ещё раз для подтверждения.</span>
             </div>
           ) : null}
+          <DialogError text={formError} />
         </div>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Camera, Check, GitCommitVertical, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
@@ -28,7 +29,6 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const projectBase = useProjectBase(projectId, PROJECT);
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [label, setLabel] = useState("");
 
@@ -75,10 +75,11 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const spanDay = Math.max(1, Math.max(curFinishDay, baseFinishDay));
 
   const onCapture = async () => {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await apply(createPlanningCommand({ type: "baseline.capture", payload: { baselineId: nid("baseline"), label: label.trim() || "Снимок плана" } }));
     setBusy(false); setCapturing(false); setLabel("");
-    setNotice(res.ok ? `Базовый план зафиксирован · коммит v${res.planVersion}` : res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
+    if (res.ok) toast.success(`Базовый план зафиксирован · коммит v${res.planVersion}`);
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
   };
 
   const tiles = [
@@ -202,7 +203,6 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         </div>
       </div>
 
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </DeliveryFrame>
   );
 }

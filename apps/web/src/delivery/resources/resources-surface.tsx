@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { SurfaceState } from "@/components/domain/surface-state";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
@@ -29,7 +30,6 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; taskId?: string; asgId?: string; initial: TaskModalValues } | null>(null);
 
   const model = useMemo(() => {
@@ -75,11 +75,10 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
 
   async function applyCmd(command: PlanningCommand) {
     setBusy(true);
-    setNotice(null);
     const res = await apply(command);
     setBusy(false);
-    if (res.ok) setNotice(`Коммит v${res.planVersion} применён`);
-    else setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
+    if (res.ok) toast.success(`Коммит v${res.planVersion} применён`);
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
   }
 
   const openCreateTask = (presetResourceId?: string) => setTaskModal({ mode: "create", initial: { title: "", assigneeId: presetResourceId ?? "", startIso: "", durDays: 5, workH: 40, pct: 0 } });
@@ -128,7 +127,8 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     setBusy(true);
     const res = await applyBatch(cmds);
     setBusy(false);
-    setNotice(res.ok ? `Задача сохранена · коммит v${res.planVersion}` : `Отклонено: ${res.message}`);
+    if (res.ok) toast.success(`Задача сохранена · коммит v${res.planVersion}`);
+    else toast.error(`Отклонено: ${res.message}`);
   }
 
   async function doAbsence(resourceId: string, typeLabel: string, start: string, finish: string) {
@@ -144,7 +144,8 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     setBusy(true);
     const res = await applyBatch(cmds);
     setBusy(false);
-    setNotice(res.ok ? `${typeLabel} добавлен · коммит v${res.planVersion}` : `Отклонено: ${res.message}`);
+    if (res.ok) toast.success(`${typeLabel} добавлен · коммит v${res.planVersion}`);
+    else toast.error(`Отклонено: ${res.message}`);
   }
 
   return (
@@ -152,7 +153,7 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       <ResourceLoadMatrix
         scope={SCOPE}
         data={model.data}
-        callbacks={{ busy, notice, onCreateTask: openCreateTask, onEditTask: openEditTask, onAcceptOverload: acceptOverload, onEditAssignmentHours: editUnits, onAbsence: doAbsence }}
+        callbacks={{ busy, onCreateTask: openCreateTask, onEditTask: openEditTask, onAcceptOverload: acceptOverload, onEditAssignmentHours: editUnits, onAbsence: doAbsence }}
       />
       {taskModal ? <TaskModal open mode={taskModal.mode} initial={taskModal.initial} onOpenChange={(o) => { if (!o) setTaskModal(null); }} onSubmit={submitTaskModal} /> : null}
     </DeliveryFrame>

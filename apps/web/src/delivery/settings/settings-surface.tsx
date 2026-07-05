@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CalendarDays, Pencil, ShieldCheck, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -48,7 +49,6 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const { readModel, status, error, reload, apply } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const [editDeadline, setEditDeadline] = useState(false);
   const [draftDeadline, setDraftDeadline] = useState("");
   const [reason, setReason] = useState("");
@@ -100,14 +100,14 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const calendarText = calCurrent ? calLabel(calCurrent) : project.calendarId ?? "— (не задан)";
 
   async function applyCmd(command: PlanningCommand, okMsg: string, after?: () => void) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await apply(command);
     setBusy(false);
-    if (res.ok) { setNotice(`${okMsg} · коммит v${res.planVersion}`); after?.(); }
-    else setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
+    if (res.ok) { toast.success(`${okMsg} · коммит v${res.planVersion}`); after?.(); }
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
   }
 
-  const openDeadlineEdit = () => { setDraftDeadline(project.deadline ?? ""); setReason(""); setEditDeadline(true); setNotice(null); };
+  const openDeadlineEdit = () => { setDraftDeadline(project.deadline ?? ""); setReason(""); setEditDeadline(true); };
   const submitDeadline = () => void applyCmd(createPlanningCommand({ type: "project.deadline.move", payload: { deadline: draftDeadline, reason: reason.trim() } }), "Дедлайн перенесён", () => { setEditDeadline(false); setReason(""); });
 
   return (
@@ -215,8 +215,6 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
             </div>
           </Section>
         </div>
-
-        {notice ? <div className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
       </div>
     </DeliveryFrame>
   );

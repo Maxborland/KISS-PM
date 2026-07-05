@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, CheckSquare, Link2, Plus, Send, StickyNote, Users } from "lucide-react";
+import { toast } from "sonner";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
@@ -70,6 +71,16 @@ const PROVIDERS: MeetingExternalLinkProvider[] = ["zoom", "teams", "google_meet"
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
+// Ошибка внутри модалки — по месту действия (не строкой позади оверлея).
+function DialogError({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
+      {text}
+    </p>
+  );
+}
+
 // Диапазон времени митинга: «25 июн, 13:00 — 14:00» + относительно (relTime начала).
 function meetingWhen(m: Meeting): string {
   const start = new Date(m.scheduledStart);
@@ -110,7 +121,6 @@ function MeetingsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
   const users = useCommsUsers();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const meetings = useMemo(() => {
     if (!data) return [];
     return [...data.meetings].sort((a, b) => Date.parse(b.scheduledStart) - Date.parse(a.scheduledStart));
@@ -149,52 +159,54 @@ function MeetingsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
     : emptyDetail();
 
   async function doPatchStatus(meetingId: string, next: MeetingStatus) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await patchMeeting(meetingId, { status: next });
     setBusy(false);
-    setNotice(res.ok ? `Статус: «${STATUS[next].label}»` : `Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) toast.success(`Статус: «${STATUS[next].label}»`);
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
   }
 
   async function doAddNote(meetingId: string, body: string) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await addNote(meetingId, body);
     setBusy(false);
-    if (res.ok) { await meetingDetail.reload(); setNotice("Заметка добавлена"); }
-    else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) { await meetingDetail.reload(); toast.success("Заметка добавлена"); }
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res.ok;
   }
 
   async function doAddLink(meetingId: string, input: { provider: MeetingExternalLinkProvider; url: string; title: string }) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await addExternalLink(meetingId, input);
     setBusy(false);
-    if (res.ok) { await meetingDetail.reload(); setNotice("Ссылка добавлена"); }
-    else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) { await meetingDetail.reload(); toast.success("Ссылка добавлена"); }
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res.ok;
   }
 
   async function doAddAction(meetingId: string, input: ActionItemInput) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await addActionItem(meetingId, input);
     setBusy(false);
-    if (res.ok) { await meetingDetail.reload(); setNotice("Action item добавлен"); }
-    else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) { await meetingDetail.reload(); toast.success("Action item добавлен"); }
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res.ok;
   }
 
   async function doPatchAction(meetingId: string, actionItemId: string, next: MeetingActionItemStatus) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await patchActionItem(meetingId, actionItemId, next);
     if (res.ok) await meetingDetail.reload();
     setBusy(false);
-    setNotice(res.ok ? "Статус задачи обновлён" : `Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) toast.success("Статус задачи обновлён");
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
   }
 
   return (
     <CommsFrame
       activeTab="Встречи"
       subtitle={`Встречи · ${scope.title}`}
-      actions={<>{scope.picker}<CreateMeetingDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createMeeting} users={users} entityType={entityType} entityId={entityId} /></>}
+      actions={<>{scope.picker}<CreateMeetingDialog busy={busy} setBusy={setBusy} create={createMeeting} users={users} entityType={entityType} entityId={entityId} /></>}
     >
       <div className="flex flex-col gap-3">
         {/* Честный баннер «Прототип» */}
@@ -266,8 +278,6 @@ function MeetingsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
             </section>
           )}
         </div>
-
-        {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
       </div>
     </CommsFrame>
   );
@@ -531,7 +541,6 @@ function ActionItemsCard({ items, busy, onAdd, onPatchStatus, users }: { items: 
 function CreateMeetingDialog({
   busy,
   setBusy,
-  setNotice,
   create,
   users,
   entityType,
@@ -539,7 +548,6 @@ function CreateMeetingDialog({
 }: {
   busy: boolean;
   setBusy: (v: boolean) => void;
-  setNotice: (v: string | null) => void;
   create: ReturnType<typeof useMeetings>["createMeeting"];
   users: CommsUsersDir;
   entityType: EntityType;
@@ -548,6 +556,7 @@ function CreateMeetingDialog({
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [agenda, setAgenda] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   // Дефолтные времена (от «сейчас», локальные).
   const [start, setStart] = useState(() => toLocalInput(new Date(Date.now() + 86_400_000).toISOString()));
   const [finish, setFinish] = useState(() => toLocalInput(new Date(Date.now() + 86_400_000 + 3_600_000).toISOString()));
@@ -566,11 +575,11 @@ function CreateMeetingDialog({
   const schedOk = Boolean(start && finish && new Date(finish).getTime() > new Date(start).getTime());
   const valid = Boolean(title.trim()) && schedOk;
 
-  const reset = () => { setTitle(""); setAgenda(""); setPicked({}); };
+  const reset = () => { setTitle(""); setAgenda(""); setPicked({}); setFormError(null); };
 
   const submit = async () => {
     if (!valid) return;
-    setBusy(true); setNotice(null);
+    setBusy(true); setFormError(null);
     const participants = Object.entries(picked).map(([userId, role]) => ({ userId, role }));
     // exactOptionalPropertyTypes: опускаем agenda/participants, а не шлём undefined.
     const input: MeetingCreateInput = {
@@ -584,8 +593,9 @@ function CreateMeetingDialog({
     if (participants.length) input.participants = participants;
     const res = await create(input);
     setBusy(false);
-    if (res.ok) { setNotice("Встреча создана"); setOpen(false); reset(); }
-    else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) { toast.success("Встреча создана"); setOpen(false); reset(); }
+    // Ошибка остаётся В модалке — по месту действия.
+    else setFormError(`Отклонено: ${commsErr(res.code, res.message)}`);
   };
 
   return (
@@ -622,6 +632,8 @@ function CreateMeetingDialog({
           </ul>
           <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Организатором становится текущий пользователь (accepted); выбранным уйдёт meeting_invite.</p>
         </div>
+
+        <DialogError text={formError} />
 
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>

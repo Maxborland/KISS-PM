@@ -374,13 +374,17 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
       return hydrateTasks(tenantId, rows);
     },
     async listMyWorkTasks(tenantId, userId) {
+      // «Мои задачи» = задачи, где пользователь ИСПОЛНИТЕЛЬ (executor/co_executor).
+      // Роль requester (постановщик) сюда не входит — иначе раздел показывал чужие
+      // задачи под заголовком «Задачи, где вы исполнитель» (G2-07).
       const participantRows = await db
         .select({ taskId: taskParticipants.taskId })
         .from(taskParticipants)
         .where(
           and(
             eq(taskParticipants.tenantId, tenantId),
-            eq(taskParticipants.userId, userId)
+            eq(taskParticipants.userId, userId),
+            inArray(taskParticipants.role, ["executor", "co_executor"])
           )
         );
       const taskIds = [...new Set(participantRows.map((row) => row.taskId))];

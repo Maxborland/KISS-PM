@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, Loader2, RefreshCw, Sparkles, TriangleAlert, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
@@ -44,7 +45,8 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const [compareId, setCompareId] = useState<string | null>(null);
   const [applyBusy, setApplyBusy] = useState(false);
   const [riskReason, setRiskReason] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
+  // валидация причины принятия риска — у поля причины (G3-19), не в toast
+  const [reasonError, setReasonError] = useState<string | null>(null);
   const [scenarioErr, setScenarioErr] = useState<string | null>(null);
 
   const model = useMemo(() => {
@@ -124,17 +126,17 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
 
   const onApply = async (p: Proposal) => {
     const requiresReason = p.conflictEffect === "accepted";
-    if (requiresReason && !riskReason.trim()) { setScenarioErr("Укажите причину принятия риска (требуется для агрессивного сценария)"); return; }
-    setApplyBusy(true); setScenarioErr(null);
+    if (requiresReason && !riskReason.trim()) { setReasonError("Укажите причину принятия риска (требуется для агрессивного сценария)"); return; }
+    setApplyBusy(true); setScenarioErr(null); setReasonError(null);
     const res = await applyScenario(p.id, requiresReason ? riskReason.trim() : undefined);
     setApplyBusy(false);
     if (res.ok) {
-      setNotice(`Сценарий «${PROFILE_META[p.profile].label}» применён · коммит v${res.planVersion} · scenarioRunId ${res.scenarioRunId}`);
+      toast.success(`Сценарий «${PROFILE_META[p.profile].label}» применён · коммит v${res.planVersion} · scenarioRunId ${res.scenarioRunId}`);
       setRiskReason(""); setCompareId(null); setProposals(null); // авто-превью пересчитает по новому состоянию
     } else if (res.conflict) { setScenarioErr("Конфликт версий — перезагружено, запросите сценарии заново"); setProposals(null); }
-    else if (res.code === "accepted_risk_reason_required") setScenarioErr("Требуется причина принятия риска");
+    else if (res.code === "accepted_risk_reason_required") setReasonError("Требуется причина принятия риска");
     else if (res.code === "scenario_expired" || res.code === "scenario_not_found") { setScenarioErr("Предложения устарели — запросите заново"); setProposals(null); }
-    else setScenarioErr(`Отклонено: ${res.message}`);
+    else toast.error(`Отклонено: ${res.message}`);
   };
 
   const FinishChip = ({ d }: { d: number }) => <span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", d > 0 ? "bg-[var(--warning-soft)] text-[var(--warning-text)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{d > 0 ? `+${d} дн` : "+0 дн"}</span>;
@@ -222,7 +224,8 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                     {p.conflictEffect === "accepted" ? (
                       <div className="mt-2 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-2.5 py-1.5">
                         <span className="text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Причина принятия риска (обязательна):</span>
-                        <input value={riskReason} onChange={(e) => setRiskReason(e.target.value)} placeholder="напр. согласовано с РП, срок критичнее" className="h-7 min-w-[240px] flex-1 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]" />
+                        <input value={riskReason} aria-invalid={reasonError ? true : undefined} onChange={(e) => { setReasonError(null); setRiskReason(e.target.value); }} placeholder="напр. согласовано с РП, срок критичнее" className="h-7 min-w-[240px] flex-1 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)] aria-[invalid]:border-[var(--danger)]" />
+                        {reasonError ? <span role="alert" className="w-full text-[length:var(--text-xs)] font-medium text-[var(--danger-text)]">{reasonError}</span> : null}
                       </div>
                     ) : null}
 
@@ -281,7 +284,6 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       )}
 
       {scenarioErr ? <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--danger)] bg-[var(--danger-soft)] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text)]">{scenarioErr}</div> : null}
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </DeliveryFrame>
   );
 }

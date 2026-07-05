@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, CheckCheck, Loader2, Save } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -108,24 +109,22 @@ function NotificationsFeed() {
   const [filter, setFilter] = useState<FeedFilter>("");
   const { data, status, error, reload, markRead } = useNotifications(filter === "" ? undefined : filter);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const notifications = data?.notifications ?? [];
   const unread = useMemo(() => notifications.filter((n) => n.readAt === null), [notifications]);
 
   async function readOne(id: string) {
     setBusy(true);
-    setNotice(null);
     const res = await markRead(id);
     setBusy(false);
-    setNotice(res.ok ? "Уведомление отмечено прочитанным" : `Не удалось: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) toast.success("Уведомление отмечено прочитанным");
+    else toast.error(`Не удалось: ${commsErr(res.code, res.message)}`);
   }
 
   // Bulk: отдельной ручки нет — честно шлём markRead по каждому непрочитанному, затем перезагружаем ленту.
   async function readAll() {
     if (unread.length === 0) return;
     setBusy(true);
-    setNotice(null);
     let failed = 0;
     for (const n of unread) {
       const res = await markRead(n.id);
@@ -133,7 +132,8 @@ function NotificationsFeed() {
     }
     await reload();
     setBusy(false);
-    setNotice(failed === 0 ? `Отмечено прочитанными: ${unread.length}` : `Отмечено с ошибками (${failed} из ${unread.length} не удалось)`);
+    if (failed === 0) toast.success(`Отмечено прочитанными: ${unread.length}`);
+    else toast.error(`Отмечено с ошибками (${failed} из ${unread.length} не удалось)`);
   }
 
   return (
@@ -223,8 +223,6 @@ function NotificationsFeed() {
         </ul>
       )}
       </SurfaceState>
-
-      {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </div>
   );
 }
@@ -243,7 +241,6 @@ export function NotificationsPrefs() {
   // Локальная матрица настроек: ключ channel::type → {enabled, digestFrequency}.
   const [rows, setRows] = useState<Map<string, PrefRow>>(new Map());
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   // Инициализация матрицы из ответа: серверные строки + дефолты для отсутствующих ячеек.
   useEffect(() => {
@@ -271,7 +268,6 @@ export function NotificationsPrefs() {
 
   async function save() {
     setBusy(true);
-    setNotice(null);
     // Полный upsert: шлём ВСЕ ячейки матрицы (включая выключенные) — PUT перезаписывает набор.
     const payload: PreferenceInput[] = [];
     for (const c of CHANNELS) {
@@ -282,7 +278,8 @@ export function NotificationsPrefs() {
     }
     const res = await savePreferences(payload);
     setBusy(false);
-    setNotice(res.ok ? "Настройки сохранены" : `Не удалось: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) toast.success("Настройки сохранены");
+    else toast.error(`Не удалось: ${commsErr(res.code, res.message)}`);
   }
 
   // Верхнеуровневое состояние настроек: forbidden (403) / error / loading.
@@ -367,8 +364,6 @@ export function NotificationsPrefs() {
       <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
         PUT /notification-preferences — полный upsert: отправляются все {CHANNELS.length * NOTIF_TYPES.length} ячеек (channel × тип), сервер возвращает актуальный набор. Пустой набор → ранний выход (никаких изменений).
       </p>
-
-      {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </div>
   );
 }

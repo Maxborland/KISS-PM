@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ArrowLeftRight, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,16 @@ const ERR_RU: Record<string, string> = {
 };
 const ruErr = (code?: string, fallback?: string) => (code && ERR_RU[code]) || fallback || code || "Ошибка";
 
+// Ошибка внутри модалки — по месту действия (раньше рендерилась строкой ПОД оверлеем, G4-05).
+function DialogError({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
+      {text}
+    </p>
+  );
+}
+
 export function ProjectDeals() {
   const { live } = useCrmRuntime();
   const { data, status, error, reload, moveStage, movePipeline, createOpportunity } = useCrm();
@@ -56,7 +67,6 @@ export function ProjectDeals() {
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [moveTarget, setMoveTarget] = useState<Opportunity | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<string | null>(null);
 
@@ -110,18 +120,24 @@ export function ProjectDeals() {
   const pipelineOfStage = (stageId: string | null) => model.allStages.find((s) => s.id === stageId)?.pipelineId ?? null;
 
   async function doMove(id: string, stageId: string) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await moveStage(id, stageId);
     setBusy(false);
-    setNotice(res.ok ? `Сделка перемещена в «${stageName(stageId)}»` : `Отклонено: ${ruErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) toast.success(`Сделка перемещена в «${stageName(stageId)}»`);
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
-  async function doMovePipeline(id: string, targetPipelineId: string, targetStageId: string) {
-    setBusy(true); setNotice(null);
+  // Возвращает текст ошибки (для показа ВНУТРИ модалки) или null при успехе.
+  async function doMovePipeline(id: string, targetPipelineId: string, targetStageId: string): Promise<string | null> {
+    setBusy(true);
     const res = await movePipeline(id, targetPipelineId, targetStageId);
     setBusy(false);
-    setMoveTarget(null);
-    setNotice(res.ok ? `Сделка перенесена в воронку «${pipelineName(targetPipelineId)}» → «${stageName(targetStageId)}»` : `Отклонено: ${ruErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) {
+      setMoveTarget(null);
+      toast.success(`Сделка перенесена в воронку «${pipelineName(targetPipelineId)}» → «${stageName(targetStageId)}»`);
+      return null;
+    }
+    return ruErr(res.code, res.message);
   }
 
   const dropOn = (stageId: string) => {
@@ -132,7 +148,7 @@ export function ProjectDeals() {
   };
 
   return (
-    <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={<CreateDealDialog stages={model.stages} data={data} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createOpportunity} />}>
+    <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={<CreateDealDialog stages={model.stages} data={data} busy={busy} setBusy={setBusy} create={createOpportunity} />}>
       {/* мультиворонки: выбор воронки — фильтрует стадии/сделки/переходы */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Воронка:</span>
@@ -263,8 +279,6 @@ export function ProjectDeals() {
       </div>
 
       <TransitionsPanel transitions={model.transitions} pipelineName={model.selected?.name ?? "—"} stageName={stageName} />
-
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CrmFrame>
   );
 }
@@ -350,14 +364,23 @@ function MovePipelineDialog({ target, pipelines, allStages, currentPipelineId, b
   currentPipelineId: string | null;
   busy: boolean;
   onClose: () => void;
-  onMove: (id: string, pipelineId: string, stageId: string) => void;
+  onMove: (id: string, pipelineId: string, stageId: string) => Promise<string | null>;
 }) {
   const [targetPipelineId, setTargetPipelineId] = useState("");
   const [targetStageId, setTargetStageId] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   const options = pipelines.filter((p) => p.status === "active" && p.id !== currentPipelineId);
   const stages = allStages.filter((s) => s.pipelineId === targetPipelineId && s.status === "active").sort((a, b) => a.sortOrder - b.sortOrder);
   const valid = Boolean(targetPipelineId && targetStageId);
-  const reset = () => { setTargetPipelineId(""); setTargetStageId(""); };
+  const reset = () => { setTargetPipelineId(""); setTargetStageId(""); setFormError(null); };
+  const submit = async () => {
+    if (!target || !valid) return;
+    setFormError(null);
+    // Ошибка остаётся В модалке (G4-05); успех — toast в родителе + закрытие через onMove.
+    const err = await onMove(target.id, targetPipelineId, targetStageId);
+    if (err) setFormError(err);
+    else reset();
+  };
   return (
     <Dialog open={target !== null} onOpenChange={(o) => { if (!o) { onClose(); reset(); } }}>
       <DialogContent className="max-w-[460px]">
@@ -378,21 +401,21 @@ function MovePipelineDialog({ target, pipelines, allStages, currentPipelineId, b
           </label>
         </div>
         <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">PATCH /opportunities/:id/pipeline — стадия и воронка сделки меняются на целевые. Финальные сделки и архивные воронки/стадии отклоняются (409).</p>
+        <DialogError text={formError} />
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => { if (target && valid) onMove(target.id, targetPipelineId, targetStageId); }}><ArrowLeftRight className="size-3.5" aria-hidden />Перенести</Button>
+          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><ArrowLeftRight className="size-3.5" aria-hidden />Перенести</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-function CreateDealDialog({ stages, data, busy, setBusy, setNotice, create }: {
+function CreateDealDialog({ stages, data, busy, setBusy, create }: {
   stages: DealStage[];
   data: ReturnType<typeof useCrm>["data"];
   busy: boolean;
   setBusy: (v: boolean) => void;
-  setNotice: (v: string | null) => void;
   create: ReturnType<typeof useCrm>["createOpportunity"];
 }) {
   const [open, setOpen] = useState(false);
@@ -405,6 +428,7 @@ function CreateDealDialog({ stages, data, busy, setBusy, setNotice, create }: {
   const [probability, setProbability] = useState("40");
   const [start, setStart] = useState("2026-05-01");
   const [finish, setFinish] = useState("2026-08-01");
+  const [formError, setFormError] = useState<string | null>(null);
 
   if (!data) return null;
   const clients = data.clients.filter((c) => c.status === "active");
@@ -414,15 +438,16 @@ function CreateDealDialog({ stages, data, busy, setBusy, setNotice, create }: {
 
   const submit = async () => {
     if (!valid) return;
-    setBusy(true); setNotice(null);
+    setBusy(true); setFormError(null);
     const res = await create({ clientId, primaryContactId: contactId, projectTypeId, stageId, title: title.trim(), plannedStart: start, plannedFinish: finish, contractValue: Math.round(Number(contractValue)), plannedHourlyRate: Math.round(Number(rate)), probability: Math.round(Number(probability)), demand: [{ positionId: "backend", requiredHours: Math.min(100000, Math.max(1, Math.floor(Number(contractValue) / Number(rate)))) }] });
     setBusy(false);
-    if (res.ok) { setNotice("Сделка создана"); setOpen(false); setTitle(""); setClientId(""); setContactId(""); setStageId(""); }
-    else setNotice(`Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) { toast.success("Сделка создана"); setOpen(false); setTitle(""); setClientId(""); setContactId(""); setStageId(""); }
+    // Ошибка остаётся В модалке — раньше уходила строкой под оверлеем (G4-05).
+    else setFormError(ruErr(res.code, res.message));
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) setFormError(null); }}>
       <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Сделка</Button></DialogTrigger>
       <DialogContent className="max-w-[560px]">
         <DialogHeader><DialogTitle>Новая сделка</DialogTitle></DialogHeader>
@@ -444,6 +469,7 @@ function CreateDealDialog({ stages, data, busy, setBusy, setNotice, create }: {
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Финиш<Input type="date" value={finish} onChange={(e) => setFinish(e.target.value)} aria-invalid={finish < start} /></label>
         </div>
         <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Трудоёмкость = сумма / ставка (POST /opportunities, статус «Новая»); строка спроса в прототипе фиксирована (позиция backend). Контакт валидируется как активный у выбранного клиента.</p>
+        <DialogError text={formError} />
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
           <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>

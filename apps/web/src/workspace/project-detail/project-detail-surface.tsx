@@ -49,6 +49,7 @@ const ddmmyyyy = (iso: string | null) => {
 
 // RU-маппер кодов проекта/задач (боевые коды projectWorkRoutes) — для SurfaceState.errorFormat.
 const ERR_RU: Record<string, string> = {
+  permission_missing: "Недостаточно прав для просмотра этого раздела",
   invalid_project_id: "Некорректный идентификатор проекта",
   project_not_found: "Проект не найден или неактивен",
   load_failed: "Не удалось загрузить данные",

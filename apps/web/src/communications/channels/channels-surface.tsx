@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Hash, Loader2, Lock, Plus, Save, Send, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
+import { toast } from "sonner";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -63,6 +65,16 @@ const ROLE_OPTIONS: { value: CommunicationChannelRole; label: string }[] = [
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
+// Ошибка внутри модалки — по месту действия (не строкой позади оверлея).
+function DialogError({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
+      {text}
+    </p>
+  );
+}
+
 // Бейдж типа канала.
 function ChannelTypeChip({ type }: { type: CommunicationChannelType }) {
   return <Chip variant={CHANNEL_TYPE_VARIANT[type]}>{CHANNEL_TYPE_LABEL[type]}</Chip>;
@@ -74,7 +86,6 @@ export function ChannelsSurface() {
   const users = useCommsUsers();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   // Каналы по типу: системный workspace_general — первым, затем остальные.
   const channels = useMemo(() => {
@@ -110,11 +121,9 @@ export function ChannelsSurface() {
 
   async function doCreate(input: Parameters<typeof createChannel>[0]) {
     setBusy(true);
-    setNotice(null);
     const res = await createChannel(input);
     setBusy(false);
-    if (res.ok) setNotice(`Канал «${input.title}» создан`);
-    else setNotice(`Отклонено: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) toast.success(`Канал «${input.title}» создан`);
     return res;
   }
 
@@ -182,8 +191,6 @@ export function ChannelsSurface() {
           </div>
         )}
       </div>
-
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CommsFrame>
   );
 }
@@ -195,7 +202,6 @@ export function ChannelsSurface() {
 function ChannelDetail({ channelId, fallback, users }: { channelId: string; fallback: Channel; users: CommsUsersDir }) {
   const { client, data, status, error, reload, patchChannel, addMember, removeMember } = useChannel(channelId);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const channel = data?.channel ?? fallback;
   const members = data?.members ?? [];
@@ -221,20 +227,18 @@ function ChannelDetail({ channelId, fallback, users }: { channelId: string; fall
 
   async function doRemove(userId: string) {
     setBusy(true);
-    setNotice(null);
     const res = await removeMember(userId);
     setBusy(false);
-    if (res.ok) setNotice(`Участник ${users.name(userId)} удалён`);
-    else setNotice(`Отклонено: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) toast.success(`Участник ${users.name(userId)} удалён`);
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
   }
 
   async function doAdd(userId: string, role: CommunicationChannelRole) {
     setBusy(true);
-    setNotice(null);
     const res = await addMember({ userId, role });
     setBusy(false);
-    if (res.ok) setNotice(`Участник ${users.name(userId)} добавлен`);
-    else setNotice(`Отклонено: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) toast.success(`Участник ${users.name(userId)} добавлен`);
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res;
   }
 
@@ -264,11 +268,9 @@ function ChannelDetail({ channelId, fallback, users }: { channelId: string; fall
           </div>
           {canManage ? <EditChannelDialog channel={channel} busy={busy} onSave={async (input) => {
             setBusy(true);
-            setNotice(null);
             const res = await patchChannel(input);
             setBusy(false);
-            if (res.ok) setNotice("Канал обновлён");
-            else setNotice(`Отклонено: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+            if (res.ok) toast.success("Канал обновлён");
             return res;
           }} /> : null}
         </div>
@@ -294,7 +296,7 @@ function ChannelDetail({ channelId, fallback, users }: { channelId: string; fall
           ) : (
             <ul className="flex flex-col gap-2">
               {members.map((m) => (
-                <MemberRow key={m.userId} member={m} canManage={canManage} busy={busy} onRemove={() => void doRemove(m.userId)} users={users} />
+                <MemberRow key={m.userId} member={m} canManage={canManage} busy={busy} onRemove={() => doRemove(m.userId)} users={users} />
               ))}
             </ul>
           )}
@@ -307,14 +309,12 @@ function ChannelDetail({ channelId, fallback, users }: { channelId: string; fall
           ) : null}
         </section>
       </div>
-
-      {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </div>
   );
 }
 
 // Строка участника канала.
-function MemberRow({ member, canManage, busy, onRemove, users }: { member: ChannelMember; canManage: boolean; busy: boolean; onRemove: () => void; users: CommsUsersDir }) {
+function MemberRow({ member, canManage, busy, onRemove, users }: { member: ChannelMember; canManage: boolean; busy: boolean; onRemove: () => void | Promise<void>; users: CommsUsersDir }) {
   const name = users.name(member.userId);
   return (
     <li className="flex items-center gap-2.5">
@@ -325,9 +325,16 @@ function MemberRow({ member, canManage, busy, onRemove, users }: { member: Chann
       </div>
       <RoleChip role={member.role} />
       {canManage && member.role !== "owner" ? (
-        <Button variant="ghost" size="icon-sm" disabled={busy} onClick={onRemove} title="Удалить участника">
-          <UserMinus className="size-3.5" aria-hidden />
-        </Button>
+        <ConfirmDialog
+          title={`Удалить участника «${name}»?`}
+          description="Участник будет удалён из канала."
+          confirmLabel="Удалить"
+          onConfirm={onRemove}
+        >
+          <Button variant="ghost" size="icon-sm" disabled={busy} title="Удалить участника">
+            <UserMinus className="size-3.5" aria-hidden />
+          </Button>
+        </ConfirmDialog>
       ) : null}
     </li>
   );
@@ -514,13 +521,14 @@ function CreateChannelDialog({
   onCreate
 }: {
   busy: boolean;
-  onCreate: (input: { channelType: "team" | "project_general" | "custom"; title: string; description?: string | null; scopeEntityType?: "project" | "org_unit" | null; scopeEntityId?: string | null }) => Promise<{ ok: boolean }>;
+  onCreate: (input: { channelType: "team" | "project_general" | "custom"; title: string; description?: string | null; scopeEntityType?: "project" | "org_unit" | null; scopeEntityId?: string | null }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
 }) {
   const [open, setOpen] = useState(false);
   const [channelType, setChannelType] = useState<"team" | "project_general" | "custom">("team");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [scopeEntityId, setScopeEntityId] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
 
   // project_general → project-scope: реальные проекты воркспейса (не демо-hardcode).
   const projectsLoad = useCommsProjects();
@@ -540,6 +548,7 @@ function CreateChannelDialog({
         : channelType === "project_general"
           ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "project" as const, scopeEntityId: scopeValue }
           : { channelType, title: title.trim(), description: description.trim() || null };
+    setFormError(null);
     const res = await onCreate(input);
     if (res.ok) {
       setOpen(false);
@@ -547,11 +556,14 @@ function CreateChannelDialog({
       setDescription("");
       setChannelType("team");
       setScopeEntityId("");
+    } else {
+      // Ошибка остаётся В модалке — по месту действия.
+      setFormError(`Отклонено: ${commsErr(res.code, res.message)}`);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) setFormError(null); }}>
       <DialogTrigger asChild>
         <Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Канал</Button>
       </DialogTrigger>
@@ -583,6 +595,7 @@ function CreateChannelDialog({
               <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">team → scopeEntityType=&quot;org_unit&quot;.</span>
             </label>
           ) : null}
+          <DialogError text={formError} />
         </div>
         <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
           POST /communication-channels — создатель становится владельцем (owner). Канал «Общий» (workspace_general) создать нельзя.
@@ -605,17 +618,19 @@ function EditChannelDialog({
 }: {
   channel: Channel;
   busy: boolean;
-  onSave: (input: { title?: string; description?: string }) => Promise<{ ok: boolean }>;
+  onSave: (input: { title?: string; description?: string }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(channel.title);
   const [description, setDescription] = useState(channel.description);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Сброс формы при открытии (актуальные значения канала).
   useEffect(() => {
     if (open) {
       setTitle(channel.title);
       setDescription(channel.description);
+      setFormError(null);
     }
   }, [open, channel.title, channel.description]);
 
@@ -628,8 +643,10 @@ function EditChannelDialog({
     const input: { title?: string; description?: string } = {};
     if (title.trim() !== channel.title) input.title = title.trim();
     if (description !== channel.description) input.description = description;
+    setFormError(null);
     const res = await onSave(input);
     if (res.ok) setOpen(false);
+    else setFormError(`Отклонено: ${commsErr(res.code, res.message)}`);
   };
 
   return (
@@ -642,6 +659,7 @@ function EditChannelDialog({
         <div className="flex flex-col gap-3">
           <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} /></label>
           <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
+          <DialogError text={formError} />
         </div>
         <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">PATCH /communication-channels/:id — меняются только название и описание; тип и область не редактируемы.</p>
         <DialogFooter>

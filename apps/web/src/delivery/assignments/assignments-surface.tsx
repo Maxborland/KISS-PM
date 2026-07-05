@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
@@ -56,7 +58,6 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   const [monthOffset, setMonthOffset] = useState(0);
   const [sel, setSel] = useState<string | null>(null); // assignmentId
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const [curveErr, setCurveErr] = useState<string | null>(null);
   const [draft, setDraft] = useState<Map<number, number> | null>(null); // ручная кривая: day → минуты
   const [hover, setHover] = useState<{ key: string; col: number } | null>(null); // прицел: строка (key) + столбец (col=period.key)
@@ -155,11 +156,11 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   const cellMin = (m: AsgMeta, p: { days: number[] }) => p.days.reduce((s, d) => s + minutesOn(m, d), 0);
 
   async function applyCmd(command: PlanningCommand, okMsg: string): Promise<ApplyResult> {
-    setBusy(true); setNotice(null); setCurveErr(null);
+    setBusy(true); setCurveErr(null);
     const res = await apply(command);
     setBusy(false);
-    if (res.ok) setNotice(`${okMsg} · коммит v${res.planVersion}`);
-    else setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
+    if (res.ok) toast.success(`${okMsg} · коммит v${res.planVersion}`);
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
     return res;
   }
 
@@ -365,14 +366,20 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
               <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Сумма по дням должна равняться трудоёмкости назначения — бэкенд отвергнет несбалансированную кривую (optimistic → validate → error).</p>
 
               <div className="mt-4 border-t border-[var(--border)] pt-3">
-                <Button variant="ghost" size="sm" disabled={busy} onClick={() => removeAsg(selMeta.asg)} className="text-[var(--danger-text)] hover:bg-[var(--danger-soft)]"><Trash2 className="size-3.5" aria-hidden />Снять исполнителя</Button>
+                <ConfirmDialog
+                  title={`Снять исполнителя «${resDir.name(selMeta.asg.resourceId)}»?`}
+                  description="Назначение и его кривая распределения будут удалены."
+                  confirmLabel="Снять"
+                  onConfirm={() => removeAsg(selMeta.asg)}
+                >
+                  <Button variant="ghost" size="sm" disabled={busy} className="text-[var(--danger-text)] hover:bg-[var(--danger-soft)]"><Trash2 className="size-3.5" aria-hidden />Снять исполнителя</Button>
+                </ConfirmDialog>
               </div>
             </div>
           </aside>
         ) : null}
       </div>
 
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
         <span className="inline-flex items-center gap-1"><UserPlus className="size-3.5" aria-hidden />+ на строке задачи — добавить исполнителя</span>
         <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: WEEKEND_BG }} /> выходной</span>

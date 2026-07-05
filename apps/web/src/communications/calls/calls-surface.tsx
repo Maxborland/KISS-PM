@@ -16,6 +16,7 @@ import {
   UserPlus,
   Video
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -82,6 +83,16 @@ const EVENT_LABEL: Record<CallEventType, string> = {
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
+// Ошибка внутри модалки — по месту действия (не строкой позади оверлея).
+function DialogError({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
+      {text}
+    </p>
+  );
+}
+
 // Scope сущности резолвится из реальных проектов воркспейса (WithCommsEntityScope);
 // явные entityType/entityId пропсы (встраивание, тесты) отключают резолв.
 export function CallsSurface({ entityType, entityId }: { entityType?: EntityType; entityId?: string } = {}) {
@@ -99,7 +110,6 @@ function CallsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
   const users = useCommsUsers();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const rooms = data?.callRooms ?? [];
   // Выбранная комната: явно выбранная → активная → первая.
@@ -112,7 +122,7 @@ function CallsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
   // Кнопку создания сохраняем и в шапке, и в empty-action — пустое состояние остаётся рабочим.
   if (status === "forbidden" || status === "error" || !data || rooms.length === 0) {
     const createAction = (
-      <CreateRoomDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRoom} onCreated={(id) => setSelectedId(id)} entityType={entityType} entityId={entityId} />
+      <CreateRoomDialog busy={busy} setBusy={setBusy} create={createRoom} onCreated={(id) => setSelectedId(id)} entityType={entityType} entityId={entityId} />
     );
     return (
       <CommsFrame activeTab="Звонки" subtitle={`Звонки · ${scope.title}`} actions={data && rooms.length === 0 ? <>{scope.picker}{createAction}</> : scope.picker ?? undefined}>
@@ -143,7 +153,7 @@ function CallsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
     <CommsFrame
       activeTab="Звонки"
       subtitle={`Звонки · ${scope.title}`}
-      actions={<>{scope.picker}<CreateRoomDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRoom} onCreated={(id) => setSelectedId(id)} entityType={entityType} entityId={entityId} /></>}
+      actions={<>{scope.picker}<CreateRoomDialog busy={busy} setBusy={setBusy} create={createRoom} onCreated={(id) => setSelectedId(id)} entityType={entityType} entityId={entityId} /></>}
     >
       {/* Честный баннер «Прототип» */}
       <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
@@ -197,8 +207,6 @@ function CallsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
           )}
         </section>
       </div>
-
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CommsFrame>
   );
 }
@@ -209,7 +217,6 @@ function CallsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
 function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir }) {
   const { data, status, error, reload, startSession, joinToken, participantState, endSession } = useCallRoom(roomId);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   // Честный inline-баннер с кодом ошибки (напр. video_provider_misconfigured).
   const [errCode, setErrCode] = useState<string | null>(null);
   const [join, setJoin] = useState<VideoJoinContract | null>(null);
@@ -238,36 +245,36 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
   const activeSessionId = resolveActiveSessionId(data);
 
   async function doStart() {
-    setBusy(true); setNotice(null); setErrCode(null);
+    setBusy(true); setErrCode(null);
     const res = await startSession();
     setBusy(false);
-    if (res.ok) setNotice("Сессия начата");
-    else { setErrCode(res.code ?? null); setNotice(`Отклонено: ${commsErr(res.code, res.message)}`); }
+    if (res.ok) toast.success("Сессия начата");
+    else { setErrCode(res.code ?? null); toast.error(`Отклонено: ${commsErr(res.code, res.message)}`); }
   }
 
   // ЧЕСТНЫЙ demoAction: получить join-ссылку (реального WebRTC не устанавливаем).
   async function doJoin(sessionId: string) {
-    setBusy(true); setNotice(null); setErrCode(null);
+    setBusy(true); setErrCode(null);
     const res = await joinToken(sessionId);
     setBusy(false);
     if (res.ok) { setJoin(res.data); setJoinOpen(true); }
-    else { setErrCode(res.code ?? null); setNotice(`Отклонено: ${commsErr(res.code, res.message)}`); }
+    else { setErrCode(res.code ?? null); toast.error(`Отклонено: ${commsErr(res.code, res.message)}`); }
   }
 
   async function doParticipant(sessionId: string, state: "joined" | "left") {
-    setBusy(true); setNotice(null); setErrCode(null);
+    setBusy(true); setErrCode(null);
     const res = await participantState(sessionId, { state });
     setBusy(false);
-    if (res.ok) setNotice(state === "joined" ? "Отмечено: вы вошли" : "Отмечено: вы вышли");
-    else { setErrCode(res.code ?? null); setNotice(`Отклонено: ${commsErr(res.code, res.message)}`); }
+    if (res.ok) toast.success(state === "joined" ? "Отмечено: вы вошли" : "Отмечено: вы вышли");
+    else { setErrCode(res.code ?? null); toast.error(`Отклонено: ${commsErr(res.code, res.message)}`); }
   }
 
   async function doEnd(sessionId: string) {
-    setBusy(true); setNotice(null); setErrCode(null);
+    setBusy(true); setErrCode(null);
     const res = await endSession(sessionId);
     setBusy(false);
-    if (res.ok) setNotice("Сессия завершена");
-    else { setErrCode(res.code ?? null); setNotice(`Отклонено: ${commsErr(res.code, res.message)}`); }
+    if (res.ok) toast.success("Сессия завершена");
+    else { setErrCode(res.code ?? null); toast.error(`Отклонено: ${commsErr(res.code, res.message)}`); }
   }
 
   return (
@@ -380,8 +387,6 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
         )}
       </section>
 
-      {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
-
       {/* Диалог join-ссылки с честной плашкой */}
       <JoinDialog open={joinOpen} onOpenChange={setJoinOpen} join={join} />
     </div>
@@ -431,10 +436,9 @@ function JoinDialog({ open, onOpenChange, join }: { open: boolean; onOpenChange:
 /* ============================================================
    Диалог создания комнаты: title / mediaKind / provider (+ опц.).
    ============================================================ */
-function CreateRoomDialog({ busy, setBusy, setNotice, create, onCreated, entityType, entityId }: {
+function CreateRoomDialog({ busy, setBusy, create, onCreated, entityType, entityId }: {
   busy: boolean;
   setBusy: (v: boolean) => void;
-  setNotice: (v: string | null) => void;
   create: ReturnType<typeof useCallRooms>["createRoom"];
   onCreated: (roomId: string) => void;
   entityType: EntityType;
@@ -445,12 +449,13 @@ function CreateRoomDialog({ busy, setBusy, setNotice, create, onCreated, entityT
   const [mediaKind, setMediaKind] = useState<CallMediaKind>("video");
   const [provider, setProvider] = useState<CallRoomProvider>("jitsi");
   const [providerRoomId, setProviderRoomId] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
 
   const valid = title.trim().length > 0;
 
   const submit = async () => {
     if (!valid) return;
-    setBusy(true); setNotice(null);
+    setBusy(true); setFormError(null);
     const trimmedRoomId = providerRoomId.trim();
     const res = await create({
       entityType,
@@ -463,16 +468,17 @@ function CreateRoomDialog({ busy, setBusy, setNotice, create, onCreated, entityT
     });
     setBusy(false);
     if (res.ok) {
-      setNotice("Комната создана");
+      toast.success("Комната создана");
       setOpen(false);
       setTitle(""); setProviderRoomId("");
     } else {
-      setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+      // Ошибка остаётся В модалке — по месту действия.
+      setFormError(`Отклонено: ${commsErr(res.code, res.message)}`);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) setFormError(null); }}>
       <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Комната</Button></DialogTrigger>
       <DialogContent className="max-w-[480px]">
         <DialogHeader><DialogTitle>Новая комната звонка</DialogTitle></DialogHeader>
@@ -493,6 +499,7 @@ function CreateRoomDialog({ busy, setBusy, setNotice, create, onCreated, entityT
           </label>
           <label className={`col-span-2 ${labelCls}`}>ID комнаты провайдера (опц.)<Input value={providerRoomId} onChange={(e) => setProviderRoomId(e.target.value)} placeholder="portal-sync (уникален в тенанте)" /></label>
         </div>
+        <DialogError text={formError} />
         <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
           POST /call-rooms — статус принудительно «Открыт». ID комнаты провайдера уникален (409 call_room_provider_room_conflict).
           join-token выдаётся только при совпадении провайдера с настроенным деплоем (jitsi); иначе 409 video_provider_misconfigured.

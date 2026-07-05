@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { GitCommitVertical, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 import { buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/planning-client";
 
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,6 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   const [data, setData] = useState<CommitsView | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!readModel) return;
@@ -67,23 +67,23 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
     if (!latestRevert || c.auditEventId !== latestRevert.auditEventId) return;
     const before = latestRevert.before as PlanningReadModel;
     const inverses = latestRevert.commands.slice().reverse().flatMap((cmd) => buildCompensatingCommands(cmd, before));
-    if (inverses.length === 0) { setNotice("Откат недоступен для этой операции (создание/перенос/назначение)"); return; }
-    setBusy(true); setNotice(null);
+    if (inverses.length === 0) { toast.error("Откат недоступен для этой операции (создание/перенос/назначение)"); return; }
+    setBusy(true);
     const res = await applyBatch(inverses);
     setBusy(false);
-    if (res.ok) { setNotice(`Откат применён компенсирующим коммитом v${res.planVersion}`); const fresh = await loadCommits(); setData(fresh); setSel(fresh.commits[0]?.auditEventId ?? null); }
-    else setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
+    if (res.ok) { toast.success(`Откат применён компенсирующим коммитом v${res.planVersion}`); const fresh = await loadCommits(); setData(fresh); setSel(fresh.commits[0]?.auditEventId ?? null); }
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
   };
 
   // BUG-PROJ-24: откат последнего обратимого коммита через серверный revert-last —
   // работает из истории (не зависит от in-session state).
   const onRevertLast = async () => {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await revertLast();
     setBusy(false);
-    if (res.ok) { setNotice(`Откат применён компенсирующим коммитом v${res.planVersion}`); const fresh = await loadCommits(); setData(fresh); setSel(fresh.commits[0]?.auditEventId ?? null); }
-    else if (res.message === "nothing_to_revert") setNotice("Нет обратимого коммита для отката");
-    else setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
+    if (res.ok) { toast.success(`Откат применён компенсирующим коммитом v${res.planVersion}`); const fresh = await loadCommits(); setData(fresh); setSel(fresh.commits[0]?.auditEventId ?? null); }
+    else if (res.message === "nothing_to_revert") toast.error("Нет обратимого коммита для отката");
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
   };
 
   return (
@@ -169,7 +169,6 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
         </div>
       </div>
 
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </DeliveryFrame>
   );
 }

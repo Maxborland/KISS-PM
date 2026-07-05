@@ -65,6 +65,7 @@ export function useProjectBase(projectId: string, mockBase: ProjectMeta): Projec
  * Неизвестный код отдаём как есть (или общий fallback).
  */
 const PLANNING_ERR_RU: Record<string, string> = {
+  permission_missing: "Недостаточно прав для просмотра плана проекта",
   project_not_found: "Проект не найден: возможно, он удалён или ссылка устарела",
   load_failed: "Не удалось загрузить план проекта",
   request_failed: "Запрос к планировщику не выполнен",

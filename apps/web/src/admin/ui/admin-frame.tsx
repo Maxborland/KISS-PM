@@ -1,8 +1,12 @@
+"use client";
+
 import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { cn } from "@/lib/cn";
+import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
+import { useSessionUser } from "@/shell/use-session-user";
 
 const ADMIN_TAB_HREF: Record<string, string> = {
   "Пользователи": "/admin/users",
@@ -20,6 +24,15 @@ const ADMIN_TAB_HREF: Record<string, string> = {
 export const ADMIN_TABS = ["Пользователи", "Роли", "Безопасность", "Аудит"] as const;
 export type AdminTab = (typeof ADMIN_TABS)[number];
 
+// Права, любое из которых открывает админку (зеркало гейта пункта навигации).
+const ADMIN_PERMISSIONS = [
+  "tenant.access_profiles.read",
+  "tenant.access_profiles.manage",
+  "tenant.users.read",
+  "tenant.users.manage",
+  "tenant.audit.read"
+];
+
 export function AdminFrame({
   activeTab,
   title,
@@ -33,6 +46,22 @@ export function AdminFrame({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  // Прямой заход не-админа по URL: цельный экран «нет доступа» вместо полного
+  // админ-хрома с ошибкой в каждой вкладке (G8-05). Пока сессия не загрузилась
+  // (null — в т.ч. Storybook), рендерим как обычно.
+  const user = useSessionUser();
+  if (user && !ADMIN_PERMISSIONS.some((p) => user.permissions.includes(p))) {
+    return (
+      <WorkspaceShell activeNav="Администрирование">
+        <main className="grid min-h-[60vh] flex-1 place-items-center bg-[var(--canvas)] p-6">
+          <ForbiddenState
+            title="Администрирование недоступно"
+            description="Этот раздел виден только ролям с правами управления рабочей областью. Если доступ нужен — обратитесь к администратору."
+          />
+        </main>
+      </WorkspaceShell>
+    );
+  }
   return (
     <WorkspaceShell activeNav="Администрирование">
       {/* Заголовок области */}

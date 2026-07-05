@@ -5,6 +5,7 @@ export const rub = (v: number) => `${v.toLocaleString("ru-RU")} ₽`;
 export const money = (v: number) => (v < 1000 ? rub(v) : v >= 1_000_000 ? `${(v / 1_000_000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} млн ₽` : `${Math.round(v / 1000).toLocaleString("ru-RU")} тыс ₽`);
 
 const ERR: Record<string, string> = {
+  permission_missing: "Недостаточно прав для этого действия",
   invalid_client_name: "Укажите название",
   invalid_contact_name: "Укажите имя",
   invalid_contact_email: "Некорректный email",

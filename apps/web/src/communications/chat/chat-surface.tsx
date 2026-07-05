@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CheckCheck, MoreHorizontal, Pencil, Pin, Send, Smile, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
@@ -337,7 +338,6 @@ function ChatPane({
 }) {
   const me = useContext(SelfUserContext);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const cid = conversation.id;
   const unread = conversation.readState?.unreadCount ?? 0;
 
@@ -362,13 +362,12 @@ function ChatPane({
 
   const run = async (fn: () => Promise<{ ok: true } | { ok: false; code?: string; message: string }>, okMsg?: string) => {
     setBusy(true);
-    setNotice(null);
     const res = await fn();
     setBusy(false);
     if (res.ok) {
-      if (okMsg) setNotice(okMsg);
+      if (okMsg) toast.success(okMsg);
     } else {
-      setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+      toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     }
   };
 
@@ -444,8 +443,6 @@ function ChatPane({
         onSend={(body) => void run(() => conv.postMessage(cid, { body }))}
         onSticker={(stickerAssetId) => void run(() => conv.postMessage(cid, { stickerAssetId }))}
       />
-
-      {notice ? <div key={notice} className="anim-rise-in-fast border-t border-[var(--border)] px-4 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </section>
   );
 }

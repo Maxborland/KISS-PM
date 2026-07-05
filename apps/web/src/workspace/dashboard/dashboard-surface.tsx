@@ -30,6 +30,7 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 // RU-маппинг кодов загрузки (как myWorkErr/crmErr в соседних surface).
 const ERR_RU: Record<string, string> = {
+  permission_missing: "Недостаточно прав для просмотра этого раздела",
   load_failed: "Не удалось загрузить данные",
   request_failed: "Ошибка запроса к серверу",
   not_found: "Данные не найдены"
@@ -76,11 +77,14 @@ export function DashboardSurface() {
   const projects = useProjects();
   const crm = useCrm();
 
-  const errored = myWork.status === "error" || projects.status === "error" || crm.status === "error";
-  // CRM может вернуть forbidden (403) на боевом API — иначе дашборд завис бы в loading навсегда.
-  const forbidden = crm.status === "forbidden";
-  const ready = Boolean(myWork.data && projects.data && crm.data);
-  const surfaceStatus = errored ? "error" : forbidden ? "forbidden" : ready ? "ready" : "loading";
+  // Повиджетная деградация (G8-06): один недоступный источник (403/ошибка) не
+  // убивает весь дашборд — его секция показывает «нет доступа», остальные живут.
+  // Целиком forbidden/error — только когда ВСЕ три источника недоступны.
+  const sources = [myWork, projects, crm];
+  const settled = sources.every((s) => Boolean(s.data) || s.status === "error" || s.status === "forbidden");
+  const allForbidden = sources.every((s) => s.status === "forbidden");
+  const allFailed = sources.every((s) => !s.data && (s.status === "error" || s.status === "forbidden"));
+  const surfaceStatus = !settled ? "loading" : allForbidden ? "forbidden" : allFailed ? "error" : "ready";
   const errorCode = myWork.error ?? projects.error ?? crm.error ?? null;
 
   return (
@@ -103,10 +107,17 @@ export function DashboardSurface() {
           loadingLabel="Собираем сводку…"
           errorTitle="Не удалось собрать сводку"
           errorFormat={dashboardErr}
-          forbidden={{ title: "Доступ к CRM ограничен", description: "У вас нет прав на просмотр сделок — сводка недоступна." }}
+          forbidden={{
+            title: "Дашборд недоступен вашей роли",
+            description: "Нет прав ни на один из разделов сводки (задачи, проекты, CRM). Доступные вам разделы — в меню слева; за расширением прав обратитесь к администратору."
+          }}
         >
-          {myWork.data && projects.data && crm.data ? (
-            <DashboardContent tasks={myWork.data.tasks} projectsCount={projects.data.projects.length} projectsHours={projects.data.projects.reduce((s, p) => s + p.plannedHours, 0)} opportunities={crm.data.opportunities} />
+          {settled && !allFailed ? (
+            <DashboardContent
+              tasks={myWork.data?.tasks ?? null}
+              projects={projects.data ? { count: projects.data.projects.length, hours: projects.data.projects.reduce((s, p) => s + p.plannedHours, 0) } : null}
+              opportunities={crm.data?.opportunities ?? null}
+            />
           ) : (
             <span />
           )}
@@ -116,54 +127,63 @@ export function DashboardSurface() {
   );
 }
 
+// Секция, недоступная роли: компактная честная пометка вместо падения всей сводки.
+function NoAccessNote({ what }: { what: string }) {
+  return (
+    <p className="px-4 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">
+      {what} недоступны вашей роли.
+    </p>
+  );
+}
+
 function DashboardContent({
   tasks,
-  projectsCount,
-  projectsHours,
+  projects,
   opportunities
 }: {
-  tasks: TaskRecord[];
-  projectsCount: number;
-  projectsHours: number;
-  opportunities: Opportunity[];
+  tasks: TaskRecord[] | null;
+  projects: { count: number; hours: number } | null;
+  opportunities: Opportunity[] | null;
 }) {
-  // Агрегаты по моим задачам.
+  // Агрегаты по моим задачам (null = раздел недоступен роли).
   const tasksByStatus = useMemo(() => {
     const m = new Map<TaskStatusCategory, number>();
-    for (const t of tasks) m.set(t.statusCategory, (m.get(t.statusCategory) ?? 0) + 1);
+    for (const t of tasks ?? []) m.set(t.statusCategory, (m.get(t.statusCategory) ?? 0) + 1);
     return m;
   }, [tasks]);
-  const activeTasks = tasks.filter((t) => t.statusCategory !== "done");
+  const activeTasks = (tasks ?? []).filter((t) => t.statusCategory !== "done");
   const upcoming = useMemo(
     () => [...activeTasks].sort((a, b) => a.plannedFinish.localeCompare(b.plannedFinish)).slice(0, 6),
     [activeTasks]
   );
 
-  // Агрегаты по сделкам.
-  const openOpps = opportunities.filter((o) => OPP_OPEN.includes(o.status));
+  // Агрегаты по сделкам (null = раздел недоступен роли).
+  const openOpps = (opportunities ?? []).filter((o) => OPP_OPEN.includes(o.status));
   const openValue = openOpps.reduce((s, o) => s + o.contractValue, 0);
-  const wonCount = opportunities.filter((o) => o.status === "won_closed").length;
+  const wonCount = (opportunities ?? []).filter((o) => o.status === "won_closed").length;
   const oppsByStatus = useMemo(() => {
     const order: Opportunity["status"][] = ["new", "feasibility", "ready_to_activate", "won_closed", "lost_rejected"];
     return order
-      .map((s) => ({ status: s, count: opportunities.filter((o) => o.status === s).length }))
+      .map((s) => ({ status: s, count: (opportunities ?? []).filter((o) => o.status === s).length }))
       .filter((r) => r.count > 0);
   }, [opportunities]);
 
   return (
     <div className="flex flex-col gap-3">
-      {/* KPI-плитки — реальные агрегаты */}
+      {/* KPI-плитки — реальные агрегаты; недоступный роли источник → «—» */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatTile label="Мои задачи" value={tasks.length} delta={`${tasksByStatus.get("in_progress") ?? 0} в работе`} tone="default" />
-        <StatTile label="Открытые сделки" value={openOpps.length} delta={money(openValue)} tone="default" />
-        <StatTile label="Активные проекты" value={projectsCount} delta={`${projectsHours.toLocaleString("ru-RU")} ч плана`} tone="default" />
-        <StatTile label="Сделки выиграны" value={wonCount} delta={wonCount > 0 ? "закрыты в плюс" : "пока нет"} tone={wonCount > 0 ? "success" : "default"} />
+        <StatTile label="Мои задачи" value={tasks ? tasks.length : "—"} delta={tasks ? `${tasksByStatus.get("in_progress") ?? 0} в работе` : "нет доступа"} tone="default" />
+        <StatTile label="Открытые сделки" value={opportunities ? openOpps.length : "—"} delta={opportunities ? money(openValue) : "нет доступа"} tone="default" />
+        <StatTile label="Активные проекты" value={projects ? projects.count : "—"} delta={projects ? `${projects.hours.toLocaleString("ru-RU")} ч плана` : "нет доступа"} tone="default" />
+        <StatTile label="Сделки выиграны" value={opportunities ? wonCount : "—"} delta={!opportunities ? "нет доступа" : wonCount > 0 ? "закрыты в плюс" : "пока нет"} tone={opportunities && wonCount > 0 ? "success" : "default"} />
       </div>
 
       <Bento>
         {/* Ближайшие задачи — реальные my-work, сортировка по плановому финишу */}
         <BentoCard title="Ближайшие задачи" subtitle="Мои незавершённые задачи по плановому финишу" span={7} flush>
-          {upcoming.length === 0 ? (
+          {tasks === null ? (
+            <NoAccessNote what="Задачи" />
+          ) : upcoming.length === 0 ? (
             <p className="px-4 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">Незавершённых задач нет — всё закрыто.</p>
           ) : (
             <ul className="flex flex-col">
@@ -186,12 +206,14 @@ function DashboardContent({
 
         {/* Воронка сделок — реальное распределение по статусам */}
         <BentoCard title="Сделки по статусам" subtitle="Распределение возможностей CRM" span={5}>
-          {oppsByStatus.length === 0 ? (
+          {opportunities === null ? (
+            <NoAccessNote what="Сделки" />
+          ) : oppsByStatus.length === 0 ? (
             <p className="py-4 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">Сделок пока нет.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {oppsByStatus.map((r) => {
-                const pct = Math.round((r.count / opportunities.length) * 100);
+                const pct = Math.round((r.count / (opportunities?.length || 1)) * 100);
                 return (
                   <li key={r.status} className="flex items-center gap-2">
                     <span className="w-24 shrink-0 text-[length:var(--text-sm)] text-[var(--muted-strong)]">{OPP_STATUS_LABEL[r.status]}</span>

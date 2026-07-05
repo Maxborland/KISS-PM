@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, User } from "lucide-react";
+import { LogOut, Settings, User } from "lucide-react";
 
 import { AuthRuntimeProvider } from "@/auth/lib/auth-runtime";
 import { useAuth } from "@/auth/lib/use-auth";
@@ -70,6 +70,15 @@ function ShellUserMenuInner() {
               className="flex items-center gap-2 px-3 py-2 text-[length:var(--text-sm)] text-[var(--muted-strong)] hover:bg-[var(--panel-subtle)]"
             >
               <User className="size-4" aria-hidden /> Профиль
+            </Link>
+            {/* /settings была недостижима из UI (G2-16) — настройки уведомлений и пр. */}
+            <Link
+              href="/settings"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 text-[length:var(--text-sm)] text-[var(--muted-strong)] hover:bg-[var(--panel-subtle)]"
+            >
+              <Settings className="size-4" aria-hidden /> Настройки
             </Link>
             <button
               type="button"
