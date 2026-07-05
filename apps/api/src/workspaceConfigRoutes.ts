@@ -585,7 +585,7 @@ export function registerWorkspaceConfigRoutes(
   });
 }
 
-function parseSecurityPolicyBody(
+export function parseSecurityPolicyBody(
   input: unknown
 ): { ok: true; value: TenantSecurityPolicy } | { ok: false; error: string } {
   const record = input && typeof input === "object" && !Array.isArray(input)
@@ -623,6 +623,11 @@ function parseSecurityPolicyBody(
         .filter((entry) => entry.length > 0)
     )
   );
+  // Каждая запись — валидный hostname (раньше «это не домен!!» сохранялось в политику, G6-10).
+  const domainPattern = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
+  if (domainAllowlist.some((entry) => !domainPattern.test(entry))) {
+    return { ok: false, error: "security_policy_domain_allowlist_invalid" };
+  }
 
   return {
     ok: true,

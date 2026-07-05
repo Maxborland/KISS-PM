@@ -3,7 +3,7 @@ import {
   canReadTenantUsers,
   type PolicyDecision
 } from "@kiss-pm/access-control";
-import type { TenantUser, UserId } from "@kiss-pm/domain";
+import type { TenantId, TenantUser, UserId } from "@kiss-pm/domain";
 import { hashPassword } from "@kiss-pm/persistence";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
@@ -97,6 +97,9 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
     if (existingUsers.some((user) => user.email === parsed.value.email)) {
       return context.json({ error: "user_email_taken" }, 409);
+    }
+    if (!(await emailDomainAllowed(dataSource, actor.tenantId, parsed.value.email))) {
+      return context.json({ error: "email_domain_not_allowed" }, 400);
     }
     if (
       !(await dataSource.listAccessProfilesByTenantId(actor.tenantId)).some(
@@ -227,6 +230,13 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       )
     ) {
       return context.json({ error: "user_email_taken" }, 409);
+    }
+    // Смена email тоже обязана уважать домен-allowlist политики безопасности.
+    if (
+      beforeState.email !== parsed.value.email &&
+      !(await emailDomainAllowed(dataSource, actor.tenantId, parsed.value.email))
+    ) {
+      return context.json({ error: "email_domain_not_allowed" }, 400);
     }
     if (
       !(await dataSource.listAccessProfilesByTenantId(actor.tenantId)).some(
@@ -414,4 +424,18 @@ function shouldRevokeSessionsAfterUserUpdate(
     before.email !== after.email ||
     before.status !== after.status
   );
+}
+
+// Домен email против политики безопасности тенанта (G6-01: allowlist теперь
+// применяется, а не только сохраняется). Пустой список = ограничений нет.
+async function emailDomainAllowed(
+  dataSource: ApiRouteDeps["dataSource"],
+  tenantId: TenantId,
+  email: string
+): Promise<boolean> {
+  if (!dataSource.getTenantSecurityPolicy) return true;
+  const policy = await dataSource.getTenantSecurityPolicy(tenantId);
+  if (policy.domainAllowlist.length === 0) return true;
+  const domain = email.split("@")[1]?.toLowerCase() ?? "";
+  return policy.domainAllowlist.includes(domain);
 }

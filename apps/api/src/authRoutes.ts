@@ -75,12 +75,17 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
       const rawToken = randomBytes(32).toString("hex");
       const loginNow = new Date();
+      // Тайм-аут сессии из политики безопасности тенанта (G6-01: настройка теперь
+      // применяется, а не только сохраняется). Без persistence-политики — прежний дефолт.
+      const sessionTimeoutMs = dataSource.getTenantSecurityPolicy
+        ? (await dataSource.getTenantSecurityPolicy(credential.tenantId)).sessionTimeoutHours * 3_600_000
+        : sessionTtlMs;
       await dataSource.createSession({
         id: `session-${randomUUID()}`,
         tenantId: credential.tenantId,
         userId: credential.userId,
         tokenHash: hashSessionToken(rawToken),
-        expiresAt: new Date(loginNow.getTime() + sessionTtlMs),
+        expiresAt: new Date(loginNow.getTime() + sessionTimeoutMs),
         userAgent: normalizeUserAgent(context.req.header("user-agent")),
         ipAddress: rateLimitInput.ip ?? null,
         lastSeenAt: loginNow
