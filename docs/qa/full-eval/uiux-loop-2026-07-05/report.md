@@ -85,6 +85,19 @@
 
 Регрессия: `fix-verify-regression-sweep` — 17/17 ключевых роутов чистые (SWEEP-CLEAN); полный `vitest run` — 909 pass, 4 fail pre-existing на master (agentExecute×3, design-v3×1). Ограничение: video-экран отказа проверен типами/кодом, live-джоин в headless без медиа-устройств не гонялся.
 
+## Статус исправлений P1 (2026-07-06)
+
+Все 4 слайса P1 внедрены (закрывают ~50 major из кластеров 4, 5, 7 + точечные):
+
+| P1 | Кластер/находки | Коммит | Live-проверка |
+|---|---|---|---|
+| P1-A toast/DialogError/confirm в 24 поверхностях | кластер 4: G2-10/11, G3-06/19, G4-05/06/19, G5-14/16, G6-02/03/12 и др. | dda462f8 | `fix-verify-p1` (toast, confirm) |
+| P1-B permission-aware nav + 403 UX + повиджетный дашборд | кластер 5: G8-02..06, G8-10, G2-02 | dda462f8 | `fix-verify-p1` (nav ролей, admin-forbidden, дашборд) |
+| P1-C замыкание CRUD | кластер 7: G4-07, G5-08, G6-04, G6-14 | a6f38061 | `fix-verify-p1c` 8/8 PASS |
+| P1-D my-work=исполнитель, /settings, тема глобально | G2-07, G2-16, G2-14 | dda462f8 | `fix-verify-p1` (count 19→13, меню, ProfileThemeSync) |
+
+Конверсия P1-A выполнена 4 параллельными агентами по непересекающимся группам файлов (эталон — admin/users-surface); финальная верификация (tsc, vitest 909 pass + 4 pre-existing, db-тесты 34 pass на изолированной БД, sweep 17/17) — вручную.
+
 ## Комплаенс-примечания (AGENTS.md §8/§9)
 
 - **CodeGraph**: код продукта в этом прогоне **не менялся** — артефакты только в `docs/qa/**` (markdown, json, png, evidence-скрипты `.mjs`). Структурные вопросы к коду решались grep/read-фолбэком внутри агентов (дисклоуз в blockers групп); `codegraph_*` для live-QA стенда не применялся.
