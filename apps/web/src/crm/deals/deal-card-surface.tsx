@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { CheckCircle2, Circle, FlaskConical, Loader2, Lock, Rocket, Save, Send, Square, Trophy, XCircle } from "lucide-react";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
@@ -57,10 +58,13 @@ const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--borde
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
 type FormState = { title: string; description: string; stageId: string; ownerUserId: string; probability: string; contractValue: string; plannedHourlyRate: string; plannedStart: string; plannedFinish: string };
+// Живой API отдаёт даты как ISO-datetime («2026-05-01T00:00:00.000Z»), а <input type="date">
+// принимает строго yyyy-MM-dd — без нормализации поля пустели и ЛЮБОЕ сохранение падало 400 (G4-01).
+const dateOnly = (s: string): string => (s.length > 10 ? s.slice(0, 10) : s);
 const formOf = (o: Opportunity): FormState => ({
   title: o.title, description: o.description ?? "", stageId: o.stageId ?? "", ownerUserId: o.ownerUserId ?? "",
   probability: String(o.probability), contractValue: String(o.contractValue), plannedHourlyRate: String(o.plannedHourlyRate),
-  plannedStart: o.plannedStart, plannedFinish: o.plannedFinish
+  plannedStart: dateOnly(o.plannedStart), plannedFinish: dateOnly(o.plannedFinish)
 });
 
 // initialId — стартовая сделка из URL (route app/crm/deals/[id]); по умолчанию пусто → fallback ниже
@@ -71,17 +75,23 @@ export function DealCard({ initialId }: { initialId?: string } = {}) {
   const { data, status, error, reload } = crm;
   const [selectedId, setSelectedId] = useState<string | null>(initialId ?? null);
 
+  // Запрошенный по URL id обязан существовать: молчаливая подмена чужой сделкой (G4-02)
+  // выглядела как запрошенная и провоцировала правку не той записи. Fallback на первую
+  // сделку остаётся только для встраивания без initialId (stories).
+  const requestedMissing = Boolean(
+    initialId && selectedId === initialId && data && !data.opportunities.some((o) => o.id === initialId)
+  );
   const selected = useMemo<Opportunity | null>(() => {
-    if (!data) return null;
+    if (!data || requestedMissing) return null;
     return data.opportunities.find((o) => o.id === selectedId) ?? data.opportunities.find((o) => o.id === "opp-2207") ?? data.opportunities[0] ?? null;
-  }, [data, selectedId]);
+  }, [data, selectedId, requestedMissing]);
 
   // Верхнеуровневые loading/error/forbidden — через SurfaceState (внутри CrmFrame).
   // Тело ниже дереференсит data/selected, поэтому сохраняем early-return для не-ready состояний.
   // НЕ трогаем вложенные состояния (лента активностей, виджет осуществимости) — это ready-контент.
   // selected===null при наличии data = «нет сделок» — показываем как ошибку (как было раньше).
   if ((status === "loading" && !data) || status === "error" || status === "forbidden" || !data || !selected) {
-    const stateStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
+    const stateStatus = requestedMissing && data ? "empty" : status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
       <CrmFrame activeTab="Сделки">
         <SurfaceState
@@ -91,6 +101,11 @@ export function DealCard({ initialId }: { initialId?: string } = {}) {
           errorFormat={ruErr}
           loadingLabel="Загрузка сделки…"
           forbidden={{ title: "Доступ к сделке ограничен", description: "У вас нет прав на просмотр карточки сделки." }}
+          empty={{
+            title: "Сделка не найдена",
+            description: "Сделки с таким адресом нет: возможно, она удалена или ссылка устарела.",
+            action: <Button asChild variant="default"><Link href="/crm/deals">К списку сделок</Link></Button>
+          }}
         >
           <span />
         </SurfaceState>

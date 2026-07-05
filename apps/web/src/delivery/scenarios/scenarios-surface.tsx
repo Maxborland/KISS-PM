@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
@@ -36,6 +36,7 @@ const riskOf = (score: number) => score >= 67 ? { label: "высокий рис�
 
 export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, previewScenarios, applyScenario } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
   const [targetKey, setTargetKey] = useState<string>("");
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
@@ -92,7 +93,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} projectId={projectId} activeTab="Сценарии">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} projectId={projectId} activeTab="Сценарии">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
           <span />
         </SurfaceState>
@@ -100,7 +101,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     );
   }
 
-  const projectMeta = deriveProjectMeta(readModel, PROJECT);
+  const projectMeta = deriveProjectMeta(readModel, projectBase);
   const list = proposals ?? [];
   const recommendedId = list.filter((p) => p.conflictEffect !== "accepted").sort((a, b) => a.explainability.riskScore - b.explainability.riskScore)[0]?.id ?? null;
   const compareP = compareId ? list.find((p) => p.id === compareId) ?? null : null;

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
@@ -27,6 +27,7 @@ const nid = (p: string) => `${p}-n${(NID += 1)}`;
 
 export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
   const [selCal, setSelCal] = useState<string>("project"); // "project" | resourceId
   const [monthOffset, setMonthOffset] = useState(0);
@@ -87,7 +88,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Календари">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Календари">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка календарей…">
           <span />
         </SurfaceState>
@@ -95,7 +96,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     );
   }
 
-  const projectMeta = deriveProjectMeta(readModel, PROJECT);
+  const projectMeta = deriveProjectMeta(readModel, projectBase);
   const focusMonth = model.monthsList[Math.max(0, Math.min(monthOffset, model.monthsList.length - 1))] ?? "";
   const monthLabel = focusMonth ? `${MONTHS_CAP[Number(focusMonth.slice(5, 7)) - 1]} ${focusMonth.slice(0, 4)}` : "";
   const isResourceView = selCal !== "project";

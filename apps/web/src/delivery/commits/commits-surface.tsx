@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type CommitMetaView, type CommitsView } from "@/delivery/lib/use-planning";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
@@ -29,6 +29,7 @@ const typeOf = (actionType: string): { label: string; cls: string } => {
 
 export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, applyBatch, revertLast, loadCommits } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const [data, setData] = useState<CommitsView | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,7 +50,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   if (status !== "ready" || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} projectId={projectId} activeTab="Коммиты">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} projectId={projectId} activeTab="Коммиты">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
           <span />
         </SurfaceState>
@@ -57,7 +58,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
     );
   }
 
-  const projectMeta = deriveProjectMeta(readModel, PROJECT);
+  const projectMeta = deriveProjectMeta(readModel, projectBase);
   const commits = data?.commits ?? [];
   const latestRevert = data?.latestRevert ?? null;
   const selected = commits.find((c) => c.auditEventId === sel) ?? commits[0] ?? null;

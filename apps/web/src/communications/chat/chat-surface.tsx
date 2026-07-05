@@ -15,12 +15,13 @@ import { CommsFrame } from "@/communications/ui/comms-frame";
 import { useCommsUsers, useConversation, useDirectMessages, usePresence, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
 import { useCommsRuntime } from "@/communications/lib/comms-runtime";
+import { WithCommsEntityScope, type ResolvedCommsScope } from "@/communications/lib/entity-scope";
 import { avatarColor, commsErr, initials, PresenceDot, relTime, UnreadDot } from "@/communications/lib/comms-bits";
 import type { Conversation, DirectConversation, EntityType, Message, PresenceStatus, Reaction } from "@/communications/lib/comms-client";
 
 /* ============================================================
    Поверхность ЧАТ блока «Коммуникации».
-   Двухпанель: слева — беседы demo-сущности (project/proj-portal),
+   Двухпанель: слева — беседы проекта-scope (WithCommsEntityScope),
    справа — лента сообщений выбранной беседы + композер.
    Работает на useConversation (createCommsClient поверх in-memory мока).
    ============================================================ */
@@ -43,11 +44,6 @@ function useSelfUserId(live: boolean): string {
   return id;
 }
 
-// Demo-сущность (entity-scoped): беседы привязаны к проекту proj-portal. Прод-route может
-// передать реальные entityType/entityId пропсами; по умолчанию — демо (для stories).
-const DEMO_ENTITY_TYPE: EntityType = "project";
-const DEMO_ENTITY_ID = "proj-portal";
-
 // Сид-стикеры (StickerAsset не отдаётся клиентом отдельным методом — берём из сид-набора).
 const STICKERS: { id: string; emoji: string; title: string }[] = [
   { id: "sticker-thumbsup", emoji: "👍", title: "Палец вверх" },
@@ -58,7 +54,18 @@ const stickerEmoji = (id: string): string => STICKERS.find((s) => s.id === id)?.
 // Быстрые реакции для попапа под сообщением.
 const QUICK_EMOJI = ["👍", "🎉", "❤️", "🔥", "👀", "✅"];
 
-export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENTITY_ID }: { entityType?: EntityType; entityId?: string } = {}) {
+// Scope сущности резолвится из реальных проектов воркспейса (WithCommsEntityScope);
+// явные entityType/entityId пропсы (встраивание, тесты) отключают резолв.
+export function ChatSurface({ entityType, entityId }: { entityType?: EntityType; entityId?: string } = {}) {
+  return (
+    <WithCommsEntityScope activeTab="Чат" {...(entityType ? { explicitEntityType: entityType } : {})} {...(entityId ? { explicitEntityId: entityId } : {})}>
+      {(scope) => <ChatSurfaceScoped scope={scope} />}
+    </WithCommsEntityScope>
+  );
+}
+
+function ChatSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
+  const { entityType, entityId } = scope;
   const conv = useConversation(entityType, entityId);
   const { data, status, error, reload, selectConversation } = conv;
   // Справочник людей тенанта (имена авторов): mock=COMMS_USERS, live=GET /api/workspace/users.
@@ -91,7 +98,7 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
 
   return (
     <SelfUserContext.Provider value={me}>
-    <CommsFrame activeTab="Чат" subtitle={`Беседы · ${entityType} / ${entityId}`}>
+    <CommsFrame activeTab="Чат" subtitle={`Беседы · ${scope.title}`} {...(scope.picker ? { actions: scope.picker } : {})}>
       <div className="flex flex-col gap-3">
         {!live ? <PrototypeBanner /> : null}
         <SurfaceState

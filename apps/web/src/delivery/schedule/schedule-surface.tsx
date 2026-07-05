@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { demoAction } from "@/views/lib/demo";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
@@ -167,6 +167,7 @@ const cellBtn = "block w-full cursor-pointer truncate rounded-[var(--radius-xs)]
 
 export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, setReadModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
   const [zoom, setZoom] = useState<Zoom>("week");
   const [sel, setSel] = useState<string | null>("t-3.2.1");
@@ -406,7 +407,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   if (status !== "ready" || !mapped || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="График">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="График">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка плана из read-model…">
           <span />
         </SurfaceState>
@@ -414,7 +415,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     );
   }
 
-  const projectMeta = deriveProjectMeta(readModel, PROJECT);
+  const projectMeta = deriveProjectMeta(readModel, projectBase);
   const { rows, deadlineDay, projectFinishDay } = mapped;
   const totalDays = Math.max(7, Math.ceil((Math.max(projectFinishDay, deadlineDay ?? 0, ...rows.map((r) => r.dayStart + r.dayDur)) + 6) / 7) * 7);
   const weeks = totalDays / 7;

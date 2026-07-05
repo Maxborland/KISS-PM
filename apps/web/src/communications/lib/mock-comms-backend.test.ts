@@ -631,3 +631,11 @@ describe("contract-mock Comms backend — уведомления", () => {
     ).rejects.toMatchObject({ status: 400, code: "digest_frequency_invalid" });
   });
 });
+
+describe("mock-comms-backend: справочник проектов (scope поверхностей)", () => {
+  it("GET /projects: мок отдаёт демо-проект как scope для entity-привязанных поверхностей", async () => {
+    const c = createCommsClient({ apiOrigin: "", fetchImpl: createMockCommsFetch() });
+    const { projects } = await c.listProjects();
+    expect(projects).toEqual([{ id: "proj-portal", title: "Производственный портал" }]);
+  });
+});

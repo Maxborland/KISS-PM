@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { createPlanningCommand } from "@kiss-pm/domain";
@@ -25,6 +25,7 @@ const nid = (p: string) => `${p}-n${(NID += 1)}`;
 
 export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, apply } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Baseline">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Baseline">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
           <span />
         </SurfaceState>
@@ -65,7 +66,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const totalWorkDelta = tasks.reduce((s, t) => s + (t.workDeltaMinutes ?? 0), 0);
   // хром выводим из РЕАЛЬНЫХ данных (а не статической заглушки PROJECT), чтобы шапка не противоречила плитке
   const projectMeta: ProjectMeta = {
-    name: PROJECT.name, code: PROJECT.code, status: PROJECT.status, statusTone: PROJECT.statusTone ?? "info",
+    name: projectBase.name, code: projectBase.code, status: projectBase.status, statusTone: projectBase.statusTone ?? "info",
     planVersion: `v${readModel.planVersion}`, deadline: ddmmYyyy(typeof readModel.project.deadline === "string" ? readModel.project.deadline : null), finish: ddmmYyyy(model.projectFinish),
     ...(baseFinishDay && projFinishDelta !== 0 ? { variance: { label: `${signDays(projFinishDelta)} к базовому плану`, tone: projFinishDelta > 0 ? ("warning" as const) : ("success" as const) } } : {})
   };

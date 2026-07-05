@@ -9,7 +9,7 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { Bento, BentoCard, StatTile } from "@/delivery/ui/bento";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type CommitMetaView } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
@@ -36,6 +36,7 @@ function ProgressBar({ value, critical }: { value: number; critical?: boolean })
 
 export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, loadCommits } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
   const [commits, setCommits] = useState<CommitMetaView[]>([]);
 
@@ -67,7 +68,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Обзор">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Обзор">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
           <span />
         </SurfaceState>
@@ -121,7 +122,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
   // шапка из РЕАЛЬНЫХ данных (финиш/variance), не из статической заглушки — чтобы не противоречить KPI
   const projectMeta: ProjectMeta = {
-    name: PROJECT.name, code: PROJECT.code, status: PROJECT.status, statusTone: PROJECT.statusTone ?? "info",
+    name: projectBase.name, code: projectBase.code, status: projectBase.status, statusTone: projectBase.statusTone ?? "info",
     planVersion: `v${readModel.planVersion}`, deadline: model.deadline ? ddmmyyyy(model.deadline) : "—", finish: ddmmyyyy(model.projectFinish),
     ...(projDelta > 0 ? { variance: { label: `+${projDelta} дн. к базовому плану`, tone: "warning" as const } } : reserveDays != null && reserveDays < 0 ? { variance: { label: `+${-reserveDays} дн. к дедлайну`, tone: "danger" as const } } : {})
   };

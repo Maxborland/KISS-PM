@@ -14,7 +14,7 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
-import { useChannel, useChannels, useCommsUsers, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { useChannel, useChannels, useCommsProjects, useCommsUsers, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { avatarColor, commsErr, initials, relTime, RoleChip } from "@/communications/lib/comms-bits";
 import type {
   Channel,
@@ -59,9 +59,6 @@ const ROLE_OPTIONS: { value: CommunicationChannelRole; label: string }[] = [
   { value: "moderator", label: "Модератор" },
   { value: "owner", label: "Владелец" }
 ];
-
-// Демо-проект для scope канала project_general (единственный известный моку проект).
-const DEMO_PROJECT_ID = "proj-portal";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
@@ -510,7 +507,7 @@ function ChannelConversation({
 /* ============================================================
    Диалог создания канала.
    channelType ∈ {team, project_general, custom}; workspace_general НЕ создаётся.
-   project_general → scopeEntityType="project" + scopeEntityId (demo proj-portal).
+   project_general → scopeEntityType="project" + scopeEntityId (реальный проект воркспейса).
    ============================================================ */
 function CreateChannelDialog({
   busy,
@@ -523,19 +520,25 @@ function CreateChannelDialog({
   const [channelType, setChannelType] = useState<"team" | "project_general" | "custom">("team");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [scopeEntityId, setScopeEntityId] = useState(DEMO_PROJECT_ID);
+  const [scopeEntityId, setScopeEntityId] = useState("");
 
-  // team → требует org_unit-scope; project_general → project-scope (демо proj-portal).
+  // project_general → project-scope: реальные проекты воркспейса (не демо-hardcode).
+  const projectsLoad = useCommsProjects();
+  const projectOptions = projectsLoad.data?.projects ?? [];
+  const effectiveProjectId = scopeEntityId || projectOptions[0]?.id || "";
+
+  // team → требует org_unit-scope; project_general → project-scope.
   const needsScope = channelType === "team" || channelType === "project_general";
-  const valid = title.trim().length > 0 && (!needsScope || scopeEntityId.trim().length > 0);
+  const scopeValue = channelType === "project_general" ? effectiveProjectId : scopeEntityId.trim();
+  const valid = title.trim().length > 0 && (!needsScope || scopeValue.length > 0);
 
   const submit = async () => {
     if (!valid) return;
     const input =
       channelType === "team"
-        ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "org_unit" as const, scopeEntityId: scopeEntityId.trim() }
+        ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "org_unit" as const, scopeEntityId: scopeValue }
         : channelType === "project_general"
-          ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "project" as const, scopeEntityId: scopeEntityId.trim() }
+          ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "project" as const, scopeEntityId: scopeValue }
           : { channelType, title: title.trim(), description: description.trim() || null };
     const res = await onCreate(input);
     if (res.ok) {
@@ -543,7 +546,7 @@ function CreateChannelDialog({
       setTitle("");
       setDescription("");
       setChannelType("team");
-      setScopeEntityId(DEMO_PROJECT_ID);
+      setScopeEntityId("");
     }
   };
 
@@ -568,10 +571,11 @@ function CreateChannelDialog({
           <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
           {channelType === "project_general" ? (
             <label className={labelCls}>Проект (область)
-              <select value={scopeEntityId} onChange={(e) => setScopeEntityId(e.target.value)} className={selCls}>
-                <option value={DEMO_PROJECT_ID}>Производственный портал ({DEMO_PROJECT_ID})</option>
+              <select value={effectiveProjectId} onChange={(e) => setScopeEntityId(e.target.value)} className={selCls} disabled={projectOptions.length === 0}>
+                {projectOptions.length === 0 ? <option value="">Нет доступных проектов</option> : null}
+                {projectOptions.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
-              <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">project_general → scopeEntityType=&quot;project&quot;; в демо известен только {DEMO_PROJECT_ID}.</span>
+              <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Канал будет привязан к выбранному проекту.</span>
             </label>
           ) : channelType === "team" ? (
             <label className={labelCls}>Подразделение (область)

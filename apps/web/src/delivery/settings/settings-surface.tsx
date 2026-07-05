@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { demoAction } from "@/views/lib/demo";
@@ -46,6 +46,7 @@ const ROValue = ({ children, mono }: { children: React.ReactNode; mono?: boolean
 
 export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, apply } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [editDeadline, setEditDeadline] = useState(false);
@@ -72,7 +73,7 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Настройки">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Настройки">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка настроек…">
           <span />
         </SurfaceState>
@@ -87,7 +88,7 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const deadlineDay = project.deadline ? isoToDay(project.deadline) : null;
   const reserveDays = deadlineDay != null && finishDay != null ? deadlineDay - finishDay : null;
   const projectMeta: ProjectMeta = {
-    ...PROJECT, planVersion: `v${readModel.planVersion}`, deadline: ddmmyyyy(project.deadline), finish: ddmmyyyy(model.finish),
+    ...projectBase, planVersion: `v${readModel.planVersion}`, deadline: ddmmyyyy(project.deadline), finish: ddmmyyyy(model.finish),
     ...(reserveDays == null ? {} : reserveDays < 0 ? { variance: { label: `+${-reserveDays} дн. к дедлайну`, tone: "danger" as const } } : { variance: { label: `резерв ${reserveDays} дн. до дедлайна`, tone: "success" as const } })
   };
 

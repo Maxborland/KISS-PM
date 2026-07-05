@@ -68,6 +68,9 @@ export type EntityType = CollaborationEntityType;
    Тот же эндпойнт, что и у блоков workspace/CRM — единый источник правды по людям тенанта. */
 export type CommsUser = { id: string; name: string };
 
+/* Проект как scope entity-привязанных коммуникаций (узкая проекция GET /api/workspace/projects). */
+export type CommsProject = { id: string; title: string };
+
 export type CommsApiClientOptions = { apiOrigin: string; fetchImpl?: typeof fetch; credentials?: RequestCredentials };
 
 /* Зеркало CrmApiError: статус + код ошибки + сырое тело ответа. */
@@ -705,6 +708,12 @@ export function createCommsClient(options: CommsApiClientOptions) {
     // Тот же боевой эндпойнт, что у workspace/CRM. В моке отдаётся COMMS_USERS.
     listUsers() {
       return requestJson<{ users: CommsUser[] }>("/api/workspace/users");
+    },
+
+    // 37) Активные проекты воркспейса — реальный scope для entity-привязанных
+    // поверхностей (чат/звонки/встречи). В моке отдаётся демо-проект proj-portal.
+    listProjects() {
+      return requestJson<{ projects: CommsProject[] }>("/api/workspace/projects");
     }
   };
 }

@@ -1,21 +1,63 @@
+import { useEffect, useState } from "react";
+
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
 
 import type { ProjectMeta } from "@/delivery/ui/delivery-frame";
+import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
 
 /**
  * Шапка проекта для состояний loading/error поверхностей Project Delivery —
- * нейтральная: без finish/variance (их даёт живой read-model) и с прочерком
+ * нейтральная: без имени/finish/variance (их дают живые данные) и с прочерком
  * дедлайна, чтобы до загрузки данных ничего конкретного не утверждать.
  */
 export const PROJECT_FALLBACK: ProjectMeta = {
-  name: "Производственный портал · Релиз 2",
-  code: "ПР",
+  name: "Проект",
+  code: "…",
   status: "В работе",
   statusTone: "info",
-  planVersion: "v17",
+  planVersion: "",
   deadline: "—",
   finish: "—"
 };
+
+/* ============================================================
+   Реальное название проекта в шапке (G3-01): read-model плана не несёт title,
+   поэтому в live тянем GET /api/workspace/projects/:id и подменяем name/code
+   базовой меты. В mock (stories, live=false) возвращаем mockBase без запросов.
+   Кэш на модуль — шапка не мигает при переключении вкладок проекта.
+   ============================================================ */
+const projectTitleCache = new Map<string, string>();
+
+const codeInitials = (title: string): string => {
+  const words = title.replace(/[«»"']/g, "").split(/[\s·]+/).filter(Boolean);
+  return ((words[0]?.[0] ?? "") + (words[1]?.[0] ?? "")).toUpperCase() || "ПР";
+};
+
+export function useProjectBase(projectId: string, mockBase: ProjectMeta): ProjectMeta {
+  const { live } = usePlanningRuntime();
+  const [title, setTitle] = useState<string | null>(() => projectTitleCache.get(projectId) ?? null);
+
+  useEffect(() => {
+    if (!live || projectTitleCache.has(projectId)) return;
+    let active = true;
+    void fetch(`/api/workspace/projects/${encodeURIComponent(projectId)}`, { credentials: "include" })
+      .then((r) => (r.ok ? (r.json() as Promise<{ project?: { title?: unknown } }>) : null))
+      .then((d) => {
+        const t = d?.project?.title;
+        if (active && typeof t === "string" && t.length > 0) {
+          projectTitleCache.set(projectId, t);
+          setTitle(t);
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [live, projectId]);
+
+  if (!live) return mockBase;
+  if (title) return { ...mockBase, name: title, code: codeInitials(title) };
+  // Название ещё не загрузилось — нейтральная шапка вместо чужого мок-имени.
+  return { ...mockBase, name: "Проект", code: "…" };
+}
 
 /**
  * RU-маппер кодов ошибок загрузки плана для <SurfaceState errorFormat>. Коды приходят
@@ -23,6 +65,7 @@ export const PROJECT_FALLBACK: ProjectMeta = {
  * Неизвестный код отдаём как есть (или общий fallback).
  */
 const PLANNING_ERR_RU: Record<string, string> = {
+  project_not_found: "Проект не найден: возможно, он удалён или ссылка устарела",
   load_failed: "Не удалось загрузить план проекта",
   request_failed: "Запрос к планировщику не выполнен",
   invalid_json_response: "Некорректный ответ планировщика",

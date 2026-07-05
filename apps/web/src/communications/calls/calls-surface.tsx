@@ -26,6 +26,7 @@ import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
 import { CallStatusChip, commsErr, relTime } from "@/communications/lib/comms-bits";
 import { useCallRoom, useCallRooms, useCommsUsers, type CallRoomDetail, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { WithCommsEntityScope, type ResolvedCommsScope } from "@/communications/lib/entity-scope";
 import type {
   CallEventType,
   CallMediaKind,
@@ -39,12 +40,8 @@ import type {
    Звонки реализованы ЧЕСТНО БЕЗ WebRTC: только метаданные комнаты,
    таймлайн событий и контракт join-token. Реального медиа-соединения
    нет — «Подключиться» лишь получает join-ссылку (demoAction).
-   Демо-сущность: project / proj-portal.
+   Scope: реальный проект воркспейса (WithCommsEntityScope).
    ============================================================ */
-
-// Демо-сущность (entity-scoped): mock/stories показывают звонки проекта proj-portal.
-// Прод-route может передать реальные entityType/entityId пропсами CallsSurface.
-const DEMO_ENTITY = { entityType: "project" as EntityType, entityId: "proj-portal" };
 
 /* Провайдеры/тип медиа — RU-подписи. */
 const PROVIDER_LABEL: Record<CallRoomProvider, string> = { manual: "Ручной", jitsi: "Jitsi", livekit: "LiveKit" };
@@ -85,7 +82,18 @@ const EVENT_LABEL: Record<CallEventType, string> = {
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
-export function CallsSurface({ entityType = DEMO_ENTITY.entityType, entityId = DEMO_ENTITY.entityId }: { entityType?: EntityType; entityId?: string } = {}) {
+// Scope сущности резолвится из реальных проектов воркспейса (WithCommsEntityScope);
+// явные entityType/entityId пропсы (встраивание, тесты) отключают резолв.
+export function CallsSurface({ entityType, entityId }: { entityType?: EntityType; entityId?: string } = {}) {
+  return (
+    <WithCommsEntityScope activeTab="Звонки" {...(entityType ? { explicitEntityType: entityType } : {})} {...(entityId ? { explicitEntityId: entityId } : {})}>
+      {(scope) => <CallsSurfaceScoped scope={scope} />}
+    </WithCommsEntityScope>
+  );
+}
+
+function CallsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
+  const { entityType, entityId } = scope;
   const { data, status, error, reload, createRoom } = useCallRooms(entityType, entityId);
   // Справочник людей тенанта (имена создателей/участников событий): mock=COMMS_USERS, live=GET /api/workspace/users.
   const users = useCommsUsers();
@@ -107,7 +115,7 @@ export function CallsSurface({ entityType = DEMO_ENTITY.entityType, entityId = D
       <CreateRoomDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRoom} onCreated={(id) => setSelectedId(id)} entityType={entityType} entityId={entityId} />
     );
     return (
-      <CommsFrame activeTab="Звонки" actions={data && rooms.length === 0 ? createAction : undefined}>
+      <CommsFrame activeTab="Звонки" subtitle={`Звонки · ${scope.title}`} actions={data && rooms.length === 0 ? <>{scope.picker}{createAction}</> : scope.picker ?? undefined}>
         <SurfaceState
           status={
             status === "forbidden"
@@ -134,8 +142,8 @@ export function CallsSurface({ entityType = DEMO_ENTITY.entityType, entityId = D
   return (
     <CommsFrame
       activeTab="Звонки"
-      subtitle="Комнаты звонков проекта · честно без WebRTC"
-      actions={<CreateRoomDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRoom} onCreated={(id) => setSelectedId(id)} entityType={entityType} entityId={entityId} />}
+      subtitle={`Звонки · ${scope.title}`}
+      actions={<>{scope.picker}<CreateRoomDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createRoom} onCreated={(id) => setSelectedId(id)} entityType={entityType} entityId={entityId} /></>}
     >
       {/* Честный баннер «Прототип» */}
       <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">

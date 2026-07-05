@@ -80,19 +80,28 @@ const STATUS_TONE: Record<TaskStatusCategory, "info" | "success" | "warning" | "
 export function ProjectDetailSurface({ initialProjectId }: { initialProjectId?: string } = {}) {
   // Выбор проекта — реальный список активных (GET /api/workspace/projects), старт = MOCK_PROJECT_ID.
   const projectsList = useProjects();
-  // старт = MOCK_PROJECT_ID (mock-fidelity); на live его в списке нет — переключаемся на первый реальный проект.
   const [selectedId, setSelectedId] = useState<string>(initialProjectId ?? MOCK_PROJECT_ID);
+  // Запрошенный по URL проект обязан существовать: молчаливая подмена первым проектом (G3-02)
+  // выглядела как запрошенная карточка. Автопереключение на первый проект — только для
+  // встраивания без initialProjectId (stories, mock-fidelity со стартом MOCK_PROJECT_ID).
+  const requestedMissing = Boolean(
+    initialProjectId &&
+      selectedId === initialProjectId &&
+      projectsList.data &&
+      !projectsList.data.projects.some((p) => p.id === initialProjectId)
+  );
   useEffect(() => {
+    if (initialProjectId) return;
     const projects = projectsList.data?.projects ?? [];
     if (projects.length && !projects.some((p) => p.id === selectedId)) setSelectedId(projects[0]!.id);
-  }, [projectsList.data, selectedId]);
+  }, [initialProjectId, projectsList.data, selectedId]);
   // Карточка проекта + его задачи (GET /api/workspace/projects/:id) — реальный запрос на смену selectedId.
   const { data, status, error, reload } = useProjectDetail(selectedId);
 
   // Статус поверхности: data → ready; иначе loading; error-код project_not_found → можно трактовать как «нет доступа»,
   // но контракт отдаёт 404 (а не 403) — показываем как error с человекочитаемым текстом. forbidden зарезервирован
   // под боевой 403, которого мок не моделирует.
-  const surfaceStatus = status === "loading" ? "loading" : status === "error" ? "error" : data ? "ready" : "loading";
+  const surfaceStatus = requestedMissing ? "empty" : status === "loading" ? "loading" : status === "error" ? "error" : data ? "ready" : "loading";
 
   return (
     <WorkspaceShell activeNav="Проекты">
@@ -117,6 +126,10 @@ export function ProjectDetailSurface({ initialProjectId }: { initialProjectId?: 
           onRetry={() => void reload()}
           errorFormat={wsErr}
           loadingLabel="Загружаем карточку проекта…"
+          empty={{
+            title: "Проект не найден",
+            description: "Проекта с таким адресом нет: возможно, он закрыт/архивирован или ссылка устарела. Выберите проект из списка выше."
+          }}
         >
           {data ? <ProjectContent project={data.project} tasks={data.tasks} /> : <span />}
         </SurfaceState>

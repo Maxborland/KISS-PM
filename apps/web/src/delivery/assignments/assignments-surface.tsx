@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
@@ -50,6 +50,7 @@ type AsgMeta = { asg: AsgRaw; days: number[]; scheduledSet: Set<number>; flatPer
 
 export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, apply } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
   const [gran, setGran] = useState<Gran>("day");
   const [monthOffset, setMonthOffset] = useState(0);
@@ -121,7 +122,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Назначения">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Назначения">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка назначений…">
           <span />
         </SurfaceState>
@@ -129,7 +130,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
     );
   }
 
-  const projectMeta = deriveProjectMeta(readModel, PROJECT);
+  const projectMeta = deriveProjectMeta(readModel, projectBase);
   const colW = COL_W[gran];
   // эффективный прицел: под курсором (hover), либо строка выбранного назначения при открытом инспекторе
   const crosshair = hover ?? (sel ? { key: `a:${sel}`, col: -1 } : null);

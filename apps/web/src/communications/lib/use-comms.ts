@@ -6,6 +6,7 @@ import {
   CommsApiError,
   createCommsClient,
   type ActionItemInput,
+  type CommsProject,
   type CommsUser,
   type MeetingActionItemStatus,
   type CallEvent,
@@ -511,3 +512,15 @@ export function useCommsUsers() {
   }, [list]);
 }
 export type CommsUsersDir = ReturnType<typeof useCommsUsers>;
+
+/* ============================================================
+   Проекты воркспейса — реальный scope entity-привязанных поверхностей
+   (чат/звонки/встречи) вместо прежнего hardcode демо-проекта proj-portal.
+   mock = демо-проект (stories работают как раньше), live = GET /api/workspace/projects.
+   В отличие от useCommsUsers ошибки не глотаем: 403/ошибка загрузки списка
+   проектов = поверхность не может определить scope и честно это показывает.
+   ============================================================ */
+export function useCommsProjects(): CommsLoadState<{ projects: CommsProject[] }> {
+  const client = useCommsClient();
+  return useCommsLoad(useCallback(() => client.listProjects(), [client]));
+}

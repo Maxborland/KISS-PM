@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
 import { useCommsUsers, useMeetingDetail, useMeetings, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { WithCommsEntityScope, type ResolvedCommsScope } from "@/communications/lib/entity-scope";
 import { avatarColor, commsErr, initials, relTime } from "@/communications/lib/comms-bits";
 import type {
   ActionItemInput,
@@ -33,7 +34,7 @@ import type {
 
 /* ============================================================
    Поверхность «Встречи» (Communications/Meetings).
-   Функциональна через useMeetings("project","proj-portal"): список митингов
+   Функциональна через useMeetings(scope): список митингов
    слева + детальная панель справа (повестка, участники, ноты-лента,
    внешние ссылки, action-items). Честность: in-memory, realtime-доставка —
    в приложении; здесь обновление по действию. Эталон стиля — deals-surface.
@@ -44,11 +45,6 @@ import type {
    засеянное содержимое (демо-снимок) + ОПТИМИСТИЧНО добавленные за сессию
    записи (мутация вернула ok). В приложении детали подтянутся с сервера.
    ============================================================ */
-
-// Демо-сущность (entity-scoped): mock/stories показывают встречи проекта proj-portal.
-// Прод-route может передать реальные entityType/entityId через пропсы MeetingsSurface.
-const DEMO_ENTITY_TYPE: EntityType = "project";
-const DEMO_ENTITY_ID = "proj-portal";
 
 const STATUS: Record<MeetingStatus, { label: string; variant: "info" | "success" | "danger" }> = {
   scheduled: { label: "Запланирована", variant: "info" },
@@ -97,7 +93,18 @@ const fromLocalInput = (local: string): string => (local ? new Date(local).toISO
 type MeetingDetail = { participants: MeetingParticipant[]; notes: MeetingNote[]; links: MeetingExternalLink[]; actionItems: MeetingActionItem[] };
 const emptyDetail = (): MeetingDetail => ({ participants: [], notes: [], links: [], actionItems: [] });
 
-export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENTITY_ID }: { entityType?: EntityType; entityId?: string } = {}) {
+// Scope сущности резолвится из реальных проектов воркспейса (WithCommsEntityScope);
+// явные entityType/entityId пропсы (встраивание, тесты) отключают резолв.
+export function MeetingsSurface({ entityType, entityId }: { entityType?: EntityType; entityId?: string } = {}) {
+  return (
+    <WithCommsEntityScope activeTab="Встречи" {...(entityType ? { explicitEntityType: entityType } : {})} {...(entityId ? { explicitEntityId: entityId } : {})}>
+      {(scope) => <MeetingsSurfaceScoped scope={scope} />}
+    </WithCommsEntityScope>
+  );
+}
+
+function MeetingsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
+  const { entityType, entityId } = scope;
   const { data, status, error, reload, createMeeting, patchMeeting, addNote, addExternalLink, addActionItem, patchActionItem } = useMeetings(entityType, entityId);
   // Справочник людей тенанта (участники/ответственные/имена): mock=COMMS_USERS, live=GET /api/workspace/users.
   const users = useCommsUsers();
@@ -120,7 +127,7 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
   // ВНУТРЕННИЙ EmptyState «Встреч пока нет» (data есть, список пуст) — НЕ top-level: остаётся в ready.
   if (status === "forbidden" || status === "error" || !data) {
     return (
-      <CommsFrame activeTab="Встречи" subtitle="Встречи проекта">
+      <CommsFrame activeTab="Встречи" subtitle={`Встречи · ${scope.title}`}>
         <SurfaceState
           status={status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error"}
           error={error}
@@ -186,8 +193,8 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
   return (
     <CommsFrame
       activeTab="Встречи"
-      subtitle="Встречи проекта «Портал»"
-      actions={<CreateMeetingDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createMeeting} users={users} entityType={entityType} entityId={entityId} />}
+      subtitle={`Встречи · ${scope.title}`}
+      actions={<>{scope.picker}<CreateMeetingDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createMeeting} users={users} entityType={entityType} entityId={entityId} /></>}
     >
       <div className="flex flex-col gap-3">
         {/* Честный баннер «Прототип» */}

@@ -2013,6 +2013,12 @@ export function createMockCommsFetch(): typeof fetch {
       return json({ users: COMMS_USERS });
     }
 
+    /* 37) GET /projects — scope для entity-привязанных поверхностей (чат/звонки/встречи).
+       Мок отдаёт единственный демо-проект DEMO_ENTITY, чтобы stories работали как раньше. */
+    if (method === "GET" && path === "/api/workspace/projects") {
+      return json({ projects: [{ id: DEMO_ENTITY.entityId, title: "Производственный портал" }] });
+    }
+
     /* Общий 404 fallback (неизвестная ручка). */
     return err("not_found", 404);
   };
