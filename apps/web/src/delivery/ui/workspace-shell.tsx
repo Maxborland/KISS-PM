@@ -2,9 +2,9 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
 
 import { cn } from "@/lib/cn";
+import { GlobalSearch } from "@/delivery/ui/global-search";
 import { ShellUserMenu } from "@/auth/avatar-menu/shell-user-menu";
 import { useSessionUser } from "@/shell/use-session-user";
 
@@ -29,7 +29,7 @@ const NAV: { title: string; items: { label: string; href?: string }[] }[] = [
  * + глобальная панель сверху. Контент (шапка проекта/отчёта + поверхность) —
  * children. Используется и DeliveryFrame (проект), и ReportingFrame (аналитика).
  *
- * Прототип: навигация/поиск/аватар не подключены (handoff-каркас).
+ * Навигация, глобальный поиск (GET /api/workspace/search) и меню пользователя — живые.
  */
 const ADMIN_PERMISSIONS = [
   "tenant.access_profiles.read",
@@ -74,15 +74,7 @@ export function WorkspaceShell({ activeNav, children }: { activeNav: string; chi
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4">
-          <label className="flex h-9 max-w-md flex-1 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 text-[var(--muted)]">
-            <Search className="size-4 shrink-0" aria-hidden />
-            <input
-              className="min-w-0 flex-1 bg-transparent text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--muted-soft)]"
-              placeholder="Найти задачу или ресурс"
-              disabled
-              title="Поиск появится в следующей версии"
-            />
-          </label>
+          <GlobalSearch />
           <ShellUserMenu />
         </header>
         {children}

@@ -93,7 +93,7 @@ describe("unified search routes", () => {
       results: [
         expect.objectContaining({
           id: "task:task-target",
-          route: "/tasks/task-target",
+          route: "/projects/project-second/schedule",
           subtitle: "Второй проект"
         })
       ]
