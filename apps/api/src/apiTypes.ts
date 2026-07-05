@@ -973,6 +973,10 @@ export type ApiTenantDataSource = {
     title?: string;
     description?: string;
   }): Promise<CommunicationChannel | undefined>;
+  archiveCommunicationChannel?(input: {
+    tenantId: TenantId;
+    channelId: string;
+  }): Promise<CommunicationChannel | undefined>;
   findCommunicationChannel?(
     tenantId: TenantId,
     channelId: string

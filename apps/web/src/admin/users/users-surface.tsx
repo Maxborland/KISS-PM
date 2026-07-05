@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil, Plus, UserMinus } from "lucide-react";
+import { Pencil, Plus, UserCheck, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,15 @@ export function AdminUsersSurface() {
     else toast.error(`Отклонено: ${adminErr(res.code, res.message)}`);
   };
 
+  // Реактивация (G6-04): деактивация была необратимой из UI — PATCH status:"active".
+  const reactivate = async (u: WorkspaceUser) => {
+    setBusy(true);
+    const res = await updateUser(u.id, { status: "active" });
+    setBusy(false);
+    if (res.ok) toast.success(`Пользователь «${u.name}» снова активен`);
+    else toast.error(`Отклонено: ${adminErr(res.code, res.message)}`);
+  };
+
   return (
     <AdminFrame
       activeTab="Пользователи"
@@ -92,13 +101,15 @@ export function AdminUsersSurface() {
                         {u.status === "active" ? (
                           <ConfirmDialog
                             title={`Деактивировать «${u.name}»?`}
-                            description="Пользователь потеряет доступ к рабочей области, его активные сессии будут завершены."
+                            description="Пользователь потеряет доступ к рабочей области, его активные сессии будут завершены. Его можно будет активировать снова."
                             confirmLabel="Деактивировать"
                             onConfirm={() => deactivate(u)}
                           >
                             <Button variant="ghost" size="sm" disabled={busy} title="Деактивировать"><UserMinus className="size-3.5" aria-hidden /></Button>
                           </ConfirmDialog>
-                        ) : null}
+                        ) : (
+                          <Button variant="ghost" size="sm" disabled={busy} onClick={() => void reactivate(u)} title="Активировать снова"><UserCheck className="size-3.5" aria-hidden /></Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -178,21 +189,23 @@ function EditUserDialog({ user, roles, positions, busy, setBusy, update }: {
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(user.name);
+  const [email, setEmail] = useState(user.email);
   const [accessProfileId, setAccessProfileId] = useState(user.accessProfileId);
   const [positionId, setPositionId] = useState(user.positionId ?? "");
   const [formError, setFormError] = useState<string | null>(null);
 
   // при открытии диалога синхронизируем форму с текущей записью
   const onOpenChange = (v: boolean) => {
-    if (v) { setName(user.name); setAccessProfileId(user.accessProfileId); setPositionId(user.positionId ?? ""); setFormError(null); }
+    if (v) { setName(user.name); setEmail(user.email); setAccessProfileId(user.accessProfileId); setPositionId(user.positionId ?? ""); setFormError(null); }
     setOpen(v);
   };
-  const valid = name.trim().length > 0 && accessProfileId.length > 0;
+  const valid = name.trim().length > 0 && email.trim().length > 0 && accessProfileId.length > 0;
   const submit = async () => {
     if (!valid) return;
     setBusy(true); setFormError(null);
     // PATCH частичный; смена роли «себе» (user-anna) → self_access_change_forbidden.
-    const res = await update(user.id, { name: name.trim(), accessProfileId, positionId: positionId || null });
+    // Смена email (G6-14) проверяется сервером против домен-allowlist политики безопасности.
+    const res = await update(user.id, { name: name.trim(), email: email.trim(), accessProfileId, positionId: positionId || null });
     setBusy(false);
     if (res.ok) { toast.success(`Пользователь «${name.trim()}» обновлён`); setOpen(false); }
     else setFormError(adminErr(res.code, res.message));
@@ -204,9 +217,12 @@ function EditUserDialog({ user, roles, positions, busy, setBusy, update }: {
         <DialogHeader><DialogTitle>Изменить пользователя</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
-            <span className="text-[length:var(--text-xs)] font-medium text-[var(--text-strong)]">{user.email}</span>
             <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{user.id}</span>
           </div>
+          <label className={labelCls}>Email
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Смена email завершит активные сессии пользователя.</span>
+          </label>
           <label className={labelCls}>Имя<Input value={name} onChange={(e) => setName(e.target.value)} /></label>
           <label className={labelCls}>Роль доступа
             <select value={accessProfileId} onChange={(e) => setAccessProfileId(e.target.value)} className={selCls}>

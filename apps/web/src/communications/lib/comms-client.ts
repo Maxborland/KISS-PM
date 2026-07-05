@@ -556,6 +556,13 @@ export function createCommsClient(options: CommsApiClientOptions) {
         body: JSON.stringify(input)
       });
     },
+    // 13b) Архивировать канал (мягкое удаление: исчезает из списка, история сохраняется).
+    // workspace_general не архивируется (400 workspace_general_channel_immutable).
+    archiveChannel(channelId: string) {
+      return requestJson<{ channel: Channel }>(`/api/workspace/communication-channels/${enc(channelId)}`, {
+        method: "DELETE"
+      });
+    },
     // 14) Беседа канала (лениво ensure: entityType=communication_channel, entityId=channelId).
     getChannelConversation(channelId: string) {
       return requestJson<{ channel: Channel; conversation: Conversation }>(`/api/workspace/communication-channels/${enc(channelId)}/conversation`);

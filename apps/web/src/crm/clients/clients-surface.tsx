@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Archive, Plus, RotateCcw } from "lucide-react";
+import { Archive, Pencil, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -99,19 +99,22 @@ export function ProjectClients() {
                     <td className="px-3 py-2 text-right v4-num font-semibold text-[var(--text-strong)]">{s.sum > 0 ? money(s.sum) : "—"}</td>
                     <td className="px-3 py-2"><StatusChip status={c.status} /></td>
                     <td className="px-3 py-2 text-right">
-                      {c.status === "active"
-                        ? (
-                          // Архивирование — только через подтверждение (G4-19).
-                          <ConfirmDialog
-                            title={`Архивировать «${c.name}»?`}
-                            description="Запись будет перенесена в архив."
-                            confirmLabel="В архив"
-                            onConfirm={() => toggleArchive(c, "archived")}
-                          >
-                            <Button variant="ghost" size="sm" disabled={busy} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
-                          </ConfirmDialog>
-                        )
-                        : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                      <div className="flex items-center justify-end gap-1">
+                        <EditClientDialog client={c} busy={busy} setBusy={setBusy} update={updateClient} />
+                        {c.status === "active"
+                          ? (
+                            // Архивирование — только через подтверждение (G4-19).
+                            <ConfirmDialog
+                              title={`Архивировать «${c.name}»?`}
+                              description="Запись будет перенесена в архив."
+                              confirmLabel="В архив"
+                              onConfirm={() => toggleArchive(c, "archived")}
+                            >
+                              <Button variant="ghost" size="sm" disabled={busy} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                            </ConfirmDialog>
+                          )
+                          : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -121,6 +124,49 @@ export function ProjectClients() {
         </div>
       </SurfaceState>
     </CrmFrame>
+  );
+}
+
+// Редактирование клиента (G4-07): управляемый диалог по образцу EditUserDialog, форма синхронизируется при открытии.
+function EditClientDialog({ client, busy, setBusy, update }: { client: Client; busy: boolean; setBusy: (v: boolean) => void; update: ReturnType<typeof useCrm>["updateClient"] }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(client.name);
+  const [description, setDescription] = useState(client.description ?? "");
+  const [formError, setFormError] = useState<string | null>(null);
+  // при открытии диалога синхронизируем форму с текущей записью
+  const onOpenChange = (v: boolean) => {
+    if (v) { setName(client.name); setDescription(client.description ?? ""); setFormError(null); }
+    setOpen(v);
+  };
+  const submit = async () => {
+    if (!name.trim()) return;
+    setBusy(true); setFormError(null);
+    // PATCH — полная запись (боевой full-replace); статус не меняем — сохраняем текущий.
+    const res = await update(client.id, { name: name.trim(), description: description.trim() || null, status: client.status });
+    setBusy(false);
+    if (res.ok) { toast.success(`Клиент «${name.trim()}» обновлён`); setOpen(false); }
+    // Ошибка остаётся В модалке — по месту действия.
+    else setFormError(crmErr(res.code, res.message));
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild><Button variant="ghost" size="sm" disabled={busy} title="Изменить"><Pencil className="size-3.5" aria-hidden /></Button></DialogTrigger>
+      <DialogContent className="max-w-[460px]">
+        <DialogHeader><DialogTitle>Изменить клиента</DialogTitle></DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
+            <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{client.id}</span>
+          </div>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Название<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ООО «Ромашка»" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Описание<Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="необязательно" /></label>
+          <DialogError text={formError} />
+        </div>
+        <DialogFooter>
+          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
+          <Button variant="default" disabled={!name.trim() || busy} onClick={() => void submit()}><Pencil className="size-3.5" aria-hidden />Сохранить</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

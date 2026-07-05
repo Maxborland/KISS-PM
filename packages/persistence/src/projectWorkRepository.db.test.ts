@@ -193,11 +193,11 @@ describe("project work repository", () => {
     expect(myWork).toEqual([
       expect.objectContaining({ id: task.id, statusId: "task-status-new" })
     ]);
+    // «Мои задачи» — только исполнители (executor/co_executor): постановщик
+    // (requester, здесь user-alpha-admin) чужую задачу в своём списке не видит (G2-07).
     await expect(
       workRepository.listMyWorkTasks("tenant-alpha", "user-alpha-admin")
-    ).resolves.toEqual([
-      expect.objectContaining({ id: task.id, statusId: "task-status-new" })
-    ]);
+    ).resolves.toEqual([]);
   });
 
   it("updates task status and keeps tenant/project boundaries", async () => {

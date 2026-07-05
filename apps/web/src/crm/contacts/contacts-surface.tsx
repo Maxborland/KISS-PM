@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Archive, Plus, RotateCcw } from "lucide-react";
+import { Archive, Pencil, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -93,19 +93,22 @@ export function ProjectContacts() {
                   <td className="px-3 py-2 text-[var(--muted)]">{c.phone ?? "—"}</td>
                   <td className="px-3 py-2"><StatusChip status={c.status} /></td>
                   <td className="px-3 py-2 text-right">
-                    {c.status === "active"
-                      ? (
-                        // Архивирование — только через подтверждение (G4-19).
-                        <ConfirmDialog
-                          title={`Архивировать «${c.name}»?`}
-                          description="Запись будет перенесена в архив."
-                          confirmLabel="В архив"
-                          onConfirm={() => toggleArchive(c, "archived")}
-                        >
-                          <Button variant="ghost" size="sm" disabled={busy} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
-                        </ConfirmDialog>
-                      )
-                      : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                    <div className="flex items-center justify-end gap-1">
+                      <EditContactDialog contact={c} clientName={clientLabel(c.clientId)} busy={busy} setBusy={setBusy} update={updateContact} />
+                      {c.status === "active"
+                        ? (
+                          // Архивирование — только через подтверждение (G4-19).
+                          <ConfirmDialog
+                            title={`Архивировать «${c.name}»?`}
+                            description="Запись будет перенесена в архив."
+                            confirmLabel="В архив"
+                            onConfirm={() => toggleArchive(c, "archived")}
+                          >
+                            <Button variant="ghost" size="sm" disabled={busy} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                          </ConfirmDialog>
+                        )
+                        : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -114,6 +117,56 @@ export function ProjectContacts() {
         </div>
       </SurfaceState>
     </CrmFrame>
+  );
+}
+
+// Редактирование контакта (G4-07): управляемый диалог по образцу EditUserDialog; клиент НЕ меняется (показан справочно).
+function EditContactDialog({ contact, clientName, busy, setBusy, update }: { contact: Contact; clientName: string; busy: boolean; setBusy: (v: boolean) => void; update: ReturnType<typeof useCrm>["updateContact"] }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(contact.name);
+  const [email, setEmail] = useState(contact.email ?? "");
+  const [phone, setPhone] = useState(contact.phone ?? "");
+  const [telegram, setTelegram] = useState(contact.telegram ?? "");
+  const [role, setRole] = useState(contact.role ?? "");
+  const [formError, setFormError] = useState<string | null>(null);
+  // при открытии диалога синхронизируем форму с текущей записью
+  const onOpenChange = (v: boolean) => {
+    if (v) { setName(contact.name); setEmail(contact.email ?? ""); setPhone(contact.phone ?? ""); setTelegram(contact.telegram ?? ""); setRole(contact.role ?? ""); setFormError(null); }
+    setOpen(v);
+  };
+  const submit = async () => {
+    if (!name.trim()) return;
+    setBusy(true); setFormError(null);
+    // PATCH — полная запись (боевой full-replace); clientId и статус не меняем — сохраняем текущие.
+    const res = await update(contact.id, { clientId: contact.clientId, name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, telegram: telegram.trim() || null, role: role.trim() || null, status: contact.status });
+    setBusy(false);
+    if (res.ok) { toast.success(`Контакт «${name.trim()}» обновлён`); setOpen(false); }
+    // Ошибка остаётся В модалке — по месту действия.
+    else setFormError(crmErr(res.code, res.message));
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild><Button variant="ghost" size="sm" disabled={busy} title="Изменить"><Pencil className="size-3.5" aria-hidden /></Button></DialogTrigger>
+      <DialogContent className="max-w-[500px]">
+        <DialogHeader><DialogTitle>Изменить контакт</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
+            <span className="text-[length:var(--text-xs)] font-medium text-[var(--text-strong)]">{clientName}</span>
+            <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{contact.id}</span>
+          </div>
+          <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Имя<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Петрова Анна" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Email<Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="anna@example.ru" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Телефон<Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7…" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Telegram<Input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@username" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Должность<Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Директор по ИТ" /></label>
+        </div>
+        <DialogError text={formError} />
+        <DialogFooter>
+          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
+          <Button variant="default" disabled={!name.trim() || busy} onClick={() => void submit()}><Pencil className="size-3.5" aria-hidden />Сохранить</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

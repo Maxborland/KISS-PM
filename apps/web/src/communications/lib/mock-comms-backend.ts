@@ -1277,6 +1277,20 @@ export function createMockCommsFetch(): typeof fetch {
       return json({ channel: serializeChannel(ch) });
     }
 
+    /* 13b) DELETE /communication-channels/:id — архив канала (workspace_general неприкасаем). */
+    const chArchive = method === "DELETE" ? path.match(/^\/api\/workspace\/communication-channels\/([^/]+)$/) : null;
+    if (chArchive) {
+      const idParsed = parseCollaborationId(decodeURIComponent(chArchive[1]!), "communication_channel_id_invalid");
+      if (!idParsed.ok) return err(idParsed.error, 400);
+      const ch = db.channels.find((c) => c.id === idParsed.value && c.archivedAt === null);
+      if (!ch) return err("communication_channel_not_found", 404);
+      if (!channelCanManage(ch.id, ch.channelType, db.channelMembers)) return err("permission_missing", 403);
+      if (ch.channelType === "workspace_general") return err("workspace_general_channel_immutable", 400);
+      ch.archivedAt = nowIso();
+      ch.updatedAt = nowIso();
+      return json({ channel: serializeChannel(ch) });
+    }
+
     /* 14) GET /communication-channels/:id/conversation — беседа канала (ensure). */
     const chConv = method === "GET" ? path.match(/^\/api\/workspace\/communication-channels\/([^/]+)\/conversation$/) : null;
     if (chConv) {

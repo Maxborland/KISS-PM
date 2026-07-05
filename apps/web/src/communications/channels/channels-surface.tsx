@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Hash, Loader2, Lock, Plus, Save, Send, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
+import { Archive, Hash, Loader2, Lock, Plus, Save, Send, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
@@ -81,7 +81,7 @@ function ChannelTypeChip({ type }: { type: CommunicationChannelType }) {
 }
 
 export function ChannelsSurface() {
-  const { data, status, error, reload, createChannel } = useChannels();
+  const { data, status, error, reload, createChannel, archiveChannel } = useChannels();
   // Справочник людей тенанта (выбор/имена участников): mock=COMMS_USERS, live=GET /api/workspace/users.
   const users = useCommsUsers();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -184,7 +184,17 @@ export function ChannelsSurface() {
 
         {/* СПРАВА: детальная панель */}
         {selected ? (
-          <ChannelDetail key={selected.id} channelId={selected.id} fallback={selected} users={users} />
+          <ChannelDetail
+            key={selected.id}
+            channelId={selected.id}
+            fallback={selected}
+            users={users}
+            onArchive={async () => {
+              const res = await archiveChannel(selected.id);
+              if (res.ok) { toast.success(`Канал «${selected.title}» архивирован`); setSelectedId(null); }
+              else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
+            }}
+          />
         ) : (
           <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-6 shadow-[var(--shadow-card)]">
             <EmptyState title="Нет каналов" description="Создайте первый канал кнопкой «Канал»." />
@@ -199,7 +209,7 @@ export function ChannelsSurface() {
    Детальная панель канала (useChannel): инфо + участники + беседа.
    fallback — запись из листинга на время загрузки детали (без мерцания).
    ============================================================ */
-function ChannelDetail({ channelId, fallback, users }: { channelId: string; fallback: Channel; users: CommsUsersDir }) {
+function ChannelDetail({ channelId, fallback, users, onArchive }: { channelId: string; fallback: Channel; users: CommsUsersDir; onArchive: () => Promise<void> }) {
   const { client, data, status, error, reload, patchChannel, addMember, removeMember } = useChannel(channelId);
   const [busy, setBusy] = useState(false);
 
@@ -266,13 +276,26 @@ function ChannelDetail({ channelId, fallback, users }: { channelId: string; fall
             </p>
             {channel.description ? <p className="mt-1 text-[length:var(--text-sm)] text-[var(--muted-strong)]">{channel.description}</p> : null}
           </div>
-          {canManage ? <EditChannelDialog channel={channel} busy={busy} onSave={async (input) => {
-            setBusy(true);
-            const res = await patchChannel(input);
-            setBusy(false);
-            if (res.ok) toast.success("Канал обновлён");
-            return res;
-          }} /> : null}
+          {canManage ? (
+            <div className="flex shrink-0 items-center gap-1.5">
+              <EditChannelDialog channel={channel} busy={busy} onSave={async (input) => {
+                setBusy(true);
+                const res = await patchChannel(input);
+                setBusy(false);
+                if (res.ok) toast.success("Канал обновлён");
+                return res;
+              }} />
+              {/* Архив канала (G5-08): мягкое удаление — канал уходит из списка, история сохраняется. */}
+              <ConfirmDialog
+                title={`Архивировать канал «${channel.title}»?`}
+                description="Канал исчезнет из списка у всех участников; история сообщений сохранится."
+                confirmLabel="Архивировать"
+                onConfirm={onArchive}
+              >
+                <Button variant="ghost" size="sm" disabled={busy} title="Архивировать канал"><Archive className="size-3.5" aria-hidden /></Button>
+              </ConfirmDialog>
+            </div>
+          ) : null}
         </div>
         {status === "loading" && !data ? (
           <div className="mt-3 flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--muted)]"><Loader2 className="size-3.5 animate-spin" aria-hidden /> Загрузка канала…</div>

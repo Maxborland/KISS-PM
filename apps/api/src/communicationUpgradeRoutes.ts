@@ -205,6 +205,50 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
     return context.json({ channel: serializeChannel(updated, resolved.value.access) });
   });
 
+  // Архив канала (мягкое удаление): канал исчезает из списка, история сохраняется.
+  // Системный workspace_general не архивируется. Права — как у правки канала (manage).
+  app.delete("/api/workspace/communication-channels/:channelId", async (context) => {
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const resolved = await resolveChannelForActor(context.req.param("channelId"), actor, deps);
+    if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
+    if (!resolved.value.access.manageDecision.allowed) {
+      await appendDeniedAudit(deps, actor, {
+        action: "channel.archive",
+        permissionResult: resolved.value.access.manageDecision
+      });
+      return context.json({ error: resolved.value.access.manageDecision.reason }, 403);
+    }
+    if (resolved.value.channel.channelType === "workspace_general") {
+      return context.json({ error: "workspace_general_channel_immutable" }, 400);
+    }
+    if (!deps.dataSource.archiveCommunicationChannel) {
+      return context.json({ error: "communications_not_configured" }, 501);
+    }
+    const archived = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const channel = await transactionDataSource.archiveCommunicationChannel!({
+        tenantId: actor.tenantId,
+        channelId: resolved.value.channel.id
+      });
+      if (!channel) return null;
+      await deps.appendManagementAuditEvent(
+        communicationAudit({
+          actionType: "communications.channel_archived",
+          actor,
+          commandInput: { channelId: channel.id },
+          permissionResult: resolved.value.access.manageDecision,
+          sourceEntity: { type: "CommunicationChannel", id: channel.id },
+          beforeState: serializeChannel(resolved.value.channel, resolved.value.access),
+          afterState: serializeChannel(channel, resolved.value.access)
+        }),
+        transactionDataSource
+      );
+      return channel;
+    });
+    if (!archived) return context.json({ error: "communication_channel_not_found" }, 404);
+    return context.json({ channel: serializeChannel(archived, resolved.value.access) });
+  });
+
   app.get("/api/workspace/communication-channels/:channelId/conversation", async (context) => {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);

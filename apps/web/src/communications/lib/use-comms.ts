@@ -266,7 +266,13 @@ export function useChannels() {
     [client, guard]
   );
 
-  return { client, data, status, error, reload: load, createChannel };
+  // Архив канала (мягкое удаление): убираем из списка сразу после успешного DELETE.
+  const archiveChannel = useCallback(
+    (channelId: string) => guard(async () => { await client.archiveChannel(channelId); setData((d) => (d ? { ...d, channels: d.channels.filter((c) => c.id !== channelId) } : d)); }),
+    [client, guard]
+  );
+
+  return { client, data, status, error, reload: load, createChannel, archiveChannel };
 }
 
 /* ============================================================

@@ -9,6 +9,7 @@ import type { UserStatus } from "@/admin/lib/admin-client";
 const ERR: Record<string, string> = {
   // конфликты (409)
   user_email_taken: "Email уже занят другим пользователем",
+  email_domain_not_allowed: "Домен email не входит в список разрешённых (политики безопасности)",
   user_id_taken: "Идентификатор пользователя уже занят",
   access_role_id_taken: "Идентификатор роли уже занят",
   access_role_name_taken: "Роль с таким названием уже существует",

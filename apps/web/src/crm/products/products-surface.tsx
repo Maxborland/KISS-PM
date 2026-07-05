@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, Plus, RotateCcw } from "lucide-react";
+import { Archive, Pencil, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -91,19 +91,22 @@ export function ProjectProducts() {
                   <td className="px-3 py-2 text-right v4-num font-semibold text-[var(--text-strong)]">{rub(p.price)}</td>
                   <td className="px-3 py-2"><StatusChip status={p.status} /></td>
                   <td className="px-3 py-2 text-right">
-                    {p.status === "active"
-                      ? (
-                        // Архивирование — только через подтверждение (G4-19).
-                        <ConfirmDialog
-                          title={`Архивировать «${p.name}»?`}
-                          description="Запись будет перенесена в архив."
-                          confirmLabel="В архив"
-                          onConfirm={() => toggleArchive(p, "archived")}
-                        >
-                          <Button variant="ghost" size="sm" disabled={busy} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
-                        </ConfirmDialog>
-                      )
-                      : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(p, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                    <div className="flex items-center justify-end gap-1">
+                      <EditProductDialog product={p} busy={busy} setBusy={setBusy} update={updateProduct} />
+                      {p.status === "active"
+                        ? (
+                          // Архивирование — только через подтверждение (G4-19).
+                          <ConfirmDialog
+                            title={`Архивировать «${p.name}»?`}
+                            description="Запись будет перенесена в архив."
+                            confirmLabel="В архив"
+                            onConfirm={() => toggleArchive(p, "archived")}
+                          >
+                            <Button variant="ghost" size="sm" disabled={busy} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                          </ConfirmDialog>
+                        )
+                        : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(p, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -112,6 +115,58 @@ export function ProjectProducts() {
         </div>
       </SurfaceState>
     </CrmFrame>
+  );
+}
+
+// Редактирование продукта (G4-07): управляемый диалог по образцу EditUserDialog; тип НЕ меняется (показан справочно).
+function EditProductDialog({ product, busy, setBusy, update }: { product: Product; busy: boolean; setBusy: (v: boolean) => void; update: ReturnType<typeof useCrm>["updateProduct"] }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(product.name);
+  const [sku, setSku] = useState(product.sku ?? "");
+  const [unit, setUnit] = useState(product.unit);
+  const [price, setPrice] = useState(String(product.price));
+  const [description, setDescription] = useState(product.description ?? "");
+  const [formError, setFormError] = useState<string | null>(null);
+  // при открытии диалога синхронизируем форму с текущей записью
+  const onOpenChange = (v: boolean) => {
+    if (v) { setName(product.name); setSku(product.sku ?? ""); setUnit(product.unit); setPrice(String(product.price)); setDescription(product.description ?? ""); setFormError(null); }
+    setOpen(v);
+  };
+  // валидация как в диалоге создания: цена — положительное целое (₽)
+  const valid = name.trim() && unit.trim() && Number(price) > 0 && Number.isFinite(Number(price));
+  const submit = async () => {
+    if (!valid) return;
+    setBusy(true); setFormError(null);
+    // PATCH — полная запись (боевой full-replace); тип и статус не меняем — сохраняем текущие.
+    const res = await update(product.id, { name: name.trim(), type: product.type, unit: unit.trim(), price: Math.round(Number(price)), sku: sku.trim() || null, description: description.trim() || null, status: product.status });
+    setBusy(false);
+    if (res.ok) { toast.success(`Продукт «${name.trim()}» обновлён`); setOpen(false); }
+    // Ошибка остаётся В модалке — по месту действия.
+    else setFormError(crmErr(res.code, res.message));
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild><Button variant="ghost" size="sm" disabled={busy} title="Изменить"><Pencil className="size-3.5" aria-hidden /></Button></DialogTrigger>
+      <DialogContent className="max-w-[500px]">
+        <DialogHeader><DialogTitle>Изменить продукт</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
+            <span className="text-[length:var(--text-xs)] font-medium text-[var(--text-strong)]">{TYPE_LABEL[product.type]}</span>
+            <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{product.id}</span>
+          </div>
+          <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Название<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Внедрение портала" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Единица<Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="проект / месяц / шт" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Цена, ₽<Input type="number" min={1} value={price} onChange={(e) => setPrice(e.target.value)} className="text-right" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">SKU<Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="необязательно" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Описание<Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="необязательно" /></label>
+        </div>
+        <DialogError text={formError} />
+        <DialogFooter>
+          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
+          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Pencil className="size-3.5" aria-hidden />Сохранить</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
