@@ -170,6 +170,7 @@ export type ControlDataPort = PlanningReadDataPort &
     | "applyPlanningCommand"
     | "createActionExecution"
     | "createCorrectiveAction"
+    | "createUserNotification"
     | "createKpiEvaluation"
     | "incrementPlanVersion"
     | "listActionExecutions"
