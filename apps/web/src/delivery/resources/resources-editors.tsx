@@ -5,7 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { ShieldCheck, UserMinus, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { RESOURCES } from "@/delivery/lib/mock-planning-backend";
+import { RESOURCES } from "@/delivery/lib/planning-demo-data";
 
 const OVERLAY = "fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px]";
 const CONTENT = "fixed left-1/2 top-1/2 z-50 w-[440px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-card)] border border-[var(--border-strong)] bg-[var(--panel)] p-4 shadow-[var(--shadow-pop)]";

@@ -19,7 +19,7 @@
     "@kiss-pm/tenant-org-structure": "workspace:*",
     "@kiss-pm/test-fixtures": "workspace:*",
     "@scalar/hono-api-reference": "^0.10.19",
-    "hono": "^4.7.10",
+    "hono": "^4.12.27",
     "livekit-server-sdk": "^2.15.5",
     "redis": "^5.12.1"
   },

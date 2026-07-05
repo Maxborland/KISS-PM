@@ -22,6 +22,7 @@ export type CommunicationRecordingDataSource = Pick<
   | "listCallRecordings"
   | "listCallRecordingsByGroup"
   | "markFileAssetReady"
+  | "appendAuditEvent"
   | "updateCallRecordingByEgress"
   | "withTransaction"
 >;
@@ -71,6 +72,30 @@ function mimeForStorageKey(key: string): string {
   return "application/octet-stream";
 }
 
+function recordingWebhookAudit(input: {
+  actionType: string;
+  recording: CallRecording;
+  commandInput: Record<string, unknown>;
+  afterState: Record<string, unknown> | null;
+  executionResult: Record<string, unknown>;
+}): ManagementAuditEventInput {
+  return {
+    actionType: input.actionType,
+    actorUserId: input.recording.createdByUserId,
+    afterState: input.afterState,
+    beforeState: {
+      recordingId: input.recording.id,
+      status: input.recording.status,
+      attachmentId: input.recording.attachmentId
+    },
+    commandInput: input.commandInput,
+    permissionResult: { allowed: true, via: "livekit_webhook" },
+    sourceEntity: { type: "CallRecording", id: input.recording.id },
+    sourceWorkflow: "livekit_webhook",
+    tenantId: input.recording.tenantId,
+    executionResult: input.executionResult
+  };
+}
 function recordingAudit(input: {
   actionType: string;
   actor: TenantUser;
@@ -313,6 +338,7 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
           const createAttachment = requireFn(tx.createEntityAttachment);
           const updateRecording = requireFn(tx.updateCallRecordingByEgress);
           const createEvent = requireFn(tx.createCallEvent);
+          requireFn(tx.appendAuditEvent);
 
           // Tenant was parsed by the webhook route from OUR egress output key
           // (recordings/{tenantId}/...), not trusted from a free-form payload field.
@@ -342,7 +368,7 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
             tenantId: recording.tenantId,
             assetId: asset.id,
             sizeBytes: input.sizeBytes,
-            checksumSha256: ""
+            checksumSha256: null
           });
           const attachment = await createAttachment({
             id: `entity-attachment-${randomUUID()}`,
@@ -385,6 +411,32 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
               durationSeconds: input.durationSeconds
             }
           });
+          await deps.appendManagementAuditEvent(
+            recordingWebhookAudit({
+              actionType: "communications.call_recording_webhook_completed",
+              recording,
+              commandInput: {
+                egressId: input.egressId,
+                storageKey: input.storageKey,
+                sizeBytes: input.sizeBytes,
+                durationSeconds: input.durationSeconds
+              },
+              afterState: {
+                recordingId: recording.id,
+                status: "ready",
+                attachmentId: attachment.id,
+                assetId: asset.id,
+                durationSeconds: input.durationSeconds,
+                checksumStatus: "unknown"
+              },
+              executionResult: {
+                status: "succeeded",
+                trigger: "livekit_webhook",
+                checksumStatus: "unknown"
+              }
+            }),
+            tx
+          );
           return { reconciled: true };
         });
       } catch (error) {
@@ -407,6 +459,7 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
         const findRecording = requireFn(tx.findCallRecordingByEgressId);
         const updateRecording = requireFn(tx.updateCallRecordingByEgress);
         const createEvent = requireFn(tx.createCallEvent);
+        requireFn(tx.appendAuditEvent);
         const recording = await findRecording({ tenantId: input.tenantId, egressId: input.egressId });
         if (!recording || recording.status !== "recording") return { failed: false };
         const updated = await updateRecording({
@@ -430,6 +483,24 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
             reason: "egress_failed"
           }
         });
+        await deps.appendManagementAuditEvent(
+          recordingWebhookAudit({
+            actionType: "communications.call_recording_webhook_failed",
+            recording,
+            commandInput: { egressId: input.egressId },
+            afterState: {
+              recordingId: recording.id,
+              status: "failed",
+              attachmentId: recording.attachmentId
+            },
+            executionResult: {
+              status: "failed",
+              trigger: "livekit_webhook",
+              reason: "egress_failed"
+            }
+          }),
+          tx
+        );
         return { failed: true };
       });
     }

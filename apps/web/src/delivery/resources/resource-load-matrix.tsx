@@ -5,7 +5,7 @@ import { ArrowDownWideNarrow, ArrowUpRight, ChevronDown, ChevronLeft, ChevronRig
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { dayToIso, isoToDay, type Resource } from "@/delivery/lib/mock-planning-backend";
+import { dayToIso, isoToDay, type Resource } from "@/delivery/lib/planning-demo-data";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
 

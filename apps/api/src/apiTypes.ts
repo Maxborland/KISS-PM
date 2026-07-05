@@ -644,7 +644,7 @@ export type ApiTenantDataSource = {
     tenantId: TenantId;
     assetId: string;
     sizeBytes: number;
-    checksumSha256: string;
+    checksumSha256: string | null;
   }): Promise<FileAssetRecord | undefined>;
   markFileAssetFailed?(input: {
     tenantId: TenantId;

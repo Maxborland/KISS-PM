@@ -1,4 +1,4 @@
-﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabase,
@@ -33,6 +33,7 @@ const projectWorkApiSeed: SeedTenantDataset = {
         "tenant.tasks.delete",
         "tenant.task_statuses.manage",
         "tenant.project_plan.read",
+        "tenant.project_plan.manage",
         "tenant.project_resources.read",
         "tenant.project_resources.manage",
         "tenant.resource_feasibility.read",
@@ -56,6 +57,12 @@ const projectWorkApiSeed: SeedTenantDataset = {
       tenantId: "tenant-alpha",
       name: "Менеджер без чтения",
       permissions: ["tenant.projects.manage"]
+    },
+    {
+      id: "access-profile-task-creator-no-resource-manage",
+      tenantId: "tenant-alpha",
+      name: "Создатель задач без ресурсов",
+      permissions: ["tenant.projects.read", "tenant.project_plan.read", "tenant.project_plan.manage", "tenant.tasks.create"]
     }
   ],
   positions: [
@@ -101,6 +108,15 @@ const projectWorkApiSeed: SeedTenantDataset = {
       accessProfileId: "access-profile-manager-only",
       positionId: "position-manager",
       password: "manager12345"
+    },
+    {
+      id: "user-alpha-task-creator-no-resource-manage",
+      tenantId: "tenant-alpha",
+      email: "task-creator-no-resource-manage@kiss-pm.local",
+      name: "Тамара Без Ресурсов",
+      accessProfileId: "access-profile-task-creator-no-resource-manage",
+      positionId: "position-manager",
+      password: "taskcreator12345"
     }
   ]
 };
@@ -390,6 +406,38 @@ describe("project work API routes", () => {
     });
   });
 
+  it("requires resource management permission when task creation creates executor assignments", async () => {
+    const creatorCookie = await loginAs(
+      "task-creator-no-resource-manage@kiss-pm.local",
+      "taskcreator12345"
+    );
+
+    const denied = await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: creatorCookie
+      },
+      body: JSON.stringify({
+        id: "task-resource-create-denied",
+        title: "Создать задачу с назначением без права ресурсов",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        durationWorkingDays: 4,
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+
+    expect(denied.status).toBe(403);
+    await expect(denied.json()).resolves.toEqual({ error: "permission_missing" });
+
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    await expect(
+      dataSource.findTaskById("tenant-alpha", "task-resource-create-denied")
+    ).resolves.toBeUndefined();
+  });
   it("creates projectless task CRUD records inside the workspace inbox planning project", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");

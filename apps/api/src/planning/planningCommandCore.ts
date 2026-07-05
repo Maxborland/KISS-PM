@@ -1,6 +1,6 @@
 import { calculatePlan, reducePlanningCommand, type PlanningCommand, type PlanSnapshot, type ValidationIssue } from "@kiss-pm/domain";
 
-import type { ApiTenantDataSource } from "../apiTypes";
+import type { PlanningReadDataPort } from "../apiDataPorts";
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { validateCommandDataSourcePreconditions } from "./planningRouteHelpers";
 
@@ -19,7 +19,7 @@ export function previewPlanningCommand(snapshot: PlanSnapshot, command: Planning
 export async function previewPlanningCommands(
   snapshot: PlanSnapshot,
   commands: PlanningCommand[],
-  dataSource: ApiTenantDataSource,
+  dataSource: PlanningReadDataPort,
   tenantId: string
 ) {
   let nextSnapshot = snapshot;

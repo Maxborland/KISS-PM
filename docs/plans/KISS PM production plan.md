@@ -102,7 +102,7 @@
  2. Inspect every dirty/untracked file before using or deleting it:
      - staged runtime QA workflow/tests/script/package/playwright changes;
      - unstaged AGENTS.md, beta docs, CSS/runtime test changes;
-     - untracked .agents/, .kiss-pm-storage/, docs/references/references/, marketing docs, landing-agent-demo paths.
+     - untracked .agents/, .kiss-pm-storage/, marketing docs, landing-agent-demo paths.
  3. Decide per file:
      - keep as implementation source;
      - convert into tracked canonical artifact;
@@ -132,7 +132,6 @@
  - apps/web/src/views/marketing/**
  - apps/web/src/widgets/landing-agent-demo/**
  - .kiss-pm-storage/
- - docs/references/references/
 
  ### Verification
 

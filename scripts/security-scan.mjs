@@ -7,6 +7,7 @@ const ignoredDirs = new Set([
   ".cursor",
   ".git",
   ".next",
+  ".worktrees",
   "coverage",
   "dist",
   "node_modules",

@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
-import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
+import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";

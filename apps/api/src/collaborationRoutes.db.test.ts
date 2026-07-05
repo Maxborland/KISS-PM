@@ -10,6 +10,7 @@ import {
 } from "@kiss-pm/persistence";
 
 import { createApp } from "./app";
+import type { ApiTenantDataSource } from "./apiTypes";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
@@ -192,6 +193,7 @@ describe("collaboration and communications API", () => {
   it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+    const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
 
     const channels = await app.request("/api/workspace/communication-channels", {
       headers: { cookie: adminCookie }
@@ -239,6 +241,90 @@ describe("collaboration and communications API", () => {
     expect(executorChannelsPayload.channels.map((channel) => channel.id)).toContain(generalChannel?.id);
     expect(executorChannelsPayload.channels.map((channel) => channel.id)).toContain(projectChannelPayload.channel.id);
     expect(executorChannelsPayload.channels.map((channel) => channel.id)).not.toContain(customChannelPayload.channel.id);
+
+    const projectMemberAddDenied = await app.request(
+      `/api/workspace/communication-channels/${projectChannelPayload.channel.id}/members`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ userId: "user-alpha-denied", role: "member" })
+      }
+    );
+    expect(projectMemberAddDenied.status).toBe(403);
+    await expect(projectMemberAddDenied.json()).resolves.toEqual({ error: "permission_missing" });
+
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    await dataSource.upsertCommunicationChannelMember?.({
+      tenantId: "tenant-alpha",
+      channelId: projectChannelPayload.channel.id,
+      userId: "user-alpha-denied",
+      role: "member",
+      createdByUserId: "user-alpha-admin"
+    });
+
+    const deniedChannels = await app.request("/api/workspace/communication-channels", {
+      headers: { cookie: deniedCookie }
+    });
+    expect(deniedChannels.status).toBe(200);
+    const deniedChannelsPayload = await deniedChannels.json() as {
+      channels: Array<{ id: string; channelType: string }>;
+    };
+    expect(deniedChannelsPayload.channels.map((channel) => channel.id)).toContain(generalChannel?.id);
+    expect(deniedChannelsPayload.channels.map((channel) => channel.id)).not.toContain(projectChannelPayload.channel.id);
+
+    const projectDetailsDenied = await app.request(
+      `/api/workspace/communication-channels/${projectChannelPayload.channel.id}`,
+      { headers: { cookie: deniedCookie } }
+    );
+    expect(projectDetailsDenied.status).toBe(403);
+
+    const projectConversation = await app.request(
+      `/api/workspace/communication-channels/${projectChannelPayload.channel.id}/conversation`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(projectConversation.status).toBe(200);
+    const projectConversationPayload = await projectConversation.json() as {
+      conversation: { id: string };
+    };
+    const projectConversationDenied = await app.request(
+      `/api/workspace/communication-channels/${projectChannelPayload.channel.id}/conversation`,
+      { headers: { cookie: deniedCookie } }
+    );
+    expect(projectConversationDenied.status).toBe(403);
+    const projectMessage = await app.request(
+      `/api/workspace/conversations/${projectConversationPayload.conversation.id}/messages`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ body: "Проектный апдейт" })
+      }
+    );
+    expect(projectMessage.status).toBe(201);
+    const projectMessagesDenied = await app.request(
+      `/api/workspace/conversations/${projectConversationPayload.conversation.id}/messages`,
+      { headers: { cookie: deniedCookie } }
+    );
+    expect(projectMessagesDenied.status).toBe(403);
+
+    const projectCallRoom = await app.request("/api/workspace/call-rooms", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        entityType: "communication_channel",
+        entityId: projectChannelPayload.channel.id,
+        title: "Проектный созвон",
+        provider: "manual"
+      })
+    });
+    expect(projectCallRoom.status).toBe(201);
+    const projectCallRoomPayload = await projectCallRoom.json() as {
+      callRoom: { roomId: string };
+    };
+    const projectRecordingsDenied = await app.request(
+      `/api/workspace/call-rooms/${projectCallRoomPayload.callRoom.roomId}`,
+      { headers: { cookie: deniedCookie } }
+    );
+    expect(projectRecordingsDenied.status).toBe(403);
 
     const customDetailsDenied = await app.request(
       `/api/workspace/communication-channels/${customChannelPayload.channel.id}`,
@@ -510,6 +596,55 @@ describe("collaboration and communications API", () => {
     });
   });
 
+  it("rolls back channel member mutations when management audit fails", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const channelResponse = await app.request("/api/workspace/communication-channels", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        channelType: "custom",
+        title: "Audit rollback room"
+      })
+    });
+    expect(channelResponse.status).toBe(201);
+    const channelPayload = await channelResponse.json() as { channel: { id: string } };
+
+    const baseDataSource = createPostgresTenantDataSource(createDatabase(client));
+    const failingAuditDataSource: ApiTenantDataSource = {
+      ...baseDataSource,
+      appendAuditEvent: async () => {
+        throw new Error("audit_forced_failure");
+      },
+      withTransaction: (operation) =>
+        baseDataSource.withTransaction!(async (transactionDataSource) =>
+          operation({
+            ...transactionDataSource,
+            appendAuditEvent: async () => {
+              throw new Error("audit_forced_failure");
+            }
+          })
+        )
+    };
+    const failingAuditApp = createApp({ dataSource: failingAuditDataSource });
+
+    const addMember = await failingAuditApp.request(
+      `/api/workspace/communication-channels/${channelPayload.channel.id}/members`,
+      {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ userId: "user-alpha-executor", role: "member" })
+      }
+    );
+    expect(addMember.status).toBe(500);
+
+    const members = await baseDataSource.listCommunicationChannelMembers?.({
+      tenantId: "tenant-alpha",
+      channelId: channelPayload.channel.id
+    });
+    expect(members?.some((member) =>
+      member.userId === "user-alpha-executor" && !member.archivedAt
+    )).toBe(false);
+  });
   it("lists the latest conversation messages and pages older history by cursor", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const conversations = await app.request(
@@ -635,6 +770,7 @@ describe("collaboration and communications API", () => {
   it("creates meetings with participants, external links, notes and action items", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+    const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
 
     const meeting = await createMeeting(adminCookie);
     expect(meeting.participants).toEqual(

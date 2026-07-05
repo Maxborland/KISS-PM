@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { deriveProjectMeta, PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
-import { MOCK_PROJECT_ID } from "@/delivery/lib/mock-planning-backend";
+import { MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { useConversation } from "@/communications/lib/use-comms";
 import { avatarColor, commsErr, initials, relTime, userName } from "@/communications/lib/comms-bits";
