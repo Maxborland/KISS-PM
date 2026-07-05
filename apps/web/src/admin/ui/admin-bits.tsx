@@ -69,6 +69,82 @@ export function AuditResultChip({ status }: { status?: string | undefined }) {
   return <Chip variant="info">{label}</Chip>;
 }
 
+/* ---- Человеческие подписи прав доступа (G6-09) ----
+   Код права: tenant.<ресурс>.<действие> (плюс пара спец-кодов профиля/темы).
+   Неизвестный код показывается как есть. */
+const PERMISSION_RESOURCE: Record<string, string> = {
+  projects: "Проекты",
+  project_plan: "План проекта",
+  project_resources: "Ресурсы проекта",
+  project_baselines: "Базовые планы проекта",
+  project_activation: "Активация проектов",
+  project_types: "Типы проектов",
+  planning_scenarios: "Сценарии планирования",
+  opportunities: "Сделки",
+  clients: "Клиенты",
+  contacts: "Контакты",
+  products: "Продукты",
+  users: "Пользователи",
+  positions: "Должности",
+  org_structure: "Оргструктура",
+  access_profiles: "Роли доступа",
+  audit_events: "Журнал аудита",
+  communications: "Коммуникации",
+  workspace_config: "Настройки рабочей области",
+  absences: "Отсутствия",
+  background_jobs: "Фоновые задачи",
+  control_signals: "Сигналы контроля",
+  control_surfaces: "Панели контроля",
+  corrective_actions: "Корректирующие действия",
+  management_actions: "Управленческие действия",
+  crm_pipelines: "Воронки CRM",
+  crm_pipeline_rules: "Правила воронок",
+  crm_pipeline_automations: "Автоматизации воронок",
+  deal_stages: "Стадии сделок",
+  retrospectives: "Ретроспективы",
+  tasks: "Задачи",
+  task_statuses: "Статусы задач",
+  template_improvements: "Улучшения шаблонов",
+  resource_feasibility: "Осуществимость",
+  production_calendar: "Производственный календарь",
+  kpi_definitions: "KPI"
+};
+const PERMISSION_ACTION: Record<string, string> = {
+  read: "просмотр",
+  manage: "управление",
+  create: "создание",
+  edit: "правка",
+  delete: "удаление",
+  publish: "публикация",
+  apply: "применение",
+  preview: "предпросмотр",
+  execute: "выполнение",
+  update: "правка"
+};
+// Спец-коды вне схемы tenant.<ресурс>.<действие>.
+const PERMISSION_SPECIAL: Record<string, { resourceLabel: string; actionLabel: string }> = {
+  "profile.read": { resourceLabel: "Профиль", actionLabel: "просмотр" },
+  "profile.update": { resourceLabel: "Профиль", actionLabel: "правка" },
+  "workspace.theme.manage": { resourceLabel: "Профиль", actionLabel: "тема оформления" }
+};
+
+/** Разбор кода права: ресурс + действие по-русски; null — код неизвестен (показывать как есть). */
+export function permissionParts(code: string): { resourceLabel: string; actionLabel: string } | null {
+  const special = PERMISSION_SPECIAL[code];
+  if (special) return special;
+  const segments = code.split(".");
+  if (segments.length !== 3 || segments[0] !== "tenant") return null;
+  const resourceLabel = PERMISSION_RESOURCE[segments[1]!];
+  const actionLabel = PERMISSION_ACTION[segments[2]!];
+  return resourceLabel && actionLabel ? { resourceLabel, actionLabel } : null;
+}
+
+/** Человеческая подпись права: «Проекты: просмотр». Неизвестный код — как есть. */
+export function permissionLabel(code: string): string {
+  const parts = permissionParts(code);
+  return parts ? `${parts.resourceLabel}: ${parts.actionLabel}` : code;
+}
+
 // Человекочитаемая метка action-типа аудита. Известные группы → RU; иначе — сам код (mono).
 const AUDIT_ACTION_LABEL: Record<string, string> = {
   "workspace.security_policy.updated": "Политика безопасности обновлена",
@@ -92,4 +168,19 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
   "workspace.project_template.updated": "Шаблон проекта изменён",
   "notification.preference_updated": "Настройки уведомлений обновлены"
 };
-export const auditActionLabel = (actionType: string): string => AUDIT_ACTION_LABEL[actionType] ?? actionType;
+// Префикс-правила для неизвестных хвостов (G6-06): хотя бы группа события по-русски.
+const AUDIT_ACTION_PREFIX: Array<[string, string]> = [
+  ["workspace.user.", "Пользователь"],
+  ["tenant.access_profile.", "Роль"],
+  ["access_role.", "Роль"],
+  ["workspace.security_policy.", "Политика безопасности"],
+  ["communications.", "Коммуникации"],
+  ["control_surface.", "Панель контроля"]
+];
+export const auditActionLabel = (actionType: string): string => {
+  const exact = AUDIT_ACTION_LABEL[actionType];
+  if (exact) return exact;
+  const prefix = AUDIT_ACTION_PREFIX.find(([p]) => actionType.startsWith(p));
+  if (prefix) return `${prefix[1]} — ${actionType.slice(prefix[0].length)}`;
+  return actionType;
+};

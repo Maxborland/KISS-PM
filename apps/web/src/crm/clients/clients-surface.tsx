@@ -14,6 +14,7 @@ import { StatusChip, crmErr, money } from "@/crm/ui/crm-bits";
 import { useCrm } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import type { Client } from "@/crm/lib/crm-client";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 // Ошибка внутри модалки — по месту действия (раньше рендерилась строкой внизу страницы).
 function DialogError({ text }: { text: string | null }) {
@@ -64,10 +65,13 @@ export function ProjectClients() {
 
   return (
     <CrmFrame activeTab="Клиенты" subtitle="Справочник клиентов" actions={<CreateClientDialog busy={busy} setBusy={setBusy} create={createClient} />}>
-      <div style={{ display: live ? "none" : undefined }} className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+      {/* Плашка-прототип: только вне live (раньше пряталась display:none и оставалась в DOM). */}
+      {!live ? (
+      <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
         <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         Реальный контракт CRM: GET/POST/PATCH /api/workspace/clients (createCrmClient). «Контактов» — активные; «Сделок»/«Сумма» — по сделкам клиента, кроме проигранных. PATCH — полная запись (как боевой). Данные in-memory.
       </div>
+      ) : null}
 
       <SurfaceState
         status={surfaceStatus}
@@ -92,7 +96,7 @@ export function ProjectClients() {
                 const s = model?.stats.get(c.id) ?? { deals: 0, sum: 0, contacts: 0 };
                 return (
                   <tr key={c.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                    <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div><div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{c.id}</div></td>
+                    <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{c.id}</div> : null}</td>
                     <td className="max-w-[280px] truncate px-3 py-2 text-[var(--muted)]">{c.description ?? "—"}</td>
                     <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{s.contacts}</td>
                     <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{s.deals}</td>
@@ -154,9 +158,11 @@ function EditClientDialog({ client, busy, setBusy, update }: { client: Client; b
       <DialogContent className="max-w-[460px]">
         <DialogHeader><DialogTitle>Изменить клиента</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
-            <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{client.id}</span>
-          </div>
+          {prototypeNotesEnabled ? (
+            <div className="flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
+              <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{client.id}</span>
+            </div>
+          ) : null}
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Название<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ООО «Ромашка»" /></label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Описание<Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="необязательно" /></label>
           <DialogError text={formError} />

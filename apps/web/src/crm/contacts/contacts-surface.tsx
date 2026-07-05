@@ -45,8 +45,9 @@ export function ProjectContacts() {
             ? "empty"
             : "ready";
 
-  // имя клиента + пометка «(архив)», если клиент архивирован (контакт остаётся при архивации клиента)
-  const clientLabel = (id: string) => { const cl = clientById.get(id); return cl ? `${cl.name}${cl.status === "archived" ? " (архив)" : ""}` : id; };
+  // имя клиента + пометка «(архив)», если клиент архивирован (контакт остаётся при архивации клиента).
+  // Если клиент не нашёлся в справочнике — читабельный фолбэк вместо сырого id (по образцу «Участник xxxx»).
+  const clientLabel = (id: string) => { const cl = clientById.get(id); return cl ? `${cl.name}${cl.status === "archived" ? " (архив)" : ""}` : `Клиент ${id.slice(-4)}`; };
   // архив/восстановление шлёт ПОЛНУЮ запись (боевой PATCH — full-replace, требует name)
   const toggleArchive = async (c: Contact, to: "active" | "archived") => {
     setBusy(true);
@@ -86,7 +87,7 @@ export function ProjectContacts() {
             <tbody>
               {(data?.contacts ?? []).map((c) => (
                 <tr key={c.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div><div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{c.id}</div></td>
+                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{c.id}</div> : null}</td>
                   <td className="px-3 py-2 text-[var(--muted-strong)]">{clientLabel(c.clientId)}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{c.role ?? "—"}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{c.email ?? "—"}</td>
@@ -152,7 +153,7 @@ function EditContactDialog({ contact, clientName, busy, setBusy, update }: { con
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2 flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
             <span className="text-[length:var(--text-xs)] font-medium text-[var(--text-strong)]">{clientName}</span>
-            <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{contact.id}</span>
+            {prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{contact.id}</span> : null}
           </div>
           <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Имя<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Петрова Анна" /></label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Email<Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="anna@example.ru" /></label>

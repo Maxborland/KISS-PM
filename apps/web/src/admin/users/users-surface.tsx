@@ -13,6 +13,7 @@ import { AdminFrame } from "@/admin/ui/admin-frame";
 import { UserStatusChip, adminErr } from "@/admin/ui/admin-bits";
 import { useAdmin } from "@/admin/lib/use-admin";
 import { useAdminRuntime } from "@/admin/lib/admin-runtime";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import type { AccessProfile, Position, WorkspaceUser } from "@/admin/lib/admin-client";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
@@ -90,7 +91,7 @@ export function AdminUsersSurface() {
               <tbody>
                 {data.users.map((u) => (
                   <tr key={u.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                    <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{u.name}</div><div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{u.id}</div></td>
+                    <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{u.name}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{u.id}</div> : null}</td>
                     <td className="px-3 py-2 text-[var(--muted)]">{u.email}</td>
                     <td className="px-3 py-2 text-[var(--muted-strong)]">{roleName.get(u.accessProfileId) ?? u.accessProfileId}</td>
                     <td className="px-3 py-2 text-[var(--muted)]">{u.positionName ?? "—"}</td>
@@ -216,9 +217,11 @@ function EditUserDialog({ user, roles, positions, busy, setBusy, update }: {
       <DialogContent className="max-w-[480px]">
         <DialogHeader><DialogTitle>Изменить пользователя</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
-            <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{user.id}</span>
-          </div>
+          {prototypeNotesEnabled ? (
+            <div className="flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
+              <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{user.id}</span>
+            </div>
+          ) : null}
           <label className={labelCls}>Email
             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Смена email завершит активные сессии пользователя.</span>

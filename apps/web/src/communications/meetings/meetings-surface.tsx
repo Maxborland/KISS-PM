@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useCommsUsers, useMeetingDetail, useMeetings, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { WithCommsEntityScope, type ResolvedCommsScope } from "@/communications/lib/entity-scope";
 import { avatarColor, commsErr, initials, relTime } from "@/communications/lib/comms-bits";
@@ -188,7 +189,7 @@ function MeetingsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
     setBusy(true);
     const res = await addActionItem(meetingId, input);
     setBusy(false);
-    if (res.ok) { await meetingDetail.reload(); toast.success("Action item добавлен"); }
+    if (res.ok) { await meetingDetail.reload(); toast.success("Задача по итогам добавлена"); }
     else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res.ok;
   }
@@ -209,14 +210,16 @@ function MeetingsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
       actions={<>{scope.picker}<CreateMeetingDialog busy={busy} setBusy={setBusy} create={createMeeting} users={users} entityType={entityType} entityId={entityId} /></>}
     >
       <div className="flex flex-col gap-3">
-        {/* Честный баннер «Прототип» */}
-        <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-          <span>
-            Реальный контракт: /api/workspace/meetings (GET список + GET деталь, POST создать, PATCH статус, POST .../notes, .../external-links, .../action-items). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.
-            {" "}Детали митинга — из GET /meetings/:id; статус action-item меняется селектом (PATCH). Приватные URL отклоняются 400.
-          </span>
-        </div>
+        {/* Честный баннер «Прототип» — только в Storybook/демо (prototypeNotesEnabled). */}
+        {prototypeNotesEnabled ? (
+          <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+            <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+            <span>
+              Реальный контракт: /api/workspace/meetings (GET список + GET деталь, POST создать, PATCH статус, POST .../notes, .../external-links, .../action-items). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.
+              {" "}Детали митинга — из GET /meetings/:id; статус action-item меняется селектом (PATCH). Приватные URL отклоняются 400.
+            </span>
+          </div>
+        ) : null}
 
         <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
           {/* СЛЕВА: список митингов */}
@@ -315,13 +318,15 @@ function MeetingDetailPanel({
           <h2 className="truncate text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">{meeting.title}</h2>
           <p className="flex items-center gap-1.5 truncate text-[length:var(--text-xs)] text-[var(--muted)]">
             <CalendarClock className="size-3.5 shrink-0" aria-hidden />
-            {meetingWhen(meeting)} · <span className="v4-mono">{meeting.id}</span>
+            {meetingWhen(meeting)}
+            {/* Технический id встречи — dev-подсказка, только в Storybook/демо (G5-11). */}
+            {prototypeNotesEnabled ? <> · <span className="v4-mono">{meeting.id}</span></> : null}
           </p>
         </div>
         <Chip variant={STATUS[meeting.status].variant}>{STATUS[meeting.status].label}</Chip>
         <label className={labelCls}>
           Статус
-          <select value={meeting.status} disabled={busy} onChange={(e) => onPatchStatus(e.target.value as MeetingStatus)} className={cn(selCls, "w-[160px]")} title="PATCH /meetings/:id">
+          <select value={meeting.status} disabled={busy} onChange={(e) => onPatchStatus(e.target.value as MeetingStatus)} className={cn(selCls, "w-[160px]")} title="Изменить статус встречи">
             <option value="scheduled">Запланирована</option>
             <option value="completed">Завершена</option>
             <option value="cancelled">Отменена</option>
@@ -344,7 +349,7 @@ function MeetingDetailPanel({
             <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{detail.participants.length}</span>
           </h3>
           {detail.participants.length === 0 ? (
-            <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Участники подтянутся с сервера в приложении.</p>
+            <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Участников пока нет.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {detail.participants.map((p) => {
@@ -459,7 +464,7 @@ function ExternalLinksCard({ links, busy, onAdd }: { links: MeetingExternalLink[
           <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Комната встречи" /></label>
         </div>
         <label className={labelCls}>URL<Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://zoom.us/j/…" /></label>
-        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Приватные адреса (localhost/внутренняя сеть) отклоняются сервером — 400.</p>
+        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Ссылки на приватные адреса (localhost, внутренняя сеть) отклоняются сервером.</p>
         <div className="flex justify-end">
           <Button variant="default" size="sm" disabled={busy || !valid} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Добавить</Button>
         </div>
@@ -486,10 +491,10 @@ function ActionItemsCard({ items, busy, onAdd, onPatchStatus, users }: { items: 
   return (
     <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
       <h3 className="mb-1 flex items-center gap-1.5 text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">
-        <CheckSquare className="size-4" aria-hidden /> Action items
+        <CheckSquare className="size-4" aria-hidden /> Задачи по итогам
         <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{items.length}</span>
       </h3>
-      <p className="mb-3 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Создаются со статусом «Открыта»; статус меняется селектом (PATCH).</p>
+      <p className="mb-3 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Создаются со статусом «Открыта»; статус можно изменить селектом.</p>
       {items.length === 0 ? (
         <p className="mb-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Задач по итогам встречи пока нет.</p>
       ) : (
@@ -505,7 +510,7 @@ function ActionItemsCard({ items, busy, onAdd, onPatchStatus, users }: { items: 
                     {it.dueDate ? ` · срок ${it.dueDate}` : ""}
                   </p>
                 </div>
-                <select value={it.status} disabled={busy} onChange={(e) => onPatchStatus(it.id, e.target.value as MeetingActionItemStatus)} className={cn(selCls, "h-8 w-[116px]")} title="PATCH статус action-item">
+                <select value={it.status} disabled={busy} onChange={(e) => onPatchStatus(it.id, e.target.value as MeetingActionItemStatus)} className={cn(selCls, "h-8 w-[116px]")} title="Изменить статус задачи">
                   <option value="open">Открыта</option>
                   <option value="done">Готово</option>
                   <option value="cancelled">Отменена</option>
@@ -630,7 +635,7 @@ function CreateMeetingDialog({
               );
             })}
           </ul>
-          <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Организатором становится текущий пользователь (accepted); выбранным уйдёт meeting_invite.</p>
+          <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Организатором становится текущий пользователь; выбранным участникам придёт приглашение на встречу.</p>
         </div>
 
         <DialogError text={formError} />

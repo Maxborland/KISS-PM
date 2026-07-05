@@ -114,7 +114,7 @@ function ProfileTab() {
       status={surfaceStatus}
       error={error ?? loginErr}
       onRetry={() => void bootstrap()}
-      loadingLabel="Демо: выполняем вход…"
+      loadingLabel={live ? "Загрузка профиля…" : "Демо: выполняем вход…"}
       errorFormat={authErr}
       forbidden={{ title: "Требуется вход в систему", description: "Сессия не найдена — войдите, чтобы открыть профиль." }}
     >
@@ -132,8 +132,8 @@ function IntegrationsTab() {
   return (
     <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] py-10 shadow-[var(--shadow-card)]">
       <EmptyState
-        title="Интеграции появятся в рабочем приложении"
-        description="Подключение CRM, мессенджеров и календарей. Контракта интеграций пока нет — это честный плейсхолдер, не фейковая форма."
+        title="Интеграции появятся в одном из следующих обновлений"
+        description="Подключение CRM, мессенджеров и календарей — раздел в разработке."
         action={
           <Button variant="secondary" size="sm" {...demoAction("подключение интеграции")}>
             <Plug className="size-3.5" aria-hidden />
@@ -150,8 +150,8 @@ function BillingTab() {
   return (
     <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] py-10 shadow-[var(--shadow-card)]">
       <EmptyState
-        title="Оплата и тарифы появятся в рабочем приложении"
-        description="Управление подпиской и платёжными данными. Биллингового контракта пока нет — здесь честный плейсхолдер."
+        title="Оплата и тарифы появятся в одном из следующих обновлений"
+        description="Управление подпиской и платёжными данными — раздел в разработке."
         action={
           <Button variant="secondary" size="sm" {...demoAction("управление подпиской")}>
             <CreditCard className="size-3.5" aria-hidden />

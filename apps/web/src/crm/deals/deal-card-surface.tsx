@@ -22,7 +22,9 @@ const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
 const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean); return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—"; };
 // Имя/цвет аватара владельца/автора/исполнителя — резолв из справочника пользователей (useCrmUsers),
 // переданного пропом из родителя (ActivityItem — many-instance, поэтому данные приходят пропом).
-const ownerName = (users: CrmUsersIndex, id: string | null) => users.name(id);
+// Если справочник пользователей недоступен/неполон (например, 403 под ограниченной ролью),
+// НЕ показываем сырой id — даём читабельный фолбэк «Участник xxxx» (G8-08, G5-12).
+const ownerName = (users: CrmUsersIndex, id: string | null) => { if (!id) return "—"; return users.byId.get(id)?.name ?? `Участник ${id.slice(-4)}`; };
 const ownerColor = (users: CrmUsersIndex, id: string | null): BemAvatarColor => { const i = users.indexOf(id); return i < 0 ? "c5" : AV[i % AV.length]!; };
 
 const STATUS_LABEL: Record<Opportunity["status"], string> = { new: "Новая", feasibility: "Проверка", ready_to_activate: "Готова к запуску", won_closed: "Выиграна", lost_rejected: "Проиграна" };
@@ -181,7 +183,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
     setBusy(true);
     const res = await crm.activate(opp.id, riskReason.trim() ? { acceptedRiskReason: riskReason.trim() } : undefined);
     setBusy(false);
-    if (res.ok) { setRiskReason(""); toast.success(`Создан проект ${res.data.id} — сделка выиграна`); }
+    if (res.ok) { setRiskReason(""); toast.success(`Создан проект «${res.data.title}» — сделка выиграна`); }
     else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
@@ -224,7 +226,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
         <BemAvatar initials={initials(ownerName(users, opp.ownerUserId))} color={ownerColor(users, opp.ownerUserId)} title={ownerName(users, opp.ownerUserId)} />
         <div className="mr-auto min-w-0">
           <h2 className="truncate text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">{opp.title}</h2>
-          <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]"><span className="v4-mono">{opp.id}</span> · {opp.clientName} · {opp.contactName}</p>
+          <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{prototypeNotesEnabled ? <><span className="v4-mono">{opp.id}</span> · </> : null}{opp.clientName} · {opp.contactName}</p>
         </div>
         <Chip variant="info">{pipelineName}</Chip>
         <Chip variant="violet">{stageName(opp.stageId)}</Chip>
@@ -262,7 +264,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
               <div className={labelCls}>Плановые часы<div className="flex h-9 items-center rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--panel-subtle)] px-2.5 v4-num text-[var(--muted-strong)]" title="Считается сервером: сумма / ставка">{plannedHours.toLocaleString("ru-RU")} ч</div></div>
             </div>
             <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] p-2.5">
-              <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Спрос на ресурсы (read-only)</div>
+              <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Спрос на ресурсы (только чтение)</div>
               <div className="flex flex-wrap gap-1.5">
                 {opp.demand.map((d) => <span key={d.positionId} className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--panel)] px-2 py-0.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{d.positionId} · <span className="v4-num">{d.requiredHours} ч</span></span>)}
               </div>
@@ -333,13 +335,13 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
                     <Button variant="ghost" size="sm" className="flex-1" disabled={busy}><XCircle className="size-3.5" aria-hidden />Проиграна</Button>
                   </ConfirmDialog>
                 </div>
-                {opp.feasibilityStatus == null ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Активация требует пройденной проверки осуществимости (400 feasibility_required).</p> : null}
+                {opp.feasibilityStatus == null ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Активация станет доступна после проверки осуществимости.</p> : null}
               </div>
             )}
             {projects.length ? (
               <div className="mt-3 border-t border-[var(--border-subtle)] pt-2.5">
                 <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Проекты из сделки</div>
-                <ul className="flex flex-col gap-1">{projects.map((p) => <li key={p.id} className="flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--text)]"><Rocket className="size-3 text-[var(--success-text)]" aria-hidden /><span className="v4-mono">{p.id}</span> · {money(p.contractValue)}</li>)}</ul>
+                <ul className="flex flex-col gap-1">{projects.map((p) => <li key={p.id} className="flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--text)]"><Rocket className="size-3 shrink-0 text-[var(--success-text)]" aria-hidden /><span className="truncate font-medium">{p.title}</span>{prototypeNotesEnabled ? <span className="v4-mono text-[var(--muted-soft)]">{p.id}</span> : null}<span className="shrink-0 text-[var(--muted-strong)]">· {money(p.contractValue)}</span></li>)}</ul>
               </div>
             ) : null}
           </section>

@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
+import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
 import { SurfaceState } from "@/components/domain/surface-state";
@@ -116,7 +118,7 @@ export function ProjectsListSurface() {
               { value: "active", label: "Активные" }
             ]}
           />
-          {filter === "all" ? (
+          {filter === "all" && prototypeNotesEnabled ? (
             <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">
               Демо-переключатель: GET /api/workspace/projects отдаёт только активные — архив/закрытые в этой ручке недоступны.
             </span>
@@ -129,7 +131,15 @@ export function ProjectsListSurface() {
           onRetry={() => void reload()}
           errorFormat={projectsErr}
           loadingLabel="Загрузка проектов…"
-          empty={{ title: "Нет проектов", description: "Активных проектов в рабочей области пока нет." }}
+          empty={{
+            title: "Нет проектов",
+            description: "Проекты появляются активацией сделки из CRM: выиграйте сделку — и она станет проектом.",
+            action: (
+              <Button asChild variant="default">
+                <Link href="/crm/deals">К сделкам</Link>
+              </Button>
+            )
+          }}
         >
           <ProjectsTable projects={projects} userColor={userColor} />
         </SurfaceState>
@@ -185,7 +195,7 @@ function ProjectsTable({ projects, userColor }: { projects: ProjectRecord[]; use
             >
               <td className="px-3 py-2">
                 <div className="font-medium text-[var(--text-strong)]">{p.title}</div>
-                <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{p.id}</div>
+                {prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{p.id}</div> : null}
               </td>
               <td className="px-3 py-2">
                 <span className="flex items-center gap-1.5">

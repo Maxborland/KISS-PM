@@ -10,7 +10,8 @@ import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogT
 import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { AdminFrame } from "@/admin/ui/admin-frame";
-import { adminErr } from "@/admin/ui/admin-bits";
+import { adminErr, permissionParts } from "@/admin/ui/admin-bits";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useAdmin } from "@/admin/lib/use-admin";
 import { useAdminRuntime } from "@/admin/lib/admin-runtime";
 import { ALL_PERMISSIONS } from "@/admin/lib/permissions-catalog";
@@ -28,19 +29,24 @@ function DialogError({ text }: { text: string | null }) {
   );
 }
 
-// Группировка прав по префиксу (первый dot-сегмент): tenant.* / profile.* / workspace.*.
-const GROUP_LABEL: Record<string, string> = { tenant: "Рабочая область (tenant.*)", profile: "Профиль (profile.*)", workspace: "Настройки (workspace.*)" };
+// Группировка прав по РЕСУРСУ с человеческим заголовком (G6-09): «Проекты», «Сделки»…
+// Неразобранный код падает в группу по первому dot-сегменту (fallback).
+const GROUP_FALLBACK_LABEL: Record<string, string> = { tenant: "Прочие права", profile: "Профиль", workspace: "Настройки" };
 type PermissionGroup = { key: string; label: string; permissions: Permission[] };
 function buildPermissionGroups(permissions: Permission[]): PermissionGroup[] {
   const order: string[] = [];
   const byKey = new Map<string, Permission[]>();
   for (const p of permissions) {
-    const key = p.split(".")[0] ?? p;
+    const first = p.split(".")[0] ?? p;
+    const key = permissionParts(p)?.resourceLabel ?? GROUP_FALLBACK_LABEL[first] ?? first;
     if (!byKey.has(key)) { byKey.set(key, []); order.push(key); }
     byKey.get(key)!.push(p);
   }
-  return order.map((key) => ({ key, label: GROUP_LABEL[key] ?? key, permissions: byKey.get(key)! }));
+  return order.map((key) => ({ key, label: key, permissions: byKey.get(key)! }));
 }
+
+// «просмотр» → «Просмотр» (подпись чекбокса).
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // Слаг из названия роли → допустимый route-id (a-z0-9 старт, далее _-, длина 3..120).
 // Кириллица-only имя (частый кейс RU-UI, напр. «Координатор») целиком вырезается
@@ -81,13 +87,16 @@ export function AdminRolesSurface() {
   return (
     <AdminFrame
       activeTab="Роли"
-      subtitle="Роли доступа (access-profiles)"
+      subtitle="Роли доступа"
       actions={<CreateRoleDialog busy={busy} setBusy={setBusy} create={createRole} groups={groups} />}
     >
-      <div style={{ display: live ? "none" : undefined }} className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+      {/* Плашка-прототип: только вне live (раньше пряталась display:none и оставалась в DOM). */}
+      {!live ? (
+      <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
         <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         <span>Реальный контракт админки: GET/PATCH/DELETE /api/workspace/access-roles, POST /api/tenant/current/access-profiles (createAdminClient + in-memory mock, swap = apiOrigin). Права — полный перечень access-control, full-replace при правке. Назначенную роль удалить нельзя (access_role_assigned). Данные in-memory.</span>
       </div>
+      ) : null}
 
       <SurfaceState
         status={surfaceStatus}
@@ -107,7 +116,7 @@ export function AdminRolesSurface() {
                   const count = assigned.get(r.id) ?? 0;
                   return (
                     <tr key={r.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                      <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{r.name}</div><div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{r.id}</div></td>
+                      <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{r.name}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{r.id}</div> : null}</td>
                       <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{r.permissions.length}</td>
                       <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{count}</td>
                       <td className="px-3 py-2">
@@ -145,12 +154,20 @@ function PermissionChecklist({ selected, toggle, groups }: { selected: Set<Permi
         <fieldset key={group.key} className="flex flex-col gap-1">
           <legend className="mb-1 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">{group.label}</legend>
           <div className="grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-2">
-            {group.permissions.map((p) => (
-              <label key={p} className="flex cursor-pointer items-center gap-2 text-[length:var(--text-xs)] text-[var(--text)]">
-                <input type="checkbox" checked={selected.has(p)} onChange={() => toggle(p)} className="size-3.5 accent-[var(--accent)]" />
-                <span className="v4-mono truncate">{p}</span>
-              </label>
-            ))}
+            {group.permissions.map((p) => {
+              const parts = permissionParts(p);
+              return (
+                <label key={p} className="flex cursor-pointer items-start gap-2 text-[length:var(--text-xs)] text-[var(--text)]">
+                  <input type="checkbox" checked={selected.has(p)} onChange={() => toggle(p)} className="mt-0.5 size-3.5 shrink-0 accent-[var(--accent)]" />
+                  <span className="flex min-w-0 flex-col">
+                    {/* Человеческая подпись действия; неизвестный код — как есть (G6-09). */}
+                    <span className={parts ? "truncate" : "v4-mono truncate"}>{parts ? cap(parts.actionLabel) : p}</span>
+                    {/* Код права — dev-подсказка, видна только в Storybook/демо. */}
+                    {prototypeNotesEnabled && parts ? <span className="v4-mono truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{p}</span> : null}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </fieldset>
       ))}
@@ -235,12 +252,12 @@ function EditRoleDialog({ role, assignedCount, busy, setBusy, update, groups }: 
       <DialogContent className="max-w-[640px]">
         <DialogHeader><DialogTitle>Изменить роль</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-3">
-          <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{role.id}</div>
+          {prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{role.id}</div> : null}
           <label className={labelCls}>Название<Input value={name} onChange={(e) => setName(e.target.value)} /></label>
           <div className={labelCls}>Права ({selected.size})<PermissionChecklist selected={selected} toggle={toggle} groups={groups} /></div>
           {emptyPermsRisk ? (
             <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--danger-muted)] bg-[var(--danger-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--danger-text)]">
-              <span>Роль назначена {assignedCount} польз.: без единого права они потеряют доступ. Нажмите «Сохранить» ещё раз для подтверждения.</span>
+              <span>Роль назначена пользователям ({assignedCount}): без единого права они потеряют доступ. Нажмите «Сохранить» ещё раз для подтверждения.</span>
             </div>
           ) : null}
           <DialogError text={formError} />

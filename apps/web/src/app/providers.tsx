@@ -5,12 +5,15 @@ import { ThemeProvider } from "next-themes";
 import { useEffect, useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { isPublicAuthPath } from "@/shell/use-session-user";
 
 // Сохранённые в профиле тема/акцент применяются на ЛЮБОЙ странице при загрузке
 // (раньше data-theme ставил только экран профиля — остальное приложение
 // оставалось светлым даже после перезагрузки, G2-14). Аноним/Storybook → no-op.
 function ProfileThemeSync() {
   useEffect(() => {
+    // Анонимные страницы: сессии нет — не создаём 401-шум в консоли (G1-AUTH-13).
+    if (isPublicAuthPath(window.location.pathname)) return;
     let alive = true;
     void fetch("/api/auth/me", { headers: { accept: "application/json" } })
       .then((r) => (r.ok ? r.json() : null))

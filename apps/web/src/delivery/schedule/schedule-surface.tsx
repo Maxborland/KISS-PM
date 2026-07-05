@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { demoAction } from "@/views/lib/demo";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { usePointerDrag } from "@/delivery/lib/use-pointer-drag";
@@ -106,7 +107,7 @@ const PROJECT: ProjectMeta = {
   planVersion: "v17",
   deadline: "12.07.2026",
   finish: "14.06.2026",
-  variance: { label: "+2 дня к baseline B2", tone: "warning" }
+  variance: { label: "+2 дня к базовому плану B2", tone: "warning" }
 };
 
 const ROW_H = 36;
@@ -171,6 +172,12 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const { readModel, setReadModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
+  // Фолбэк имени ресурса: под ограниченной ролью справочник людей может отдать 403 —
+  // резолвер вернёт сырой id; показываем «Участник xxxx» вместо user-/r-идентификатора (G8-08).
+  const resName = useMemo(() => {
+    const name = resDir.name;
+    return (id: string) => { const n = name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
+  }, [resDir.name]);
   const [zoom, setZoom] = useState<Zoom>("week");
   const [sel, setSel] = useState<string | null>("t-3.2.1");
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -200,7 +207,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; parentId: string | null; taskId?: string; asgId?: string; initial: TaskModalValues } | null>(null);
   const [colW, setColW] = useState<number[]>(() => [...DEFAULT_COLW]);
 
-  const mapped = useMemo(() => (readModel ? mapRows(readModel, resDir.name) : null), [readModel, resDir.name]);
+  const mapped = useMemo(() => (readModel ? mapRows(readModel, resName) : null), [readModel, resName]);
   const dayW = ZOOM_DAY_W[zoom];
   const lastCommitRef = useRef<{ commands: PlanningCommand[]; before: PlanningReadModel } | null>(null);
   const batchBaseRef = useRef<PlanningReadModel | null>(null);
@@ -399,7 +406,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       const m = new Map<string, string>();
       (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); });
       setErrors(m);
-      toast.error(`Отклонено бэком: ${res.issues?.[0]?.message ?? res.message}`);
+      toast.error(`Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
     }
   }
 
@@ -411,7 +418,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
       <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="График">
-        <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка плана из read-model…">
+        <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка плана…">
           <span />
         </SurfaceState>
       </DeliveryFrame>
@@ -557,7 +564,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       toast.success(`Коммит v${res.planVersion} применён · затронуто задач: ${res.changed.length}`);
       window.setTimeout(() => setFlash(new Set()), 1700);
     } else if (res.conflict) toast.error("Конфликт версий плана — перезагружено");
-    else { const m = new Map<string, string>(); (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); }); setErrors(m); toast.error(`Отклонено бэком: ${res.issues?.[0]?.message ?? res.message}`); }
+    else { const m = new Map<string, string>(); (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); }); setErrors(m); toast.error(`Отклонено: ${res.issues?.[0]?.message ?? res.message}`); }
   }
   const addFinish = (iso: string, dur: number) => dayToIso(isoToDay(iso) + dur);
   const openCreate = (parentId: string | null) => setTaskModal({ mode: "create", parentId, initial: { title: "", assigneeId: "", startIso: "", durDays: 5, workH: 40, pct: 0 } });
@@ -734,10 +741,12 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        Реальный контракт planning · каждая правка = коммит preview→apply через @kiss-pm/planning-client. Данные in-memory, не сохраняются. Нижняя строка — создать задачу (Enter) · 2× клик — правка ячейки · ПКМ — меню · границы колонок — ширина · бар: тяни тело (сдвиг), края (длительность), точку справа — связь.
-      </div>
+      {prototypeNotesEnabled ? (
+        <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          Реальный контракт planning · каждая правка = коммит preview→apply через @kiss-pm/planning-client. Данные in-memory, не сохраняются. Нижняя строка — создать задачу (Enter) · 2× клик — правка ячейки · ПКМ — меню · границы колонок — ширина · бар: тяни тело (сдвиг), края (длительность), точку справа — связь.
+        </div>
+      ) : null}
 
       {errors.size > 0 ? (
         <div className="mb-2 flex flex-col gap-1 rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--danger-text)]">
@@ -975,7 +984,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 <Fact label="Слак" value={selected.slackDays != null ? `${selected.slackDays} дн` : "—"} />
                 <Fact label="Ресурсы" value={selected.res} span />
               </dl>
-              <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">Триангл: Труд = Длит × {HPD}ч × Единицы. Изменишь длительность — пересчитается труд; изменишь труд — изменятся единицы.</p>
+              <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">Треугольник планирования: Труд = Длительность × {HPD} ч × Единицы. Изменишь длительность — пересчитается труд; изменишь труд — изменятся единицы.</p>
               <div className="mt-3 border-t border-[var(--border)] pt-3">
                 <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Зависимости</div>
                 {selected.predList.length ? (
@@ -1004,7 +1013,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[length:var(--text-sm)] text-[var(--muted)]">
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-5 rounded-[3px] bg-[var(--success)]" /> Задача</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-5 rounded-[3px] bg-[var(--critical-stripe)]" /> Критический путь</span>
-        <span className="flex items-center gap-1.5"><span className="h-1.5 w-5 rounded-[3px] bg-[var(--text-strong)]" /> Summary</span>
+        <span className="flex items-center gap-1.5"><span className="h-1.5 w-5 rounded-[3px] bg-[var(--text-strong)]" /> Суммарная задача</span>
         <span className="flex items-center gap-1.5"><span className="size-2.5 rotate-45 rounded-[2px] bg-[var(--text-strong)]" /> Веха</span>
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-5 rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" /> Baseline B2</span>
         <span className="flex items-center gap-1.5"><svg width="22" height="8" aria-hidden><polyline points="1,4 14,4" fill="none" stroke="var(--muted-soft)" strokeWidth="1.25" /><polygon points="21,4 15,1.5 15,6.5" fill="var(--muted-soft)" /></svg> Связь</span>

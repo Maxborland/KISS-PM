@@ -16,6 +16,7 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useChannel, useChannels, useCommsProjects, useCommsUsers, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { avatarColor, commsErr, initials, relTime, RoleChip } from "@/communications/lib/comms-bits";
 import type {
@@ -133,15 +134,17 @@ export function ChannelsSurface() {
       subtitle="Каналы рабочей области и проектов"
       actions={<CreateChannelDialog busy={busy} onCreate={doCreate} />}
     >
-      {/* Честный баннер «Прототип» */}
-      <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        <span>
-          Реальный контракт: /api/workspace/communication-channels (список/создание/правка, участники) и /:id/conversation (лента канала).
-          Канал «Общий» — системный (workspace_general), не создаётся и не управляется. Данные in-memory; realtime-доставка появится в приложении —
-          здесь обновление по действию.
-        </span>
-      </div>
+      {/* Честный баннер «Прототип» — только в Storybook/демо (prototypeNotesEnabled). */}
+      {prototypeNotesEnabled ? (
+        <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          <span>
+            Реальный контракт: /api/workspace/communication-channels (список/создание/правка, участники) и /:id/conversation (лента канала).
+            Канал «Общий» — системный (workspace_general), не создаётся и не управляется. Данные in-memory; realtime-доставка появится в приложении —
+            здесь обновление по действию.
+          </span>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
         {/* СЛЕВА: список каналов */}
@@ -270,10 +273,13 @@ function ChannelDetail({ channelId, fallback, users, onArchive }: { channelId: s
                 <span className="inline-flex items-center gap-1 text-[length:var(--text-xs)] text-[var(--accent-text)]"><ShieldCheck className="size-3" aria-hidden />управление</span>
               ) : null}
             </div>
-            <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">
-              <span className="v4-mono">{channel.id}</span>
-              {channel.scopeEntityId ? ` · область: ${channel.scopeEntityType} / ${channel.scopeEntityId}` : null}
-            </p>
+            {/* Технический id канала и сырой scope — dev-подсказка, только в Storybook/демо (G5-11). */}
+            {prototypeNotesEnabled ? (
+              <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">
+                <span className="v4-mono">{channel.id}</span>
+                {channel.scopeEntityId ? ` · область: ${channel.scopeEntityType} / ${channel.scopeEntityId}` : null}
+              </p>
+            ) : null}
             {channel.description ? <p className="mt-1 text-[length:var(--text-sm)] text-[var(--muted-strong)]">{channel.description}</p> : null}
           </div>
           {canManage ? (
@@ -344,7 +350,8 @@ function MemberRow({ member, canManage, busy, onRemove, users }: { member: Chann
       <BemAvatar initials={initials(name)} color={avatarColor(member.userId)} size="sm" title={name} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{name}</div>
-        <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{member.userId}</div>
+        {/* Сырой userId — dev-подсказка, только в Storybook/демо (рядом уже есть имя). */}
+        {prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{member.userId}</div> : null}
       </div>
       <RoleChip role={member.role} />
       {canManage && member.role !== "owner" ? (
@@ -480,7 +487,8 @@ function ChannelConversation({
     <section className="flex min-h-[280px] flex-col rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-2.5">
         <h3 className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Лента канала</h3>
-        <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">GET /communication-channels/{channelId}/conversation</span>
+        {/* API-путь — dev-подсказка, только в Storybook/демо. */}
+        {prototypeNotesEnabled ? <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">GET /communication-channels/{channelId}/conversation</span> : null}
       </div>
 
       <div className="flex max-h-[360px] min-h-[160px] flex-1 flex-col gap-3 overflow-auto p-4">
@@ -615,14 +623,14 @@ function CreateChannelDialog({
           ) : channelType === "team" ? (
             <label className={labelCls}>Подразделение (область)
               <Input value={scopeEntityId} onChange={(e) => setScopeEntityId(e.target.value)} placeholder="org-portal" />
-              <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">team → scopeEntityType=&quot;org_unit&quot;.</span>
+              <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Канал будет привязан к указанному подразделению.</span>
             </label>
           ) : null}
           <DialogError text={formError} />
         </div>
         <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
-          POST /communication-channels — создатель становится владельцем (owner). Канал «Общий» (workspace_general) создать нельзя.
-          Тип и область канала после создания не редактируются (только название/описание).
+          Создатель канала становится владельцем. Системный канал «Общий» создать нельзя.
+          Тип и область канала после создания не редактируются (только название и описание).
         </p>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
@@ -684,7 +692,7 @@ function EditChannelDialog({
           <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
           <DialogError text={formError} />
         </div>
-        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">PATCH /communication-channels/:id — меняются только название и описание; тип и область не редактируемы.</p>
+        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Меняются только название и описание; тип и область канала не редактируются.</p>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
           <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Save className="size-3.5" aria-hidden />Сохранить</Button>

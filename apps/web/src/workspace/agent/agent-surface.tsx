@@ -58,7 +58,7 @@ function actionToChange(action: ProposedAction, index: number): DemoChange {
   } else if (action.tool === "apply_plan_commands") {
     before = "текущий план";
     const count = Array.isArray(action.input.commands) ? action.input.commands.length : 0;
-    after = `${count} изменени${count === 1 ? "е" : "я"} плана`;
+    after = `${count} ${pluralRu(count, "изменение", "изменения", "изменений")} плана`;
   } else if (action.tool === "comment_task") {
     before = "комментарий";
     after = String(action.input.body ?? ""); // редактируемое поле = текст комментария
@@ -79,6 +79,15 @@ function actionToChange(action: ProposedAction, index: number): DemoChange {
 }
 
 const clock = (offsetMs: number): string => new Date(offsetMs).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+
+// Русская плюрализация: 1 изменение / 2 изменения / 5 изменений (G7-17).
+function pluralRu(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
 
 /**
  * Агент — полноценный чат с AI-ассистентом, действующим в рамках прав сотрудника.
@@ -188,7 +197,7 @@ export function AgentSurface() {
       const okCount = res.data.results.filter((r) => r.ok).length;
       setChanges((cs) => cs.map((c) => (selected.includes(c) ? { ...c, status: "применено" } : c)));
       setPhase("applied");
-      addMessage("henry", `Применил ${okCount} изменени${okCount === 1 ? "е" : "я"}. Готово — данные обновлены.`);
+      addMessage("henry", `Применил ${okCount} ${pluralRu(okCount, "изменение", "изменения", "изменений")}. Готово — данные обновлены.`);
     } else {
       const failure = res.ok ? res.data.results.find((r) => !r.ok)?.error ?? "не применено" : res.code;
       addMessage("henry", `Не удалось применить: ${failure}.`);

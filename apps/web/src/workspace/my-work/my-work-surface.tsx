@@ -81,7 +81,12 @@ export function MyWorkSurface() {
   const { data, status, error, reload, updateTaskStatus } = useMyWork();
   const usersDir = useWorkspaceUsers();
   const statuses = useWorkspaceTaskStatuses();
-  const userName = (id: string) => usersDir.name(id);
+  // Фолбэк имени: под ограниченной ролью справочник людей отдаёт 403 — резолвер вернёт сырой id.
+  // Показываем «Участник xxxx» вместо user-… (G8-08, G5-12).
+  const userName = (id: string) => {
+    const n = usersDir.name(id);
+    return n === id ? `Участник ${id.slice(-4)}` : n;
+  };
   const userColor = (id: string): BemAvatarColor => {
     const i = usersDir.indexOf(id);
     return i < 0 ? "c5" : AV[i % AV.length]!;
@@ -241,7 +246,7 @@ export function MyWorkSurface() {
                         <tr key={t.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
                           <td className="px-3 py-2">
                             <div className="font-medium text-[var(--text-strong)]">{t.title}</div>
-                            <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{t.id}</div>
+                            {prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{t.id}</div> : null}
                           </td>
                           <td className="px-3 py-2 text-[var(--muted-strong)]">{t.projectId}</td>
                           <td className="px-3 py-2">

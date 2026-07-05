@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { CallStatusChip, commsErr, relTime } from "@/communications/lib/comms-bits";
 import { useCallRoom, useCallRooms, useCommsUsers, type CallRoomDetail, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { WithCommsEntityScope, type ResolvedCommsScope } from "@/communications/lib/entity-scope";
@@ -67,7 +68,7 @@ const EVENT_ICON: Record<CallEventType, ReactNode> = {
 const EVENT_LABEL: Record<CallEventType, string> = {
   room_created: "Комната создана",
   session_started: "Сессия начата",
-  join_token_issued: "Выдан join-token",
+  join_token_issued: "Выдана ссылка для подключения",
   participant_invited: "Участник приглашён",
   participant_joining: "Участник подключается",
   participant_joined: "Участник вошёл",
@@ -155,15 +156,17 @@ function CallsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
       subtitle={`Звонки · ${scope.title}`}
       actions={<>{scope.picker}<CreateRoomDialog busy={busy} setBusy={setBusy} create={createRoom} onCreated={(id) => setSelectedId(id)} entityType={entityType} entityId={entityId} /></>}
     >
-      {/* Честный баннер «Прототип» */}
-      <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        <span>
-          Реальный контракт: /api/workspace/call-rooms (комнаты, сессии, события, записи). Данные in-memory.
-          Realtime-доставка появится в приложении; здесь обновление по действию (ре-фетч после мутации).
-          Медиа честно без WebRTC: «Подключиться» лишь получает join-ссылку — реальное соединение Jitsi/LiveKit устанавливается только в проде.
-        </span>
-      </div>
+      {/* Честный баннер «Прототип» — только в Storybook/демо (prototypeNotesEnabled). */}
+      {prototypeNotesEnabled ? (
+        <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          <span>
+            Реальный контракт: /api/workspace/call-rooms (комнаты, сессии, события, записи). Данные in-memory.
+            Realtime-доставка появится в приложении; здесь обновление по действию (ре-фетч после мутации).
+            Медиа честно без WebRTC: «Подключиться» лишь получает join-ссылку — реальное соединение Jitsi/LiveKit устанавливается только в проде.
+          </span>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
         {/* СЛЕВА: список комнат (rooms непуст — пустой список разведён в top-level SurfaceState empty) */}
@@ -287,7 +290,9 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
         <div className="mr-auto min-w-0">
           <h2 className="truncate text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">{room.title}</h2>
           <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">
-            <span className="v4-mono">{room.roomId}</span> · создал {users.name(room.createdByUserId)} · {relTime(room.createdAt)}
+            {/* Технический id комнаты — dev-подсказка, только в Storybook/демо (G5-11). */}
+            {prototypeNotesEnabled ? <><span className="v4-mono">{room.roomId}</span> · </> : null}
+            создал {users.name(room.createdByUserId)} · {relTime(room.createdAt)}
           </p>
         </div>
         <CallStatusChip status={room.status} />
@@ -298,11 +303,14 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
       {/* Честный inline-баннер с кодом отказа (напр. video_provider_misconfigured) */}
       {errCode ? (
         <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--danger-text)]">
-          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--danger)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">{errCode}</span>
+          {/* Сырой код ошибки — dev-подсказка, только в Storybook/демо; человеческое описание рядом. */}
+          {prototypeNotesEnabled ? (
+            <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--danger)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">{errCode}</span>
+          ) : null}
           <span>
             {commsErr(errCode)}.
             {errCode === "video_provider_misconfigured"
-              ? " Провайдер комнаты не совпадает с настроенным видеопровайдером деплоя (jitsi). join-token не выдан."
+              ? " Провайдер комнаты не совпадает с настроенным видеопровайдером — ссылка для подключения не выдана."
               : " Сервер отклонил действие."}
           </span>
         </div>
@@ -318,7 +326,7 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
         ) : room.status === "active" && activeSessionId ? (
           <div className="flex flex-wrap items-center gap-2">
             {/* ЧЕСТНОЕ «Подключиться» — получить join-ссылку, не WebRTC */}
-            <Button variant="primary" size="sm" disabled={busy} onClick={() => void doJoin(activeSessionId)} title="Демо: получить join-ссылку (реальное WebRTC не устанавливается)">
+            <Button variant="primary" size="sm" disabled={busy} onClick={() => void doJoin(activeSessionId)} title="Получить ссылку для подключения к звонку">
               <LogIn className="size-3.5" aria-hidden /> Подключиться
             </Button>
             <Button variant="secondary" size="sm" disabled={busy} onClick={() => void doParticipant(activeSessionId, "joined")}>
@@ -336,7 +344,7 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
             <Button variant="primary" size="sm" disabled={busy} onClick={() => void doStart()}>
               <Play className="size-3.5" aria-hidden /> Начать сессию
             </Button>
-            <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Старт переведёт комнату в «Идёт» (повторный старт активной → 409 call_room_already_active).</span>
+            <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Старт переведёт комнату в «Идёт»; повторный старт уже активного звонка будет отклонён.</span>
           </div>
         )}
       </section>
@@ -372,14 +380,15 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
       <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
         <h3 className="mb-2.5 text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Записи</h3>
         {data.recordings.length === 0 ? (
-          <p className="py-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Записей нет. В проде запись прикрепляется метаданной (POST /recordings) после загрузки вложения.</p>
+          <p className="py-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Записей нет. Запись прикрепляется к звонку после загрузки вложения.</p>
         ) : (
           <ul className="flex flex-col gap-1.5">
             {data.recordings.map((rec) => (
               <li key={rec.id} className="flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--text)]">
                 <CircleDot className="size-3.5 text-[var(--accent-text)]" aria-hidden />
                 <span className="font-medium">{rec.title}</span>
-                <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{rec.attachmentId}</span>
+                {/* Сырой id вложения — dev-подсказка, только в Storybook/демо (рядом есть название записи). */}
+                {prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{rec.attachmentId}</span> : null}
                 <span className="ml-auto text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{relTime(rec.createdAt)}</span>
               </li>
             ))}
@@ -409,20 +418,22 @@ function JoinDialog({ open, onOpenChange, join }: { open: boolean; onOpenChange:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[480px]">
-        <DialogHeader><DialogTitle>Контракт подключения</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Данные для подключения</DialogTitle></DialogHeader>
         {join ? (
           <div className="flex flex-col gap-2.5">
             <div className="flex flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] p-3 text-[length:var(--text-xs)]">
               <div className="flex items-center gap-2"><span className="w-20 text-[var(--muted-soft)]">Провайдер</span><Chip variant="violet">{PROVIDER_LABEL[join.provider]}</Chip></div>
-              <div className="flex items-start gap-2"><span className="w-20 shrink-0 text-[var(--muted-soft)]">join-ссылка</span><span className="v4-mono break-all text-[var(--text)]">{join.joinUrl}</span></div>
-              <div className="flex items-center gap-2"><span className="w-20 text-[var(--muted-soft)]">token</span><span className="text-[var(--text)]">{join.token ? "выдан (JWT)" : "не требуется (null)"}</span></div>
-              {join.expiresAt ? <div className="flex items-center gap-2"><span className="w-20 text-[var(--muted-soft)]">истекает</span><span className="text-[var(--text)]">{new Date(join.expiresAt).toLocaleString("ru-RU")}</span></div> : null}
+              <div className="flex items-start gap-2"><span className="w-20 shrink-0 text-[var(--muted-soft)]">Ссылка</span><span className="v4-mono break-all text-[var(--text)]">{join.joinUrl}</span></div>
+              <div className="flex items-center gap-2"><span className="w-20 text-[var(--muted-soft)]">Токен</span><span className="text-[var(--text)]">{join.token ? "выдан" : "не требуется"}</span></div>
+              {join.expiresAt ? <div className="flex items-center gap-2"><span className="w-20 text-[var(--muted-soft)]">Истекает</span><span className="text-[var(--text)]">{new Date(join.expiresAt).toLocaleString("ru-RU")}</span></div> : null}
             </div>
-            {/* Честная плашка */}
-            <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--warning-text)]">
-              <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              <span>Демо: реальное WebRTC-соединение не устанавливается. В проде по этой ссылке откроется Jitsi/LiveKit.</span>
-            </div>
+            {/* Честная плашка про демо — только в Storybook/демо (prototypeNotesEnabled). */}
+            {prototypeNotesEnabled ? (
+              <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--warning-text)]">
+                <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                <span>Демо: реальное WebRTC-соединение не устанавливается. В проде по этой ссылке откроется Jitsi/LiveKit.</span>
+              </div>
+            ) : null}
           </div>
         ) : null}
         <DialogFooter>
@@ -497,12 +508,12 @@ function CreateRoomDialog({ busy, setBusy, create, onCreated, entityType, entity
               <option value="livekit">LiveKit</option>
             </select>
           </label>
-          <label className={`col-span-2 ${labelCls}`}>ID комнаты провайдера (опц.)<Input value={providerRoomId} onChange={(e) => setProviderRoomId(e.target.value)} placeholder="portal-sync (уникален в тенанте)" /></label>
+          <label className={`col-span-2 ${labelCls}`}>ID комнаты провайдера (опц.)<Input value={providerRoomId} onChange={(e) => setProviderRoomId(e.target.value)} placeholder="portal-sync" /></label>
         </div>
         <DialogError text={formError} />
         <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
-          POST /call-rooms — статус принудительно «Открыт». ID комнаты провайдера уникален (409 call_room_provider_room_conflict).
-          join-token выдаётся только при совпадении провайдера с настроенным деплоем (jitsi); иначе 409 video_provider_misconfigured.
+          Новая комната создаётся в статусе «Открыт». ID комнаты провайдера должен быть уникальным.
+          Ссылка для подключения выдаётся, только если провайдер комнаты совпадает с настроенным видеопровайдером.
         </p>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>

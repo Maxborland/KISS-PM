@@ -167,7 +167,7 @@ export function TaskInspector() {
           </span>
         ) : null}
         <div className="ml-auto flex items-center gap-1.5">
-          <Button variant="secondary" size="sm" {...demoAction("открытие в Gantt")}>Открыть в Gantt</Button>
+          <Button variant="secondary" size="sm" {...demoAction("открытие в «Графике»")}>Открыть в «Графике»</Button>
           <Button variant="destructive-soft" size="sm" {...demoAction("удаление задачи")}>Удалить</Button>
         </div>
       </div>
@@ -322,7 +322,7 @@ function TaskHero({ taskId, taskTitle }: { taskId: string; taskTitle: string }) 
         <div className="grid flex-1 place-items-center text-center">
           <div>
             <div className="text-[length:var(--text-md)] font-semibold text-[var(--text-strong)]">Раздел «{tab}»</div>
-            <div className="mt-1 text-[length:var(--text-sm)] text-[var(--muted)]">Появится в рабочем приложении</div>
+            <div className="mt-1 text-[length:var(--text-sm)] text-[var(--muted)]">Появится в одном из следующих обновлений</div>
           </div>
         </div>
       )}
@@ -379,7 +379,7 @@ function ChatPane({
       <header className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
         <div className="mr-auto min-w-0">
           <h3 className="truncate text-[length:var(--text-sm)] font-bold text-[var(--text-strong)]">Обсуждение · {title}</h3>
-          <p className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{ordered.length} сообщ. · entity task</p>
+          <p className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{ordered.length} сообщ.{prototypeNotesEnabled ? " · entity task" : ""}</p>
         </div>
       </header>
 

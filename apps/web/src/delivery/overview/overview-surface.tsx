@@ -14,6 +14,7 @@ import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type CommitMetaView } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { demoAction } from "@/views/lib/demo";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import type { PlanTask } from "@kiss-pm/domain";
 
 // customFields — типизированный открытый мешок (Record<string,unknown>) в домене; на этой поверхности
@@ -38,6 +39,9 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const { readModel, status, error, reload, loadCommits } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
+  // Фолбэк имени: под ограниченной ролью справочник людей может отдать 403 — резолвер вернёт сырой id.
+  // Показываем «Участник xxxx» вместо user-/r-идентификатора (G8-08).
+  const resName = (id: string) => { const n = resDir.name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
   const [commits, setCommits] = useState<CommitMetaView[]>([]);
 
   useEffect(() => {
@@ -101,7 +105,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const signals: Array<{ tone: "danger" | "warning" | "info"; icon: typeof Zap; title: string; detail: string; action: string }> = [];
   // срыв дедлайна — самый критичный выводимый из плана факт, ведёт список
   if (reserveDays != null && reserveDays < 0) signals.push({ tone: "danger", icon: AlertTriangle, title: `Финиш за дедлайном: +${-reserveDays} дн.`, detail: `расчётный ${ddmmyyyy(model.projectFinish)} · дедлайн ${ddmmyyyy(model.deadline ?? "")}`, action: "Открыть График" });
-  if (overloadResources.length > 0) signals.push({ tone: "danger", icon: Zap, title: `Перегруз ресурсов: ${overloadResources.length}`, detail: `${overloadResources.map(resDir.name).join(", ")} · ${model.overloads.length} дн с превышением`, action: "Открыть Сценарии" });
+  if (overloadResources.length > 0) signals.push({ tone: "danger", icon: Zap, title: `Перегруз ресурсов: ${overloadResources.length}`, detail: `${overloadResources.map(resName).join(", ")} · ${model.overloads.length} дн с превышением`, action: "Открыть Сценарии" });
   if (projDelta > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Финиш сдвинут +${projDelta} дн от базового плана`, detail: `текущий ${ddmm(model.projectFinish)} · базовый ${ddmm(baseFinishDay ? model.bc.find((t) => t.baselineFinish && isoToDay(t.baselineFinish) === baseFinishDay)?.baselineFinish ?? null : null)}`, action: "Открыть Baseline" });
   if (overdue.length > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Просрочено задач: ${overdue.length}`, detail: `срок раньше ${ddmmyyyy(TODAY)}, не закрыты`, action: "Открыть График" });
   if (critNoSlack.length > 0) signals.push({ tone: "info", icon: TrendingUp, title: `На критическом пути: ${critNoSlack.length} задач`, detail: "резерв 0 дн — сдвиг тянет дедлайн", action: "Показать путь" });
@@ -134,7 +138,9 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Обзор проекта</h2>
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Что горит, что готовится и какие действия доступны — сводка по реальному плану.</p>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-[var(--accent)]">Прототип · in-memory</span>
+        {prototypeNotesEnabled ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-[var(--accent)]">Прототип · in-memory</span>
+        ) : null}
       </div>
 
       {/* KPI-полоса — всё из read-model */}
@@ -215,7 +221,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 <span className="v4-num mt-0.5 w-[78px] shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{hhmm(c.at)}</span>
                 <div className="min-w-0 flex-1">
                   <div className="text-[length:var(--text-sm)] text-[var(--text)]"><b className="font-semibold text-[var(--text-strong)]">v{c.version}</b> {c.summary}</div>
-                  <div className="v4-mono text-[length:var(--text-xs)] text-[var(--muted-soft)]">{c.auditEventId}{c.changedTaskIds.length ? ` · задач: ${c.changedTaskIds.length}` : ""}</div>
+                  <div className="v4-mono text-[length:var(--text-xs)] text-[var(--muted-soft)]">{prototypeNotesEnabled ? <>{c.auditEventId}{c.changedTaskIds.length ? " · " : ""}</> : null}{c.changedTaskIds.length ? `задач: ${c.changedTaskIds.length}` : null}</div>
                 </div>
               </li>
             ))}

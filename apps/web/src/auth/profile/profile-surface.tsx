@@ -11,6 +11,8 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { cn } from "@/lib/cn";
 import { authErr, FormError } from "@/auth/lib/auth-bits";
+import { permissionLabel } from "@/admin/ui/admin-bits";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useAuth } from "@/auth/lib/use-auth";
 import type { ProfileUpdateInput, ThemeUpdateInput, WorkspaceUser } from "@/auth/lib/auth-client";
 
@@ -158,7 +160,7 @@ export function ProfileSurface({ demoAutoLogin = true }: ProfileSurfaceProps = {
           status={surfaceStatus}
           error={error}
           onRetry={() => void reload()}
-          loadingLabel="Демо: выполняем вход админом…"
+          loadingLabel={demoAutoLogin ? "Демо: выполняем вход админом…" : "Загружаем профиль…"}
           errorFormat={authErr}
           forbidden={{
             title: "Требуется вход в систему",
@@ -176,8 +178,10 @@ export function ProfileSurface({ demoAutoLogin = true }: ProfileSurfaceProps = {
   );
 }
 
-// Баннер честности «Прототип» (зеркало deals-surface).
+// Баннер честности «Прототип» (зеркало deals-surface). G2-13: в live данные РЕАЛЬНЫЕ,
+// поэтому плашка рендерится только под флагом прототип-заметок (Storybook/демо).
 function ProtoBanner() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">
@@ -249,7 +253,7 @@ function ProfileCard({ user, permissions }: { user: WorkspaceUser; permissions: 
       </dl>
 
       <div className="border-t border-[var(--border-subtle)] pt-2">
-        <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.04em] text-[var(--muted-soft)]">Права (permissions)</div>
+        <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.04em] text-[var(--muted-soft)]">Права доступа</div>
         <PermissionsList permissions={permissions} />
       </div>
     </aside>
@@ -261,11 +265,14 @@ function PermissionsList({ permissions }: { permissions: string[] }) {
   if (permissions.length === 0) return <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Права не назначены.</p>;
   return (
     <ul className="flex flex-wrap gap-1">
-      {permissions.map((p) => (
-        <li key={p} className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel-subtle)] px-1.5 py-0.5 v4-mono text-[length:var(--text-2xs)] text-[var(--muted-strong)]">
-          {p}
+      {permissions.map((p) => {
+        const label = permissionLabel(p);
+        return (
+          <li key={p} title={prototypeNotesEnabled ? p : undefined} className={cn("rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel-subtle)] px-1.5 py-0.5 text-[length:var(--text-2xs)] text-[var(--muted-strong)]", label === p && "v4-mono")}>
+          {label}
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }
@@ -368,7 +375,7 @@ function ProfileForm({
     >
       <div>
         <h2 className="text-[length:var(--text-md)] font-semibold text-[var(--text-strong)]">Редактирование профиля</h2>
-        <p className="text-[length:var(--text-xs)] text-[var(--muted)]">PATCH /api/profile (имя/телефон/Telegram) и /api/profile/theme (тема/цвет) — только изменённые поля.</p>
+        <p className="text-[length:var(--text-xs)] text-[var(--muted)]">Имя, телефон, Telegram, тема и акцентный цвет — сохраняются только изменённые поля.</p>
       </div>
 
       <FormError code={errorCode} />

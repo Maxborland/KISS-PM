@@ -13,6 +13,7 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { commsErr, NotifTypeIcon, relTime } from "@/communications/lib/comms-bits";
 import { useNotificationPreferences, useNotifications } from "@/communications/lib/use-comms";
 import type {
@@ -58,7 +59,7 @@ const NOTIF_TYPE_LABEL: Record<NotificationType, string> = {
   deadline_risk: "Риск дедлайна",
   control_signal: "Контрольный сигнал",
   meeting_invite: "Приглашение на встречу",
-  meeting_action_item: "Action item встречи"
+  meeting_action_item: "Задача по итогам встречи"
 };
 const DIGEST_LABEL: Record<DigestFrequency, string> = {
   none: "Без дайджеста",
@@ -89,12 +90,15 @@ export function NotificationsSurface() {
         />
       }
     >
-      <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        <span>
-          Реальный контракт: /api/workspace/{"{notifications, notification-preferences}"}. «Прочитать» — POST /notifications/:id/read (не идемпотентно); «Прочитать все» — отдельной ручки нет, поэтому честно шлём по одному POST на каждое непрочитанное. Настройки — PUT /notification-preferences (полный upsert). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.
-        </span>
-      </div>
+      {/* Честный баннер «Прототип» — только в Storybook/демо (prototypeNotesEnabled). */}
+      {prototypeNotesEnabled ? (
+        <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          <span>
+            Реальный контракт: /api/workspace/{"{notifications, notification-preferences}"}. «Прочитать» — POST /notifications/:id/read (не идемпотентно); «Прочитать все» — отдельной ручки нет, поэтому честно шлём по одному POST на каждое непрочитанное. Настройки — PUT /notification-preferences (полный upsert). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.
+          </span>
+        </div>
+      ) : null}
 
       <div key={view} className="anim-fade-in">{view === "feed" ? <NotificationsFeed /> : <NotificationsPrefs />}</div>
     </CommsFrame>
@@ -150,7 +154,7 @@ function NotificationsFeed() {
           ]}
         />
         {unread.length > 0 ? <Chip variant="violet">{unread.length} непрочит.</Chip> : null}
-        <Button variant="secondary" size="sm" className="ml-auto" disabled={busy || unread.length === 0} onClick={() => void readAll()} title="Шлёт POST /read на каждое непрочитанное (bulk-ручки нет)">
+        <Button variant="secondary" size="sm" className="ml-auto" disabled={busy || unread.length === 0} onClick={() => void readAll()} title="Отметить все уведомления прочитанными">
           {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <CheckCheck className="size-3.5" aria-hidden />}
           Прочитать все
         </Button>
@@ -171,7 +175,7 @@ function NotificationsFeed() {
         <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] py-6 shadow-[var(--shadow-card)]">
           <EmptyState
             title={filter === "unread" ? "Непрочитанных уведомлений нет" : filter === "read" ? "Прочитанных уведомлений нет" : "Уведомлений пока нет"}
-            description="Здесь появятся упоминания, приглашения на встречи и action items после встреч."
+            description="Здесь появятся упоминания, приглашения на встречи и задачи по итогам встреч."
           />
         </div>
       ) : (
@@ -361,9 +365,12 @@ export function NotificationsPrefs() {
         </table>
       </div>
 
-      <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
-        PUT /notification-preferences — полный upsert: отправляются все {CHANNELS.length * NOTIF_TYPES.length} ячеек (channel × тип), сервер возвращает актуальный набор. Пустой набор → ранний выход (никаких изменений).
-      </p>
+      {/* Контракт-заметка (API-путь) — dev-подсказка, только в Storybook/демо. */}
+      {prototypeNotesEnabled ? (
+        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
+          PUT /notification-preferences — полный upsert: отправляются все {CHANNELS.length * NOTIF_TYPES.length} ячеек (channel × тип), сервер возвращает актуальный набор. Пустой набор → ранний выход (никаких изменений).
+        </p>
+      ) : null}
     </div>
   );
 }

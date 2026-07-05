@@ -4,6 +4,7 @@ import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Chip } from "@/components/ui/chip";
 import { cn } from "@/lib/cn";
 import { DEMO_NAV_TITLE, PROTOTYPE_LABEL } from "@/views/lib/demo";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 export type SidebarItem = {
   label: string;
@@ -34,9 +35,11 @@ export function AppSidebar({ workspace = "acme.studio", groups, user }: AppSideb
           <span className="app-sidebar__brand-meta">{workspace}</span>
         </span>
       </div>
-      <Chip variant="warning" className="app-sidebar__proto">
-        {PROTOTYPE_LABEL}
-      </Chip>
+      {prototypeNotesEnabled ? (
+        <Chip variant="warning" className="app-sidebar__proto">
+          {PROTOTYPE_LABEL}
+        </Chip>
+      ) : null}
       {groups.map((g) => (
         <div key={g.title} className="app-sidebar__group">
           <div className="app-sidebar__group-title">{g.title}</div>
@@ -51,7 +54,7 @@ export function AppSidebar({ workspace = "acme.studio", groups, user }: AppSideb
                 item.active && "is-active"
               )}
               aria-current={item.active ? "page" : undefined}
-              title={DEMO_NAV_TITLE}
+              title={prototypeNotesEnabled ? DEMO_NAV_TITLE : undefined}
             >
               {item.label}
               {item.badge ? (

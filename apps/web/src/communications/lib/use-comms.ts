@@ -514,7 +514,7 @@ export function useCommsUsers() {
   }, [client]);
   return useMemo(() => {
     const byId = new Map(list.map((u) => [u.id, u]));
-    return { list, byId, name: (id: string | null): string => (id ? byId.get(id)?.name ?? id : "—") };
+    return { list, byId, name: (id: string | null): string => (id ? byId.get(id)?.name ?? `Участник ${id.slice(-4)}` : "—") };
   }, [list]);
 }
 export type CommsUsersDir = ReturnType<typeof useCommsUsers>;

@@ -62,6 +62,8 @@ export type AuditEvent = {
   id: string;
   actionType: string;
   createdAt: string;
+  // Кто совершил действие: боевой auditRoutes отдаёт запись целиком (…event), включая actorUserId.
+  actorUserId?: string | null;
   executionResult?: { status?: string } | null;
   sourceEntity?: { type?: string; id?: string } | null;
 };

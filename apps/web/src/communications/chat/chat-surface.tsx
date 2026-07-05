@@ -13,6 +13,7 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useCommsUsers, useConversation, useDirectMessages, usePresence, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
 import { useCommsRuntime } from "@/communications/lib/comms-runtime";
@@ -384,7 +385,8 @@ function ChatPane({
       <header className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
         <div className="mr-auto min-w-0">
           <h2 className="truncate text-[length:var(--text-sm)] font-bold text-[var(--text-strong)]">{conversation.title}</h2>
-          <p className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{ordered.length} сообщ. · {conversation.entityId}</p>
+          {/* Сырой entityId — dev-подсказка, только в Storybook/демо (рядом уже есть название беседы). */}
+          <p className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{ordered.length} сообщ.{prototypeNotesEnabled ? <> · {conversation.entityId}</> : null}</p>
         </div>
         <Button
           variant="ghost"

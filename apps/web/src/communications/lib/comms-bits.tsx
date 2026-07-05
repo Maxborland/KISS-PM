@@ -151,7 +151,10 @@ export const COMMS_USERS: { id: string; name: string }[] = [
 const userById = new Map(COMMS_USERS.map((u) => [u.id, u]));
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
 
-export const userName = (id: string | null): string => (id ? userById.get(id)?.name ?? id : "—");
+// Фолбэк для неизвестного id: человекочитаемое «Участник a3f7» вместо сырого user-…
+// (под ограниченной ролью справочник людей отдаёт 403, и имена не резолвятся — G8-08).
+export const fallbackUserName = (id: string): string => `Участник ${id.slice(-4)}`;
+export const userName = (id: string | null): string => (id ? userById.get(id)?.name ?? fallbackUserName(id) : "—");
 export const initials = (name: string): string => {
   const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean);
   return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—";

@@ -18,6 +18,7 @@ import {
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { demoAction } from "@/views/lib/demo";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { authErr } from "@/auth/lib/auth-bits";
 import { useAuth } from "@/auth/lib/use-auth";
 import type { WorkspaceUser } from "@/auth/lib/auth-client";
@@ -113,7 +114,7 @@ export function AvatarMenuSurface() {
             status="forbidden"
             forbidden={{
               title: "Вы вышли из системы",
-              description: "Сессия завершена (POST /api/auth/logout). В рабочем приложении откроется экран входа.",
+              description: "Сессия завершена. В рабочем приложении откроется экран входа.",
               action: (
                 <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
                   Войти снова
@@ -282,7 +283,9 @@ export function AvatarMenuSurface() {
   );
 }
 
+// Плашка «Прототип» — только под флагом прототип-заметок (Storybook/демо), в прод не течёт (R1).
 function ProtoBanner() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
