@@ -691,7 +691,7 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       // Денормализованный crm_pipelines.lifecycle_graph_metadata читает first-class CRM API
       // (transition-guard / final-stage / feasibility). Пересобираем в той же транзакции, иначе новая
       // стадия невидима графу до несвязанной first-class мутации (read-model drift).
-      if (transactionDataSource.refreshCrmPipelineLifecycleGraph) {
+      if (transactionDataSource.refreshCrmPipelineLifecycleGraph && stageInput.pipelineId) {
         await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, stageInput.pipelineId);
       }
       await appendManagementAuditEvent(

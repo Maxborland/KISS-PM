@@ -40,7 +40,8 @@ import { notifyPlanVersionChanged } from "./planningEventBus";
 import { previewPlanningCommands } from "./planning/planningCommandCore";
 import { PLANNING_ENGINE_VERSION } from "./planning/planningConstants";
 import { createPlanningReadModel } from "./planning/planningReadModel";
-import { includeResourceExceptionsFor, permissionForCommand } from "./planning/planningRouteAuth";
+import { includeResourceExceptionsFor } from "./planning/planningRouteAuth";
+import { permissionForCommand } from "./planning/planningCommandPermissions";
 import { summarizeSnapshot } from "./planning/planningRouteHelpers";
 import {
   parseControlSignalIdParam,

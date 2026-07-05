@@ -24,7 +24,8 @@ import {
 import { previewPlanningCommand, previewPlanningCommands } from "./planningCommandCore";
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { createPlanningReadModel } from "./planningReadModel";
-import { canReadPlanningReadModel, includeResourceExceptionsFor, permissionForCommand } from "./planningRouteAuth";
+import { canReadPlanningReadModel, includeResourceExceptionsFor } from "./planningRouteAuth";
+import { permissionForCommand } from "./planningCommandPermissions";
 import { denyPlanningAction, respondFromFailedResult } from "./planningRouteResponders";
 import { requireCapabilities } from "../dataSourceCapabilities";
 import {
