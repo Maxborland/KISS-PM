@@ -224,9 +224,9 @@ export function AgentSurface() {
       {provider && !provider.live ? (
         <div
           role="status"
-          style={{ display: "flex", gap: 8, alignItems: "baseline", padding: "8px 16px", background: "#FEF3C7", color: "#78350F", fontSize: 13, borderBottom: "1px solid #FDE68A" }}
+          className="flex items-baseline gap-2 border-b border-[var(--warning)] bg-[var(--warning-soft)] px-4 py-2 text-[length:var(--text-sm)] text-[var(--warning-text)]"
         >
-          <strong style={{ whiteSpace: "nowrap" }}>Демо-режим</strong>
+          <strong className="whitespace-nowrap">Демо-режим</strong>
           <span>
             LLM-ключ не настроен (провайдер {provider.model}) — агент отвечает заглушкой и реальных предложений не даст.
             Задайте OPENROUTER_API_KEY или ANTHROPIC_API_KEY в конфигурации сервера.

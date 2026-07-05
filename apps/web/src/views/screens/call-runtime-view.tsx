@@ -88,10 +88,10 @@ function ActiveStep({ roomId, selection }: { roomId: string; selection: LobbySel
     const known = JOIN_ERROR_RU[error];
     return (
       <div className="call-screen">
-        <div style={{ maxWidth: 520, margin: "10vh auto 0", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="mx-auto mt-[10vh] flex w-full max-w-[520px] flex-col gap-3">
           <BannerInline variant="danger">{known?.title ?? `Не удалось подключиться к звонку (${error})`}</BannerInline>
-          {known?.hint ? <p style={{ fontSize: 14, opacity: 0.85, margin: 0 }}>{known.hint}</p> : null}
-          <a href="/communications/calls" style={{ fontSize: 14, textDecoration: "underline" }}>← К списку звонков</a>
+          {known?.hint ? <p className="m-0 text-[length:var(--text-sm)] text-[var(--muted-strong)]">{known.hint}</p> : null}
+          <a href="/communications/calls" className="text-[length:var(--text-sm)] text-[var(--accent-text,var(--accent))] underline underline-offset-4">← К списку звонков</a>
         </div>
       </div>
     );

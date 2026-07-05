@@ -93,7 +93,12 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
       context.header(
         "Set-Cookie",
-        buildSessionCookieHeader(rawToken, { secure: secureCookies })
+        // Max-Age cookie = тайм-аут политики: иначе при политике > 7 дней браузер
+        // терял cookie раньше серверной сессии (ревью PR #224).
+        buildSessionCookieHeader(rawToken, {
+          secure: secureCookies,
+          maxAgeSeconds: Math.floor(sessionTimeoutMs / 1000)
+        })
       );
 
       return context.json({

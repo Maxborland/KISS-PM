@@ -58,7 +58,7 @@ function ShellUserMenuInner() {
       {open ? (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
-          <div role="menu" className="absolute right-0 z-20 mt-1.5 w-52 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] shadow-[0_8px_24px_-6px_rgba(15,23,42,0.18)]">
+          <div role="menu" className="absolute right-0 z-20 mt-1.5 w-52 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-lg)]">
             <div className="border-b border-[var(--border)] px-3 py-2">
               <div className="truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{name}</div>
               {user?.id ? <div className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{user.id}</div> : null}
