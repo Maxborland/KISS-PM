@@ -114,6 +114,51 @@ describe("scenario planning", () => {
 
     expect(proposals.map((proposal) => proposal.profile)).toEqual(["aggressive"]);
   });
+
+  // Регресс BUG-PROJ-25: переназначение не предлагает ресурс ДРУГОЙ позиции (посторонний).
+  it("does not reassign overload to a resource of a different position", () => {
+    const base = createOverloadedSnapshot();
+    // единственный альтернативный ресурс — другой позиции (analyst, а перегружен engineer)
+    const snapshot: PlanSnapshot = {
+      ...base,
+      resources: base.resources.map((resource) =>
+        resource.id === "resource-beta" ? { ...resource, positionId: "analyst" } : resource
+      )
+    };
+    const calculatedPlan = calculatePlan(snapshot, {
+      calculatedAt: "2026-05-21T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+    const resourceLoad = buildResourceLoadMatrix({
+      plan: calculatedPlan,
+      resources: snapshot.resources,
+      assignments: snapshot.assignments,
+      calendars: snapshot.calendars,
+      calendarExceptions: snapshot.calendarExceptions,
+      reservations: snapshot.reservations,
+      rangeStart: snapshot.project.plannedStart,
+      rangeFinish: snapshot.project.plannedFinish
+    });
+    const proposals = proposePlanningScenarios({
+      snapshot,
+      calculatedPlan,
+      resourceLoad,
+      target: {
+        type: "resource_overload",
+        resourceId: "resource-alpha",
+        date: "2026-06-01",
+        overloadMinutes: 480,
+        taskIds: ["task-a"]
+      }
+    });
+    // ни один профиль не переносит нагрузку на постороннюю позицию resource-beta
+    const reassignsToBeta = proposals.some((proposal) =>
+      proposal.planDelta.commands.some(
+        (command) => command.type === "assignment.upsert" && command.payload.resourceId === "resource-beta"
+      )
+    );
+    expect(reassignsToBeta).toBe(false);
+  });
 });
 
 function assertProposalEffect(snapshot: PlanSnapshot, proposal: ScenarioProposal): void {

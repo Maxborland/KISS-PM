@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Chip } from "@/components/ui/chip";
@@ -9,6 +10,7 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { useProjects, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
 import type { ProjectRecord } from "@/workspace/lib/workspace-client";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
    Workspace — поверхность «Проекты» (список активных проектов
@@ -138,6 +140,7 @@ export function ProjectsListSurface() {
 
 // Баннер честности «Прототип» (зеркало profile-/deals-surface).
 function ProtoBanner() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">
@@ -153,6 +156,7 @@ function ProtoBanner() {
 
 // Таблица проектов: Проект · Клиент · Статус · Срок · Сумма · План.часы · Спрос.
 function ProjectsTable({ projects, userColor }: { projects: ProjectRecord[]; userColor: (id: string) => BemAvatarColor }) {
+  const router = useRouter();
   return (
     <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
       <table className="w-full border-collapse text-[length:var(--text-sm)]">
@@ -171,8 +175,13 @@ function ProjectsTable({ projects, userColor }: { projects: ProjectRecord[]; use
           {projects.map((p) => (
             <tr
               key={p.id}
-              className="v4-row cursor-default border-b border-[var(--border-subtle)] last:border-0"
-              title="Демо-прототип: карточка проекта — отдельный экран рабочего приложения"
+              className="v4-row cursor-pointer border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--panel-subtle)]"
+              onClick={() => router.push(`/projects/${p.id}/overview`)}
+              role="link"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") router.push(`/projects/${p.id}/overview`);
+              }}
             >
               <td className="px-3 py-2">
                 <div className="font-medium text-[var(--text-strong)]">{p.title}</div>

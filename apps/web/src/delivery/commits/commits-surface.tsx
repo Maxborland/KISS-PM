@@ -11,6 +11,7 @@ import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
 import { MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type CommitMetaView, type CommitsView } from "@/delivery/lib/use-planning";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
 const dt = (iso: string) => { const d = new Date(iso); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}, ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
@@ -27,7 +28,7 @@ const typeOf = (actionType: string): { label: string; cls: string } => {
 };
 
 export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
-  const { readModel, status, error, reload, applyBatch, loadCommits } = usePlanning(projectId);
+  const { readModel, status, error, reload, applyBatch, revertLast, loadCommits } = usePlanning(projectId);
   const [data, setData] = useState<CommitsView | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -48,7 +49,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   if (status !== "ready" || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Коммиты">
+      <DeliveryFrame project={PROJECT_FALLBACK} projectId={projectId} activeTab="Коммиты">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
           <span />
         </SurfaceState>
@@ -73,17 +74,33 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
     else setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
   };
 
+  // BUG-PROJ-24: откат последнего обратимого коммита через серверный revert-last —
+  // работает из истории (не зависит от in-session state).
+  const onRevertLast = async () => {
+    setBusy(true); setNotice(null);
+    const res = await revertLast();
+    setBusy(false);
+    if (res.ok) { setNotice(`Откат применён компенсирующим коммитом v${res.planVersion}`); const fresh = await loadCommits(); setData(fresh); setSel(fresh.commits[0]?.auditEventId ?? null); }
+    else if (res.message === "nothing_to_revert") setNotice("Нет обратимого коммита для отката");
+    else setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
+  };
+
   return (
-    <DeliveryFrame project={projectMeta} activeTab="Коммиты">
-      <div className="mb-2">
-        <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Коммиты плана</h2>
-        <p className="text-[length:var(--text-sm)] text-[var(--muted)]">PM-as-code: каждая правка плана — версия с аудит-событием. Откат последнего обратимого коммита — компенсирующими командами.</p>
+    <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Коммиты">
+      <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Коммиты плана</h2>
+          <p className="text-[length:var(--text-sm)] text-[var(--muted)]">PM-as-code: каждая правка плана — версия с аудит-событием. Откат последнего обратимого коммита — компенсирующими командами.</p>
+        </div>
+        <Button variant="secondary" size="sm" disabled={busy} onClick={() => void onRevertLast()}><RotateCcw className="size-3.5" aria-hidden />Откатить последний</Button>
       </div>
 
-      <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        История версий текущей сессии (auditEventId / planVersion реальны). Откат — через buildCompensatingCommands + apply-command-batch (обратимы правки задач/связей). Данные in-memory.
-      </div>
+      {prototypeNotesEnabled && (
+        <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          История версий текущей сессии (auditEventId / planVersion реальны). Откат — через buildCompensatingCommands + apply-command-batch (обратимы правки задач/связей). Данные in-memory.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
         {/* лента коммитов */}

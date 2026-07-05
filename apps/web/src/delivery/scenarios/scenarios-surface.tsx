@@ -11,6 +11,7 @@ import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 type Profile = "aggressive" | "balanced" | "resilient";
 type DiffRow = { wbs: string; title: string; detail: string; delta: string };
@@ -91,7 +92,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Сценарии">
+      <DeliveryFrame project={PROJECT_FALLBACK} projectId={projectId} activeTab="Сценарии">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
           <span />
         </SurfaceState>
@@ -139,7 +140,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const OverChip = ({ m }: { m: number }) => <span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", m < 0 ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{m < 0 ? `−${h(-m)} ч` : "0 ч"}</span>;
 
   return (
-    <DeliveryFrame project={projectMeta} activeTab="Сценарии">
+    <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Сценарии">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Сценарии планирования</h2>
@@ -148,10 +149,12 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
         <Button variant="ghost" size="sm" className="ml-auto" disabled={previewBusy || !target} onClick={() => { if (target) { setProposals(null); void runPreview(target); } }}><RefreshCw className={cn("size-3.5", previewBusy && "animate-spin")} aria-hidden />Запросить заново</Button>
       </div>
 
-      <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        Реальный контракт: previewScenarios(target) → 3 профиля (наборы PlanningCommand с пересчётом метрик) → applyScenario (permission + audit «planning.scenario.applied», bump версии). Агрессивный принимает перегруз — нужна причина риска. Данные in-memory.
-      </div>
+      {prototypeNotesEnabled && (
+        <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          Реальный контракт: previewScenarios(target) → 3 профиля (наборы PlanningCommand с пересчётом метрик) → applyScenario (permission + audit «planning.scenario.applied», bump версии). Агрессивный принимает перегруз — нужна причина риска. Данные in-memory.
+        </div>
+      )}
 
       {model.overloads.length === 0 ? (
         <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-10 text-center text-[length:var(--text-sm)] text-[var(--muted)] shadow-[var(--shadow-card)]">

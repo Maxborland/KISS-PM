@@ -10,6 +10,7 @@ import {
   workingMinutesForDate
 } from "./workingTime";
 import type {
+  AcceptedOverload,
   BucketGranularity,
   CalculatedPlan,
   PlanAssignment,
@@ -62,6 +63,8 @@ export type ResourceLoadBucket = {
 
 export type ResourceOverload = ResourceLoadBucket & {
   overloadMinutes: number;
+  // BUG-PROJ-19: перегруз принят как риск (risk.accept_overload) — UI не считает его проблемой.
+  accepted: boolean;
   reasons: Array<{
     type: "task" | "assignment" | "reservation" | "occupancy" | "calendar_exception";
     id: string;
@@ -76,6 +79,8 @@ export type ResourceLoadMatrix = {
   buckets: ResourceLoadBucket[];
   overloads: ResourceOverload[];
   freeCapacityBuckets: FreeCapacityBucket[];
+  // BUG-PROJ-19: принятые перегрузы (ключи `resourceId:date`) — read-model прокидывает их в UI матрицы.
+  acceptedOverloads?: string[];
 };
 
 export type BuildResourceLoadMatrixInput = {
@@ -90,6 +95,8 @@ export type BuildResourceLoadMatrixInput = {
   rangeStart: PlanDate;
   rangeFinish: PlanDate;
   granularities?: BucketGranularity[];
+  // BUG-PROJ-19: принятые перегрузы (resourceId + день) — помечаем accepted, не считаем проблемой.
+  acceptedOverloads?: AcceptedOverload[] | undefined;
 };
 
 const defaultCalendar: PlanCalendar = {
@@ -109,6 +116,8 @@ export function buildResourceLoadMatrix(
     ...(granularities.includes("month") ? aggregateBuckets(dayBuckets, "month") : [])
   ].sort(compareBuckets);
 
+  // Принятые перегрузы: ключ resourceId:date (принятие — на дневной грануляции).
+  const acceptedKeys = new Set((input.acceptedOverloads ?? []).map((a) => `${a.resourceId}:${a.date}`));
   return {
     buckets,
     overloads: buckets
@@ -117,6 +126,7 @@ export function buildResourceLoadMatrix(
       .map(({ bucket, balance }) => ({
         ...bucket,
         overloadMinutes: balance.overloadMinutes,
+        accepted: bucket.granularity === "day" && acceptedKeys.has(`${bucket.resourceId}:${bucket.date}`),
         reasons: [
           ...bucket.taskIds.map((id) => ({ type: "task" as const, id })),
           ...bucket.assignmentIds.map((id) => ({ type: "assignment" as const, id })),

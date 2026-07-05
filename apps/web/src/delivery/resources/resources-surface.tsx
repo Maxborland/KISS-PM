@@ -62,7 +62,7 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Ресурсы">
+      <DeliveryFrame project={PROJECT_FALLBACK} projectId={projectId} activeTab="Ресурсы">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка ресурсной загрузки…">
           <span />
         </SurfaceState>
@@ -147,7 +147,7 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   }
 
   return (
-    <DeliveryFrame project={projectMeta} activeTab="Ресурсы">
+    <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Ресурсы">
       <ResourceLoadMatrix
         scope={SCOPE}
         data={model.data}

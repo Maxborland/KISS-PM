@@ -90,6 +90,13 @@ export function createPlanningApiClient(options: PlanningApiClientOptions) {
         { method: "POST", body: JSON.stringify(input) }
       );
     },
+    // BUG-PROJ-24: откат последнего обратимого коммита плана (серверные компенсирующие команды).
+    revertLast(projectId: string) {
+      return requestJson<PlanningApplyResponse & { reverted: string }>(
+        `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/revert-last`,
+        { method: "POST", body: JSON.stringify({}) }
+      );
+    },
     bumpPlanVersionForTests(projectId: string) {
       return requestJson<{ newPlanVersion: number }>(
         `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/test/bump-plan-version`,

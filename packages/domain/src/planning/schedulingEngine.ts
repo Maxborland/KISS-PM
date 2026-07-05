@@ -251,7 +251,16 @@ function resolveDurationMinutes(
   );
   if (explicitAllocationDuration !== null) return explicitAllocationDuration;
 
-  if (task.workMinutes < 0 || (task.durationMinutes !== null && task.durationMinutes <= 0) || unitsPermille < 0) {
+  // Нулевая веха (work=0, duration=0) — валидный маркер, НЕ ошибка (BUG-PROJ-23:
+  // раньше `durationMinutes <= 0` флагило её invalid_work_model и блокировало ВСЕ
+  // команды планирования проекта). Невалидно: отрицательные значения либо нулевая
+  // длительность ПРИ наличии трудоёмкости (есть работа, но нет длительности).
+  if (
+    task.workMinutes < 0 ||
+    unitsPermille < 0 ||
+    (task.durationMinutes !== null && task.durationMinutes < 0) ||
+    (task.durationMinutes === 0 && task.workMinutes > 0)
+  ) {
     validationIssues.push({
       code: "invalid_work_model",
       severity: "error",

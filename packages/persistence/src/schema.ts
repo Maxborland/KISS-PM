@@ -981,6 +981,32 @@ export const calendarExceptions = pgTable(
   ]
 );
 
+// BUG-PROJ-19: принятые перегрузы ресурса (risk.accept_overload). PK = ресурс+день;
+// хранение делает принятие персистентным (раньше команда была no-op).
+export const planAcceptedOverloads = pgTable(
+  "plan_accepted_overloads",
+  {
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    resourceId: text("resource_id").notNull(),
+    date: text("date").notNull(),
+    reason: text("reason"),
+    acceptedByUserId: text("accepted_by_user_id"),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    primaryKey({
+      name: "plan_accepted_overloads_pkey",
+      columns: [table.tenantId, table.projectId, table.resourceId, table.date]
+    }),
+    foreignKey({
+      name: "plan_accepted_overloads_project_fk",
+      columns: [table.tenantId, table.projectId],
+      foreignColumns: [projects.tenantId, projects.id]
+    }).onDelete("cascade")
+  ]
+);
+
 export const tenantProductionCalendars = pgTable(
   "tenant_production_calendars",
   {

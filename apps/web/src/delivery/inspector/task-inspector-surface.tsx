@@ -32,6 +32,7 @@ import { useConversation } from "@/communications/lib/use-comms";
 import { avatarColor, commsErr, initials, relTime, userName } from "@/communications/lib/comms-bits";
 import type { Message } from "@/communications/lib/comms-client";
 import { demoAction } from "@/views/lib/demo";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 const MIN_PER_DAY = 480; // 8 рабочих часов = «день» длительности (зеркало мока)
 
@@ -225,6 +226,7 @@ export function TaskInspector() {
 
 // Честный баннер «Прототип»: реальные контракты + in-memory + переключение на боевой.
 function PrototypeBanner() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>

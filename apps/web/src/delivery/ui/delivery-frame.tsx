@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { cn } from "@/lib/cn";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 export type ProjectMeta = {
   name: string;
@@ -15,17 +17,20 @@ export type ProjectMeta = {
   variance?: { label: string; tone: "warning" | "danger" | "success" };
 };
 
-export const DELIVERY_TABS = [
-  "Обзор",
-  "График",
-  "Ресурсы",
-  "Назначения",
-  "Календари",
-  "Сценарии",
-  "Baseline",
-  "Коммиты",
-  "Настройки"
-] as const;
+// Таб → сегмент роута /projects/[id]/<slug>. Порядок = порядок табов.
+const DELIVERY_TAB_SLUGS = {
+  "Обзор": "overview",
+  "График": "schedule",
+  "Ресурсы": "resources",
+  "Назначения": "assignments",
+  "Календари": "calendars",
+  "Сценарии": "scenarios",
+  "Baseline": "baseline",
+  "Коммиты": "commits",
+  "Настройки": "settings"
+} as const;
+
+export const DELIVERY_TABS = Object.keys(DELIVERY_TAB_SLUGS) as (keyof typeof DELIVERY_TAB_SLUGS)[];
 
 export type DeliveryTab = (typeof DELIVERY_TABS)[number];
 
@@ -64,10 +69,13 @@ function Pill({ children, tone }: { children: ReactNode; tone?: "info" | "succes
  */
 export function DeliveryFrame({
   project,
+  projectId,
   activeTab,
   children
 }: {
   project: ProjectMeta;
+  /** Реальный id проекта — база для ссылок табов. Без него табы неактивны. */
+  projectId?: string;
   activeTab: DeliveryTab;
   children: ReactNode;
 }) {
@@ -92,31 +100,36 @@ export function DeliveryFrame({
           {project.variance ? <Pill tone={project.variance.tone}>{project.variance.label}</Pill> : null}
         </div>
 
-        {/* Tabs */}
+        {/* Tabs — реальные ссылки на /projects/[id]/<slug> */}
         <nav className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 md:px-4">
           {DELIVERY_TABS.map((tab) => {
             const active = tab === activeTab;
-            return (
-              <span
-                key={tab}
-                aria-current={active ? "page" : undefined}
-                title={active ? undefined : "Демо-прототип: переключение поверхностей появится в приложении"}
-                className={cn(
-                  "relative cursor-default whitespace-nowrap px-3 py-2.5 text-[length:var(--text-sm)] font-medium transition-colors duration-[var(--duration-fast)]",
-                  active ? "text-[var(--text-strong)]" : "text-[var(--muted)] hover:text-[var(--text-strong)]"
-                )}
-              >
+            const tabClass = cn(
+              "relative whitespace-nowrap px-3 py-2.5 text-[length:var(--text-sm)] font-medium transition-colors duration-[var(--duration-fast)]",
+              active ? "text-[var(--text-strong)]" : "text-[var(--muted)] hover:text-[var(--text-strong)]"
+            );
+            const underline = active ? (
+              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[var(--accent)]" />
+            ) : null;
+            // projectId известен → ссылка; иначе (Storybook/без id) — статичный текст.
+            return projectId ? (
+              <Link key={tab} href={`/projects/${projectId}/${DELIVERY_TAB_SLUGS[tab]}`} aria-current={active ? "page" : undefined} className={tabClass}>
                 {tab}
-                {active ? (
-                  <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[var(--accent)]" />
-                ) : null}
+                {underline}
+              </Link>
+            ) : (
+              <span key={tab} aria-current={active ? "page" : undefined} className={tabClass}>
+                {tab}
+                {underline}
               </span>
             );
           })}
-          <span className="ml-auto hidden items-center gap-1.5 pr-2 text-[length:var(--text-sm)] text-[var(--success-text)] md:flex">
-            <span className="v4-pulse size-1.5 rounded-full bg-[var(--success)]" />
-            Сохранено
-          </span>
+          {prototypeNotesEnabled ? (
+            <span className="ml-auto hidden items-center gap-1.5 pr-2 text-[length:var(--text-sm)] text-[var(--success-text)] md:flex">
+              <span className="v4-pulse size-1.5 rounded-full bg-[var(--success)]" />
+              Сохранено
+            </span>
+          ) : null}
         </nav>
 
         {/* Surface content */}

@@ -133,6 +133,26 @@ export function usePlanning(projectId: string) {
     [client, projectId, readModel, load]
   );
 
+  // BUG-PROJ-24: откат последнего обратимого коммита через серверный revert-last
+  // (работает из истории /commits, не зависит от in-session lastApplyRef).
+  const revertLast = useCallback(async (): Promise<ApplyResult> => {
+    if (!client) return { ok: false, conflict: false, message: "no_client" };
+    try {
+      const res = await client.revertLast(projectId);
+      setReadModel(res.readModel);
+      return { ok: true, changed: res.applied.changedTaskIds, planVersion: res.newPlanVersion };
+    } catch (e) {
+      if (e instanceof PlanningApiError && e.code === "nothing_to_revert") {
+        return { ok: false, conflict: false, message: "nothing_to_revert" };
+      }
+      if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
+        await load();
+        return { ok: false, conflict: true, message: "plan_version_conflict" };
+      }
+      return { ok: false, conflict: false, message: e instanceof Error ? e.message : "revert_failed" };
+    }
+  }, [client, projectId, load]);
+
   const previewScenarios = useCallback(
     async (target: Record<string, unknown>): Promise<ScenarioPreviewResult> => {
       if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
@@ -175,5 +195,5 @@ export function usePlanning(projectId: string) {
     return client.getCommits(projectId, lastApplyRef.current);
   }, [client, projectId]);
 
-  return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch, previewScenarios, applyScenario, loadCommits };
+  return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch, revertLast, previewScenarios, applyScenario, loadCommits };
 }

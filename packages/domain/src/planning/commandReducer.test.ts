@@ -151,6 +151,18 @@ describe("planning command reducer", () => {
     ]);
   });
 
+  // Регресс BUG-PROJ-18: снятие несуществующего назначения — ошибка, не молчаливый успех.
+  it("rejects assignment.delete for an unknown assignment id", () => {
+    const snapshot = createSnapshot();
+    const result = reducePlanningCommand(snapshot, {
+      type: "assignment.delete",
+      payload: { assignmentId: "assignment-does-not-exist" }
+    });
+    expect(result.validationIssues).toEqual([
+      expect.objectContaining({ code: "planning_command_invalid", severity: "error" })
+    ]);
+  });
+
   it("normalizes nullable task schedule payloads to the same dates persistence can store", () => {
     const snapshot = createSnapshot();
 

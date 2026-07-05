@@ -85,9 +85,16 @@ function createReassignmentProposal(
       (assignment.role === "executor" || assignment.role === "co_executor")
   );
   if (!targetAssignment) return null;
-  const alternateResource = input.snapshot.resources.find(
-    (resource) => resource.id !== input.target.resourceId
+  // BUG-PROJ-25: кандидат переназначения должен быть ТОЙ ЖЕ позиции (может выполнять
+  // работу), иначе сценарий предлагал случайного постороннего. Среди подходящих
+  // предпочитаем наименее загруженного в день перегруза; нет кандидата → профиль без решения.
+  const targetResource = input.snapshot.resources.find((resource) => resource.id === input.target.resourceId);
+  const eligible = input.snapshot.resources.filter(
+    (resource) =>
+      resource.id !== input.target.resourceId &&
+      (targetResource?.positionId ? resource.positionId === targetResource.positionId : true)
   );
+  const alternateResource = eligible[0];
   if (!alternateResource) return null;
 
   const originalWork = targetAssignment.workMinutes ?? targetBucket.assignedMinutes;

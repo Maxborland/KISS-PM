@@ -399,7 +399,9 @@ function ChatPane({
             <div key={m.id} className="flex items-center gap-2 text-[length:var(--text-xs)]">
               <Pin className="size-3 shrink-0 text-[var(--accent)]" aria-hidden />
               <span className="font-semibold text-[var(--muted-strong)]">{users.name(m.authorUserId)}:</span>
-              <span className="truncate text-[var(--muted)]">{m.body || (m.stickers[0] ? stickerEmoji(m.stickers[0].stickerAssetId) : "—")}</span>
+              <span className="min-w-0 flex-1 truncate text-[var(--muted)]">{m.body || (m.stickers[0] ? stickerEmoji(m.stickers[0].stickerAssetId) : "—")}</span>
+              {/* COMM-06: снять закрепление */}
+              <button type="button" onClick={() => void run(() => conv.unpinMessage(cid, m.id), "Закрепление снято")} className="shrink-0 rounded-[var(--radius-sm)] p-0.5 text-[var(--muted-soft)] hover:bg-[var(--panel-strong)] hover:text-[var(--text-strong)]" title="Снять закрепление" aria-label="Снять закрепление"><X className="size-3" aria-hidden /></button>
             </div>
           ))}
         </div>

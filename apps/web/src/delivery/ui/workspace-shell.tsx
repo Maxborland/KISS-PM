@@ -1,9 +1,12 @@
+"use client";
+
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { ShellUserMenu } from "@/auth/avatar-menu/shell-user-menu";
+import { useSessionUser } from "@/shell/use-session-user";
 
 // href задан → пункт кликабелен (реальный роут). Без href — пока не подключённый раздел.
 const NAV: { title: string; items: { label: string; href?: string }[] }[] = [
@@ -28,7 +31,18 @@ const NAV: { title: string; items: { label: string; href?: string }[] }[] = [
  *
  * Прототип: навигация/поиск/аватар не подключены (handoff-каркас).
  */
+const ADMIN_PERMISSIONS = [
+  "tenant.access_profiles.read",
+  "tenant.access_profiles.manage",
+  "tenant.users.read",
+  "tenant.users.manage",
+  "tenant.audit.read"
+];
+
 export function WorkspaceShell({ activeNav, children }: { activeNav: string; children: ReactNode }) {
+  // SHELL-03: группа «Администрирование» видна только ролям с admin-правами.
+  const perms = useSessionUser()?.permissions ?? [];
+  const nav = NAV.filter((g) => g.title !== "Администрирование" || ADMIN_PERMISSIONS.some((p) => perms.includes(p)));
   return (
     <div className="flex min-h-screen w-full bg-[var(--canvas)] text-[length:var(--text-md)]">
       <aside className="hidden w-[232px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--panel)] md:flex">
@@ -37,7 +51,7 @@ export function WorkspaceShell({ activeNav, children }: { activeNav: string; chi
           <span className="font-[family-name:var(--font-display)] text-[length:var(--text-md)] font-bold text-[var(--text-strong)]">KISS PM</span>
         </div>
         <nav className="flex flex-col gap-4 px-2 py-1.5">
-          {NAV.map((group) => (
+          {nav.map((group) => (
             <div key={group.title} className="flex flex-col gap-0.5">
               <div className="px-2.5 pb-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.06em] text-[var(--muted-soft)]">{group.title}</div>
               {group.items.map((item) => {
@@ -56,7 +70,6 @@ export function WorkspaceShell({ activeNav, children }: { activeNav: string; chi
             </div>
           ))}
         </nav>
-        <div className="mt-auto px-4 py-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">v0.1 · прототип</div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -67,7 +80,7 @@ export function WorkspaceShell({ activeNav, children }: { activeNav: string; chi
               className="min-w-0 flex-1 bg-transparent text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--muted-soft)]"
               placeholder="Найти задачу или ресурс"
               disabled
-              title="Демо-прототип: поиск подключится к рабочему приложению"
+              title="Поиск появится в следующей версии"
             />
           </label>
           <ShellUserMenu />

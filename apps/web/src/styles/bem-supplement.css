@@ -234,7 +234,10 @@
   justify-content: center;
   gap: var(--space-4);
   width: 100%;
+  /* BUG-011: на мобильных 100vh включает адресную строку и сдвигает карту вниз.
+     100dvh центрирует по фактически видимому вьюпорту; vh — фолбэк для старых браузеров. */
   min-height: 100vh;
+  min-height: 100dvh;
   padding: var(--space-6) var(--space-4);
 }
 

@@ -34,6 +34,7 @@ export type DiscussionMessagePersistenceAdapter = Pick<
   | "listMessageReactionsByMessageIds"
   | "listMessageStickersByMessageIds"
   | "pinDiscussionMessage"
+  | "unpinDiscussionMessage"
   | "replaceMessageMentions"
   | "updateDiscussionMessage"
   | "upsertMessageReaction"
@@ -161,6 +162,7 @@ export function createFocusedCollaborationPersistenceAdapters(
       listMessageReactionsByMessageIds: repository.listMessageReactionsByMessageIds.bind(repository),
       listMessageStickersByMessageIds: repository.listMessageStickersByMessageIds.bind(repository),
       pinDiscussionMessage: repository.pinDiscussionMessage.bind(repository),
+      unpinDiscussionMessage: repository.unpinDiscussionMessage.bind(repository),
       replaceMessageMentions: repository.replaceMessageMentions.bind(repository),
       updateDiscussionMessage: repository.updateDiscussionMessage.bind(repository),
       upsertMessageReaction: repository.upsertMessageReaction.bind(repository)

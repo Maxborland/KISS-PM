@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
@@ -101,8 +102,17 @@ export function AdminRolesSurface() {
                       <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{count}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center justify-end gap-1">
-                          <EditRoleDialog role={r} busy={busy} setBusy={setBusy} setNotice={setNotice} update={updateRole} groups={groups} />
-                          <Button variant="ghost" size="sm" disabled={busy} onClick={() => void remove(r)} title={count > 0 ? "Назначена пользователям — удаление отклонится" : "Удалить роль"}><Trash2 className="size-3.5" aria-hidden /></Button>
+                          <EditRoleDialog role={r} assignedCount={count} busy={busy} setBusy={setBusy} setNotice={setNotice} update={updateRole} groups={groups} />
+                          <ConfirmDialog
+                            title={`Удалить роль «${r.name}»?`}
+                            description={count > 0
+                              ? `Роль назначена пользователям (${count}). Удаление будет отклонено — сначала переназначьте их.`
+                              : "Действие необратимо. Роль будет удалена из рабочей области."}
+                            confirmLabel="Удалить роль"
+                            onConfirm={() => remove(r)}
+                          >
+                            <Button variant="ghost" size="sm" disabled={busy} title={count > 0 ? "Назначена пользователям — удаление отклонится" : "Удалить роль"}><Trash2 className="size-3.5" aria-hidden /></Button>
+                          </ConfirmDialog>
                         </div>
                       </td>
                     </tr>
@@ -178,19 +188,25 @@ function CreateRoleDialog({ busy, setBusy, setNotice, create, groups }: {
   );
 }
 
-function EditRoleDialog({ role, busy, setBusy, setNotice, update, groups }: {
-  role: AccessProfile; busy: boolean; setBusy: (v: boolean) => void; setNotice: (v: string | null) => void;
+function EditRoleDialog({ role, assignedCount, busy, setBusy, setNotice, update, groups }: {
+  role: AccessProfile; assignedCount: number; busy: boolean; setBusy: (v: boolean) => void; setNotice: (v: string | null) => void;
   update: ReturnType<typeof useAdmin>["updateRole"]; groups: PermissionGroup[];
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(role.name);
   const [selected, setSelected] = useState<Set<Permission>>(() => new Set(role.permissions));
-  const toggle = (p: Permission) => setSelected((prev) => { const next = new Set(prev); if (next.has(p)) next.delete(p); else next.add(p); return next; });
+  const [confirmedEmpty, setConfirmedEmpty] = useState(false);
+  const toggle = (p: Permission) => setSelected((prev) => { const next = new Set(prev); if (next.has(p)) next.delete(p); else next.add(p); setConfirmedEmpty(false); return next; });
 
-  const onOpenChange = (v: boolean) => { if (v) { setName(role.name); setSelected(new Set(role.permissions)); } setOpen(v); };
+  const onOpenChange = (v: boolean) => { if (v) { setName(role.name); setSelected(new Set(role.permissions)); setConfirmedEmpty(false); } setOpen(v); };
   const valid = name.trim().length > 0;
+  // ADM-02: обнуление прав назначенной роли лишает доступа всех её пользователей —
+  // требуем явного подтверждения, а не молчаливого сохранения.
+  const emptyPermsRisk = selected.size === 0 && assignedCount > 0;
+  const needsConfirm = emptyPermsRisk && !confirmedEmpty;
   const submit = async () => {
     if (!valid) return;
+    if (needsConfirm) { setConfirmedEmpty(true); return; }
     setBusy(true); setNotice(null);
     // full-replace: name + полный набор permissions. Роль актора → self_access_role_update_forbidden.
     const permissions = [...selected];
@@ -208,10 +224,15 @@ function EditRoleDialog({ role, busy, setBusy, setNotice, update, groups }: {
           <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{role.id}</div>
           <label className={labelCls}>Название<Input value={name} onChange={(e) => setName(e.target.value)} /></label>
           <div className={labelCls}>Права ({selected.size})<PermissionChecklist selected={selected} toggle={toggle} groups={groups} /></div>
+          {emptyPermsRisk ? (
+            <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--danger-muted)] bg-[var(--danger-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--danger-text)]">
+              <span>Роль назначена {assignedCount} польз.: без единого права они потеряют доступ. Нажмите «Сохранить» ещё раз для подтверждения.</span>
+            </div>
+          ) : null}
         </div>
         <DialogFooter>
           <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Pencil className="size-3.5" aria-hidden />Сохранить</Button>
+          <Button variant={needsConfirm ? "destructive" : "default"} disabled={!valid || busy} onClick={() => void submit()}><Pencil className="size-3.5" aria-hidden />{needsConfirm ? "Сохранить без прав" : confirmedEmpty ? "Подтвердить" : "Сохранить"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

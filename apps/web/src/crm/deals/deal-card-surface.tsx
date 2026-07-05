@@ -13,6 +13,7 @@ import { CrmFrame } from "@/crm/ui/crm-frame";
 import { money } from "@/crm/ui/crm-bits";
 import { useCrm, useCrmUsers, type CrmUsersIndex } from "@/crm/lib/use-crm";
 import type { CrmActivity, FeasibilityAssessment, Opportunity } from "@/crm/lib/crm-client";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
 const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean); return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—"; };
@@ -193,10 +194,12 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        <span>Реальный контракт CRM: PATCH /opportunities/:id (правка, full-replace), POST /:id/feasibility (осуществимость), POST /:id/activate (создаёт проект, сделка → won_closed), /crm/opportunity/:id/activity (лента). Спрос/связи редактируются на отдельном экране — здесь шлются как есть. Данные in-memory.</span>
-      </div>
+      {prototypeNotesEnabled && (
+        <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          <span>Реальный контракт CRM: PATCH /opportunities/:id (правка, full-replace), POST /:id/feasibility (осуществимость), POST /:id/activate (создаёт проект, сделка → won_closed), /crm/opportunity/:id/activity (лента). Спрос/связи редактируются на отдельном экране — здесь шлются как есть. Данные in-memory.</span>
+        </div>
+      )}
 
       {/* шапка */}
       <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-3 shadow-[var(--shadow-card)]">

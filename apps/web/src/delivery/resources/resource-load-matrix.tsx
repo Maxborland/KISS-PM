@@ -8,6 +8,7 @@ import { cn } from "@/lib/cn";
 import { dayToIso, isoToDay, type Resource } from "@/delivery/lib/planning-demo-data";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
    ResourceLoadMatrix — УНИВЕРСАЛЬНАЯ матрица загрузки.
@@ -383,7 +384,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
         {onCreateTask ? <Button variant="default" size="sm" onClick={() => onCreateTask(sel?.resourceId)} disabled={busy}><Plus className="size-3.5" aria-hidden />Задача</Button> : null}
         <Button variant="ghost" size="sm" onClick={() => setOnlyOverload((v) => !v)} className={cn(onlyOverload && "bg-[var(--danger-soft)] text-[var(--danger-text)]")}><Filter className="size-3.5" aria-hidden />Только перегруженные</Button>
         <Button variant="ghost" size="sm" onClick={() => setHideIdle((v) => !v)} className={cn(hideIdle && "bg-[var(--panel-strong)] text-[var(--text-strong)]")}><EyeOff className="size-3.5" aria-hidden />Скрыть незанятых</Button>
-        {onAbsence ? <AbsenceDialog onSubmit={onAbsence}><Button variant="ghost" size="sm" disabled={busy}><UserPlus className="size-3.5" aria-hidden />Отсутствие</Button></AbsenceDialog> : null}
+        {onAbsence ? <AbsenceDialog onSubmit={onAbsence} resources={data.resources}><Button variant="ghost" size="sm" disabled={busy}><UserPlus className="size-3.5" aria-hidden />Отсутствие</Button></AbsenceDialog> : null}
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
           {showTeamFilter ? (
             <select value={teamFilter} onChange={(e) => { setTeamFilter(e.target.value); setRoleFilter("all"); }} className={selectCls} aria-label="Команда">
@@ -417,10 +418,12 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        {captureBanner}
-      </div>
+      {prototypeNotesEnabled && (
+        <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          {captureBanner}
+        </div>
+      )}
 
       {/* KPI — по видимому окну × видимым ресурсам (учитывают период и все фильтры) */}
       <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">

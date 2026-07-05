@@ -5,31 +5,38 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { ShieldCheck, UserMinus, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { RESOURCES } from "@/delivery/lib/planning-demo-data";
+import { RESOURCES, type Resource } from "@/delivery/lib/planning-demo-data";
+
+// Даты по умолчанию — от «сегодня» (BUG-PROJ-20: раньше был хардкод мок-эпохи 04–08.05.2026).
+const isoToday = (plusDays = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + plusDays);
+  return d.toISOString().slice(0, 10);
+};
 
 const OVERLAY = "fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px]";
 const CONTENT = "fixed left-1/2 top-1/2 z-50 w-[440px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-card)] border border-[var(--border-strong)] bg-[var(--panel)] p-4 shadow-[var(--shadow-pop)]";
 const FIELD = "rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1.5 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]";
 const LABEL = "text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]";
 
-function ResourceSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ResourceSelect({ value, onChange, resources }: { value: string; onChange: (v: string) => void; resources: Resource[] }) {
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} className={FIELD}>
-      {RESOURCES.map((r) => <option key={r.id} value={r.id}>{r.name} · {r.positionName}</option>)}
+      {resources.map((r) => <option key={r.id} value={r.id}>{r.name} · {r.positionName}</option>)}
     </select>
   );
 }
 
 /* Резервирование ресурса (resource.reserve) */
-export function ReserveDialog({ onSubmit, children }: { onSubmit: (resourceId: string, start: string, finish: string, hours: number) => void; children: ReactNode }) {
+export function ReserveDialog({ onSubmit, resources = RESOURCES, children }: { onSubmit: (resourceId: string, start: string, finish: string, hours: number) => void; resources?: Resource[]; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [resourceId, setResourceId] = useState(RESOURCES[0]!.id);
-  const [start, setStart] = useState("2026-04-06");
-  const [finish, setFinish] = useState("2026-04-17");
+  const [resourceId, setResourceId] = useState(resources[0]?.id ?? "");
+  const [start, setStart] = useState(isoToday());
+  const [finish, setFinish] = useState(isoToday(9));
   const [hours, setHours] = useState("40");
   const submit = () => { const h = Number(hours); if (resourceId && start && finish && h > 0) { onSubmit(resourceId, start, finish, h); setOpen(false); } };
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root open={open} onOpenChange={(o) => { setOpen(o); if (o && !resourceId) setResourceId(resources[0]?.id ?? ""); }}>
       <Dialog.Trigger asChild>{children}</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className={OVERLAY} />
@@ -39,7 +46,7 @@ export function ReserveDialog({ onSubmit, children }: { onSubmit: (resourceId: s
             <Dialog.Close className="grid size-7 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)]" aria-label="Закрыть"><X className="size-4" aria-hidden /></Dialog.Close>
           </div>
           <div className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1"><span className={LABEL}>Сотрудник</span><ResourceSelect value={resourceId} onChange={setResourceId} /></label>
+            <label className="flex flex-col gap-1"><span className={LABEL}>Сотрудник</span><ResourceSelect value={resourceId} onChange={setResourceId} resources={resources} /></label>
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1"><span className={LABEL}>С</span><input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={FIELD} /></label>
               <label className="flex flex-col gap-1"><span className={LABEL}>По</span><input type="date" value={finish} onChange={(e) => setFinish(e.target.value)} className={FIELD} /></label>
@@ -62,15 +69,15 @@ const ABSENCE_TYPES = [
   { id: "sick", label: "Больничный" },
   { id: "dayoff", label: "Отгул" }
 ];
-export function AbsenceDialog({ onSubmit, children }: { onSubmit: (resourceId: string, type: string, start: string, finish: string) => void; children: ReactNode }) {
+export function AbsenceDialog({ onSubmit, resources = RESOURCES, children }: { onSubmit: (resourceId: string, type: string, start: string, finish: string) => void; resources?: Resource[]; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [resourceId, setResourceId] = useState(RESOURCES[0]!.id);
+  const [resourceId, setResourceId] = useState(resources[0]?.id ?? "");
   const [type, setType] = useState("vacation");
-  const [start, setStart] = useState("2026-05-04");
-  const [finish, setFinish] = useState("2026-05-08");
+  const [start, setStart] = useState(isoToday());
+  const [finish, setFinish] = useState(isoToday(4));
   const submit = () => { if (resourceId && start && finish && finish >= start) { onSubmit(resourceId, ABSENCE_TYPES.find((t) => t.id === type)?.label ?? "Отсутствие", start, finish); setOpen(false); } };
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root open={open} onOpenChange={(o) => { setOpen(o); if (o && !resourceId) setResourceId(resources[0]?.id ?? ""); }}>
       <Dialog.Trigger asChild>{children}</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className={OVERLAY} />
@@ -80,7 +87,7 @@ export function AbsenceDialog({ onSubmit, children }: { onSubmit: (resourceId: s
             <Dialog.Close className="grid size-7 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)]" aria-label="Закрыть"><X className="size-4" aria-hidden /></Dialog.Close>
           </div>
           <div className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1"><span className={LABEL}>Сотрудник</span><ResourceSelect value={resourceId} onChange={setResourceId} /></label>
+            <label className="flex flex-col gap-1"><span className={LABEL}>Сотрудник</span><ResourceSelect value={resourceId} onChange={setResourceId} resources={resources} /></label>
             <div className="flex flex-col gap-1">
               <span className={LABEL}>Тип</span>
               <div className="flex gap-1.5">

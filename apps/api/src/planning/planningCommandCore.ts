@@ -4,15 +4,28 @@ import type { PlanningReadDataPort } from "../apiDataPorts";
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { validateCommandDataSourcePreconditions } from "./planningRouteHelpers";
 
+// Стабильный ключ issue для diff «до/после» (код + сущность).
+function issueKey(issue: ValidationIssue): string {
+  return `${issue.code}:${issue.entity?.type ?? ""}:${issue.entity?.id ?? ""}`;
+}
+
+// BUG-PROJ-23 (робастность): движковые issue считаем блокирующими ТОЛЬКО если их
+// внесла ЭТА команда (diff before/after). Предсуществующие ошибки плана в несвязанной
+// части не должны блокировать новую правку. Возвращаем внесённые + command-specific issue.
+function introducedEngineIssues(before: PlanSnapshot, after: PlanSnapshot): ValidationIssue[] {
+  const opts = { calculatedAt: before.capturedAt, engineVersion: PLANNING_ENGINE_VERSION } as const;
+  const beforeKeys = new Set(calculatePlan(before, opts).validationIssues.map(issueKey));
+  return calculatePlan(after, opts).validationIssues.filter((issue) => !beforeKeys.has(issueKey(issue)));
+}
+
 export function previewPlanningCommand(snapshot: PlanSnapshot, command: PlanningCommand) {
   const reduction = reducePlanningCommand(snapshot, command);
-  const calculated = calculatePlan(reduction.nextSnapshot, {
-    calculatedAt: snapshot.capturedAt,
-    engineVersion: PLANNING_ENGINE_VERSION
-  });
   return {
     ...reduction,
-    validationIssues: [...reduction.validationIssues, ...calculated.validationIssues]
+    validationIssues: [
+      ...reduction.validationIssues,
+      ...introducedEngineIssues(snapshot, reduction.nextSnapshot)
+    ]
   };
 }
 
@@ -30,24 +43,23 @@ export async function previewPlanningCommands(
   const acceptedRiskIds = new Set<string>();
 
   for (const command of commands) {
-    const preview = previewPlanningCommand(nextSnapshot, command);
-    nextSnapshot = preview.nextSnapshot;
+    // Только command-specific issue (reduction + precondition); движковые считаем ниже
+    // как net-diff по всему пакету, чтобы предошибки плана не блокировали пакет (BUG-PROJ-23).
+    const reduction = reducePlanningCommand(nextSnapshot, command);
+    nextSnapshot = reduction.nextSnapshot;
     validationIssues = [
       ...validationIssues,
-      ...preview.validationIssues,
+      ...reduction.validationIssues,
       ...(await validateCommandDataSourcePreconditions(dataSource, tenantId, command))
     ];
-    preview.planDelta.changedTaskIds.forEach((id) => changedTaskIds.add(id));
-    preview.planDelta.changedAssignmentIds.forEach((id) => changedAssignmentIds.add(id));
-    preview.planDelta.changedDependencyIds.forEach((id) => changedDependencyIds.add(id));
-    preview.planDelta.acceptedRiskIds.forEach((id) => acceptedRiskIds.add(id));
+    reduction.planDelta.changedTaskIds.forEach((id) => changedTaskIds.add(id));
+    reduction.planDelta.changedAssignmentIds.forEach((id) => changedAssignmentIds.add(id));
+    reduction.planDelta.changedDependencyIds.forEach((id) => changedDependencyIds.add(id));
+    reduction.planDelta.acceptedRiskIds.forEach((id) => acceptedRiskIds.add(id));
   }
 
-  const calculated = calculatePlan(nextSnapshot, {
-    calculatedAt: snapshot.capturedAt,
-    engineVersion: PLANNING_ENGINE_VERSION
-  });
-  validationIssues = [...validationIssues, ...calculated.validationIssues];
+  // Движковые issue, ВНЕСЁННЫЕ пакетом (net diff исходного снапшота и итогового).
+  validationIssues = [...validationIssues, ...introducedEngineIssues(snapshot, nextSnapshot)];
 
   return {
     nextSnapshot,
