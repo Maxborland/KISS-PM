@@ -170,7 +170,7 @@ export function createAuthClient(options: AuthApiClientOptions) {
     },
     // POST /api/auth/password-reset/request — anti-enumeration, всегда 202 {status:"ok"}.
     requestPasswordReset(email: string) {
-      return requestJson<{ status: "ok" }>("/api/auth/password-reset/request", { method: "POST", body: JSON.stringify({ email } satisfies ResetRequestInput) });
+      return requestJson<{ status: "ok"; delivery?: "email" | "none"; devToken?: string }>("/api/auth/password-reset/request", { method: "POST", body: JSON.stringify({ email } satisfies ResetRequestInput) });
     },
     // POST /api/auth/password-reset/confirm — смена пароля по токену, 200 {status:"ok"}.
     confirmPasswordReset(token: string, password: string) {

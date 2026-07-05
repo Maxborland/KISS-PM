@@ -79,7 +79,7 @@ export function createAgentClient(options: AgentApiClientOptions) {
 
   return {
     listTools() {
-      return requestJson<{ tools: AgentToolAvailability[] }>("/api/workspace/agent/tools");
+      return requestJson<{ tools: AgentToolAvailability[]; provider?: { model: string; live: boolean } }>("/api/workspace/agent/tools");
     },
     propose(goal: string, attachmentIds: string[] = [], history: AgentHistoryTurn[] = []) {
       return requestJson<AgentProposeResponse>("/api/workspace/agent/propose", { method: "POST", body: JSON.stringify({ goal, attachmentIds, history }) });

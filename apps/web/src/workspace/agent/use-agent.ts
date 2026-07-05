@@ -36,6 +36,9 @@ export function useAgent() {
   const client = clientRef.current;
 
   const [tools, setTools] = useState<AgentToolAvailability[]>([]);
+  // Статус LLM-провайдера инсталляции: live=false (demo/mock) → UI показывает
+  // честный баннер деградации вместо неотличимого «Предложений нет» (G7-01).
+  const [provider, setProvider] = useState<{ model: string; live: boolean } | null>(null);
   const [proposal, setProposal] = useState<AgentProposeResponse | null>(null);
   const [status, setStatus] = useState<AgentStatus>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +47,7 @@ export function useAgent() {
     let active = true;
     void client
       .listTools()
-      .then((r) => { if (active) setTools(r.tools); })
+      .then((r) => { if (active) { setTools(r.tools); setProvider(r.provider ?? null); } })
       .catch(() => { if (active) setTools([]); })
       .finally(() => { if (active) setStatus("idle"); });
     return () => { active = false; };
@@ -141,5 +144,5 @@ export function useAgent() {
     [client]
   );
 
-  return { tools, proposal, setProposal, status, error, propose, proposeStream, uploadAttachment, listProjects, execute };
+  return { tools, provider, proposal, setProposal, status, error, propose, proposeStream, uploadAttachment, listProjects, execute };
 }

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthShell, AuthCard, FormError, PasswordField } from "@/auth/lib/auth-bits";
 import { useAuth } from "@/auth/lib/use-auth";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
    Поверхность «Регистрация» (Auth/Register) — БОЕВОЙ контракт
@@ -152,6 +153,7 @@ export function RegisterSurface() {
 
 // Плашка честности: contract-mock боевого контракта регистрации (новый тенант + авто-логин).
 function PrototypeNote() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="mt-1 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">

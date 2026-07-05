@@ -266,7 +266,12 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
       await deps.authRateLimiter.recordFailure(rateLimitInput, {
         reserved: reservedAttempt
       });
-      return context.json({ status: "ok" }, 202);
+      // delivery — свойство ИНСТАЛЛЯЦИИ (настроен ли канал почты), не аккаунта:
+      // anti-enumeration не нарушается — ответ одинаков для любого email.
+      // "none" (in-memory provider) → UI честно предупреждает, что письмо не придёт.
+      const delivery =
+        "provider" in emailProvider && emailProvider.provider === "smtp" ? "email" : "none";
+      return context.json({ status: "ok", delivery }, 202);
     } catch (error) {
       if (reservedAttempt) {
         await deps.authRateLimiter.releaseReservedAttempt?.(rateLimitInput);

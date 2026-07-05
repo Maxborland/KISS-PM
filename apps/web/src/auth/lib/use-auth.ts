@@ -166,8 +166,8 @@ export function useAuth() {
 
   // request возвращает данные: devToken для honest-показа (письма нет). Боевой; devToken — демо-замена письма в моке.
   const requestPasswordReset = useCallback(
-    (email: string): Promise<AuthDataResult<{ status: "ok"; devToken?: string }>> =>
-      guardData(() => client.requestPasswordReset(email) as Promise<{ status: "ok"; devToken?: string }>),
+    (email: string): Promise<AuthDataResult<{ status: "ok"; delivery?: "email" | "none"; devToken?: string }>> =>
+      guardData(() => client.requestPasswordReset(email)),
     [client]
   );
 

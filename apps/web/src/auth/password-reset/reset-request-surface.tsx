@@ -10,6 +10,7 @@ import { Field } from "@/components/domain/form-layout";
 import { cn } from "@/lib/cn";
 import { AuthCard, AuthShell, FormError } from "@/auth/lib/auth-bits";
 import { useAuth } from "@/auth/lib/use-auth";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
    ResetRequestSurface — экран «Сброс пароля» (запрос инструкций).
@@ -30,12 +31,15 @@ import { useAuth } from "@/auth/lib/use-auth";
 
 export function ResetRequestSurface() {
   const { requestPasswordReset } = useAuth();
-  const [email, setEmail] = useState("admin@kiss-pm.local");
+  const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   // Код ошибки формы (invalid_email) — null когда ошибки нет.
   const [errorCode, setErrorCode] = useState<string | null>(null);
   // sent=true после успешного запроса → показываем нейтральное подтверждение.
   const [sent, setSent] = useState(false);
+  // delivery: "none" — инсталляция без почтового канала (боевой in-memory provider) →
+  // честно предупреждаем, что письмо не придёт, вместо ложного «отправили» (G1-AUTH-02).
+  const [delivery, setDelivery] = useState<"email" | "none" | null>(null);
   // devToken — демо-показ токена (письма нет); только для зарегистрированного email.
   const [devToken, setDevToken] = useState<string | null>(null);
 
@@ -54,6 +58,7 @@ export function ResetRequestSurface() {
     // anti-enumeration: показываем нейтральное подтверждение независимо от того,
     // зарегистрирован ли адрес. devToken есть ТОЛЬКО когда email зарегистрирован.
     setSent(true);
+    setDelivery(res.data.delivery ?? null);
     setDevToken(res.data.devToken ?? null);
   }
 
@@ -97,13 +102,27 @@ export function ResetRequestSurface() {
         </Button>
 
         {/* anti-enumeration: единое нейтральное подтверждение (не раскрывает существование email). */}
-        {sent ? (
+        {sent && delivery !== "none" ? (
           <div
             role="status"
             className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--success)] bg-[var(--success-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--success-text)]"
           >
             <MailCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
             <span>Если адрес зарегистрирован — мы отправили инструкции по сбросу пароля.</span>
+          </div>
+        ) : null}
+
+        {/* Честная деградация: почтовый канал инсталляции не настроен — письмо не придёт. */}
+        {sent && delivery === "none" ? (
+          <div
+            role="status"
+            className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft,var(--panel-subtle))] px-3 py-2 text-[length:var(--text-sm)] text-[var(--warning-text,var(--text))]"
+          >
+            <MailCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              Заявка принята, но отправка почты в этой инсталляции не настроена — письмо не придёт.
+              Попросите администратора настроить SMTP или выдать токен сброса, затем введите его на странице подтверждения.
+            </span>
           </div>
         ) : null}
 
@@ -115,7 +134,9 @@ export function ResetRequestSurface() {
 }
 
 // Плашка-прототип: contract-mock боевого контракта сброса (письма нет → токен показывается).
+// Виден только в прототип-режиме (prototypeNotesEnabled) — не в проде.
 function PrototypeNote() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">

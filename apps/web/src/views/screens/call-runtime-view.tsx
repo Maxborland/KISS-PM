@@ -66,14 +66,39 @@ function LobbyStep({ onJoin }: { onJoin: (selection: LobbySelection) => void }) 
   );
 }
 
+// RU-тексты известных причин отказа подключения. Прочие коды показываем как есть
+// (сырой код лучше, чем ложный generic, — его можно назвать поддержке).
+const JOIN_ERROR_RU: Record<string, { title: string; hint: string }> = {
+  video_provider_disabled: {
+    title: "Видеозвонки не настроены в этой инсталляции",
+    hint: "Администратору нужно подключить медиасервер (KISS_PM_VIDEO_PROVIDER). Метаданные звонков и их история доступны в разделе «Коммуникации»."
+  },
+  call_session_not_found: {
+    title: "Сессия звонка не найдена",
+    hint: "Звонок мог завершиться. Проверьте список звонков."
+  }
+};
+
 function ActiveStep({ roomId, selection }: { roomId: string; selection: LobbySelection }) {
   const { stage, controls, handlers, error, chat, sendChat } = useCallEngine(roomId, selection);
 
+  // Подключение не удалось — честный отказ вместо мёртвой сцены с чатом,
+  // имитирующим отправку (G5-04/05), и с рабочим путём назад (G5-06).
+  if (error) {
+    const known = JOIN_ERROR_RU[error];
+    return (
+      <div className="call-screen">
+        <div style={{ maxWidth: 520, margin: "10vh auto 0", display: "flex", flexDirection: "column", gap: 12 }}>
+          <BannerInline variant="danger">{known?.title ?? `Не удалось подключиться к звонку (${error})`}</BannerInline>
+          {known?.hint ? <p style={{ fontSize: 14, opacity: 0.85, margin: 0 }}>{known.hint}</p> : null}
+          <a href="/communications/calls" style={{ fontSize: 14, textDecoration: "underline" }}>← К списку звонков</a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="call-screen">
-      {error ? (
-        <BannerInline variant="danger">Не удалось подключиться к звонку</BannerInline>
-      ) : null}
       <div className="call-inchat">
         <div className="call-inchat__stage">
           <CallStage view={stage} controls={controls} handlers={handlers} />

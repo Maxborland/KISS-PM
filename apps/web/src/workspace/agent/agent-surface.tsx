@@ -88,7 +88,7 @@ const clock = (offsetMs: number): string => new Date(offsetMs).toLocaleTimeStrin
  * live → реальный LLM (ключ на сервере); mock/Storybook → детерминированный демо-«мозг».
  */
 export function AgentSurface() {
-  const { proposeStream, execute, uploadAttachment, listProjects, status } = useAgent();
+  const { proposeStream, execute, uploadAttachment, listProjects, status, provider } = useAgent();
 
   const [phase, setPhase] = useState<DemoPhase>("draft");
   const [inputValue, setInputValue] = useState("");
@@ -210,6 +210,20 @@ export function AgentSurface() {
 
   return (
     <AgentWorkspaceFrame>
+      {/* Честная деградация (G7-01): без LLM-ключа агент отвечает детерминированной
+          заглушкой — иначе «Предложений нет» неотличимо от нормальной работы. */}
+      {provider && !provider.live ? (
+        <div
+          role="status"
+          style={{ display: "flex", gap: 8, alignItems: "baseline", padding: "8px 16px", background: "#FEF3C7", color: "#78350F", fontSize: 13, borderBottom: "1px solid #FDE68A" }}
+        >
+          <strong style={{ whiteSpace: "nowrap" }}>Демо-режим</strong>
+          <span>
+            LLM-ключ не настроен (провайдер {provider.model}) — агент отвечает заглушкой и реальных предложений не даст.
+            Задайте OPENROUTER_API_KEY или ANTHROPIC_API_KEY в конфигурации сервера.
+          </span>
+        </div>
+      ) : null}
       <div className={cn("lad-layout", navExpanded && "lad-layout--nav-expanded", reviewVisible && "lad-layout--review-open")}>
         <CollapsedAppNav expanded={navExpanded} mobileOpen={mobileLeft} onToggle={() => setNavExpanded((v) => !v)} />
         <MobileDrawerBackdrop visible={mobileLeft || mobileReview} onClick={() => { setMobileLeft(false); setMobileReview(false); }} />
