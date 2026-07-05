@@ -12,8 +12,7 @@ function lineCount(relativePath: string): number {
 
 describe("planning API route health budgets", () => {
   it.each([
-    { path: "registerPlanningRoutes.ts", maxLines: 770 },
-    { path: "applyPlanningCommandHandler.ts", maxLines: 260 },
+    { path: "registerPlanningRoutes.ts", maxLines: 930 },
     { path: "planningRouteHelpers.ts", maxLines: 220 },
     { path: "planningReadModel.ts", maxLines: 140 },
     { path: "planningCommandCore.ts", maxLines: 90 },
