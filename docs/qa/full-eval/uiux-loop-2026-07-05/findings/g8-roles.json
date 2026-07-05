@@ -1,0 +1,380 @@
+{
+  "group": "g8-roles",
+  "stand": "web http://127.0.0.1:3000, API http://127.0.0.1:4000, master ab90acc9, дата 2026-07-05, учётки plan-reader-no-resources / resource-reader / engineer / beta (пустой тенант)",
+  "coverage": [
+    { "route": "/dashboard [plan-reader]", "status": "fail", "notes": "Вся сводка заблокирована одним отсутствующим CRM-правом («Доступ к CRM ограничен»), хотя задачи и проекты роли доступны." },
+    { "route": "/dashboard [resource-reader]", "status": "fail", "notes": "«Не удалось собрать сводку / permission_missing» — сырой техкод + бесполезный «Повторить»." },
+    { "route": "/dashboard [engineer]", "status": "pass", "notes": "Полная сводка; блок «Митинги и сигналы» — плейсхолдер с внутренним жаргоном." },
+    { "route": "/dashboard [beta]", "status": "pass", "notes": "Нулевые KPI и осмысленные пустые блоки; тот же жаргон-плейсхолдер." },
+    { "route": "/my-work [plan-reader]", "status": "partial", "notes": "Канбан работает; аватар исполнителя — «U» (403 на /users), 403 в консоли." },
+    { "route": "/my-work [resource-reader]", "status": "fail", "notes": "«Не удалось загрузить / permission_missing» — личная поверхность роли недоступна." },
+    { "route": "/my-work [beta]", "status": "pass", "notes": "Внятный empty state «Задач пока нет»." },
+    { "route": "/projects [plan-reader]", "status": "pass", "notes": "Список работает (403 на /users в консоли)." },
+    { "route": "/projects [resource-reader]", "status": "fail", "notes": "«permission_missing» — пункт меню «Проекты» ведёт в ошибку." },
+    { "route": "/projects [beta]", "status": "partial", "notes": "Empty state без CTA «как начать»; создать проект из UI нельзя вовсе (ср. G3-01)." },
+    { "route": "/projects/project-vektor-portal/schedule [plan-reader]", "status": "partial", "notes": "Полный редактор с активными кнопками записи; write-отказы см. G3-10/G3-11." },
+    { "route": "/projects/project-vektor-portal/schedule|resources|assignments|overview [resource-reader]", "status": "blocked", "notes": "Все вкладки: «Доступ ограничен» с внятной копией, но вкладки не задизейблены; «читатель ресурсов» не видит ресурсы нигде." },
+    { "route": "/crm/deals [plan-reader, resource-reader]", "status": "partial", "notes": "Внятный отказ «Доступ к сделкам ограничен», но пункт меню «Сделки» всё равно показан ролям без прав." },
+    { "route": "/crm/clients|contacts|products [plan-reader]", "status": "partial", "notes": "Единообразные внятные отказы по каждому справочнику." },
+    { "route": "/crm/deals [beta]", "status": "fail", "notes": "Пустой тенант: нет empty state, пустой селектор «Воронка:», dev-блок «GET /pipelines/:id/stage-transitions»; модалка сделки — тупик." },
+    { "route": "/crm/deals [engineer]", "status": "pass", "notes": "Канбан с данными." },
+    { "route": "/communications/chat [все роли]", "status": "fail", "notes": "«Сущность не найдена» у всех: захардкожен entityId=proj-portal (несуществующий), сырой слаг в подзаголовке." },
+    { "route": "/communications/calls|meetings [plan-reader]", "status": "fail", "notes": "Тот же несуществующий proj-portal → «Сущность не найдена»." },
+    { "route": "/communications/channels [plan-reader]", "status": "partial", "notes": "Работает, но автор сообщения — сырой ID user-alpha-admin; «+ Канал» активен и отклоняется постфактум." },
+    { "route": "/communications/notifications [plan-reader]", "status": "pass", "notes": "Внятный empty state; ПРОТОТИП-баннер с эндпоинтами." },
+    { "route": "/admin [plan-reader, resource-reader]", "status": "fail", "notes": "Прямой URL рендерит полный админ-хром (4 вкладки) с ошибкой загрузки и вечным «Повторить» вместо страницы «нет доступа»." },
+    { "route": "/admin [engineer, beta]", "status": "pass", "notes": "Список пользователей рендерится; beta видит только себя." },
+    { "route": "/agent [plan-reader]", "status": "partial", "notes": "Работает; странная копия «Запрос уже набран» при пустом поле." },
+    { "route": "/agent [resource-reader]", "status": "partial", "notes": "Селектор привязки проекта тихо исчезает (403 на /projects), console error." },
+    { "route": "/resources, /kpi [все роли]", "status": "fail", "notes": "Роутов не существует (404 «Страница не найдена»), при этом пункты «Ресурсы» и «KPI» висят в сайдбаре у всех ролей как мёртвые некликабельные элементы." }
+  ],
+  "findings": [
+    {
+      "id": "G8-01",
+      "route": "/dashboard, /my-work, /projects, /projects/project-vektor-portal/*, /crm/deals [resource-reader]",
+      "criterion": "роли",
+      "severity": "critical",
+      "title": "У роли resource-reader нет ни одной рабочей поверхности — включая сами ресурсы",
+      "description": "После логина resource-reader каждая точка продукта — ошибка: Дашборд, Мои задачи и Проекты падают с «permission_missing»; все вкладки проекта (включая «Ресурсы» и «Назначения») — «Доступ ограничен»; CRM — отказ; /admin — ошибка; глобального роута /resources не существует (404). Роль, названная «читатель ресурсов», не имеет ни одного места, где можно увидеть ресурсы, и ни одной подсказки, что ей вообще доступно. Продукт для этой роли — сплошной тупик.",
+      "repro": [
+        "Войти как resource-reader@kiss-pm.local/resource12345",
+        "Открыть по очереди /dashboard, /my-work, /projects — везде ошибка permission_missing",
+        "Открыть /projects/project-vektor-portal/resources — «Доступ ограничен»",
+        "Открыть /resources — 404"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-resourceReader-dashboard.png",
+        "evidence/screenshots/g8-roles-resourceReader-my-work.png",
+        "evidence/screenshots/g8-roles-resourceReader-projects.png",
+        "evidence/screenshots/g8-roles-resourceReader-project-resources.png",
+        "evidence/screenshots/g8-roles-resourceReader-resources.png",
+        "evidence/g8-roles-crawl.json",
+        "evidence/g8-roles-nav-resources.json"
+      ],
+      "suggestedFix": "Либо гранты роли должны покрывать хотя бы просмотр ресурсной матрицы (её заявленное назначение), либо после логина показывать страницу «что вам доступно»; каждая закрытая поверхность должна объяснять, какое право нужно и к кому обратиться."
+    },
+    {
+      "id": "G8-02",
+      "route": "/dashboard, /my-work, /projects [resource-reader]",
+      "criterion": "обратная связь",
+      "severity": "major",
+      "title": "Сырой техкод «permission_missing» как текст ошибки для пользователя",
+      "description": "На трёх ключевых страницах под resource-reader в карточке ошибки вместо человеческого объяснения выводится машинный код ошибки API «permission_missing» (не по-русски, без объяснения, какое право отсутствует и что делать). На других поверхностях та же ситуация оформлена нормально («У вас нет прав на просмотр воронки продаж») — то есть словарь ошибок применяется непоследовательно.",
+      "repro": [
+        "Войти как resource-reader",
+        "Открыть /dashboard — «Не удалось собрать сводку / permission_missing»",
+        "Открыть /my-work и /projects — «Не удалось загрузить / permission_missing»"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-resourceReader-dashboard.png",
+        "evidence/screenshots/g8-roles-resourceReader-my-work.png",
+        "evidence/screenshots/g8-roles-resourceReader-projects.png"
+      ],
+      "suggestedFix": "Единый маппинг кодов ошибок API на русские сообщения (permission_missing → «Недостаточно прав: … Обратитесь к администратору»); сырой код показывать только в details/консоли."
+    },
+    {
+      "id": "G8-03",
+      "route": "/admin/users [plan-reader], /dashboard, /my-work, /projects [resource-reader]",
+      "criterion": "удобство",
+      "severity": "major",
+      "title": "Кнопка «Повторить» на permission-ошибках — зацикленный тупик",
+      "description": "Единственное действие в отказных состояниях — «Повторить», которое просто повторно шлёт те же запросы и снова получает 403 (проверено кликом: текст страницы не меняется, в сети те же 4 × 403). Ошибка прав — не транзиентная, retry её не лечит; альтернативного выхода (на главную, запросить доступ) нет.",
+      "repro": [
+        "Войти как plan-reader, открыть /admin/users",
+        "Нажать «Повторить» — те же 403 (permission-catalog, users, access-roles, positions), состояние не меняется"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-planReader-admin-retry.png",
+        "evidence/g8-roles-deep.json"
+      ],
+      "suggestedFix": "Для 403 не показывать «Повторить»; вместо него — «На главную» и/или «Запросить доступ у администратора». Retry оставить только для сетевых/5xx ошибок."
+    },
+    {
+      "id": "G8-04",
+      "route": "sidebar [plan-reader, resource-reader]",
+      "criterion": "логичность",
+      "severity": "major",
+      "title": "Навигация не учитывает права: пункты меню ведут прямиком в отказы",
+      "description": "Сайдбар одинаков для всех ролей: «Сделки» показывается plan-reader и resource-reader, у которых нет CRM-прав — клик ведёт в «Доступ к сделкам ограничен»; «Дашборд» для plan-reader ведёт в полностью заблокированную сводку; для resource-reader в отказ ведут «Мои задачи», «Проекты» и «Дашборд». При этом механизм ролевого скрытия в приложении есть — пункт «Администрирование» читателям не показывается, значит остальная навигация просто не подключена к правам.",
+      "repro": [
+        "Войти как plan-reader — в сайдбаре есть «Сделки», клик → отказ",
+        "Войти как resource-reader — 4 из 5 пунктов меню ведут в ошибку/отказ"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-planReader-crm-deals.png",
+        "evidence/screenshots/g8-roles-resourceReader-crm-deals.png",
+        "evidence/g8-roles-crawl.json"
+      ],
+      "suggestedFix": "Скрывать или дизейблить (с тултипом «нет прав») пункты навигации по той же ролевой логике, что уже применена к «Администрированию»."
+    },
+    {
+      "id": "G8-05",
+      "route": "/admin [plan-reader, resource-reader]",
+      "criterion": "роли",
+      "severity": "major",
+      "title": "/admin для не-админа рендерит полный админ-хром с ошибкой вместо страницы «нет доступа»",
+      "description": "По прямому URL /admin роль без прав получает полноценный интерфейс администрирования: заголовок, бейдж ADMIN, четыре кликабельные вкладки (Пользователи, Роли, Безопасность, Аудит) — и внутри каждой одну и ту же ошибку «Не удалось загрузить / Недостаточно прав» с бесполезным «Повторить». Пользователь дезориентирован: интерфейс выглядит доступным, но всё мёртвое.",
+      "repro": [
+        "Войти как plan-reader",
+        "Открыть /admin — редирект на /admin/users с админ-хромом и ошибкой",
+        "Кликать вкладки — везде тот же отказ"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-planReader-admin.png",
+        "evidence/screenshots/g8-roles-resourceReader-admin.png"
+      ],
+      "suggestedFix": "На уровне layout проверять право доступа к разделу и показывать единую страницу «У вас нет доступа к администрированию» без вкладок."
+    },
+    {
+      "id": "G8-06",
+      "route": "/dashboard [plan-reader]",
+      "criterion": "роли",
+      "severity": "major",
+      "title": "Дашборд plan-reader гибнет целиком из-за одного отсутствующего CRM-права",
+      "description": "У plan-reader есть права на задачи и проекты (/my-work и /projects работают), но вся «Персональная сводка» заменяется единственным блоком «Доступ к CRM ограничен — сводка недоступна». Частичная деградация не реализована: вместо KPI по задачам/проектам без CRM-виджетов пользователь получает пустую страницу-тупик, противоречащую подзаголовку «задачи, проекты и сделки».",
+      "repro": [
+        "Войти как plan-reader",
+        "Открыть /dashboard — вместо сводки один отказный блок, хотя /my-work и /projects работают"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-planReader-dashboard.png",
+        "evidence/g8-roles-crawl.json"
+      ],
+      "suggestedFix": "Собирать сводку из доступных источников: показывать задачи/проекты, а CRM-виджеты заменять локальной заглушкой «нет прав на сделки»."
+    },
+    {
+      "id": "G8-07",
+      "route": "/communications/chat, /communications/calls, /communications/meetings [все роли]",
+      "criterion": "кривость",
+      "severity": "critical",
+      "title": "Чат/Звонки/Встречи мертвы у всех ролей: захардкожен несуществующий entityId=proj-portal",
+      "description": "Дефолтная поверхность коммуникаций для каждой проверенной роли (admin-tenant beta, engineer, plan-reader, resource-reader) запрашивает /api/workspace/conversations?entityType=project&entityId=proj-portal (реальный id — project-vektor-portal), получает 404 и показывает «Не удалось загрузить / Сущность не найдена» с бесполезным «Повторить». В подзаголовке — сырой техслаг «Беседы · project / proj-portal». Выбора сущности в UI нет, т.е. основной сценарий вкладок Чат/Звонки/Встречи невыполним в принципе. (Вероятно, пересекается с находками группы коммуникаций — здесь зафиксировано как кросс-ролевая деградация.)",
+      "repro": [
+        "Войти под любой учёткой",
+        "Открыть /communications/chat (или /calls, /meetings)",
+        "Наблюдать 404 по entityId=proj-portal и «Сущность не найдена»"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-planReader-chat.png",
+        "evidence/screenshots/g8-roles-engineer-chat.png",
+        "evidence/screenshots/g8-roles-beta-chat.png",
+        "evidence/screenshots/g8-roles-planReader-comm-calls.png",
+        "evidence/screenshots/g8-roles-planReader-comm-meetings.png",
+        "evidence/g8-roles-crawl.json"
+      ],
+      "suggestedFix": "Убрать захардкоженный proj-portal: дать выбор проекта/сущности в UI и дефолтить на реально существующую сущность тенанта; слаг заменить человеческим названием."
+    },
+    {
+      "id": "G8-08",
+      "route": "/communications/channels [plan-reader]",
+      "criterion": "кривость",
+      "severity": "major",
+      "title": "Лента канала под plan-reader показывает сырой ID автора вместо имени",
+      "description": "У роли без права на /api/workspace/users имена участников не резолвятся, и деградация не оформлена: автор сообщения отображается как «user-alpha-admin» с аватаром-заглушкой «U». Пользователь видит технические идентификаторы вместо людей.",
+      "repro": [
+        "Войти как plan-reader",
+        "Открыть /communications/channels → канал «Общий канал Альфа»",
+        "В ленте автор — user-alpha-admin, аватар «U»"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-planReader-comm-channels.png",
+        "evidence/g8-roles-crawl.json"
+      ],
+      "suggestedFix": "Отдавать display-имена авторов вместе с сообщениями (или публичный облегчённый справочник участников), чтобы рендер не зависел от админского права на список пользователей."
+    },
+    {
+      "id": "G8-09",
+      "route": "/communications/channels [plan-reader]",
+      "criterion": "роли",
+      "severity": "major",
+      "title": "«+ Канал» активен для роли без права создания — отказ приходит только после заполнения формы",
+      "description": "Plan-reader видит активную кнопку «+ Канал», открывает модалку, заполняет название — и лишь после сабмита получает «Отклонено: Недостаточно прав» (POST 403). Действие не скрыто и не задизейблено, пользователь тратит время на заведомо невозможную операцию. Та же системная проблема, что и в планировании (ср. G3-11). В самой модалке — dev-жаргон: «team → scopeEntityType=\"org_unit\"», «POST /communication-channels — создатель становится владельцем (owner)».",
+      "repro": [
+        "Войти как plan-reader, открыть /communications/channels",
+        "Нажать «+ Канал», ввести название, нажать «Создать»",
+        "POST /communication-channels → 403, сообщение «Отклонено: Недостаточно прав»"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-planReader-channel-create-modal.png",
+        "evidence/screenshots/g8-roles-planReader-channel-create-after.png",
+        "evidence/g8-roles-channel-create.json"
+      ],
+      "suggestedFix": "Дизейблить/скрывать write-действия по правам роли (право известно на клиенте до клика); техпояснения контракта убрать из пользовательской модалки."
+    },
+    {
+      "id": "G8-10",
+      "route": "sidebar «Ресурсы», «KPI»; /resources, /kpi [все роли]",
+      "criterion": "недоделанность",
+      "severity": "major",
+      "title": "Мёртвые пункты сайдбара «Ресурсы» и «KPI»: не кликаются, а их роуты — 404",
+      "description": "У всех ролей (включая админа тенанта Beta и engineer) в сайдбаре висят пункты «Ресурсы» (секция РАБОТА) и «KPI» (секция АНАЛИТИКА). Это не ссылки и не задизейбленные кнопки с объяснением — клик не делает ничего (URL не меняется); прямые адреса /resources и /kpi отдают 404 «Страница не найдена». Навигация обещает разделы, которых нет, без пометки «скоро» или тултипа.",
+      "repro": [
+        "Войти под любой учёткой",
+        "Кликнуть «Ресурсы» или «KPI» в сайдбаре — ничего не происходит",
+        "Открыть /resources или /kpi напрямую — 404"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-planReader-resources.png",
+        "evidence/screenshots/g8-roles-planReader-kpi.png",
+        "evidence/screenshots/g8-roles-beta-resources.png",
+        "evidence/g8-roles-nav-resources.json"
+      ],
+      "suggestedFix": "Убрать пункты до готовности разделов либо явно пометить их задизейбленными с тултипом «в разработке»; 404-роуты не должны совпадать с пунктами меню."
+    },
+    {
+      "id": "G8-11",
+      "route": "/crm/deals [beta, пустой тенант]",
+      "criterion": "достаточность",
+      "severity": "major",
+      "title": "CRM пустого тенанта: вместо empty state — пустота, dev-блок и разомкнутый сценарий (воронку создать нельзя)",
+      "description": "Админ пустого тенанта Beta на /crm/deals видит: пустой селектор «Воронка:» без значения, ни одной канбан-колонки и единственный содержательный блок — «Условия переходов, воронка «—» · GET /pipelines/:id/stage-transitions» (сырой эндпоинт в UI). Нет ни объяснения «что такое воронка и как начать», ни способа создать воронку/стадии из UI — сценарий разомкнут: сделку без стадий тоже не создать.",
+      "repro": [
+        "Войти как beta@kiss-pm.local",
+        "Открыть /crm/deals — пустая область, «воронка «—»», «GET /pipelines/:id/stage-transitions»"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-beta-crm-deals.png",
+        "evidence/g8-roles-crawl.json"
+      ],
+      "suggestedFix": "Empty state с онбордингом («Создайте воронку и стадии, чтобы вести сделки») и действием создания воронки; dev-подпись с эндпоинтом убрать."
+    },
+    {
+      "id": "G8-12",
+      "route": "/crm/deals → «Новая сделка» [beta, пустой тенант]",
+      "criterion": "обратная связь",
+      "severity": "major",
+      "title": "Модалка «Новая сделка» в пустом тенанте — тупик без валидации",
+      "description": "Форма открывается, но «Клиент» и «Стадия» — пустые селекты «Выберите…» без единой опции и без подсказки, что сначала нужно создать клиента и воронку. Нажатие «Создать» с пустой формой не даёт никакой видимой реакции: ни inline-ошибок, ни toast, запрос не уходит — модалка просто продолжает висеть. В подписи формы — dev-жаргон: «(POST /opportunities, статус «Новая»); строка спроса в прототипе фиксирована (позиция backend)».",
+      "repro": [
+        "Войти как beta, открыть /crm/deals, нажать «+ Сделка»",
+        "Селекты «Клиент» и «Стадия» пустые",
+        "Нажать «Создать» — никакой видимой реакции/ошибок"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-beta-deal-create-empty.png",
+        "evidence/screenshots/g8-roles-beta-deal-empty-submit.png",
+        "evidence/g8-roles-nav-resources.json"
+      ],
+      "suggestedFix": "При отсутствии клиентов/стадий показывать в модалке подсказку с ссылками («Сначала создайте клиента»); на пустой сабмит — inline-валидация по-русски у каждого обязательного поля."
+    },
+    {
+      "id": "G8-13",
+      "route": "/projects/project-vektor-portal/* [resource-reader]",
+      "criterion": "роли",
+      "severity": "minor",
+      "title": "При «Доступ ограничен» все 9 вкладок проекта остаются кликабельными и дают одинаковый отказ",
+      "description": "Resource-reader видит шапку проекта с метаданными (статус «В работе», «план v17») и девять вкладок (Обзор…Настройки); каждая кликабельна и показывает один и тот же экран «Доступ ограничен. У вас нет прав на просмотр этого раздела» — пользователь перебирает вкладки впустую, не понимая, есть ли у него хоть что-то доступное и какое право нужно.",
+      "repro": [
+        "Войти как resource-reader",
+        "Открыть /projects/project-vektor-portal/schedule и прокликать вкладки — везде одинаковый отказ"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-resourceReader-schedule.png",
+        "evidence/screenshots/g8-roles-resourceReader-project-resources.png",
+        "evidence/screenshots/g8-roles-resourceReader-project-overview.png"
+      ],
+      "suggestedFix": "Дизейблить недоступные вкладки (тултип «нет права X») либо в отказе перечислять, какие разделы роли доступны."
+    },
+    {
+      "id": "G8-14",
+      "route": "все страницы [plan-reader, resource-reader]",
+      "criterion": "кривость",
+      "severity": "minor",
+      "title": "Консоль ограниченных ролей завалена 403 при обычной навигации",
+      "description": "Каждая страница безусловно дёргает /api/workspace/users и весь набор CRM-справочников (opportunities, clients, deal-stages, contacts, products, project-types, pipelines) даже у ролей без прав: до 9 × 403 на один переход (например /dashboard resource-reader) и по 7-8 × 403 на CRM-вкладках. Это консольный шум, лишняя нагрузка и признак того, что фронт не знает права пользователя до запроса.",
+      "repro": [
+        "Войти как resource-reader, открыть DevTools",
+        "Перейти на /dashboard — 9 запросов со статусом 403"
+      ],
+      "evidence": [
+        "evidence/g8-roles-crawl.json"
+      ],
+      "suggestedFix": "Отдавать клиенту карту прав в сессии и не запрашивать закрытые справочники; либо глушить ожидаемые 403 без console.error."
+    },
+    {
+      "id": "G8-15",
+      "route": "/dashboard [все роли]",
+      "criterion": "недоделанность",
+      "severity": "minor",
+      "title": "Плейсхолдер «Митинги и сигналы» написан внутренним жаргоном разработчиков",
+      "description": "Блок дашборда у всех ролей и тенантов показывает: «Митинги „на сегодня“, фокус-график и tenant-сигналы появятся после агрегирующего контракта — у отдельных ручек (митинги привязаны к сущности; сигналы — к проекту) tenant-широкой сводки пока нет. Здесь честный плейсхолдер вместо фейковых чисел». «Агрегирующий контракт», «ручки», «tenant-широкой» — язык командного чата, а не пользовательского продукта.",
+      "repro": [
+        "Войти под любой учёткой, открыть /dashboard",
+        "Прочитать блок «Митинги и сигналы»"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-engineer-dashboard.png",
+        "evidence/screenshots/g8-roles-beta-dashboard.png"
+      ],
+      "suggestedFix": "Заменить на пользовательский текст («Сводка встреч и сигналов появится в ближайших обновлениях») или скрыть блок до готовности."
+    },
+    {
+      "id": "G8-16",
+      "route": "/dashboard, /crm/* [plan-reader]",
+      "criterion": "кривость",
+      "severity": "minor",
+      "title": "В отказных состояниях «Доступ … ограничен» вместо иконки — пустой бежевый круг",
+      "description": "Экраны «Доступ к CRM ограничен» / «Доступ к сделкам ограничен» / «Доступ ограничен» рендерят слот иконки как пустой залитый круг без глифа (для сравнения: у error-состояний permission_missing иконка «!» есть). Выглядит как недогрузившаяся картинка.",
+      "repro": [
+        "Войти как plan-reader",
+        "Открыть /dashboard или /crm/deals — над заголовком отказа пустой круг"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-planReader-dashboard.png",
+        "evidence/screenshots/g8-roles-planReader-crm-deals.png",
+        "evidence/screenshots/g8-roles-resourceReader-schedule.png"
+      ],
+      "suggestedFix": "Добавить глиф (замок) в компонент отказного состояния."
+    },
+    {
+      "id": "G8-17",
+      "route": "/agent [resource-reader]",
+      "criterion": "роли",
+      "severity": "minor",
+      "title": "В агенте у resource-reader селектор «Привязать файл к проекту…» тихо исчезает",
+      "description": "У plan-reader на /agent есть селектор привязки файла к проекту, у resource-reader он молча отсутствует (запрос /api/workspace/projects падает 403, ошибка только в консоли). Пользователь не знает, что функция существует и почему её нет — деградация не объяснена.",
+      "repro": [
+        "Сравнить /agent под plan-reader (селектор есть) и resource-reader (селектора нет, 403 в консоли)"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-planReader-agent.png",
+        "evidence/screenshots/g8-roles-resourceReader-agent.png",
+        "evidence/g8-roles-crawl.json"
+      ],
+      "suggestedFix": "Показывать задизейбленный селектор с подсказкой «нужно право на просмотр проектов» либо честно скрывать без console.error."
+    },
+    {
+      "id": "G8-18",
+      "route": "/projects [beta, пустой тенант]",
+      "criterion": "недоделанность",
+      "severity": "minor",
+      "title": "Empty state списка проектов не говорит, как начать",
+      "description": "Пустой тенант видит «Нет проектов. Активных проектов в рабочей области пока нет.» — констатация без CTA. Поскольку создание проекта из UI отсутствует вовсе (ср. G3-01), новый тенант упирается в тупик на первом же шаге онбординга.",
+      "repro": [
+        "Войти как beta@kiss-pm.local",
+        "Открыть /projects — пустое состояние без действия"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-beta-projects.png"
+      ],
+      "suggestedFix": "Добавить в empty state кнопку «Создать проект» (и сам сценарий создания), либо объяснение, откуда берутся проекты (из выигранных сделок)."
+    },
+    {
+      "id": "G8-19",
+      "route": "/agent [все роли]",
+      "criterion": "логичность",
+      "severity": "nit",
+      "title": "Пустой чат агента утверждает «Запрос уже набран», хотя поле ввода пустое",
+      "description": "Empty state диалога с Генри Ганттом гласит «Запрос уже набран. Отправьте его Генри», при этом инпут показывает пустой placeholder «Сообщение Генри Гантту…». Текст противоречит видимому состоянию: непонятно, что именно «набрано» и что будет отправлено.",
+      "repro": [
+        "Войти под любой учёткой, открыть /agent",
+        "Сравнить текст empty state и пустое поле ввода"
+      ],
+      "evidence": [
+        "evidence/screenshots/g8-roles-resourceReader-agent.png",
+        "evidence/screenshots/g8-roles-planReader-agent.png"
+      ],
+      "suggestedFix": "Если выбранный шаблон подставляет запрос — показывать его в поле ввода; иначе заменить копию на «Выберите шаблон или напишите запрос»."
+    }
+  ]
+}

@@ -1,0 +1,158 @@
+{
+  "group": "g1-auth",
+  "coverage": [
+    { "route": "/", "status": "pass", "notes": "Аноним корректно редиректится на /login." },
+    { "route": "/login", "status": "pass", "notes": "Вход (верный/неверный пароль), сохранение ввода, RU-ошибки, защита от двойного сабмита, 1280×800 — ок. Minor: disabled-кнопка без объяснения, favicon/title/console-шум." },
+    { "route": "/register", "status": "partial", "notes": "Регистрация uiux-eval-ok-1783261953551@example.com успешна (авто-логин → /dashboard, 1 POST при двойном клике). Но: плашка «ПРОТОТИП» с ложным «данные in-memory», generic-валидация email, ошибка не у поля." },
+    { "route": "/password-reset", "status": "fail", "notes": "Основной сценарий невыполним на стенде: письмо молча не уходит (in-memory email provider), UI утверждает «отправили инструкции», токен не показывается. Плюс поле предзаполнено admin@kiss-pm.local и плашка «ПРОТОТИП»." },
+    { "route": "/password-reset/confirm", "status": "partial", "notes": "Ошибки (невалидный токен, слабый пароль) — внятные RU-тексты, ?token= из URL подставляется. Happy-path с валидным токеном не проверен (письмо недоставаемо — blocked). Плашка «ПРОТОТИП», generic-ошибка на пустой сабмит." },
+    { "route": "/definitely-not-a-page-xyz (аноним)", "status": "partial", "notes": "Молчаливый редирект на /login без 404-объяснения." },
+    { "route": "/dashboard и /projects/* под гейтом (аноним)", "status": "partial", "notes": "Гейт работает, но deep-link теряется: редирект на /login без ?from=, после входа всегда /dashboard." },
+    { "route": "logout → повторный вход (меню аватара)", "status": "pass", "notes": "Выход через меню аватара → /login, повторный вход успешен." }
+  ],
+  "findings": [
+    {
+      "id": "G1-AUTH-01",
+      "route": "/register, /password-reset, /password-reset/confirm",
+      "criterion": "недоделанность",
+      "severity": "major",
+      "title": "Плашки «ПРОТОТИП» с dev-жаргоном и ложными утверждениями на боевых auth-страницах",
+      "description": "На трёх боевых страницах рендерится плашка «ПРОТОТИП»: «Contract-mock боевого POST /api/auth/register… данные in-memory», «anti-enumeration: всегда 202 {status:\"ok\"}», «Письма нет → токен показывается (демо-замена)». Все утверждения ложны: данные пишутся в реальный Postgres, токен на странице НЕ показывается. Внутренний жаргон (contract-mock, apiOrigin, 202) виден конечному пользователю. Причина: PrototypeNote в register-surface.tsx и reset-*-surface.tsx не обёрнут в prototypeNotesEnabled (в отличие от login-surface.tsx, где гейт стоит и плашка скрыта). Это ровно BUG-014-класс, задокументированный в apps/web/src/views/lib/prototype-gate.ts.",
+      "repro": ["Открыть анонимом http://127.0.0.1:3000/register (или /password-reset, /password-reset/confirm)", "Под формой видна плашка «ПРОТОТИП» с текстом про contract-mock и in-memory"],
+      "evidence": ["evidence/screenshots/g1-auth-anon-register.png", "evidence/screenshots/g1-auth-anon-reset-request.png", "evidence/screenshots/g1-auth-anon-reset-confirm.png"],
+      "suggestedFix": "Обернуть PrototypeNote в prototypeNotesEnabled во всех трёх surface (как в login-surface.tsx) либо удалить плашки из прод-веток рендера."
+    },
+    {
+      "id": "G1-AUTH-02",
+      "route": "/password-reset → /password-reset/confirm",
+      "criterion": "достаточность",
+      "severity": "critical",
+      "title": "Сброс пароля — тупик: письмо молча исчезает, UI утверждает «мы отправили инструкции»",
+      "description": "На стенде (email provider = in-memory, дефолт вне NODE_ENV=production) запрос сброса для зарегистрированного email возвращает 202, UI показывает «Если адрес зарегистрирован — мы отправили инструкции», но письмо никуда не отправляется и токен нигде не отображается (реальный API не возвращает devToken, DevTokenPanel мёртв). Пользователь упирается в форму «64-символьный токен из письма», которое не придёт — основной сценарий поверхности невыполним. В отличие от звонков (video provider = disabled с внятной деградацией) у почтовой деградации нет НИКАКОГО сигнала в UI. Каверзность: в prod NODE_ENV=production принудительно требует SMTP (memory запрещён), т.е. это баг «молчаливой деградации» в non-prod/degraded конфигурации + ложная плашка, обещающая показ токена.",
+      "repro": ["Зарегистрировать uiux-eval-*@example.com", "Открыть /password-reset, ввести этот email, «Отправить инструкции»", "Получить «мы отправили инструкции», письма нет, токена нет", "Открыть /password-reset/confirm — заполнить нечем"],
+      "evidence": ["evidence/screenshots/g1-auth-reset-request-sent.png", "evidence/g1-auth-register-reset.json", "apps/api/src/emailProvider.ts (createInMemoryEmailProvider — дефолт вне production)"],
+      "suggestedFix": "При provider=memory отдавать в UI внятный degraded-баннер (как у звонков) или devToken в dev-режиме; убрать ложную плашку про показ токена; для оператора — health-сигнал о неконфигурированной почте."
+    },
+    {
+      "id": "G1-AUTH-03",
+      "route": "/password-reset",
+      "criterion": "кривость",
+      "severity": "major",
+      "title": "Поле Email предзаполнено чужим адресом admin@kiss-pm.local",
+      "description": "Форма сброса пароля открывается с уже введённым admin@kiss-pm.local — это hardcoded useState(\"admin@kiss-pm.local\") из Storybook-стори, утёкший в прод-маршрут. Реальный пользователь видит чужой (админский) email, раскрывается служебный адрес, а невнимательный клик «Отправить инструкции» инициирует сброс чужого пароля и сжигает rate-limit-бюджет админа.",
+      "repro": ["Открыть анонимом http://127.0.0.1:3000/password-reset", "Поле Email уже содержит admin@kiss-pm.local"],
+      "evidence": ["evidence/screenshots/g1-auth-anon-reset-request.png", "evidence/g1-auth-register-reset.json (resetRequest.prefilledEmail)"],
+      "suggestedFix": "useState(\"\") в reset-request-surface.tsx; демо-значение передавать только пропсой в стори."
+    },
+    {
+      "id": "G1-AUTH-04",
+      "route": "гейт анонима → /login",
+      "criterion": "удобство",
+      "severity": "major",
+      "title": "Deep-link теряется при входе: гейт не передаёт ?from=, после логина всегда /dashboard",
+      "description": "Аноним, открывший прямую ссылку (например /projects/project-vektor-portal из письма или чата), редиректится на /login БЕЗ параметра from. Код логина поддерживает возврат по ?from= (login-surface.tsx, BUG-AUTH-03), но гейт его не ставит, поэтому после входа пользователь всегда попадает на /dashboard и вынужден искать нужную страницу заново.",
+      "repro": ["Анонимом открыть http://127.0.0.1:3000/projects/project-vektor-portal", "URL после редиректа — /login без ?from=", "Войти admin@kiss-pm.local — попадаем на /dashboard, а не на проект"],
+      "evidence": ["evidence/g1-auth-login-flows.json (deepLink.afterGateUrl, deepLink.afterLoginUrl)", "evidence/screenshots/g1-auth-deeplink-after-login.png"],
+      "suggestedFix": "В гейте (proxy/middleware) редиректить на /login?from=<исходный path+query>."
+    },
+    {
+      "id": "G1-AUTH-05",
+      "route": "/<несуществующий-url> (аноним)",
+      "criterion": "логичность",
+      "severity": "minor",
+      "title": "Несуществующий URL для анонима молча превращается в форму логина без объяснения",
+      "description": "Аноним по опечатанной/протухшей ссылке (/definitely-not-a-page-xyz) получает страницу входа без какого-либо сообщения. Невозможно отличить «страница не существует» от «нужен вход»: после логина по этой ссылке пользователь окажется на /dashboard и так и не узнает, что адрес был кривой. Выделенного 404-состояния для анонима нет.",
+      "repro": ["Анонимом открыть http://127.0.0.1:3000/definitely-not-a-page-xyz", "Показана обычная форма «Вход в KISS PM», URL стал /login"],
+      "evidence": ["evidence/screenshots/g1-auth-anon-404.png", "evidence/g1-auth-anon.json (anon-404)"],
+      "suggestedFix": "Отдавать 404-страницу и для анонима (с кнопкой «Войти»), либо после входа возвращать на исходный URL и показывать там 404."
+    },
+    {
+      "id": "G1-AUTH-06",
+      "route": "/login",
+      "criterion": "обратная связь",
+      "severity": "minor",
+      "title": "Кнопка «Войти» задизейблена при опечатке в email без какого-либо объяснения",
+      "description": "При email, не проходящем клиентский формат-чек (например «not-an-email»), кнопка «Войти» просто неактивна: нет inline-подсказки у поля, native-валидация браузера не срабатывает (кнопка disabled — сабмит не происходит). Пользователь с опечаткой не понимает, почему нельзя нажать кнопку.",
+      "repro": ["Открыть /login", "Ввести email «not-an-email» и любой пароль", "Кнопка «Войти» неактивна, никакого сообщения нет"],
+      "evidence": ["evidence/screenshots/g1-auth-login-invalid-email.png", "evidence/g1-auth-login-flows.json (invalidEmail)"],
+      "suggestedFix": "Показывать inline-ошибку «Некорректный email» при blur/попытке сабмита вместо молчаливого дизейбла (или не дизейблить кнопку и валидировать на сабмите)."
+    },
+    {
+      "id": "G1-AUTH-07",
+      "route": "/register",
+      "criterion": "обратная связь",
+      "severity": "minor",
+      "title": "Валидация регистрации: generic-ошибка не по месту, кривой email доходит до сервера",
+      "description": "Кнопка «Создать аккаунт» активна с email «uiux-eval-bad-email» (клиент проверяет только непустоту), сабмит уходит на сервер и возвращает 400 с generic-текстом «Проверьте имя, email и пароль» — не сказано, какое именно поле кривое. Native-валидация type=email обходится (форма сабмитится несмотря на validationMessage). Ошибка weak_password рендерится над полем «Имя» — в самом верху формы, а не у поля «Пароль», которое её вызвало; на /login ошибка наоборот у кнопки — размещение непоследовательно.",
+      "repro": ["Открыть /register, заполнить имя/пароль, email «uiux-eval-bad-email», сабмит → «Проверьте имя, email и пароль»", "Заполнить пароль 7 символов, сабмит → ошибка «Пароль слишком простой…» появляется над полем «Имя»"],
+      "evidence": ["evidence/screenshots/g1-auth-register-bad-email.png", "evidence/screenshots/g1-auth-register-weak-password.png", "evidence/g1-auth-register-reset.json (regBadEmail, regWeakPassword)"],
+      "suggestedFix": "Полевые ошибки у соответствующих полей (email-формат на клиенте, weak_password у пароля); единое место FormError во всех auth-формах."
+    },
+    {
+      "id": "G1-AUTH-08",
+      "route": "/login vs /register vs /password-reset*",
+      "criterion": "кривость",
+      "severity": "minor",
+      "title": "Разнобой primary-кнопок внутри одного auth-флоу: чёрная vs фиолетовая",
+      "description": "«Войти», «Отправить инструкции», «Изменить пароль» — фиолетовые (variant primary), а «Создать аккаунт» на /register — чёрная (variant default). Пользователь, переключаясь между экранами одного флоу, видит два разных стиля главной кнопки; disabled-состояния тоже различаются (светло-фиолетовая vs тёмно-серая).",
+      "repro": ["Открыть /login и /register рядом", "Сравнить стиль сабмит-кнопок"],
+      "evidence": ["evidence/screenshots/g1-auth-anon-login.png", "evidence/screenshots/g1-auth-register-weak-password.png"],
+      "suggestedFix": "Единый variant primary для сабмит-кнопок всех auth-экранов."
+    },
+    {
+      "id": "G1-AUTH-09",
+      "route": "/password-reset/confirm",
+      "criterion": "обратная связь",
+      "severity": "minor",
+      "title": "Пустой сабмит формы «Новый пароль» даёт generic «Проверьте токен и пароль» с сервера",
+      "description": "Клик «Изменить пароль» с пустыми полями уходит на сервер (400) и возвращает «Проверьте токен и пароль» — общий текст без указания, что поля просто пустые; required-атрибуты стоят, но native-валидация не блокирует сабмит. Пустой сабмит /password-reset аналогично даёт серверный round-trip («Некорректный email»).",
+      "repro": ["Открыть /password-reset/confirm", "Нажать «Изменить пароль» с пустыми полями", "Ошибка «Проверьте токен и пароль», в network — POST 400"],
+      "evidence": ["evidence/screenshots/g1-auth-reset-confirm-empty-submit.png", "evidence/g1-auth-logout-empty.json (confirmEmptySubmit, resetEmptySubmit)"],
+      "suggestedFix": "Клиентская проверка пустых полей до сабмита + полевые сообщения «Заполните это поле» на русском."
+    },
+    {
+      "id": "G1-AUTH-10",
+      "route": "письмо сброса пароля (email-канал)",
+      "criterion": "логичность",
+      "severity": "minor",
+      "title": "Письмо сброса пароля полностью на английском для RU-продукта",
+      "description": "SMTP-провайдер шлёт письмо «KISS PM password reset» / «A password reset was requested for your KISS PM workspace account…» — весь пользовательский текст на английском, при том что весь UI продукта на русском. Пользователь RU-рынка получает EN-письмо со ссылкой сброса.",
+      "repro": ["Код: apps/api/src/emailProvider.ts, createSmtpEmailProvider.sendPasswordReset (subject/body)", "На стенде письмо недоставаемо (см. G1-AUTH-02), проверено по коду"],
+      "evidence": ["apps/api/src/emailProvider.ts:115-131"],
+      "suggestedFix": "Русифицировать subject/body письма сброса (или локализовать по языку тенанта)."
+    },
+    {
+      "id": "G1-AUTH-11",
+      "route": "все страницы",
+      "criterion": "кривость",
+      "severity": "nit",
+      "title": "favicon.ico отдаёт 404: консольная ошибка на каждой странице и пустая иконка вкладки",
+      "description": "GET /favicon.ico → 404, в консоли каждой страницы «Failed to load resource: 404», во вкладке браузера нет иконки продукта.",
+      "repro": ["curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/favicon.ico → 404", "Открыть любую страницу с DevTools → console error"],
+      "evidence": ["evidence/g1-auth-login-flows.json (console: 404 в каждом сценарии)"],
+      "suggestedFix": "Добавить favicon (app/icon.png или favicon.ico в public)."
+    },
+    {
+      "id": "G1-AUTH-12",
+      "route": "/login, /register, /password-reset*",
+      "criterion": "кривость",
+      "severity": "nit",
+      "title": "Заголовок вкладки всегда «KISS PM» — auth-страницы не различимы в табах/истории",
+      "description": "document.title одинаков («KISS PM») на входе, регистрации и сбросе пароля — в истории браузера и при нескольких вкладках страницы неотличимы.",
+      "repro": ["Открыть /login и /register", "Сравнить title вкладок"],
+      "evidence": ["evidence/g1-auth-anon.json (title у всех результатов)"],
+      "suggestedFix": "Per-route metadata.title («Вход — KISS PM», «Регистрация — KISS PM», …)."
+    },
+    {
+      "id": "G1-AUTH-13",
+      "route": "все анонимные страницы",
+      "criterion": "кривость",
+      "severity": "nit",
+      "title": "Консольная ошибка 401 (GET /api/auth/me) при каждом открытии auth-страниц",
+      "description": "Стартовый probe сессии на анонимных страницах логирует «Failed to load resource: 401» в консоль браузера — шум, затрудняющий отладку реальных проблем.",
+      "repro": ["Открыть /login с DevTools", "В консоли ошибка 401 для /api/auth/me"],
+      "evidence": ["evidence/g1-auth-anon.json (consoleErrors.*)"],
+      "suggestedFix": "Probe сессии без консольного следа затруднён для fetch, но можно отдавать 200 {authenticated:false} для me-probe либо принять как известный шум и задокументировать."
+    }
+  ]
+}

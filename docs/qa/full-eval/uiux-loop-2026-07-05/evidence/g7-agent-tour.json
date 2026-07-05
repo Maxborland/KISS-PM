@@ -1,0 +1,132 @@
+{
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "pageErrors": [],
+  "checks": [
+    {
+      "name": "empty-state-text",
+      "emptyText": "Запрос уже набран. Отправьте его Генри."
+    },
+    {
+      "name": "doc-title",
+      "title": "KISS PM"
+    },
+    {
+      "name": "agent-menu-text",
+      "menuText": "Генри ГанттАгент аккаунтаПамятьКонтекст примерных проектовИстория решений в примереДоступПроекты, работы, сроки, ресурсыПоведениеСпрашивает перед применениемНастроить в аккаунте →"
+    },
+    {
+      "name": "agent-menu-configure-btn",
+      "urlBefore": "http://127.0.0.1:3000/agent",
+      "urlAfter": "http://127.0.0.1:3000/agent",
+      "changed": false
+    },
+    {
+      "name": "nav-items",
+      "navItems": [
+        "Агент",
+        "Проекты",
+        "Работы",
+        "Команда",
+        "Сроки",
+        "Документы",
+        "Настройки"
+      ]
+    },
+    {
+      "name": "nav-projects-click",
+      "urlAfter": "http://127.0.0.1:3000/agent",
+      "navigated": false
+    },
+    {
+      "name": "history-items",
+      "historyItems": [
+        "План недели",
+        "Сроки согласования",
+        "Риски перед встречей",
+        "Передача проекта"
+      ]
+    },
+    {
+      "name": "history-click-effect",
+      "clicked": "План недели",
+      "activeAfterClick": [
+        "Сроки согласования"
+      ]
+    },
+    {
+      "name": "thinking-steps-shown",
+      "sendDisabledFilled": false,
+      "thinkingSteps": []
+    },
+    {
+      "name": "first-exchange",
+      "messages": [
+        {
+          "author": "Вы",
+          "time": "17:41",
+          "text": "uiux-eval: покажи мои задачи и предложи, что делать дальше"
+        },
+        {
+          "author": "Генри Гантт",
+          "time": "17:41",
+          "text": "Предложений нет."
+        }
+      ],
+      "proposeResponses": [
+        {
+          "url": "http://127.0.0.1:3000/api/workspace/agent/propose/stream",
+          "status": 200
+        },
+        {
+          "url": "http://127.0.0.1:3000/api/workspace/agent/propose/stream",
+          "status": 200
+        }
+      ],
+      "realTimeNow": "22:03:22"
+    },
+    {
+      "name": "second-exchange-times",
+      "messages2": [
+        {
+          "time": "17:41",
+          "text": "uiux-eval: покажи мои задачи и предложи, что делать дальше"
+        },
+        {
+          "time": "17:41",
+          "text": "Предложений нет."
+        },
+        {
+          "time": "17:45",
+          "text": "uiux-eval: а какие перегрузки ресурсов есть?"
+        },
+        {
+          "time": "17:45",
+          "text": "Предложений нет."
+        }
+      ]
+    },
+    {
+      "name": "persistence-after-reload",
+      "messagesBefore": 4,
+      "messagesAfterReload": 0
+    },
+    {
+      "name": "attach-bar",
+      "attachBar": 1,
+      "anchorOptions": [
+        "Привязать файл к проекту…",
+        "uiux-eval-сделка-02",
+        "Портал подрядчиков Вектор",
+        "Миграция данных Горсеть",
+        "CRM intake"
+      ]
+    },
+    {
+      "name": "attach-without-anchor",
+      "lastMsg": "Сначала выберите проект, к которому привязать файл."
+    }
+  ],
+  "finalUrl": "http://127.0.0.1:3000/agent"
+}

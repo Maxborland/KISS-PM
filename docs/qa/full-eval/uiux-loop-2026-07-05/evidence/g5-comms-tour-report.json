@@ -1,0 +1,80 @@
+{
+  "realRoomId": "call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027",
+  "pages": [
+    {
+      "route": "/communications/chat",
+      "screenshot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g5-comms-chat.png",
+      "error": "TimeoutError: page.goto: Timeout 45000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:3000/communications/chat\", waiting until \"networkidle\"\u001b[22m\n",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "failedRequests": [
+        "404 GET http://127.0.0.1:3000/api/workspace/conversations?entityType=project&entityId=proj-portal"
+      ],
+      "bodyText": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nКомм.\nКоммуникации\n\nБеседы · project / proj-portal\n\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\n\nНе удалось загрузить\n\nСущность не найдена\n\nПовторить"
+    },
+    {
+      "route": "/communications/channels",
+      "screenshot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g5-comms-channels.png",
+      "error": "TimeoutError: page.goto: Timeout 45000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:3000/communications/channels\", waiting until \"networkidle\"\u001b[22m\n",
+      "consoleErrors": [],
+      "failedRequests": [],
+      "bodyText": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nКомм.\nКоммуникации\n\nКаналы рабочей области и проектов\n\nКанал\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\nПРОТОТИП\nРеальный контракт: /api/workspace/communication-channels (список/создание/правка, участники) и /:id/conversation (лента канала). Канал «Общий» — системный (workspace_general), не создаётся и не управляется. Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.\nКаналы\n2\nОбщий канал Альфа\nОбщий\nОтдел внедрения\nКоманда\nОбщий канал Альфа\nОбщий\nсистемный\n\nchannel-alpha-general\n\nОбщие объявления и обсуждения команды.\n\nЛента канала\nGET /communication-channels/channel-alpha-general/conversation\nСообщений пока нет — начните беседу канала.\nОтправить\nУчастники\n4\n\nСистемный канал «Общий» доступен всей рабочей области — список участников не управляется."
+    },
+    {
+      "route": "/communications/meetings",
+      "screenshot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g5-comms-meetings.png",
+      "error": "TimeoutError: page.goto: Timeout 45000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:3000/communications/meetings\", waiting until \"networkidle\"\u001b[22m\n",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "failedRequests": [
+        "404 GET http://127.0.0.1:3000/api/workspace/meetings?entityType=project&entityId=proj-portal"
+      ],
+      "bodyText": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nКомм.\nКоммуникации\n\nВстречи проекта\n\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\n\nНе удалось загрузить\n\nСущность не найдена\n\nПовторить"
+    },
+    {
+      "route": "/communications/calls",
+      "screenshot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g5-comms-calls.png",
+      "error": "TimeoutError: page.goto: Timeout 45000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:3000/communications/calls\", waiting until \"networkidle\"\u001b[22m\n",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "failedRequests": [
+        "404 GET http://127.0.0.1:3000/api/workspace/call-rooms?entityType=project&entityId=proj-portal"
+      ],
+      "bodyText": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nКомм.\nКоммуникации\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\n\nНе удалось загрузить\n\nСущность не найдена\n\nПовторить"
+    },
+    {
+      "route": "/communications/notifications",
+      "screenshot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g5-comms-notifications.png",
+      "error": "TimeoutError: page.goto: Timeout 45000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:3000/communications/notifications\", waiting until \"networkidle\"\u001b[22m\n",
+      "consoleErrors": [],
+      "failedRequests": [],
+      "bodyText": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nКомм.\nКоммуникации\n\nЛента уведомлений и настройки доставки\n\nЛента\nНастройки\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\nПРОТОТИП\nРеальный контракт: /api/workspace/{notifications, notification-preferences}. «Прочитать» — POST /notifications/:id/read (не идемпотентно); «Прочитать все» — отдельной ручки нет, поэтому честно шлём по одному POST на каждое непрочитанное. Настройки — PUT /notification-preferences (полный upsert). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.\nВсе\nНепрочитанные\nПрочитанные\n1 непрочит.\nПрочитать все\nРиск срыва срока\nРиск дедлайна\n22 мая\nНОВОЕ\n\nПроект «Портал Вектор» приближается к дедлайну.\n\nПерейти\nПрочитать"
+    },
+    {
+      "route": "/calls/call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027",
+      "screenshot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g5-comms-call-runtime-real.png",
+      "error": null,
+      "consoleErrors": [],
+      "failedRequests": [],
+      "bodyText": "Вы\nПеред входом\n\nПроверьте камеру и микрофон\n\nДоступ к камере запрещён\nКамера\nКамера\nМикрофон\nМикрофон\nМикрофон\nКамера\nПрисоединиться"
+    },
+    {
+      "route": "/calls/not-a-real-room-id",
+      "screenshot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g5-comms-call-runtime-invalid.png",
+      "error": null,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "failedRequests": [
+        "404 GET http://127.0.0.1:3000/api/workspace/call-rooms/not-a-real-room-id",
+        "404 GET http://127.0.0.1:3000/api/workspace/call-rooms/not-a-real-room-id"
+      ],
+      "bodyText": "Нет доступа к этому звонку"
+    }
+  ]
+}

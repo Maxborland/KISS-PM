@@ -1,0 +1,88 @@
+{
+  "sidebar": [
+    {
+      "tag": "A",
+      "text": "Мои задачи",
+      "href": "/my-work",
+      "disabled": null,
+      "cls": "flex items-center justify-between rounded-[var(--radius-md)]"
+    },
+    {
+      "tag": "A",
+      "text": "Проекты",
+      "href": "/projects",
+      "disabled": null,
+      "cls": "flex items-center justify-between rounded-[var(--radius-md)]"
+    },
+    {
+      "tag": "A",
+      "text": "Сделки",
+      "href": "/crm/deals",
+      "disabled": null,
+      "cls": "flex items-center justify-between rounded-[var(--radius-md)]"
+    },
+    {
+      "tag": "A",
+      "text": "Дашборд",
+      "href": "/dashboard",
+      "disabled": null,
+      "cls": "flex items-center justify-between rounded-[var(--radius-md)]"
+    },
+    {
+      "tag": "A",
+      "text": "Коммуникации",
+      "href": "/communications/chat",
+      "disabled": null,
+      "cls": "flex items-center justify-between rounded-[var(--radius-md)]"
+    }
+  ],
+  "click-Ресурсы": {
+    "url": "/dashboard",
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nДоступ к CRM ограничен\n\nУ вас нет прав на просмотр сделок — сводка недоступна."
+  },
+  "click-KPI": {
+    "url": "/dashboard",
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nДоступ к CRM ограничен\n\nУ вас нет прав на просмотр сделок — сводка недоступна."
+  },
+  "rr-project-resources": {
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nРР\nПР\nПроизводственный портал · Релиз 2\nВ работе\nплан v17\nДедлайн —\nФиниш —\nОбзор\nГрафик\nРесурсы\nНазначения\nКалендари\nСценарии\nBaseline\nКоммиты\nНастройки\nДоступ ограничен\nУ вас нет прав на просмотр этого раздела.",
+    "fails": [
+      {
+        "url": "/api/workspace/projects/project-vektor-portal/planning/read-model",
+        "status": 403
+      },
+      {
+        "url": "/api/workspace/users",
+        "status": 403
+      }
+    ]
+  },
+  "rr-project-assignments": {
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nРР\nПР\nПроизводственный портал · Релиз 2\nВ работе\nплан v17\nДедлайн —\nФиниш —\nОбзор\nГрафик\nРесурсы\nНазначения\nКалендари\nСценарии\nBaseline\nКоммиты\nНастройки\nДоступ ограничен\nУ вас нет прав на просмотр этого раздела.",
+    "fails": [
+      {
+        "url": "/api/workspace/projects/project-vektor-portal/planning/read-model",
+        "status": 403
+      },
+      {
+        "url": "/api/workspace/users",
+        "status": 403
+      }
+    ]
+  },
+  "rr-project-overview": {
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nРР\nПР\nПроизводственный портал · Релиз 2\nВ работе\nплан v17\nДедлайн —\nФиниш —\nОбзор\nГрафик\nРесурсы\nНазначения\nКалендари\nСценарии\nBaseline\nКоммиты\nНастройки\nДоступ ограничен\nУ вас нет прав на просмотр этого раздела.",
+    "fails": [
+      {
+        "url": "/api/workspace/projects/project-vektor-portal/planning/read-model",
+        "status": 403
+      },
+      {
+        "url": "/api/workspace/users",
+        "status": 403
+      }
+    ]
+  },
+  "betaDealSelects": [],
+  "betaDealEmptySubmit": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nБА\nCRM\nПродажи и клиенты\nВоронка продаж и активные сделки\nСделка\nСделки\nКлиенты\nКонтакты\nПродукты\nВоронка:\nКанбан\nСписок\nПрогноз\nПеретащите карточку между стадиями (переход проверяется условиями воронки)\nУсловия переходов\nворонка «—» · GET /pipelines/:id/stage-transitions\nПереходы не настроены — переносы между стадиями этой воронки не ограничены.\nНовая сделка\nНазвание\nКлиент\nВыберите…\nКонтакт\nСначала клиент\nСтадия\nВыберите…\nВероятность, %\nСумма, ₽\nСтавка, ₽/ч\nСтарт\nФиниш\nТрудоёмкость = сумма / ставка (POST /opportunities, статус «Новая»); строка спроса в прототипе фиксирована (позиция backend). Контакт валидируется как активный у выбранного клиента.\nОтмена\nСоздать\nClose"
+}

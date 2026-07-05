@@ -1,0 +1,253 @@
+{
+  "planReader-extra": {
+    "/resources": {
+      "finalUrl": "/resources",
+      "text": "Страница не найдена\nЗапрошенный маршрут не существует.\nНа главную",
+      "fails": [
+        {
+          "url": "/resources",
+          "status": 404
+        }
+      ]
+    },
+    "/kpi": {
+      "finalUrl": "/kpi",
+      "text": "Страница не найдена\nЗапрошенный маршрут не существует.\nНа главную",
+      "fails": [
+        {
+          "url": "/kpi",
+          "status": 404
+        }
+      ]
+    }
+  },
+  "resourceReader-extra": {
+    "/resources": {
+      "finalUrl": "/resources",
+      "text": "Страница не найдена\nЗапрошенный маршрут не существует.\nНа главную",
+      "fails": [
+        {
+          "url": "/resources",
+          "status": 404
+        }
+      ]
+    },
+    "/kpi": {
+      "finalUrl": "/kpi",
+      "text": "Страница не найдена\nЗапрошенный маршрут не существует.\nНа главную",
+      "fails": [
+        {
+          "url": "/kpi",
+          "status": 404
+        }
+      ]
+    }
+  },
+  "planReader-tabs": {
+    "/crm/clients": {
+      "finalUrl": "/crm/clients",
+      "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nCRM\nПродажи и клиенты\nСправочник клиентов\nКлиент\nСделки\nКлиенты\nКонтакты\nПродукты\nДоступ к клиентам ограничен\nУ вас нет прав на просмотр справочника клиентов.",
+      "fails": [
+        {
+          "url": "/api/workspace/opportunities",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/deal-stages",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/clients",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/products",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/contacts",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/project-types",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/pipelines",
+          "status": 403
+        }
+      ]
+    },
+    "/crm/contacts": {
+      "finalUrl": "/crm/contacts",
+      "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nCRM\nПродажи и клиенты\nСправочник контактов\nСделки\nКлиенты\nКонтакты\nПродукты\nДоступ к контактам ограничен\nУ вас нет прав на просмотр справочника контактов.",
+      "fails": [
+        {
+          "url": "/api/workspace/contacts",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/products",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/opportunities",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/clients",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/deal-stages",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/project-types",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/pipelines",
+          "status": 403
+        }
+      ]
+    },
+    "/crm/products": {
+      "finalUrl": "/crm/products",
+      "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nCRM\nПродажи и клиенты\nСправочник продуктов\nПродукт\nСделки\nКлиенты\nКонтакты\nПродукты\nДоступ к продуктам ограничен\nУ вас нет прав на просмотр справочника продуктов.",
+      "fails": [
+        {
+          "url": "/api/workspace/opportunities",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/deal-stages",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/contacts",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/clients",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/products",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/project-types",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/pipelines",
+          "status": 403
+        }
+      ]
+    },
+    "/communications/channels": {
+      "finalUrl": "/communications/channels",
+      "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nКомм.\nКоммуникации\nКаналы рабочей области и проектов\nКанал\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления\nПРОТОТИП\nРеальный контракт: /api/workspace/communication-channels (список/создание/правка, участники) и /:id/conversation (лента канала). Канал «Общий» — системный (workspace_general), не создаётся и не управляется. Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.\nКаналы\n2\nОбщий канал Альфа\nОбщий\nОтдел внедрения\nКоманда\nОбщий канал Альфа\nОбщий\nсистемный\nchannel-alpha-general\nОбщие объявления и обсуждения команды.\nЛента канала\nGET /communication-channels/channel-alpha-general/conversation\nU\nuser-alpha-admin\nтолько что\nuiux-eval-сообщение в общий канал\nОтправить\nУчастники\n4\nСистемный канал «Общий» доступен всей рабочей области — список участников не упра",
+      "fails": [
+        {
+          "url": "/api/workspace/users",
+          "status": 403
+        }
+      ]
+    },
+    "/communications/calls": {
+      "finalUrl": "/communications/calls",
+      "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nКомм.\nКоммуникации\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления\nНе удалось загрузить\nСущность не найдена\nПовторить",
+      "fails": [
+        {
+          "url": "/api/workspace/call-rooms?entityType=project&entityId=proj-portal",
+          "status": 404
+        },
+        {
+          "url": "/api/workspace/users",
+          "status": 403
+        }
+      ]
+    },
+    "/communications/meetings": {
+      "finalUrl": "/communications/meetings",
+      "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nКомм.\nКоммуникации\nВстречи проекта\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления\nНе удалось загрузить\nСущность не найдена\nПовторить",
+      "fails": [
+        {
+          "url": "/api/workspace/meetings?entityType=project&entityId=proj-portal",
+          "status": 404
+        },
+        {
+          "url": "/api/workspace/users",
+          "status": 403
+        }
+      ]
+    },
+    "/communications/notifications": {
+      "finalUrl": "/communications/notifications",
+      "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nКомм.\nКоммуникации\nЛента уведомлений и настройки доставки\nЛента\nНастройки\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления\nПРОТОТИП\nРеальный контракт: /api/workspace/{notifications, notification-preferences}. «Прочитать» — POST /notifications/:id/read (не идемпотентно); «Прочитать все» — отдельной ручки нет, поэтому честно шлём по одному POST на каждое непрочитанное. Настройки — PUT /notification-preferences (полный upsert). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.\nВсе\nНепрочитанные\nПрочитанные\nПрочитать все\nУведомлений пока нет\nЗдесь появятся упоминания, приглашения на встречи и action items после встреч.",
+      "fails": []
+    },
+    "admin-retry": {
+      "textAfter": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nADMIN\nАдминистрирование\nПользователи рабочей области\nПользователи\nРоли\nБезопасность\nАудит\nНе удалось загрузить\nНедостаточно прав для этого действия\nПовторить",
+      "sameAsBefore": true,
+      "failsAfterClick": [
+        {
+          "url": "/api/workspace/positions",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/users",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/access-roles",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/permission-catalog",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/permission-catalog",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/users",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/positions",
+          "status": 403
+        },
+        {
+          "url": "/api/workspace/access-roles",
+          "status": 403
+        }
+      ]
+    }
+  },
+  "dashboard-404": [],
+  "beta-extra": {
+    "/admin": {
+      "finalUrl": "/admin/users",
+      "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nБА\nADMIN\nАдминистрирование\nПользователи рабочей области\nСоздать пользователя\nПользователи\nРоли\nБезопасность\nАудит\nПОЛЬЗОВАТЕЛЬ\tEMAIL\tРОЛЬ\tПОЗИЦИЯ\tСТАТУС\t\nБорис Администратор\nuser-beta-admin\n\tbeta@kiss-pm.local\tАдминистратор\t—\tАктивен",
+      "fails": []
+    },
+    "deal-create": {
+      "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nБА\nCRM\nПродажи и клиенты\nВоронка продаж и активные сделки\nСделка\nСделки\nКлиенты\nКонтакты\nПродукты\nВоронка:\nКанбан\nСписок\nПрогноз\nПеретащите карточку между стадиями (переход проверяется условиями воронки)\nУсловия переходов\nворонка «—» · GET /pipelines/:id/stage-transitions\nПереходы не настроены — переносы между стадиями этой воронки не ограничены.\nНовая сделка\nНазвание\nКлиент\nВыберите…\nКонтакт\nСначала клиент\nСтадия\nВыберите…\nВероятность, %\nСумма, ₽\nСтавка, ₽/ч\nСтарт\nФиниш\nТрудоёмкость = сумма / ставка (POST /opportunities, статус «Новая»); строка спроса в прототипе фиксирована (позиция backend). Контакт валидируется как активный у выбранного клиента.\nОтмена\nСоздать\nClose",
+      "fails": []
+    },
+    "/resources": {
+      "finalUrl": "/resources",
+      "text": "Страница не найдена\nЗапрошенный маршрут не существует.\nНа главную",
+      "fails": [
+        {
+          "url": "/resources",
+          "status": 404
+        }
+      ]
+    }
+  }
+}

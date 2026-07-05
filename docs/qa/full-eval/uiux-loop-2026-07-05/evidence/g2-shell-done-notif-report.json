@@ -1,0 +1,96 @@
+{
+  "steps": {
+    "markDoneAllowed": {
+      "before": "task-status-in-progress",
+      "after": "task-status-done",
+      "bottomMsg": [
+        "АА",
+        "Анна Администратор",
+        "Статус изменён на «Выполнено»"
+      ],
+      "reverted": "task-status-done"
+    },
+    "notifControls": {
+      "switches": 18,
+      "checkboxes": 0,
+      "selects": 18,
+      "buttons": [
+        {
+          "text": "Сохранить",
+          "role": null,
+          "ariaChecked": null,
+          "disabled": false
+        },
+        {
+          "text": "",
+          "role": "switch",
+          "ariaChecked": "false",
+          "disabled": false
+        },
+        {
+          "text": "",
+          "role": "switch",
+          "ariaChecked": "false",
+          "disabled": false
+        },
+        {
+          "text": "",
+          "role": "switch",
+          "ariaChecked": "false",
+          "disabled": false
+        },
+        {
+          "text": "",
+          "role": "switch",
+          "ariaChecked": "false",
+          "disabled": false
+        },
+        {
+          "text": "",
+          "role": "switch",
+          "ariaChecked": "false",
+          "disabled": false
+        },
+        {
+          "text": "",
+          "role": "switch",
+          "ariaChecked": "false",
+          "disabled": false
+        },
+        {
+          "text": "",
+          "role": "switch",
+          "ariaChecked": "false",
+          "disabled": false
+        },
+        {
+          "text": "",
+          "role": "switch",
+          "ariaChecked": "false",
+          "disabled": false
+        },
+        {
+          "text": "",
+          "role": "switch",
+          "ariaChecked": "false",
+          "disabled": false
+        }
+      ]
+    },
+    "notifSave": {
+      "before": "false",
+      "textAfterSave": "Настройки рабочей области\n\nПрофиль, уведомления, интеграции и оплата\n\nПрофиль\nУведомления\nИнтеграции\nОплата\n\nВключите доставку по типам уведомлений и каналам. Для дайджеста задайте частоту. «Сохранить» перезапишет весь набор настроек целиком.\n\nСохран",
+      "revertedTo": "false"
+    }
+  },
+  "console": [
+    {
+      "url": "http://127.0.0.1:3000/my-work",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "url": "http://127.0.0.1:3000/my-work",
+      "text": "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    }
+  ]
+}

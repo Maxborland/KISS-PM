@@ -1,0 +1,112 @@
+{
+  "results": [
+    {
+      "route": "/projects",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-list.png"
+    },
+    {
+      "route": "/projects/project-vektor-portal",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/project-vektor-portal",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-detail-root.png"
+    },
+    {
+      "route": "/projects/project-vektor-portal/overview",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/project-vektor-portal/overview",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-overview.png"
+    },
+    {
+      "route": "/projects/project-vektor-portal/schedule",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/project-vektor-portal/schedule",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-schedule.png"
+    },
+    {
+      "route": "/projects/project-vektor-portal/resources",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/project-vektor-portal/resources",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-resources.png"
+    },
+    {
+      "route": "/projects/project-vektor-portal/assignments",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/project-vektor-portal/assignments",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-assignments.png"
+    },
+    {
+      "route": "/projects/project-vektor-portal/baseline",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/project-vektor-portal/baseline",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-baseline.png"
+    },
+    {
+      "route": "/projects/project-vektor-portal/calendars",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/project-vektor-portal/calendars",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-calendars.png"
+    },
+    {
+      "route": "/projects/project-vektor-portal/commits",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/project-vektor-portal/commits",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-commits.png"
+    },
+    {
+      "route": "/projects/project-vektor-portal/scenarios",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/project-vektor-portal/scenarios",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-scenarios.png"
+    },
+    {
+      "route": "/projects/project-vektor-portal/settings",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/project-vektor-portal/settings",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-settings.png"
+    },
+    {
+      "route": "/projects/does-not-exist-123",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/does-not-exist-123",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-invalid-id.png"
+    },
+    {
+      "route": "/projects/does-not-exist-123/schedule",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:3000/projects/does-not-exist-123/schedule",
+      "title": "KISS PM",
+      "shot": "E:\\KISS-PM\\.claude\\worktrees\\full-eval-uiux\\docs\\qa\\full-eval\\uiux-loop-2026-07-05\\evidence/screenshots/g3-projects-invalid-id-schedule.png"
+    }
+  ],
+  "console": [
+    {
+      "route": "/projects",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "route": "/projects/does-not-exist-123",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "route": "/projects/does-not-exist-123/schedule",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    }
+  ]
+}

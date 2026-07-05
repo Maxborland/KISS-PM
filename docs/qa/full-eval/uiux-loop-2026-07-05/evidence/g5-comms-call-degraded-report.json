@@ -1,0 +1,62 @@
+{
+  "steps": [
+    {
+      "step": "degraded-chat-send",
+      "detail": "Чат звонка\nСообщения во время встречи\nВы\n22:12\n\nuiux-eval-чат-при-ошибке\n\nОтправить"
+    },
+    {
+      "step": "end-call",
+      "detail": "url after end: http://127.0.0.1:3000/calls/call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027"
+    }
+  ],
+  "net": [
+    {
+      "status": 200,
+      "method": "GET",
+      "url": "/api/workspace/call-rooms/call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027",
+      "body": "{\"callRoom\":{\"entityId\":\"project-vektor-portal\",\"entityType\":\"project\",\"mediaKind\":\"video\",\"provider\":\"livekit\",\"roomId\":\"call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027\",\"status\":\"active\",\"createdAt\":\"2026-07-05T14:21:31.666Z\",\"createdByUserId\":\"user-alpha-admin\",\"meetingId\":null,\"title\":\"Audit Live"
+    },
+    {
+      "status": 200,
+      "method": "GET",
+      "url": "/api/workspace/call-rooms/call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027",
+      "body": "{\"callRoom\":{\"entityId\":\"project-vektor-portal\",\"entityType\":\"project\",\"mediaKind\":\"video\",\"provider\":\"livekit\",\"roomId\":\"call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027\",\"status\":\"active\",\"createdAt\":\"2026-07-05T14:21:31.666Z\",\"createdByUserId\":\"user-alpha-admin\",\"meetingId\":null,\"title\":\"Audit Live"
+    },
+    {
+      "status": 200,
+      "method": "GET",
+      "url": "/api/workspace/call-rooms/call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027",
+      "body": "{\"callRoom\":{\"entityId\":\"project-vektor-portal\",\"entityType\":\"project\",\"mediaKind\":\"video\",\"provider\":\"livekit\",\"roomId\":\"call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027\",\"status\":\"active\",\"createdAt\":\"2026-07-05T14:21:31.666Z\",\"createdByUserId\":\"user-alpha-admin\",\"meetingId\":null,\"title\":\"Audit Live"
+    },
+    {
+      "status": 200,
+      "method": "GET",
+      "url": "/api/workspace/call-rooms/call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027",
+      "body": "{\"callRoom\":{\"entityId\":\"project-vektor-portal\",\"entityType\":\"project\",\"mediaKind\":\"video\",\"provider\":\"livekit\",\"roomId\":\"call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027\",\"status\":\"active\",\"createdAt\":\"2026-07-05T14:21:31.666Z\",\"createdByUserId\":\"user-alpha-admin\",\"meetingId\":null,\"title\":\"Audit Live"
+    },
+    {
+      "status": 200,
+      "method": "POST",
+      "url": "/api/workspace/call-rooms/call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027/sessions/call-session-1511eeda-2bf9-408f-9d3d-6480a438b4c1/turn-credentials",
+      "body": "{\"turn\":null}"
+    },
+    {
+      "status": 501,
+      "method": "POST",
+      "url": "/api/workspace/call-rooms/call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027/sessions/call-session-1511eeda-2bf9-408f-9d3d-6480a438b4c1/join-token",
+      "body": "{\"error\":\"video_provider_disabled\"}"
+    },
+    {
+      "status": 200,
+      "method": "POST",
+      "url": "/api/workspace/call-rooms/call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027/sessions/call-session-1511eeda-2bf9-408f-9d3d-6480a438b4c1/turn-credentials",
+      "body": "{\"turn\":null}"
+    },
+    {
+      "status": 501,
+      "method": "POST",
+      "url": "/api/workspace/call-rooms/call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027/sessions/call-session-1511eeda-2bf9-408f-9d3d-6480a438b4c1/join-token",
+      "body": "{\"error\":\"video_provider_disabled\"}"
+    }
+  ]
+}

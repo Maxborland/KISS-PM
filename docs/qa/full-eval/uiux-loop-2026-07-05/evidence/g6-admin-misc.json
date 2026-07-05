@@ -1,0 +1,49 @@
+[
+  {
+    "kind": "planreader",
+    "route": "/admin/users",
+    "finalUrl": "http://127.0.0.1:3000/admin/users",
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nADMIN\nАдминистрирование\n\nПользователи рабочей области\n\nПользователи\nРоли\nБезопасность\nАудит\n\nНе удалось загрузить\n\nНедостаточно прав для этого действия\n\nПовторить"
+  },
+  {
+    "kind": "planreader",
+    "route": "/admin/security",
+    "finalUrl": "http://127.0.0.1:3000/admin/security",
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nADMIN\nАдминистрирование\n\nПолитики безопасности рабочей области\n\nСохранить\nПользователи\nРоли\nБезопасность\nАудит\nПРОТОТИП\nРеальный контракт: GET/PUT /api/tenant/current/security-policy (createAdminClient + in-memory mock, swap = apiOrigin). Изменение требует права управления конфигурацией рабочей области (canManageWorkspaceConfig); каждое сохранение пишется в журнал аудита.\n\nНе удалось загрузить\n\nНедостаточно прав для этого действия\n\nПовторить"
+  },
+  {
+    "kind": "planreader",
+    "route": "/admin/audit",
+    "finalUrl": "http://127.0.0.1:3000/admin/audit",
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nADMIN\nАдминистрирование\n\nЖурнал управленческих действий и системных событий\n\nПользователи\nРоли\nБезопасность\nАудит\nПРОТОТИП\nРеальный контракт: GET /api/tenant/current/audit-events (createAdminClient + in-memory mock, swap = apiOrigin). Требует право чтения журнала (canReadAuditEvents). Последние события по убыванию времени.\n\nНе удалось загрузить\n\nНедостаточно прав для этого действия\n\nПовторить"
+  },
+  {
+    "kind": "invalid-subroute",
+    "status": 404,
+    "url": "http://127.0.0.1:3000/admin/nonexistent-section",
+    "text": "Страница не найдена\n\nЗапрошенный маршрут не существует.\n\nНа главную"
+  },
+  {
+    "kind": "viewport-1280",
+    "horizontalScroll": false
+  },
+  {
+    "kind": "bad-domain-save",
+    "saveEnabled": true
+  },
+  {
+    "kind": "bad-domain-save-result",
+    "tail": " сохранение пишется в журнал аудита.\nПолитики безопасности\nОбязательная двухфакторная аутентификация\nВсе пользователи рабочей области обязаны включить 2FA при входе.\nЕдиный вход (SSO, SAML)\nАутентификация через корпоративный SAML-провайдер.\nТайм-аут сессии\nЧерез сколько часов бездействия завершать сессию (1…8760).\nчасов\nРазрешённые email-домены\nПользователей можно приглашать только с этих доменов. Пусто — ограничения нет.\nДобавить\nonly-audit.example\nэто не домен!!\nПолитика безопасности сохранена"
+  },
+  {
+    "kind": "bad-domain-chip-removed",
+    "stillChip": 1
+  },
+  {
+    "kind": "api",
+    "auditStatus": 200,
+    "auditBody": "{\"auditEvents\":[{\"id\":\"audit-f7f50d89-78f7-4234-9ed2-fa8cb0430bb1\",\"tenantId\":\"tenant-alpha\",\"actorUserId\":\"user-alpha-admin\",\"actionType\":\"workspace.security_policy.updated\",\"sourceSurfaceId\":null,\"sourceWorkflow\":\"single_workspace_config\",\"sourceEntity\":{\"id\":\"tenant-alpha\",\"type\":\"SecurityPolicy\"},\"input\":{\"ssoSamlEnabled\":false,\"domainAllowlist\":[\"only-audit.example\",\"это не домен!!\"],\"twoFact",
+    "policyStatus": 200,
+    "policyBody": "{\"securityPolicy\":{\"twoFactorRequired\":true,\"sessionTimeoutHours\":1,\"ssoSamlEnabled\":false,\"domainAllowlist\":[\"only-audit.example\",\"это не домен!!\"]}}"
+  }
+]

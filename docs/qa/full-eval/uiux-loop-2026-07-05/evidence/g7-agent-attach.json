@@ -1,0 +1,40 @@
+{
+  "consoleErrors": [
+    {
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://127.0.0.1:3000/favicon.ico"
+    }
+  ],
+  "checks": [
+    {
+      "name": "attach-admin",
+      "anchorLabel": "uiux-eval-сделка-02",
+      "chips": [
+        "uiux-eval-notes.txt×"
+      ]
+    },
+    {
+      "name": "attach-chip-remove",
+      "chipsAfter": 0
+    },
+    {
+      "name": "attach-plan-reader",
+      "options": [
+        "Привязать файл к проекту…",
+        "uiux-eval-сделка-02",
+        "Портал подрядчиков Вектор",
+        "Миграция данных Горсеть",
+        "CRM intake"
+      ],
+      "lastMsg": "Нет прав на добавление файла в этот проект — выберите проект, которым вы управляете.",
+      "chips": 0
+    },
+    {
+      "name": "server-error-clean",
+      "typedBefore": "uiux-eval: запрос при недоступном LLM",
+      "errMsg": "Не удалось обработать запрос: agent_llm_failed",
+      "inputAfterError": "",
+      "inputLost": true
+    }
+  ]
+}

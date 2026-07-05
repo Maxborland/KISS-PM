@@ -1,0 +1,51 @@
+{
+  "network404": [
+    {
+      "url": "http://127.0.0.1:3000/definitely-not-a-page-uiux-eval",
+      "status": 404
+    }
+  ],
+  "console": [
+    {
+      "url": "http://127.0.0.1:3000/dashboard",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "url": "http://127.0.0.1:3000/definitely-not-a-page-uiux-eval",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    }
+  ],
+  "searchState": {
+    "disabled": true,
+    "title": "Поиск появится в следующей версии"
+  },
+  "avatarMenu": "Анна Администратор\nuser-alpha-admin\nПрофиль\nВыйти",
+  "grayNav_Ресурсы": {
+    "tag": "SPAN",
+    "href": null,
+    "title": "Раздел появится в приложении",
+    "cursor": "default",
+    "urlAfterClick": "http://127.0.0.1:3000/dashboard"
+  },
+  "grayNav_KPI": {
+    "tag": "SPAN",
+    "href": null,
+    "title": "Раздел появится в приложении",
+    "cursor": "default",
+    "urlAfterClick": "http://127.0.0.1:3000/dashboard"
+  },
+  "notFoundHomeButton": {
+    "url": "http://127.0.0.1:3000/"
+  },
+  "dashboardTaskClick": {
+    "insideLink": false,
+    "href": null,
+    "cursor": "auto",
+    "urlAfterClick": "http://127.0.0.1:3000/dashboard"
+  },
+  "dashboardTileClick": {
+    "insideLink": false,
+    "href": null,
+    "urlAfterClick": "http://127.0.0.1:3000/dashboard"
+  }
+}

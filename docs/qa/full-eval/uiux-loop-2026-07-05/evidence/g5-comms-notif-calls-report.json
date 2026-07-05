@@ -1,0 +1,48 @@
+{
+  "steps": [
+    {
+      "step": "notif-route-href",
+      "detail": "/projects/project-vektor-portal"
+    },
+    {
+      "step": "notif-read-one",
+      "detail": "статус обновился"
+    },
+    {
+      "step": "notif-tab-badge-after-read",
+      "detail": "\"Чат Каналы Звонки Встречи Уведомления1\""
+    },
+    {
+      "step": "notif-filter-unread",
+      "detail": "пустое состояние ок"
+    },
+    {
+      "step": "prefs-save",
+      "detail": "switch was false; body has 'Настройки сохранены': true"
+    },
+    {
+      "step": "prefs-lost-on-tab-switch",
+      "detail": "switch#2 aria-checked=false (если вернулся к серверному значению — ввод потерян без предупреждения)"
+    },
+    {
+      "step": "call-room",
+      "detail": "call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027 provider=livekit status=open"
+    },
+    {
+      "step": "call-join-degraded",
+      "detail": "Не удалось подключиться к звонку\nЗвонок команды\nОшибка связи\nМикрофон\nКамера\nЭкран\nФон\nЗавершить\nЧат звонка\nСообщения во время встречи\n\nПока нет сообщений. Начните обсуждение.\n\nОтправить"
+    },
+    {
+      "step": "chat-retry",
+      "detail": "всё та же ошибка (тупик)"
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 409 (Conflict)",
+    "Failed to load resource: the server responded with a status of 501 (Not Implemented)",
+    "Failed to load resource: the server responded with a status of 501 (Not Implemented)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

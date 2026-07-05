@@ -1,0 +1,5 @@
+{
+  "removedClick": true,
+  "chipStill": 0,
+  "policy": "{\"securityPolicy\":{\"twoFactorRequired\":true,\"sessionTimeoutHours\":1,\"ssoSamlEnabled\":false,\"domainAllowlist\":[\"only-audit.example\"]}}"
+}

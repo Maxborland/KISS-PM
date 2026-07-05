@@ -1,0 +1,64 @@
+{
+  "consoleErrors": [],
+  "checks": [
+    {
+      "name": "live-steps",
+      "liveSteps": [
+        "Проверяет работы",
+        "Проверяет сроки",
+        "Смотрит зависимости",
+        "Сверяет ответственных",
+        "Готовит Сверку"
+      ]
+    },
+    {
+      "name": "review-header-vs-actual",
+      "headerCount": "5 изменений",
+      "actualChanges": 4,
+      "summary": "3 выбраноГотово к проверкеВыбрано",
+      "statuses": [
+        "выбрано",
+        "выбрано",
+        "выбрано",
+        "требует прав"
+      ]
+    },
+    {
+      "name": "summary-dropdown-click",
+      "afterSummaryClick": "3 выбраноГотово к проверкеВыбрано",
+      "domChanged": false
+    },
+    {
+      "name": "edit-blocked-status-action",
+      "editBlockMsg": "Это действие нельзя отредактировать вручную — отклоните его и уточните запрос, и я предложу новый вариант."
+    },
+    {
+      "name": "edit-comment",
+      "textareaVisible": 1,
+      "editedStatus": "изменено"
+    },
+    {
+      "name": "reject-change",
+      "rejectedStatus": "отклонено"
+    },
+    {
+      "name": "apply-result",
+      "appliedBanner": "Выбранные изменения применены4 изменения записаны в журнал проекта",
+      "applyChatMsg": "Применил 2 изменения. Готово — данные обновлены.",
+      "executeActions": [
+        "change_task_status",
+        "comment_task"
+      ],
+      "editedBodySent": true
+    },
+    {
+      "name": "apply-disabled-after",
+      "applyDisabled": true
+    },
+    {
+      "name": "reset-no-confirm",
+      "msgsAfterReset": 0,
+      "reviewGone": 0
+    }
+  ]
+}

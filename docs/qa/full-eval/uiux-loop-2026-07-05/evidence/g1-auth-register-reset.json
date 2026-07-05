@@ -1,0 +1,76 @@
+{
+  "regWeakPassword": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    ],
+    "errorText": "Пароль слишком простой — минимум 8 символов",
+    "nameKept": "uiux-eval Тестов",
+    "emailKept": "uiux-eval-weak-1783261953551@example.com"
+  },
+  "regEmailTaken": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    ],
+    "errorText": "Этот email уже зарегистрирован"
+  },
+  "regBadEmail": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    ],
+    "buttonEnabledWithBadEmail": true,
+    "errorText": "Проверьте имя, email и пароль",
+    "nativeValidation": "Адрес электронной почты должен содержать символ \"@\". В адресе \"uiux-eval-bad-email\" отсутствует символ \"@\"."
+  },
+  "regSuccess": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "midText": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nUУ\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nМОИ ЗАДАЧИ\n0\n0 в работе\nОТКРЫТЫЕ СДЕЛКИ\n0\n0 тыс ₽\nАКТИВНЫЕ ПРОЕКТЫ\n0\n0 ч плана\nСДЕЛКИ ВЫИГРАНЫ\n0\nпока нет\nБлижайшие задачи\n\nМои незавершённые задачи по плановому финишу\n\nНезавершённых задач нет — всё закрыто.\n\nСделки по статусам\n\nРаспределение возможностей CRM\n\nСделок пока нет.\n\nМитинги и сигналы\n\nСводка дня\n\nМитинги «на сегодня», фокус-график и tenant-сигналы появятся после агрегирующего контракта — у отдельных ручек (митинги привязаны к сущности; сигналы — к проекту) tenant-широкой сводки пока нет. Здесь честный плейсхолдер вместо фейковых чисел.",
+    "finalUrl": "http://127.0.0.1:3000/dashboard",
+    "regPosts": 1,
+    "email": "uiux-eval-ok-1783261953551@example.com"
+  },
+  "resetRequest": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "prefilledEmail": "admin@kiss-pm.local",
+    "bodyText": "К\nKISS PM\nРабочее пространство\nСброс пароля\n\nУкажите email рабочего пространства — мы отправим инструкции по сбросу пароля.\n\nПРОТОТИП\nContract-mock боевого POST /api/auth/password-reset/request — anti-enumeration: всегда 202 {status:\"ok\"}. Письма нет → токен показывается (демо-замена). Переключение на боевой = смена apiOrigin; данные in-memory.\nEmail\nОтправить инструкции\nЕсли адрес зарегистрирован — мы отправили инструкции по сбросу пароля.\nУже есть токен? Перейти к подтверждению",
+    "hasDevToken": false
+  },
+  "resetBadEmail": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    ],
+    "errorText": "Некорректный email",
+    "nativeValidation": "Адрес электронной почты должен содержать символ \"@\". В адресе \"uiux-eval-bad\" отсутствует символ \"@\"."
+  },
+  "confirmBadToken": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    ],
+    "errorText": "Ссылка для сброса недействительна",
+    "tokenKept": 64
+  },
+  "confirmWeakPassword": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    ],
+    "errorText": "Пароль слишком простой — минимум 8 символов"
+  },
+  "responses404": []
+}

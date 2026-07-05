@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "http",
+    "status": 409,
+    "url": "http://127.0.0.1:3000/api/workspace/users",
+    "method": "POST"
+  },
+  {
+    "kind": "dup-email",
+    "modalOpen": 1,
+    "emailVal": "admin@kiss-pm.local",
+    "text": "er-20260705205400\n\taudit-user-manager-20260705205400@kiss-pm.local\tAudit User Manager 20260705205400\t—\tАктивен\t\n\n\nuiux-eval-g6-1783263859275\nuser-b6185f8a-8b7d-4e36-a908-d24bd62d1fd8\n\tuiux-eval-g6-1783263859275@only-audit.example\tАдминистратор\t—\tАктивен\t\n\n\nuiux-eval-g6-bad-1783263859275\nuser-5cedb2cc-f0a6-447e-8d92-a5f777394d92\n\tuiux-eval-g6-bad-1783263859275@kiss-pm.local\tАдминистратор\t—\tНеактивен\t\n\n\nАнна Администратор\nuser-alpha-admin\n\tadmin@kiss-pm.local\tАдминистратор\tРуководитель проекта\tАктивен\t\n\n\nИгорь Инженер\nuser-alpha-engineer\n\tengineer@kiss-pm.local\tАдминистратор\tИнженер\tАктивен\t\n\n\nНикита Без Ресурсов\nuser-alpha-plan-reader-no-resources\n\tplan-reader-no-resources@kiss-pm.local\tНаблюдатель плана без ресурсов\tИнженер\tАктивен\t\n\n\nРоман Ресурсный\nuser-alpha-resource-reader\n\tresource-reader@kiss-pm.local\tНаблюдатель ресурсов\tИнженер\tАктивен\t\nОтклонено: Email уже занят другим пользователем\nНовый пользователь\nEmail\nИмя\nРоль доступа\nАдминистратор\nAudit Browser User Manager 20260705212045\nAudit User Manager 20260705205400\nНаблюдатель плана без ресурсов\nНаблюдатель ресурсов\nПозиция\n— без позиции —\nАналитик\nИнженер\nРуководитель проекта\nТимлид\nПароль (≥ 8 символов)\nОтмена\nСоздать\nClose"
+  }
+]

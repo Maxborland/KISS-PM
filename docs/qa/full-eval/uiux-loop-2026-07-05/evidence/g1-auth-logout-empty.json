@@ -1,0 +1,32 @@
+{
+  "logoutCycle": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "afterLogoutUrl": "http://127.0.0.1:3000/login",
+    "loggedOutVia": "avatar-menu",
+    "reloginUrl": "http://127.0.0.1:3000/dashboard"
+  },
+  "resetEmptySubmit": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    ],
+    "errorText": "Некорректный email",
+    "nativeMsg": "Заполните это поле."
+  },
+  "confirmEmptySubmit": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    ],
+    "errorText": "Проверьте токен и пароль",
+    "nativeMsg": "Заполните это поле."
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "consoleErrors": {
+    "anon-root": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      }
+    ],
+    "anon-login": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      }
+    ],
+    "anon-login-1280": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      }
+    ],
+    "anon-register": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      }
+    ],
+    "anon-reset-request": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      }
+    ],
+    "anon-reset-confirm": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      }
+    ],
+    "anon-reset-confirm-badtoken": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      }
+    ],
+    "anon-404": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      }
+    ],
+    "anon-dashboard-gate": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      }
+    ]
+  },
+  "results": {
+    "anon-root": {
+      "path": "/",
+      "finalUrl": "http://127.0.0.1:3000/login",
+      "status": 200,
+      "title": "KISS PM",
+      "bodyTextHead": "К\nKISS PM\nРабочее пространство\nВход в KISS PM\n\nКорпоративный email и пароль рабочего пространства.\n\nEmail\nПароль\nВойти\nНет аккаунта? Создать аккаунт\nЗабыли пароль?"
+    },
+    "anon-login": {
+      "path": "/login",
+      "finalUrl": "http://127.0.0.1:3000/login",
+      "status": 200,
+      "title": "KISS PM",
+      "bodyTextHead": "К\nKISS PM\nРабочее пространство\nВход в KISS PM\n\nКорпоративный email и пароль рабочего пространства.\n\nEmail\nПароль\nВойти\nНет аккаунта? Создать аккаунт\nЗабыли пароль?"
+    },
+    "anon-login-1280": {
+      "path": "/login",
+      "finalUrl": "http://127.0.0.1:3000/login",
+      "status": 200,
+      "title": "KISS PM",
+      "bodyTextHead": "К\nKISS PM\nРабочее пространство\nВход в KISS PM\n\nКорпоративный email и пароль рабочего пространства.\n\nEmail\nПароль\nВойти\nНет аккаунта? Создать аккаунт\nЗабыли пароль?"
+    },
+    "anon-register": {
+      "path": "/register",
+      "finalUrl": "http://127.0.0.1:3000/register",
+      "status": 200,
+      "title": "KISS PM",
+      "bodyTextHead": "К\nKISS PM\nРабочее пространство\nРегистрация\n\nСоздайте учётную запись в рабочем пространстве\n\nИмя\nEmail\nПароль\nНе короче 8 символов, без управляющих символов.\nСоздать аккаунт\nПРОТОТИП\nContract-mock боевого POST /api/auth/register (новый тенант + авто-логин); переключение на боевой = apiOrigin; данные in-memory.\nУже есть аккаунт? Войти"
+    },
+    "anon-reset-request": {
+      "path": "/password-reset",
+      "finalUrl": "http://127.0.0.1:3000/password-reset",
+      "status": 200,
+      "title": "KISS PM",
+      "bodyTextHead": "К\nKISS PM\nРабочее пространство\nСброс пароля\n\nУкажите email рабочего пространства — мы отправим инструкции по сбросу пароля.\n\nПРОТОТИП\nContract-mock боевого POST /api/auth/password-reset/request — anti-enumeration: всегда 202 {status:\"ok\"}. Письма нет → токен показывается (демо-замена). Переключение на боевой = смена apiOrigin; данные in-memory.\nEmail\nОтправить инструкции\nУже есть токен? Перейти к подтверждению"
+    },
+    "anon-reset-confirm": {
+      "path": "/password-reset/confirm",
+      "finalUrl": "http://127.0.0.1:3000/password-reset/confirm",
+      "status": 200,
+      "title": "KISS PM",
+      "bodyTextHead": "К\nKISS PM\nРабочее пространство\nНовый пароль\n\nВставьте токен сброса и задайте новый пароль рабочего пространства.\n\nПРОТОТИП\nContract-mock боевого POST /api/auth/password-reset/confirm — токен 64-hex, политика пароля ≥8. Письма нет → токен показывается на шаге запроса (демо-замена). Переключение на боевой = смена apiOrigin; данные in-memory.\nТокен сброса\nНовый пароль\nИзменить пароль\nНет токена? Запросить сброс заново"
+    },
+    "anon-reset-confirm-badtoken": {
+      "path": "/password-reset/confirm?token=abc",
+      "finalUrl": "http://127.0.0.1:3000/password-reset/confirm?token=abc",
+      "status": 200,
+      "title": "KISS PM",
+      "bodyTextHead": "К\nKISS PM\nРабочее пространство\nНовый пароль\n\nВставьте токен сброса и задайте новый пароль рабочего пространства.\n\nПРОТОТИП\nContract-mock боевого POST /api/auth/password-reset/confirm — токен 64-hex, политика пароля ≥8. Письма нет → токен показывается на шаге запроса (демо-замена). Переключение на боевой = смена apiOrigin; данные in-memory.\nТокен сброса\nНовый пароль\nИзменить пароль\nНет токена? Запросить сброс заново"
+    },
+    "anon-404": {
+      "path": "/definitely-not-a-page-xyz",
+      "finalUrl": "http://127.0.0.1:3000/login",
+      "status": 200,
+      "title": "KISS PM",
+      "bodyTextHead": "К\nKISS PM\nРабочее пространство\nВход в KISS PM\n\nКорпоративный email и пароль рабочего пространства.\n\nEmail\nПароль\nВойти\nНет аккаунта? Создать аккаунт\nЗабыли пароль?"
+    },
+    "anon-dashboard-gate": {
+      "path": "/dashboard",
+      "finalUrl": "http://127.0.0.1:3000/login",
+      "status": 200,
+      "title": "KISS PM",
+      "bodyTextHead": "К\nKISS PM\nРабочее пространство\nВход в KISS PM\n\nКорпоративный email и пароль рабочего пространства.\n\nEmail\nПароль\nВойти\nНет аккаунта? Создать аккаунт\nЗабыли пароль?"
+    }
+  }
+}

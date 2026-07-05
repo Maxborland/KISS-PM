@@ -1,0 +1,57 @@
+{
+  "consoleErrors": [
+    {
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://127.0.0.1:3000/favicon.ico"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "url": "http://127.0.0.1:3000/api/workspace/agent/propose/stream"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://127.0.0.1:3000/favicon.ico"
+    }
+  ],
+  "checks": [
+    {
+      "name": "double-submit",
+      "inputEnabledDuringThinking": true,
+      "sendEnabledDuringThinking": true,
+      "streamCalls": 2,
+      "msgs": [
+        "uiux-eval: первый запрос",
+        "uiux-eval: второй запрос во время обработки первого",
+        "Ответ на запрос #2.",
+        "Ответ на запрос #2."
+      ],
+      "reviewTitles": [
+        "Комментарий #2"
+      ]
+    },
+    {
+      "name": "viewport-1280-overflow",
+      "horizontalOverflow": false
+    },
+    {
+      "name": "long-message",
+      "lengthSent": 1196,
+      "bubbleWidth": 560,
+      "bubbleHeight": 460
+    },
+    {
+      "name": "server-error-render",
+      "errMsg": "Не удалось обработать запрос: agent_llm_failed"
+    },
+    {
+      "name": "plan-reader",
+      "attachBar": 1,
+      "attachMsg": "Сначала выберите проект, к которому привязать файл.",
+      "readerMsgs": [
+        "Сначала выберите проект, к которому привязать файл.",
+        "uiux-eval: что мне доступно?",
+        "Предложений нет."
+      ]
+    }
+  ]
+}
