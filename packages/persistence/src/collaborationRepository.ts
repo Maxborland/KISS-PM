@@ -186,6 +186,10 @@ export type CollaborationRepository = {
     messageId: string;
     pinnedByUserId: UserId;
   }): Promise<DiscussionMessage | undefined>;
+  unpinDiscussionMessage(input: {
+    tenantId: TenantId;
+    messageId: string;
+  }): Promise<DiscussionMessage | undefined>;
   replaceMessageMentions(input: {
     tenantId: TenantId;
     messageId: string;
@@ -764,6 +768,24 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         .set({
           pinnedAt: new Date(),
           pinnedByUserId: input.pinnedByUserId
+        })
+        .where(
+          and(
+            eq(discussionMessages.tenantId, input.tenantId),
+            eq(discussionMessages.id, input.messageId),
+            isNull(discussionMessages.archivedAt)
+          )
+        )
+        .returning();
+      return row ? mapDiscussionMessage(row) : undefined;
+    },
+    // COMM-06: снятие закрепления (зеркало pin) — раньше закрепление было необратимо.
+    async unpinDiscussionMessage(input) {
+      const [row] = await db
+        .update(discussionMessages)
+        .set({
+          pinnedAt: null,
+          pinnedByUserId: null
         })
         .where(
           and(

@@ -4,7 +4,7 @@ import {
   canPreviewPlanningScenarios,
   canReadProjectResources
 } from "@kiss-pm/access-control";
-import { isBlockingValidationIssue, proposePlanningScenarios } from "@kiss-pm/domain";
+import { buildCompensatingCommands, isBlockingValidationIssue, proposePlanningScenarios, type PlanningCommand } from "@kiss-pm/domain";
 import type { Handler, Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
@@ -14,6 +14,7 @@ import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRo
 import { notifyPlanVersionChanged } from "../planningEventBus";
 import { registerPlanningEventsRoute } from "../planningEventsRoute";
 import { registerPlanningAutoSolverRoutes } from "./planningAutoSolverRoutes";
+import { registerPlanningRevertRoute } from "./planningRevertRoute";
 import { registerPlanningSavedViewRoutes } from "./planningSavedViewRoutes";
 import {
   parsePlanningCommandEnvelope,
@@ -40,6 +41,7 @@ import {
   validateCommandDataSourcePreconditions,
   type PlanningRouteDeps
 } from "./planningRouteHelpers";
+import { normalizeTaskCreateStatus } from "./taskCreateNormalization";
 import {
   parseScenarioProposal,
   scenarioRequiresAcceptedRiskReason,
@@ -61,6 +63,7 @@ function emitPlanVersionFromBody(
 }
 
 export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
+  registerPlanningRevertRoute(app, deps);
   registerPlanningEventsRoute(app, {
     getSessionActorFromHeaders: deps.getSessionActorFromHeaders,
     getActorProfile: deps.getActorProfile,
@@ -139,13 +142,16 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       return context.json({ error: "plan_version_conflict", currentPlanVersion: snapshot.planVersion }, 409);
     }
 
-    const preview = previewPlanningCommand(snapshot, parsed.value.command);
+    // Тот же statusId-резолв, что при apply (BUG-PROJ-01) — иначе предпросмотр task.create
+    // покажет ложную ошибку «неизвестный статус».
+    const previewCommand = await normalizeTaskCreateStatus(deps.dataSource, actor.tenantId, parsed.value.command);
+    const preview = previewPlanningCommand(snapshot, previewCommand);
     const validationIssues = [
       ...preview.validationIssues,
       ...(await validateCommandDataSourcePreconditions(
         deps.dataSource,
         actor.tenantId,
-        parsed.value.command
+        previewCommand
       ))
     ];
     const hasBlockingValidationIssue = validationIssues.some(isBlockingValidationIssue);
@@ -156,7 +162,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       validationIssues,
       permissionPreview,
       auditPreview: {
-        actionType: auditActionForCommand(parsed.value.command),
+        actionType: auditActionForCommand(previewCommand),
         sourceWorkflow: "planning",
         planVersionBefore: snapshot.planVersion,
         planVersionAfter: hasBlockingValidationIssue ? snapshot.planVersion : snapshot.planVersion + 1
@@ -270,13 +276,15 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         };
       }
 
-      const preview = previewPlanningCommand(snapshot, parsed.value.command);
+      // BUG-PROJ-01: клиентский statusId нормализуем к активному статусу тенанта.
+      const command = await normalizeTaskCreateStatus(transactionDataSource, actor.tenantId, parsed.value.command);
+      const preview = previewPlanningCommand(snapshot, command);
       const validationIssues = [
         ...preview.validationIssues,
         ...(await validateCommandDataSourcePreconditions(
           transactionDataSource,
           actor.tenantId,
-          parsed.value.command
+          command
         ))
       ];
       if (validationIssues.some(isBlockingValidationIssue)) {
@@ -292,22 +300,24 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         tenantId: actor.tenantId,
         projectId,
         actorUserId: actor.id,
-        command: parsed.value.command
+        command
       });
       const newPlanVersion = await transactionDataSource.incrementPlanVersion(actor.tenantId, projectId);
       const auditEventId = await appendPlanningAuditIfConfigured(deps, {
         tenantId: actor.tenantId,
         actorUserId: actor.id,
-        actionType: auditActionForCommand(parsed.value.command),
+        actionType: auditActionForCommand(command),
         sourceWorkflow: "planning",
         sourceEntity: { type: "Project", id: projectId },
-        commandInput: { command: parsed.value.command, idempotencyKey: parsed.value.idempotencyKey ?? null },
+        commandInput: { command, idempotencyKey: parsed.value.idempotencyKey ?? null },
         beforeState: summarizeSnapshot(snapshot),
         afterState: {
           planVersion: newPlanVersion,
           changedTaskIds: preview.planDelta.changedTaskIds,
           changedAssignmentIds: preview.planDelta.changedAssignmentIds,
-          changedDependencyIds: preview.planDelta.changedDependencyIds
+          changedDependencyIds: preview.planDelta.changedDependencyIds,
+          // BUG-PROJ-24: обратные команды для revert-last (пустой массив = необратимо).
+          compensatingCommands: buildCompensatingCommands(command, snapshot)
         },
         permissionResult: decision,
         executionResult: { status: "succeeded", validationIssues }
@@ -320,7 +330,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         actorUserId: actor.id,
         beforeSnapshot: snapshot,
         afterSnapshot: appliedSnapshot,
-        commands: [parsed.value.command]
+        commands: [command]
       });
       const responseBody = {
         applied: preview.planDelta,
@@ -464,9 +474,16 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         };
       }
 
+      // Нормализуем statusId у task.create в пакете (BUG-PROJ-01) — как в одиночном apply.
+      const commands = await Promise.all(
+        parsed.value.commands.map((command) =>
+          normalizeTaskCreateStatus(transactionDataSource, actor.tenantId, command)
+        )
+      );
+
       const batchPreview = await previewPlanningCommands(
         snapshot,
-        parsed.value.commands,
+        commands,
         transactionDataSource,
         actor.tenantId
       );
@@ -479,7 +496,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         };
       }
 
-      for (const command of parsed.value.commands) {
+      for (const command of commands) {
         await transactionDataSource.applyPlanningCommand({
           tenantId: actor.tenantId,
           projectId,
@@ -495,7 +512,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         sourceWorkflow: "planning",
         sourceEntity: { type: "Project", id: projectId },
         commandInput: {
-          commands: parsed.value.commands,
+          commands,
           idempotencyKey: parsed.value.idempotencyKey ?? null
         },
         beforeState: summarizeSnapshot(snapshot),
@@ -516,7 +533,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         actorUserId: actor.id,
         beforeSnapshot: snapshot,
         afterSnapshot: appliedSnapshot,
-        commands: parsed.value.commands
+        commands
       });
       const responseBody = {
         applied: batchPreview.planDelta,

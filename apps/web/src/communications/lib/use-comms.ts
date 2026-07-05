@@ -222,6 +222,10 @@ export function useConversation(entityType: EntityType, entityId: string) {
     (conversationId: string, messageId: string) => guard(async () => { await client.pinMessage(conversationId, messageId); await loadMessages(conversationId); }),
     [client, guard, loadMessages]
   );
+  const unpinMessage = useCallback(
+    (conversationId: string, messageId: string) => guard(async () => { await client.unpinMessage(conversationId, messageId); await loadMessages(conversationId); }),
+    [client, guard, loadMessages]
+  );
   const markRead = useCallback(
     (conversationId: string) => guard(async () => {
       await client.markRead(conversationId);
@@ -240,7 +244,7 @@ export function useConversation(entityType: EntityType, entityId: string) {
     [client, guard]
   );
 
-  return { client, data, status, error, reload: load, selectConversation, reloadMessages, postMessage, editMessage, deleteMessage, addReaction, removeReaction, pinMessage, markRead };
+  return { client, data, status, error, reload: load, selectConversation, reloadMessages, postMessage, editMessage, deleteMessage, addReaction, removeReaction, pinMessage, unpinMessage, markRead };
 }
 
 /* ============================================================

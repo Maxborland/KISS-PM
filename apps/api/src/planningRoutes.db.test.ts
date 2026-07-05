@@ -969,6 +969,161 @@ describe("planning API routes", () => {
     await expect(deniedApply.json()).resolves.toEqual({ error: "permission_missing" });
   });
 
+  // Регресс BUG-PROJ-01: task.create с неизвестным statusId ("todo") не падает 409 —
+  // сервер подставляет начальный статус тенанта (категория "new").
+  it("normalizes an unknown task.create statusId to the tenant initial status", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const readModelBody = await readModel.json();
+
+    const command = {
+      type: "task.create",
+      payload: {
+        id: "task-status-normalized",
+        projectId: "project-alpha",
+        parentTaskId: null,
+        title: "Задача без валидного статуса",
+        statusId: "todo", // не существует в тенанте (реальные — task-status-*)
+        plannedStart: null,
+        plannedFinish: null,
+        durationMinutes: 480,
+        workMinutes: 480,
+        assignments: []
+      }
+    };
+
+    const applied = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({ command, clientPlanVersion: readModelBody.planVersion })
+      }
+    );
+    expect(applied.status).toBe(200);
+
+    // созданная задача получила начальный статус (task-status-new), а не "todo"
+    const after = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const afterBody = await after.json();
+    const created = (afterBody.authored.tasks as Array<{ id: string; statusId: string }>).find(
+      (t) => t.id === "task-status-normalized"
+    );
+    expect(created).toBeDefined();
+    expect(created?.statusId).toBe("task-status-new");
+  });
+
+  // Регресс BUG-PROJ-03: task.update_progress СОХРАНЯЕТ percentComplete (раньше
+  // персистенция не имела case для команды → значение молча терялось при 200).
+  it("persists task.update_progress percentComplete", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = { "content-type": "application/json", "x-kiss-pm-action": "same-origin", cookie: adminCookie };
+    const readModel = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const v0 = (await readModel.json()).planVersion;
+
+    // создаём задачу с трудоёмкостью
+    const created = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        command: {
+          type: "task.create",
+          payload: {
+            id: "task-progress-persist",
+            projectId: "project-alpha",
+            parentTaskId: null,
+            title: "Задача для проверки прогресса",
+            statusId: "task-status-new",
+            plannedStart: "2026-06-10",
+            plannedFinish: "2026-06-11",
+            durationMinutes: 480,
+            workMinutes: 480,
+            assignments: []
+          }
+        },
+        clientPlanVersion: v0
+      })
+    });
+    expect(created.status).toBe(200);
+    const v1 = (await created.json()).newPlanVersion;
+
+    // обновляем прогресс
+    const applied = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        command: { type: "task.update_progress", payload: { taskId: "task-progress-persist", percentComplete: 42 } },
+        clientPlanVersion: v1
+      })
+    });
+    expect(applied.status).toBe(200);
+
+    // percentComplete сохранился в read-model
+    const after = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const afterBody = await after.json();
+    const updated = (afterBody.authored.tasks as Array<{ id: string; percentComplete: number }>).find(
+      (t) => t.id === "task-progress-persist"
+    );
+    expect(updated?.percentComplete).toBe(42);
+  });
+
+  // Регресс BUG-PROJ-24: revert-last откатывает последний обратимый коммит
+  // компенсирующими командами (значение восстанавливается).
+  it("reverts the last planning commit via compensating commands", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = { "content-type": "application/json", "x-kiss-pm-action": "same-origin", cookie: adminCookie };
+    const rm0 = await app.request("/api/workspace/projects/project-alpha/planning/read-model", { headers: { cookie: adminCookie } });
+    const v0 = (await rm0.json()).planVersion;
+
+    const created = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        command: {
+          type: "task.create",
+          payload: { id: "task-revert", projectId: "project-alpha", parentTaskId: null, title: "Откат", statusId: "task-status-new", plannedStart: "2026-06-10", plannedFinish: "2026-06-11", durationMinutes: 480, workMinutes: 480, assignments: [] }
+        },
+        clientPlanVersion: v0
+      })
+    });
+    const v1 = (await created.json()).newPlanVersion;
+
+    // меняем прогресс 0 → 55
+    const upd = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        command: { type: "task.update_progress", payload: { taskId: "task-revert", percentComplete: 55 } },
+        clientPlanVersion: v1
+      })
+    });
+    expect(upd.status).toBe(200);
+
+    // откат последнего коммита → прогресс возвращается к 0
+    const revert = await app.request("/api/workspace/projects/project-alpha/planning/revert-last", { method: "POST", headers });
+    expect(revert.status).toBe(200);
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", { headers: { cookie: adminCookie } });
+    const afterBody = await after.json();
+    const task = (afterBody.authored.tasks as Array<{ id: string; percentComplete: number }>).find((t) => t.id === "task-revert");
+    expect(task?.percentComplete).toBe(0);
+  });
+
   it("requires resource management permission to create and read auto-solver runs", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const limitedManagerCookie = await loginAs(
@@ -1178,6 +1333,49 @@ describe("planning API routes", () => {
         })
       ]
     });
+  });
+
+  // Регресс BUG-PROJ-22: свежезафиксированный baseline даёт Δ=0 (морозим calculated-даты,
+  // а не authored — иначе появлялась мнимая дельта сразу после захвата).
+  it("shows zero deltas immediately after capturing a baseline", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-fresh-baseline",
+      title: "Свежий baseline",
+      start: "2026-06-02",
+      finish: "2026-06-05",
+      plannedWork: 24
+    });
+    const rm = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const rmBody = await rm.json();
+
+    const capture = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin", cookie: adminCookie },
+      body: JSON.stringify({
+        command: { type: "baseline.capture", payload: { baselineId: "baseline-fresh", label: "Свежий" } },
+        clientPlanVersion: rmBody.planVersion
+      })
+    });
+    expect(capture.status).toBe(200);
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    const comparison = afterBody.baselineComparison as {
+      baselineId: string;
+      tasks: Array<{ startDeltaDays: number | null; finishDeltaDays: number | null; workDeltaMinutes: number | null }>;
+    };
+    expect(comparison.baselineId).toBe("baseline-fresh");
+    expect(comparison.tasks.length).toBeGreaterThan(0);
+    for (const t of comparison.tasks) {
+      expect(t.startDeltaDays).toBe(0);
+      expect(t.finishDeltaDays).toBe(0);
+      expect(t.workDeltaMinutes).toBe(0);
+    }
   });
 
   it("emits distinct audit actions for archived and hard-deleted planning tasks", async () => {

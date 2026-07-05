@@ -1037,6 +1037,10 @@ export type ApiTenantDataSource = {
     messageId: string;
     pinnedByUserId: UserId;
   }): Promise<DiscussionMessage | undefined>;
+  unpinDiscussionMessage?(input: {
+    tenantId: TenantId;
+    messageId: string;
+  }): Promise<DiscussionMessage | undefined>;
   replaceMessageMentions?(input: {
     tenantId: TenantId;
     messageId: string;

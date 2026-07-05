@@ -10,6 +10,7 @@ import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { cn } from "@/lib/cn";
 import { useMyWork, useWorkspaceTaskStatuses, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
 import type { TaskPriority, TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
    Мои задачи (authenticated) — домашний экран рабочей области текущего
@@ -278,6 +279,7 @@ export function MyWorkSurface() {
 
 // Баннер честности «Прототип» (зеркало profile/deals).
 function ProtoBanner() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">

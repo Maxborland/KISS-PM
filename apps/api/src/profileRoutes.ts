@@ -186,6 +186,9 @@ function parseProfileTextField(
   }
 
   const value = (input as Record<string, unknown>)[key];
+  // SHELL-10: null трактуем как «очистить поле» (клиент шлёт null при стирании
+  // телефона/telegram) — эквивалент пустой строки, а не invalid_profile_payload.
+  if (value === null) return { ok: true, value: "" };
   if (typeof value !== "string") return { ok: false };
   if (/[\u0000-\u001f\u007f]/.test(value)) return { ok: false };
 

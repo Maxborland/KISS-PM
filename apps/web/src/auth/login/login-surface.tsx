@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { AuthCard, AuthShell, FormError, PasswordField, authErr } from "@/auth/lib/auth-bits";
 import { useAuth } from "@/auth/lib/use-auth";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
    Поверхность ВХОД (Auth/Login).
@@ -46,9 +47,16 @@ export function LoginSurface({ prefill = false }: LoginSurfaceProps) {
   const { state, status, error, user, reload, login, logout } = useAuth();
   const router = useRouter();
 
-  // Вошли → ведём в рабочую область. В Storybook next/navigation замокан (no-op) — безопасно.
+  // BUG-AUTH-03: после успешного входа — редирект в рабочую область (или на
+  // возвратный путь ?from=, если пришли по защищённой ссылке). window.location
+  // вместо useSearchParams — чтобы не тянуть Suspense-границу на статичной форме.
   useEffect(() => {
-    if (state === "authenticated") router.replace("/dashboard");
+    if (state !== "authenticated") return;
+    const from = new URLSearchParams(window.location.search).get("from");
+    // Только внутренний путь: один ведущий «/» + не «/» и не «\» следом — блокирует
+    // protocol-relative (//evil.com), backslash-обход (/\evil.com) и абсолютные URL.
+    const safe = from !== null && /^\/[^/\\]/.test(from) && !from.startsWith("/login");
+    router.replace(safe ? from! : "/dashboard");
   }, [state, router]);
 
   const [email, setEmail] = useState(prefill ? DEMO_EMAIL : "");
@@ -179,6 +187,7 @@ function LoginFooter() {
    Футнот «Прототип» с демо-кредами и пометкой contract-mock.
    ============================================================ */
 function PrototypeFootnote() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">

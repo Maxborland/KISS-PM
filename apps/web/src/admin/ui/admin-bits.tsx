@@ -37,9 +37,13 @@ const ERR: Record<string, string> = {
   security_policy_domain_allowlist_invalid: "Список доменов: только строки",
   // not-found (404)
   user_not_found: "Пользователь не найден",
-  access_role_not_found: "Роль не найдена"
+  access_role_not_found: "Роль не найдена",
+  // авторизация (401/403) — BUG-ADM-01/SHELL-06: раньше утекали сырым кодом
+  session_required: "Требуется вход в систему",
+  permission_missing: "Недостаточно прав для этого действия",
+  forbidden: "Доступ запрещён"
 };
-export const adminErr = (code?: string, fallback?: string) => (code && ERR[code]) || fallback || code || "Ошибка";
+export const adminErr = (code?: string, fallback?: string) => (code && ERR[code]) || fallback || "Не удалось выполнить действие";
 
 export function UserStatusChip({ status }: { status: UserStatus }) {
   return status === "active" ? (
@@ -67,6 +71,11 @@ export function AuditResultChip({ status }: { status?: string | undefined }) {
 // Человекочитаемая метка action-типа аудита. Известные группы → RU; иначе — сам код (mono).
 const AUDIT_ACTION_LABEL: Record<string, string> = {
   "workspace.security_policy.updated": "Политика безопасности обновлена",
+  // BUG-ADM-05: API эмитит tenant.access_profile.*, а не access_role.* — старые ключи никогда не совпадали.
+  "tenant.access_profile.created": "Роль создана",
+  "tenant.access_profile.updated": "Роль изменена",
+  "tenant.access_profile.deleted": "Роль удалена",
+  // алиасы на старые коды (на случай исторических записей аудита)
   "access_role.created": "Роль создана",
   "access_role.update": "Роль изменена",
   "access_role.deleted": "Роль удалена",

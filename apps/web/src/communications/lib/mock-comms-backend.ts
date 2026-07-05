@@ -1120,6 +1120,21 @@ export function createMockCommsFetch(): typeof fetch {
       return json({ message });
     }
 
+    /* 8b) DELETE /conversations/:id/messages/:msgId/pin — снять закрепление (COMM-06). */
+    const unpin = method === "DELETE" ? path.match(/^\/api\/workspace\/conversations\/([^/]+)\/messages\/([^/]+)\/pin$/) : null;
+    if (unpin) {
+      const resolved = resolveConversation(unpin[1]!);
+      if (!resolved.ok) return err(resolved.error, resolved.status);
+      if (!canManageEntity(resolved.conversation.entityType, resolved.conversation.entityId)) return err("permission_missing", 403);
+      const messageId = decodeURIComponent(unpin[2]!);
+      const message = db.messages.find((m) => m.id === messageId && m.conversationId === resolved.conversation.id);
+      if (!message) return err("message_not_found", 404);
+      if (message.archivedAt !== null) return err("message_not_found", 404);
+      message.pinnedAt = null;
+      message.pinnedByUserId = null;
+      return json({ message });
+    }
+
     /* 9) POST /conversations/:id/read-state — отметить прочитанным (unreadCount=0). */
     const readState = method === "POST" ? path.match(/^\/api\/workspace\/conversations\/([^/]+)\/read-state$/) : null;
     if (readState) {

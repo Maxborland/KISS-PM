@@ -514,10 +514,16 @@ export function createCommsClient(options: CommsApiClientOptions) {
         { method: "DELETE" }
       );
     },
-    // 8) Закрепить сообщение (manage проверяется ДО поиска сообщения; unpin-роута НЕТ).
+    // 8) Закрепить / снять закрепление сообщения (manage проверяется ДО поиска сообщения).
     pinMessage(conversationId: string, messageId: string) {
       return requestJson<{ message: Message }>(`/api/workspace/conversations/${enc(conversationId)}/messages/${enc(messageId)}/pin`, {
         method: "POST"
+      });
+    },
+    // COMM-06: снятие закрепления (DELETE .../pin).
+    unpinMessage(conversationId: string, messageId: string) {
+      return requestJson<{ message: Message }>(`/api/workspace/conversations/${enc(conversationId)}/messages/${enc(messageId)}/pin`, {
+        method: "DELETE"
       });
     },
     // 9) Отметить беседу прочитанной (unreadCount=0, lastRead*).

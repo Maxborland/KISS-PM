@@ -483,6 +483,54 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     return context.json({ message: serializeMessage(pinned) });
   });
 
+  // COMM-06: снятие закрепления — раньше закрепление было необратимо (не было роута).
+  app.delete("/api/workspace/conversations/:conversationId/messages/:messageId/pin", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
+    if (!conversation.value.access.manageDecision.allowed) {
+      await appendDeniedAudit(deps, {
+        actionType: "collaboration.message_unpinned",
+        actor,
+        sourceEntity: conversation.value.access.sourceEntity,
+        commandInput: { messageId: context.req.param("messageId") },
+        permissionResult: conversation.value.access.manageDecision
+      });
+      return context.json({ error: conversation.value.access.manageDecision.reason }, 403);
+    }
+    const message = await deps.dataSource.findDiscussionMessage?.(
+      actor.tenantId,
+      context.req.param("messageId")
+    );
+    if (!message || message.conversationId !== conversation.value.conversation.id) {
+      return context.json({ error: "message_not_found" }, 404);
+    }
+    if (!deps.dataSource.unpinDiscussionMessage) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const unpinned = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const unpinnedMessage = await requireMethod(transactionDataSource.unpinDiscussionMessage).call(transactionDataSource, {
+        tenantId: actor.tenantId,
+        messageId: message.id
+      });
+      if (!unpinnedMessage) return undefined;
+      await deps.appendManagementAuditEvent(collaborationAudit({
+        actionType: "collaboration.message_unpinned",
+        actor,
+        sourceEntity: conversation.value.access.sourceEntity,
+        commandInput: { messageId: unpinnedMessage.id },
+        permissionResult: conversation.value.access.manageDecision,
+        afterState: { pinnedAt: null }
+      }), transactionDataSource);
+      return unpinnedMessage;
+    });
+    if (!unpinned) {
+      return context.json({ error: "message_not_found" }, 404);
+    }
+    return context.json({ message: serializeMessage(unpinned) });
+  });
+
   app.delete("/api/workspace/conversations/:conversationId/messages/:messageId", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
     if (!actor) return context.json({ error: "session_required" }, 401);

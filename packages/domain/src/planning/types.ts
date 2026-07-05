@@ -153,7 +153,14 @@ export type PlanSnapshot = {
   reservations: PlanReservation[];
   occupancyWindows?: import("./occupancy").OccupancyWindow[] | undefined;
   constraints: PlanConstraint[];
+  // BUG-PROJ-19: принятые перегрузы (resourceId + день) — снимают отметку «перегруз».
+  acceptedOverloads?: AcceptedOverload[] | undefined;
   capturedAt: PlanDateTime;
+};
+
+export type AcceptedOverload = {
+  resourceId: string;
+  date: PlanDate;
 };
 
 export type ValidationIssueCode =

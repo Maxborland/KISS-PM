@@ -34,6 +34,7 @@ export function buildSnapshotResourceLoad(
     calendarExceptions: snapshot.calendarExceptions,
     reservations: snapshot.reservations,
     occupancyWindows: snapshot.occupancyWindows,
+    acceptedOverloads: snapshot.acceptedOverloads,
     rangeStart: snapshot.project.plannedStart,
     rangeFinish: latestDate([
       calculatedPlan.projectFinish,
@@ -71,7 +72,12 @@ export function createPlanningReadModel(
     },
     calculatedPlan,
     baselineComparison: buildBaselineComparison(snapshot, calculatedPlan),
-    resourceLoad,
+    // BUG-PROJ-19: acceptedOverloads (ключи resourceId:date) — UI матрицы снимает по ним
+    // отметку перегруза (resource-load-matrix ожидает именно этот массив).
+    resourceLoad: {
+      ...resourceLoad,
+      acceptedOverloads: (snapshot.acceptedOverloads ?? []).map((a) => `${a.resourceId}:${a.date}`)
+    },
     // Производственный календарь(и) проекта + исключения (праздники resourceId=null / отсутствия).
     // Поверхности Календари/Настройки читают их top-level — раньше отдавал только mock,
     // теперь и боевой read-model (инвариант «смена apiOrigin без правок UI»).

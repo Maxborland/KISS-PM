@@ -358,6 +358,31 @@ describe("planning repository", () => {
     ).rejects.toThrow();
   });
 
+  // Регресс BUG-PROJ-19: risk.accept_overload теперь ПЕРСИСТЕНТЕН (был no-op) —
+  // принятие переживает перезагрузку снапшота.
+  it("persists an accepted overload across snapshot reloads", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "risk.accept_overload",
+        payload: { overloadId: "user-alpha-executor:2026-06-02", acceptedRiskReason: "Подтверждено" }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    expect(snapshot?.acceptedOverloads).toEqual([
+      { resourceId: "user-alpha-executor", date: "2026-06-02" }
+    ]);
+  });
+
   it("cascades explicit allocations when their assignment is deleted", async () => {
     const db = createDatabase(client);
     const intakeRepository = createProjectIntakeRepository(db);

@@ -12,6 +12,7 @@ import { useCrm } from "@/crm/lib/use-crm";
 import { useMyWork, useProjects } from "@/workspace/lib/use-workspace";
 import type { TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
 import type { Opportunity } from "@/crm/lib/crm-client";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
    Workspace/Дашборд — персональный home, СОБРАННЫЙ КЛИЕНТСКОЙ
@@ -225,6 +226,7 @@ function DashboardContent({
 }
 
 function ProtoBanner() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>

@@ -1,5 +1,6 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import {
+  buildCompensatingCommands,
   isBlockingValidationIssue,
   type PlanningCommand,
   type TenantUser,
@@ -19,6 +20,7 @@ import {
   summarizeSnapshot,
   validateCommandDataSourcePreconditions
 } from "./planningRouteHelpers";
+import { normalizeTaskCreateStatus } from "./taskCreateNormalization";
 
 export type ApplyPlanningCommandEnvelope = {
   command: PlanningCommand;
@@ -140,6 +142,13 @@ export async function executeApplyPlanningCommand(input: {
 
     const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
     if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+    // Новая задача стартует в начальном статусе тенанта — клиентский statusId для
+    // task.create нормализуем (BUG-PROJ-01: UI слал несуществующий "todo").
+    const command = await normalizeTaskCreateStatus(
+      transactionDataSource,
+      actor.tenantId,
+      envelope.command
+    );
     if (snapshot.planVersion !== envelope.clientPlanVersion) {
       await appendPlanningAudit(deps, {
         tenantId: actor.tenantId,
@@ -161,13 +170,13 @@ export async function executeApplyPlanningCommand(input: {
       };
     }
 
-    const preview = previewPlanningCommand(snapshot, envelope.command);
+    const preview = previewPlanningCommand(snapshot, command);
     const validationIssues = [
       ...preview.validationIssues,
       ...(await validateCommandDataSourcePreconditions(
         transactionDataSource,
         actor.tenantId,
-        envelope.command
+        command
       ))
     ];
     if (validationIssues.some(isBlockingValidationIssue)) {
@@ -183,22 +192,25 @@ export async function executeApplyPlanningCommand(input: {
       tenantId: actor.tenantId,
       projectId,
       actorUserId: actor.id,
-      command: envelope.command
+      command
     });
     const newPlanVersion = await transactionDataSource.incrementPlanVersion(actor.tenantId, projectId);
     const auditEventId = await appendPlanningAudit(deps, {
       tenantId: actor.tenantId,
       actorUserId: actor.id,
-      actionType: auditActionForCommand(envelope.command),
+      actionType: auditActionForCommand(command),
       sourceWorkflow: "planning",
       sourceEntity: { type: "Project", id: projectId },
-      commandInput: { command: envelope.command, idempotencyKey: envelope.idempotencyKey ?? null },
+      commandInput: { command, idempotencyKey: envelope.idempotencyKey ?? null },
       beforeState: summarizeSnapshot(snapshot),
       afterState: {
         planVersion: newPlanVersion,
         changedTaskIds: preview.planDelta.changedTaskIds,
         changedAssignmentIds: preview.planDelta.changedAssignmentIds,
-        changedDependencyIds: preview.planDelta.changedDependencyIds
+        changedDependencyIds: preview.planDelta.changedDependencyIds,
+        // BUG-PROJ-24: компенсирующие команды (инверсия по снапшоту «до») — их
+        // проигрывает revert-эндпоинт; [] = коммит необратим.
+        compensatingCommands: buildCompensatingCommands(command, snapshot)
       },
       permissionResult: decision,
       executionResult: { status: "succeeded", validationIssues }
@@ -211,7 +223,7 @@ export async function executeApplyPlanningCommand(input: {
       actorUserId: actor.id,
       beforeSnapshot: snapshot,
       afterSnapshot: appliedSnapshot,
-      commands: [envelope.command]
+      commands: [command]
     });
     const responseBody = {
       applied: preview.planDelta,

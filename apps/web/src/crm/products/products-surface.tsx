@@ -12,6 +12,7 @@ import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr, rub } from "@/crm/ui/crm-bits";
 import { useCrm } from "@/crm/lib/use-crm";
 import type { Product } from "@/crm/lib/crm-client";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 const TYPE_LABEL = { service: "Услуга", goods: "Товар" } as const;
@@ -44,10 +45,12 @@ export function ProjectProducts() {
 
   return (
     <CrmFrame activeTab="Продукты" subtitle="Справочник продуктов" actions={<CreateProductDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createProduct} />}>
-      <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        Реальный контракт CRM: GET/POST/PATCH /api/workspace/products. Цена — положительное целое (₽). Данные in-memory.
-      </div>
+      {prototypeNotesEnabled && (
+        <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          Реальный контракт CRM: GET/POST/PATCH /api/workspace/products. Цена — положительное целое (₽). Данные in-memory.
+        </div>
+      )}
 
       <SurfaceState
         status={surfaceStatus}

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCheck, Loader2, Save } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, CheckCheck, Loader2, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -197,7 +198,19 @@ function NotificationsFeed() {
                     {isUnread ? <span className="text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.03em] text-[var(--accent-text)]">Новое</span> : null}
                   </div>
                   <p className={cn("mt-0.5 text-[length:var(--text-sm)]", isUnread ? "text-[var(--text)]" : "text-[var(--muted)]")}>{n.body}</p>
-                  <p className="mt-0.5 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{n.route}</p>
+                  {/* COMM-04: раньше route был просто текстом. Внутренний путь → ссылка-переход
+                      (при клике помечаем прочитанным). Не-путь показываем как раньше. */}
+                  {n.route && n.route.startsWith("/") ? (
+                    <Link
+                      href={n.route}
+                      onClick={() => { if (isUnread) void readOne(n.id); }}
+                      className="mt-0.5 inline-flex items-center gap-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--accent)] hover:underline"
+                    >
+                      Перейти <ArrowUpRight className="size-3" aria-hidden />
+                    </Link>
+                  ) : n.route ? (
+                    <p className="mt-0.5 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{n.route}</p>
+                  ) : null}
                 </div>
                 {isUnread ? (
                   <Button variant="ghost" size="sm" disabled={busy} onClick={() => void readOne(n.id)} className="shrink-0">Прочитать</Button>

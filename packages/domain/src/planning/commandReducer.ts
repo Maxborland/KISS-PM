@@ -129,8 +129,19 @@ export function reducePlanningCommand(
           reason: command.payload.reason
         })
       });
-    case "risk.accept_overload":
-      return withSnapshot(snapshot, command, {}, { acceptedRiskIds: [command.payload.overloadId] });
+    case "risk.accept_overload": {
+      // BUG-PROJ-19: принятие кладём в snapshot.acceptedOverloads (не только в delta),
+      // чтобы preview/read-model сразу видели снятие перегруза. overloadId = "resourceId:date".
+      const sep = command.payload.overloadId.lastIndexOf(":");
+      const accepted =
+        sep > 0
+          ? [
+              ...(snapshot.acceptedOverloads ?? []),
+              { resourceId: command.payload.overloadId.slice(0, sep), date: command.payload.overloadId.slice(sep + 1) }
+            ]
+          : snapshot.acceptedOverloads ?? [];
+      return withSnapshot(snapshot, command, { acceptedOverloads: accepted }, { acceptedRiskIds: [command.payload.overloadId] });
+    }
     case "project.deadline.move":
       return withSnapshot(snapshot, command, {
         project: { ...snapshot.project, deadline: command.payload.deadline }
@@ -508,6 +519,13 @@ function validateCommandPreconditions(
     case "dependency.delete":
       if (!dependencyIds.has(command.payload.dependencyId)) {
         return [invalid("planning_command_invalid", "Команда ссылается на неизвестную зависимость")];
+      }
+      return [];
+    case "assignment.delete":
+      // BUG-PROJ-18: снятие несуществующего (плейсхолдер из спроса) назначения раньше
+      // молча давало 200 при 0 удалённых строк. Требуем реальную строку назначения.
+      if (!assignmentIds.has(command.payload.assignmentId)) {
+        return [invalid("planning_command_invalid", "Команда ссылается на неизвестное назначение")];
       }
       return [];
     case "assignment.upsert":

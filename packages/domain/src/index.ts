@@ -44,6 +44,7 @@ export * from "./crmPipeline";
 export * from "./planning/types";
 export * from "./planning/planningCommands";
 export * from "./planning/commandReducer";
+export * from "./planning/compensatingCommands";
 export * from "./planning/calendar";
 export * from "./planning/workingTime";
 export * from "./planning/workModel";

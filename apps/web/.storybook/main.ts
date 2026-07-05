@@ -28,6 +28,12 @@ const config: StorybookConfig = {
       ...config.resolve.alias,
       "@": join(webRoot, "src")
     };
+    // Прототип-заметки ("Прототип"/contract-mock/in-memory) видны только в Storybook
+    // (handoff-контекст); в прод-сборке флаг не задан → см. views/lib/prototype-gate (BUG-014).
+    config.define = {
+      ...config.define,
+      "process.env.NEXT_PUBLIC_KISS_PM_PROTOTYPE_NOTES": JSON.stringify("true")
+    };
     return config;
   }
 };

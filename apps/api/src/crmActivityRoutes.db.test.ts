@@ -635,6 +635,42 @@ describe("CRM activity API", () => {
     return response.headers.get("set-cookie") ?? "";
   }
 
+  // Регресс BUG-CRM-05: сделка с несуществующей demand-позицией ("backend", хардкод
+  // UI) создаётся (201) с подстановкой реальной позиции тенанта, а не падает в 500.
+  it("normalizes an unknown demand position instead of failing on opportunity create", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const response = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers: jsonHeaders(cookie),
+      body: JSON.stringify({
+        id: "opportunity-bad-position",
+        clientId: "client-alpha",
+        primaryContactId: "contact-alpha",
+        projectTypeId: "project-type-alpha",
+        stageId: "deal-stage-alpha-new",
+        title: "Сделка с заглушкой позиции",
+        description: "demand ссылается на несуществующую позицию",
+        plannedStart: "2026-06-01",
+        plannedFinish: "2026-06-12",
+        contractValue: 960000,
+        plannedHourlyRate: 6000,
+        probability: 80,
+        templateId: null,
+        demand: [{ positionId: "backend", requiredHours: 100 }]
+      })
+    });
+    expect(response.status).toBe(201);
+
+    const list = await app.request("/api/workspace/opportunities", { headers: jsonHeaders(cookie) });
+    const body = (await list.json()) as {
+      opportunities: Array<{ id: string; demand: Array<{ positionId: string }> }>;
+    };
+    const created = body.opportunities.find((o) => o.id === "opportunity-bad-position");
+    expect(created).toBeDefined();
+    // подставилась реальная позиция тенанта (единственная активная — position-engineer)
+    expect(created?.demand[0]?.positionId).toBe("position-engineer");
+  });
+
   async function createAlphaOpportunity(cookie: string, id: string) {
     return createOpportunity(cookie, {
       id,

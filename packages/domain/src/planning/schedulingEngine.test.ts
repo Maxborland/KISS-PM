@@ -311,6 +311,36 @@ const expectedStartByDependency = {
   SF: { date: "2026-06-01", minuteOfDay: 0 }
 } as const;
 
+// Регресс BUG-PROJ-23: нулевая веха (work=0, duration=0) — валидна, а задача с
+// трудоёмкостью, но нулевой длительностью — нет.
+describe("invalid_work_model validation", () => {
+  it("does not flag a zero-work, zero-duration milestone", () => {
+    const milestone: PlanTask = {
+      ...createTask("task-milestone", "1", "2026-06-01"),
+      workMinutes: 0,
+      durationMinutes: 0
+    };
+    const result = calculatePlan(createSnapshot({ tasks: [milestone], assignments: [] }), {
+      calculatedAt: "2026-05-21T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+    expect(result.validationIssues.filter((i) => i.code === "invalid_work_model")).toEqual([]);
+  });
+
+  it("flags a task that has work but zero duration", () => {
+    const broken: PlanTask = {
+      ...createTask("task-broken", "1", "2026-06-01"),
+      workMinutes: 480,
+      durationMinutes: 0
+    };
+    const result = calculatePlan(createSnapshot({ tasks: [broken], assignments: [] }), {
+      calculatedAt: "2026-05-21T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+    expect(result.validationIssues.some((i) => i.code === "invalid_work_model")).toBe(true);
+  });
+});
+
 function task(result: ReturnType<typeof calculatePlan>, taskId: string) {
   const found = result.tasks.find((candidate) => candidate.id === taskId);
   if (!found) throw new Error(`missing task ${taskId}`);

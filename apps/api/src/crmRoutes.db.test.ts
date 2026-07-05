@@ -377,6 +377,60 @@ describe("Phase 3.1 CRM API", () => {
     );
   });
 
+  // Регресс BUG-CRM-01: дубликат SKU/имени продукта должен давать 409, а не 500.
+  it("returns 409 (not 500) when creating a product with a duplicate SKU or name", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const first = await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-dup-a",
+        name: "Продукт А",
+        sku: "DUP-SKU",
+        type: "service",
+        unit: "час",
+        price: 1000
+      })
+    });
+    expect(first.status).toBe(201);
+
+    const dupSku = await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-dup-b",
+        name: "Продукт Б",
+        sku: "DUP-SKU",
+        type: "service",
+        unit: "час",
+        price: 2000
+      })
+    });
+    expect(dupSku.status).toBe(409);
+    await expect(dupSku.json()).resolves.toEqual({ error: "product_sku_taken" });
+
+    const dupName = await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-dup-c",
+        name: "Продукт А",
+        sku: "OTHER-SKU",
+        type: "service",
+        unit: "час",
+        price: 3000
+      })
+    });
+    expect(dupName.status).toBe(409);
+    await expect(dupName.json()).resolves.toEqual({ error: "product_name_taken" });
+  });
+
   it("updates CRM foundation entities with tenant-scoped audit trail", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {

@@ -40,6 +40,23 @@ import {
   executeUpdateClientCommand
 } from "./crm/clientCommandHandlers";
 
+// Дубликат SKU/имени продукта нарушает уникальный индекс (products_tenant_id_sku_uidx /
+// products_tenant_id_name_uidx, Postgres 23505). Распознаём, чтобы вернуть 409 вместо 500
+// (house-паттерн, как isCredentialEmailConflict в authRegistrationRoutes). Обходим error.cause.
+function productUniqueConflict(error: unknown): "product_sku_taken" | "product_name_taken" | null {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 8; depth += 1) {
+    const rec = current as { code?: unknown; constraint?: unknown; constraint_name?: unknown; message?: unknown; cause?: unknown };
+    if (rec.code === "23505") {
+      const marker = String(rec.constraint ?? rec.constraint_name ?? rec.message ?? "");
+      if (marker.includes("products_tenant_id_sku_uidx")) return "product_sku_taken";
+      if (marker.includes("products_tenant_id_name_uidx")) return "product_name_taken";
+    }
+    current = rec.cause;
+  }
+  return null;
+}
+
 type CrmRouteDeps = {
   dataSource: ApiTenantDataSource;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
@@ -331,25 +348,32 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseProductBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const product = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createProduct) {
-        throw new Error("transactional_product_create_not_configured");
-      }
-      const created = await transactionDataSource.createProduct(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "product.created",
-          sourceEntity: { type: "Product", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
-    });
+    let product;
+    try {
+      product = await runDataSourceTransaction(async (transactionDataSource) => {
+        if (!transactionDataSource.createProduct) {
+          throw new Error("transactional_product_create_not_configured");
+        }
+        const created = await transactionDataSource.createProduct(parsed.value);
+        await appendManagementAuditEvent(
+          auditInput({
+            actor,
+            actionType: "product.created",
+            sourceEntity: { type: "Product", id: created.id },
+            commandInput: parsed.value,
+            beforeState: null,
+            afterState: created,
+            permissionResult: decision
+          }),
+          transactionDataSource
+        );
+        return created;
+      });
+    } catch (error) {
+      const conflict = productUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     return context.json({ product }, 201);
   });
