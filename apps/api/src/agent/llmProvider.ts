@@ -10,6 +10,8 @@
  * иначе mock. setAgentLlmProviderOverride — инъекция в тестах.
  */
 
+import { createOpenRouterLlmProvider } from "./openRouterProvider";
+
 export type LlmToolSchema = { name: string; description: string; input_schema: Record<string, unknown> };
 
 export type LlmTextBlock = { type: "text"; text: string };
@@ -28,6 +30,7 @@ export interface LlmProvider {
 }
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
+const DEFAULT_OPENROUTER_MODEL = "anthropic/claude-sonnet-4.6"; // переопределяется KISS_PM_AGENT_MODEL
 
 // ---- боевой провайдер (Anthropic SDK) ----
 export function createAnthropicLlmProvider(opts: { apiKey: string; model?: string; maxTokens?: number }): LlmProvider {
@@ -125,15 +128,26 @@ export function setAgentLlmProviderOverride(provider: LlmProvider | null): void 
   override = provider;
 }
 
+/**
+ * Выбор провайдера по окружению. Приоритет — OpenRouter (несколько моделей за одним API),
+ * затем Anthropic, затем demo/mock. Явное переопределение — KISS_PM_AGENT_PROVIDER
+ * ("openrouter" | "anthropic" | "demo" | "mock"). Модель — KISS_PM_AGENT_MODEL.
+ */
 export function createAgentLlmProviderFromEnv(): LlmProvider {
   if (override) return override;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  const model = process.env.KISS_PM_AGENT_MODEL || DEFAULT_MODEL;
-  if (apiKey && apiKey.length > 0) {
-    const maxTokens = Number.parseInt(process.env.KISS_PM_AGENT_MAX_TOKENS ?? "", 10);
-    return createAnthropicLlmProvider({ apiKey, model, ...(Number.isFinite(maxTokens) && maxTokens > 0 ? { maxTokens } : {}) });
+  const explicit = (process.env.KISS_PM_AGENT_PROVIDER ?? "").toLowerCase();
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const maxTokensRaw = Number.parseInt(process.env.KISS_PM_AGENT_MAX_TOKENS ?? "", 10);
+  const maxTokens = Number.isFinite(maxTokensRaw) && maxTokensRaw > 0 ? maxTokensRaw : undefined;
+  const maxTokensOpt = maxTokens ? { maxTokens } : {};
+
+  if (openRouterKey && openRouterKey.length > 0 && (explicit === "openrouter" || explicit === "")) {
+    return createOpenRouterLlmProvider({ apiKey: openRouterKey, model: process.env.KISS_PM_AGENT_MODEL || DEFAULT_OPENROUTER_MODEL, ...maxTokensOpt });
   }
-  // Без ключа: demo-мозг (если включён) или пустой mock.
-  if (process.env.KISS_PM_AGENT_DEMO === "true") return createDemoLlmProvider();
+  if (anthropicKey && (explicit === "anthropic" || explicit === "")) {
+    return createAnthropicLlmProvider({ apiKey: anthropicKey, model: process.env.KISS_PM_AGENT_MODEL || DEFAULT_MODEL, ...maxTokensOpt });
+  }
+  if (explicit === "demo" || process.env.KISS_PM_AGENT_DEMO === "true") return createDemoLlmProvider();
   return createMockLlmProvider();
 }

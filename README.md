@@ -1,81 +1,202 @@
 # KISS PM
 
-KISS PM — это русскоязычная продуктовая спецификация и будущая реализация SaaS/self-hosted платформы для управления проектами, ресурсной загрузкой и управленческим контролем.
+[![Status](https://img.shields.io/badge/status-founder--beta%20readiness-2563eb)](#project-status)
+[![Stack](https://img.shields.io/badge/stack-Node%20%2B%20Hono%20%2B%20Next.js%20%2B%20PostgreSQL-111827)](#technology-stack)
+[![Package manager](https://img.shields.io/badge/pnpm-10.33.2-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-16a34a)](LICENSE)
 
-Текущий репозиторий перезапущен в режиме **docs-first**: старый код считается непригодным для продолжения и не является основой новой реализации. История Git сохраняет прежние материалы, но рабочая версия развивается заново: сначала цельная документация, затем новая реализация по утвержденному фазовому плану.
+**KISS PM** is an agent-first project management platform for project operations, resource planning, governed changes, and auditability.
 
-## Что строим
-
-KISS PM — не набор отчетов и не BitrixReports-клон. Это платформа, где CRM-вход, оценка емкости, проектный план, Gantt, задачи, ресурсная матрица, KPI, управленческие действия, аудит и ретроспективы образуют один рабочий контур.
-
-Ключевая идея:
+The core product loop is simple:
 
 ```txt
-увидел сигнал -> понял причину -> выбрал разрешенное действие -> система проверила действие -> действие записано в аудит -> состояние пересчитано
+goal → agent run → proposed project diff → human review → apply → audit
 ```
 
-## Что находится в репозитории сейчас
+KISS PM is not another task board with an AI chat bolted on. It turns intent into reviewable project changes: the agent prepares a structured diff, the user chooses what to apply, the system checks permissions and preconditions, and every important change leaves an audit trail.
 
-- `AGENTS.md` — правила работы для Codex/агентов.
-- `docs/` — русскоязычный canonical baseline продукта.
-- `docs/references/` — обязательные референсы: BR2-скриншоты и русские выжимки по MS Project scheduling.
-- `apps/api` — первый Node/Hono API shell.
-- `apps/web` — Next.js App Router web shell на React/TypeScript.
-- `packages/domain` — минимальная tenant/user domain model.
-- `packages/access-control` — минимальная проверка tenant access.
-- `packages/persistence` — PostgreSQL/Drizzle schema, первая migration и audit event foundation.
-- `packages/test-fixtures` — детерминированные фикстуры для Phase 1.
-- Phase 2.2 runtime — single-workspace экран входа, пользователи, роли доступа, должности, профиль, тема и audit-backed CRUD через API.
-- Web runtime: Next.js App Router. Authenticated workspace shell остается client-side UI поверх cookie-сессии `kiss_pm_session`; `/api/...` и `/health` в dev проксируются Next rewrites в отдельный Node/Hono backend `apps/api`.
+---
 
-## Команды старта
+## Why this project exists
 
-Репозиторий закрепляет `pnpm@10.33.2` через `packageManager`. Локально включите Corepack и запускайте install через `corepack pnpm ...` или активируйте эту версию `corepack prepare pnpm@10.33.2 --activate`; глобальный `pnpm` 11 для установки зависимостей не используется.
+Most project management tools are good at showing work, but weak at moving it forward safely. After meetings, delays, and risks, managers still collect context manually, update tasks, move dates, reassign owners, write follow-ups, and explain consequences.
+
+KISS PM explores a different workflow:
+
+- the user states a project goal or problem;
+- the agent diagnoses the current state;
+- proposed changes are shown as a project diff;
+- the user reviews, edits, accepts, or rejects individual hunks;
+- accepted changes go through application commands, permission checks, and audit logging.
+
+```mermaid
+flowchart LR
+  A[User goal] --> B[Agent run]
+  B --> C[Project diagnosis]
+  C --> D[Proposed project diff]
+  D --> E{Human review}
+  E -->|Apply selected hunks| F[Application command]
+  E -->|Reject| G[No state change]
+  F --> H[Permissions and preconditions]
+  H --> I[Project state update]
+  I --> J[Audit trail]
+```
+
+## Product direction
+
+KISS PM is built around **Project Management as Code**: project state, decisions, proposals, and reviews should be treated with the same discipline software teams use for code changes.
+
+That means the product is not just an agent UI. The long-term direction is a dedicated Pi-based project-management harness with its own tools for reading project state, preparing safe changes, reviewing alternatives, applying approved updates, and preserving a traceable decision history.
+
+Two ideas guide the system:
+
+1. **Project Management as Code** — project changes are prepared as structured diffs, reviewed before application, and handled through explicit tools instead of hidden automation.
+2. **Audit as commit history** — audit is not only a log entry. Important decisions should become repository-like commits that can be reviewed, compared, reverted, and branched.
+
+This enables project teams and agents to work with decisions directly: create separate branches for hypotheses, compare possible plans, review proposed changes, apply only selected hunks, and roll back decisions when the chosen path is no longer valid.
+
+## What is included
+
+- **Agent-first project workflow** — the agent prepares changes, but does not silently mutate project state.
+- **Project diff review** — tasks, dates, owners, dependencies, risks, and messages are visible before they are applied.
+- **Governed actions** — important mutations pass through permissions, stale-state checks, and audit records.
+- **Planning and resources** — Gantt/WBS, tasks, roles, capacity, resource matrix, and KPI/control signals share one product model.
+- **SaaS and self-hosted direction** — the architecture keeps future hosted and self-hosted deployments in scope.
+
+## Project status
+
+KISS PM is in **founder-beta / runtime readiness** development.
+
+The repository already contains a Node + pnpm monorepo implementation, while product and architecture decisions remain docs-first. Current work focuses on real runtime routes with API contracts, PostgreSQL persistence, RBAC, audit records, QA gates, and browser evidence.
+
+This is an active early-stage project. Expect implementation churn, but not placeholder-first product direction.
+
+## Technology stack
+
+| Layer | Technologies |
+|---|---|
+| Backend | Node.js, Hono, OpenAPI/Scalar |
+| Frontend | Next.js App Router, React, TypeScript |
+| Persistence | PostgreSQL, Drizzle |
+| UI | design-v3 tokens, BEM-oriented styles, Storybook catalog |
+| Testing | Vitest, Playwright, runtime QA gates |
+| Monorepo | pnpm workspaces |
+
+## Repository structure
+
+```txt
+apps/
+  api/       Node/Hono backend, OpenAPI, RBAC, audit, runtime routes
+  web/       Next.js runtime UI, workspace shell, design-v3 screens
+  landing/   marketing-facing landing experiments
+
+packages/
+  domain/                 domain model
+  access-control/         permission and access checks
+  persistence/            PostgreSQL/Drizzle schema and migrations
+  planning-client/        planning API client/contracts
+  planning-gantt-ui/      Gantt/planning UI package
+  tenant-org-structure/   tenant/workspace organization model
+  test-fixtures/          deterministic test fixtures
+
+.github/     workflows, issue templates, and pull request template
+e2e/         Playwright smoke, runtime, planning, and accessibility checks
+scripts/     dev seed, runtime QA, and security automation
+```
+
+## Quick start
+
+### Prerequisites
+
+- Node.js compatible with the workspace TypeScript toolchain
+- pnpm 10.33.2
+- Docker and Docker Compose for the local PostgreSQL-backed runtime
+
+### Install dependencies
 
 ```bash
-corepack pnpm install
-corepack pnpm test
-corepack pnpm typecheck
-pnpm dev:api
-pnpm dev:web
+pnpm install
 ```
 
-Чтобы держать PostgreSQL, API и web включенными через Docker Compose с live reload:
+### Start the full local runtime
 
 ```bash
 pnpm dev:compose
 ```
 
-Для фонового запуска:
+This starts PostgreSQL, API, and web, applies migrations, runs the development seed, and keeps frontend/backend services running with live reload.
+
+For detached mode:
 
 ```bash
 pnpm dev:compose:detached
 ```
 
-После запуска web доступен на `http://127.0.0.1:3000`, API — на `http://127.0.0.1:4000`, PostgreSQL — на `127.0.0.1:55432`. Compose сам ставит зависимости в Linux-volume, применяет миграции и выполняет dev seed перед стартом API.
+### Open the app
 
-Для локального PostgreSQL слоя через Docker Compose:
+| Service | URL |
+|---|---|
+| Web | `http://127.0.0.1:3000` |
+| API | `http://127.0.0.1:4000` |
+| PostgreSQL | `127.0.0.1:55432` |
+
+Development seed credentials are intentionally local-only and may change. Check the seed script or local runtime output after `pnpm db:seed:dev`.
+
+A secret-free environment example is available in `.env.example`; replace all example values before using any non-local environment.
+
+## Manual service workflow
 
 ```bash
 pnpm db:up
 pnpm db:generate
 pnpm db:migrate
 pnpm db:seed:dev
-pnpm test:db
-pnpm test:e2e:smoke
+pnpm dev:api
+pnpm dev:web
+```
+
+Stop the local PostgreSQL layer:
+
+```bash
 pnpm db:down
 ```
 
-Playwright smoke поднимает отдельные web/API процессы на `127.0.0.1:3100` и `127.0.0.1:4100`, чтобы не переиспользовать живой Docker/dev runtime на `3000/4000`. Порты можно переопределить через `E2E_WEB_PORT` и `E2E_API_PORT`.
+## Verification
 
-Локальный вход после seed: `admin@kiss-pm.local` / `admin12345`.
+| Command | Purpose |
+|---|---|
+| `pnpm typecheck` | TypeScript project references |
+| `pnpm test` | Vitest unit/integration tests |
+| `pnpm test:db` | DB-backed tests |
+| `pnpm test:e2e:smoke` | Browser/API smoke tests |
+| `pnpm verify:storybook-contract` | Storybook/design-v3 contract gate |
+| `pnpm security:check` | Backend security audit and scan |
 
-`DATABASE_URL` задается через окружение. Пример без секретов есть в `.env.example`.
+Playwright smoke tests start isolated web/API processes on `127.0.0.1:3100` and `127.0.0.1:4100` so they do not accidentally reuse an already-running development runtime. Override ports with `E2E_WEB_PORT` and `E2E_API_PORT` when needed.
 
-## Как работать дальше
+## Public project resources
 
-1. Сначала читать `AGENTS.md`.
-2. Затем читать `docs/README.md` и документы по порядку.
-3. Писать код только внутри утвержденной фазы и с тестами.
-4. Любая реализация должна иметь E2E-доказательство для управленческих потоков.
-5. В пользовательском языке продукт описывается по-русски. Кодовые идентификаторы в будущей реализации могут быть на английском.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution workflow and review expectations.
+- [SECURITY.md](SECURITY.md) — private vulnerability reporting and safe testing scope.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community standards.
+- [.github/ISSUE_TEMPLATE](.github/ISSUE_TEMPLATE) — issue forms for bugs and feature requests.
+- [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) — pull request checklist.
+
+Detailed product strategy, private planning notes, reference screenshots, and operational runbooks are intentionally not published in this public repository.
+
+## Development principles
+
+1. Documentation and contracts first, implementation second.
+2. Runtime UI must not expose fake controls without a working scenario or explicit disabled reason.
+3. Significant state changes follow `proposal → confirmation → result/audit`.
+4. Tenant-specific roles, stages, KPI definitions, fields, and labels live in configuration, not hardcoded product logic.
+5. CRM, Bitrix24, AmoCRM, Jira, Slack, email, and MS Project are integration adapters, not the core domain.
+6. Any beta/runtime change needs targeted verification: a test, E2E run, screenshot, or documented blocker.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and pull requests are welcome when they preserve the product direction: reviewable project changes, human confirmation, permission checks, and auditability.
+
+## License
+
+KISS PM is licensed under the [Apache License 2.0](LICENSE).

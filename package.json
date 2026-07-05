@@ -7,6 +7,7 @@
   "scripts": {
     "dev:api": "pnpm --filter @kiss-pm/api dev",
     "dev:web": "pnpm --filter @kiss-pm/web dev",
+    "dev:landing": "pnpm --filter @kiss-pm/landing dev",
     "dev:compose": "docker compose up postgres api web",
     "dev:compose:detached": "docker compose up -d postgres api web",
     "db:up": "docker compose up -d postgres",
@@ -15,10 +16,10 @@
     "db:migrate": "pnpm --filter @kiss-pm/persistence db:migrate",
     "db:seed:dev": "tsx scripts/seed-dev.ts",
     "db:reset:dev": "pnpm db:migrate && pnpm db:seed:dev",
-    "test": "vitest run",
+    "test": "vitest run && pnpm --filter @kiss-pm/landing test",
     "test:db": "vitest run --config vitest.db.config.ts",
     "test:e2e:smoke": "pnpm db:migrate && pnpm db:seed:dev && playwright test --config playwright.config.ts",
-    "typecheck": "tsc -b --pretty false",
+    "typecheck": "tsc -b --pretty false && pnpm --filter @kiss-pm/landing typecheck",
     "build:api": "pnpm --filter @kiss-pm/api build",
     "build": "pnpm build:api && pnpm --filter @kiss-pm/web build && pnpm typecheck",
     "security:audit": "node scripts/security-audit-backend.mjs",
@@ -27,20 +28,32 @@
     "verify:storybook-contract": "pnpm --filter @kiss-pm/web verify:storybook-contract"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.10.1",
     "@kiss-pm/persistence": "workspace:*",
     "@kiss-pm/test-fixtures": "workspace:*",
+    "@axe-core/playwright": "^4.10.1",
     "@playwright/test": "^1.60.0",
     "@types/node": "^22.15.21",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.22.1",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.6"
+    "vitest": "^3.1.4"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.2",
-    "hono": "^4.12.27",
+    "hono": "^4.7.10",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "esbuild": "^0.25.12",
+      "uuid": "^11.1.1",
+      "postcss": "^8.5.14"
+    },
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "sharp"
+    ]
   }
 }

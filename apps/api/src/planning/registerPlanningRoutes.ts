@@ -13,14 +13,8 @@ import { persistPlanningNotifications } from "../collaborationNotificationServic
 import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRoutes";
 import { notifyPlanVersionChanged } from "../planningEventBus";
 import { registerPlanningEventsRoute } from "../planningEventsRoute";
-import { executeApplyPlanningCommand } from "./applyPlanningCommandHandler";
 import { registerPlanningAutoSolverRoutes } from "./planningAutoSolverRoutes";
 import { registerPlanningSavedViewRoutes } from "./planningSavedViewRoutes";
-import {
-  appendScenarioApplyConflictAudit,
-  appendScenarioApplyDeniedAudit,
-  scenarioApplyAuditContext
-} from "./planningScenarioApplyAudit";
 import {
   parsePlanningCommandEnvelope,
   parsePlanningCommandBatchEnvelope,
@@ -30,8 +24,9 @@ import {
 import { previewPlanningCommand, previewPlanningCommands } from "./planningCommandCore";
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { createPlanningReadModel } from "./planningReadModel";
-import { permissionForCommand } from "./planningCommandPermissions";
-import { canReadPlanningReadModel, includeResourceExceptionsFor } from "./planningRouteAuth";
+import { canReadPlanningReadModel, includeResourceExceptionsFor, permissionForCommand } from "./planningRouteAuth";
+import { denyPlanningAction, respondFromFailedResult } from "./planningRouteResponders";
+import { requireCapabilities } from "../dataSourceCapabilities";
 import {
   appendPlanningAuditIfConfigured,
   auditActionForCommand,
@@ -60,7 +55,7 @@ function emitPlanVersionFromBody(
 ) {
   if (typeof body.newPlanVersion === "number") {
     invalidateCapacityCacheForTenant(tenantId);
-    notifyPlanVersionChanged(projectId, body.newPlanVersion);
+    notifyPlanVersionChanged(tenantId, projectId, body.newPlanVersion);
   }
 }
 
@@ -174,6 +169,9 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
 
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!deps.dataSource.appendAuditEvent) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -181,25 +179,171 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const profile = await deps.getActorProfile(actor);
-    const result = await executeApplyPlanningCommand({
-      deps: {
-        auditDataSource: deps.dataSource,
-        runDataSourceTransaction: (operation) =>
-          deps.runDataSourceTransaction((transactionDataSource) => operation(transactionDataSource)),
-        appendManagementAuditEvent: deps.appendManagementAuditEvent
-      },
-      actor,
-      profile,
-      projectId: parsedProjectId.value,
-      envelope: parsed.value
+    const decision = permissionForCommand(parsed.value.command, actor, profile);
+    if (!decision.allowed) {
+      return await denyPlanningAction(deps, context, {
+        actor,
+        projectId: parsedProjectId.value,
+        actionType: "planning.command_denied",
+        decision,
+        commandInput: { command: parsed.value.command }
+      });
+    }
+    const readDecision = canReadPlanningReadModel({ actor, profile });
+    if (!readDecision.allowed) {
+      return await denyPlanningAction(deps, context, {
+        actor,
+        projectId: parsedProjectId.value,
+        actionType: "planning.command_denied",
+        decision: readDecision,
+        commandInput: { command: parsed.value.command }
+      });
+    }
+
+    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+      // Один вызов вместо цепочки `!ds.a || !ds.b`; возвращает store с этими методами как обязательными,
+      // downstream больше не нуждается в non-null-ассершенах.
+      const transactionDataSource = requireCapabilities(rawStore, [
+        "getPlanSnapshot",
+        "applyPlanningCommand",
+        "incrementPlanVersion",
+        "appendAuditEvent"
+      ]);
+      if (!transactionDataSource) {
+        return { ok: false as const, status: 501, error: "persistence_not_configured" };
+      }
+      if (
+        parsed.value.idempotencyKey &&
+        (!transactionDataSource.findPlanningCommandIdempotency ||
+          !transactionDataSource.createPlanningCommandIdempotency)
+      ) {
+        return { ok: false as const, status: 501, error: "persistence_not_configured" };
+      }
+
+      const projectId = parsedProjectId.value;
+      await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      const idempotencyKey = parsed.value.idempotencyKey;
+      const requestHash = idempotencyKey
+        ? hashJson({
+            actorUserId: actor.id,
+            clientPlanVersion: parsed.value.clientPlanVersion,
+            command: parsed.value.command
+          })
+        : null;
+      if (idempotencyKey && requestHash) {
+        const existingIdempotency = await transactionDataSource.findPlanningCommandIdempotency?.(
+          actor.tenantId,
+          projectId,
+          idempotencyKey
+        );
+        if (existingIdempotency) {
+          if (
+            existingIdempotency.actorUserId !== actor.id ||
+            existingIdempotency.requestHash !== requestHash
+          ) {
+            return { ok: false as const, status: 409, error: "idempotency_key_conflict" };
+          }
+          return { ok: true as const, body: existingIdempotency.responsePayload };
+        }
+      }
+      const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
+      if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
+        await appendPlanningAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "planning.command_conflict",
+          sourceWorkflow: "planning",
+          sourceEntity: { type: "Project", id: projectId },
+          commandInput: { command: parsed.value.command, clientPlanVersion: parsed.value.clientPlanVersion },
+          beforeState: { planVersion: snapshot.planVersion },
+          afterState: null,
+          permissionResult: decision,
+          executionResult: { status: "conflict" }
+        }, transactionDataSource);
+        return {
+          ok: false as const,
+          status: 409,
+          error: "plan_version_conflict",
+          currentPlanVersion: snapshot.planVersion
+        };
+      }
+
+      const preview = previewPlanningCommand(snapshot, parsed.value.command);
+      const validationIssues = [
+        ...preview.validationIssues,
+        ...(await validateCommandDataSourcePreconditions(
+          transactionDataSource,
+          actor.tenantId,
+          parsed.value.command
+        ))
+      ];
+      if (validationIssues.some(isBlockingValidationIssue)) {
+        return {
+          ok: false as const,
+          status: 409,
+          error: "planning_precondition_failed",
+          validationIssues
+        };
+      }
+
+      await transactionDataSource.applyPlanningCommand({
+        tenantId: actor.tenantId,
+        projectId,
+        actorUserId: actor.id,
+        command: parsed.value.command
+      });
+      const newPlanVersion = await transactionDataSource.incrementPlanVersion(actor.tenantId, projectId);
+      const auditEventId = await appendPlanningAuditIfConfigured(deps, {
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        actionType: auditActionForCommand(parsed.value.command),
+        sourceWorkflow: "planning",
+        sourceEntity: { type: "Project", id: projectId },
+        commandInput: { command: parsed.value.command, idempotencyKey: parsed.value.idempotencyKey ?? null },
+        beforeState: summarizeSnapshot(snapshot),
+        afterState: {
+          planVersion: newPlanVersion,
+          changedTaskIds: preview.planDelta.changedTaskIds,
+          changedAssignmentIds: preview.planDelta.changedAssignmentIds,
+          changedDependencyIds: preview.planDelta.changedDependencyIds
+        },
+        permissionResult: decision,
+        executionResult: { status: "succeeded", validationIssues }
+      }, transactionDataSource);
+      const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
+      if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      await persistPlanningNotifications({
+        dataSource: transactionDataSource,
+        tenantId: actor.tenantId,
+        actorUserId: actor.id,
+        beforeSnapshot: snapshot,
+        afterSnapshot: appliedSnapshot,
+        commands: [parsed.value.command]
+      });
+      const responseBody = {
+        applied: preview.planDelta,
+        newPlanVersion,
+        auditEventId,
+        readModel: createPlanningReadModel(appliedSnapshot, { includeResourceExceptions: includeResourceExceptionsFor({ actor, profile }) })
+      };
+      if (idempotencyKey && requestHash) {
+        await transactionDataSource.createPlanningCommandIdempotency?.({
+          tenantId: actor.tenantId,
+          projectId,
+          idempotencyKey,
+          requestHash,
+          responsePayload: responseBody,
+          actorUserId: actor.id
+        });
+      }
+      return {
+        ok: true as const,
+        body: responseBody
+      };
     });
 
-    if (!result.ok) {
-      if (result.status === 501) return context.json({ error: result.error }, 501);
-      if (result.status === 404) return context.json({ error: result.error }, 404);
-      if (result.status === 409) return context.json(errorResponseBody(result), 409);
-      return context.json({ error: result.error }, result.status);
-    }
+    if (!result.ok) return respondFromFailedResult(context, result);
 
     emitPlanVersionFromBody(
       actor.tenantId,
@@ -229,33 +373,35 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     for (const command of parsed.value.commands) {
       const decision = permissionForCommand(command, actor, profile);
       if (!decision.allowed) {
-        await appendPlanningAuditIfConfigured(deps, {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
+        return await denyPlanningAction(deps, context, {
+          actor,
+          projectId,
           actionType: "planning.command_denied",
-          sourceWorkflow: "planning",
-          sourceEntity: { type: "Project", id: projectId },
-          commandInput: { commands: parsed.value.commands, command },
-          beforeState: null,
-          afterState: null,
-          permissionResult: decision,
-          executionResult: { status: "denied" }
+          decision,
+          commandInput: { commands: parsed.value.commands, command }
         });
-        return context.json({ error: decision.reason }, 403);
       }
     }
     const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) {
-      return context.json({ error: readDecision.reason }, 403);
+      // Комплаенс-паритет с одиночным apply-command: batch read-deny раньше НЕ писал аудит.
+      return await denyPlanningAction(deps, context, {
+        actor,
+        projectId,
+        actionType: "planning.command_denied",
+        decision: readDecision,
+        commandInput: { commands: parsed.value.commands }
+      });
     }
 
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.getPlanSnapshot ||
-        !transactionDataSource.applyPlanningCommand ||
-        !transactionDataSource.incrementPlanVersion ||
-        !transactionDataSource.appendAuditEvent
-      ) {
+    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+      const transactionDataSource = requireCapabilities(rawStore, [
+        "getPlanSnapshot",
+        "applyPlanningCommand",
+        "incrementPlanVersion",
+        "appendAuditEvent"
+      ]);
+      if (!transactionDataSource) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
       if (
@@ -295,6 +441,20 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
       if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
+        // Паритет с одиночным apply-command: фиксируем конфликт версий в аудите — иначе серия
+        // проигранных optimistic-гонок через batch-эндпоинт не оставляет следа.
+        await appendPlanningAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "planning.command_conflict",
+          sourceWorkflow: "planning",
+          sourceEntity: { type: "Project", id: projectId },
+          commandInput: { commands: parsed.value.commands, clientPlanVersion: parsed.value.clientPlanVersion },
+          beforeState: { planVersion: snapshot.planVersion },
+          afterState: null,
+          permissionResult: readDecision,
+          executionResult: { status: "conflict" }
+        }, transactionDataSource);
         return {
           ok: false as const,
           status: 409,
@@ -376,12 +536,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       return { ok: true as const, body: responseBody };
     });
 
-    if (!result.ok) {
-      if (result.status === 501) return context.json({ error: result.error }, 501);
-      if (result.status === 404) return context.json({ error: result.error }, 404);
-      if (result.status === 409) return context.json(errorResponseBody(result), 409);
-      return context.json({ error: result.error }, 400);
-    }
+    if (!result.ok) return respondFromFailedResult(context, result);
 
     emitPlanVersionFromBody(actor.tenantId, projectId, result.body as { newPlanVersion?: number });
     return context.json(result.body);
@@ -402,7 +557,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
       const projectId = parsedProjectId.value;
       const newPlanVersion = await deps.dataSource.incrementPlanVersion(actor.tenantId, projectId);
-      notifyPlanVersionChanged(projectId, newPlanVersion);
+      notifyPlanVersionChanged(actor.tenantId, projectId, newPlanVersion);
       return context.json({ newPlanVersion });
     });
   }
@@ -559,26 +714,40 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       profile,
       targetTenantId: actor.tenantId
     });
-    const scenarioAudit = scenarioApplyAuditContext({ deps, tenantId: actor.tenantId, actorUserId: actor.id, projectId: parsedProjectId.value, scenarioRunId: parsedScenarioRunId.value, clientPlanVersion: parsed.value.clientPlanVersion });
+    const scenarioDenyInput = {
+      scenarioRunId: parsedScenarioRunId.value,
+      clientPlanVersion: parsed.value.clientPlanVersion
+    };
     if (!decision.allowed) {
-      await appendScenarioApplyDeniedAudit({ ...scenarioAudit, permissionResult: decision });
-      return context.json({ error: decision.reason }, 403);
+      return await denyPlanningAction(deps, context, {
+        actor,
+        projectId: parsedProjectId.value,
+        actionType: "planning.scenario_denied",
+        decision,
+        commandInput: scenarioDenyInput
+      });
     }
     const readDecision = canReadPlanningReadModel({ actor, profile });
     if (!readDecision.allowed) {
-      await appendScenarioApplyDeniedAudit({ ...scenarioAudit, permissionResult: readDecision });
-      return context.json({ error: readDecision.reason }, 403);
+      return await denyPlanningAction(deps, context, {
+        actor,
+        projectId: parsedProjectId.value,
+        actionType: "planning.scenario_denied",
+        decision: readDecision,
+        commandInput: scenarioDenyInput
+      });
     }
 
-    const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.getPlanSnapshot ||
-        !transactionDataSource.findPlanningScenarioRun ||
-        !transactionDataSource.applyPlanningCommand ||
-        !transactionDataSource.incrementPlanVersion ||
-        !transactionDataSource.markPlanningScenarioRunApplied ||
-        !transactionDataSource.appendAuditEvent
-      ) {
+    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+      const transactionDataSource = requireCapabilities(rawStore, [
+        "getPlanSnapshot",
+        "findPlanningScenarioRun",
+        "applyPlanningCommand",
+        "incrementPlanVersion",
+        "markPlanningScenarioRunApplied",
+        "appendAuditEvent"
+      ]);
+      if (!transactionDataSource) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
 
@@ -587,7 +756,6 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
       if (snapshot.planVersion !== parsed.value.clientPlanVersion) {
-        await appendScenarioApplyConflictAudit({ ...scenarioAudit, auditDataSource: transactionDataSource, permissionResult: decision, scenarioRunId: parsedScenarioRunId.value, reason: "plan_version_conflict", currentPlanVersion: snapshot.planVersion });
         return {
           ok: false as const,
           status: 409,
@@ -602,16 +770,11 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         parsedScenarioRunId.value
       );
       if (!scenarioRun) return { ok: false as const, status: 404, error: "scenario_not_found" };
-      if (scenarioRun.appliedAt) {
-        await appendScenarioApplyConflictAudit({ ...scenarioAudit, auditDataSource: transactionDataSource, permissionResult: decision, scenarioRunId: scenarioRun.id, reason: "planning_scenario_already_applied", currentPlanVersion: snapshot.planVersion });
-        return { ok: false as const, status: 409, error: "planning_scenario_already_applied" };
-      }
+      if (scenarioRun.appliedAt) return { ok: false as const, status: 409, error: "planning_scenario_already_applied" };
       if (scenarioRun.expiresAt.getTime() <= Date.now()) {
-        await appendScenarioApplyConflictAudit({ ...scenarioAudit, auditDataSource: transactionDataSource, permissionResult: decision, scenarioRunId: scenarioRun.id, reason: "scenario_expired", currentPlanVersion: snapshot.planVersion });
         return { ok: false as const, status: 409, error: "scenario_expired" };
       }
       if (scenarioRun.planVersion !== snapshot.planVersion) {
-        await appendScenarioApplyConflictAudit({ ...scenarioAudit, auditDataSource: transactionDataSource, permissionResult: decision, scenarioRunId: scenarioRun.id, reason: "plan_version_conflict", currentPlanVersion: snapshot.planVersion });
         return {
           ok: false as const,
           status: 409,
@@ -620,18 +783,13 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         };
       }
       if (hashJson(scenarioRun.proposalPayload) !== scenarioRun.proposalPayloadHash) {
-        await appendScenarioApplyConflictAudit({ ...scenarioAudit, auditDataSource: transactionDataSource, permissionResult: decision, scenarioRunId: scenarioRun.id, reason: "planning_scenario_hash_mismatch", currentPlanVersion: snapshot.planVersion });
         return { ok: false as const, status: 409, error: "planning_scenario_hash_mismatch" };
       }
 
       const proposal = parseScenarioProposal(scenarioRun.proposalPayload);
-      if (!proposal) {
-        await appendScenarioApplyConflictAudit({ ...scenarioAudit, auditDataSource: transactionDataSource, permissionResult: decision, scenarioRunId: scenarioRun.id, reason: "planning_scenario_invalid", currentPlanVersion: snapshot.planVersion });
-        return { ok: false as const, status: 409, error: "planning_scenario_invalid" };
-      }
+      if (!proposal) return { ok: false as const, status: 409, error: "planning_scenario_invalid" };
       const integrityError = validateScenarioRunIntegrity(scenarioRun, snapshot);
       if (integrityError) {
-        await appendScenarioApplyConflictAudit({ ...scenarioAudit, auditDataSource: transactionDataSource, permissionResult: decision, scenarioRunId: scenarioRun.id, reason: integrityError, currentPlanVersion: snapshot.planVersion });
         return { ok: false as const, status: 409, error: integrityError };
       }
       if (scenarioRequiresAcceptedRiskReason(proposal) && !parsed.value.acceptedRiskReason) {
@@ -645,20 +803,6 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         proposal.planDelta.commands,
         parsed.value.acceptedRiskReason
       );
-      for (const command of commandsToApply) {
-        const commandDecision = permissionForCommand(command, actor, profile);
-        if (!commandDecision.allowed) {
-          await appendScenarioApplyDeniedAudit({
-            ...scenarioAudit,
-            auditDataSource: transactionDataSource,
-            commandType: command.type,
-            permissionResult: commandDecision,
-            planVersion: snapshot.planVersion,
-            scenarioRunId: scenarioRun.id
-          });
-          return { ok: false as const, status: 403, error: commandDecision.reason };
-        }
-      }
       let preview = {
         nextSnapshot: snapshot,
         validationIssues: [] as ReturnType<typeof previewPlanningCommand>["validationIssues"]
@@ -747,7 +891,6 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     if (!result.ok) {
       if (result.status === 501) return context.json({ error: result.error }, 501);
       if (result.status === 404) return context.json({ error: result.error }, 404);
-      if (result.status === 403) return context.json({ error: result.error }, 403);
       if (result.status === 409) return context.json(errorResponseBody(result), 409);
       if (result.status === 400) return context.json({ error: result.error }, 400);
       return context.json({ error: result.error }, 400);

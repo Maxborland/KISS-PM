@@ -1,0 +1,53 @@
+---
+const year = new Date().getFullYear();
+
+const productLinks = [
+  { href: "#agent-demo", label: "Генри" },
+  { href: "#loop", label: "Шесть шагов" },
+  { href: "#demo", label: "Сценарий" },
+  { href: "#waitlist", label: "Ранний доступ" },
+] as const;
+
+const legalLinks = [
+  { href: "/privacy", label: "Конфиденциальность" },
+  { href: "/terms", label: "Условия альфы" },
+] as const;
+---
+
+<footer class="site-footer">
+  <div class="l-container">
+    <div class="site-footer__panel">
+      <div class="site-footer__brand-block">
+        <a class="site-footer__brand" href="#hero" aria-label="KISS PM — наверх">
+          <span class="site-footer__mark">K</span>
+          <span>KISS PM</span>
+        </a>
+        <p class="site-footer__tag">
+          Агент помогает подготовить изменение проекта. Человек ревьюит и применяет только одобренное.
+        </p>
+      </div>
+
+      <div class="site-footer__groups">
+        <nav class="site-footer__group" aria-label="Разделы лендинга">
+          <p class="site-footer__heading">Лендинг</p>
+          {productLinks.map((link) => (
+            <a href={link.href}>{link.label}</a>
+          ))}
+        </nav>
+
+        <nav class="site-footer__group" aria-label="Юридические документы">
+          <p class="site-footer__heading">Документы</p>
+          {legalLinks.map((link) => (
+            <a href={link.href}>{link.label}</a>
+          ))}
+        </nav>
+      </div>
+
+      <div class="site-footer__meta">
+        <a class="site-footer__mail" href="mailto:hello@kiss-pm.app">hello@kiss-pm.app</a>
+        <p class="site-footer__copy">© {year} KISS PM</p>
+        <p class="site-footer__status">Закрытая альфа</p>
+      </div>
+    </div>
+  </div>
+</footer>

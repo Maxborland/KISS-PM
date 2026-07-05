@@ -21,6 +21,27 @@
    tokens/bem/kiss-v4 → весь preview без стилей). */
 @plugin "tailwindcss-animate";
 
+/* Тёмная тема — UNLAYERED (бьёт :root из tokens.css И kiss-v4.css, которые в @layer).
+   Активируется <html data-theme="dark"> из профиля. Минимальный функциональный набор основных
+   поверхностей/текста; акцент задаётся отдельно inline-переменной --accent. Полная палитра
+   (success/danger/accent-soft и т.д.) — отдельная работа. */
+[data-theme="dark"] {
+  --canvas: #0f172a;
+  --canvas-tint: #131c2e;
+  --panel: #1e293b;
+  --panel-subtle: #18222f;
+  --panel-strong: #243042;
+  --panel-elevated: #243042;
+  --border: #334155;
+  --border-strong: #475569;
+  --border-subtle: #1e293b;
+  --text: #e2e8f0;
+  --text-strong: #f8fafc;
+  --muted: #94a3b8;
+  --muted-strong: #cbd5e1;
+  --muted-soft: #64748b;
+}
+
 @theme inline {
   --color-background: var(--canvas);
   --color-foreground: var(--text);

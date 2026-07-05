@@ -1,12 +1,20 @@
-import type { BuiltInKpiMetricKey, KpiExpression, KpiFormula } from "./types";
+import type { BuiltInKpiMetricKey, KpiExpression, KpiFormula, KpiMetricValues } from "./types";
 
-const builtInMetricKeys: readonly BuiltInKpiMetricKey[] = [
+// Рантайм-список ключей выводится из типа KpiMetricValues (см. types.ts), а не дублирует его руками:
+// `satisfies` ловит лишний/опечатанный ключ, а _AllKeysCovered ниже — пропущенный. Расхождение с
+// каноническим типом в любую сторону = ошибка компиляции.
+const builtInMetricKeys = [
   "deadline_delta_days",
   "resource_overload_minutes",
   "critical_task_count",
   "progress_percent",
   "baseline_finish_slip_days"
-];
+] as const satisfies readonly BuiltInKpiMetricKey[];
+
+// Полнота: если массив выше не покрывает какой-то ключ KpiMetricValues — тип станет never и присвоение упадёт.
+type _AllKeysCovered = [BuiltInKpiMetricKey] extends [(typeof builtInMetricKeys)[number]] ? true : never;
+const _allKeysCovered: _AllKeysCovered = true;
+void _allKeysCovered;
 
 const binaryOps = ["add", "sub", "mul", "div"] as const;
 const unaryOps = ["abs"] as const;
@@ -14,7 +22,8 @@ const aggregateOps = ["min", "max"] as const;
 const maxExpressionDepth = 8;
 const maxAggregateValues = 8;
 
-export type KpiMetricValues = Record<BuiltInKpiMetricKey, number>;
+// Реэкспорт канонического типа из types.ts — kpiEngine импортирует KpiMetricValues отсюда.
+export type { KpiMetricValues };
 
 export function evaluateKpiExpression(
   expression: KpiExpression,

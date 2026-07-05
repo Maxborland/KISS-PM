@@ -1,3 +1,4 @@
+import { computeCapacityBalance } from "./capacityBalance";
 import type { ResourceLoadBucket } from "./resourcePlanning";
 
 export const HIDDEN_PROJECT_ID = "__hidden__";
@@ -254,12 +255,13 @@ function buildDayLoad(input: {
       input.capacityMinutes > 0 &&
       !input.day.isWeekend &&
       !input.day.isHoliday);
+  const balance = computeCapacityBalance(input.workMinutes, input.capacityMinutes);
   return {
     date: input.day.date,
     workMinutes: input.workMinutes,
     capacityMinutes: input.capacityMinutes,
-    freeMinutes: input.freeMinutes ?? Math.max(0, input.capacityMinutes - input.workMinutes),
-    overloadMinutes: input.overloadMinutes ?? Math.max(0, input.workMinutes - input.capacityMinutes),
+    freeMinutes: input.freeMinutes ?? balance.freeMinutes,
+    overloadMinutes: input.overloadMinutes ?? balance.overloadMinutes,
     isWeekend: input.day.isWeekend,
     isHoliday: input.day.isHoliday,
     hasAbsence: input.hasAbsence,
@@ -302,9 +304,10 @@ export function buildEmployeeRows(input: {
       // выходной тенанта в день с нагрузкой скрывают перегруз (KPI-001).
       // Отсутствие режет ёмкость на свою долю дня (portion): полный день → 0, полдня → половина (KPI-005).
       const capacityMinutes = Math.max(0, Math.round(baseDayCapacity * (1 - absentPortion)));
-      const isOverload = totalWork > capacityMinutes && capacityMinutes >= 0;
-      const freeMinutes = Math.max(0, capacityMinutes - totalWork);
-      const overloadMinutes = Math.max(0, totalWork - capacityMinutes);
+      const balance = computeCapacityBalance(totalWork, capacityMinutes);
+      const isOverload = balance.isOverload && capacityMinutes >= 0;
+      const freeMinutes = balance.freeMinutes;
+      const overloadMinutes = balance.overloadMinutes;
 
       let displayWork = totalWork;
       if (input.projectFilterId && merged) {

@@ -23,8 +23,6 @@ type Proposal = {
   explainability: { finishDate: string | null; overloadMinutes: number; changedTaskIds: string[]; riskScore: number; requiredApprovals: string[] };
 };
 type Overload = { resourceId: string; date: string; overloadMinutes: number; taskIds: string[] };
-type RawTask = { id: string; wbsCode: string; title: string };
-type RawAsg = { id: string; resourceId: string; workMinutes: number };
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
 const PROFILE_META: Record<Profile, { label: string; desc: string }> = {
@@ -51,18 +49,20 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     if (!readModel) return null;
     // Уже принятые перегрузки исключаем из целей сценария (каноничный ключ `resourceId:dateIso`),
     // иначе после применения сценария только что принятый день остаётся целью по умолчанию и снова предлагается.
+    // `acceptedOverloads` — мок-only поле бэкенда: в каноничном ResourceLoadMatrix его нет,
+    // поэтому это узкий документированный каст (не `as unknown as`), а не доступ по контракту.
     const accepted = new Set(
-      (readModel.resourceLoad as unknown as { acceptedOverloads?: string[] }).acceptedOverloads ?? []
+      (readModel.resourceLoad as { acceptedOverloads?: string[] }).acceptedOverloads ?? []
     );
-    const overloads = ((readModel.resourceLoad as unknown as { overloads: Array<{ resourceId: string; date: string; granularity?: string; overloadMinutes: number; taskIds: string[] }> }).overloads ?? [])
-      .filter((o) => o.granularity === undefined || o.granularity === "day")
+    const overloads = (readModel.resourceLoad.overloads ?? [])
+      .filter((o) => o.granularity === "day")
       .filter((o) => !accepted.has(`${o.resourceId}:${o.date}`))
       .map((o) => ({ resourceId: o.resourceId, date: o.date, overloadMinutes: o.overloadMinutes, taskIds: o.taskIds }))
       .sort((a, b) => b.overloadMinutes - a.overloadMinutes) as Overload[];
-    const deadline = (readModel.project as unknown as { deadline: string }).deadline;
-    const baseFinish = (readModel.calculatedPlan as unknown as { projectFinish: string }).projectFinish;
-    const baseCritical = ((readModel.calculatedPlan as unknown as { criticalPathTaskIds: string[] }).criticalPathTaskIds ?? []).length;
-    const authored = readModel.authored as unknown as { tasks: RawTask[]; assignments: RawAsg[] };
+    const deadline = readModel.project.deadline;
+    const baseFinish = readModel.calculatedPlan.projectFinish;
+    const baseCritical = (readModel.calculatedPlan.criticalPathTaskIds ?? []).length;
+    const authored = readModel.authored;
     const taskById = new Map(authored.tasks.map((t) => [t.id, t]));
     const asgById = new Map(authored.assignments.map((a) => [a.id, a]));
     return { overloads, deadline, baseFinish, baseCritical, taskById, asgById };
@@ -116,7 +116,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     const taskId = String(pay.taskId ?? ""); const rid = String(pay.resourceId ?? ""); const wm = Number(pay.workMinutes ?? 0);
     const task = model.taskById.get(taskId);
     const existing = model.asgById.get(String(pay.id ?? ""));
-    if (existing) { const d = wm - existing.workMinutes; return { wbs: task?.wbsCode ?? taskId, title: task?.title ?? taskId, detail: `${resDir.name(rid)}: труд ${h(existing.workMinutes)} → ${h(wm)} ч`, delta: `${d < 0 ? "−" : "+"}${h(Math.abs(d))} ч` }; }
+    if (existing) { const exWm = existing.workMinutes ?? 0; const d = wm - exWm; return { wbs: task?.wbsCode ?? taskId, title: task?.title ?? taskId, detail: `${resDir.name(rid)}: труд ${h(exWm)} → ${h(wm)} ч`, delta: `${d < 0 ? "−" : "+"}${h(Math.abs(d))} ч` }; }
     return { wbs: task?.wbsCode ?? taskId, title: task?.title ?? taskId, detail: `+ ${resDir.name(rid)} (${pay.role === "co_executor" ? "соисполнитель" : "исполнитель"})`, delta: `+${h(wm)} ч` };
   });
 

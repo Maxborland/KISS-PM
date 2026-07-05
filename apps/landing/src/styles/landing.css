@@ -1,0 +1,9 @@
+/* KISS PM Landing — section surface aggregator.
+   Shared surface rules stay in surfaces.css; section implementation lives under sections/*.css. */
+@import "./surfaces.css";
+@import "./sections/philosophy.css";
+@import "./sections/notification-dock.css";
+@import "./sections/demo.css";
+@import "./sections/scope.css";
+@import "./sections/waitlist.css";
+@import "./sections/faq-footer.css";

@@ -8,6 +8,7 @@ import {
   createAgentClient,
   type AgentActionInput,
   type AgentExecuteResponse,
+  type AgentHistoryTurn,
   type AgentProposeResponse,
   type AgentStreamEvent,
   type AgentToolAvailability
@@ -69,16 +70,16 @@ export function useAgent() {
   );
 
   const proposeStream = useCallback(
-    async (goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = []): Promise<AgentResult<AgentProposeResponse>> => {
+    async (goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = [], history: AgentHistoryTurn[] = []): Promise<AgentResult<AgentProposeResponse>> => {
       setStatus("proposing");
       setError(null);
       try {
         // live → реальный SSE; mock/Storybook (нет stream-ручки) → обычный propose +
         // синтез событий из результата, чтобы CoT-трейс отображался и в витрине.
         const data = live
-          ? await client.proposeStream(goal, onEvent, attachmentIds)
+          ? await client.proposeStream(goal, onEvent, attachmentIds, history)
           : await (async () => {
-              const result = await client.propose(goal, attachmentIds);
+              const result = await client.propose(goal, attachmentIds, history);
               for (const analyze of result.analyzeResults) onEvent({ type: "analyze", tool: analyze.tool, title: analyze.tool, ok: true });
               for (const action of result.proposedActions) onEvent({ type: "proposal", tool: action.tool, title: action.title });
               if (result.reasoning) onEvent({ type: "reasoning", text: result.reasoning });

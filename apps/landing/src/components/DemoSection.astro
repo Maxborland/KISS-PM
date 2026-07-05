@@ -1,0 +1,29 @@
+---
+import DemoSandbox from "./DemoSandbox.tsx";
+---
+
+<section
+  id="demo"
+  class="l-band l-band--panel demo-band"
+  aria-labelledby="demo-title"
+  data-demo-dim-section
+>
+  <div class="demo-dim-overlay" aria-hidden="true" data-demo-dim-overlay></div>
+
+  <div class="demo-band__wrap">
+    <header class="section-head section-head--tight">
+      <h2 id="demo-title" class="l-display" data-text-reveal>
+        Интерактивный сценарий
+      </h2>
+      <p class="section-head__copy section-head__copy--visible" data-text-reveal>
+        Восемь шагов на живом портфеле из 147 проектов — от сделки в CRM до записи в аудите.
+      </p>
+    </header>
+
+    <div class="demo-frame" data-reveal data-demo-dim-frame>
+      <div class="demo-frame__inner">
+        <DemoSandbox client:visible />
+      </div>
+    </div>
+  </div>
+</section>

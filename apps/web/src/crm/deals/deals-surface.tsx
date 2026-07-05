@@ -14,6 +14,7 @@ import { StatTile } from "@/delivery/ui/bento";
 import { cn } from "@/lib/cn";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { useCrm, useCrmUsers } from "@/crm/lib/use-crm";
+import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import type { DealStage, Opportunity, Pipeline, StageTransition } from "@/crm/lib/crm-client";
 
 type Mode = "kanban" | "list" | "forecast";
@@ -48,6 +49,7 @@ const ERR_RU: Record<string, string> = {
 const ruErr = (code?: string, fallback?: string) => (code && ERR_RU[code]) || fallback || code || "Ошибка";
 
 export function ProjectDeals() {
+  const { live } = useCrmRuntime();
   const { data, status, error, reload, moveStage, movePipeline, createOpportunity } = useCrm();
   const users = useCrmUsers();
   const [mode, setMode] = useState<Mode>("kanban");
@@ -159,7 +161,7 @@ export function ProjectDeals() {
         {mode === "list" ? <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Кнопка «⇄ Воронка» — перенос сделки в другую воронку</span> : null}
       </div>
 
-      <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+      <div style={{ display: live ? "none" : undefined }} className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
         <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         <span>Реальный контракт CRM: /api/workspace/{"{pipelines, deal-stages, opportunities}"}. Перенос стадии — PATCH /opportunities/:id/stage (условия переходов воронки: 422 — условие не выполнено, 409 — переход запрещён); перенос между воронками — PATCH /opportunities/:id/pipeline. Без planVersion (плоский REST). Данные in-memory.</span>
       </div>

@@ -12,7 +12,22 @@ const ALL = [
   "tenant.project_plan.read", "tenant.project_plan.manage",
   "tenant.project_resources.read", "tenant.project_resources.manage",
   "tenant.planning_scenarios.preview", "tenant.planning_scenarios.apply",
-  "tenant.tasks.create", "tenant.tasks.edit"
+  "tenant.tasks.create", "tenant.tasks.edit",
+  // CRM
+  "tenant.clients.read", "tenant.clients.manage",
+  "tenant.contacts.read", "tenant.contacts.manage",
+  "tenant.products.read", "tenant.products.manage",
+  "tenant.opportunities.read", "tenant.opportunities.manage",
+  "tenant.crm_pipelines.read", "tenant.crm_pipelines.manage", "tenant.crm_pipeline_rules.manage",
+  // Коммуникации
+  "tenant.communications.read", "tenant.communications.manage",
+  // Админ/оргструктура
+  "tenant.users.read", "tenant.users.manage",
+  "tenant.access_profiles.read", "tenant.access_profiles.manage",
+  "tenant.positions.read", "tenant.positions.manage",
+  "tenant.org_structure.read", "tenant.task_statuses.manage",
+  // Жизненный цикл проектов
+  "tenant.project_activation.manage"
 ];
 
 describe("agent tool registry RBAC filtering", () => {

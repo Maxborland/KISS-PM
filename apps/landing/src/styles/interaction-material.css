@@ -1,0 +1,342 @@
+/* KISS PM Landing — interaction material Module.
+   Interface: .l-btn, .l-card, .kp-spotlight-card and cursor-bound CSS variables.
+   Implementation: hover/focus/disabled plasma, card sweep, and spotlight states. */
+
+.l-btn {
+  --btn-mx: 50%;
+  --btn-my: 50%;
+  --btn-hover-opacity: 0;
+  --btn-sweep-opacity: 0;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  padding-inline: 22px;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: var(--text-base);
+  transform: translate3d(0, 0, 0);
+  transition:
+    background-position var(--duration-slow) var(--ease-soft),
+    color var(--duration-ui) var(--ease-ui),
+    border-color var(--duration-ui) var(--ease-ui),
+    opacity var(--duration-ui) var(--ease-ui),
+    box-shadow var(--duration-ui) var(--ease-ui),
+    transform var(--duration-ui) var(--ease-soft);
+  cursor: pointer;
+  border: 1px solid transparent;
+  user-select: none;
+  min-width: 44px;
+}
+
+.l-btn::before,
+.l-btn::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  transition:
+    opacity var(--duration-ui) var(--ease-ui),
+    transform var(--duration-slow) var(--ease-soft);
+}
+
+.l-btn::before {
+  inset: 0;
+  background:
+    radial-gradient(
+      104px circle at var(--btn-mx) var(--btn-my),
+      rgba(255, 255, 255, 0.34) 0%,
+      rgba(125, 211, 252, 0.2) 28%,
+      rgba(37, 99, 235, 0.16) 48%,
+      transparent 72%
+    ),
+    linear-gradient(
+      120deg,
+      rgba(79, 70, 229, 0) 0%,
+      rgba(79, 70, 229, 0.18) 35%,
+      rgba(37, 99, 235, 0.2) 55%,
+      rgba(125, 211, 252, 0) 90%
+    );
+  opacity: var(--btn-hover-opacity);
+  transform: scale(0.92);
+}
+
+.l-btn::after {
+  inset: 0;
+  background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.34) 46%, transparent 72%);
+  opacity: var(--btn-sweep-opacity);
+  transform: translate3d(-115%, 0, 0);
+}
+
+.l-btn:hover,
+.l-btn:focus-visible {
+  --btn-hover-opacity: 1;
+  --btn-sweep-opacity: 1;
+  transform: translate3d(0, -1px, 0);
+}
+
+.l-btn:hover::before,
+.l-btn:focus-visible::before {
+  transform: scale(1);
+}
+
+.l-btn:hover::after,
+.l-btn:focus-visible::after {
+  transform: translate3d(82%, 0, 0);
+}
+
+.l-btn--primary {
+  color: #fff;
+  background:
+    linear-gradient(105deg, rgba(255, 255, 255, 0.04), transparent 32%, rgba(255, 255, 255, 0.11) 52%, transparent 70%),
+    linear-gradient(180deg, var(--text-strong), color-mix(in oklab, var(--text-strong) 76%, var(--plasma-violet) 24%));
+  background-size: 220% 100%, 100% 100%;
+  border-color: color-mix(in oklab, var(--text-strong) 88%, #fff 12%);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--text-strong) 80%, var(--text) 20%),
+    0 18px 42px -28px rgba(2, 6, 23, 0.82),
+    0 1px 0 rgba(255, 255, 255, 0.28) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.32) inset;
+}
+
+.l-btn--primary:hover {
+  color: #fff;
+  background-position: 100% 0, 0 0;
+  border-color: color-mix(in oklab, var(--text-strong) 76%, var(--plasma-cyan) 24%);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--text-strong) 78%, var(--plasma-cyan) 22%),
+    0 24px 48px -24px rgba(2, 6, 23, 0.92),
+    0 18px 34px -24px rgba(37, 99, 235, 0.42),
+    0 10px 28px -22px rgba(125, 211, 252, 0.36),
+    0 1px 0 rgba(255, 255, 255, 0.32) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.34) inset;
+}
+
+.l-btn--primary:focus-visible {
+  color: #fff;
+  border-color: color-mix(in oklab, var(--text-strong) 76%, var(--plasma-cyan) 24%);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--text-strong) 78%, var(--plasma-cyan) 22%),
+    0 0 0 3px rgba(37, 99, 235, 0.3),
+    0 0 0 6px rgba(37, 99, 235, 0.12),
+    0 24px 48px -24px rgba(2, 6, 23, 0.9),
+    0 1px 0 rgba(255, 255, 255, 0.32) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.34) inset;
+}
+
+.l-btn--primary:active {
+  transform: translate3d(0, 0, 0);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--text-strong) 82%, var(--text) 18%),
+    0 10px 22px -18px rgba(2, 6, 23, 0.9),
+    0 1px 0 rgba(255, 255, 255, 0.24) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.36) inset;
+}
+
+.l-btn--ghost {
+  background:
+    linear-gradient(105deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.9) 46%, rgba(255, 255, 255, 0) 72%),
+    rgba(255, 255, 255, 0.72);
+  background-size: 220% 100%, 100% 100%;
+  color: var(--text-strong);
+  border-color: color-mix(in oklab, var(--border) 78%, var(--text-strong) 22%);
+  backdrop-filter: blur(12px) saturate(145%);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.04),
+    0 14px 34px -28px rgba(15, 23, 42, 0.48),
+    0 1px 0 rgba(255, 255, 255, 0.92) inset,
+    0 -1px 0 rgba(15, 23, 42, 0.08) inset;
+}
+
+.l-btn--ghost::before {
+  background:
+    radial-gradient(
+      104px circle at var(--btn-mx) var(--btn-my),
+      rgba(255, 255, 255, 0.86) 0%,
+      rgba(125, 211, 252, 0.2) 34%,
+      rgba(37, 99, 235, 0.12) 56%,
+      transparent 76%
+    ),
+    linear-gradient(120deg, rgba(79, 70, 229, 0), rgba(79, 70, 229, 0.12), rgba(125, 211, 252, 0));
+}
+
+.l-btn--ghost:hover {
+  background: #fff;
+  background-position: 100% 0, 0 0;
+  border-color: color-mix(in oklab, var(--border-strong) 60%, var(--plasma-cyan) 40%);
+  color: var(--text-strong);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.06),
+    0 18px 38px -24px rgba(15, 23, 42, 0.62),
+    0 14px 30px -24px rgba(125, 211, 252, 0.42),
+    0 1px 0 rgba(255, 255, 255, 1) inset,
+    0 -1px 0 rgba(15, 23, 42, 0.1) inset;
+}
+
+.l-btn--ghost:focus-visible {
+  color: var(--text-strong);
+  border-color: color-mix(in oklab, var(--border-strong) 60%, var(--plasma-cyan) 40%);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.06),
+    0 0 0 3px rgba(37, 99, 235, 0.22),
+    0 0 0 6px rgba(125, 211, 252, 0.14),
+    0 18px 38px -24px rgba(15, 23, 42, 0.62),
+    0 1px 0 rgba(255, 255, 255, 1) inset,
+    0 -1px 0 rgba(15, 23, 42, 0.1) inset;
+}
+
+.l-btn[aria-disabled="true"],
+.l-btn:disabled {
+  --btn-hover-opacity: 0;
+  --btn-sweep-opacity: 0;
+  cursor: not-allowed;
+  opacity: 0.42;
+  transform: none;
+}
+
+.l-card {
+  --card-hover-enter: 620ms;
+  --card-hover-exit: 420ms;
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, box-shadow;
+  transition:
+    transform var(--card-hover-exit) var(--ease-soft),
+    border-color var(--card-hover-exit) var(--ease-ui),
+    box-shadow var(--card-hover-exit) var(--ease-ui),
+    background var(--card-hover-exit) var(--ease-ui);
+}
+
+.l-card::before,
+.l-card::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 360ms var(--ease-ui),
+    transform 760ms var(--ease-soft);
+}
+
+.l-card::before {
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.92), transparent 42%),
+    radial-gradient(circle at 14% 0%, rgba(37, 99, 235, 0.08), transparent 38%),
+    radial-gradient(circle at 86% 8%, rgba(125, 211, 252, 0.12), transparent 40%);
+}
+
+.l-card::after {
+  inset: -35% -70%;
+  background: linear-gradient(112deg, transparent 36%, rgba(255, 255, 255, 0.72) 48%, transparent 61%);
+  transform: translate3d(-42%, 0, 0) rotate(4deg);
+}
+
+.l-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.l-card:hover {
+  transform: translate3d(0, -5px, 0);
+  border-color: color-mix(in oklab, var(--border-strong) 58%, var(--plasma-cyan) 42%);
+  background:
+    radial-gradient(circle at 50% -20%, rgba(125, 211, 252, 0.1), transparent 45%),
+    var(--panel);
+  box-shadow:
+    var(--shadow-md),
+    0 30px 72px -46px rgba(15, 23, 42, 0.48),
+    0 18px 42px -34px rgba(37, 99, 235, 0.32),
+    0 1px 0 rgba(255, 255, 255, 0.98) inset;
+  transition-duration: var(--card-hover-enter);
+}
+
+.l-card:hover::before,
+.l-card:hover::after {
+  opacity: 1;
+}
+
+.l-card:hover::after {
+  transform: translate3d(38%, 0, 0) rotate(4deg);
+}
+
+/* -------- card spotlight --------
+   Mouse-tracked plasma glow. The parent must set
+   `--mx`/`--my` on pointermove (handled by reveal.ts). */
+.kp-spotlight-card {
+  position: relative;
+  isolation: isolate;
+}
+
+.kp-spotlight-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      280px circle at var(--mx, 50%) var(--my, 0%),
+      rgba(255, 255, 255, 0.72),
+      rgba(125, 211, 252, 0.16) 28%,
+      rgba(37, 99, 235, 0.11) 48%,
+      transparent 66%
+    ),
+    radial-gradient(
+      420px circle at var(--mx, 50%) var(--my, 0%),
+      var(--plasma-soft-violet),
+      transparent 64%
+    );
+  opacity: 0;
+  transform: scale(0.98);
+  transition:
+    opacity 420ms var(--ease-ui),
+    transform 760ms var(--ease-soft);
+  z-index: 1;
+}
+
+.kp-spotlight-card::after {
+  content: "";
+  position: absolute;
+  inset: -36% -70%;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(112deg, transparent 36%, rgba(255, 255, 255, 0.56) 48%, transparent 61%);
+  opacity: 0;
+  transform: translate3d(-42%, 0, 0) rotate(4deg);
+  transition:
+    opacity 420ms var(--ease-ui),
+    transform 880ms var(--ease-soft);
+  z-index: 1;
+}
+
+.kp-spotlight-card:hover::before,
+.kp-spotlight-card:focus-within::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.kp-spotlight-card:hover::after,
+.kp-spotlight-card:focus-within::after {
+  opacity: 1;
+  transform: translate3d(38%, 0, 0) rotate(4deg);
+}
+
+.kp-spotlight-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+

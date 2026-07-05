@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Loader2, LogOut } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,12 @@ export type LoginSurfaceProps = {
 export function LoginSurface({ prefill = false }: LoginSurfaceProps) {
   // useAuth: гейт сессии. state/status — стартовое anonymous после me()→401.
   const { state, status, error, user, reload, login, logout } = useAuth();
+  const router = useRouter();
+
+  // Вошли → ведём в рабочую область. В Storybook next/navigation замокан (no-op) — безопасно.
+  useEffect(() => {
+    if (state === "authenticated") router.replace("/dashboard");
+  }, [state, router]);
 
   const [email, setEmail] = useState(prefill ? DEMO_EMAIL : "");
   const [password, setPassword] = useState(prefill ? DEMO_PASSWORD : "");
@@ -136,9 +144,8 @@ export function LoginSurface({ prefill = false }: LoginSurfaceProps) {
 function AuthedCard({ name, busy, onLogout }: { name: string; busy: boolean; onLogout: () => void }) {
   return (
     <AuthCard title="Вы вошли в KISS PM" subtitle={`Добро пожаловать, ${name}.`}>
-      {/* Честная заглушка редиректа: в Storybook навигации нет. */}
       <div className="rounded-[var(--radius-md)] border border-[var(--success-border,var(--success))] bg-[var(--success-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--success-text)]">
-        Сессия установлена (GET /api/auth/me → authenticated). В приложении здесь — переход в рабочую область.
+        Сессия установлена — перенаправляем в рабочую область…
       </div>
       <Button variant="secondary" type="button" className="w-full" disabled={busy} onClick={onLogout}>
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <LogOut className="size-4" aria-hidden />}
@@ -158,12 +165,12 @@ function AuthedCard({ name, busy, onLogout }: { name: string; busy: boolean; onL
 function LoginFooter() {
   return (
     <div className="flex items-center justify-between gap-2 text-[length:var(--text-xs)]">
-      <span className="text-[var(--muted)]" title="Демо-прототип: навигация подключится в рабочем приложении">
-        Нет аккаунта? <span className="font-medium text-[var(--muted-strong)]">Создать аккаунт</span>
+      <span className="text-[var(--muted)]">
+        Нет аккаунта? <Link href="/register" className="font-medium text-[var(--accent)] hover:underline">Создать аккаунт</Link>
       </span>
-      <span className="font-medium text-[var(--muted-strong)]" title="Демо-прототип: навигация подключится в рабочем приложении">
+      <Link href="/password-reset" className="font-medium text-[var(--accent)] hover:underline">
         Забыли пароль?
-      </span>
+      </Link>
     </div>
   );
 }

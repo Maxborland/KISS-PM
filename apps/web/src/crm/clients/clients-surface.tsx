@@ -10,9 +10,11 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr, money } from "@/crm/ui/crm-bits";
 import { useCrm } from "@/crm/lib/use-crm";
+import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import type { Client } from "@/crm/lib/crm-client";
 
 export function ProjectClients() {
+  const { live } = useCrmRuntime();
   const { data, status, error, reload, createClient, updateClient } = useCrm();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -51,7 +53,7 @@ export function ProjectClients() {
 
   return (
     <CrmFrame activeTab="Клиенты" subtitle="Справочник клиентов" actions={<CreateClientDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createClient} />}>
-      <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+      <div style={{ display: live ? "none" : undefined }} className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
         <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
         Реальный контракт CRM: GET/POST/PATCH /api/workspace/clients (createCrmClient). «Контактов» — активные; «Сделок»/«Сумма» — по сделкам клиента, кроме проигранных. PATCH — полная запись (как боевой). Данные in-memory.
       </div>

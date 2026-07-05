@@ -6,51 +6,29 @@ import {
   canPreviewPlanningScenarios,
   canReadProjectPlan,
   canReadProjectResources,
-  canReadProjects,
-  type AccessProfile,
-  type PolicyDecision
+  canReadProjects
 } from "@kiss-pm/access-control";
+import type { AccessProfile } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 
+import { tenantCapability, type AgentTool, type AgentToolKind } from "./toolKit";
+import { ADMIN_TOOLS } from "./tools/adminTools";
+import { COMMS_TOOLS } from "./tools/commsTools";
+import { CRM_TOOLS } from "./tools/crmTools";
+import { PROJECT_TOOLS } from "./tools/projectTools";
+
+// Публичная поверхность типов/китов для существующих импортёров (agentRoutes, тесты).
+export type { AgentTool, AgentToolBinding, AgentToolCapability, AgentToolKind } from "./toolKit";
+export { reTool, tenantCapability } from "./toolKit";
+
 /**
- * Реестр инструментов агента (P-agent slice 1).
- *
- * Агент НЕ содержит собственной бизнес-логики: каждый tool — тонкая обёртка над уже
- * существующим, RBAC-гейтнутым контрактом (governed planning apply / task preflight+command /
- * scenario apply). Здесь определяются только метаданные + JSON-схема входа (для Anthropic
- * tool-calling) + грубый capability-гейт (canX) для фильтрации набора под права актора.
- *
- * kind:
- *   - "analyze"  — только чтение; исполняется вживую в LLM-цикле (slice 2).
- *   - "mutation" — изменяет систему; в цикле НЕ исполняется (возвращается как предложение),
- *                  применяется отдельным /execute по подтверждению (slice 3) с повторной
- *                  server-side RBAC-проверкой.
- *
- * Capability здесь — ГРУБЫЙ фильтр («есть ли у сотрудника хоть какой-то доступ к этому
- * инструменту»). Точная per-resource проверка (участник задачи, per-command право,
- * version-lock) выполняется в момент execute существующими гейтами.
+ * Реестр инструментов агента. Каждый tool — тонкая обёртка над уже существующим RBAC-гейтнутым
+ * governed-роутом; бизнес-логика не дублируется. «Ручные» инструменты (задачи/план/сценарии)
+ * имеют кастомную логику исполнения в agentRoutes; доменные (CRM/comms/admin/projects)
+ * декларативны (binding) и исполняются generic-редиспатчем. Набор фильтруется по правам актора
+ * (allowedToolsForActor) → «инструменты = что разрешено сотруднику».
  */
-export type AgentToolKind = "analyze" | "mutation";
-
-export type AgentToolCapabilityInput = { actor: TenantUser; profile: AccessProfile };
-export type AgentToolCapability = (input: AgentToolCapabilityInput) => PolicyDecision;
-
-export type AgentTool = {
-  name: string;
-  title: string;
-  description: string;
-  kind: AgentToolKind;
-  inputSchema: { type: "object"; properties: Record<string, unknown>; required?: string[] };
-  capability: AgentToolCapability;
-};
-
-// Грубый capability из тенант-scoped canX (targetTenantId = тенант актора).
-const tenantCapability =
-  (canX: (input: { actor: TenantUser; profile: AccessProfile; targetTenantId: string }) => PolicyDecision): AgentToolCapability =>
-  ({ actor, profile }) =>
-    canX({ actor, profile, targetTenantId: actor.tenantId });
-
-export const AGENT_TOOLS: AgentTool[] = [
+const HANDWIRED_TOOLS: AgentTool[] = [
   // ---- analyze (только чтение) ----
   {
     name: "list_my_tasks",
@@ -147,6 +125,9 @@ export const AGENT_TOOLS: AgentTool[] = [
     capability: tenantCapability(canManageProjectPlan)
   }
 ];
+
+// Полный набор: ручные (кастомное исполнение) + доменные декларативные (generic-редиспатч).
+export const AGENT_TOOLS: AgentTool[] = [...HANDWIRED_TOOLS, ...CRM_TOOLS, ...COMMS_TOOLS, ...ADMIN_TOOLS, ...PROJECT_TOOLS];
 
 export type AgentToolAvailability = {
   name: string;

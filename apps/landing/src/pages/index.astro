@@ -1,0 +1,31 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import HeroSection from "../components/HeroSection.astro";
+import LandingAgentDemoSection from "../components/LandingAgentDemoSection.astro";
+import PhilosophySection from "../components/PhilosophySection.astro";
+import PathSection from "../components/PathSection.astro";
+import DemoSection from "../components/DemoSection.astro";
+import WaitlistSection from "../components/WaitlistSection.astro";
+import FaqSection from "../components/FaqSection.astro";
+
+export const prerender = true;
+---
+
+<BaseLayout
+  title="KISS PM — управляйте проектами через агента"
+  description="KISS PM — агентная система управления проектами: цель, proposed project diff, ревью, применение выбранного и audit trail."
+>
+  <SiteHeader slot="header" />
+
+  <HeroSection />
+  <LandingAgentDemoSection />
+  <PhilosophySection />
+  <PathSection />
+  <DemoSection />
+  <FaqSection />
+  <WaitlistSection />
+
+  <SiteFooter slot="footer" />
+</BaseLayout>

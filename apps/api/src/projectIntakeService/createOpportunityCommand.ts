@@ -40,7 +40,9 @@ export async function createOpportunity(
     return { ok: false, status: 409, error: "opportunity_id_taken" };
   }
 
-  const opportunity = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+  let opportunity;
+  try {
+    opportunity = await deps.runDataSourceTransaction(async (transactionDataSource) => {
     if (!transactionDataSource.createOpportunity) {
       throw new Error("transactional_opportunity_create_not_configured");
     }
@@ -78,7 +80,15 @@ export async function createOpportunity(
     );
 
     return createdOpportunity;
-  });
+    });
+  } catch (error) {
+    // Гонка pre-check (listOpportunities выше) не транзакционен: два параллельных create с одним id
+    // оба проходят проверку, проигравший ловит opportunities_pkey (23505) → отдаём 409, а не 500.
+    if ((error as { code?: unknown }).code === "23505") {
+      return { ok: false, status: 409, error: "opportunity_id_taken" };
+    }
+    throw error;
+  }
 
   return { ok: true, status: 201, opportunity };
 }

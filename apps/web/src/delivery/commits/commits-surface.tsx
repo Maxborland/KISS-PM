@@ -39,7 +39,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   }, [readModel?.planVersion, loadCommits, readModel]);
 
   const taskTitle = useMemo(() => {
-    const m = new Map(((readModel?.authored as unknown as { tasks: Array<{ id: string; title: string; wbsCode: string }> } | undefined)?.tasks ?? []).map((t) => [t.id, t]));
+    const m = new Map((readModel?.authored.tasks ?? []).map((t) => [t.id, t]));
     return (id: string) => { const t = m.get(id); return t ? `${t.wbsCode} ${t.title}` : id; };
   }, [readModel]);
 

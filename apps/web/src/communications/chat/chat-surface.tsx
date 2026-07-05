@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CheckCheck, MoreHorizontal, Pencil, Pin, Send, Smile, Trash2, X } from "lucide-react";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
 import { useCommsUsers, useConversation, useDirectMessages, usePresence, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
+import { useCommsRuntime } from "@/communications/lib/comms-runtime";
 import { avatarColor, commsErr, initials, PresenceDot, relTime, UnreadDot } from "@/communications/lib/comms-bits";
 import type { Conversation, DirectConversation, EntityType, Message, PresenceStatus, Reaction } from "@/communications/lib/comms-client";
 
@@ -24,10 +25,23 @@ import type { Conversation, DirectConversation, EntityType, Message, PresenceSta
    Работает на useConversation (createCommsClient поверх in-memory мока).
    ============================================================ */
 
-// «Текущий пользователь» прототипа = u-anna (зеркало CURRENT_ACTOR_ID в моке). На боевом API
-// «свои» реакции/авторство определяются сессией сервера; отдельной ручки «кто я» здесь нет —
-// ME остаётся прототипным актором (см. blockers). Подсветка своих реакций на live приблизительна.
-const ME = "u-anna";
+// Текущий пользователь: live → id из сессии (/api/auth/me), иначе прототипный u-anna (mock).
+// Через контекст — чтобы вложенные ChatPane/MessageBubble определяли «свои» реакции/авторство
+// по РЕАЛЬНОМУ пользователю, а не по захардкоженному актору.
+const SelfUserContext = createContext<string>("u-anna");
+function useSelfUserId(live: boolean): string {
+  const [id, setId] = useState("u-anna");
+  useEffect(() => {
+    if (!live) return;
+    let active = true;
+    void fetch("/api/auth/me", { credentials: "include", headers: { "x-kiss-pm-action": "same-origin" } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { user?: { id?: unknown } } | null) => { if (active && typeof d?.user?.id === "string") setId(d.user.id); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [live]);
+  return id;
+}
 
 // Demo-сущность (entity-scoped): беседы привязаны к проекту proj-portal. Прод-route может
 // передать реальные entityType/entityId пропсами; по умолчанию — демо (для stories).
@@ -53,6 +67,9 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
   const dm = useDirectMessages();
   // P4.3 presence: статусы пользователей (initial GET + live presence.changed).
   const presence = usePresence();
+  // Текущий пользователь из сессии (live) — для «своих» реакций/авторства.
+  const { live } = useCommsRuntime();
+  const me = useSelfUserId(live);
 
   // P4.1/P4.3 realtime: в live-режиме сообщение/присутствие прилетают push'ем (SSE).
   // onMessage → перечитываем ленту; onPresence → обновляем карту присутствия. В mock — no-op.
@@ -73,9 +90,10 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
     (selectedDm ? adaptDmToConversation(selectedDm, users) : null);
 
   return (
+    <SelfUserContext.Provider value={me}>
     <CommsFrame activeTab="Чат" subtitle={`Беседы · ${entityType} / ${entityId}`}>
       <div className="flex flex-col gap-3">
-        <PrototypeBanner />
+        {!live ? <PrototypeBanner /> : null}
         <SurfaceState
           status={surfaceStatus}
           error={error}
@@ -118,6 +136,7 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
         </SurfaceState>
       </div>
     </CommsFrame>
+    </SelfUserContext.Provider>
   );
 }
 
@@ -309,6 +328,7 @@ function ChatPane({
   users: CommsUsersDir;
   presenceOf: (userId: string | null) => PresenceStatus;
 }) {
+  const me = useContext(SelfUserContext);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const cid = conversation.id;
@@ -347,7 +367,7 @@ function ChatPane({
 
   // Тоггл реакции по своему userId (ME): есть своя — снять, иначе — поставить.
   const toggleReaction = (m: Message, emoji: string) => {
-    const mine = m.reactions.find((r) => r.userId === ME && r.emoji === emoji && !r.archivedAt);
+    const mine = m.reactions.find((r) => r.userId === me && r.emoji === emoji && !r.archivedAt);
     if (mine) void run(() => conv.removeReaction(cid, m.id, mine.id));
     else void run(() => conv.addReaction(cid, m.id, emoji));
   };
@@ -441,8 +461,9 @@ function MessageBubble({
   onDelete: () => void;
   onPin: () => void;
 }) {
+  const me = useContext(SelfUserContext);
   const m = message;
-  const mine = m.authorUserId === ME;
+  const mine = m.authorUserId === me;
   const archived = Boolean(m.archivedAt);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(m.body);
@@ -464,7 +485,7 @@ function MessageBubble({
   }
 
   // Агрегируем реакции по emoji (счётчик + есть ли своя).
-  const grouped = groupReactions(m.reactions);
+  const grouped = groupReactions(m.reactions, me);
 
   return (
     <div className="group flex gap-2.5">
@@ -545,13 +566,13 @@ function MessageBubble({
 
 // Группировка реакций по emoji: счётчик + флаг «есть моя».
 type GroupedReaction = { emoji: string; count: number; mine: boolean };
-function groupReactions(reactions: Reaction[]): GroupedReaction[] {
+function groupReactions(reactions: Reaction[], me: string): GroupedReaction[] {
   const map = new Map<string, GroupedReaction>();
   for (const r of reactions) {
     if (r.archivedAt) continue;
     const g = map.get(r.emoji) ?? { emoji: r.emoji, count: 0, mine: false };
     g.count += 1;
-    if (r.userId === ME) g.mine = true;
+    if (r.userId === me) g.mine = true;
     map.set(r.emoji, g);
   }
   return [...map.values()];

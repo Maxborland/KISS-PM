@@ -1,0 +1,71 @@
+---
+const tiers = [
+  {
+    value: "30",
+    suffix: "+",
+    label: "Команда",
+    title: "Общий язык приоритетов",
+    bar: 38,
+  },
+  {
+    value: "50",
+    suffix: "—150",
+    label: "Программный офис",
+    title: "Общие исполнители",
+    bar: 68,
+  },
+  {
+    value: "150",
+    suffix: "+",
+    label: "УК",
+    title: "Карта сценариев",
+    bar: 96,
+  },
+];
+---
+
+<section id="portfolio" class="l-band l-band--canvas" aria-labelledby="portfolio-title">
+  <div class="l-band__grid" aria-hidden="true"></div>
+
+  <div class="l-container">
+    <header class="section-head section-head--tight">
+      <h2 id="portfolio-title" class="l-display" data-text-reveal>
+        Один портфель — три масштаба
+      </h2>
+      <p class="section-head__copy section-head__copy--visible" data-text-reveal>
+        От небольшой команды до программного офиса и управляющей компании — без смены продукта.
+      </p>
+    </header>
+
+    <div class="hscroll-wrap" data-hscroll data-hscroll-wheel="true" data-bento-group>
+      <div class="hscroll" data-hscroll-rail role="list">
+        {tiers.map((tier) => (
+          <article class="hscroll__item pressure-card kp-spotlight-card" data-hscroll-item role="listitem">
+            <div class="pressure-card__head">
+              <p class="pressure-card__value">
+                {tier.value}<sup>{tier.suffix}</sup>
+              </p>
+              <span class="pressure-card__label">{tier.label}</span>
+            </div>
+            <h3 class="pressure-card__title">{tier.title}</h3>
+            <div class="pressure-card__bar" role="presentation">
+              <span style={`width:${tier.bar}%`}></span>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div class="hscroll-foot hscroll-foot--dots-only">
+        <nav class="hscroll-dots" aria-label="Масштаб портфеля">
+          {tiers.map((_, idx) => (
+            <button
+              type="button"
+              class="hscroll-dots__dot"
+              data-hscroll-dot
+              aria-current={idx === 0 ? "true" : undefined}
+            ></button>
+          ))}
+        </nav>
+      </div>
+    </div>
+  </div>
+</section>

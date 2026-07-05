@@ -48,22 +48,11 @@ const ME = "u-anna";
 const TABS = ["Чат", "Файлы", "Встречи", "Аудит"] as const;
 type Tab = (typeof TABS)[number];
 
-/* ---- Проекции read-model (форма из mock-planning-backend.buildReadModel) ---- */
-type AuthoredTask = {
-  id: string;
-  wbsCode: string;
-  title: string;
-  statusId: string;
-  plannedStart: string;
-  plannedFinish: string;
-  durationMinutes: number | null;
-  workMinutes: number;
-  percentComplete: number;
-  calendarId: string | null;
-  customFields?: { kind?: string; resLabel?: string };
-};
-type CalcTask = { id: string; calculatedStart: string; calculatedFinish: string; totalSlackMinutes: number | null; isCritical: boolean };
-type Dependency = { id: string; predecessorTaskId: string; successorTaskId: string; type: string; lagMinutes: number };
+// Проекции read-model теперь берём напрямую из типизированного контракта
+// PlanningReadModel (authored.tasks: PlanTask[], authored.dependencies: PlanDependency[],
+// calculatedPlan.tasks: CalculatedTask[]) — локальные raw-типы больше не нужны.
+// customFields — открытый мешок Record<string,unknown>; читаем нужные ключи узким локальным кастом.
+type TaskCustomFields = { kind?: string; resLabel?: string };
 
 const STATUS_RU: Record<string, { label: string; cls: string }> = {
   todo: { label: "К выполнению", cls: "bg-[var(--panel-strong)] text-[var(--muted-strong)]" },
@@ -89,12 +78,14 @@ export function TaskInspector() {
   // Если зависимостей нет ни у кого — берём первый лист. Только из реальных данных.
   const picked = useMemo(() => {
     if (!readModel) return null;
-    const tasks = (readModel.authored as unknown as { tasks: AuthoredTask[] }).tasks;
-    const deps = (readModel.authored as unknown as { dependencies: Dependency[] }).dependencies;
-    const cp = readModel.calculatedPlan as unknown as { tasks: CalcTask[] };
-    const calcById = new Map(cp.tasks.map((c) => [c.id, c]));
+    const tasks = readModel.authored.tasks;
+    const deps = readModel.authored.dependencies;
+    const calcById = new Map(readModel.calculatedPlan.tasks.map((c) => [c.id, c]));
     const byId = new Map(tasks.map((t) => [t.id, t]));
-    const leaves = tasks.filter((t) => t.durationMinutes != null && t.customFields?.kind !== "milestone");
+    const leaves = tasks.filter((t) => {
+      const cf = (t.customFields ?? {}) as TaskCustomFields;
+      return t.durationMinutes != null && cf.kind !== "milestone";
+    });
     const withPred = leaves.find((t) => deps.some((d) => d.successorTaskId === t.id));
     const task = withPred ?? leaves[0] ?? null;
     if (!task) return null;
@@ -148,7 +139,7 @@ export function TaskInspector() {
     { label: "Финиш", value: ddmmyyyy(calc?.calculatedFinish ?? task.plannedFinish), mono: true },
     { label: "Длительность", value: `${minToDays(task.durationMinutes) ?? "—"} дн`, mono: true },
     { label: "Работа", value: `${Math.round(task.workMinutes / 60)} ч`, mono: true },
-    { label: "Исполнитель", value: task.customFields?.resLabel || "—" },
+    { label: "Исполнитель", value: ((task.customFields ?? {}) as TaskCustomFields).resLabel || "—" },
     { label: "Календарь", value: task.calendarId ?? "—" },
     ...(slackDays != null ? [{ label: "Резерв", value: `${slackDays} дн`, mono: true }] : [])
   ];

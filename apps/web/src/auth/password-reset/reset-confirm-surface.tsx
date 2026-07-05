@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { CheckCircle2, Loader2, LogIn, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -59,12 +60,12 @@ export function ResetConfirmSurface({ token: initialToken = "" }: ResetConfirmSu
         // onSubmit опускаем на финальном экране (exactOptionalPropertyTypes: не передаём undefined).
         {...(done ? {} : { onSubmit: submit })}
         footer={
-          <a
-            href="?path=/story/auth-password-reset--request"
+          <Link
+            href="/password-reset"
             className="text-[length:var(--text-sm)] font-medium text-[var(--accent)] underline-offset-4 hover:underline"
           >
             Нет токена? Запросить сброс заново
-          </a>
+          </Link>
         }
       >
         {/* Плашка-прототип: contract-mock боевого контракта password-reset/confirm. */}
@@ -80,13 +81,13 @@ export function ResetConfirmSurface({ token: initialToken = "" }: ResetConfirmSu
               <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>Пароль изменён — войдите с новым паролем.</span>
             </div>
-            <a
-              href="?path=/story/auth-login--login"
+            <Link
+              href="/login"
               className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--accent)] text-[length:var(--text-sm)] font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
             >
               <LogIn className="size-4" aria-hidden />
               Перейти ко входу
-            </a>
+            </Link>
           </div>
         ) : (
           <>

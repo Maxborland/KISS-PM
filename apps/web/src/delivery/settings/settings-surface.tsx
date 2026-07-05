@@ -13,17 +13,14 @@ import { PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { demoAction } from "@/views/lib/demo";
-import type { PlanningCommand } from "@kiss-pm/domain";
-
-type ProjRaw = { id: string; sourceType: string; sourceOpportunityId: string | null; plannedStart: string; plannedFinish: string; deadline: string | null; calendarId: string | null };
-type CalRaw = { id: string; workingWeekdays: number[]; workingMinutesPerDay: number };
-type TaskRaw = { id: string; schedulingMode: "auto" | "manual"; durationMinutes: number | null; customFields?: { kind?: string } };
+import { createPlanningCommand } from "@kiss-pm/domain";
+import type { PlanningCommand, PlanCalendar } from "@kiss-pm/domain";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 // PROJECT_FALLBACK (шапка loading/error) импортируется из delivery/lib/project-chrome
 const DOW_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const ddmmyyyy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
-const calLabel = (c: CalRaw) => { const days = c.workingWeekdays.map((d) => DOW_RU[d] ?? "?"); const span = days.length ? `${days[0]}–${days[days.length - 1]}` : "—"; return `Производственный · ${span} ${Math.round(c.workingMinutesPerDay / 60)} ч`; };
+const calLabel = (c: PlanCalendar) => { const days = c.workingWeekdays.map((d) => DOW_RU[d] ?? "?"); const span = days.length ? `${days[0]}–${days[days.length - 1]}` : "—"; return `Производственный · ${span} ${Math.round(c.workingMinutesPerDay / 60)} ч`; };
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -57,10 +54,14 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
   const model = useMemo(() => {
     if (!readModel) return null;
-    const project = readModel.project as unknown as ProjRaw;
-    const calendars = ((readModel as unknown as { calendars: CalRaw[] }).calendars ?? []);
-    const finish = (readModel.calculatedPlan as unknown as { projectFinish: string }).projectFinish;
-    const leaves = (readModel.authored as unknown as { tasks: TaskRaw[] }).tasks.filter((t) => t.durationMinutes != null && t.customFields?.kind !== "milestone");
+    const project = readModel.project;
+    const calendars = readModel.calendars ?? [];
+    const finish = readModel.calculatedPlan.projectFinish;
+    // «веха» помечается в customFields.kind (открытый бэг домена — читаем узко типизированно, не as unknown as)
+    const leaves = readModel.authored.tasks.filter((t) => {
+      const cf = (t.customFields ?? {}) as { kind?: string };
+      return t.durationMinutes != null && cf.kind !== "milestone";
+    });
     const autoCount = leaves.filter((t) => t.schedulingMode === "auto").length;
     const manualCount = leaves.filter((t) => t.schedulingMode === "manual").length;
     return { project, calendars, finish, autoCount, manualCount, leafCount: leaves.length };
@@ -80,10 +81,11 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }
 
   const { project } = model;
-  const finishDay = isoToDay(model.finish);
+  // финиш домена (calculatedPlan.projectFinish) теперь nullable: без него день не считаем (раньше cast форсировал string)
+  const finishDay = model.finish ? isoToDay(model.finish) : null;
   // дедлайн домена nullable: без него резерв не считаем (иначе NaN), показываем «—» как deriveProjectMeta
   const deadlineDay = project.deadline ? isoToDay(project.deadline) : null;
-  const reserveDays = deadlineDay != null ? deadlineDay - finishDay : null;
+  const reserveDays = deadlineDay != null && finishDay != null ? deadlineDay - finishDay : null;
   const projectMeta: ProjectMeta = {
     ...PROJECT, planVersion: `v${readModel.planVersion}`, deadline: ddmmyyyy(project.deadline), finish: ddmmyyyy(model.finish),
     ...(reserveDays == null ? {} : reserveDays < 0 ? { variance: { label: `+${-reserveDays} дн. к дедлайну`, tone: "danger" as const } } : { variance: { label: `резерв ${reserveDays} дн. до дедлайна`, tone: "success" as const } })
@@ -105,7 +107,7 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }
 
   const openDeadlineEdit = () => { setDraftDeadline(project.deadline ?? ""); setReason(""); setEditDeadline(true); setNotice(null); };
-  const submitDeadline = () => void applyCmd({ type: "project.deadline.move", payload: { deadline: draftDeadline, reason: reason.trim() } } as PlanningCommand, "Дедлайн перенесён", () => { setEditDeadline(false); setReason(""); });
+  const submitDeadline = () => void applyCmd(createPlanningCommand({ type: "project.deadline.move", payload: { deadline: draftDeadline, reason: reason.trim() } }), "Дедлайн перенесён", () => { setEditDeadline(false); setReason(""); });
 
   return (
     <DeliveryFrame project={projectMeta} activeTab="Настройки">
