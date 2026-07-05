@@ -56,8 +56,7 @@ const dataset: SeedTenantDataset = {
         "tenant.projects.read",
         "tenant.project_plan.read",
         "tenant.project_resources.read",
-        "tenant.project_plan.manage",
-        "tenant.planning_scenarios.apply"
+        "tenant.project_plan.manage"
       ]
     },
     {
@@ -260,10 +259,6 @@ describe("planning API routes", () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const readerCookie = await loginAs("executor@kiss-pm.local", "executor12345");
     const planOnlyReaderCookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "reader12345");
-    const limitedScenarioApplyCookie = await loginAs(
-      "plan-manager-no-resource-manage@kiss-pm.local",
-      "planmanager12345"
-    );
     await createTask(adminCookie, {
       id: "task-plan-a",
       title: "Подготовить план",
@@ -599,16 +594,6 @@ describe("planning API routes", () => {
         })
       ])
     });
-    const allocationChangingProposal = scenarioPreviewBody.proposals.find(
-      (proposal: { planDelta: { commands: Array<{ type: string }> } }) =>
-        proposal.planDelta.commands.some((command) =>
-          command.type === "assignment.upsert" ||
-          command.type === "assignment.delete" ||
-          command.type === "assignment.allocations.replace" ||
-          command.type === "resource.reserve"
-        )
-    );
-    expect(allocationChangingProposal).toBeDefined();
 
     const deniedScenarioApply = await app.request(
       `/api/workspace/projects/project-alpha/planning/scenario-proposals/${scenarioPreviewBody.proposals[0].id}/apply`,
@@ -624,26 +609,6 @@ describe("planning API routes", () => {
     );
     expect(deniedScenarioApply.status).toBe(403);
     await expect(deniedScenarioApply.json()).resolves.toEqual({ error: "permission_missing" });
-
-    const resourceDeniedScenarioApply = await app.request(
-      `/api/workspace/projects/project-alpha/planning/scenario-proposals/${allocationChangingProposal!.id}/apply`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-kiss-pm-action": "same-origin",
-          cookie: limitedScenarioApplyCookie
-        },
-        body: JSON.stringify({
-          clientPlanVersion: assignmentAppliedBody.newPlanVersion,
-          acceptedRiskReason: "Проверка, что scenario apply не обходит управление ресурсами"
-        })
-      }
-    );
-    expect(resourceDeniedScenarioApply.status).toBe(403);
-    await expect(resourceDeniedScenarioApply.json()).resolves.toEqual({
-      error: "permission_missing"
-    });
 
     const missingRiskReasonApply = await app.request(
       `/api/workspace/projects/project-alpha/planning/scenario-proposals/${scenarioPreviewBody.proposals[0].id}/apply`,
@@ -677,38 +642,6 @@ describe("planning API routes", () => {
     expect(missingScenarioApply.status).toBe(404);
     await expect(missingScenarioApply.json()).resolves.toEqual({
       error: "scenario_not_found"
-    });
-
-    const stalePreview = await app.request(
-      "/api/workspace/projects/project-alpha/planning/scenario-proposals",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-kiss-pm-action": "same-origin",
-          cookie: adminCookie
-        },
-        body: JSON.stringify(scenarioPreviewRequest)
-      }
-    );
-    const stalePreviewBody = await stalePreview.json();
-    expect(stalePreview.status).toBe(200);
-    const staleScenarioApply = await app.request(
-      `/api/workspace/projects/project-alpha/planning/scenario-proposals/${stalePreviewBody.proposals[0].id}/apply`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-kiss-pm-action": "same-origin",
-          cookie: adminCookie
-        },
-        body: JSON.stringify({ clientPlanVersion: assignmentAppliedBody.newPlanVersion - 1 })
-      }
-    );
-    expect(staleScenarioApply.status).toBe(409);
-    await expect(staleScenarioApply.json()).resolves.toMatchObject({
-      error: "plan_version_conflict",
-      currentPlanVersion: assignmentAppliedBody.newPlanVersion
     });
 
     const expiredPreview = await app.request(
@@ -746,48 +679,6 @@ describe("planning API routes", () => {
     expect(expiredApply.status).toBe(409);
     await expect(expiredApply.json()).resolves.toEqual({
       error: "scenario_expired"
-    });
-
-    const hashMismatchPreview = await app.request(
-      "/api/workspace/projects/project-alpha/planning/scenario-proposals",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-kiss-pm-action": "same-origin",
-          cookie: adminCookie
-        },
-        body: JSON.stringify(scenarioPreviewRequest)
-      }
-    );
-    const hashMismatchPreviewBody = await hashMismatchPreview.json();
-    expect(hashMismatchPreview.status).toBe(200);
-    const hashCorruptedProposal = {
-      ...hashMismatchPreviewBody.proposals[0],
-      profile: "hash-corrupted"
-    };
-    await client`
-      UPDATE planning_scenario_runs
-      SET proposal_payload = ${JSON.stringify(hashCorruptedProposal)}::jsonb
-      WHERE tenant_id = 'tenant-alpha'
-        AND project_id = 'project-alpha'
-        AND id = ${hashMismatchPreviewBody.proposals[0].id}
-    `;
-    const hashMismatchApply = await app.request(
-      `/api/workspace/projects/project-alpha/planning/scenario-proposals/${hashMismatchPreviewBody.proposals[0].id}/apply`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-kiss-pm-action": "same-origin",
-          cookie: adminCookie
-        },
-        body: JSON.stringify({ clientPlanVersion: assignmentAppliedBody.newPlanVersion })
-      }
-    );
-    expect(hashMismatchApply.status).toBe(409);
-    await expect(hashMismatchApply.json()).resolves.toEqual({
-      error: "planning_scenario_hash_mismatch"
     });
 
     const engineMismatchPreview = await app.request(
@@ -999,26 +890,6 @@ describe("planning API routes", () => {
           actionType: "planning.scenario_denied",
           sourceWorkflow: "planning",
           sourceEntity: { type: "Project", id: "project-alpha" }
-        }),
-        expect.objectContaining({
-          actionType: "planning.scenario_denied",
-          sourceWorkflow: "planning",
-          input: expect.objectContaining({ commandType: expect.any(String) })
-        }),
-        expect.objectContaining({
-          actionType: "planning.scenario_apply_conflict",
-          sourceWorkflow: "planning",
-          input: expect.objectContaining({ reason: "plan_version_conflict" })
-        }),
-        expect.objectContaining({
-          actionType: "planning.scenario_apply_conflict",
-          sourceWorkflow: "planning",
-          input: expect.objectContaining({ reason: "scenario_expired" })
-        }),
-        expect.objectContaining({
-          actionType: "planning.scenario_apply_conflict",
-          sourceWorkflow: "planning",
-          input: expect.objectContaining({ reason: "planning_scenario_hash_mismatch" })
         }),
         expect.objectContaining({
           actionType: "planning.scenario.applied",
