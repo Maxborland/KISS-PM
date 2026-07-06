@@ -23,7 +23,7 @@ const NAV: { title: string; items: NavItem[] }[] = [
   },
   { title: "Аналитика", items: [{ label: "Дашборд", href: "/dashboard", requires: ["tenant.projects.read", "tenant.opportunities.read"] }] },
   { title: "Коммуникации", items: [{ label: "Коммуникации", href: "/communications/chat", requires: ["tenant.communications.read"] }] },
-  { title: "Администрирование", items: [{ label: "Администрирование", href: "/admin", requires: ["tenant.access_profiles.read", "tenant.access_profiles.manage", "tenant.users.read", "tenant.users.manage", "tenant.audit.read", "tenant.workspace_config.read", "tenant.workspace_config.manage"] }] }
+  { title: "Администрирование", items: [{ label: "Администрирование", href: "/admin", requires: ["tenant.access_profiles.read", "tenant.access_profiles.manage", "tenant.users.read", "tenant.users.manage", "tenant.audit_events.read", "tenant.workspace_config.read", "tenant.workspace_config.manage"] }] }
 ];
 
 /**

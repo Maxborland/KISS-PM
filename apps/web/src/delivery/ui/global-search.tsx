@@ -66,9 +66,12 @@ export function GlobalSearch() {
         })
         .then((body) => {
           if (seq !== seqRef.current) return;
-          setResults(body.results);
+          // Страниц базы знаний в web ещё нет — результаты с /knowledge/-маршрутами
+          // вели бы в 404 (ревью PR #224). Снимем фильтр вместе с появлением страниц.
+          const routable = body.results.filter((r) => !r.route.includes("/knowledge/"));
+          setResults(routable);
           setError(null);
-          setActiveIndex(body.results.length ? 0 : -1);
+          setActiveIndex(routable.length ? 0 : -1);
         })
         .catch(() => {
           if (seq !== seqRef.current) return;

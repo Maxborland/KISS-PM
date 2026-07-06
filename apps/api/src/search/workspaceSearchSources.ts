@@ -95,8 +95,10 @@ async function searchTasks(input: WorkspaceSearchInput, limit: number): Promise<
       snippet: task.description ?? task.statusName,
       entityType: "task",
       entityId: task.id,
-      // Детальной страницы задачи нет: ведём в график проекта, без проекта — в «Мои задачи».
-      route: project ? `/projects/${project.id}/schedule` : "/my-work",
+      // Детальной страницы задачи нет: ведём в карточку проекта (доступна с
+      // tenant.projects.read — как и сам поиск задач; график требовал бы ещё
+      // project_plan.read и давал 403). Без проекта — в «Мои задачи».
+      route: project ? `/projects/${project.id}` : "/my-work",
       updatedAt: task.updatedAt.toISOString(),
       score: score(input.query, task.title, task.description ?? "", task.statusName),
       source: "tasks"
