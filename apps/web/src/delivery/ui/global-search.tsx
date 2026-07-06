@@ -127,7 +127,7 @@ export function GlobalSearch() {
       </label>
 
       {showPanel ? (
-        <div className="absolute inset-x-0 top-[calc(100%+4px)] z-50 max-h-[420px] overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] py-1 shadow-[var(--shadow-pop,0_8px_24px_rgba(0,0,0,0.12))]">
+        <div className="absolute inset-x-0 top-[calc(100%+4px)] z-50 max-h-[420px] overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] py-1 shadow-[var(--shadow-lg)]">
           {error ? (
             <p className="px-3 py-2 text-[length:var(--text-sm)] text-[var(--danger-text,var(--danger))]">{error}</p>
           ) : results && results.length === 0 ? (

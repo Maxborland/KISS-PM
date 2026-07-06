@@ -13,26 +13,46 @@ export function isPublicAuthPath(pathname: string): boolean {
   return ["/login", "/register", "/password-reset"].some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-export function useSessionUser(): SessionUser | null {
-  const [user, setUser] = useState<SessionUser | null>(null);
+export type SessionState = {
+  user: SessionUser | null;
+  /** true, когда запрос /api/auth/me завершился (успехом, 401 или сетевой ошибкой). */
+  loaded: boolean;
+};
+
+// Полное состояние сессии — для мест, которым важно отличать «ещё грузится»
+// от «сессии нет» (ревью PR #224: протухший cookie оставлял /admin в вечном
+// loading, т.к. 401 проглатывался и user навсегда оставался null).
+export function useSessionState(): SessionState {
+  const [state, setState] = useState<SessionState>({ user: null, loaded: false });
   useEffect(() => {
-    if (isPublicAuthPath(window.location.pathname)) return;
+    if (isPublicAuthPath(window.location.pathname)) {
+      setState({ user: null, loaded: true });
+      return;
+    }
     let alive = true;
     void fetch("/api/auth/me", { headers: { accept: "application/json" } })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (alive && d?.user) {
-          setUser({ id: d.user.id ?? "", name: d.user.name ?? "", permissions: d.permissions ?? [] });
-        }
+        if (!alive) return;
+        setState(
+          d?.user
+            ? { user: { id: d.user.id ?? "", name: d.user.name ?? "", permissions: d.permissions ?? [] }, loaded: true }
+            : { user: null, loaded: true }
+        );
       })
       .catch(() => {
         /* нет сессии/сети — оболочка показывает нейтральный плейсхолдер */
+        if (alive) setState({ user: null, loaded: true });
       });
     return () => {
       alive = false;
     };
   }, []);
-  return user;
+  return state;
+}
+
+export function useSessionUser(): SessionUser | null {
+  return useSessionState().user;
 }
 
 // Инициалы из имени: первые буквы первых двух слов (для BemAvatar).

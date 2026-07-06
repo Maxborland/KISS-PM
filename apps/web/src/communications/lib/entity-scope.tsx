@@ -56,6 +56,54 @@ function ScopePicker({ projects, selectedId, onSelect }: { projects: CommsProjec
   );
 }
 
+/** Состояние резолва проект-scope для поверхностей, живущих и БЕЗ него (чат: DM-ось). */
+export type CommsScopeState = {
+  scope: ResolvedCommsScope | null;
+  status: "loading" | "ready" | "error" | "forbidden";
+  error: string | null;
+  reload: () => void | Promise<void>;
+};
+
+/**
+ * Резолв проект-scope как хук: scope-или-null + состояние загрузки проектов.
+ * Для поверхностей, у которых есть не-проектная ось (DM в чате) и которые
+ * не должны прятаться за гейтом целиком.
+ */
+export function useCommsEntityScope(
+  input: { explicitEntityType?: EntityType; explicitEntityId?: string } = {}
+): CommsScopeState {
+  const projectsLoad = useCommsProjects();
+  // Выбор пользователя в рамках сессии; стартуем с ?project= из URL (deep-link).
+  const [chosenId, setChosenId] = useState<string | null>(readProjectParam);
+
+  const projects = projectsLoad.data?.projects ?? [];
+  const selected = projects.find((p) => p.id === chosenId) ?? projects[0] ?? null;
+
+  const onSelect = useCallback((id: string) => {
+    setChosenId(id);
+    writeProjectParam(id);
+  }, []);
+
+  const picker =
+    selected && projects.length > 1 ? <ScopePicker projects={projects} selectedId={selected.id} onSelect={onSelect} /> : null;
+
+  // Явный scope (stories/тесты/встраивание в карточку сущности) — без резолва и селектора.
+  if (input.explicitEntityType && input.explicitEntityId) {
+    return {
+      scope: { entityType: input.explicitEntityType, entityId: input.explicitEntityId, title: input.explicitEntityId, picker: null },
+      status: "ready",
+      error: null,
+      reload: () => {}
+    };
+  }
+  return {
+    scope: selected ? { entityType: "project", entityId: selected.id, title: selected.title, picker } : null,
+    status: projectsLoad.status,
+    error: projectsLoad.error,
+    reload: projectsLoad.reload
+  };
+}
+
 /**
  * Резолвит проект-scope и рендерит children только когда scope определён.
  * Пока проекты грузятся / ошибка / нет проектов — рендерит CommsFrame с
@@ -73,33 +121,18 @@ export function WithCommsEntityScope({
   explicitEntityId?: string;
   children: (scope: ResolvedCommsScope) => ReactNode;
 }) {
-  const projectsLoad = useCommsProjects();
-  // Выбор пользователя в рамках сессии; стартуем с ?project= из URL (deep-link).
-  const [chosenId, setChosenId] = useState<string | null>(readProjectParam);
+  const state = useCommsEntityScope({
+    ...(explicitEntityType ? { explicitEntityType } : {}),
+    ...(explicitEntityId ? { explicitEntityId } : {})
+  });
 
-  const projects = projectsLoad.data?.projects ?? [];
-  const selected = projects.find((p) => p.id === chosenId) ?? projects[0] ?? null;
-
-  const onSelect = useCallback((id: string) => {
-    setChosenId(id);
-    writeProjectParam(id);
-  }, []);
-
-  const picker =
-    selected && projects.length > 1 ? <ScopePicker projects={projects} selectedId={selected.id} onSelect={onSelect} /> : null;
-
-  // Явный scope (stories/тесты/встраивание в карточку сущности) — без резолва и селектора.
-  if (explicitEntityType && explicitEntityId) {
-    return <>{children({ entityType: explicitEntityType, entityId: explicitEntityId, title: explicitEntityId, picker: null })}</>;
-  }
-
-  if (!selected) {
+  if (!state.scope) {
     return (
       <CommsFrame activeTab={activeTab}>
         <SurfaceState
-          status={projectsLoad.status}
-          error={projectsLoad.error}
-          onRetry={() => void projectsLoad.reload()}
+          status={state.status}
+          error={state.error}
+          onRetry={() => void state.reload()}
           errorFormat={commsErr}
           loadingLabel="Определяем проект…"
           forbidden={{ title: "Нет доступа к проектам", description: "Коммуникации привязаны к проектам, а у вас нет прав на их просмотр." }}
@@ -113,5 +146,5 @@ export function WithCommsEntityScope({
     );
   }
 
-  return <>{children({ entityType: "project", entityId: selected.id, title: selected.title, picker })}</>;
+  return <>{children(state.scope)}</>;
 }

@@ -17,7 +17,7 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useCommsUsers, useConversation, useDirectMessages, usePresence, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
 import { useCommsRuntime } from "@/communications/lib/comms-runtime";
-import { WithCommsEntityScope, type ResolvedCommsScope } from "@/communications/lib/entity-scope";
+import { useCommsEntityScope, type CommsScopeState } from "@/communications/lib/entity-scope";
 import { avatarColor, commsErr, initials, PresenceDot, relTime, UnreadDot } from "@/communications/lib/comms-bits";
 import type { Conversation, DirectConversation, EntityType, Message, PresenceStatus, Reaction } from "@/communications/lib/comms-client";
 
@@ -59,16 +59,20 @@ const QUICK_EMOJI = ["👍", "🎉", "❤️", "🔥", "👀", "✅"];
 // Scope сущности резолвится из реальных проектов воркспейса (WithCommsEntityScope);
 // явные entityType/entityId пропсы (встраивание, тесты) отключают резолв.
 export function ChatSurface({ entityType, entityId }: { entityType?: EntityType; entityId?: string } = {}) {
-  return (
-    <WithCommsEntityScope activeTab="Чат" {...(entityType ? { explicitEntityType: entityType } : {})} {...(entityId ? { explicitEntityId: entityId } : {})}>
-      {(scope) => <ChatSurfaceScoped scope={scope} />}
-    </WithCommsEntityScope>
-  );
+  // Ревью PR #224: DM — НЕ проектная ось. Проектный scope не гейтит чат целиком:
+  // без прав на проекты / без проектов личные сообщения остаются доступными,
+  // состояние scope показывает только левая проектная секция.
+  const scopeState = useCommsEntityScope({
+    ...(entityType ? { explicitEntityType: entityType } : {}),
+    ...(entityId ? { explicitEntityId: entityId } : {})
+  });
+  return <ChatSurfaceScoped scopeState={scopeState} />;
 }
 
-function ChatSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
-  const { entityType, entityId } = scope;
-  const conv = useConversation(entityType, entityId);
+function ChatSurfaceScoped({ scopeState }: { scopeState: CommsScopeState }) {
+  const scope = scopeState.scope;
+  // Без scope useConversation работает в DM-only режиме (пустой entityId → без сети).
+  const conv = useConversation(scope?.entityType ?? "project", scope?.entityId ?? "");
   const { data, status, error, reload, selectConversation } = conv;
   // Справочник людей тенанта (имена авторов): mock=COMMS_USERS, live=GET /api/workspace/users.
   const users = useCommsUsers();
@@ -99,7 +103,7 @@ function ChatSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
 
   return (
     <SelfUserContext.Provider value={me}>
-    <CommsFrame activeTab="Чат" subtitle={`Беседы · ${scope.title}`} {...(scope.picker ? { actions: scope.picker } : {})}>
+    <CommsFrame activeTab="Чат" subtitle={`Беседы · ${scope?.title ?? "Личные сообщения"}`} {...(scope?.picker ? { actions: scope.picker } : {})}>
       <div className="flex flex-col gap-3">
         {!live ? <PrototypeBanner /> : null}
         <SurfaceState
@@ -113,11 +117,15 @@ function ChatSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
           {data ? (
             <div className="grid min-h-0 gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
               <div className="flex min-h-0 flex-col gap-3">
-                <ConversationList
-                  conversations={data.conversations}
-                  selectedId={data.selectedConversationId}
-                  onSelect={(id) => void selectConversation(id)}
-                />
+                {scope ? (
+                  <ConversationList
+                    conversations={data.conversations}
+                    selectedId={data.selectedConversationId}
+                    onSelect={(id) => void selectConversation(id)}
+                  />
+                ) : (
+                  <ProjectScopeStatePanel state={scopeState} />
+                )}
                 <DirectMessageList
                   dms={dm.data?.conversations ?? []}
                   users={users}
@@ -134,7 +142,11 @@ function ChatSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
                 <ChatPane key={selected.id} conv={conv} conversation={selected} messages={data.messages} users={users} presenceOf={presence.status} />
               ) : (
                 <div className="grid min-h-[480px] place-items-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
-                  <EmptyState title="Нет бесед" description="У этой сущности пока нет бесед." />
+                  {scope ? (
+                    <EmptyState title="Нет бесед" description="У этой сущности пока нет бесед." />
+                  ) : (
+                    <EmptyState title="Личные сообщения" description="Выберите личную беседу слева или начните новую." />
+                  )}
                 </div>
               )}
             </div>
@@ -159,6 +171,36 @@ function PrototypeBanner() {
         Реальный контракт: /api/workspace/conversations (беседы сущности + readState), .../messages (отправка, правка, удаление, реакции, закрепление), .../read-state (прочитано). Данные in-memory. Realtime-доставка появится в приложении; здесь лента обновляется по действию.
       </span>
     </div>
+  );
+}
+
+// СЛЕВА (вместо списка бесед проекта, когда scope недоступен): состояние резолва
+// проектов — DM-панель ниже живёт независимо от прав на проекты (ревью PR #224).
+function ProjectScopeStatePanel({ state }: { state: CommsScopeState }) {
+  const text =
+    state.status === "loading"
+      ? "Определяем проект…"
+      : state.status === "forbidden"
+        ? "Нет доступа к проектам: беседы проектов скрыты, личные сообщения доступны ниже."
+        : state.status === "error"
+          ? commsErr(state.error ?? undefined)
+          : "Пока нет проектов. Как только появится проект, здесь откроются его беседы.";
+  return (
+    <aside className="flex flex-col rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+      <div className="border-b border-[var(--border)] px-3 py-2 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">
+        Беседы
+      </div>
+      <p className="px-3 py-3 text-[length:var(--text-xs)] text-[var(--muted)]">{text}</p>
+      {state.status === "error" ? (
+        <button
+          type="button"
+          onClick={() => void state.reload()}
+          className="mx-3 mb-3 self-start rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1 text-[length:var(--text-xs)] text-[var(--muted-strong)] hover:bg-[var(--panel-strong)]"
+        >
+          Повторить
+        </button>
+      ) : null}
+    </aside>
   );
 }
 

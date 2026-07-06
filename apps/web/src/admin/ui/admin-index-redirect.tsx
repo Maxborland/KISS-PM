@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { LoadingState } from "@/components/ui/loading-state";
-import { useSessionUser } from "@/shell/use-session-user";
+import { useSessionState } from "@/shell/use-session-user";
 
 /* /admin → первая вкладка, доступная правам роли (ревью PR #224): раньше был
    безусловный redirect на /admin/users, и роль только с правами конфигурации
@@ -18,17 +18,23 @@ const TAB_BY_PERMISSION: Array<{ href: string; requires: string[] }> = [
 ];
 
 export function AdminIndexRedirect() {
-  const user = useSessionUser();
+  const { user, loaded } = useSessionState();
   const router = useRouter();
 
   useEffect(() => {
-    if (!user) return;
+    if (!loaded) return;
+    // Сессии нет (или протухла: cookie есть, /api/auth/me → 401) — на вход,
+    // а не вечный loading (ревью PR #224).
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
     const target =
       TAB_BY_PERMISSION.find((t) => t.requires.some((p) => user.permissions.includes(p)))?.href ??
       // Ни одной админ-вкладки: ведём на users — AdminFrame покажет цельный «нет доступа» (G8-05).
       "/admin/users";
     router.replace(target);
-  }, [user, router]);
+  }, [user, loaded, router]);
 
   return (
     <main className="grid min-h-screen place-items-center bg-[var(--canvas)]">

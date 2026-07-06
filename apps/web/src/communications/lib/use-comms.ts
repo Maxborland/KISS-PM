@@ -112,6 +112,11 @@ export function useConversation(entityType: EntityType, entityId: string) {
 
   // fetcher для общего load-state: беседы сущности + сообщения первой беседы.
   const fetcher = useCallback(async (): Promise<ConversationData> => {
+    // DM-only режим (проектный scope недоступен: нет прав/проектов) — бесед
+    // сущности нет, сеть не дёргаем; личные сообщения живут отдельной осью.
+    if (!entityId) {
+      return { conversations: [], selectedConversationId: null, messages: [], nextCursor: null };
+    }
     const { conversations } = await client.listConversations(entityType, entityId);
     const first = conversations[0] ?? null;
     let messages: Message[] = [];
