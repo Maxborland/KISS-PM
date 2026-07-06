@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { AdminApiError, createAdminClient, type SecurityPolicy } from "./admin-client";
+import { guardMutation } from "../../lib/domain-client";
+import { useDomainClient } from "../../lib/use-domain-client";
+import { createAdminClient, type SecurityPolicy } from "./admin-client";
 import { createMockAdminFetch } from "./mock-admin-backend";
 import { useAdminRuntime } from "./admin-runtime";
 
@@ -17,15 +19,7 @@ export type SecurityPolicySaveResult = { ok: true } | { ok: false; code?: string
  */
 export function useSecurityPolicy() {
   const { live } = useAdminRuntime();
-  const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null && !live) fetchRef.current = createMockAdminFetch();
-  const clientRef = useRef<ReturnType<typeof createAdminClient> | null>(null);
-  if (clientRef.current === null) {
-    clientRef.current = live
-      ? createAdminClient({ apiOrigin: "" })
-      : createAdminClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
-  }
-  const client = clientRef.current;
+  const client = useDomainClient(live, createAdminClient, createMockAdminFetch);
 
   const [policy, setPolicy] = useState<SecurityPolicy | null>(null);
   const [status, setStatus] = useState<SecurityPolicyLoadStatus>("loading");
@@ -49,16 +43,11 @@ export function useSecurityPolicy() {
   }, [load]);
 
   const save = useCallback(
-    async (input: SecurityPolicy): Promise<SecurityPolicySaveResult> => {
-      try {
+    (input: SecurityPolicy): Promise<SecurityPolicySaveResult> =>
+      guardMutation(async () => {
         const res = await client.updateSecurityPolicy(input);
         setPolicy(res.securityPolicy);
-        return { ok: true };
-      } catch (e) {
-        if (e instanceof AdminApiError) return { ok: false, code: e.code, message: e.code };
-        return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
-      }
-    },
+      }),
     [client]
   );
 

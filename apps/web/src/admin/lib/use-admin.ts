@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { guardMutation, type MutationResult } from "../../lib/domain-client";
+import { useDomainClient } from "../../lib/use-domain-client";
 import {
-  AdminApiError, createAdminClient,
+  createAdminClient,
   type AccessProfile, type AccessRoleCreateInput, type AccessRoleUpdateInput,
   type Permission, type Position, type UserCreateInput, type UserUpdateInput, type WorkspaceUser
 } from "./admin-client";
@@ -17,7 +19,7 @@ export type AdminData = {
   positions: Position[];
   permissions: Permission[];
 };
-export type AdminMutationResult = { ok: true } | { ok: false; code?: string; message: string };
+export type AdminMutationResult = MutationResult;
 
 /**
  * Работает через настоящий createAdminClient. Транспорт выбирается по
@@ -31,18 +33,8 @@ export type AdminMutationResult = { ok: true } | { ok: false; code?: string; mes
  * точечное обновление локального кэша по затронутой сущности.
  */
 export function useAdmin() {
-  // live → боевой createAdminClient (без fetchImpl, fetch на /api/* + cookie-сессия);
-  // mock → contract-mock fetchImpl на каждый монтаж (изолированная in-memory сессия).
   const { live } = useAdminRuntime();
-  const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null && !live) fetchRef.current = createMockAdminFetch();
-  const clientRef = useRef<ReturnType<typeof createAdminClient> | null>(null);
-  if (clientRef.current === null) {
-    clientRef.current = live
-      ? createAdminClient({ apiOrigin: "" })
-      : createAdminClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
-  }
-  const client = clientRef.current;
+  const client = useDomainClient(live, createAdminClient, createMockAdminFetch);
 
   const [data, setData] = useState<AdminData | null>(null);
   const [status, setStatus] = useState<AdminLoadStatus>("loading");
@@ -70,16 +62,7 @@ export function useAdmin() {
     void load();
   }, [load]);
 
-  // обёртка мутации: ошибки AdminApiError → {ok:false, code, message}
-  const guard = useCallback(async (fn: () => Promise<void>): Promise<AdminMutationResult> => {
-    try {
-      await fn();
-      return { ok: true };
-    } catch (e) {
-      if (e instanceof AdminApiError) return { ok: false, code: e.code, message: e.code };
-      return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
-    }
-  }, []);
+  const guard = guardMutation;
 
   const patchUser = (u: WorkspaceUser) => setData((d) => (d ? { ...d, users: d.users.map((x) => (x.id === u.id ? u : x)) } : d));
 

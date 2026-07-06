@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { useDomainClient } from "../../lib/use-domain-client";
 import { createAdminClient, type AuditEvent } from "./admin-client";
 import { createMockAdminFetch } from "./mock-admin-backend";
 import { useAdminRuntime } from "./admin-runtime";
@@ -16,15 +17,7 @@ export type AuditLoadStatus = "loading" | "ready" | "error";
  */
 export function useAuditEvents(limit = 50) {
   const { live } = useAdminRuntime();
-  const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null && !live) fetchRef.current = createMockAdminFetch();
-  const clientRef = useRef<ReturnType<typeof createAdminClient> | null>(null);
-  if (clientRef.current === null) {
-    clientRef.current = live
-      ? createAdminClient({ apiOrigin: "" })
-      : createAdminClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
-  }
-  const client = clientRef.current;
+  const client = useDomainClient(live, createAdminClient, createMockAdminFetch);
 
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [status, setStatus] = useState<AuditLoadStatus>("loading");

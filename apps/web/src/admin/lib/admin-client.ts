@@ -17,20 +17,12 @@
    пользователя — это PATCH со status:"inactive" (отдельной ручки нет).
    ============================================================ */
 
-export type AdminApiClientOptions = { apiOrigin: string; fetchImpl?: typeof fetch; credentials?: RequestCredentials };
+import { createRequestJson, DomainApiError, type DomainClientOptions } from "../../lib/domain-client";
 
-export class AdminApiError extends Error {
-  readonly status: number;
-  readonly code: string;
-  readonly body: Record<string, unknown>;
-  constructor(status: number, code: string, body: Record<string, unknown>) {
-    super(code);
-    this.name = "AdminApiError";
-    this.status = status;
-    this.code = code;
-    this.body = body;
-  }
-}
+export type AdminApiClientOptions = DomainClientOptions;
+
+// Общий класс ошибки транспорта; алиас сохраняет прежнее имя для instanceof-проверок.
+export { DomainApiError as AdminApiError };
 
 /* ---- View-типы (форма боевых записей) ---- */
 // Перечень прав — packages/access-control/src/index.ts (полный список permission-строк).
@@ -85,31 +77,7 @@ export type UserUpdateInput = Partial<{
 }>;
 
 export function createAdminClient(options: AdminApiClientOptions) {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const credentials = options.credentials ?? "include";
-
-  async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetchImpl(`${options.apiOrigin}${path}`, {
-      ...init,
-      credentials,
-      headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin", ...(init?.headers ?? {}) }
-    });
-    const rawText = await response.text();
-    let body: Record<string, unknown> = {};
-    if (rawText.length > 0) {
-      try {
-        const parsed: unknown = JSON.parse(rawText);
-        body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : { error: "invalid_json_response" };
-      } catch {
-        body = { error: "invalid_json_response" };
-      }
-    }
-    if (!response.ok) {
-      throw new AdminApiError(response.status, typeof body.error === "string" ? body.error : "request_failed", body);
-    }
-    return body as T;
-  }
-
+  const requestJson = createRequestJson(options);
   const enc = encodeURIComponent;
   return {
     // роли (access-profiles): list/update/delete под /access-roles; create под /tenant/current/access-profiles
