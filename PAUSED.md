@@ -5,7 +5,9 @@
 Текущая WIP заморожена и зачекпойнчена, чтобы ничего не потерять до пивота.
 
 > Это session-level handoff. Есть и per-package PAUSED:
-> `packages/planning-gantt-ui/PAUSED.md`, `packages/planning-client/PAUSED.md`.
+> `packages/planning-gantt-ui/PAUSED.md`.
+> (`planning-client` больше не paused — с 2026-07 это боевая runtime-зависимость
+> delivery-контура `apps/web`, см. `apps/web/src/delivery/lib/planning-client.ts`.)
 
 ---
 
