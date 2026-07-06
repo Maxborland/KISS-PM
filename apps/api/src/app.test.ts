@@ -963,7 +963,7 @@ describe("KISS PM API Phase 1 shell", () => {
       ]
     };
     let applyPlanningCommandCalled = false;
-    const dataSource: ApiTenantDataSource = {
+    const dataSource: Partial<ApiTenantDataSource> = {
       async listDevUsers() {
         return [];
       },

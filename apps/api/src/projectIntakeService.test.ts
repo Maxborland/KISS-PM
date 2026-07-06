@@ -1,3 +1,4 @@
+import { ensureCompleteDataSource } from "./dataSourceCompletion";
 import { describe, expect, it } from "vitest";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 import { createProjectIntakeService } from "./projectIntakeService";
@@ -54,7 +55,7 @@ describe("project intake application service", () => {
     let createdInput: OpportunityInput | null = null;
     let transactionUsed = false;
 
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -142,7 +143,7 @@ describe("project intake application service", () => {
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
 
     const service = createProjectIntakeService({
       dataSource,
@@ -211,7 +212,7 @@ describe("project intake application service", () => {
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
 
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -302,7 +303,7 @@ describe("project intake application service", () => {
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
 
     const service = createProjectIntakeService({
       dataSource,
@@ -379,7 +380,7 @@ describe("project intake application service", () => {
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -455,7 +456,7 @@ describe("project intake application service", () => {
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
     const service = createProjectIntakeService({
       dataSource,
       getActorProfile: async () => tenantAdminProfile,
@@ -493,7 +494,7 @@ describe("project intake application service", () => {
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -531,7 +532,7 @@ describe("project intake application service", () => {
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
     const service = createProjectIntakeService({
       dataSource,
       getActorProfile: async () => tenantAdminProfile,
@@ -569,7 +570,7 @@ describe("project intake application service", () => {
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -603,7 +604,7 @@ describe("project intake application service", () => {
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
     const service = createProjectIntakeService({
       dataSource,
       getActorProfile: async () => tenantAdminProfile,
@@ -642,7 +643,7 @@ describe("project intake application service", () => {
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -696,7 +697,7 @@ describe("project intake application service", () => {
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
     const service = createProjectIntakeService({
       dataSource,
       getActorProfile: async () => tenantAdminProfile,
@@ -739,7 +740,7 @@ describe("project intake application service", () => {
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
 
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -770,7 +771,7 @@ describe("project intake application service", () => {
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
 
     const service = createProjectIntakeService({
       dataSource,

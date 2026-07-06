@@ -1,3 +1,4 @@
+import { ensureCompleteDataSource } from "../dataSourceCompletion";
 import type { BackgroundJobRun } from "@kiss-pm/domain";
 import { describe, expect, it } from "vitest";
 
@@ -14,7 +15,7 @@ describe("background job worker", () => {
   it("claims a queued job, runs the handler and completes it", async () => {
     const job = backgroundJob("storage.asset_cleanup");
     const events: string[] = [];
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       claimNextBackgroundJob: async () => job,
       completeBackgroundJob: async () => {
         events.push("completed");
@@ -26,7 +27,7 @@ describe("background job worker", () => {
       },
       listArchivedFileAssetsForCleanup: async () => [],
       markFileAssetPurged: async () => undefined
-    } as unknown as ApiTenantDataSource;
+    }) as unknown as ApiTenantDataSource;
 
     const result = await runBackgroundJobWorkerTick({
       dataSource,
@@ -43,7 +44,7 @@ describe("background job worker", () => {
   it("turns handler failures into retry/dead transitions through persistence", async () => {
     const job = backgroundJob("capacity.cache_warmup", { monthIso: "not-a-month" });
     const events: string[] = [];
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       claimNextBackgroundJob: async () => job,
       completeBackgroundJob: async () => {
         events.push("completed");
@@ -53,7 +54,7 @@ describe("background job worker", () => {
         events.push("failed");
         return { ...job, status: "queued" };
       }
-    } as unknown as ApiTenantDataSource;
+    }) as unknown as ApiTenantDataSource;
 
     const result = await runBackgroundJobWorkerTick({
       dataSource,
@@ -72,14 +73,14 @@ describe("background job worker", () => {
   it("redacts raw handler errors before persistence", async () => {
     const job = backgroundJob("storage.asset_cleanup");
     let persistedError: string | undefined;
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       claimNextBackgroundJob: async () => job,
       completeBackgroundJob: async () => ({ ...job, status: "succeeded" }),
       failBackgroundJob: async (input: Parameters<NonNullable<ApiTenantDataSource["failBackgroundJob"]>>[0]) => {
         persistedError = input.error;
         return { ...job, status: "queued", lastError: input.error };
       }
-    } as unknown as ApiTenantDataSource;
+    }) as unknown as ApiTenantDataSource;
 
     const result = await runBackgroundJobWorkerTick({
       dataSource,
@@ -104,14 +105,14 @@ describe("background job worker", () => {
     const finishedAt = new Date("2026-05-27T00:05:00.000Z");
     const job = backgroundJob("notification.dispatch");
     let persistedFinishedAt: Date | undefined;
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       claimNextBackgroundJob: async () => job,
       completeBackgroundJob: async (input: Parameters<NonNullable<ApiTenantDataSource["completeBackgroundJob"]>>[0]) => {
         persistedFinishedAt = input.finishedAt;
         return { ...job, status: "succeeded", finishedAt: input.finishedAt };
       },
       failBackgroundJob: async () => undefined
-    } as unknown as ApiTenantDataSource;
+    }) as unknown as ApiTenantDataSource;
     const clockValues = [startedAt, finishedAt];
 
     await expect(runBackgroundJobWorkerTick({
@@ -127,14 +128,14 @@ describe("background job worker", () => {
 
   it("does not claim jobs when the worker registry is empty", async () => {
     let claimed = false;
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       claimNextBackgroundJob: async () => {
         claimed = true;
         return backgroundJob("notification.dispatch");
       },
       completeBackgroundJob: async () => undefined,
       failBackgroundJob: async () => undefined
-    } as unknown as ApiTenantDataSource;
+    }) as unknown as ApiTenantDataSource;
 
     await expect(runBackgroundJobWorkerTick({
       dataSource,
@@ -148,7 +149,7 @@ describe("background job worker", () => {
   it("serializes poller ticks so overlapping intervals are skipped", async () => {
     let releaseFirstTick!: () => void;
     let scheduleReads = 0;
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       ...createIdleSchedulerDataSource(),
       listDueBackgroundJobSchedules: async () => {
         scheduleReads += 1;
@@ -157,7 +158,7 @@ describe("background job worker", () => {
         });
         return [];
       }
-    } as ApiTenantDataSource;
+    }) as ApiTenantDataSource;
     const poller = createSerializedBackgroundJobPoller({
       dataSource,
       registry: createDefaultBackgroundJobRegistry(),
@@ -174,7 +175,7 @@ describe("background job worker", () => {
 
   it("enqueues due schedules with idempotency tied to schedule key and due instant", async () => {
     const enqueued: string[] = [];
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       listDueBackgroundJobSchedules: async () => [
         {
           id: "schedule-1",
@@ -195,7 +196,7 @@ describe("background job worker", () => {
         return backgroundJob(input.kind, input.payload);
       },
       markBackgroundJobScheduleEnqueued: async () => undefined
-    } as unknown as ApiTenantDataSource;
+    }) as unknown as ApiTenantDataSource;
 
     await expect(enqueueDueBackgroundJobSchedules({
       dataSource,

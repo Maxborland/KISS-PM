@@ -322,18 +322,18 @@ export type ManagementAuditEventInput = {
 
 export type ManagementAuditDataSource = Pick<ApiTenantDataSource, "appendAuditEvent">;
 
-// Контракт данных принадлежит persistence (композиция интерфейсов репозиториев).
-// Optional-обёртка существует потому, что приложение умеет стартовать без БД
-// (server.ts без DATABASE_URL) и unit-фикстуры реализуют узкие подмножества;
-// хендлеры отвечают 501 persistence_not_configured на отсутствующие методы.
-// withTransaction переобъявлен: внутри транзакции виден тот же частичный
-// контракт, guard'ы 501 обязаны жить и в транзакционных колбэках.
-export type ApiTenantDataSource = Omit<Partial<PostgresTenantDataSource>, "withTransaction"> & {
-  withTransaction?<T>(operation: (dataSource: ApiTenantDataSource) => Promise<T>): Promise<T>;
-};
+// Контракт данных принадлежит persistence и ОБЯЗАТЕЛЕН статически. Частичные
+// источники (in-memory dev-fallback, тестовые фикстуры) — поддерживаемый режим:
+// они легализуются на границе ensureCompleteDataSource, а их неполноту
+// обслуживают in-пробы состава и capability-guard'ы маршрутов (в т.ч.
+// fail-closed-инварианты и ?.-обогащения). Прод-источник всегда полный.
+export type ApiTenantDataSource = PostgresTenantDataSource;
 
 export type CreateAppOptions = {
-  dataSource?: ApiTenantDataSource;
+  // Принимает частичный источник (unit-фикстуры, in-memory): createApp
+  // легализует его в полный ТИП на границе ensureCompleteDataSource (cast);
+  // рантайм-неполноту обслуживают in-пробы и capability-guard'ы маршрутов.
+  dataSource?: Partial<ApiTenantDataSource>;
   storageProvider?: StorageProvider;
   videoProvider?: VideoProvider;
   egressProvider?: LiveKitEgressProvider | null;

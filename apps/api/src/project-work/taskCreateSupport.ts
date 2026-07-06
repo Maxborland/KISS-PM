@@ -25,29 +25,29 @@ export type CreateTaskAuthorization =
 
 export function hasWorkspaceInboxCreateTaskDeps(deps: TaskCommandWorkspaceDeps): boolean {
   return Boolean(
-    deps.dataSource.ensureWorkspaceInboxProject &&
-      deps.dataSource.listWorkspaceUsers &&
-      deps.dataSource.listTaskStatuses &&
-      deps.dataSource.applyPlanningCommand &&
-      deps.dataSource.updateTaskMetadata &&
-      deps.dataSource.findTaskById &&
-      deps.dataSource.incrementPlanVersion &&
-      deps.dataSource.createTaskActivity &&
-      deps.dataSource.withTransaction
+    "ensureWorkspaceInboxProject" in deps.dataSource &&
+      "listWorkspaceUsers" in deps.dataSource &&
+      "listTaskStatuses" in deps.dataSource &&
+      "applyPlanningCommand" in deps.dataSource &&
+      "updateTaskMetadata" in deps.dataSource &&
+      "findTaskById" in deps.dataSource &&
+      "incrementPlanVersion" in deps.dataSource &&
+      "createTaskActivity" in deps.dataSource &&
+      "withTransaction" in deps.dataSource
   );
 }
 
 export function hasProjectCreateTaskDeps(deps: TaskCommandWorkspaceDeps): boolean {
   return Boolean(
-    deps.dataSource.listProjects &&
-      deps.dataSource.listWorkspaceUsers &&
-      deps.dataSource.listTaskStatuses &&
-      deps.dataSource.applyPlanningCommand &&
-      deps.dataSource.updateTaskMetadata &&
-      deps.dataSource.findTaskById &&
-      deps.dataSource.incrementPlanVersion &&
-      deps.dataSource.createTaskActivity &&
-      deps.dataSource.withTransaction
+    "listProjects" in deps.dataSource &&
+      "listWorkspaceUsers" in deps.dataSource &&
+      "listTaskStatuses" in deps.dataSource &&
+      "applyPlanningCommand" in deps.dataSource &&
+      "updateTaskMetadata" in deps.dataSource &&
+      "findTaskById" in deps.dataSource &&
+      "incrementPlanVersion" in deps.dataSource &&
+      "createTaskActivity" in deps.dataSource &&
+      "withTransaction" in deps.dataSource
   );
 }
 

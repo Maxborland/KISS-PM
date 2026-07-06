@@ -510,7 +510,7 @@ function createSurfaceDataSource(input: { permissions?: AccessProfile["permissio
   const versions: ControlSurfaceVersionRecord[] = [];
   const auditEvents: AuditEventListItem[] = [];
 
-  const dataSource: ApiTenantDataSource = {
+  const dataSource: Partial<ApiTenantDataSource> = {
     async listDevUsers() {
       return [actor];
     },

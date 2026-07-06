@@ -20,7 +20,9 @@ import type { ApiTenantDataSource } from "./apiTypes";
    ============================================================ */
 
 type RouteAuthDeps = {
-  dataSource: ApiTenantDataSource;
+  // Узкие Pick-порты маршрутов и частичные источники (in-memory, фикстуры)
+  // допустимы; их неполноту обслуживает in-проба capabilities ниже.
+  dataSource: Partial<ApiTenantDataSource>;
   getSessionActorFromHeaders(cookie: string | null): Promise<TenantUser | undefined>;
   getActorProfile(actor: TenantUser): Promise<AccessProfile>;
 };
@@ -56,7 +58,9 @@ export async function authenticateRoute<K extends keyof ApiTenantDataSource = ne
     };
   }
   for (const capability of input.capabilities ?? []) {
-    if (!deps.dataSource[capability]) {
+    // Проба состава через in: у частичных источников (in-memory, фикстуры)
+    // метод отсутствует как свойство — это и есть сигнал 501.
+    if (!(capability in deps.dataSource)) {
       return {
         ok: false,
         response: context.json(

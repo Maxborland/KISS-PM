@@ -17,11 +17,11 @@ const actor: TenantUser = {
 function buildApp(overrides: {
   actor?: TenantUser | undefined;
   permissions?: readonly ["tenant.clients.read"] | readonly [];
-  dataSource?: ApiTenantDataSource;
+  dataSource?: Partial<ApiTenantDataSource>;
 }) {
   const app = new Hono();
   const deps = {
-    dataSource: overrides.dataSource ?? ({ listClients: async () => [] } as ApiTenantDataSource),
+    dataSource: overrides.dataSource ?? ({ listClients: async () => [] } as Partial<ApiTenantDataSource>),
     getSessionActorFromHeaders: async () => overrides.actor,
     getActorProfile: async () => ({
       id: "profile-1",

@@ -1,3 +1,4 @@
+import { ensureCompleteDataSource } from "./dataSourceCompletion";
 import { createTenantUser } from "@kiss-pm/domain";
 import { describe, expect, it } from "vitest";
 
@@ -14,9 +15,9 @@ describe("entity access module", () => {
       name: "Анна",
       accessProfileId: "profile-admin"
     });
-    const dataSource: EntityLookupDataPort = {
+    const dataSource = ensureCompleteDataSource({
       listProjects: async () => [projectRecord]
-    };
+    });
 
     const result = await resolveEntityAccessContext({
       actor,
@@ -41,7 +42,7 @@ describe("entity access module", () => {
       name: "Егор",
       accessProfileId: "profile-limited"
     });
-    const dataSource: EntityLookupDataPort = {
+    const dataSource = ensureCompleteDataSource({
       findTaskById: async () => ({
         actualWork: 0,
         archivedAt: null,
@@ -69,7 +70,7 @@ describe("entity access module", () => {
         title: "Интервью заказчика",
         updatedAt: new Date("2026-05-01T00:00:00.000Z")
       })
-    };
+    });
 
     const result = await resolveEntityAccessContext({
       actor,

@@ -1,3 +1,4 @@
+import { ensureCompleteDataSource } from "./dataSourceCompletion";
 import { describe, expect, it } from "vitest";
 
 import type { PolicyDecision } from "@kiss-pm/access-control";
@@ -27,12 +28,12 @@ const deniedDecision: PolicyDecision = {
   reason: "permission_missing"
 };
 
-const minimalDataSource: ApiTenantDataSource = {
+const minimalDataSource = ensureCompleteDataSource({
   findTenantById: async () => undefined,
   findUserById: async () => undefined,
   listDevUsers: async () => [],
   listUsersByTenantId: async () => []
-};
+});
 
 describe("runGovernedMutation", () => {
   it("writes denied audit through the denied-only helper", async () => {

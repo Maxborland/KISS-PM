@@ -520,7 +520,7 @@ function createRetrospectiveDataSource(
   const auditEvents: AuditEventListItem[] = [];
   const failAuditActionTypes = new Set<string>();
 
-  const dataSource: ApiTenantDataSource = {
+  const dataSource: Partial<ApiTenantDataSource> = {
     async listDevUsers() {
       return [actor];
     },
