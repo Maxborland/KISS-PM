@@ -65,7 +65,7 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
       await deps.authRateLimiter.recordSuccess(rateLimitInput, { reserved: reservedAttempt });
 
-      const actor = await dataSource.findUserById(credential.userId);
+      const actor = await dataSource.findUserById?.(credential.userId);
       if (!actor) {
         return context.json({ error: "user_not_found" }, 404);
       }

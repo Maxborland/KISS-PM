@@ -6,7 +6,7 @@ export function registerDevTenantRoutes(app: ApiApp, deps: ApiRouteDeps) {
   const { dataSource, getActor, getActorProfile, getDevActorFromHeaders } = deps;
 
   app.get("/api/session/dev-users", async (context) => {
-    const users = await dataSource.listDevUsers();
+    const users = (await dataSource.listDevUsers?.()) ?? [];
 
     return context.json({
       users: users.map((user) => ({
@@ -50,7 +50,7 @@ export function registerDevTenantRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "dev_session_required" }, 401);
     }
 
-    const tenant = await dataSource.findTenantById(actor.tenantId);
+    const tenant = await dataSource.findTenantById?.(actor.tenantId);
 
     if (!tenant) {
       return context.json({ error: "tenant_not_found" }, 404);
@@ -91,7 +91,7 @@ export function registerDevTenantRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: decision.reason }, 403);
     }
 
-    const users = await dataSource.listUsersByTenantId(targetTenantId);
+    const users = (await dataSource.listUsersByTenantId?.(targetTenantId)) ?? [];
 
     return context.json({
       users: users.map((user) => ({

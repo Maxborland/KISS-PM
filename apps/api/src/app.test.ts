@@ -998,7 +998,7 @@ describe("KISS PM API Phase 1 shell", () => {
         return [status];
       },
       async withTransaction(operation) {
-        return operation(dataSource);
+        return operation(dataSource as ApiTenantDataSource);
       },
       async lockTenantResourcePlanning() {
         task = {

@@ -35,7 +35,7 @@ export async function filterCollaborationMentionRecipients(input: {
 }): Promise<string[]> {
   const rawIds = extractMentionedUserIds(input.body).filter((id) => id !== input.actor.id);
   if (rawIds.length === 0) return [];
-  const tenantUsers = await input.dataSource.listUsersByTenantId(input.actor.tenantId);
+  const tenantUsers = (await input.dataSource.listUsersByTenantId?.(input.actor.tenantId)) ?? [];
   const usersById = new Map(tenantUsers.map((user) => [user.id, user]));
   const allowed: string[] = [];
   for (const userId of rawIds) {

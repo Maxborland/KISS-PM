@@ -383,7 +383,7 @@ function createRouteFixture(profile = adminProfile) {
       });
     },
     async withTransaction(operation) {
-      return operation(dataSource);
+      return operation(dataSource as ApiTenantDataSource);
     }
   };
 
@@ -398,7 +398,7 @@ function createRouteFixture(profile = adminProfile) {
     async runDataSourceTransaction<T>(
       operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
     ) {
-      return operation(dataSource);
+      return operation(dataSource as ApiTenantDataSource);
     },
     async appendManagementAuditEvent(
       input: ManagementAuditEventInput,

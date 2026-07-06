@@ -536,7 +536,7 @@ function createSurfaceDataSource(input: { permissions?: AccessProfile["permissio
       };
     },
     async withTransaction(operation) {
-      return operation(dataSource);
+      return operation(dataSource as ApiTenantDataSource);
     },
     async listControlSurfaces(tenantId) {
       return surfaces.filter((surface) => surface.tenantId === tenantId);

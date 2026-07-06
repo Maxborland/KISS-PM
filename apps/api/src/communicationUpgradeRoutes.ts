@@ -302,7 +302,7 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseMemberBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const targetUser = (await deps.dataSource.listUsersByTenantId(actor.tenantId))
+    const targetUser = ((await deps.dataSource.listUsersByTenantId?.(actor.tenantId)) ?? [])
       .find((user) => user.id === parsed.value.userId);
     if (!targetUser) return context.json({ error: "tenant_user_not_found" }, 404);
     if (!(await canTargetUserJoinChannel(targetUser, resolved.value.channel, deps))) {

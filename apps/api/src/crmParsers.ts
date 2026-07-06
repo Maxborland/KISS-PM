@@ -383,10 +383,14 @@ export function parseCrmPipelineStageAutomationDefinitionBody(
   };
 }
 
+// Черновик стадии из тела запроса: pipelineId ещё может быть null (legacy-клиенты
+// без воронки) — роут нормализует его в default-воронку перед записью.
+export type DealStageDraft = Omit<DealStageInput, "pipelineId"> & { pipelineId: string | null };
+
 export function parseDealStageBody(
   body: unknown,
   tenantId: string
-): ParseResult<DealStageInput> {
+): ParseResult<DealStageDraft> {
   if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
   const input = body as Record<string, unknown>;
   const id = getOptionalString(input, "id") ?? `deal-stage-${crypto.randomUUID()}`;

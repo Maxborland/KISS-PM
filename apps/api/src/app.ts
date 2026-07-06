@@ -120,7 +120,7 @@ export function createApp(options: CreateAppOptions = {}) {
     if (!userId) return undefined;
     const parsedUserId = parseUserIdParam(userId);
     if (!parsedUserId.ok) return undefined;
-    const actor = await dataSource.findUserById(parsedUserId.value);
+    const actor = await dataSource.findUserById?.(parsedUserId.value);
     if (!actor) return undefined;
     return (await isWorkspaceUserActive(actor)) ? actor : undefined;
   }
@@ -146,7 +146,7 @@ export function createApp(options: CreateAppOptions = {}) {
       }
     }
 
-    const actor = await dataSource.findUserById(session.userId);
+    const actor = await dataSource.findUserById?.(session.userId);
     if (!actor) return undefined;
     return (await isWorkspaceUserActive(actor)) ? actor : undefined;
   }

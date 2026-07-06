@@ -1431,7 +1431,7 @@ async function validateTenantUserIds(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const uniqueIds = [...new Set(userIds)];
   if (uniqueIds.length === 0) return { ok: true };
-  const tenantUsers = await dataSource.listUsersByTenantId(tenantId);
+  const tenantUsers = (await dataSource.listUsersByTenantId?.(tenantId)) ?? [];
   const existing = new Set(tenantUsers.map((user) => user.id));
   return uniqueIds.every((userId) => existing.has(userId))
     ? { ok: true }

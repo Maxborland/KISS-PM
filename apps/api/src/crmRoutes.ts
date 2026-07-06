@@ -711,7 +711,11 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
         }
         stageInput = { ...stageInput, pipelineId: defaultPipeline.id };
       }
-      const created = await transactionDataSource.createDealStage(stageInput);
+      const { pipelineId } = stageInput;
+      if (pipelineId === null) {
+        throw new Error("transactional_deal_stage_without_pipeline");
+      }
+      const created = await transactionDataSource.createDealStage({ ...stageInput, pipelineId });
       // Денормализованный crm_pipelines.lifecycle_graph_metadata читает first-class CRM API
       // (transition-guard / final-stage / feasibility). Пересобираем в той же транзакции, иначе новая
       // стадия невидима графу до несвязанной first-class мутации (read-model drift).
@@ -794,7 +798,10 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       if (!transactionDataSource.updateDealStage) {
         throw new Error("transactional_deal_stage_update_not_configured");
       }
-      const updated = await transactionDataSource.updateDealStage(parsed.value);
+      const updated = await transactionDataSource.updateDealStage({
+        ...parsed.value,
+        pipelineId: beforeState.pipelineId
+      });
       if (transactionDataSource.refreshCrmPipelineLifecycleGraph && beforeState.pipelineId) {
         await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, beforeState.pipelineId);
       }
