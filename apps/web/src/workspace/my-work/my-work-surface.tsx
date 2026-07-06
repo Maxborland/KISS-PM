@@ -102,7 +102,7 @@ export function MyWorkSurface() {
   // Статус поверхности: есть данные → ready; нет данных и ошибка → error; иначе loading.
   // (Пустой набор задач показываем как empty через SurfaceState.)
   const tasks = data?.tasks ?? null;
-  const surfaceStatus = tasks ? (tasks.length === 0 ? "empty" : "ready") : status === "error" ? "error" : "loading";
+  const surfaceStatus = status === "forbidden" ? "forbidden" : tasks ? (tasks.length === 0 ? "empty" : "ready") : status === "error" ? "error" : "loading";
 
   // Колонки канбана по системным статусам (TASK_STATUSES, упорядочены sortOrder).
   // Группировка по statusCategory задачи (status === statusCategory), как в боевом TaskRecord.

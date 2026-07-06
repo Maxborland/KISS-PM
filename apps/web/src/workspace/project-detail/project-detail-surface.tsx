@@ -102,7 +102,7 @@ export function ProjectDetailSurface({ initialProjectId }: { initialProjectId?: 
   // Статус поверхности: data → ready; иначе loading; error-код project_not_found → можно трактовать как «нет доступа»,
   // но контракт отдаёт 404 (а не 403) — показываем как error с человекочитаемым текстом. forbidden зарезервирован
   // под боевой 403, которого мок не моделирует.
-  const surfaceStatus = requestedMissing ? "empty" : status === "loading" ? "loading" : status === "error" ? "error" : data ? "ready" : "loading";
+  const surfaceStatus = requestedMissing ? "empty" : status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : data ? "ready" : "loading";
 
   return (
     <WorkspaceShell activeNav="Проекты">

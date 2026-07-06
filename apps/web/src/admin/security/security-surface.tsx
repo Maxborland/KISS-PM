@@ -34,7 +34,7 @@ export function AdminSecuritySurface() {
     if (policy) setForm(policy);
   }, [policy]);
 
-  const surfaceStatus = status === "loading" ? "loading" : status === "error" ? "error" : !form ? "loading" : "ready";
+  const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : !form ? "loading" : "ready";
 
   const dirty = useMemo(() => {
     if (!policy || !form) return false;

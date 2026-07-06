@@ -32,7 +32,7 @@ export function AdminUsersSurface() {
     return m;
   }, [data]);
 
-  const surfaceStatus = status === "loading" ? "loading" : status === "error" ? "error" : !data ? "error" : data.users.length === 0 ? "empty" : "ready";
+  const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : !data ? "error" : data.users.length === 0 ? "empty" : "ready";
 
   // Деактивация: PATCH status:"inactive" — только через подтверждение (G6-03).
   const deactivate = async (u: WorkspaceUser) => {

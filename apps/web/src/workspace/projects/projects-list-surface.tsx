@@ -90,13 +90,15 @@ export function ProjectsListSurface() {
   // Статус поверхности: есть данные → ready; ошибка → error; иначе loading.
   // Пустой список активных проектов → empty.
   const surfaceStatus =
-    status === "error"
-      ? "error"
-      : data
-        ? projects.length === 0
-          ? "empty"
-          : "ready"
-        : "loading";
+    status === "forbidden"
+      ? "forbidden"
+      : status === "error"
+        ? "error"
+        : data
+          ? projects.length === 0
+            ? "empty"
+            : "ready"
+          : "loading";
 
   return (
     <WorkspaceShell activeNav="Проекты">

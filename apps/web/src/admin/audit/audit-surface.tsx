@@ -66,7 +66,7 @@ export function AdminAuditSurface() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, typeFilter, query, userName]);
 
-  const surfaceStatus = status === "loading" ? "loading" : status === "error" ? "error" : events.length === 0 ? "empty" : "ready";
+  const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : events.length === 0 ? "empty" : "ready";
 
   return (
     <AdminFrame activeTab="Аудит" subtitle="Журнал управленческих действий и системных событий">

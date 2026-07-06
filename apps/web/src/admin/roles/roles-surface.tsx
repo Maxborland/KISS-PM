@@ -64,7 +64,7 @@ export function AdminRolesSurface() {
     return m;
   }, [data]);
 
-  const surfaceStatus = status === "loading" ? "loading" : status === "error" ? "error" : !data ? "error" : data.roles.length === 0 ? "empty" : "ready";
+  const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : !data ? "error" : data.roles.length === 0 ? "empty" : "ready";
 
   const remove = async (role: AccessProfile) => {
     setBusy(true);
