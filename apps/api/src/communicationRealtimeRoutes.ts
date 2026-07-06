@@ -21,14 +21,13 @@ import {
   serializeCallRoom,
   serializeCallSession
 } from "./communications/callSerializers";
-import {
-  resolveCommunicationEntityAccess,
-  type CommunicationEntityAccessContext
-} from "./communications/entityAccess";
+import { resolveEntityAccessContext, type EntityAccessContext } from "./entityAccess";
 import { readLimitedJsonBody } from "./jsonBody";
 import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
 import { createTurnConfigFromEnv, issueTurnCredentials } from "./turnCredentials";
 import type { ApiRouteDeps } from "./routeTypes";
+
+type CommunicationEntityAccessContext = EntityAccessContext<CollaborationEntityType>;
 
 type ResolvedCallRoom = {
   access: CommunicationEntityAccessContext;
@@ -552,12 +551,13 @@ async function resolveAccessForActor(
   deps: ApiRouteDeps
 ) {
   const profile = await deps.getActorProfile(actor);
-  return resolveCommunicationEntityAccess({
+  return resolveEntityAccessContext({
     actor,
     dataSource: deps.dataSource,
     entityId: entity.entityId,
     entityType: entity.entityType,
-    profile
+    profile,
+    notFoundError: "communications_entity_not_found"
   });
 }
 
