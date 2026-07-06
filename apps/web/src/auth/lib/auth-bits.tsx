@@ -6,6 +6,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
+import { makeRuError } from "@/lib/error-messages";
 
 /* ============================================================
    Общие крошки блока «Auth/Профиль» (зеркало crm-bits / comms-bits):
@@ -22,13 +23,12 @@ const ERR: Record<string, string> = {
   user_not_found: "Пользователь не найден",
   user_inactive: "Учётная запись отключена",
   auth_not_configured: "Аутентификация недоступна",
-  // сессия (БОЕВОЙ)
-  session_required: "Требуется вход в систему",
+  // сессия (БОЕВОЙ) session_required — из COMMON_ERR
   // профиль (БОЕВОЙ, profileRoutes.ts) — РЕАЛЬНЫЕ коды двух ручек
   invalid_profile_payload: "Проверьте имя, телефон и Telegram", // PATCH /api/profile — единый код
   invalid_theme: "Недопустимая тема", // PATCH /api/profile/theme
   invalid_accent_color: "Цвет в формате #RRGGBB", // PATCH /api/profile/theme
-  persistence_not_configured: "Хранилище профиля недоступно",
+  persistence_not_configured: "Хранилище профиля недоступно", // перекрывает COMMON_ERR (уточнение «профиля»)
   // register (БОЕВОЙ, authRegistrationRoutes.ts)
   invalid_registration_payload: "Проверьте имя, email и пароль",
   weak_password: "Пароль слишком простой — минимум 8 символов",
@@ -38,14 +38,11 @@ const ERR: Record<string, string> = {
   invalid_reset_confirm_payload: "Проверьте токен и пароль",
   invalid_reset_token: "Ссылка для сброса недействительна",
   token_expired: "Срок действия ссылки истёк",
-  reset_token_used: "Ссылка уже была использована",
-  // общие транспортные
-  invalid_json: "Некорректный запрос",
-  not_found: "Не найдено",
-  request_failed: "Не удалось выполнить запрос"
+  reset_token_used: "Ссылка уже была использована"
+  // общие транспортные (invalid_json / not_found / request_failed) — из COMMON_ERR
 };
 // RU-текст кода ошибки (как commsErr/crmErr): код → человекочитаемая строка.
-export const authErr = (code?: string, fallback?: string) => (code && ERR[code]) || fallback || code || "Ошибка";
+export const authErr = makeRuError(ERR);
 
 /* ============================================================
    Unauth-каркас: центрированная карточка (login/register/reset).

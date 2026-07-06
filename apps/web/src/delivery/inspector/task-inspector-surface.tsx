@@ -23,7 +23,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { EmptyState } from "@/components/ui/empty-state";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SurfaceState } from "@/components/domain/surface-state";
+import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
@@ -277,8 +277,7 @@ function TaskHero({ taskId, taskTitle }: { taskId: string; taskTitle: string }) 
   const cid = conversation?.id ?? null;
 
   // Верхнеуровневый статус ленты: forbidden(403)/error/loading/ready.
-  const feedStatus =
-    status === "forbidden" ? "forbidden" : status === "error" || !data ? (status === "loading" ? "loading" : "error") : "ready";
+  const feedStatus = surfaceStatusOf(status, Boolean(data));
 
   return (
     <>

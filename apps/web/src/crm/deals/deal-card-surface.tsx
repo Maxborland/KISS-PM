@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { money } from "@/crm/ui/crm-bits";
+import { makeRuError } from "@/lib/error-messages";
 import { useCrm, useCrmUsers, type CrmUsersIndex } from "@/crm/lib/use-crm";
 import type { CrmActivity, FeasibilityAssessment, Opportunity } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
@@ -56,7 +57,7 @@ const ERR_RU: Record<string, string> = {
   invalid_probability: "Вероятность 0…100",
   owner_user_not_found: "Владелец не найден"
 };
-const ruErr = (code?: string, fallback?: string) => (code && ERR_RU[code]) || fallback || code || "Ошибка";
+const ruErr = makeRuError(ERR_RU);
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";

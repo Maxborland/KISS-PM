@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Segmented } from "@/components/ui/segmented";
-import { SurfaceState } from "@/components/domain/surface-state";
+import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
@@ -286,11 +286,12 @@ export function NotificationsPrefs() {
     else toast.error(`Не удалось: ${commsErr(res.code, res.message)}`);
   }
 
-  // Верхнеуровневое состояние настроек: forbidden (403) / error / loading.
-  if (status === "forbidden" || status === "error" || !data) {
+  // Верхнеуровневое состояние настроек: forbidden (403) / error / loading — общий surfaceStatusOf.
+  const surfaceStatus = surfaceStatusOf(status, Boolean(data));
+  if (surfaceStatus !== "ready") {
     return (
       <SurfaceState
-        status={status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error"}
+        status={surfaceStatus}
         error={error}
         onRetry={() => void reload()}
         errorFormat={commsErr}

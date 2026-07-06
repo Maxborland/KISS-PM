@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { SurfaceState } from "@/components/domain/surface-state";
+import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
@@ -225,11 +225,13 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
   const [join, setJoin] = useState<VideoJoinContract | null>(null);
   const [joinOpen, setJoinOpen] = useState(false);
 
-  // Верхнеуровневое состояние детальной комнаты: forbidden (403) / error / loading.
-  if (status === "forbidden" || status === "error" || !data) {
+  // Верхнеуровневое состояние детальной комнаты: forbidden (403) / error / loading — общий surfaceStatusOf.
+  // Доп. проверка !data в if дублирует hasData только ради TS-narrowing (тело ниже дереференсит data).
+  const surfaceStatus = surfaceStatusOf(status, Boolean(data));
+  if (surfaceStatus !== "ready" || !data) {
     return (
       <SurfaceState
-        status={status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error"}
+        status={surfaceStatus}
         error={error}
         onRetry={() => void reload()}
         errorFormat={commsErr}

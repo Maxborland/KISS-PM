@@ -10,7 +10,7 @@ import { Chip } from "@/components/ui/chip";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { SurfaceState } from "@/components/domain/surface-state";
+import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
@@ -136,11 +136,12 @@ function MeetingsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
 
   // Верхнеуровневый статус поверхности: forbidden (403) / error / loading.
   // ВНУТРЕННИЙ EmptyState «Встреч пока нет» (data есть, список пуст) — НЕ top-level: остаётся в ready.
-  if (status === "forbidden" || status === "error" || !data) {
+  const surfaceStatus = surfaceStatusOf(status, Boolean(data));
+  if (surfaceStatus !== "ready") {
     return (
       <CommsFrame activeTab="Встречи" subtitle={`Встречи · ${scope.title}`}>
         <SurfaceState
-          status={status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error"}
+          status={surfaceStatus}
           error={error}
           onRetry={() => void reload()}
           errorFormat={commsErr}

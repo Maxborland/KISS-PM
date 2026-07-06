@@ -11,9 +11,10 @@ import { Chip } from "@/components/ui/chip";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
-import { SurfaceState } from "@/components/domain/surface-state";
+import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { StatTile } from "@/delivery/ui/bento";
 import { cn } from "@/lib/cn";
+import { makeRuError } from "@/lib/error-messages";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { useCrm, useCrmUsers } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
@@ -53,7 +54,7 @@ const ERR_RU: Record<string, string> = {
   opportunity_finalized: "Сделка завершена — перенос недоступен",
   pipeline_not_found: "Воронка не найдена"
 };
-const ruErr = (code?: string, fallback?: string) => (code && ERR_RU[code]) || fallback || code || "Ошибка";
+const ruErr = makeRuError(ERR_RU);
 
 // Ошибка внутри модалки — по месту действия (раньше рендерилась строкой ПОД оверлеем, G4-05).
 function DialogError({ text }: { text: string | null }) {
@@ -99,15 +100,15 @@ export function ProjectDeals() {
   }, [data, pipelineId]);
 
   // Верхнеуровневые loading/error/forbidden — через SurfaceState (внутри CrmFrame).
-  // Сохраняем прежнее условие входа (loading&&!data → loading; error/forbidden/нет model → состояние),
-  // т.к. ниже тело дереференсит model. Reload-с-данными по-прежнему рендерит ready (поведение не меняем).
+  // Лестница статусов — общий surfaceStatusOf; reload-с-данными по-прежнему рендерит ready (поведение не меняем).
+  // Доп. проверки !model/!data в if дублируют hasData только ради TS-narrowing: тело ниже дереференсит model/data.
   // НЕ трогаем вложенные состояния (per-column «перетащите сюда», панель переходов) — это ready-контент.
-  if ((status === "loading" && !data) || status === "error" || status === "forbidden" || !model || !data) {
-    const stateStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
+  const surfaceStatus = surfaceStatusOf(status, Boolean(model && data));
+  if (surfaceStatus !== "ready" || !model || !data) {
     return (
       <CrmFrame activeTab="Сделки">
         <SurfaceState
-          status={stateStatus}
+          status={surfaceStatus}
           error={error}
           onRetry={() => void reload()}
           errorFormat={ruErr}

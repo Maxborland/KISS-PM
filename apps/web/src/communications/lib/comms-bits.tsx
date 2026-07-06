@@ -4,6 +4,7 @@ import { AtSign, CalendarClock, ListTodo, Phone, ShieldAlert } from "lucide-reac
 import type { BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Chip } from "@/components/ui/chip";
 import { cn } from "@/lib/cn";
+import { makeRuError } from "@/lib/error-messages";
 import type { CallRoomStatus, CommunicationChannelRole, EntityType, NotificationType } from "./comms-client";
 
 /* ============================================================
@@ -14,11 +15,8 @@ import type { CallRoomStatus, CommunicationChannelRole, EntityType, Notification
 
 /* ---- RU-маппинг кодов ошибок (собрано из §2 спеки: chat/channels/calls/meetings/notifications) ---- */
 const ERR: Record<string, string> = {
-  // сессия / общие
-  session_required: "Требуется вход в систему",
-  permission_missing: "Недостаточно прав",
-  not_found: "Не найдено",
-  invalid_json: "Некорректный запрос",
+  // сессия / общие (session_required / not_found / invalid_json — из COMMON_ERR)
+  permission_missing: "Недостаточно прав", // перекрывает COMMON_ERR (короткая доменная формулировка)
   invalid_content_length: "Некорректный размер запроса",
   payload_too_large: "Запрос слишком большой",
   unsupported_media_type: "Неподдерживаемый формат запроса",
@@ -113,7 +111,7 @@ const ERR: Record<string, string> = {
   notification_type_invalid: "Некорректный тип уведомления",
   digest_frequency_invalid: "Некорректная частота дайджеста"
 };
-export const commsErr = (code?: string, fallback?: string) => (code && ERR[code]) || fallback || code || "Ошибка";
+export const commsErr = makeRuError(ERR);
 
 /* ---- Относительное время на русском (relTime): «только что», «5 мин назад», «вчера», дата. ---- */
 export function relTime(iso: string, now: Date = new Date()): string {

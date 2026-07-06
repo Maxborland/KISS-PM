@@ -1,5 +1,6 @@
 import { Chip } from "@/components/ui/chip";
 import type { UserStatus } from "@/admin/lib/admin-client";
+import { makeRuError } from "@/lib/error-messages";
 
 /**
  * Общие крошки поверхностей администрирования: RU-маппер кодов ошибок (зеркало crmErr)
@@ -38,13 +39,10 @@ const ERR: Record<string, string> = {
   security_policy_domain_allowlist_invalid: "Список доменов: только строки",
   // not-found (404)
   user_not_found: "Пользователь не найден",
-  access_role_not_found: "Роль не найдена",
-  // авторизация (401/403) — BUG-ADM-01/SHELL-06: раньше утекали сырым кодом
-  session_required: "Требуется вход в систему",
-  permission_missing: "Недостаточно прав для этого действия",
-  forbidden: "Доступ запрещён"
+  access_role_not_found: "Роль не найдена"
+  // авторизация (401/403) — BUG-ADM-01/SHELL-06: раньше утекали сырым кодом; теперь из COMMON_ERR
 };
-export const adminErr = (code?: string, fallback?: string) => (code && ERR[code]) || fallback || "Не удалось выполнить действие";
+export const adminErr = makeRuError(ERR, "Не удалось выполнить действие");
 
 export function UserStatusChip({ status }: { status: UserStatus }) {
   return status === "active" ? (

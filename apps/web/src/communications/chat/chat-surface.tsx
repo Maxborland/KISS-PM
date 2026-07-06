@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SurfaceState } from "@/components/domain/surface-state";
+import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
@@ -90,8 +90,7 @@ function ChatSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
 
   // Верхнеуровневый статус поверхности: forbidden (403) / error / loading / ready.
   // (ВЛОЖЕННЫЙ EmptyState «Нет бесед» — НЕ top-level: остаётся внутри ready-разметки.)
-  const surfaceStatus =
-    status === "forbidden" ? "forbidden" : status === "error" || !data ? (status === "loading" ? "loading" : "error") : "ready";
+  const surfaceStatus = surfaceStatusOf(status, Boolean(data));
   // selected ищем и среди бесед сущности, и среди DM (DM адаптируем к Conversation: title = имя собеседника).
   const selectedDm = dm.data?.conversations.find((c) => c.id === data?.selectedConversationId) ?? null;
   const selected: Conversation | null =

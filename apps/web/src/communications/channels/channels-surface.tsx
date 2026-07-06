@@ -12,7 +12,7 @@ import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogT
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { SurfaceState } from "@/components/domain/surface-state";
+import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
@@ -103,11 +103,12 @@ export function ChannelsSurface() {
 
   // Верхнеуровневый статус поверхности: forbidden (403) / error / loading.
   // ВНУТРЕННИЙ EmptyState «Нет каналов» (data есть, список пуст) — НЕ top-level: остаётся в ready.
-  if (status === "forbidden" || status === "error" || !data) {
+  const surfaceStatus = surfaceStatusOf(status, Boolean(data));
+  if (surfaceStatus !== "ready") {
     return (
       <CommsFrame activeTab="Каналы">
         <SurfaceState
-          status={status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error"}
+          status={surfaceStatus}
           error={error}
           onRetry={() => void reload()}
           errorFormat={commsErr}
