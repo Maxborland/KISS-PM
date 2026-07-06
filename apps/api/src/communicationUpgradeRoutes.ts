@@ -38,6 +38,7 @@ import {
   type CommunicationChannelAccess
 } from "./communicationChannelAccess";
 import { readLimitedJsonBody } from "./jsonBody";
+import { authenticateRoute, authorizeRoute } from "./routeAuth";
 import type { ApiRouteDeps } from "./routeTypes";
 
 const maxStickerUploadBytes = 2 * 1024 * 1024;
@@ -45,19 +46,20 @@ const maxStickerMultipartEnvelopeBytes = maxStickerUploadBytes + 256 * 1024;
 
 export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps) {
   app.get("/api/workspace/communication-channels", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.ensureWorkspaceGeneralChannel || !deps.dataSource.listCommunicationChannels) {
-      return context.json({ error: "communications_not_configured" }, 501);
-    }
-    await deps.dataSource.ensureWorkspaceGeneralChannel({
+    const auth = await authenticateRoute(context, deps, {
+      capabilities: ["ensureWorkspaceGeneralChannel", "listCommunicationChannels"],
+      capabilityError: "communications_not_configured"
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
+    await dataSource.ensureWorkspaceGeneralChannel({
       tenantId: actor.tenantId,
       createdByUserId: actor.id
     });
     const channelType = parseOptionalChannelType(context.req.query("type"));
     if (!channelType.ok) return context.json({ error: channelType.error }, 400);
     const profile = await deps.getActorProfile(actor);
-    const channels = await deps.dataSource.listCommunicationChannels({
+    const channels = await dataSource.listCommunicationChannels({
       tenantId: actor.tenantId,
       ...(channelType.value ? { channelType: channelType.value } : {})
     });
@@ -77,21 +79,16 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.post("/api/workspace/communication-channels", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    const profile = await deps.getActorProfile(actor);
-    const manageDecision = canManageCommunications({
-      actor,
-      profile,
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageCommunications,
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit(deps, actor, {
+          action: "channel.create",
+          permissionResult: decision
+        })
     });
-    if (!manageDecision.allowed) {
-      await appendDeniedAudit(deps, actor, {
-        action: "channel.create",
-        permissionResult: manageDecision
-      });
-      return context.json({ error: manageDecision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision: manageDecision } = auth.value;
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseChannelCreateBody(body.value);
@@ -144,8 +141,9 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.get("/api/workspace/communication-channels/:channelId", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveChannelForActor(context.req.param("channelId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.readDecision.allowed) {
@@ -162,8 +160,9 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.patch("/api/workspace/communication-channels/:channelId", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveChannelForActor(context.req.param("channelId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.manageDecision.allowed) {
@@ -208,8 +207,9 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   // Архив канала (мягкое удаление): канал исчезает из списка, история сохраняется.
   // Системный workspace_general не архивируется. Права — как у правки канала (manage).
   app.delete("/api/workspace/communication-channels/:channelId", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveChannelForActor(context.req.param("channelId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.manageDecision.allowed) {
@@ -250,8 +250,9 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.get("/api/workspace/communication-channels/:channelId/conversation", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveChannelForActor(context.req.param("channelId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.readDecision.allowed) {
@@ -286,8 +287,9 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.post("/api/workspace/communication-channels/:channelId/members", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveChannelForActor(context.req.param("channelId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.manageDecision.allowed) {
@@ -344,8 +346,9 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.delete("/api/workspace/communication-channels/:channelId/members/:userId", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveChannelForActor(context.req.param("channelId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.manageDecision.allowed) {
@@ -386,11 +389,9 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.get("/api/workspace/sticker-packs", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    const profile = await deps.getActorProfile(actor);
-    const decision = canReadCommunications({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const auth = await authorizeRoute(context, deps, { permission: canReadCommunications });
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const packs = await deps.dataSource.listStickerPacks?.(actor.tenantId);
     if (!packs) return context.json({ error: "communications_not_configured" }, 501);
     const assets: StickerAsset[] = [];
@@ -409,11 +410,9 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.get("/api/workspace/sticker-packs/:packId/stickers", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    const profile = await deps.getActorProfile(actor);
-    const decision = canReadCommunications({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const auth = await authorizeRoute(context, deps, { permission: canReadCommunications });
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const packId = parseCollaborationId(context.req.param("packId"), "sticker_pack_id_invalid");
     if (!packId.ok) return context.json({ error: packId.error }, 400);
     const packs = await deps.dataSource.listStickerPacks?.(actor.tenantId);
@@ -428,14 +427,13 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.post("/api/workspace/sticker-packs", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageCommunications({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAudit(deps, actor, { action: "sticker-pack.create", permissionResult: decision });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageCommunications,
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit(deps, actor, { action: "sticker-pack.create", permissionResult: decision })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseStickerPackBody(body.value);
@@ -470,14 +468,13 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.post("/api/workspace/sticker-packs/:packId/import", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageCommunications({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAudit(deps, actor, { action: "sticker.import", permissionResult: decision });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageCommunications,
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit(deps, actor, { action: "sticker.import", permissionResult: decision })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
     const packId = parseCollaborationId(context.req.param("packId"), "sticker_pack_id_invalid");
     if (!packId.ok) return context.json({ error: packId.error }, 400);
     const packs = await deps.dataSource.listStickerPacks?.(actor.tenantId);
@@ -506,14 +503,13 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.delete("/api/workspace/sticker-packs/:packId", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageCommunications({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAudit(deps, actor, { action: "sticker-pack.archive", permissionResult: decision });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageCommunications,
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit(deps, actor, { action: "sticker-pack.archive", permissionResult: decision })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
     const packId = parseCollaborationId(context.req.param("packId"), "sticker_pack_id_invalid");
     if (!packId.ok) return context.json({ error: packId.error }, 400);
     if (!deps.dataSource.archiveStickerPack) {
@@ -543,11 +539,9 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.get("/api/workspace/stickers/:stickerId/download", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    const profile = await deps.getActorProfile(actor);
-    const decision = canReadCommunications({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const auth = await authorizeRoute(context, deps, { permission: canReadCommunications });
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     if (!deps.dataSource.findStickerAsset || !deps.dataSource.findFileAssetById) {
       return context.json({ error: "communications_not_configured" }, 501);
     }
@@ -573,14 +567,13 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
   });
 
   app.delete("/api/workspace/stickers/:stickerId", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageCommunications({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAudit(deps, actor, { action: "sticker.archive", permissionResult: decision });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageCommunications,
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit(deps, actor, { action: "sticker.archive", permissionResult: decision })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
     const stickerId = parseCollaborationId(context.req.param("stickerId"), "sticker_id_invalid");
     if (!stickerId.ok) return context.json({ error: stickerId.error }, 400);
     if (!deps.dataSource.archiveStickerAsset) {

@@ -524,15 +524,12 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const defaultPipeline =
       pipelines.find((pipeline) => pipeline.isDefault) ??
       pipelines.find((pipeline) => pipeline.id === defaultPipelineId);
+    // pipelineId NOT NULL с миграции 0041 — legacy-ветки «бесхозных» стадий удалены.
     if (!defaultPipeline) {
-      return context.json({
-        dealStages: dealStages.filter((stage) => stage.pipelineId === null)
-      });
+      return context.json({ dealStages: [] });
     }
     return context.json({
-      dealStages: dealStages.filter(
-        (stage) => stage.pipelineId === null || stage.pipelineId === defaultPipeline.id
-      )
+      dealStages: dealStages.filter((stage) => stage.pipelineId === defaultPipeline.id)
     });
   });
 

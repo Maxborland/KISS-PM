@@ -23,6 +23,7 @@ import {
 } from "./communications/callSerializers";
 import { resolveEntityAccessContext, type EntityAccessContext } from "./entityAccess";
 import { readLimitedJsonBody } from "./jsonBody";
+import { authenticateRoute } from "./routeAuth";
 import { createCommunicationRecordingWorkspace } from "./communications/recording/recordingWorkspace";
 import { createTurnConfigFromEnv, issueTurnCredentials } from "./turnCredentials";
 import type { ApiRouteDeps } from "./routeTypes";
@@ -44,8 +45,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   const turnConfig = createTurnConfigFromEnv();
 
   app.get("/api/workspace/call-rooms", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const entity = parseEntityQuery(context.req.query("entityType"), context.req.query("entityId"));
     if (!entity.ok) return context.json({ error: entity.error }, 400);
     const access = await resolveAccessForActor(actor, entity.value, deps);
@@ -65,8 +67,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   });
 
   app.post("/api/workspace/call-rooms", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const record = parseRecordBody(body.value);
@@ -97,8 +100,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   });
 
   app.get("/api/workspace/call-rooms/:roomId", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveCallRoomForActor(context.req.param("roomId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.readDecision.allowed) {
@@ -129,8 +133,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   });
 
   app.post("/api/workspace/call-rooms/:roomId/sessions/start", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveCallRoomForActor(context.req.param("roomId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.manageDecision.allowed) {
@@ -159,8 +164,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   });
 
   app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/join-token", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveCallRoomAndSession(context.req.param("roomId"), context.req.param("sessionId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.readDecision.allowed) {
@@ -187,8 +193,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   });
 
   app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/turn-credentials", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveCallRoomAndSession(
       context.req.param("roomId"),
       context.req.param("sessionId"),
@@ -211,8 +218,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   });
 
   app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/participant-state", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveCallRoomAndSession(context.req.param("roomId"), context.req.param("sessionId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.readDecision.allowed) {
@@ -257,8 +265,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   });
 
   app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/end", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveCallRoomAndSession(context.req.param("roomId"), context.req.param("sessionId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.manageDecision.allowed) {
@@ -298,8 +307,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   });
 
   app.post("/api/workspace/call-rooms/:roomId/recordings", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveCallRoomForActor(context.req.param("roomId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.manageDecision.allowed) {
@@ -332,8 +342,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   });
 
   app.post("/api/workspace/call-rooms/:roomId/sessions/:sessionId/recordings/start", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveCallRoomAndSession(
       context.req.param("roomId"),
       context.req.param("sessionId"),
@@ -368,8 +379,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   });
 
   app.post("/api/workspace/call-rooms/:roomId/recordings/groups/:groupId/stop", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveCallRoomForActor(context.req.param("roomId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.manageDecision.allowed) {
@@ -393,8 +405,9 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
   });
 
   app.get("/api/workspace/call-rooms/:roomId/events", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const resolved = await resolveCallRoomForActor(context.req.param("roomId"), actor, deps);
     if (!resolved.ok) return context.json({ error: resolved.error }, resolved.status);
     if (!resolved.value.access.readDecision.allowed) {
@@ -410,10 +423,6 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     });
     return context.json({ events: events.map(serializeCallEvent) });
   });
-}
-
-async function requireActor(cookie: string | null, deps: ApiRouteDeps) {
-  return deps.getSessionActorFromHeaders(cookie);
 }
 
 function parseCreateRoomBody(record: Record<string, unknown>) {
