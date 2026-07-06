@@ -20,7 +20,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/domain/form-dialog";
 import { Input } from "@/components/ui/input";
 import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
@@ -83,16 +84,6 @@ const EVENT_LABEL: Record<CallEventType, string> = {
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
-
-// Ошибка внутри модалки — по месту действия (не строкой позади оверлея).
-function DialogError({ text }: { text: string | null }) {
-  if (!text) return null;
-  return (
-    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
-      {text}
-    </p>
-  );
-}
 
 // Scope сущности резолвится из реальных проектов воркспейса (WithCommsEntityScope);
 // явные entityType/entityId пропсы (встраивание, тесты) отключают резолв.
@@ -457,71 +448,61 @@ function CreateRoomDialog({ busy, setBusy, create, onCreated, entityType, entity
   entityType: EntityType;
   entityId: string;
 }) {
-  const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [mediaKind, setMediaKind] = useState<CallMediaKind>("video");
   const [provider, setProvider] = useState<CallRoomProvider>("jitsi");
   const [providerRoomId, setProviderRoomId] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
 
   const valid = title.trim().length > 0;
 
-  const submit = async () => {
-    if (!valid) return;
-    setBusy(true); setFormError(null);
-    const trimmedRoomId = providerRoomId.trim();
-    const res = await create({
-      entityType,
-      entityId,
-      title: title.trim(),
-      provider,
-      mediaKind,
-      // providerRoomId опционален: передаём только при заполнении (exactOptionalPropertyTypes).
-      ...(trimmedRoomId ? { providerRoomId: trimmedRoomId } : {})
-    });
-    setBusy(false);
-    if (res.ok) {
-      toast.success("Комната создана");
-      setOpen(false);
-      setTitle(""); setProviderRoomId("");
-    } else {
-      // Ошибка остаётся В модалке — по месту действия.
-      setFormError(`Отклонено: ${commsErr(res.code, res.message)}`);
-    }
-  };
-
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) setFormError(null); }}>
-      <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Комната</Button></DialogTrigger>
-      <DialogContent className="max-w-[480px]">
-        <DialogHeader><DialogTitle>Новая комната звонка</DialogTitle></DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          <label className={`col-span-2 ${labelCls}`}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Синхронизация команды" /></label>
-          <label className={labelCls}>Тип медиа
-            <select value={mediaKind} onChange={(e) => setMediaKind(e.target.value as CallMediaKind)} className={selCls}>
-              <option value="video">Видео</option>
-              <option value="audio">Аудио</option>
-            </select>
-          </label>
-          <label className={labelCls}>Провайдер
-            <select value={provider} onChange={(e) => setProvider(e.target.value as CallRoomProvider)} className={selCls}>
-              <option value="jitsi">Jitsi</option>
-              <option value="manual">Ручной</option>
-              <option value="livekit">LiveKit</option>
-            </select>
-          </label>
-          <label className={`col-span-2 ${labelCls}`}>ID комнаты провайдера (опц.)<Input value={providerRoomId} onChange={(e) => setProviderRoomId(e.target.value)} placeholder="portal-sync" /></label>
-        </div>
-        <DialogError text={formError} />
-        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
-          Новая комната создаётся в статусе «Открыт». ID комнаты провайдера должен быть уникальным.
-          Ссылка для подключения выдаётся, только если провайдер комнаты совпадает с настроенным видеопровайдером.
-        </p>
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      title="Новая комната звонка"
+      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Комната</Button>}
+      submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
+      submitDisabled={!valid || busy}
+      successToast="Комната создана"
+      contentClassName="max-w-[480px]"
+      // Ошибка остаётся В модалке — по месту действия.
+      onSubmit={async () => {
+        if (!valid) return null;
+        setBusy(true);
+        const trimmedRoomId = providerRoomId.trim();
+        const res = await create({
+          entityType,
+          entityId,
+          title: title.trim(),
+          provider,
+          mediaKind,
+          // providerRoomId опционален: передаём только при заполнении (exactOptionalPropertyTypes).
+          ...(trimmedRoomId ? { providerRoomId: trimmedRoomId } : {})
+        });
+        setBusy(false);
+        return res.ok ? null : `Отклонено: ${commsErr(res.code, res.message)}`;
+      }}
+      onSuccess={() => { setTitle(""); setProviderRoomId(""); }}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <label className={`col-span-2 ${labelCls}`}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Синхронизация команды" /></label>
+        <label className={labelCls}>Тип медиа
+          <select value={mediaKind} onChange={(e) => setMediaKind(e.target.value as CallMediaKind)} className={selCls}>
+            <option value="video">Видео</option>
+            <option value="audio">Аудио</option>
+          </select>
+        </label>
+        <label className={labelCls}>Провайдер
+          <select value={provider} onChange={(e) => setProvider(e.target.value as CallRoomProvider)} className={selCls}>
+            <option value="jitsi">Jitsi</option>
+            <option value="manual">Ручной</option>
+            <option value="livekit">LiveKit</option>
+          </select>
+        </label>
+        <label className={`col-span-2 ${labelCls}`}>ID комнаты провайдера (опц.)<Input value={providerRoomId} onChange={(e) => setProviderRoomId(e.target.value)} placeholder="portal-sync" /></label>
+      </div>
+      <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
+        Новая комната создаётся в статусе «Открыт». ID комнаты провайдера должен быть уникальным.
+        Ссылка для подключения выдаётся, только если провайдер комнаты совпадает с настроенным видеопровайдером.
+      </p>
+    </FormDialog>
   );
 }

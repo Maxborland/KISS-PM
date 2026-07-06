@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/domain/form-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
@@ -71,16 +71,6 @@ const PROVIDERS: MeetingExternalLinkProvider[] = ["zoom", "teams", "google_meet"
 // Локальные UI-классы (зеркало deals-surface): select/label единым стилем.
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
-
-// Ошибка внутри модалки — по месту действия (не строкой позади оверлея).
-function DialogError({ text }: { text: string | null }) {
-  if (!text) return null;
-  return (
-    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
-      {text}
-    </p>
-  );
-}
 
 // Диапазон времени митинга: «25 июн, 13:00 — 14:00» + относительно (relTime начала).
 function meetingWhen(m: Meeting): string {
@@ -559,10 +549,8 @@ function CreateMeetingDialog({
   entityType: EntityType;
   entityId: string;
 }) {
-  const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [agenda, setAgenda] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
   // Дефолтные времена (от «сейчас», локальные).
   const [start, setStart] = useState(() => toLocalInput(new Date(Date.now() + 86_400_000).toISOString()));
   const [finish, setFinish] = useState(() => toLocalInput(new Date(Date.now() + 86_400_000 + 3_600_000).toISOString()));
@@ -581,71 +569,65 @@ function CreateMeetingDialog({
   const schedOk = Boolean(start && finish && new Date(finish).getTime() > new Date(start).getTime());
   const valid = Boolean(title.trim()) && schedOk;
 
-  const reset = () => { setTitle(""); setAgenda(""); setPicked({}); setFormError(null); };
-
-  const submit = async () => {
-    if (!valid) return;
-    setBusy(true); setFormError(null);
-    const participants = Object.entries(picked).map(([userId, role]) => ({ userId, role }));
-    // exactOptionalPropertyTypes: опускаем agenda/participants, а не шлём undefined.
-    const input: MeetingCreateInput = {
-      entityType,
-      entityId,
-      title: title.trim(),
-      scheduledStart: fromLocalInput(start),
-      scheduledFinish: fromLocalInput(finish)
-    };
-    if (agenda.trim()) input.agenda = agenda.trim();
-    if (participants.length) input.participants = participants;
-    const res = await create(input);
-    setBusy(false);
-    if (res.ok) { toast.success("Встреча создана"); setOpen(false); reset(); }
-    // Ошибка остаётся В модалке — по месту действия.
-    else setFormError(`Отклонено: ${commsErr(res.code, res.message)}`);
-  };
+  const reset = () => { setTitle(""); setAgenda(""); setPicked({}); };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Встреча</Button></DialogTrigger>
-      <DialogContent className="max-w-[560px]">
-        <DialogHeader><DialogTitle>Новая встреча</DialogTitle></DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          <label className={`col-span-2 ${labelCls}`}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Kickoff релиза" /></label>
-          <label className={`col-span-2 ${labelCls}`}>Повестка<Textarea rows={2} value={agenda} onChange={(e) => setAgenda(e.target.value)} placeholder="Цели, распределение задач, риски…" /></label>
-          <label className={labelCls}>Начало<Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} /></label>
-          <label className={labelCls}>Окончание<Input type="datetime-local" value={finish} onChange={(e) => setFinish(e.target.value)} aria-invalid={!schedOk} /></label>
-        </div>
-        {!schedOk ? <p className="text-[length:var(--text-xs)] text-[var(--danger-text)]">Окончание должно быть позже начала.</p> : null}
+    <FormDialog
+      title="Новая встреча"
+      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Встреча</Button>}
+      submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
+      submitDisabled={!valid || busy}
+      successToast="Встреча создана"
+      onClose={reset}
+      // Ошибка остаётся В модалке — по месту действия.
+      onSubmit={async () => {
+        if (!valid) return null;
+        setBusy(true);
+        const participants = Object.entries(picked).map(([userId, role]) => ({ userId, role }));
+        // exactOptionalPropertyTypes: опускаем agenda/participants, а не шлём undefined.
+        const input: MeetingCreateInput = {
+          entityType,
+          entityId,
+          title: title.trim(),
+          scheduledStart: fromLocalInput(start),
+          scheduledFinish: fromLocalInput(finish)
+        };
+        if (agenda.trim()) input.agenda = agenda.trim();
+        if (participants.length) input.participants = participants;
+        const res = await create(input);
+        setBusy(false);
+        return res.ok ? null : `Отклонено: ${commsErr(res.code, res.message)}`;
+      }}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <label className={`col-span-2 ${labelCls}`}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Kickoff релиза" /></label>
+        <label className={`col-span-2 ${labelCls}`}>Повестка<Textarea rows={2} value={agenda} onChange={(e) => setAgenda(e.target.value)} placeholder="Цели, распределение задач, риски…" /></label>
+        <label className={labelCls}>Начало<Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} /></label>
+        <label className={labelCls}>Окончание<Input type="datetime-local" value={finish} onChange={(e) => setFinish(e.target.value)} aria-invalid={!schedOk} /></label>
+      </div>
+      {!schedOk ? <p className="text-[length:var(--text-xs)] text-[var(--danger-text)]">Окончание должно быть позже начала.</p> : null}
 
-        <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] p-2.5">
-          <div className="mb-2 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Участники</div>
-          <ul className="flex flex-col gap-2">
-            {users.list.length === 0 ? <li className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Загрузка участников…</li> : null}
-            {users.list.map((u) => {
-              const on = u.id in picked;
-              return (
-                <li key={u.id} className="flex items-center gap-2">
-                  <Switch checked={on} onCheckedChange={(v) => toggle(u.id, v)} />
-                  <BemAvatar initials={initials(u.name)} color={avatarColor(u.id)} size="sm" title={u.name} />
-                  <span className="mr-auto text-[length:var(--text-sm)] text-[var(--text)]">{u.name}</span>
-                  <select value={picked[u.id] ?? "required"} disabled={!on} onChange={(e) => setRole(u.id, e.target.value as MeetingParticipantRole)} className={cn(selCls, "w-[150px]")}>
-                    <option value="required">Обязателен</option>
-                    <option value="optional">Опционально</option>
-                  </select>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Организатором становится текущий пользователь; выбранным участникам придёт приглашение на встречу.</p>
-        </div>
-
-        <DialogError text={formError} />
-
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] p-2.5">
+        <div className="mb-2 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Участники</div>
+        <ul className="flex flex-col gap-2">
+          {users.list.length === 0 ? <li className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Загрузка участников…</li> : null}
+          {users.list.map((u) => {
+            const on = u.id in picked;
+            return (
+              <li key={u.id} className="flex items-center gap-2">
+                <Switch checked={on} onCheckedChange={(v) => toggle(u.id, v)} />
+                <BemAvatar initials={initials(u.name)} color={avatarColor(u.id)} size="sm" title={u.name} />
+                <span className="mr-auto text-[length:var(--text-sm)] text-[var(--text)]">{u.name}</span>
+                <select value={picked[u.id] ?? "required"} disabled={!on} onChange={(e) => setRole(u.id, e.target.value as MeetingParticipantRole)} className={cn(selCls, "w-[150px]")}>
+                  <option value="required">Обязателен</option>
+                  <option value="optional">Опционально</option>
+                </select>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Организатором становится текущий пользователь; выбранным участникам придёт приглашение на встречу.</p>
+      </div>
+    </FormDialog>
   );
 }

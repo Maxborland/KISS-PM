@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/domain/form-dialog";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
@@ -55,16 +55,6 @@ const ERR_RU: Record<string, string> = {
   pipeline_not_found: "Воронка не найдена"
 };
 const ruErr = makeRuError(ERR_RU);
-
-// Ошибка внутри модалки — по месту действия (раньше рендерилась строкой ПОД оверлеем, G4-05).
-function DialogError({ text }: { text: string | null }) {
-  if (!text) return null;
-  return (
-    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
-      {text}
-    </p>
-  );
-}
 
 export function ProjectDeals() {
   const { live } = useCrmRuntime();
@@ -424,46 +414,42 @@ function MovePipelineDialog({ target, pipelines, allStages, currentPipelineId, b
 }) {
   const [targetPipelineId, setTargetPipelineId] = useState("");
   const [targetStageId, setTargetStageId] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
   const options = pipelines.filter((p) => p.status === "active" && p.id !== currentPipelineId);
   const stages = allStages.filter((s) => s.pipelineId === targetPipelineId && s.status === "active").sort((a, b) => a.sortOrder - b.sortOrder);
   const valid = Boolean(targetPipelineId && targetStageId);
-  const reset = () => { setTargetPipelineId(""); setTargetStageId(""); setFormError(null); };
-  const submit = async () => {
-    if (!target || !valid) return;
-    setFormError(null);
-    // Ошибка остаётся В модалке (G4-05); успех — toast в родителе + закрытие через onMove.
-    const err = await onMove(target.id, targetPipelineId, targetStageId);
-    if (err) setFormError(err);
-    else reset();
-  };
+  const reset = () => { setTargetPipelineId(""); setTargetStageId(""); };
   return (
-    <Dialog open={target !== null} onOpenChange={(o) => { if (!o) { onClose(); reset(); } }}>
-      <DialogContent className="max-w-[460px]">
-        <DialogHeader><DialogTitle>Перенести сделку в другую воронку</DialogTitle></DialogHeader>
-        {target ? <p className="text-[length:var(--text-xs)] text-[var(--muted)]">«{target.title}» · текущая воронка: {pipelines.find((p) => p.id === currentPipelineId)?.name ?? "—"}</p> : null}
-        <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Целевая воронка
-            <select value={targetPipelineId} onChange={(e) => { setTargetPipelineId(e.target.value); setTargetStageId(""); }} className={selCls}>
-              <option value="" disabled>Выберите воронку…</option>
-              {options.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Стадия в целевой воронке
-            <select value={targetStageId} onChange={(e) => setTargetStageId(e.target.value)} disabled={!targetPipelineId} className={selCls}>
-              <option value="" disabled>{targetPipelineId ? "Выберите стадию…" : "Сначала воронка"}</option>
-              {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </label>
-        </div>
-        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Сделка перейдёт в выбранную воронку на выбранную стадию. Завершённые сделки, архивные воронки и стадии перенести нельзя.</p>
-        <DialogError text={formError} />
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><ArrowLeftRight className="size-3.5" aria-hidden />Перенести</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      title="Перенести сделку в другую воронку"
+      open={target !== null}
+      onClose={() => { onClose(); reset(); }}
+      submitLabel={<><ArrowLeftRight className="size-3.5" aria-hidden />Перенести</>}
+      submitDisabled={!valid || busy}
+      contentClassName="max-w-[460px]"
+      // Успех — toast в родителе; ошибка остаётся В модалке (G4-05).
+      onSubmit={async () => {
+        if (!target || !valid) return null;
+        return onMove(target.id, targetPipelineId, targetStageId);
+      }}
+      onSuccess={reset}
+    >
+      {target ? <p className="text-[length:var(--text-xs)] text-[var(--muted)]">«{target.title}» · текущая воронка: {pipelines.find((p) => p.id === currentPipelineId)?.name ?? "—"}</p> : null}
+      <div className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Целевая воронка
+          <select value={targetPipelineId} onChange={(e) => { setTargetPipelineId(e.target.value); setTargetStageId(""); }} className={selCls}>
+            <option value="" disabled>Выберите воронку…</option>
+            {options.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Стадия в целевой воронке
+          <select value={targetStageId} onChange={(e) => setTargetStageId(e.target.value)} disabled={!targetPipelineId} className={selCls}>
+            <option value="" disabled>{targetPipelineId ? "Выберите стадию…" : "Сначала воронка"}</option>
+            {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </label>
+      </div>
+      <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Сделка перейдёт в выбранную воронку на выбранную стадию. Завершённые сделки, архивные воронки и стадии перенести нельзя.</p>
+    </FormDialog>
   );
 }
 
@@ -474,7 +460,6 @@ function CreateDealDialog({ stages, data, busy, setBusy, create }: {
   setBusy: (v: boolean) => void;
   create: ReturnType<typeof useCrm>["createOpportunity"];
 }) {
-  const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState("");
   const [contactId, setContactId] = useState("");
@@ -486,7 +471,6 @@ function CreateDealDialog({ stages, data, busy, setBusy, create }: {
   // Разумные дефолты дат: старт = сегодня, финиш = +3 месяца (G4-15).
   const [start, setStart] = useState(() => isoToday());
   const [finish, setFinish] = useState(() => isoPlusMonths(3));
-  const [formError, setFormError] = useState<string | null>(null);
 
   if (!data) return null;
   const clients = data.clients.filter((c) => c.status === "active");
@@ -503,22 +487,24 @@ function CreateDealDialog({ stages, data, busy, setBusy, create }: {
   if (stages.length === 0) missing.push(<>Воронка продаж не настроена — создайте воронку на вкладке «Сделки», тогда появятся стадии.</>);
   if (data.projectTypes.length === 0) missing.push(<>Не настроены типы проектов — обратитесь к администратору рабочей области.</>);
 
-  const submit = async () => {
-    if (!valid) return;
-    setBusy(true); setFormError(null);
-    const res = await create({ clientId, primaryContactId: contactId, projectTypeId, stageId, title: title.trim(), plannedStart: start, plannedFinish: finish, contractValue: Math.round(Number(contractValue)), plannedHourlyRate: Math.round(Number(rate)), probability: Math.round(Number(probability)), demand: [{ positionId: "backend", requiredHours: Math.min(100000, Math.max(1, Math.floor(Number(contractValue) / Number(rate)))) }] });
-    setBusy(false);
-    if (res.ok) { toast.success("Сделка создана"); setOpen(false); setTitle(""); setClientId(""); setContactId(""); setStageId(""); setContractValue(""); setRate(""); }
-    // Ошибка остаётся В модалке — раньше уходила строкой под оверлеем (G4-05).
-    else setFormError(ruErr(res.code, res.message));
-  };
-
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) setFormError(null); }}>
-      <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Сделка</Button></DialogTrigger>
-      <DialogContent className="max-w-[560px]">
-        <DialogHeader><DialogTitle>Новая сделка</DialogTitle></DialogHeader>
-        {missing.length ? (
+    <FormDialog
+      title="Новая сделка"
+      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Сделка</Button>}
+      submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
+      submitDisabled={!valid || busy}
+      successToast="Сделка создана"
+      // Ошибка остаётся В модалке — раньше уходила строкой под оверлеем (G4-05).
+      onSubmit={async () => {
+        if (!valid) return null;
+        setBusy(true);
+        const res = await create({ clientId, primaryContactId: contactId, projectTypeId, stageId, title: title.trim(), plannedStart: start, plannedFinish: finish, contractValue: Math.round(Number(contractValue)), plannedHourlyRate: Math.round(Number(rate)), probability: Math.round(Number(probability)), demand: [{ positionId: "backend", requiredHours: Math.min(100000, Math.max(1, Math.floor(Number(contractValue) / Number(rate)))) }] });
+        setBusy(false);
+        return res.ok ? null : ruErr(res.code, res.message);
+      }}
+      onSuccess={() => { setTitle(""); setClientId(""); setContactId(""); setStageId(""); setContractValue(""); setRate(""); }}
+    >
+      {missing.length ? (
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
             <p className="mb-1 font-medium">Для создания сделки не хватает данных:</p>
             <ul className="flex list-disc flex-col gap-0.5 pl-4">
@@ -544,12 +530,6 @@ function CreateDealDialog({ stages, data, busy, setBusy, create }: {
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Финиш<Input type="date" value={finish} onChange={(e) => setFinish(e.target.value)} aria-invalid={finish < start} /></label>
         </div>
         <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Плановая трудоёмкость рассчитывается автоматически: сумма ÷ ставка. Спрос на ресурсы предзаполняется по трудоёмкости — уточнить его можно после создания сделки. Сделка создаётся со статусом «Новая».</p>
-        <DialogError text={formError} />
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 }

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/domain/form-dialog";
 import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
@@ -16,16 +16,6 @@ import type { Contact } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
-
-// Ошибка внутри модалки — по месту действия (раньше рендерилась строкой внизу страницы).
-function DialogError({ text }: { text: string | null }) {
-  if (!text) return null;
-  return (
-    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
-      {text}
-    </p>
-  );
-}
 
 export function ProjectContacts() {
   const { data, status, error, reload, createContact, updateContact } = useCrm();
@@ -123,33 +113,31 @@ export function ProjectContacts() {
 
 // Редактирование контакта (G4-07): управляемый диалог по образцу EditUserDialog; клиент НЕ меняется (показан справочно).
 function EditContactDialog({ contact, clientName, busy, setBusy, update }: { contact: Contact; clientName: string; busy: boolean; setBusy: (v: boolean) => void; update: ReturnType<typeof useCrm>["updateContact"] }) {
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState(contact.name);
   const [email, setEmail] = useState(contact.email ?? "");
   const [phone, setPhone] = useState(contact.phone ?? "");
   const [telegram, setTelegram] = useState(contact.telegram ?? "");
   const [role, setRole] = useState(contact.role ?? "");
-  const [formError, setFormError] = useState<string | null>(null);
-  // при открытии диалога синхронизируем форму с текущей записью
-  const onOpenChange = (v: boolean) => {
-    if (v) { setName(contact.name); setEmail(contact.email ?? ""); setPhone(contact.phone ?? ""); setTelegram(contact.telegram ?? ""); setRole(contact.role ?? ""); setFormError(null); }
-    setOpen(v);
-  };
-  const submit = async () => {
-    if (!name.trim()) return;
-    setBusy(true); setFormError(null);
-    // PATCH — полная запись (боевой full-replace); clientId и статус не меняем — сохраняем текущие.
-    const res = await update(contact.id, { clientId: contact.clientId, name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, telegram: telegram.trim() || null, role: role.trim() || null, status: contact.status });
-    setBusy(false);
-    if (res.ok) { toast.success(`Контакт «${name.trim()}» обновлён`); setOpen(false); }
-    // Ошибка остаётся В модалке — по месту действия.
-    else setFormError(crmErr(res.code, res.message));
-  };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild><Button variant="ghost" size="sm" disabled={busy} title="Изменить"><Pencil className="size-3.5" aria-hidden /></Button></DialogTrigger>
-      <DialogContent className="max-w-[500px]">
-        <DialogHeader><DialogTitle>Изменить контакт</DialogTitle></DialogHeader>
+    <FormDialog
+      title="Изменить контакт"
+      trigger={<Button variant="ghost" size="sm" disabled={busy} title="Изменить"><Pencil className="size-3.5" aria-hidden /></Button>}
+      // при открытии диалога синхронизируем форму с текущей записью
+      onOpenChange={(v) => { if (v) { setName(contact.name); setEmail(contact.email ?? ""); setPhone(contact.phone ?? ""); setTelegram(contact.telegram ?? ""); setRole(contact.role ?? ""); } }}
+      submitLabel={<><Pencil className="size-3.5" aria-hidden />Сохранить</>}
+      submitDisabled={!name.trim() || busy}
+      successToast={`Контакт «${name.trim()}» обновлён`}
+      contentClassName="max-w-[500px]"
+      // Ошибка остаётся В модалке — по месту действия.
+      onSubmit={async () => {
+        if (!name.trim()) return null;
+        setBusy(true);
+        // PATCH — полная запись (боевой full-replace); clientId и статус не меняем — сохраняем текущие.
+        const res = await update(contact.id, { clientId: contact.clientId, name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, telegram: telegram.trim() || null, role: role.trim() || null, status: contact.status });
+        setBusy(false);
+        return res.ok ? null : crmErr(res.code, res.message);
+      }}
+    >
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2 flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
             <span className="text-[length:var(--text-xs)] font-medium text-[var(--text-strong)]">{clientName}</span>
@@ -161,40 +149,36 @@ function EditContactDialog({ contact, clientName, busy, setBusy, update }: { con
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Telegram<Input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@username" /></label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Должность<Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Директор по ИТ" /></label>
         </div>
-        <DialogError text={formError} />
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!name.trim() || busy} onClick={() => void submit()}><Pencil className="size-3.5" aria-hidden />Сохранить</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 }
 
 function CreateContactDialog({ data, busy, setBusy, create }: { data: NonNullable<ReturnType<typeof useCrm>["data"]>; busy: boolean; setBusy: (v: boolean) => void; create: ReturnType<typeof useCrm>["createContact"] }) {
-  const [open, setOpen] = useState(false);
   const [clientId, setClientId] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
   const clients = data.clients.filter((c) => c.status === "active");
   const valid = clientId && name.trim();
-  const submit = async () => {
-    if (!valid) return;
-    setBusy(true); setFormError(null);
-    const res = await create({ clientId, name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, role: role.trim() || null });
-    setBusy(false);
-    if (res.ok) { toast.success("Контакт создан"); setOpen(false); setClientId(""); setName(""); setEmail(""); setPhone(""); setRole(""); }
-    // Ошибка остаётся В модалке — раньше уходила строкой внизу страницы.
-    else setFormError(crmErr(res.code, res.message));
-  };
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) setFormError(null); }}>
-      <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Контакт</Button></DialogTrigger>
-      <DialogContent className="max-w-[500px]">
-        <DialogHeader><DialogTitle>Новый контакт</DialogTitle></DialogHeader>
+    <FormDialog
+      title="Новый контакт"
+      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Контакт</Button>}
+      submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
+      submitDisabled={!valid || busy}
+      successToast="Контакт создан"
+      contentClassName="max-w-[500px]"
+      // Ошибка остаётся В модалке — раньше уходила строкой внизу страницы.
+      onSubmit={async () => {
+        if (!valid) return null;
+        setBusy(true);
+        const res = await create({ clientId, name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, role: role.trim() || null });
+        setBusy(false);
+        return res.ok ? null : crmErr(res.code, res.message);
+      }}
+      onSuccess={() => { setClientId(""); setName(""); setEmail(""); setPhone(""); setRole(""); }}
+    >
         <div className="grid grid-cols-2 gap-3">
           <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Клиент
             <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={selCls}><option value="" disabled>Выберите активного клиента…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
@@ -204,12 +188,6 @@ function CreateContactDialog({ data, busy, setBusy, create }: { data: NonNullabl
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Телефон<Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7…" /></label>
           <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Должность<Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Директор по ИТ" /></label>
         </div>
-        <DialogError text={formError} />
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 }

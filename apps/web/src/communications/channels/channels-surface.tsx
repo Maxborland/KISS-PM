@@ -8,7 +8,7 @@ import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/domain/form-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -65,16 +65,6 @@ const ROLE_OPTIONS: { value: CommunicationChannelRole; label: string }[] = [
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
-
-// Ошибка внутри модалки — по месту действия (не строкой позади оверлея).
-function DialogError({ text }: { text: string | null }) {
-  if (!text) return null;
-  return (
-    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
-      {text}
-    </p>
-  );
-}
 
 // Бейдж типа канала.
 function ChannelTypeChip({ type }: { type: CommunicationChannelType }) {
@@ -555,12 +545,10 @@ function CreateChannelDialog({
   busy: boolean;
   onCreate: (input: { channelType: "team" | "project_general" | "custom"; title: string; description?: string | null; scopeEntityType?: "project" | "org_unit" | null; scopeEntityId?: string | null }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
 }) {
-  const [open, setOpen] = useState(false);
   const [channelType, setChannelType] = useState<"team" | "project_general" | "custom">("team");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [scopeEntityId, setScopeEntityId] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
 
   // project_general → project-scope: реальные проекты воркспейса (не демо-hardcode).
   const projectsLoad = useCommsProjects();
@@ -572,73 +560,59 @@ function CreateChannelDialog({
   const scopeValue = channelType === "project_general" ? effectiveProjectId : scopeEntityId.trim();
   const valid = title.trim().length > 0 && (!needsScope || scopeValue.length > 0);
 
-  const submit = async () => {
-    if (!valid) return;
-    const input =
-      channelType === "team"
-        ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "org_unit" as const, scopeEntityId: scopeValue }
-        : channelType === "project_general"
-          ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "project" as const, scopeEntityId: scopeValue }
-          : { channelType, title: title.trim(), description: description.trim() || null };
-    setFormError(null);
-    const res = await onCreate(input);
-    if (res.ok) {
-      setOpen(false);
-      setTitle("");
-      setDescription("");
-      setChannelType("team");
-      setScopeEntityId("");
-    } else {
-      // Ошибка остаётся В модалке — по месту действия.
-      setFormError(`Отклонено: ${commsErr(res.code, res.message)}`);
-    }
-  };
-
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) setFormError(null); }}>
-      <DialogTrigger asChild>
-        <Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Канал</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-[520px]">
-        <DialogHeader><DialogTitle>Новый канал</DialogTitle></DialogHeader>
-        <div className="flex flex-col gap-3">
-          <label className={labelCls}>Тип канала
-            <select
-              value={channelType}
-              onChange={(e) => setChannelType(e.target.value as "team" | "project_general" | "custom")}
-              className={selCls}
-            >
-              {CREATABLE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+    <FormDialog
+      title="Новый канал"
+      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Канал</Button>}
+      submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
+      submitDisabled={!valid || busy}
+      contentClassName="max-w-[520px]"
+      // Успех — toast в родителе (doCreate); ошибка остаётся В модалке — по месту действия.
+      onSubmit={async () => {
+        if (!valid) return null;
+        const input =
+          channelType === "team"
+            ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "org_unit" as const, scopeEntityId: scopeValue }
+            : channelType === "project_general"
+              ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "project" as const, scopeEntityId: scopeValue }
+              : { channelType, title: title.trim(), description: description.trim() || null };
+        const res = await onCreate(input);
+        return res.ok ? null : `Отклонено: ${commsErr(res.code, res.message)}`;
+      }}
+      onSuccess={() => { setTitle(""); setDescription(""); setChannelType("team"); setScopeEntityId(""); }}
+    >
+      <div className="flex flex-col gap-3">
+        <label className={labelCls}>Тип канала
+          <select
+            value={channelType}
+            onChange={(e) => setChannelType(e.target.value as "team" | "project_general" | "custom")}
+            className={selCls}
+          >
+            {CREATABLE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </label>
+        <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Команда портала" /></label>
+        <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
+        {channelType === "project_general" ? (
+          <label className={labelCls}>Проект (область)
+            <select value={effectiveProjectId} onChange={(e) => setScopeEntityId(e.target.value)} className={selCls} disabled={projectOptions.length === 0}>
+              {projectOptions.length === 0 ? <option value="">Нет доступных проектов</option> : null}
+              {projectOptions.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
             </select>
+            <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Канал будет привязан к выбранному проекту.</span>
           </label>
-          <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Команда портала" /></label>
-          <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
-          {channelType === "project_general" ? (
-            <label className={labelCls}>Проект (область)
-              <select value={effectiveProjectId} onChange={(e) => setScopeEntityId(e.target.value)} className={selCls} disabled={projectOptions.length === 0}>
-                {projectOptions.length === 0 ? <option value="">Нет доступных проектов</option> : null}
-                {projectOptions.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
-              </select>
-              <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Канал будет привязан к выбранному проекту.</span>
-            </label>
-          ) : channelType === "team" ? (
-            <label className={labelCls}>Подразделение (область)
-              <Input value={scopeEntityId} onChange={(e) => setScopeEntityId(e.target.value)} placeholder="org-portal" />
-              <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Канал будет привязан к указанному подразделению.</span>
-            </label>
-          ) : null}
-          <DialogError text={formError} />
-        </div>
-        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
-          Создатель канала становится владельцем. Системный канал «Общий» создать нельзя.
-          Тип и область канала после создания не редактируются (только название и описание).
-        </p>
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        ) : channelType === "team" ? (
+          <label className={labelCls}>Подразделение (область)
+            <Input value={scopeEntityId} onChange={(e) => setScopeEntityId(e.target.value)} placeholder="org-portal" />
+            <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Канал будет привязан к указанному подразделению.</span>
+          </label>
+        ) : null}
+      </div>
+      <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
+        Создатель канала становится владельцем. Системный канал «Общий» создать нельзя.
+        Тип и область канала после создания не редактируются (только название и описание).
+      </p>
+    </FormDialog>
   );
 }
 
@@ -655,50 +629,43 @@ function EditChannelDialog({
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(channel.title);
   const [description, setDescription] = useState(channel.description);
-  const [formError, setFormError] = useState<string | null>(null);
 
   // Сброс формы при открытии (актуальные значения канала).
   useEffect(() => {
     if (open) {
       setTitle(channel.title);
       setDescription(channel.description);
-      setFormError(null);
     }
   }, [open, channel.title, channel.description]);
 
   const dirty = title.trim() !== channel.title || description !== channel.description;
   const valid = title.trim().length > 0 && dirty;
 
-  const submit = async () => {
-    if (!valid) return;
-    // Шлём только изменённые поля (PATCH требует ≥1 поле).
-    const input: { title?: string; description?: string } = {};
-    if (title.trim() !== channel.title) input.title = title.trim();
-    if (description !== channel.description) input.description = description;
-    setFormError(null);
-    const res = await onSave(input);
-    if (res.ok) setOpen(false);
-    else setFormError(`Отклонено: ${commsErr(res.code, res.message)}`);
-  };
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="secondary" size="sm"><Save className="size-3.5" aria-hidden />Изменить</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-[520px]">
-        <DialogHeader><DialogTitle>Изменить канал</DialogTitle></DialogHeader>
-        <div className="flex flex-col gap-3">
-          <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} /></label>
-          <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
-          <DialogError text={formError} />
-        </div>
-        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Меняются только название и описание; тип и область канала не редактируются.</p>
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Save className="size-3.5" aria-hidden />Сохранить</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      title="Изменить канал"
+      trigger={<Button variant="secondary" size="sm"><Save className="size-3.5" aria-hidden />Изменить</Button>}
+      open={open}
+      onOpenChange={setOpen}
+      submitLabel={<><Save className="size-3.5" aria-hidden />Сохранить</>}
+      submitDisabled={!valid || busy}
+      contentClassName="max-w-[520px]"
+      // Успех — toast в родителе (onSave); ошибка остаётся В модалке — по месту действия.
+      onSubmit={async () => {
+        if (!valid) return null;
+        // Шлём только изменённые поля (PATCH требует ≥1 поле).
+        const input: { title?: string; description?: string } = {};
+        if (title.trim() !== channel.title) input.title = title.trim();
+        if (description !== channel.description) input.description = description;
+        const res = await onSave(input);
+        return res.ok ? null : `Отклонено: ${commsErr(res.code, res.message)}`;
+      }}
+    >
+      <div className="flex flex-col gap-3">
+        <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+        <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
+      </div>
+      <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Меняются только название и описание; тип и область канала не редактируются.</p>
+    </FormDialog>
   );
 }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { DialogError, FormDialog } from "@/components/domain/form-dialog";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { AdminFrame } from "@/admin/ui/admin-frame";
 import { adminErr, permissionParts } from "@/admin/ui/admin-bits";
@@ -18,16 +19,6 @@ import { ALL_PERMISSIONS } from "@/admin/lib/permissions-catalog";
 import type { AccessProfile, Permission } from "@/admin/lib/admin-client";
 
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
-
-// Ошибка внутри модалки — по месту действия (раньше рендерилась строкой ПОЗАДИ модалки, G6-02).
-function DialogError({ text }: { text: string | null }) {
-  if (!text) return null;
-  return (
-    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
-      {text}
-    </p>
-  );
-}
 
 // Группировка прав по РЕСУРСУ с человеческим заголовком (G6-09): «Проекты», «Сделки»…
 // Неразобранный код падает в группу по первому dot-сегменту (fallback).
@@ -179,41 +170,36 @@ function CreateRoleDialog({ busy, setBusy, create, groups }: {
   busy: boolean; setBusy: (v: boolean) => void;
   create: ReturnType<typeof useAdmin>["createRole"]; groups: PermissionGroup[];
 }) {
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<Set<Permission>>(() => new Set());
-  const [formError, setFormError] = useState<string | null>(null);
   const toggle = (p: Permission) => setSelected((prev) => { const next = new Set(prev); if (next.has(p)) next.delete(p); else next.add(p); return next; });
 
-  const onOpenChange = (v: boolean) => { if (v) { setName(""); setSelected(new Set()); setFormError(null); } setOpen(v); };
   const valid = name.trim().length > 0;
-  const submit = async () => {
-    if (!valid) return;
-    setBusy(true); setFormError(null);
-    // id обязателен — генерируем слаг из названия (боевой route-id формат).
-    const permissions = [...selected];
-    const res = await create({ id: slugify(name), name: name.trim(), permissions });
-    setBusy(false);
-    if (res.ok) { toast.success(`Роль «${name.trim()}» создана`); setOpen(false); }
-    // Ошибка остаётся В модалке — раньше уходила строкой позади оверлея (G6-02).
-    else setFormError(adminErr(res.code, res.message));
-  };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Создать роль</Button></DialogTrigger>
-      <DialogContent className="max-w-[640px]">
-        <DialogHeader><DialogTitle>Новая роль</DialogTitle></DialogHeader>
-        <div className="flex flex-col gap-3">
-          <label className={labelCls}>Название<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Координатор" /></label>
-          <div className={labelCls}>Права ({selected.size})<PermissionChecklist selected={selected} toggle={toggle} groups={groups} /></div>
-          <DialogError text={formError} />
-        </div>
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      title="Новая роль"
+      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Создать роль</Button>}
+      onOpenChange={(v) => { if (v) { setName(""); setSelected(new Set()); } }}
+      submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
+      submitDisabled={!valid || busy}
+      contentClassName="max-w-[640px]"
+      successToast={`Роль «${name.trim()}» создана`}
+      // Ошибка остаётся В модалке — раньше уходила строкой позади оверлея (G6-02).
+      onSubmit={async () => {
+        if (!valid) return null;
+        setBusy(true);
+        // id обязателен — генерируем слаг из названия (боевой route-id формат).
+        const permissions = [...selected];
+        const res = await create({ id: slugify(name), name: name.trim(), permissions });
+        setBusy(false);
+        return res.ok ? null : adminErr(res.code, res.message);
+      }}
+    >
+      <div className="flex flex-col gap-3">
+        <label className={labelCls}>Название<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Координатор" /></label>
+        <div className={labelCls}>Права ({selected.size})<PermissionChecklist selected={selected} toggle={toggle} groups={groups} /></div>
+      </div>
+    </FormDialog>
   );
 }
 

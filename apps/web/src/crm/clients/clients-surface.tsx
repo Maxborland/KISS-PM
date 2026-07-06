@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/domain/form-dialog";
 import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
@@ -15,16 +15,6 @@ import { useCrm } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import type { Client } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
-
-// Ошибка внутри модалки — по месту действия (раньше рендерилась строкой внизу страницы).
-function DialogError({ text }: { text: string | null }) {
-  if (!text) return null;
-  return (
-    <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft,var(--panel-subtle))] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text,var(--danger))]">
-      {text}
-    </p>
-  );
-}
 
 export function ProjectClients() {
   const { live } = useCrmRuntime();
@@ -133,78 +123,66 @@ export function ProjectClients() {
 
 // Редактирование клиента (G4-07): управляемый диалог по образцу EditUserDialog, форма синхронизируется при открытии.
 function EditClientDialog({ client, busy, setBusy, update }: { client: Client; busy: boolean; setBusy: (v: boolean) => void; update: ReturnType<typeof useCrm>["updateClient"] }) {
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState(client.name);
   const [description, setDescription] = useState(client.description ?? "");
-  const [formError, setFormError] = useState<string | null>(null);
-  // при открытии диалога синхронизируем форму с текущей записью
-  const onOpenChange = (v: boolean) => {
-    if (v) { setName(client.name); setDescription(client.description ?? ""); setFormError(null); }
-    setOpen(v);
-  };
-  const submit = async () => {
-    if (!name.trim()) return;
-    setBusy(true); setFormError(null);
-    // PATCH — полная запись (боевой full-replace); статус не меняем — сохраняем текущий.
-    const res = await update(client.id, { name: name.trim(), description: description.trim() || null, status: client.status });
-    setBusy(false);
-    if (res.ok) { toast.success(`Клиент «${name.trim()}» обновлён`); setOpen(false); }
-    // Ошибка остаётся В модалке — по месту действия.
-    else setFormError(crmErr(res.code, res.message));
-  };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild><Button variant="ghost" size="sm" disabled={busy} title="Изменить"><Pencil className="size-3.5" aria-hidden /></Button></DialogTrigger>
-      <DialogContent className="max-w-[460px]">
-        <DialogHeader><DialogTitle>Изменить клиента</DialogTitle></DialogHeader>
-        <div className="flex flex-col gap-3">
-          {prototypeNotesEnabled ? (
-            <div className="flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
-              <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{client.id}</span>
-            </div>
-          ) : null}
-          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Название<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ООО «Ромашка»" /></label>
-          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Описание<Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="необязательно" /></label>
-          <DialogError text={formError} />
-        </div>
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!name.trim() || busy} onClick={() => void submit()}><Pencil className="size-3.5" aria-hidden />Сохранить</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      title="Изменить клиента"
+      trigger={<Button variant="ghost" size="sm" disabled={busy} title="Изменить"><Pencil className="size-3.5" aria-hidden /></Button>}
+      // при открытии диалога синхронизируем форму с текущей записью
+      onOpenChange={(v) => { if (v) { setName(client.name); setDescription(client.description ?? ""); } }}
+      submitLabel={<><Pencil className="size-3.5" aria-hidden />Сохранить</>}
+      submitDisabled={!name.trim() || busy}
+      successToast={`Клиент «${name.trim()}» обновлён`}
+      contentClassName="max-w-[460px]"
+      // Ошибка остаётся В модалке — по месту действия.
+      onSubmit={async () => {
+        if (!name.trim()) return null;
+        setBusy(true);
+        // PATCH — полная запись (боевой full-replace); статус не меняем — сохраняем текущий.
+        const res = await update(client.id, { name: name.trim(), description: description.trim() || null, status: client.status });
+        setBusy(false);
+        return res.ok ? null : crmErr(res.code, res.message);
+      }}
+    >
+      <div className="flex flex-col gap-3">
+        {prototypeNotesEnabled ? (
+          <div className="flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
+            <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{client.id}</span>
+          </div>
+        ) : null}
+        <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Название<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ООО «Ромашка»" /></label>
+        <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Описание<Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="необязательно" /></label>
+      </div>
+    </FormDialog>
   );
 }
 
 function CreateClientDialog({ busy, setBusy, create }: { busy: boolean; setBusy: (v: boolean) => void; create: ReturnType<typeof useCrm>["createClient"] }) {
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
-  const submit = async () => {
-    if (!name.trim()) return;
-    setBusy(true); setFormError(null);
-    const res = await create({ name: name.trim(), description: description.trim() || null });
-    setBusy(false);
-    if (res.ok) { toast.success("Клиент создан"); setOpen(false); setName(""); setDescription(""); }
-    // Ошибка остаётся В модалке — раньше уходила строкой внизу страницы.
-    else setFormError(crmErr(res.code, res.message));
-  };
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) setFormError(null); }}>
-      <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Клиент</Button></DialogTrigger>
-      <DialogContent className="max-w-[460px]">
-        <DialogHeader><DialogTitle>Новый клиент</DialogTitle></DialogHeader>
-        <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Название<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ООО «Ромашка»" /></label>
-          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Описание<Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="необязательно" /></label>
-          <DialogError text={formError} />
-        </div>
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!name.trim() || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      title="Новый клиент"
+      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Клиент</Button>}
+      submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
+      submitDisabled={!name.trim() || busy}
+      successToast="Клиент создан"
+      contentClassName="max-w-[460px]"
+      // Ошибка остаётся В модалке — раньше уходила строкой внизу страницы.
+      onSubmit={async () => {
+        if (!name.trim()) return null;
+        setBusy(true);
+        const res = await create({ name: name.trim(), description: description.trim() || null });
+        setBusy(false);
+        return res.ok ? null : crmErr(res.code, res.message);
+      }}
+      onSuccess={() => { setName(""); setDescription(""); }}
+    >
+      <div className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Название<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ООО «Ромашка»" /></label>
+        <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Описание<Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="необязательно" /></label>
+      </div>
+    </FormDialog>
   );
 }
