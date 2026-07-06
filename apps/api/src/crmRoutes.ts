@@ -26,6 +26,7 @@ import {
   parseStageTransitionBody
 } from "./crmParsers";
 import { readLimitedJsonBody } from "./jsonBody";
+import { authorizeRoute } from "./routeAuth";
 import {
   parseClientIdParam,
   parseContactIdParam,
@@ -80,18 +81,12 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   } = deps;
 
   app.get("/api/workspace/clients", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listClients) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadClients({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadClients,
+      capabilities: ["listClients"]
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({ clients: await dataSource.listClients(actor.tenantId) });
   });
@@ -149,50 +144,32 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     return context.json(result.body, result.status);
   });
   app.get("/api/workspace/contacts", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listContacts) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadContacts({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadContacts,
+      capabilities: ["listContacts"]
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({ contacts: await dataSource.listContacts(actor.tenantId) });
   });
 
   app.post("/api/workspace/contacts", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createContact ||
-      !dataSource.findClientById ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageContacts({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageContacts,
+      capabilities: ["createContact", "findClientById", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "contact.create_denied",
+          sourceEntity: { type: "Contact", id: "unknown" },
+          commandInput: { endpoint: "createContact" },
+          permissionResult: decision,
+          error: decision.reason
+        })
     });
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "contact.create_denied",
-        sourceEntity: { type: "Contact", id: "unknown" },
-        commandInput: { endpoint: "createContact" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -232,35 +209,28 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: parsedContactId.error }, 400);
     }
 
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.findContactById ||
-      !dataSource.findClientById ||
-      !dataSource.updateContact ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageContacts({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
     const contactId = parsedContactId.value;
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "contact.update_denied",
-        sourceEntity: { type: "Contact", id: contactId },
-        commandInput: { endpoint: "updateContact", contactId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageContacts,
+      capabilities: [
+        "findContactById",
+        "findClientById",
+        "updateContact",
+        "appendAuditEvent",
+        "withTransaction"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "contact.update_denied",
+          sourceEntity: { type: "Contact", id: contactId },
+          commandInput: { endpoint: "updateContact", contactId },
+          permissionResult: decision,
+          error: decision.reason
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const beforeState = await dataSource.findContactById(actor.tenantId, contactId);
     if (!beforeState) return context.json({ error: "contact_not_found" }, 404);
@@ -299,49 +269,32 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   });
 
   app.get("/api/workspace/products", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listProducts) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadProducts({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadProducts,
+      capabilities: ["listProducts"]
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({ products: await dataSource.listProducts(actor.tenantId) });
   });
 
   app.post("/api/workspace/products", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createProduct ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageProducts({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageProducts,
+      capabilities: ["createProduct", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "product.create_denied",
+          sourceEntity: { type: "Product", id: "unknown" },
+          commandInput: { endpoint: "createProduct" },
+          permissionResult: decision,
+          error: decision.reason
+        })
     });
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "product.create_denied",
-        sourceEntity: { type: "Product", id: "unknown" },
-        commandInput: { endpoint: "createProduct" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -384,34 +337,22 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: parsedProductId.error }, 400);
     }
 
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.findProductById ||
-      !dataSource.updateProduct ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageProducts({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
     const productId = parsedProductId.value;
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "product.update_denied",
-        sourceEntity: { type: "Product", id: productId },
-        commandInput: { endpoint: "updateProduct", productId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageProducts,
+      capabilities: ["findProductById", "updateProduct", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "product.update_denied",
+          sourceEntity: { type: "Product", id: productId },
+          commandInput: { endpoint: "updateProduct", productId },
+          permissionResult: decision,
+          error: decision.reason
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const beforeState = await dataSource.findProductById(actor.tenantId, productId);
     if (!beforeState) return context.json({ error: "product_not_found" }, 404);
@@ -445,18 +386,12 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   });
 
   app.get("/api/workspace/project-types", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listProjectTypes) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadProjectTypes({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadProjectTypes,
+      capabilities: ["listProjectTypes"]
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({
       projectTypes: await dataSource.listProjectTypes(actor.tenantId)
@@ -464,32 +399,21 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   });
 
   app.post("/api/workspace/project-types", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createProjectType ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageProjectTypes({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageProjectTypes,
+      capabilities: ["createProjectType", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "project_type.create_denied",
+          sourceEntity: { type: "ProjectType", id: "unknown" },
+          commandInput: { endpoint: "createProjectType" },
+          permissionResult: decision,
+          error: decision.reason
+        })
     });
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "project_type.create_denied",
-        sourceEntity: { type: "ProjectType", id: "unknown" },
-        commandInput: { endpoint: "createProjectType" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -527,34 +451,27 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: parsedProjectTypeId.error }, 400);
     }
 
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.findProjectTypeById ||
-      !dataSource.updateProjectType ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageProjectTypes({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
     const projectTypeId = parsedProjectTypeId.value;
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "project_type.update_denied",
-        sourceEntity: { type: "ProjectType", id: projectTypeId },
-        commandInput: { endpoint: "updateProjectType", projectTypeId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageProjectTypes,
+      capabilities: [
+        "findProjectTypeById",
+        "updateProjectType",
+        "appendAuditEvent",
+        "withTransaction"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "project_type.update_denied",
+          sourceEntity: { type: "ProjectType", id: projectTypeId },
+          commandInput: { endpoint: "updateProjectType", projectTypeId },
+          permissionResult: decision,
+          error: decision.reason
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const beforeState = await dataSource.findProjectTypeById(actor.tenantId, projectTypeId);
     if (!beforeState) return context.json({ error: "project_type_not_found" }, 404);
@@ -591,18 +508,12 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   });
 
   app.get("/api/workspace/deal-stages", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listDealStages) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadDealStages({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadDealStages,
+      capabilities: ["listDealStages"]
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     const dealStages = await dataSource.listDealStages(actor.tenantId);
     if (!dataSource.listPipelines) {
@@ -626,32 +537,21 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   });
 
   app.post("/api/workspace/deal-stages", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createDealStage ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageDealStages({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageDealStages,
+      capabilities: ["createDealStage", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "deal_stage.create_denied",
+          sourceEntity: { type: "DealStage", id: "unknown" },
+          commandInput: { endpoint: "createDealStage" },
+          permissionResult: decision,
+          error: decision.reason
+        })
     });
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "deal_stage.create_denied",
-        sourceEntity: { type: "DealStage", id: "unknown" },
-        commandInput: { endpoint: "createDealStage" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -746,34 +646,22 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: parsedStageId.error }, 400);
     }
 
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.findDealStageById ||
-      !dataSource.updateDealStage ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageDealStages({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
     const stageId = parsedStageId.value;
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "deal_stage.update_denied",
-        sourceEntity: { type: "DealStage", id: stageId },
-        commandInput: { endpoint: "updateDealStage", stageId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageDealStages,
+      capabilities: ["findDealStageById", "updateDealStage", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "deal_stage.update_denied",
+          sourceEntity: { type: "DealStage", id: stageId },
+          commandInput: { endpoint: "updateDealStage", stageId },
+          permissionResult: decision,
+          error: decision.reason
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const beforeState = await dataSource.findDealStageById(actor.tenantId, stageId);
     if (!beforeState) return context.json({ error: "deal_stage_not_found" }, 404);
@@ -825,50 +713,33 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
 
   // Мультиворонки: список воронок (право чтения стадий).
   app.get("/api/workspace/pipelines", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listPipelines) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadDealStages({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadDealStages,
+      capabilities: ["listPipelines"]
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({ pipelines: await dataSource.listPipelines(actor.tenantId) });
   });
 
   // Мультиворонки: создание воронки (право управления стадиями).
   app.post("/api/workspace/pipelines", async (context) => {
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createPipeline ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageDealStages({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageDealStages,
+      capabilities: ["createPipeline", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "pipeline.create_denied",
+          sourceEntity: { type: "Pipeline", id: "unknown" },
+          commandInput: { endpoint: "createPipeline" },
+          permissionResult: decision,
+          error: decision.reason
+        })
     });
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "pipeline.create_denied",
-        sourceEntity: { type: "Pipeline", id: "unknown" },
-        commandInput: { endpoint: "createPipeline" },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -905,34 +776,22 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: parsedPipelineId.error }, 400);
     }
 
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.findPipelineById ||
-      !dataSource.updatePipeline ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageDealStages({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
     const pipelineId = parsedPipelineId.value;
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "pipeline.update_denied",
-        sourceEntity: { type: "Pipeline", id: pipelineId },
-        commandInput: { endpoint: "updatePipeline", pipelineId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageDealStages,
+      capabilities: ["findPipelineById", "updatePipeline", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "pipeline.update_denied",
+          sourceEntity: { type: "Pipeline", id: pipelineId },
+          commandInput: { endpoint: "updatePipeline", pipelineId },
+          permissionResult: decision,
+          error: decision.reason
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const beforeState = await dataSource.findPipelineById(actor.tenantId, pipelineId);
     if (!beforeState) return context.json({ error: "pipeline_not_found" }, 404);
@@ -984,18 +843,12 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: parsedPipelineId.error }, 400);
     }
 
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.findPipelineById || !dataSource.listStageTransitions) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadDealStages({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadDealStages,
+      capabilities: ["findPipelineById", "listStageTransitions"]
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     const pipelineId = parsedPipelineId.value;
     const pipeline = await dataSource.findPipelineById(actor.tenantId, pipelineId);
@@ -1013,36 +866,29 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: parsedPipelineId.error }, 400);
     }
 
-    const actor = await getActor(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.findPipelineById ||
-      !dataSource.findDealStageById ||
-      !dataSource.listStageTransitions ||
-      !dataSource.createStageTransition ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageDealStages({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
     const pipelineId = parsedPipelineId.value;
-    if (!decision.allowed) {
-      await appendDeniedAudit({
-        actor,
-        actionType: "stage_transition.create_denied",
-        sourceEntity: { type: "StageTransition", id: "unknown" },
-        commandInput: { endpoint: "createStageTransition", pipelineId },
-        permissionResult: decision,
-        error: decision.reason
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageDealStages,
+      capabilities: [
+        "findPipelineById",
+        "findDealStageById",
+        "listStageTransitions",
+        "createStageTransition",
+        "appendAuditEvent",
+        "withTransaction"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "stage_transition.create_denied",
+          sourceEntity: { type: "StageTransition", id: "unknown" },
+          commandInput: { endpoint: "createStageTransition", pipelineId },
+          permissionResult: decision,
+          error: decision.reason
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const pipeline = await dataSource.findPipelineById(actor.tenantId, pipelineId);
     if (!pipeline) return context.json({ error: "pipeline_not_found" }, 404);
@@ -1122,35 +968,28 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
         return context.json({ error: parsedTransitionId.error }, 400);
       }
 
-      const actor = await getActor(context.req.header("cookie") ?? null);
-      if (!actor) return context.json({ error: "session_required" }, 401);
-      if (
-        !dataSource.findStageTransitionById ||
-        !dataSource.deleteStageTransition ||
-        !dataSource.appendAuditEvent ||
-        !dataSource.withTransaction
-      ) {
-        return context.json({ error: "persistence_not_configured" }, 501);
-      }
-
-      const decision = canManageDealStages({
-        actor,
-        profile: await getActorProfile(actor),
-        targetTenantId: actor.tenantId
-      });
       const pipelineId = parsedPipelineId.value;
       const transitionId = parsedTransitionId.value;
-      if (!decision.allowed) {
-        await appendDeniedAudit({
-          actor,
-          actionType: "stage_transition.delete_denied",
-          sourceEntity: { type: "StageTransition", id: transitionId },
-          commandInput: { endpoint: "deleteStageTransition", pipelineId, transitionId },
-          permissionResult: decision,
-          error: decision.reason
-        });
-        return context.json({ error: decision.reason }, 403);
-      }
+      const auth = await authorizeRoute(context, deps, {
+        permission: canManageDealStages,
+        capabilities: [
+          "findStageTransitionById",
+          "deleteStageTransition",
+          "appendAuditEvent",
+          "withTransaction"
+        ],
+        onDenied: ({ actor, decision }) =>
+          appendDeniedAudit({
+            actor,
+            actionType: "stage_transition.delete_denied",
+            sourceEntity: { type: "StageTransition", id: transitionId },
+            commandInput: { endpoint: "deleteStageTransition", pipelineId, transitionId },
+            permissionResult: decision,
+            error: decision.reason
+          })
+      });
+      if (!auth.ok) return auth.response;
+      const { actor, decision, dataSource } = auth.value;
 
       const beforeState = await dataSource.findStageTransitionById(
         actor.tenantId,

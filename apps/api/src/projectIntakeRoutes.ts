@@ -22,6 +22,7 @@ import {
   parseProjectActivationBody
 } from "./projectIntakeParsers";
 import { createProjectIntakeService } from "./projectIntakeService";
+import { authorizeRoute } from "./routeAuth";
 import { parseOpportunityIdParam } from "./routeParamParsers";
 
 type ProjectIntakeRouteDeps = {
@@ -46,21 +47,16 @@ export function registerProjectIntakeRoutes(
     getActorProfile,
     getSessionActorFromHeaders
   } = deps;
+  const routeAuthDeps = { dataSource, getSessionActorFromHeaders, getActorProfile };
   const projectIntakeService = createProjectIntakeService(deps);
 
   app.get("/api/workspace/opportunities", async (context) => {
-    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listOpportunities) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadOpportunities({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canReadOpportunities,
+      capabilities: ["listOpportunities"]
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({
       opportunities: await dataSource.listOpportunities(actor.tenantId)
@@ -71,18 +67,12 @@ export function registerProjectIntakeRoutes(
     const opportunityId = parseOpportunityIdParam(context.req.param("opportunityId"));
     if (!opportunityId.ok) return context.json({ error: opportunityId.error }, 400);
 
-    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.findOpportunityById) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadOpportunities({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canReadOpportunities,
+      capabilities: ["findOpportunityById"]
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     const opportunity = await dataSource.findOpportunityById(
       actor.tenantId,
@@ -277,18 +267,12 @@ export function registerProjectIntakeRoutes(
   });
 
   app.get("/api/workspace/projects", async (context) => {
-    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listProjects) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadProjects({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canReadProjects,
+      capabilities: ["listProjects"]
     });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({
       projects: (await dataSource.listProjects(actor.tenantId)).filter(

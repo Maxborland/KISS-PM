@@ -32,6 +32,7 @@ import {
   parseProjectTemplateIdParam,
   parseTemplateImprovementActionIdParam
 } from "./routeParamParsers";
+import { authorizeRoute } from "./routeAuth";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 
 type TemplateImprovementActionPersistenceInput = Omit<
@@ -53,22 +54,19 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
     if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
 
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.getRetrospectiveReadModel || !deps.dataSource.listProjects) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = readDecision(actor, profile);
     const projectId = parsedProjectId.value;
-    if (!decision.allowed) {
-      await appendDeniedAudit(deps, actor, "closure.read_denied", { projectId }, decision);
-      return context.json({ error: decision.reason }, 403);
-    }
-    const project = await findProject(deps.dataSource, actor.tenantId, projectId);
+    const auth = await authorizeRoute(context, deps, {
+      permission: ({ actor, profile }) => readDecision(actor, profile),
+      capabilities: ["getRetrospectiveReadModel", "listProjects"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit(deps, actor, "closure.read_denied", { projectId }, decision)
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
+    const project = await findProject(dataSource, actor.tenantId, projectId);
     if (!project) return context.json({ error: "project_not_found" }, 404);
 
-    const readModel = await deps.dataSource.getRetrospectiveReadModel(
+    const readModel = await dataSource.getRetrospectiveReadModel(
       actor.tenantId,
       projectId
     );
@@ -79,27 +77,20 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsedProjectId = parseProjectIdParam(context.req.param("projectId"));
     if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
 
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !deps.dataSource.getPlanSnapshot ||
-      !deps.dataSource.listProjectTasks ||
-      !deps.dataSource.listProjects
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = readDecision(actor, profile);
     const projectId = parsedProjectId.value;
-    if (!decision.allowed) {
-      await appendDeniedAudit(deps, actor, "closure.preview_denied", { projectId }, decision);
-      return context.json({ error: decision.reason }, 403);
-    }
-    const project = await findProject(deps.dataSource, actor.tenantId, projectId);
+    const auth = await authorizeRoute(context, deps, {
+      permission: ({ actor, profile }) => readDecision(actor, profile),
+      capabilities: ["getPlanSnapshot", "listProjectTasks", "listProjects"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit(deps, actor, "closure.preview_denied", { projectId }, decision)
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
+    const project = await findProject(dataSource, actor.tenantId, projectId);
     if (!project) return context.json({ error: "project_not_found" }, 404);
-    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
+    const snapshot = await dataSource.getPlanSnapshot(actor.tenantId, projectId);
     if (!snapshot) return context.json({ error: "project_not_found" }, 404);
-    const tasks = await deps.dataSource.listProjectTasks(actor.tenantId, projectId);
+    const tasks = await dataSource.listProjectTasks(actor.tenantId, projectId);
     const planFactSummary = buildClosurePlanFactSummary({
       snapshot,
       factTasks: tasks.map((task) => ({
@@ -377,27 +368,24 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
         return context.json({ error: parsedActionId.error }, 400);
       }
 
-      const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-      if (!actor) return context.json({ error: "session_required" }, 401);
-      if (
-        !deps.dataSource.applyTemplateImprovementAction ||
-        !deps.dataSource.getRetrospectiveReadModel ||
-        !deps.dataSource.appendAuditEvent ||
-        !deps.dataSource.withTransaction
-      ) {
-        return context.json({ error: "persistence_not_configured" }, 501);
-      }
-      const profile = await deps.getActorProfile(actor);
-      const decision = templateImprovementDecision(actor, profile);
       const projectId = parsedProjectId.value;
       const actionId = parsedActionId.value;
-      if (!decision.allowed) {
-        await appendDeniedAudit(deps, actor, "template_improvement.apply_denied", {
-          projectId,
-          actionId
-        }, decision);
-        return context.json({ error: decision.reason }, 403);
-      }
+      const auth = await authorizeRoute(context, deps, {
+        permission: ({ actor, profile }) => templateImprovementDecision(actor, profile),
+        capabilities: [
+          "applyTemplateImprovementAction",
+          "getRetrospectiveReadModel",
+          "appendAuditEvent",
+          "withTransaction"
+        ],
+        onDenied: ({ actor, decision }) =>
+          appendDeniedAudit(deps, actor, "template_improvement.apply_denied", {
+            projectId,
+            actionId
+          }, decision)
+      });
+      if (!auth.ok) return auth.response;
+      const { actor, decision } = auth.value;
       const auditEventId = `audit-${randomUUID()}`;
       const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
         if (
@@ -503,15 +491,13 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: parsedTemplateId.error }, 400);
     }
 
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.listTemplateImprovementActions) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = readDecision(actor, profile);
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
-    const actions = await deps.dataSource.listTemplateImprovementActions({
+    const auth = await authorizeRoute(context, deps, {
+      permission: ({ actor, profile }) => readDecision(actor, profile),
+      capabilities: ["listTemplateImprovementActions"]
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
+    const actions = await dataSource.listTemplateImprovementActions({
       tenantId: actor.tenantId,
       templateId: parsedTemplateId.value,
       status: "applied"

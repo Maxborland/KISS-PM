@@ -43,6 +43,7 @@ import { createPlanningReadModel } from "./planning/planningReadModel";
 import { includeResourceExceptionsFor } from "./planning/planningRouteAuth";
 import { permissionForCommand } from "./planning/planningCommandPermissions";
 import { summarizeSnapshot } from "./planning/planningRouteHelpers";
+import { authorizeRoute } from "./routeAuth";
 import {
   parseControlSignalIdParam,
   parseCorrectiveActionIdParam,
@@ -66,28 +67,26 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.post("/api/tenant/current/kpi-definitions", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.upsertKpiDefinition || !deps.dataSource.appendAuditEvent) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageKpiDefinitions({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await deps.appendManagementAuditEvent({
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: "kpi.definition.upsert_denied",
-        sourceWorkflow: "control",
-        sourceEntity: { type: "KpiDefinition", id: "__unknown__" },
-        commandInput: { route: "/api/tenant/current/kpi-definitions" },
-        beforeState: null,
-        afterState: null,
-        permissionResult: decision,
-        executionResult: { status: "denied" }
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageKpiDefinitions,
+      capabilities: ["upsertKpiDefinition", "appendAuditEvent"],
+      onDenied: async ({ actor, decision }) => {
+        await deps.appendManagementAuditEvent({
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "kpi.definition.upsert_denied",
+          sourceWorkflow: "control",
+          sourceEntity: { type: "KpiDefinition", id: "__unknown__" },
+          commandInput: { route: "/api/tenant/current/kpi-definitions" },
+          beforeState: null,
+          afterState: null,
+          permissionResult: decision,
+          executionResult: { status: "denied" }
+        });
+      }
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseKpiDefinitionBody(body.value, actor.tenantId);
@@ -812,18 +811,12 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const routeIds = parseControlSignalRouteParams(context);
     if (!routeIds.ok) return context.json({ error: routeIds.error }, 400);
 
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !deps.dataSource.listControlSignals ||
-      !deps.dataSource.createCorrectiveAction ||
-      !deps.dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageCorrectiveActions({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageCorrectiveActions,
+      capabilities: ["listControlSignals", "createCorrectiveAction", "appendAuditEvent"]
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const { projectId, signalId } = routeIds.value;

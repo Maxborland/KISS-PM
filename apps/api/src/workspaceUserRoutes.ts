@@ -7,6 +7,7 @@ import type { TenantId, TenantUser, UserId } from "@kiss-pm/domain";
 import { hashPassword } from "@kiss-pm/persistence";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
+import { authorizeRoute } from "./routeAuth";
 import { parseUserIdParam } from "./routeParamParsers";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import {
@@ -24,28 +25,19 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
   } = deps;
 
   app.get("/api/workspace/users", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listWorkspaceUsers) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadTenantUsers({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadTenantUsers,
+      capabilities: ["listWorkspaceUsers"],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceUserDeniedAudit(deps, actor, {
+          actionType: "workspace.user.read_denied",
+          entityId: "users",
+          commandInput: { resource: "users" },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendWorkspaceUserDeniedAudit(deps, actor, {
-        actionType: "workspace.user.read_denied",
-        entityId: "users",
-        commandInput: { resource: "users" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({
       users: await dataSource.listWorkspaceUsers(actor.tenantId)
@@ -53,36 +45,27 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.post("/api/workspace/users", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createWorkspaceUser ||
-      !dataSource.upsertCredential ||
-      !dataSource.listWorkspaceUsers ||
-      !dataSource.listAccessProfilesByTenantId ||
-      !dataSource.listPositions ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageTenantUsers({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageTenantUsers,
+      capabilities: [
+        "createWorkspaceUser",
+        "upsertCredential",
+        "listWorkspaceUsers",
+        "listAccessProfilesByTenantId",
+        "listPositions",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceUserDeniedAudit(deps, actor, {
+          actionType: "workspace.user.create_denied",
+          entityId: "new",
+          commandInput: { operation: "create_user" },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendWorkspaceUserDeniedAudit(deps, actor, {
-        actionType: "workspace.user.create_denied",
-        entityId: "new",
-        commandInput: { operation: "create_user" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -169,36 +152,27 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsedUserId = parseUserIdParam(context.req.param("userId"));
     if (!parsedUserId.ok) return context.json({ error: parsedUserId.error }, 400);
     const userId = parsedUserId.value;
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.updateWorkspaceUser ||
-      !dataSource.listWorkspaceUsers ||
-      !dataSource.listAccessProfilesByTenantId ||
-      !dataSource.listPositions ||
-      !dataSource.updateCredentialEmail ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageTenantUsers({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageTenantUsers,
+      capabilities: [
+        "updateWorkspaceUser",
+        "listWorkspaceUsers",
+        "listAccessProfilesByTenantId",
+        "listPositions",
+        "updateCredentialEmail",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceUserDeniedAudit(deps, actor, {
+          actionType: "workspace.user.update_denied",
+          entityId: userId,
+          commandInput: { userId },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendWorkspaceUserDeniedAudit(deps, actor, {
-        actionType: "workspace.user.update_denied",
-        entityId: userId,
-        commandInput: { userId },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
