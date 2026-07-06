@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
+import { guardMutation, type MutationResult } from "../../lib/domain-client";
+import { useDomainClient } from "../../lib/use-domain-client";
 import {
   CommsApiError,
   createCommsClient,
@@ -56,7 +58,7 @@ import { useCommsRuntime } from "./comms-runtime";
 // на сид-данных не активируется; ветка проведена честно и сработает на боевом API
 // (apiOrigin) или при ужесточении стаба — поверхностям менять ничего не нужно.
 export type CommsLoadStatus = "loading" | "ready" | "error" | "forbidden";
-export type CommsMutationResult = { ok: true } | { ok: false; code?: string; message: string };
+export type CommsMutationResult = MutationResult;
 // Результат мутации, ВОЗВРАЩАЮЩЕЙ данные для UI (например, join-token, action-item).
 export type CommsDataResult<T> = { ok: true; data: T } | { ok: false; code?: string; message: string };
 
@@ -108,52 +110,37 @@ function useCommsLoad<T>(fetcher: () => Promise<T>): CommsLoadState<T> {
 //  • mock  — ОДИН createMockCommsFetch на весь модуль (общий in-memory стор). Раньше каждый
 //    хук строил свой стор → канал/комната, созданные родительским useChannels()/useCallRooms(),
 //    не были видны детальным useChannel()/useCallRoom() (getChannel(newId) → channel_not_found):
-//    create-then-open ломался. Поэтому все хуки делят ОДИН мок-клиент.
+//    create-then-open ломался. Поэтому все хуки делят ОДИН mock-fetch (стор живёт в fetchImpl).
 //  • live — боевой createCommsClient без fetchImpl: fetch на /api/workspace/* (next.config-прокси
-//    в Hono), credentials:"include" → cookie-сессия. Один общий live-клиент (стора нет — состояние
-//    на сервере), та же причина «один клиент»: согласованность между списком и деталью.
-// Singletons держим на уровне модуля, чтобы все хуки одного режима делили клиент. Режим фиксируется
-// провайдером на монтаж (live не меняется в рамках дерева), поэтому выбор один раз в ref безопасен.
-let sharedMockClient: ReturnType<typeof createCommsClient> | null = null;
-let sharedLiveClient: ReturnType<typeof createCommsClient> | null = null;
-function getSharedMockClient(): ReturnType<typeof createCommsClient> {
-  if (sharedMockClient === null) sharedMockClient = createCommsClient({ apiOrigin: "", fetchImpl: createMockCommsFetch() });
-  return sharedMockClient;
-}
-function getSharedLiveClient(): ReturnType<typeof createCommsClient> {
-  if (sharedLiveClient === null) sharedLiveClient = createCommsClient({ apiOrigin: "" });
-  return sharedLiveClient;
+//    в Hono), credentials:"include" → cookie-сессия (стора нет — состояние на сервере).
+// Общий mock-fetch держим на уровне модуля (ОДИН in-memory стор на все хуки); сами клиенты
+// stateless (замыкание над fetch), поэтому per-mount клиент из useDomainClient безопасен.
+// Режим фиксируется провайдером на монтаж (live не меняется в рамках дерева).
+let sharedMockFetch: typeof fetch | null = null;
+function getSharedMockFetch(): typeof fetch {
+  if (sharedMockFetch === null) sharedMockFetch = createMockCommsFetch();
+  return sharedMockFetch;
 }
 
 function useCommsClient() {
   const { live } = useCommsRuntime();
-  const clientRef = useRef<ReturnType<typeof createCommsClient> | null>(null);
-  if (clientRef.current === null) clientRef.current = live ? getSharedLiveClient() : getSharedMockClient();
-  return clientRef.current;
+  return useDomainClient(live, createCommsClient, getSharedMockFetch);
 }
 
-// Обёртка мутации: CommsApiError → {ok:false, code, message}.
+// как guardMutation, но возвращает данные мутации для UI.
+async function guardData<T>(fn: () => Promise<T>): Promise<CommsDataResult<T>> {
+  try {
+    const data = await fn();
+    return { ok: true, data };
+  } catch (e) {
+    if (e instanceof CommsApiError) return { ok: false, code: e.code, message: e.code };
+    return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
+  }
+}
+
+// Обёртка мутации: CommsApiError → {ok:false, code, message} (общий guardMutation ядра).
 function useGuard() {
-  const guard = useCallback(async (fn: () => Promise<void>): Promise<CommsMutationResult> => {
-    try {
-      await fn();
-      return { ok: true };
-    } catch (e) {
-      if (e instanceof CommsApiError) return { ok: false, code: e.code, message: e.code };
-      return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
-    }
-  }, []);
-  // как guard, но возвращает данные мутации для UI.
-  const guardData = useCallback(async <T,>(fn: () => Promise<T>): Promise<CommsDataResult<T>> => {
-    try {
-      const data = await fn();
-      return { ok: true, data };
-    } catch (e) {
-      if (e instanceof CommsApiError) return { ok: false, code: e.code, message: e.code };
-      return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
-    }
-  }, []);
-  return { guard, guardData };
+  return { guard: guardMutation, guardData };
 }
 
 /* ============================================================

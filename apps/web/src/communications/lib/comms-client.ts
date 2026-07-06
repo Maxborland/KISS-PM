@@ -14,6 +14,8 @@
    двухуровневый (read/manage), но в моке упрощён (см. mock-comms-backend).
    ============================================================ */
 
+import { createRequestJson, DomainApiError, type DomainClientOptions } from "../../lib/domain-client";
+
 /* Реэкспорт доменных union-типов коллаборации — единый источник правды.
    View-типы клиента строятся на ЭТИХ union'ах, чтобы контракт был верен. */
 export type {
@@ -71,21 +73,10 @@ export type CommsUser = { id: string; name: string };
 /* Проект как scope entity-привязанных коммуникаций (узкая проекция GET /api/workspace/projects). */
 export type CommsProject = { id: string; title: string };
 
-export type CommsApiClientOptions = { apiOrigin: string; fetchImpl?: typeof fetch; credentials?: RequestCredentials };
+export type CommsApiClientOptions = DomainClientOptions;
 
-/* Зеркало CrmApiError: статус + код ошибки + сырое тело ответа. */
-export class CommsApiError extends Error {
-  readonly status: number;
-  readonly code: string;
-  readonly body: Record<string, unknown>;
-  constructor(status: number, code: string, body: Record<string, unknown>) {
-    super(code);
-    this.name = "CommsApiError";
-    this.status = status;
-    this.code = code;
-    this.body = body;
-  }
-}
+// Общий класс ошибки транспорта; алиас сохраняет прежнее имя для instanceof-проверок.
+export { DomainApiError as CommsApiError };
 
 /* ============================================================
    View-типы (форма боевых записей; даты пересекают провод как ISO-строки).
@@ -420,30 +411,7 @@ export type PreferenceInput = {
 };
 
 export function createCommsClient(options: CommsApiClientOptions) {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const credentials = options.credentials ?? "include";
-
-  async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetchImpl(`${options.apiOrigin}${path}`, {
-      ...init,
-      credentials,
-      headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin", ...(init?.headers ?? {}) }
-    });
-    const rawText = await response.text();
-    let body: Record<string, unknown> = {};
-    if (rawText.length > 0) {
-      try {
-        const parsed: unknown = JSON.parse(rawText);
-        body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : { error: "invalid_json_response" };
-      } catch {
-        body = { error: "invalid_json_response" };
-      }
-    }
-    if (!response.ok) {
-      throw new CommsApiError(response.status, typeof body.error === "string" ? body.error : "request_failed", body);
-    }
-    return body as T;
-  }
+  const requestJson = createRequestJson(options);
 
   const enc = encodeURIComponent;
   // Сборка query-строки из заданных параметров (через URLSearchParams), пустые опускаются.

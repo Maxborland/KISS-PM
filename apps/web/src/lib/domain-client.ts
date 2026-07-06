@@ -33,13 +33,20 @@ export function createRequestJson(options: DomainClientOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const credentials = options.credentials ?? "include";
 
-  return async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  // opts.sameOrigin (дефолт true) управляет заголовком x-kiss-pm-action:
+  // login — боевое исключение, зовёт с sameOrigin:false (заголовок не шлётся).
+  return async function requestJson<T>(
+    path: string,
+    init?: RequestInit,
+    opts?: { sameOrigin?: boolean }
+  ): Promise<T> {
+    const sameOrigin = opts?.sameOrigin ?? true;
     const response = await fetchImpl(`${options.apiOrigin}${path}`, {
       ...init,
       credentials,
       headers: {
         "content-type": "application/json",
-        "x-kiss-pm-action": "same-origin",
+        ...(sameOrigin ? { "x-kiss-pm-action": "same-origin" } : {}),
         ...(init?.headers ?? {})
       }
     });

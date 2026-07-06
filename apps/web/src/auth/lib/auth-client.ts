@@ -16,21 +16,12 @@
    заголовок ШЛЮТ (они НЕ в исключениях, требуют same-origin).
    ============================================================ */
 
-export type AuthApiClientOptions = { apiOrigin: string; fetchImpl?: typeof fetch; credentials?: RequestCredentials };
+import { createRequestJson, DomainApiError, type DomainClientOptions } from "../../lib/domain-client";
 
-/* Зеркало CrmApiError / CommsApiError: статус + код ошибки + сырое тело ответа. */
-export class AuthApiError extends Error {
-  readonly status: number;
-  readonly code: string;
-  readonly body: Record<string, unknown>;
-  constructor(status: number, code: string, body: Record<string, unknown>) {
-    super(code);
-    this.name = "AuthApiError";
-    this.status = status;
-    this.code = code;
-    this.body = body;
-  }
-}
+export type AuthApiClientOptions = DomainClientOptions;
+
+// Общий класс ошибки транспорта; алиас сохраняет прежнее имя для instanceof-проверок.
+export { DomainApiError as AuthApiError };
 
 /* ============================================================
    View-типы (форма боевых ответов; §2 спеки).
@@ -97,37 +88,9 @@ export type ResetRequestInput = { email: string };
 export type ResetConfirmInput = { token: string; password: string };
 
 export function createAuthClient(options: AuthApiClientOptions) {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const credentials = options.credentials ?? "include";
-
   /* opts.sameOrigin (дефолт true) управляет заголовком x-kiss-pm-action.
      login передаёт sameOrigin:false — заголовок НЕ шлётся (боевое исключение). */
-  async function requestJson<T>(path: string, init?: RequestInit, opts?: { sameOrigin?: boolean }): Promise<T> {
-    const sameOrigin = opts?.sameOrigin ?? true;
-    const response = await fetchImpl(`${options.apiOrigin}${path}`, {
-      ...init,
-      credentials,
-      headers: {
-        "content-type": "application/json",
-        ...(sameOrigin ? { "x-kiss-pm-action": "same-origin" } : {}),
-        ...(init?.headers ?? {})
-      }
-    });
-    const rawText = await response.text();
-    let body: Record<string, unknown> = {};
-    if (rawText.length > 0) {
-      try {
-        const parsed: unknown = JSON.parse(rawText);
-        body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : { error: "invalid_json_response" };
-      } catch {
-        body = { error: "invalid_json_response" };
-      }
-    }
-    if (!response.ok) {
-      throw new AuthApiError(response.status, typeof body.error === "string" ? body.error : "request_failed", body);
-    }
-    return body as T;
-  }
+  const requestJson = createRequestJson(options);
 
   return {
     /* ---- БОЕВЫЕ ручки (мок зеркалит дословно) ---- */
