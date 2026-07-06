@@ -67,7 +67,8 @@ function DialogError({ text }: { text: string | null }) {
 
 export function ProjectDeals() {
   const { live } = useCrmRuntime();
-  const { data, status, error, reload, moveStage, movePipeline, createOpportunity, createPipeline } = useCrm();
+  const crm = useCrm();
+  const { data, status, error, reload, moveStage, movePipeline, createOpportunity } = crm;
   const users = useCrmUsers();
   const [mode, setMode] = useState<Mode>("kanban");
   const [pipelineId, setPipelineId] = useState<string | null>(null);
@@ -157,12 +158,24 @@ export function ProjectDeals() {
 
   // Онбординг пустого тенанта (G4-09): воронок ещё нет — вместо пустого канбана
   // предлагаем создать первую воронку прямо отсюда.
+  // Вместе со стадиями: воронка без стадий — те же пустые колонки и тупиковая
+  // модалка сделки (ревью PR #224).
   async function createDefaultPipeline() {
     setBusy(true);
-    const res = await createPipeline({ name: "Основная воронка", sortOrder: 1, isDefault: true });
-    setBusy(false);
-    if (res.ok) { toast.success("Воронка «Основная воронка» создана"); void reload(); }
-    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
+    try {
+      const { pipeline } = await crm.client.createPipeline({ name: "Основная воронка", sortOrder: 1, isDefault: true });
+      const defaultStages = ["Новая", "Переговоры", "Договор"];
+      for (const [i, name] of defaultStages.entries()) {
+        await crm.client.createDealStage({ name, sortOrder: i + 1, pipelineId: pipeline.id });
+      }
+      toast.success(`Воронка «${pipeline.name}» создана: стадии ${defaultStages.join(" → ")}`);
+      void reload();
+    } catch (e) {
+      const err = e as { code?: string; message?: string };
+      toast.error(`Отклонено: ${ruErr(err.code, err.message)}`);
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (model.pipelines.length === 0) {

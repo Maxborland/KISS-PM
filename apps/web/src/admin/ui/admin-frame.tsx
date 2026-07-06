@@ -30,7 +30,11 @@ const ADMIN_PERMISSIONS = [
   "tenant.access_profiles.manage",
   "tenant.users.read",
   "tenant.users.manage",
-  "tenant.audit.read"
+  "tenant.audit.read",
+  // Вкладка «Безопасность» живёт на правах конфигурации воркспейса — роль
+  // только с ними тоже должна попадать в админку (ревью PR #224).
+  "tenant.workspace_config.read",
+  "tenant.workspace_config.manage"
 ];
 
 export function AdminFrame({

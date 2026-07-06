@@ -181,6 +181,8 @@ export function createCrmClient(options: CrmApiClientOptions) {
     // мультиворонки (pipelines + stage-transitions + cross-pipeline move)
     listPipelines() { return requestJson<{ pipelines: Pipeline[] }>("/api/workspace/pipelines"); },
     createPipeline(input: { name: string; sortOrder: number; description?: string | null; isDefault?: boolean; status?: CrmStatus }) { return requestJson<{ pipeline: Pipeline }>("/api/workspace/pipelines", { method: "POST", body: JSON.stringify(input) }); },
+    // Стадия сделки (POST /deal-stages): нужна бутстрапу первой воронки — воронка без стадий неюзабельна.
+    createDealStage(input: { name: string; sortOrder: number; pipelineId?: string | null; status?: CrmStatus }) { return requestJson<{ dealStage: DealStage }>("/api/workspace/deal-stages", { method: "POST", body: JSON.stringify(input) }); },
     updatePipeline(pipelineId: string, input: { name: string; sortOrder: number; description?: string | null; isDefault?: boolean; status?: CrmStatus }) { return requestJson<{ pipeline: Pipeline }>(`/api/workspace/pipelines/${enc(pipelineId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     listStageTransitions(pipelineId: string) { return requestJson<{ stageTransitions: StageTransition[] }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`); },
     createStageTransition(pipelineId: string, input: { fromStageId: string; toStageId: string; requireFeasibilityOk?: boolean; minProbability?: number | null; guardNote?: string | null }) { return requestJson<{ stageTransition: StageTransition }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`, { method: "POST", body: JSON.stringify(input) }); },

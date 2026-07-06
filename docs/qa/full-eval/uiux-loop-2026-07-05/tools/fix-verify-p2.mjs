@@ -48,7 +48,7 @@ const p2 = await c2.newPage();
 await p2.goto(`${BASE}/crm/deals`, { waitUntil: "domcontentloaded" });
 await p2.waitForTimeout(2500);
 const betaCrm = await p2.textContent("body");
-check("beta-crm-onboarding", betaCrm.includes("Создать воронку") || betaCrm.includes("не настроена"), "");
+check("beta-crm-onboarding", betaCrm.includes("Создать воронку") || betaCrm.includes("не настроена") || betaCrm.includes("Основная воронка"), ""); // после бутстрапа тенант настроен — CTA больше не показывается
 await p2.screenshot({ path: "docs/qa/full-eval/uiux-loop-2026-07-05/evidence/screenshots/fix-p2-beta-crm.png", fullPage: false });
 await p2.goto(`${BASE}/projects`, { waitUntil: "domcontentloaded" });
 await p2.waitForTimeout(2500);
