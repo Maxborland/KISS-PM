@@ -1,9 +1,15 @@
 "use client";
 
+import { useMemo, useState } from "react";
+
 import { AdminFrame } from "@/admin/ui/admin-frame";
 import { adminErr, auditActionLabel, AuditResultChip } from "@/admin/ui/admin-bits";
+import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
+import { useAdmin } from "@/admin/lib/use-admin";
+import { useAdminRuntime } from "@/admin/lib/admin-runtime";
 import { useAuditEvents } from "@/admin/lib/use-audit-events";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 // Дата+время события (ru-RU, как боевой формат журнала).
 const fmt = (iso: string): string => {
@@ -12,21 +18,64 @@ const fmt = (iso: string): string => {
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(d);
 };
 
+const selCls = "h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
+
 /**
  * Admin «Аудит» — журнал управленческих действий и системных событий на боевом
  * контракте GET /api/tenant/current/audit-events (createAdminClient + in-memory mock,
  * swap = apiOrigin). Заменяет v2-экран 09-admin/audit (монолит) реальной поверхностью.
  */
 export function AdminAuditSurface() {
+  const { live } = useAdminRuntime();
   const { events, status, error, reload } = useAuditEvents(50);
-  const surfaceStatus = status === "loading" ? "loading" : status === "error" ? "error" : events.length === 0 ? "empty" : "ready";
+  // Справочник людей для колонки «Кто» (G6-05): actorUserId → имя. Если список
+  // пользователей роли недоступен (403) — фолбэк «Участник xxxx», не сырой id (R3).
+  const admin = useAdmin();
+  const userName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const u of admin.data?.users ?? []) m.set(u.id, u.name);
+    return m;
+  }, [admin.data]);
+  const who = (actorUserId?: string | null): string =>
+    actorUserId ? (userName.get(actorUserId) ?? `Участник ${actorUserId.slice(-4)}`) : "—";
+
+  // Клиентский фильтр по типу события + поиск по подстроке (G6-07). Пагинации у API нет.
+  const [typeFilter, setTypeFilter] = useState("");
+  const [query, setQuery] = useState("");
+  const types = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const e of events) if (!seen.has(e.actionType)) { seen.add(e.actionType); out.push(e.actionType); }
+    return out;
+  }, [events]);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return events.filter((e) => {
+      if (typeFilter && e.actionType !== typeFilter) return false;
+      if (!q) return true;
+      const haystack = [
+        e.actionType,
+        auditActionLabel(e.actionType),
+        who(e.actorUserId),
+        e.sourceEntity?.type ?? "",
+        e.sourceEntity?.id ?? ""
+      ].join(" ").toLowerCase();
+      return haystack.includes(q);
+    });
+    // who зависит от userName — включаем его в зависимости пересчёта.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, typeFilter, query, userName]);
+
+  const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : events.length === 0 ? "empty" : "ready";
 
   return (
     <AdminFrame activeTab="Аудит" subtitle="Журнал управленческих действий и системных событий">
-      <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        <span>Реальный контракт: GET /api/tenant/current/audit-events (createAdminClient + in-memory mock, swap = apiOrigin). Требует право чтения журнала (canReadAuditEvents). Последние события по убыванию времени.</span>
-      </div>
+      {!live ? (
+        <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          <span>Реальный контракт: GET /api/tenant/current/audit-events (createAdminClient + in-memory mock, swap = apiOrigin). Требует право чтения журнала (canReadAuditEvents). Последние события по убыванию времени.</span>
+        </div>
+      ) : null}
 
       <SurfaceState
         status={surfaceStatus}
@@ -35,40 +84,85 @@ export function AdminAuditSurface() {
         errorFormat={(c) => adminErr(c)}
         empty={{ title: "Событий пока нет", description: "Журнал аудита пуст — управленческие действия появятся здесь." }}
       >
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+            Тип события
+            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={selCls}>
+              <option value="">Все типы</option>
+              {types.map((t) => <option key={t} value={t}>{auditActionLabel(t)}</option>)}
+            </select>
+          </label>
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Поиск по событиям…"
+            aria-label="Поиск по событиям"
+            className="h-8 max-w-[260px] text-[length:var(--text-xs)]"
+          />
+        </div>
+
         <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
           <table className="w-full border-collapse text-[length:var(--text-sm)]">
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
                 <th className="px-3 py-2 font-semibold">Действие</th>
+                <th className="px-3 py-2 font-semibold">Кто</th>
                 <th className="px-3 py-2 font-semibold">Сущность</th>
                 <th className="px-3 py-2 font-semibold">Результат</th>
                 <th className="px-3 py-2 font-semibold">Когда</th>
               </tr>
             </thead>
             <tbody>
-              {events.map((event) => (
-                <tr key={event.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                  <td className="px-3 py-2">
-                    <div className="font-medium text-[var(--text-strong)]">{auditActionLabel(event.actionType)}</div>
-                    <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{event.actionType}</div>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-3 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">
+                    По заданному фильтру событий не найдено.
                   </td>
-                  <td className="px-3 py-2 text-[var(--muted-strong)]">
-                    {event.sourceEntity?.type ? (
-                      <>
-                        <span>{event.sourceEntity.type}</span>
-                        {event.sourceEntity.id ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]"> · {event.sourceEntity.id}</span> : null}
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="px-3 py-2"><AuditResultChip status={event.executionResult?.status} /></td>
-                  <td className="px-3 py-2 text-[var(--muted)]">{fmt(event.createdAt)}</td>
                 </tr>
-              ))}
+              ) : (
+                filtered.map((event) => {
+                  const label = auditActionLabel(event.actionType);
+                  return (
+                    <tr key={event.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
+                      <td className="px-3 py-2">
+                        <div className="font-medium text-[var(--text-strong)]">{label}</div>
+                        {/* Код события — dev-подсказка (только Storybook/демо); без дублирования, когда подпись = код. */}
+                        {prototypeNotesEnabled && label !== event.actionType ? (
+                          <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{event.actionType}</div>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 text-[var(--muted-strong)]">
+                        <div>{who(event.actorUserId)}</div>
+                        {prototypeNotesEnabled && event.actorUserId ? (
+                          <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{event.actorUserId}</div>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 text-[var(--muted-strong)]">
+                        {event.sourceEntity?.type ? (
+                          <>
+                            <span>{event.sourceEntity.type}</span>
+                            {event.sourceEntity.id ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]"> · {event.sourceEntity.id}</span> : null}
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-3 py-2"><AuditResultChip status={event.executionResult?.status} /></td>
+                      <td className="px-3 py-2 text-[var(--muted)]">{fmt(event.createdAt)}</td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Пагинации у API нет — честная подпись об объёме журнала. */}
+        <p className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
+          {filtered.length === events.length
+            ? `Показаны последние ${events.length} событий`
+            : `Отфильтровано ${filtered.length} из последних ${events.length} событий`}
+        </p>
       </SurfaceState>
     </AdminFrame>
   );

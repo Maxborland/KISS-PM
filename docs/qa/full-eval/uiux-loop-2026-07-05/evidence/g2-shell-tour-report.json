@@ -1,0 +1,110 @@
+{
+  "/dashboard": {
+    "finalUrl": "http://127.0.0.1:3000/dashboard",
+    "title": "KISS PM",
+    "h1": [
+      "Дашборд"
+    ]
+  },
+  "/my-work": {
+    "finalUrl": "http://127.0.0.1:3000/my-work",
+    "title": "KISS PM",
+    "h1": [
+      "Мои задачи"
+    ]
+  },
+  "/profile": {
+    "finalUrl": "http://127.0.0.1:3000/profile",
+    "title": "KISS PM",
+    "h1": [
+      "Личный кабинет"
+    ]
+  },
+  "/settings": {
+    "finalUrl": "http://127.0.0.1:3000/settings",
+    "title": "KISS PM",
+    "h1": [
+      "Настройки рабочей области"
+    ]
+  },
+  "/definitely-not-a-page-uiux-eval": {
+    "finalUrl": "http://127.0.0.1:3000/definitely-not-a-page-uiux-eval",
+    "title": "KISS PM",
+    "h1": [
+      "Страница не найдена"
+    ]
+  },
+  "nav": [
+    {
+      "tag": "A",
+      "text": "Мои задачи",
+      "href": "/my-work",
+      "disabled": false,
+      "cls": "flex items-center justify-between rounded-[var(--radius-md)] px-2.5 py-1.5 text-[length:var(--text-sm)] font-medium text"
+    },
+    {
+      "tag": "A",
+      "text": "Проекты",
+      "href": "/projects",
+      "disabled": false,
+      "cls": "flex items-center justify-between rounded-[var(--radius-md)] px-2.5 py-1.5 text-[length:var(--text-sm)] font-medium text"
+    },
+    {
+      "tag": "A",
+      "text": "Сделки",
+      "href": "/crm/deals",
+      "disabled": false,
+      "cls": "flex items-center justify-between rounded-[var(--radius-md)] px-2.5 py-1.5 text-[length:var(--text-sm)] font-medium text"
+    },
+    {
+      "tag": "A",
+      "text": "Дашборд",
+      "href": "/dashboard",
+      "disabled": false,
+      "cls": "flex items-center justify-between rounded-[var(--radius-md)] px-2.5 py-1.5 text-[length:var(--text-sm)] bg-[var(--accent"
+    },
+    {
+      "tag": "A",
+      "text": "Коммуникации",
+      "href": "/communications/chat",
+      "disabled": false,
+      "cls": "flex items-center justify-between rounded-[var(--radius-md)] px-2.5 py-1.5 text-[length:var(--text-sm)] font-medium text"
+    },
+    {
+      "tag": "A",
+      "text": "Администрирование",
+      "href": "/admin",
+      "disabled": false,
+      "cls": "flex items-center justify-between rounded-[var(--radius-md)] px-2.5 py-1.5 text-[length:var(--text-sm)] font-medium text"
+    }
+  ],
+  "header": {
+    "text": "АА",
+    "buttons": [
+      {
+        "tag": "BUTTON",
+        "text": "АА",
+        "aria": null,
+        "href": null
+      }
+    ],
+    "inputs": [
+      {
+        "placeholder": "Найти задачу или ресурс",
+        "type": "text"
+      }
+    ]
+  },
+  "console": [
+    {
+      "route": "http://127.0.0.1:3000/dashboard",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "route": "http://127.0.0.1:3000/definitely-not-a-page-uiux-eval",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    }
+  ]
+}

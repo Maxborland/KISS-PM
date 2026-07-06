@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { type MutationResult } from "../../lib/domain-client";
+import { useDomainClient } from "../../lib/use-domain-client";
+import { useResource, type LoadStatus } from "../../lib/use-resource";
 import {
   WorkspaceApiError,
   createWorkspaceClient,
@@ -14,97 +17,43 @@ import {
 import { createMockWorkspaceFetch } from "./mock-workspace-backend";
 import { useWorkspaceRuntime } from "./workspace-runtime";
 
-export type WorkspaceLoadStatus = "loading" | "ready" | "error";
+// 403 → forbidden: разделы без соответствующего права показывают «Доступ ограничен».
+export type WorkspaceLoadStatus = LoadStatus;
 // Результат мутации смены статуса: {ok} либо {ok,code,message} (как guard в use-crm).
-export type WorkspaceMutationResult = { ok: true } | { ok: false; code?: string; message: string };
+export type WorkspaceMutationResult = MutationResult;
 
 /* Изолированный клиент на каждый монтаж: свой fetchImpl-мок (отдельная
    in-memory сессия) + свой createWorkspaceClient. Переключение на боевой
    API = смена apiOrigin + удаление fetchImpl. Зеркало useCrm/usePlanning. */
 function useWorkspaceClient(): WorkspaceClient {
   const { live } = useWorkspaceRuntime();
-  const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null && !live) fetchRef.current = createMockWorkspaceFetch();
-  const clientRef = useRef<WorkspaceClient | null>(null);
-  if (clientRef.current === null) {
-    clientRef.current = live
-      ? createWorkspaceClient({ apiOrigin: "" })
-      : createWorkspaceClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
-  }
-  return clientRef.current;
+  return useDomainClient(live, createWorkspaceClient, createMockWorkspaceFetch);
 }
 
 // ---- useProjects: активные проекты рабочей области ----
 export function useProjects() {
   const client = useWorkspaceClient();
-  const [data, setData] = useState<{ projects: ProjectRecord[] } | null>(null);
-  const [status, setStatus] = useState<WorkspaceLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const r = await client.listProjects();
-      setData({ projects: r.projects });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
-  }, [client]);
-
-  useEffect(() => { void load(); }, [load]);
-
+  const loader = useCallback(async () => ({ projects: (await client.listProjects()).projects }), [client]);
+  const { data, status, error, reload: load } = useResource(loader);
   return { data, status, error, reload: load };
 }
 
 // ---- useProjectDetail: карточка проекта + его задачи ----
 export function useProjectDetail(projectId: string) {
   const client = useWorkspaceClient();
-  const [data, setData] = useState<{ project: ProjectRecord; tasks: TaskRecord[] } | null>(null);
-  const [status, setStatus] = useState<WorkspaceLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const r = await client.getProjectDetail(projectId);
-      setData({ project: r.project, tasks: r.tasks });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof WorkspaceApiError ? e.code : e instanceof Error ? e.message : "load_failed");
-    }
+  const loader = useCallback(async () => {
+    const r = await client.getProjectDetail(projectId);
+    return { project: r.project, tasks: r.tasks };
   }, [client, projectId]);
-
-  useEffect(() => { void load(); }, [load]);
-
+  const { data, status, error, reload: load } = useResource(loader);
   return { data, status, error, reload: load };
 }
 
 // ---- useMyWork: задачи текущего пользователя + смена статуса ----
 export function useMyWork() {
   const client = useWorkspaceClient();
-  const [data, setData] = useState<{ tasks: TaskRecord[] } | null>(null);
-  const [status, setStatus] = useState<WorkspaceLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const r = await client.listMyWork();
-      setData({ tasks: r.tasks });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
-  }, [client]);
-
-  useEffect(() => { void load(); }, [load]);
+  const loader = useCallback(async () => ({ tasks: (await client.listMyWork()).tasks }), [client]);
+  const { data, status, error, setData, reload: load } = useResource(loader);
 
   // Смена статуса задачи: проектируем из самой задачи (нужен её projectId).
   // Ошибки WorkspaceApiError → {ok:false, code, message}; успех точечно патчит кэш.

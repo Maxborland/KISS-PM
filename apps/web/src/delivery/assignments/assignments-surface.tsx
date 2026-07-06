@@ -2,16 +2,19 @@
 
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AddAssigneeDialog, distribute, presetWeights, ROLES, roleLabel } from "@/delivery/assignments/assignments-editors";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
 
@@ -20,7 +23,7 @@ type Gran = "day" | "week";
 // а workMinutes нормализован к числу (в домене PlanAssignment.workMinutes может быть null). Маппится из PlanAssignment.
 type AsgRaw = { id: string; taskId: string; resourceId: string; role: string; unitsPermille: number; workMinutes: number };
 
-const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
+const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const MONTHS_CAP = ["", "Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
 const DOW = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
 const COL_W: Record<Gran, number> = { day: 30, week: 44 };
@@ -50,12 +53,15 @@ type AsgMeta = { asg: AsgRaw; days: number[]; scheduledSet: Set<number>; flatPer
 
 export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, apply } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
+  // Фолбэк имени: под ограниченной ролью справочник людей может отдать 403 — резолвер вернёт сырой id.
+  // Показываем «Участник xxxx» вместо user-/r-идентификатора (G8-08).
+  const resName = (id: string) => { const n = resDir.name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
   const [gran, setGran] = useState<Gran>("day");
   const [monthOffset, setMonthOffset] = useState(0);
   const [sel, setSel] = useState<string | null>(null); // assignmentId
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const [curveErr, setCurveErr] = useState<string | null>(null);
   const [draft, setDraft] = useState<Map<number, number> | null>(null); // ручная кривая: day → минуты
   const [hover, setHover] = useState<{ key: string; col: number } | null>(null); // прицел: строка (key) + столбец (col=period.key)
@@ -121,7 +127,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Назначения">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Назначения">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка назначений…">
           <span />
         </SurfaceState>
@@ -129,7 +135,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
     );
   }
 
-  const projectMeta = deriveProjectMeta(readModel, PROJECT);
+  const projectMeta = deriveProjectMeta(readModel, projectBase);
   const colW = COL_W[gran];
   // эффективный прицел: под курсором (hover), либо строка выбранного назначения при открытом инспекторе
   const crosshair = hover ?? (sel ? { key: `a:${sel}`, col: -1 } : null);
@@ -154,11 +160,11 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   const cellMin = (m: AsgMeta, p: { days: number[] }) => p.days.reduce((s, d) => s + minutesOn(m, d), 0);
 
   async function applyCmd(command: PlanningCommand, okMsg: string): Promise<ApplyResult> {
-    setBusy(true); setNotice(null); setCurveErr(null);
+    setBusy(true); setCurveErr(null);
     const res = await apply(command);
     setBusy(false);
-    if (res.ok) setNotice(`${okMsg} · коммит v${res.planVersion}`);
-    else setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
+    if (res.ok) toast.success(`${okMsg} · коммит v${res.planVersion}`);
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
     return res;
   }
 
@@ -223,10 +229,12 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        Реальный контракт: assignment.upsert / assignment.allocations.replace (сумма кривой = трудоёмкости) / assignment.delete. Кривая по дням редактируема; пресеты дают сбалансированную раскладку. Данные in-memory.
-      </div>
+      {prototypeNotesEnabled ? (
+        <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          Реальный контракт: assignment.upsert / assignment.allocations.replace (сумма кривой = трудоёмкости) / assignment.delete. Кривая по дням редактируема; пресеты дают сбалансированную раскладку. Данные in-memory.
+        </div>
+      ) : null}
 
       <div className="relative">
         <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
@@ -289,7 +297,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                           const inCross = crosshair?.col === p.key || crosshair?.key === `a:${m.asg.id}`;
                           const isFocal = crosshair?.col === p.key && crosshair?.key === `a:${m.asg.id}`;
                           const bg = mm > 0 ? `color-mix(in oklab, var(--accent) ${Math.round(14 + intensity * 46)}%, var(--panel))` : p.weekend ? WEEKEND_BG : "transparent";
-                          return <span key={p.key} onMouseEnter={() => setHover({ key: `a:${m.asg.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] tabular-nums", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: bg, color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resDir.name(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? Math.round(hrs) : ""}</span>;
+                          return <span key={p.key} onMouseEnter={() => setHover({ key: `a:${m.asg.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] tabular-nums", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: bg, color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resName(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? Math.round(hrs) : ""}</span>;
                         })}
                       </div>
                     ))}
@@ -306,7 +314,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
             <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
               <div className="min-w-0">
                 <div className="mono text-[length:var(--text-xs)] text-[var(--muted)]">{selTask.wbsCode} · {selTask.title}</div>
-                <h3 className="truncate text-[length:var(--text-base)] font-bold text-[var(--text-strong)]">{resDir.name(selMeta.asg.resourceId)}</h3>
+                <h3 className="truncate text-[length:var(--text-base)] font-bold text-[var(--text-strong)]">{resName(selMeta.asg.resourceId)}</h3>
               </div>
               <button type="button" onClick={() => { setSel(null); setDraft(null); }} className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)]" aria-label="Закрыть"><X className="size-4" aria-hidden /></button>
             </div>
@@ -339,8 +347,8 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
               </div>
               <div className="mb-2 flex flex-wrap gap-1">
                 <Button variant="secondary" size="sm" disabled={busy || selMeta.days.length === 0} onClick={() => applyPreset(selMeta, "even")}>Равномерно</Button>
-                <Button variant="secondary" size="sm" disabled={busy || selMeta.days.length === 0} onClick={() => applyPreset(selMeta, "front")}>Фронт</Button>
-                <Button variant="secondary" size="sm" disabled={busy || selMeta.days.length === 0} onClick={() => applyPreset(selMeta, "back")}>Бэк</Button>
+                <Button variant="secondary" size="sm" disabled={busy || selMeta.days.length === 0} onClick={() => applyPreset(selMeta, "front")}>К началу</Button>
+                <Button variant="secondary" size="sm" disabled={busy || selMeta.days.length === 0} onClick={() => applyPreset(selMeta, "back")}>К концу</Button>
                 {selMeta.hasExplicit ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => resetCurve(selMeta)}>Сбросить</Button> : null}
               </div>
               {curveErr ? <div className="mb-2 rounded-[var(--radius-sm)] border border-[var(--danger)] bg-[var(--danger-soft)] px-2 py-1 text-[length:var(--text-xs)] text-[var(--danger-text)]">{curveErr}</div> : null}
@@ -361,17 +369,23 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                 <Button variant="default" size="sm" disabled={busy || selMeta.days.length === 0} onClick={() => applyCurve(selMeta, curDraft(selMeta))}>Применить кривую</Button>
                 {draft ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => { setDraft(null); setCurveErr(null); }}>Отмена</Button> : null}
               </div>
-              <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Сумма по дням должна равняться трудоёмкости назначения — бэкенд отвергнет несбалансированную кривую (optimistic → validate → error).</p>
+              <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Сумма по дням должна равняться трудоёмкости назначения — иначе изменения будут отклонены.</p>
 
               <div className="mt-4 border-t border-[var(--border)] pt-3">
-                <Button variant="ghost" size="sm" disabled={busy} onClick={() => removeAsg(selMeta.asg)} className="text-[var(--danger-text)] hover:bg-[var(--danger-soft)]"><Trash2 className="size-3.5" aria-hidden />Снять исполнителя</Button>
+                <ConfirmDialog
+                  title={`Снять исполнителя «${resName(selMeta.asg.resourceId)}»?`}
+                  description="Назначение и его кривая распределения будут удалены."
+                  confirmLabel="Снять"
+                  onConfirm={() => removeAsg(selMeta.asg)}
+                >
+                  <Button variant="ghost" size="sm" disabled={busy} className="text-[var(--danger-text)] hover:bg-[var(--danger-soft)]"><Trash2 className="size-3.5" aria-hidden />Снять исполнителя</Button>
+                </ConfirmDialog>
               </div>
             </div>
           </aside>
         ) : null}
       </div>
 
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
         <span className="inline-flex items-center gap-1"><UserPlus className="size-3.5" aria-hidden />+ на строке задачи — добавить исполнителя</span>
         <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: WEEKEND_BG }} /> выходной</span>

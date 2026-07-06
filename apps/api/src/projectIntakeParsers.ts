@@ -44,6 +44,11 @@ export function parseOpportunityBody(
 ): ParseResult<OpportunityInput> {
   const parsed = parseOpportunityFields(body, tenantId);
   if (!parsed.ok) return parsed;
+  // Для создания спрос обязателен (≥1 строка); для PATCH пустой demand допустим —
+  // см. parseDemand.
+  if (parsed.value.fields.demand.length === 0) {
+    return { ok: false, error: "invalid_demand" };
+  }
 
   return {
     ok: true,
@@ -270,7 +275,10 @@ function parseCustomFieldValues(
 }
 
 function parseDemand(value: unknown): ParseResult<OpportunityInput["demand"]> {
-  if (!Array.isArray(value) || value.length === 0 || value.length > maxDemandRows) {
+  // Пустой массив допустим: сделки без строк спроса существуют (seed, интеграции),
+  // и требование ≥1 строки делало их нередактируемыми (любой PATCH → 400 invalid_demand).
+  // Для создания ≥1 строка по-прежнему требуется — проверка в parseOpportunityBody.
+  if (!Array.isArray(value) || value.length > maxDemandRows) {
     return { ok: false, error: "invalid_demand" };
   }
 

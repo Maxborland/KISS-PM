@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { useDomainClient } from "../../lib/use-domain-client";
+import { useResource, type LoadStatus } from "../../lib/use-resource";
 import { createAdminClient, type AuditEvent } from "./admin-client";
 import { createMockAdminFetch } from "./mock-admin-backend";
 import { useAdminRuntime } from "./admin-runtime";
 
-export type AuditLoadStatus = "loading" | "ready" | "error";
+// 403 → forbidden: журнал аудита закрыт без tenant.audit_events.read.
+export type AuditLoadStatus = LoadStatus;
 
 /**
  * Хук журнала аудита (admin «Аудит»). Лёгкий брат useAdmin/useSecurityPolicy:
@@ -16,36 +19,10 @@ export type AuditLoadStatus = "loading" | "ready" | "error";
  */
 export function useAuditEvents(limit = 50) {
   const { live } = useAdminRuntime();
-  const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null && !live) fetchRef.current = createMockAdminFetch();
-  const clientRef = useRef<ReturnType<typeof createAdminClient> | null>(null);
-  if (clientRef.current === null) {
-    clientRef.current = live
-      ? createAdminClient({ apiOrigin: "" })
-      : createAdminClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
-  }
-  const client = clientRef.current;
+  const client = useDomainClient(live, createAdminClient, createMockAdminFetch);
 
-  const [events, setEvents] = useState<AuditEvent[]>([]);
-  const [status, setStatus] = useState<AuditLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
+  const loader = useCallback(async () => (await client.listAuditEvents(limit)).auditEvents, [client, limit]);
+  const { data, status, error, reload: load } = useResource(loader);
 
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const res = await client.listAuditEvents(limit);
-      setEvents(res.auditEvents);
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
-  }, [client, limit]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  return { events, status, error, reload: load };
+  return { events: data ?? [], status, error, reload: load };
 }

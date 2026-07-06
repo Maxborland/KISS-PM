@@ -185,6 +185,16 @@ describe("project intake parsers", () => {
     });
   });
 
+  it("update: пустой demand допустим — сделки без строк спроса остаются редактируемыми", () => {
+    const parsed = parseOpportunityUpdateBody({ ...validOpportunityBody, demand: [] }, "tenant-alpha");
+    expect(parsed).toMatchObject({ ok: true, value: { demand: [] } });
+  });
+
+  it("create: пустой demand по-прежнему отклоняется", () => {
+    const parsed = parseOpportunityBody({ ...validOpportunityBody, demand: [] }, "tenant-alpha");
+    expect(parsed).toEqual({ ok: false, error: "invalid_demand" });
+  });
+
   it("rejects duplicated demand positions", () => {
     const parsed = parseOpportunityBody(
       {

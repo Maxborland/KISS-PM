@@ -1,16 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil, Plus, UserMinus } from "lucide-react";
+import { Pencil, Plus, UserCheck, UserMinus } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { FormDialog } from "@/components/domain/form-dialog";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { AdminFrame } from "@/admin/ui/admin-frame";
 import { UserStatusChip, adminErr } from "@/admin/ui/admin-bits";
 import { useAdmin } from "@/admin/lib/use-admin";
 import { useAdminRuntime } from "@/admin/lib/admin-runtime";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import type { AccessProfile, Position, WorkspaceUser } from "@/admin/lib/admin-client";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
@@ -21,7 +24,6 @@ export function AdminUsersSurface() {
   const admin = useAdmin();
   const { data, status, error, reload, createUser, updateUser, deactivateUser } = admin;
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   // карта roleId → имя роли (для колонки «Роль»)
   const roleName = useMemo(() => {
@@ -30,22 +32,31 @@ export function AdminUsersSurface() {
     return m;
   }, [data]);
 
-  const surfaceStatus = status === "loading" ? "loading" : status === "error" ? "error" : !data ? "error" : data.users.length === 0 ? "empty" : "ready";
+  const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : !data ? "error" : data.users.length === 0 ? "empty" : "ready";
 
-  // Деактивация: PATCH status:"inactive"; для «текущего» пользователя (user-anna) → self_access_change_forbidden.
+  // Деактивация: PATCH status:"inactive" — только через подтверждение (G6-03).
   const deactivate = async (u: WorkspaceUser) => {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await deactivateUser(u.id);
     setBusy(false);
-    if (res.ok) setNotice(`Пользователь «${u.name}» деактивирован`);
-    else setNotice(`Отклонено: ${adminErr(res.code, res.message)}`);
+    if (res.ok) toast.success(`Пользователь «${u.name}» деактивирован`);
+    else toast.error(`Отклонено: ${adminErr(res.code, res.message)}`);
+  };
+
+  // Реактивация (G6-04): деактивация была необратимой из UI — PATCH status:"active".
+  const reactivate = async (u: WorkspaceUser) => {
+    setBusy(true);
+    const res = await updateUser(u.id, { status: "active" });
+    setBusy(false);
+    if (res.ok) toast.success(`Пользователь «${u.name}» снова активен`);
+    else toast.error(`Отклонено: ${adminErr(res.code, res.message)}`);
   };
 
   return (
     <AdminFrame
       activeTab="Пользователи"
       subtitle="Пользователи рабочей области"
-      actions={data ? <CreateUserDialog roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createUser} /> : undefined}
+      actions={data ? <CreateUserDialog roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} create={createUser} /> : undefined}
     >
       {!live ? (
         <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
@@ -70,17 +81,26 @@ export function AdminUsersSurface() {
               <tbody>
                 {data.users.map((u) => (
                   <tr key={u.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                    <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{u.name}</div><div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{u.id}</div></td>
+                    <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{u.name}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{u.id}</div> : null}</td>
                     <td className="px-3 py-2 text-[var(--muted)]">{u.email}</td>
                     <td className="px-3 py-2 text-[var(--muted-strong)]">{roleName.get(u.accessProfileId) ?? u.accessProfileId}</td>
                     <td className="px-3 py-2 text-[var(--muted)]">{u.positionName ?? "—"}</td>
                     <td className="px-3 py-2"><UserStatusChip status={u.status} /></td>
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-end gap-1">
-                        <EditUserDialog user={u} roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} setNotice={setNotice} update={updateUser} />
-                        {u.status === "active"
-                          ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void deactivate(u)} title="Деактивировать"><UserMinus className="size-3.5" aria-hidden /></Button>
-                          : null}
+                        <EditUserDialog user={u} roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} update={updateUser} />
+                        {u.status === "active" ? (
+                          <ConfirmDialog
+                            title={`Деактивировать «${u.name}»?`}
+                            description="Пользователь потеряет доступ к рабочей области, его активные сессии будут завершены. Его можно будет активировать снова."
+                            confirmLabel="Деактивировать"
+                            onConfirm={() => deactivate(u)}
+                          >
+                            <Button variant="ghost" size="sm" disabled={busy} title="Деактивировать"><UserMinus className="size-3.5" aria-hidden /></Button>
+                          </ConfirmDialog>
+                        ) : (
+                          <Button variant="ghost" size="sm" disabled={busy} onClick={() => void reactivate(u)} title="Активировать снова"><UserCheck className="size-3.5" aria-hidden /></Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -90,17 +110,15 @@ export function AdminUsersSurface() {
           </div>
         ) : null}
       </SurfaceState>
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </AdminFrame>
   );
 }
 
-function CreateUserDialog({ roles, positions, busy, setBusy, setNotice, create }: {
+function CreateUserDialog({ roles, positions, busy, setBusy, create }: {
   roles: AccessProfile[]; positions: Position[];
-  busy: boolean; setBusy: (v: boolean) => void; setNotice: (v: string | null) => void;
+  busy: boolean; setBusy: (v: boolean) => void;
   create: ReturnType<typeof useAdmin>["createUser"];
 }) {
-  const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [accessProfileId, setAccessProfileId] = useState(roles[0]?.id ?? "");
@@ -108,98 +126,102 @@ function CreateUserDialog({ roles, positions, busy, setBusy, setNotice, create }
   const [password, setPassword] = useState("");
 
   const valid = email.trim().length > 0 && name.trim().length > 0 && accessProfileId.length > 0 && password.length >= 8;
-  const submit = async () => {
-    if (!valid) return;
-    setBusy(true); setNotice(null);
-    // password обязателен (≥ 8) — боевой контракт; positionId опционален.
-    const res = await create({ email: email.trim(), name: name.trim(), accessProfileId, password, positionId: positionId || null });
-    setBusy(false);
-    if (res.ok) { setNotice(`Пользователь «${name.trim()}» создан`); setOpen(false); setEmail(""); setName(""); setPositionId(""); setPassword(""); }
-    else setNotice(`Отклонено: ${adminErr(res.code, res.message)}`);
-  };
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Создать пользователя</Button></DialogTrigger>
-      <DialogContent className="max-w-[480px]">
-        <DialogHeader><DialogTitle>Новый пользователь</DialogTitle></DialogHeader>
-        <div className="flex flex-col gap-3">
-          <label className={labelCls}>Email<Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@kiss-pm.dev" /></label>
-          <label className={labelCls}>Имя<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя Фамилия" /></label>
-          <label className={labelCls}>Роль доступа
-            <select value={accessProfileId} onChange={(e) => setAccessProfileId(e.target.value)} className={selCls}>
-              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-          </label>
-          <label className={labelCls}>Позиция
-            <select value={positionId} onChange={(e) => setPositionId(e.target.value)} className={selCls}>
-              <option value="">— без позиции —</option>
-              {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </label>
-          <label className={labelCls}>Пароль (≥ 8 символов)<Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="временный пароль" aria-invalid={password.length > 0 && password.length < 8} /></label>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      title="Новый пользователь"
+      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Создать пользователя</Button>}
+      submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
+      submitDisabled={!valid || busy}
+      contentClassName="max-w-[480px]"
+      successToast={`Пользователь «${name.trim()}» создан`}
+      // Ошибка остаётся В модалке — раньше уходила строкой позади оверлея (G6-02).
+      onSubmit={async () => {
+        if (!valid) return null;
+        setBusy(true);
+        // password обязателен (≥ 8) — боевой контракт; positionId опционален.
+        const res = await create({ email: email.trim(), name: name.trim(), accessProfileId, password, positionId: positionId || null });
+        setBusy(false);
+        return res.ok ? null : adminErr(res.code, res.message);
+      }}
+      onSuccess={() => { setEmail(""); setName(""); setPositionId(""); setPassword(""); }}
+    >
+      <div className="flex flex-col gap-3">
+        <label className={labelCls}>Email<Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@kiss-pm.dev" /></label>
+        <label className={labelCls}>Имя<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя Фамилия" /></label>
+        <label className={labelCls}>Роль доступа
+          <select value={accessProfileId} onChange={(e) => setAccessProfileId(e.target.value)} className={selCls}>
+            {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+        </label>
+        <label className={labelCls}>Позиция
+          <select value={positionId} onChange={(e) => setPositionId(e.target.value)} className={selCls}>
+            <option value="">— без позиции —</option>
+            {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+        <label className={labelCls}>Пароль (≥ 8 символов)<Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="временный пароль" aria-invalid={password.length > 0 && password.length < 8} /></label>
+      </div>
+    </FormDialog>
   );
 }
 
-function EditUserDialog({ user, roles, positions, busy, setBusy, setNotice, update }: {
+function EditUserDialog({ user, roles, positions, busy, setBusy, update }: {
   user: WorkspaceUser; roles: AccessProfile[]; positions: Position[];
-  busy: boolean; setBusy: (v: boolean) => void; setNotice: (v: string | null) => void;
+  busy: boolean; setBusy: (v: boolean) => void;
   update: ReturnType<typeof useAdmin>["updateUser"];
 }) {
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState(user.name);
+  const [email, setEmail] = useState(user.email);
   const [accessProfileId, setAccessProfileId] = useState(user.accessProfileId);
   const [positionId, setPositionId] = useState(user.positionId ?? "");
 
-  // при открытии диалога синхронизируем форму с текущей записью
-  const onOpenChange = (v: boolean) => {
-    if (v) { setName(user.name); setAccessProfileId(user.accessProfileId); setPositionId(user.positionId ?? ""); }
-    setOpen(v);
-  };
-  const valid = name.trim().length > 0 && accessProfileId.length > 0;
-  const submit = async () => {
-    if (!valid) return;
-    setBusy(true); setNotice(null);
-    // PATCH частичный; смена роли «себе» (user-anna) → self_access_change_forbidden.
-    const res = await update(user.id, { name: name.trim(), accessProfileId, positionId: positionId || null });
-    setBusy(false);
-    if (res.ok) { setNotice(`Пользователь «${name.trim()}» обновлён`); setOpen(false); }
-    else setNotice(`Отклонено: ${adminErr(res.code, res.message)}`);
-  };
+  const valid = name.trim().length > 0 && email.trim().length > 0 && accessProfileId.length > 0;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild><Button variant="ghost" size="sm" title="Изменить"><Pencil className="size-3.5" aria-hidden /></Button></DialogTrigger>
-      <DialogContent className="max-w-[480px]">
-        <DialogHeader><DialogTitle>Изменить пользователя</DialogTitle></DialogHeader>
-        <div className="flex flex-col gap-3">
+    <FormDialog
+      title="Изменить пользователя"
+      trigger={<Button variant="ghost" size="sm" title="Изменить"><Pencil className="size-3.5" aria-hidden /></Button>}
+      // при открытии диалога синхронизируем форму с текущей записью
+      onOpenChange={(v) => {
+        if (v) { setName(user.name); setEmail(user.email); setAccessProfileId(user.accessProfileId); setPositionId(user.positionId ?? ""); }
+      }}
+      submitLabel={<><Pencil className="size-3.5" aria-hidden />Сохранить</>}
+      submitDisabled={!valid || busy}
+      contentClassName="max-w-[480px]"
+      successToast={`Пользователь «${name.trim()}» обновлён`}
+      // Ошибка остаётся В модалке — раньше уходила строкой позади оверлея (G6-02).
+      onSubmit={async () => {
+        if (!valid) return null;
+        setBusy(true);
+        // PATCH частичный; смена роли «себе» (user-anna) → self_access_change_forbidden.
+        // Смена email (G6-14) проверяется сервером против домен-allowlist политики безопасности.
+        const res = await update(user.id, { name: name.trim(), email: email.trim(), accessProfileId, positionId: positionId || null });
+        setBusy(false);
+        return res.ok ? null : adminErr(res.code, res.message);
+      }}
+    >
+      <div className="flex flex-col gap-3">
+        {prototypeNotesEnabled ? (
           <div className="flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
-            <span className="text-[length:var(--text-xs)] font-medium text-[var(--text-strong)]">{user.email}</span>
             <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{user.id}</span>
           </div>
-          <label className={labelCls}>Имя<Input value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label className={labelCls}>Роль доступа
-            <select value={accessProfileId} onChange={(e) => setAccessProfileId(e.target.value)} className={selCls}>
-              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-          </label>
-          <label className={labelCls}>Позиция
-            <select value={positionId} onChange={(e) => setPositionId(e.target.value)} className={selCls}>
-              <option value="">— без позиции —</option>
-              {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </label>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Pencil className="size-3.5" aria-hidden />Сохранить</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        ) : null}
+        <label className={labelCls}>Email
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Смена email завершит активные сессии пользователя.</span>
+        </label>
+        <label className={labelCls}>Имя<Input value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label className={labelCls}>Роль доступа
+          <select value={accessProfileId} onChange={(e) => setAccessProfileId(e.target.value)} className={selCls}>
+            {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+        </label>
+        <label className={labelCls}>Позиция
+          <select value={positionId} onChange={(e) => setPositionId(e.target.value)} className={selCls}>
+            <option value="">— без позиции —</option>
+            {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+      </div>
+    </FormDialog>
   );
 }

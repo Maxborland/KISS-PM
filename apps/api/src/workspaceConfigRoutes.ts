@@ -21,6 +21,7 @@ import {
 } from "./workspaceConfigParsers";
 import { readLimitedJsonBody } from "./jsonBody";
 import { getStringField } from "./parseHelpers";
+import { authorizeRoute } from "./routeAuth";
 import {
   parseCustomFieldIdParam,
   parseProjectTemplateIdParam
@@ -74,31 +75,23 @@ export function registerWorkspaceConfigRoutes(
     getSessionActorFromHeaders,
     runDataSourceTransaction
   } = deps;
+  const routeAuthDeps = { dataSource, getSessionActorFromHeaders, getActorProfile };
 
   app.get("/api/workspace/config/custom-fields", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listCustomFieldDefinitions) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canReadWorkspaceConfig,
+      capabilities: ["listCustomFieldDefinitions"],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceConfigDeniedAudit(deps, actor, {
+          actionType: "workspace.config.read_denied",
+          entityType: "WorkspaceConfig",
+          entityId: "custom-fields",
+          commandInput: { resource: "custom-fields" },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendWorkspaceConfigDeniedAudit(deps, actor, {
-        actionType: "workspace.config.read_denied",
-        entityType: "WorkspaceConfig",
-        entityId: "custom-fields",
-        commandInput: { resource: "custom-fields" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({
       customFields: await dataSource.listCustomFieldDefinitions(actor.tenantId)
@@ -106,34 +99,25 @@ export function registerWorkspaceConfigRoutes(
   });
 
   app.post("/api/workspace/config/custom-fields", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createCustomFieldDefinition ||
-      !dataSource.listCustomFieldDefinitions ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canManageWorkspaceConfig,
+      capabilities: [
+        "createCustomFieldDefinition",
+        "listCustomFieldDefinitions",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceConfigDeniedAudit(deps, actor, {
+          actionType: "workspace.custom_field.create_denied",
+          entityType: "CustomFieldDefinition",
+          entityId: "new",
+          commandInput: { operation: "create_custom_field" },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendWorkspaceConfigDeniedAudit(deps, actor, {
-        actionType: "workspace.custom_field.create_denied",
-        entityType: "CustomFieldDefinition",
-        entityId: "new",
-        commandInput: { operation: "create_custom_field" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -187,34 +171,25 @@ export function registerWorkspaceConfigRoutes(
       return context.json({ error: parsedFieldId.error }, 400);
     }
 
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.updateCustomFieldDefinition ||
-      !dataSource.listCustomFieldDefinitions ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canManageWorkspaceConfig,
+      capabilities: [
+        "updateCustomFieldDefinition",
+        "listCustomFieldDefinitions",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceConfigDeniedAudit(deps, actor, {
+          actionType: "workspace.custom_field.update_denied",
+          entityType: "CustomFieldDefinition",
+          entityId: parsedFieldId.value,
+          commandInput: { fieldId: parsedFieldId.value },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendWorkspaceConfigDeniedAudit(deps, actor, {
-        actionType: "workspace.custom_field.update_denied",
-        entityType: "CustomFieldDefinition",
-        entityId: parsedFieldId.value,
-        commandInput: { fieldId: parsedFieldId.value },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const fieldId = parsedFieldId.value;
     const existingFields = await dataSource.listCustomFieldDefinitions(actor.tenantId);
@@ -278,29 +253,20 @@ export function registerWorkspaceConfigRoutes(
   });
 
   app.get("/api/workspace/config/project-templates", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listProjectTemplates) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canReadWorkspaceConfig,
+      capabilities: ["listProjectTemplates"],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceConfigDeniedAudit(deps, actor, {
+          actionType: "workspace.config.read_denied",
+          entityType: "WorkspaceConfig",
+          entityId: "project-templates",
+          commandInput: { resource: "project-templates" },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendWorkspaceConfigDeniedAudit(deps, actor, {
-        actionType: "workspace.config.read_denied",
-        entityType: "WorkspaceConfig",
-        entityId: "project-templates",
-        commandInput: { resource: "project-templates" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({
       projectTemplates: await dataSource.listProjectTemplates(actor.tenantId)
@@ -308,34 +274,25 @@ export function registerWorkspaceConfigRoutes(
   });
 
   app.post("/api/workspace/config/project-templates", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createProjectTemplate ||
-      !dataSource.listProjectTemplates ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canManageWorkspaceConfig,
+      capabilities: [
+        "createProjectTemplate",
+        "listProjectTemplates",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceConfigDeniedAudit(deps, actor, {
+          actionType: "workspace.project_template.create_denied",
+          entityType: "ProjectTemplate",
+          entityId: "new",
+          commandInput: { operation: "create_project_template" },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendWorkspaceConfigDeniedAudit(deps, actor, {
-        actionType: "workspace.project_template.create_denied",
-        entityType: "ProjectTemplate",
-        entityId: "new",
-        commandInput: { operation: "create_project_template" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -395,34 +352,25 @@ export function registerWorkspaceConfigRoutes(
       return context.json({ error: parsedTemplateId.error }, 400);
     }
 
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.updateProjectTemplate ||
-      !dataSource.listProjectTemplates ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canManageWorkspaceConfig,
+      capabilities: [
+        "updateProjectTemplate",
+        "listProjectTemplates",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceConfigDeniedAudit(deps, actor, {
+          actionType: "workspace.project_template.update_denied",
+          entityType: "ProjectTemplate",
+          entityId: parsedTemplateId.value,
+          commandInput: { templateId: parsedTemplateId.value },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendWorkspaceConfigDeniedAudit(deps, actor, {
-        actionType: "workspace.project_template.update_denied",
-        entityType: "ProjectTemplate",
-        entityId: parsedTemplateId.value,
-        commandInput: { templateId: parsedTemplateId.value },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const templateId = parsedTemplateId.value;
     const existingTemplates = await dataSource.listProjectTemplates(actor.tenantId);
@@ -491,29 +439,20 @@ export function registerWorkspaceConfigRoutes(
   });
 
   app.get("/api/tenant/current/security-policy", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.getTenantSecurityPolicy) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canReadWorkspaceConfig,
+      capabilities: ["getTenantSecurityPolicy"],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceConfigDeniedAudit(deps, actor, {
+          actionType: "workspace.config.read_denied",
+          entityType: "WorkspaceConfig",
+          entityId: "security-policy",
+          commandInput: { resource: "security-policy" },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendWorkspaceConfigDeniedAudit(deps, actor, {
-        actionType: "workspace.config.read_denied",
-        entityType: "WorkspaceConfig",
-        entityId: "security-policy",
-        commandInput: { resource: "security-policy" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({
       securityPolicy: await dataSource.getTenantSecurityPolicy(actor.tenantId)
@@ -521,34 +460,25 @@ export function registerWorkspaceConfigRoutes(
   });
 
   app.put("/api/tenant/current/security-policy", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.getTenantSecurityPolicy ||
-      !dataSource.upsertTenantSecurityPolicy ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManageWorkspaceConfig({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canManageWorkspaceConfig,
+      capabilities: [
+        "getTenantSecurityPolicy",
+        "upsertTenantSecurityPolicy",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceConfigDeniedAudit(deps, actor, {
+          actionType: "workspace.security_policy.update_denied",
+          entityType: "SecurityPolicy",
+          entityId: actor.tenantId,
+          commandInput: { operation: "update_security_policy" },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendWorkspaceConfigDeniedAudit(deps, actor, {
-        actionType: "workspace.security_policy.update_denied",
-        entityType: "SecurityPolicy",
-        entityId: actor.tenantId,
-        commandInput: { operation: "update_security_policy" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -585,7 +515,7 @@ export function registerWorkspaceConfigRoutes(
   });
 }
 
-function parseSecurityPolicyBody(
+export function parseSecurityPolicyBody(
   input: unknown
 ): { ok: true; value: TenantSecurityPolicy } | { ok: false; error: string } {
   const record = input && typeof input === "object" && !Array.isArray(input)
@@ -623,6 +553,11 @@ function parseSecurityPolicyBody(
         .filter((entry) => entry.length > 0)
     )
   );
+  // Каждая запись — валидный hostname (раньше «это не домен!!» сохранялось в политику, G6-10).
+  const domainPattern = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
+  if (domainAllowlist.some((entry) => !domainPattern.test(entry))) {
+    return { ok: false, error: "security_policy_domain_allowlist_invalid" };
+  }
 
   return {
     ok: true,

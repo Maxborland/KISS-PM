@@ -2,21 +2,23 @@
 
 import { useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, TriangleAlert, UserPlus, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { PlanningCommand, PlanCalendar, PlanCalendarException, PlanTask } from "@kiss-pm/domain";
 
-const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
+const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const MONTHS_CAP = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 const DOW_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const BASE_MS = Date.UTC(2026, 2, 2);const ddmm = (iso: string) => { const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
@@ -27,11 +29,11 @@ const nid = (p: string) => `${p}-n${(NID += 1)}`;
 
 export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
   const [selCal, setSelCal] = useState<string>("project"); // "project" | resourceId
   const [monthOffset, setMonthOffset] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const model = useMemo(() => {
     if (!readModel) return null;
@@ -87,7 +89,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Календари">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Календари">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка календарей…">
           <span />
         </SurfaceState>
@@ -95,7 +97,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     );
   }
 
-  const projectMeta = deriveProjectMeta(readModel, PROJECT);
+  const projectMeta = deriveProjectMeta(readModel, projectBase);
   const focusMonth = model.monthsList[Math.max(0, Math.min(monthOffset, model.monthsList.length - 1))] ?? "";
   const monthLabel = focusMonth ? `${MONTHS_CAP[Number(focusMonth.slice(5, 7)) - 1]} ${focusMonth.slice(0, 4)}` : "";
   const isResourceView = selCal !== "project";
@@ -119,10 +121,11 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   };
 
   async function applyCmd(command: PlanningCommand, okMsg: string) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await apply(command);
     setBusy(false);
-    setNotice(res.ok ? `${okMsg} · коммит v${res.planVersion}` : res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
+    if (res.ok) toast.success(`${okMsg} · коммит v${res.planVersion}`);
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
   }
 
   // клик по дню: тогл праздника (вид проекта) или отсутствия (вид ресурса). Восстановление = рабочие минуты.
@@ -153,7 +156,8 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     setBusy(true);
     const res = await applyBatch(cmds);
     setBusy(false);
-    setNotice(res.ok ? `${typeLabel} добавлен · коммит v${res.planVersion}` : `Отклонено: ${res.message}`);
+    if (res.ok) toast.success(`${typeLabel} добавлен · коммит v${res.planVersion}`);
+    else toast.error(`Отклонено: ${res.message}`);
   }
 
   // правый столбец: список исключений (праздники + отсутствия выбранного ресурса)
@@ -176,10 +180,12 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
         </div>
       </div>
 
-      <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        Реальный контракт: PlanCalendar (5×8, рабочая неделя read-only) + calendar.exception.upsert (праздник для всех — resourceId=null, отсутствие — по ресурсу). Ёмкость пересчитывается. Данные in-memory.
-      </div>
+      {prototypeNotesEnabled ? (
+        <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          Реальный контракт: PlanCalendar (5×8, рабочая неделя read-only) + calendar.exception.upsert (праздник для всех — resourceId=null, отсутствие — по ресурсу). Ёмкость пересчитывается. Данные in-memory.
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[260px_minmax(0,1fr)_300px]">
         {/* LEFT: календари/ресурсы */}
@@ -262,13 +268,12 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
             <div className="rounded-[var(--radius-card)] border border-[var(--warning)] bg-[var(--warning-soft)] p-3 text-[length:var(--text-xs)] text-[var(--warning-text)]">
               <div className="mb-1 flex items-center gap-1.5 font-semibold"><TriangleAlert className="size-3.5" aria-hidden />Конфликт с расписанием</div>
               <p>Задача «{model.conflicts[0]!.task.wbsCode} {model.conflicts[0]!.task.title}» запланирована на нерабочий день ({ddmm(dayToIso(model.conflicts[0]!.day))}).{model.conflicts.length > 1 ? ` И ещё ${model.conflicts.length - 1}.` : ""}</p>
-              <button type="button" title="Демо-прототип: переход на График появится в приложении" className="mt-2 cursor-default rounded-[var(--radius-sm)] border border-[var(--warning)] bg-[var(--panel)] px-2 py-1 font-medium text-[var(--warning-text)]">Открыть График</button>
+              <button type="button" title="Переход к «Графику» отсюда появится в одном из следующих обновлений" className="mt-2 cursor-default rounded-[var(--radius-sm)] border border-[var(--warning)] bg-[var(--panel)] px-2 py-1 font-medium text-[var(--warning-text)]">Открыть График</button>
             </div>
           ) : null}
         </div>
       </div>
 
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </DeliveryFrame>
   );
 }

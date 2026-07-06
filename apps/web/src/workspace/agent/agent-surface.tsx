@@ -58,7 +58,7 @@ function actionToChange(action: ProposedAction, index: number): DemoChange {
   } else if (action.tool === "apply_plan_commands") {
     before = "текущий план";
     const count = Array.isArray(action.input.commands) ? action.input.commands.length : 0;
-    after = `${count} изменени${count === 1 ? "е" : "я"} плана`;
+    after = `${count} ${pluralRu(count, "изменение", "изменения", "изменений")} плана`;
   } else if (action.tool === "comment_task") {
     before = "комментарий";
     after = String(action.input.body ?? ""); // редактируемое поле = текст комментария
@@ -80,6 +80,15 @@ function actionToChange(action: ProposedAction, index: number): DemoChange {
 
 const clock = (offsetMs: number): string => new Date(offsetMs).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 
+// Русская плюрализация: 1 изменение / 2 изменения / 5 изменений (G7-17).
+function pluralRu(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
 /**
  * Агент — полноценный чат с AI-ассистентом, действующим в рамках прав сотрудника.
  * Дизайн — SSOT `LandingAgentDemo` (чат-тред + панель сверки изменений), но на БОЕВОМ
@@ -88,7 +97,7 @@ const clock = (offsetMs: number): string => new Date(offsetMs).toLocaleTimeStrin
  * live → реальный LLM (ключ на сервере); mock/Storybook → детерминированный демо-«мозг».
  */
 export function AgentSurface() {
-  const { proposeStream, execute, uploadAttachment, listProjects, status } = useAgent();
+  const { proposeStream, execute, uploadAttachment, listProjects, status, provider } = useAgent();
 
   const [phase, setPhase] = useState<DemoPhase>("draft");
   const [inputValue, setInputValue] = useState("");
@@ -188,7 +197,7 @@ export function AgentSurface() {
       const okCount = res.data.results.filter((r) => r.ok).length;
       setChanges((cs) => cs.map((c) => (selected.includes(c) ? { ...c, status: "применено" } : c)));
       setPhase("applied");
-      addMessage("henry", `Применил ${okCount} изменени${okCount === 1 ? "е" : "я"}. Готово — данные обновлены.`);
+      addMessage("henry", `Применил ${okCount} ${pluralRu(okCount, "изменение", "изменения", "изменений")}. Готово — данные обновлены.`);
     } else {
       const failure = res.ok ? res.data.results.find((r) => !r.ok)?.error ?? "не применено" : res.code;
       addMessage("henry", `Не удалось применить: ${failure}.`);
@@ -210,6 +219,20 @@ export function AgentSurface() {
 
   return (
     <AgentWorkspaceFrame>
+      {/* Честная деградация (G7-01): без LLM-ключа агент отвечает детерминированной
+          заглушкой — иначе «Предложений нет» неотличимо от нормальной работы. */}
+      {provider && !provider.live ? (
+        <div
+          role="status"
+          className="flex items-baseline gap-2 border-b border-[var(--warning)] bg-[var(--warning-soft)] px-4 py-2 text-[length:var(--text-sm)] text-[var(--warning-text)]"
+        >
+          <strong className="whitespace-nowrap">Демо-режим</strong>
+          <span>
+            LLM-ключ не настроен (провайдер {provider.model}) — агент отвечает заглушкой и реальных предложений не даст.
+            Задайте OPENROUTER_API_KEY или ANTHROPIC_API_KEY в конфигурации сервера.
+          </span>
+        </div>
+      ) : null}
       <div className={cn("lad-layout", navExpanded && "lad-layout--nav-expanded", reviewVisible && "lad-layout--review-open")}>
         <CollapsedAppNav expanded={navExpanded} mobileOpen={mobileLeft} onToggle={() => setNavExpanded((v) => !v)} />
         <MobileDrawerBackdrop visible={mobileLeft || mobileReview} onClick={() => { setMobileLeft(false); setMobileReview(false); }} />

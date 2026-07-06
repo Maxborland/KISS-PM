@@ -6,6 +6,7 @@ import {
 import type { TenantUser } from "@kiss-pm/domain";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
+import { authorizeRoute } from "./routeAuth";
 import { parsePositionIdParam } from "./routeParamParsers";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import { parsePositionBody } from "./workspaceParsers";
@@ -13,67 +14,46 @@ import { parsePositionBody } from "./workspaceParsers";
 export function registerPositionRoutes(app: ApiApp, deps: ApiRouteDeps) {
   const {
     appendManagementAuditEvent,
-    dataSource,
-    getActorProfile,
-    getSessionActorFromHeaders,
     runDataSourceTransaction
   } = deps;
 
   app.get("/api/workspace/positions", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listPositions) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canReadPositions({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadPositions,
+      capabilities: ["listPositions"],
+      onDenied: ({ actor, decision }) =>
+        appendPositionDeniedAudit(deps, actor, {
+          actionType: "workspace.position.read_denied",
+          entityId: "positions",
+          commandInput: { resource: "positions" },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendPositionDeniedAudit(deps, actor, {
-        actionType: "workspace.position.read_denied",
-        entityId: "positions",
-        commandInput: { resource: "positions" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({ positions: await dataSource.listPositions(actor.tenantId) });
   });
 
   app.post("/api/workspace/positions", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.createPosition ||
-      !dataSource.listPositions ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManagePositions({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManagePositions,
+      capabilities: [
+        "createPosition",
+        "listPositions",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendPositionDeniedAudit(deps, actor, {
+          actionType: "workspace.position.create_denied",
+          entityId: "new",
+          commandInput: { operation: "create_position" },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendPositionDeniedAudit(deps, actor, {
-        actionType: "workspace.position.create_denied",
-        entityId: "new",
-        commandInput: { operation: "create_position" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -122,33 +102,24 @@ export function registerPositionRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsedPositionId = parsePositionIdParam(context.req.param("positionId"));
     if (!parsedPositionId.ok) return context.json({ error: parsedPositionId.error }, 400);
     const positionId = parsedPositionId.value;
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.updatePosition ||
-      !dataSource.listPositions ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManagePositions({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManagePositions,
+      capabilities: [
+        "updatePosition",
+        "listPositions",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendPositionDeniedAudit(deps, actor, {
+          actionType: "workspace.position.update_denied",
+          entityId: positionId,
+          commandInput: { positionId },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendPositionDeniedAudit(deps, actor, {
-        actionType: "workspace.position.update_denied",
-        entityId: positionId,
-        commandInput: { positionId },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const existingPositions = await dataSource.listPositions(actor.tenantId);
     const beforeState =
@@ -209,34 +180,25 @@ export function registerPositionRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsedPositionId = parsePositionIdParam(context.req.param("positionId"));
     if (!parsedPositionId.ok) return context.json({ error: parsedPositionId.error }, 400);
     const positionId = parsedPositionId.value;
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !dataSource.deletePosition ||
-      !dataSource.listPositions ||
-      !dataSource.listWorkspaceUsers ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const decision = canManagePositions({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManagePositions,
+      capabilities: [
+        "deletePosition",
+        "listPositions",
+        "listWorkspaceUsers",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendPositionDeniedAudit(deps, actor, {
+          actionType: "workspace.position.delete_denied",
+          entityId: positionId,
+          commandInput: { positionId },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendPositionDeniedAudit(deps, actor, {
-        actionType: "workspace.position.delete_denied",
-        entityId: positionId,
-        commandInput: { positionId },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
 
     const beforeState =
       (await dataSource.listPositions(actor.tenantId)).find(

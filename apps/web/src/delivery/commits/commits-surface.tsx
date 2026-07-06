@@ -2,24 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { GitCommitVertical, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 import { buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/planning-client";
 
 import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type CommitMetaView, type CommitsView } from "@/delivery/lib/use-planning";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
-const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
+const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const dt = (iso: string) => { const d = new Date(iso); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}, ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
 const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
 
 // тип-чип по actionType (как в макете 09-audit)
 const typeOf = (actionType: string): { label: string; cls: string } => {
-  if (actionType.startsWith("planning.baseline")) return { label: "baseline", cls: "bg-[var(--info-soft)] text-[var(--info)]" };
+  if (actionType.startsWith("planning.baseline")) return { label: "базовый план", cls: "bg-[var(--info-soft)] text-[var(--info)]" };
   if (actionType.startsWith("planning.scenario")) return { label: "сценарий", cls: "bg-[color-mix(in_oklab,var(--violet)_16%,var(--panel))] text-[var(--violet)]" };
   if (actionType.startsWith("planning.overload")) return { label: "перегруз", cls: "bg-[var(--warning-soft)] text-[var(--warning-text)]" };
   if (actionType.startsWith("planning.assignment")) return { label: "назначение", cls: "bg-[var(--warning-soft)] text-[var(--warning-text)]" };
@@ -29,10 +30,10 @@ const typeOf = (actionType: string): { label: string; cls: string } => {
 
 export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, applyBatch, revertLast, loadCommits } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const [data, setData] = useState<CommitsView | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!readModel) return;
@@ -49,7 +50,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   if (status !== "ready" || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} projectId={projectId} activeTab="Коммиты">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} projectId={projectId} activeTab="Коммиты">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
           <span />
         </SurfaceState>
@@ -57,7 +58,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
     );
   }
 
-  const projectMeta = deriveProjectMeta(readModel, PROJECT);
+  const projectMeta = deriveProjectMeta(readModel, projectBase);
   const commits = data?.commits ?? [];
   const latestRevert = data?.latestRevert ?? null;
   const selected = commits.find((c) => c.auditEventId === sel) ?? commits[0] ?? null;
@@ -66,23 +67,23 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
     if (!latestRevert || c.auditEventId !== latestRevert.auditEventId) return;
     const before = latestRevert.before as PlanningReadModel;
     const inverses = latestRevert.commands.slice().reverse().flatMap((cmd) => buildCompensatingCommands(cmd, before));
-    if (inverses.length === 0) { setNotice("Откат недоступен для этой операции (создание/перенос/назначение)"); return; }
-    setBusy(true); setNotice(null);
+    if (inverses.length === 0) { toast.error("Откат недоступен для этой операции (создание/перенос/назначение)"); return; }
+    setBusy(true);
     const res = await applyBatch(inverses);
     setBusy(false);
-    if (res.ok) { setNotice(`Откат применён компенсирующим коммитом v${res.planVersion}`); const fresh = await loadCommits(); setData(fresh); setSel(fresh.commits[0]?.auditEventId ?? null); }
-    else setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
+    if (res.ok) { toast.success(`Откат применён компенсирующим коммитом v${res.planVersion}`); const fresh = await loadCommits(); setData(fresh); setSel(fresh.commits[0]?.auditEventId ?? null); }
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
   };
 
   // BUG-PROJ-24: откат последнего обратимого коммита через серверный revert-last —
   // работает из истории (не зависит от in-session state).
   const onRevertLast = async () => {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await revertLast();
     setBusy(false);
-    if (res.ok) { setNotice(`Откат применён компенсирующим коммитом v${res.planVersion}`); const fresh = await loadCommits(); setData(fresh); setSel(fresh.commits[0]?.auditEventId ?? null); }
-    else if (res.message === "nothing_to_revert") setNotice("Нет обратимого коммита для отката");
-    else setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
+    if (res.ok) { toast.success(`Откат применён компенсирующим коммитом v${res.planVersion}`); const fresh = await loadCommits(); setData(fresh); setSel(fresh.commits[0]?.auditEventId ?? null); }
+    else if (res.message === "nothing_to_revert") toast.error("Нет обратимого коммита для отката");
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
   };
 
   return (
@@ -137,7 +138,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
           {selected ? (
             <div className="px-3 py-3 text-[length:var(--text-sm)]">
               <div className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{selected.summary}</div>
-              <div className="mono mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{selected.actionType}</div>
+              {prototypeNotesEnabled ? <div className="mono mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{selected.actionType}</div> : null}
 
               <div className="mt-3 space-y-1.5">
                 <div className="flex items-center justify-between"><span className="text-[var(--muted)]">Версия плана</span><span className="mono text-[var(--text-strong)]">v{selected.version - 1} → v{selected.version}</span></div>
@@ -159,16 +160,17 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
                 <Button variant="secondary" size="sm" className="mt-3" disabled={busy} onClick={() => void onRevert(selected)}><RotateCcw className="size-3.5" aria-hidden />Откатить коммит</Button>
               ) : selected.revertible ? <p className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Откат доступен только для последнего обратимого коммита.</p> : <p className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Откат недоступен (необратимая операция или системная запись).</p>}
 
+              {prototypeNotesEnabled ? (
               <details className="mt-3 rounded-[var(--radius-md)] border border-[var(--border)]">
                 <summary className="cursor-pointer px-2 py-1.5 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Показать raw payload</summary>
                 <pre className="mono overflow-auto rounded-b-[var(--radius-md)] bg-[var(--text-strong)] px-2 py-2 text-[length:var(--text-2xs)] leading-relaxed text-[var(--panel)]">{JSON.stringify({ version: selected.version, actionType: selected.actionType, auditEventId: selected.auditEventId, changedTaskIds: selected.changedTaskIds, revertible: selected.revertible, at: selected.at }, null, 2)}</pre>
               </details>
+              ) : null}
             </div>
           ) : <div className="px-3 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted)]">Выберите коммит из ленты.</div>}
         </div>
       </div>
 
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </DeliveryFrame>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, Check, ChevronDown, LogOut, Monitor, Settings, ShieldCheck, TriangleAlert, User, X } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Monitor, Settings, ShieldCheck, User, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { demoAction } from "@/views/lib/demo";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { authErr } from "@/auth/lib/auth-bits";
 import { useAuth } from "@/auth/lib/use-auth";
 import type { WorkspaceUser } from "@/auth/lib/auth-client";
@@ -69,8 +71,6 @@ export function AvatarMenuSurface() {
   const [bootstrapping, setBootstrapping] = useState(true);
   const [loggedOut, setLoggedOut] = useState(false);
   const [busy, setBusy] = useState(false);
-  // notice несёт исход (ok), чтобы провал НЕ рисовался как успех (зелёная галочка).
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     if (autoLoginRef.current) return;
@@ -91,10 +91,11 @@ export function AvatarMenuSurface() {
 
   async function handleRevoke(sessionId: string) {
     setBusy(true);
-    setNotice(null);
     const res = await revokeSession(sessionId);
     setBusy(false);
-    setNotice(res.ok ? { ok: true, text: "Сессия отозвана" } : { ok: false, text: `Не удалось отозвать: ${authErr(res.code)}` });
+    // toast несёт исход (success/error), чтобы провал НЕ рисовался как успех (зелёная галочка).
+    if (res.ok) toast.success("Сессия отозвана");
+    else toast.error(`Не удалось отозвать: ${authErr(res.code)}`);
   }
 
   async function handleLogout() {
@@ -113,7 +114,7 @@ export function AvatarMenuSurface() {
             status="forbidden"
             forbidden={{
               title: "Вы вышли из системы",
-              description: "Сессия завершена (POST /api/auth/logout). В рабочем приложении откроется экран входа.",
+              description: "Сессия завершена. В рабочем приложении откроется экран входа.",
               action: (
                 <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
                   Войти снова
@@ -210,19 +211,6 @@ export function AvatarMenuSurface() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                {notice ? (
-                  <div
-                    {...(notice.ok ? {} : { role: "alert" })}
-                    className={`mt-3 inline-flex items-center gap-1.5 text-[length:var(--text-xs)] ${notice.ok ? "text-[var(--muted-strong)]" : "text-[var(--danger-text)]"}`}
-                  >
-                    {notice.ok ? (
-                      <Check className="size-3.5 text-[var(--success-text)]" aria-hidden />
-                    ) : (
-                      <TriangleAlert className="size-3.5 text-[var(--danger-text)]" aria-hidden />
-                    )}
-                    {notice.text}
-                  </div>
-                ) : null}
               </section>
 
               {/* Сводка сессии (реальные данные me) + честный плейсхолдер устройств */}
@@ -295,7 +283,9 @@ export function AvatarMenuSurface() {
   );
 }
 
+// Плашка «Прототип» — только под флагом прототип-заметок (Storybook/демо), в прод не течёт (R1).
 function ProtoBanner() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>

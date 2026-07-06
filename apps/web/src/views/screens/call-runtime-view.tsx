@@ -66,14 +66,39 @@ function LobbyStep({ onJoin }: { onJoin: (selection: LobbySelection) => void }) 
   );
 }
 
+// RU-тексты известных причин отказа подключения. Прочие коды показываем как есть
+// (сырой код лучше, чем ложный generic, — его можно назвать поддержке).
+const JOIN_ERROR_RU: Record<string, { title: string; hint: string }> = {
+  video_provider_disabled: {
+    title: "Видеозвонки не настроены в этой инсталляции",
+    hint: "Администратору нужно подключить медиасервер (KISS_PM_VIDEO_PROVIDER). Метаданные звонков и их история доступны в разделе «Коммуникации»."
+  },
+  call_session_not_found: {
+    title: "Сессия звонка не найдена",
+    hint: "Звонок мог завершиться. Проверьте список звонков."
+  }
+};
+
 function ActiveStep({ roomId, selection }: { roomId: string; selection: LobbySelection }) {
   const { stage, controls, handlers, error, chat, sendChat } = useCallEngine(roomId, selection);
 
+  // Подключение не удалось — честный отказ вместо мёртвой сцены с чатом,
+  // имитирующим отправку (G5-04/05), и с рабочим путём назад (G5-06).
+  if (error) {
+    const known = JOIN_ERROR_RU[error];
+    return (
+      <div className="call-screen">
+        <div className="mx-auto mt-[10vh] flex w-full max-w-[520px] flex-col gap-3">
+          <BannerInline variant="danger">{known?.title ?? `Не удалось подключиться к звонку (${error})`}</BannerInline>
+          {known?.hint ? <p className="m-0 text-[length:var(--text-sm)] text-[var(--muted-strong)]">{known.hint}</p> : null}
+          <a href="/communications/calls" className="text-[length:var(--text-sm)] text-[var(--accent-text,var(--accent))] underline underline-offset-4">← К списку звонков</a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="call-screen">
-      {error ? (
-        <BannerInline variant="danger">Не удалось подключиться к звонку</BannerInline>
-      ) : null}
       <div className="call-inchat">
         <div className="call-inchat__stage">
           <CallStage view={stage} controls={controls} handlers={handlers} />

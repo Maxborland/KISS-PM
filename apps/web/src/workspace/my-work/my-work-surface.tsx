@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
+import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Segmented } from "@/components/ui/segmented";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
@@ -23,7 +26,7 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
      contract-mock, переключение на боевой = apiOrigin; данные in-memory.
    - Канбан DnD и select в списке шлют РЕАЛЬНУЮ мутацию в мок
      (updateTaskStatus), а не demoAction-заглушку. Матрица переходов реальна:
-     запрещённый переход возвращает 409 и показывается отклонением (notice).
+     запрещённый переход возвращает 409 и показывается отклонением (toast).
    - Реордер внутри колонки боевым контрактом НЕ покрыт → не реализуем
      (статус задаётся только колонкой/селектом).
    ============================================================ */
@@ -78,7 +81,12 @@ export function MyWorkSurface() {
   const { data, status, error, reload, updateTaskStatus } = useMyWork();
   const usersDir = useWorkspaceUsers();
   const statuses = useWorkspaceTaskStatuses();
-  const userName = (id: string) => usersDir.name(id);
+  // Фолбэк имени: под ограниченной ролью справочник людей отдаёт 403 — резолвер вернёт сырой id.
+  // Показываем «Участник xxxx» вместо user-… (G8-08, G5-12).
+  const userName = (id: string) => {
+    const n = usersDir.name(id);
+    return n === id ? `Участник ${id.slice(-4)}` : n;
+  };
   const userColor = (id: string): BemAvatarColor => {
     const i = usersDir.indexOf(id);
     return i < 0 ? "c5" : AV[i % AV.length]!;
@@ -87,12 +95,14 @@ export function MyWorkSurface() {
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overStatusId, setOverStatusId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  // G2-10: переход в «Выполнено» необратим (обратные переходы запрещены матрицей) —
+  // мутация откладывается до явного подтверждения в управляемом диалоге.
+  const [pendingDone, setPendingDone] = useState<{ taskId: string; statusId: string; title: string } | null>(null);
 
   // Статус поверхности: есть данные → ready; нет данных и ошибка → error; иначе loading.
   // (Пустой набор задач показываем как empty через SurfaceState.)
   const tasks = data?.tasks ?? null;
-  const surfaceStatus = tasks ? (tasks.length === 0 ? "empty" : "ready") : status === "error" ? "error" : "loading";
+  const surfaceStatus = status === "forbidden" ? "forbidden" : tasks ? (tasks.length === 0 ? "empty" : "ready") : status === "error" ? "error" : "loading";
 
   // Колонки канбана по системным статусам (TASK_STATUSES, упорядочены sortOrder).
   // Группировка по statusCategory задачи (status === statusCategory), как в боевом TaskRecord.
@@ -104,15 +114,25 @@ export function MyWorkSurface() {
     return sorted.map((s) => ({ status: s, items: byCategory.get(s.category) ?? [] }));
   }, [tasks, statuses.list]);
 
-  // Применить смену статуса (общий путь для DnD и select). Отклонение перехода — честный notice.
+  // Применить смену статуса (общий путь для DnD и select). Отклонение перехода — честный toast.
   async function applyStatus(taskId: string, targetStatusId: string) {
     const target = statuses.byId.get(targetStatusId);
     setBusyTaskId(taskId);
-    setNotice(null);
     const res = await updateTaskStatus(taskId, targetStatusId);
     setBusyTaskId(null);
-    if (res.ok) setNotice(`Статус изменён на «${target?.name ?? targetStatusId}»`);
-    else setNotice(`Отклонено: ${myWorkErr(res.code ?? undefined)}`);
+    if (res.ok) toast.success(`Статус изменён на «${target?.name ?? targetStatusId}»`);
+    else toast.error(`Отклонено: ${myWorkErr(res.code ?? undefined)}`);
+  }
+
+  // G2-10: целевой статус «done» → не мутируем сразу, а запрашиваем подтверждение
+  // (переход необратим). Остальные статусы — сразу мутация, как раньше.
+  function requestStatus(task: TaskRecord, targetStatusId: string) {
+    const target = statuses.byId.get(targetStatusId);
+    if (target?.category === "done" && task.statusCategory !== "done") {
+      setPendingDone({ taskId: task.id, statusId: targetStatusId, title: task.title });
+      return;
+    }
+    void applyStatus(task.id, targetStatusId);
   }
 
   // Drop карточки в колонку: меняем статус, только если он отличается.
@@ -122,7 +142,7 @@ export function MyWorkSurface() {
     setOverStatusId(null);
     if (!id) return;
     const task = (tasks ?? []).find((t) => t.id === id);
-    if (task && task.statusId !== statusId) void applyStatus(id, statusId);
+    if (task && task.statusId !== statusId) requestStatus(task, statusId);
   };
 
   return (
@@ -226,7 +246,7 @@ export function MyWorkSurface() {
                         <tr key={t.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
                           <td className="px-3 py-2">
                             <div className="font-medium text-[var(--text-strong)]">{t.title}</div>
-                            <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{t.id}</div>
+                            {prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{t.id}</div> : null}
                           </td>
                           <td className="px-3 py-2 text-[var(--muted-strong)]">{t.projectId}</td>
                           <td className="px-3 py-2">
@@ -236,7 +256,7 @@ export function MyWorkSurface() {
                             <select
                               value={t.statusId}
                               disabled={busyTaskId === t.id}
-                              onChange={(e) => void applyStatus(t.id, e.target.value)}
+                              onChange={(e) => requestStatus(t, e.target.value)}
                               className="h-7 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-1.5 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
                             >
                               {statuses.list.map((s) => (
@@ -271,7 +291,29 @@ export function MyWorkSurface() {
           )}
         </SurfaceState>
 
-        {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
+        {/* G2-10: подтверждение необратимого перехода в «Выполнено». Отмена/закрытие —
+            мутации нет, select остаётся на прежнем значении (он управляемый, value={t.statusId}). */}
+        <Dialog open={pendingDone !== null} onOpenChange={(v) => { if (!v) setPendingDone(null); }}>
+          <DialogContent className="max-w-[440px]">
+            <DialogHeader>
+              <DialogTitle>{pendingDone ? `Завершить задачу «${pendingDone.title}»?` : "Завершить задачу?"}</DialogTitle>
+              <DialogDescription>Задача будет закрыта навсегда, вернуть её в работу нельзя.</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  const p = pendingDone;
+                  setPendingDone(null);
+                  if (p) void applyStatus(p.taskId, p.statusId);
+                }}
+              >
+                Завершить задачу
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </WorkspaceShell>
   );

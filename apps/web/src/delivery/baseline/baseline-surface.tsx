@@ -2,17 +2,19 @@
 
 import { useMemo, useState } from "react";
 import { Camera, Check, GitCommitVertical, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { createPlanningCommand } from "@kiss-pm/domain";
 
-const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к baseline B2", tone: "warning" } };
+const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const h = (min: number) => Math.round(min / 60);
 const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
 const ddmmYyyy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
@@ -25,9 +27,9 @@ const nid = (p: string) => `${p}-n${(NID += 1)}`;
 
 export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, apply } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [label, setLabel] = useState("");
 
@@ -46,7 +48,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="Baseline">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Baseline">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
           <span />
         </SurfaceState>
@@ -65,7 +67,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const totalWorkDelta = tasks.reduce((s, t) => s + (t.workDeltaMinutes ?? 0), 0);
   // хром выводим из РЕАЛЬНЫХ данных (а не статической заглушки PROJECT), чтобы шапка не противоречила плитке
   const projectMeta: ProjectMeta = {
-    name: PROJECT.name, code: PROJECT.code, status: PROJECT.status, statusTone: PROJECT.statusTone ?? "info",
+    name: projectBase.name, code: projectBase.code, status: projectBase.status, statusTone: projectBase.statusTone ?? "info",
     planVersion: `v${readModel.planVersion}`, deadline: ddmmYyyy(typeof readModel.project.deadline === "string" ? readModel.project.deadline : null), finish: ddmmYyyy(model.projectFinish),
     ...(baseFinishDay && projFinishDelta !== 0 ? { variance: { label: `${signDays(projFinishDelta)} к базовому плану`, tone: projFinishDelta > 0 ? ("warning" as const) : ("success" as const) } } : {})
   };
@@ -74,10 +76,11 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const spanDay = Math.max(1, Math.max(curFinishDay, baseFinishDay));
 
   const onCapture = async () => {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await apply(createPlanningCommand({ type: "baseline.capture", payload: { baselineId: nid("baseline"), label: label.trim() || "Снимок плана" } }));
     setBusy(false); setCapturing(false); setLabel("");
-    setNotice(res.ok ? `Базовый план зафиксирован · коммит v${res.planVersion}` : res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
+    if (res.ok) toast.success(`Базовый план зафиксирован · коммит v${res.planVersion}`);
+    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
   };
 
   const tiles = [
@@ -94,7 +97,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Сравнение текущего плана с зафиксированным базовым: отклонения по срокам и трудозатратам.</p>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          <button type="button" title="Демо-прототип: наложение на График появится в приложении" className="inline-flex cursor-default items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1 text-[length:var(--text-sm)] text-[var(--muted-soft)]">Overlay в График</button>
+          <button type="button" title="Наложение базового плана на «График» появится в одном из следующих обновлений" className="inline-flex cursor-default items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1 text-[length:var(--text-sm)] text-[var(--muted-soft)]">Слой в «Графике»</button>
           {capturing ? (
             <div className="flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-1.5 py-1">
               <input autoFocus value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Название снимка" className="h-7 w-[160px] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]" />
@@ -105,10 +108,12 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         </div>
       </div>
 
-      <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        Реальный контракт: baselineComparison (per-task дельты сроков/труда) + команда baseline.capture (фиксация снимка, аудит planning.baseline.captured). Данные in-memory.
-      </div>
+      {prototypeNotesEnabled ? (
+        <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          Реальный контракт: baselineComparison (per-task дельты сроков/труда) + команда baseline.capture (фиксация снимка, аудит planning.baseline.captured). Данные in-memory.
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
         {/* левая колонка: история базовых планов */}
@@ -201,7 +206,6 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         </div>
       </div>
 
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </DeliveryFrame>
   );
 }

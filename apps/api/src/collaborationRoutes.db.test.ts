@@ -610,7 +610,7 @@ describe("collaboration and communications API", () => {
     const channelPayload = await channelResponse.json() as { channel: { id: string } };
 
     const baseDataSource = createPostgresTenantDataSource(createDatabase(client));
-    const failingAuditDataSource: ApiTenantDataSource = {
+    const failingAuditDataSource: Partial<ApiTenantDataSource> = {
       ...baseDataSource,
       appendAuditEvent: async () => {
         throw new Error("audit_forced_failure");

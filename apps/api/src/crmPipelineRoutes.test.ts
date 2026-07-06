@@ -284,7 +284,7 @@ function createRouteFixture(profile = adminProfile) {
   const automations: CrmPipelineStageAutomationDefinition[] = [];
   const now = new Date("2026-06-06T00:00:00.000Z");
 
-  const dataSource: ApiTenantDataSource = {
+  const dataSource: Partial<ApiTenantDataSource> = {
     async listDevUsers() {
       return [actor];
     },
@@ -383,7 +383,7 @@ function createRouteFixture(profile = adminProfile) {
       });
     },
     async withTransaction(operation) {
-      return operation(dataSource);
+      return operation(dataSource as ApiTenantDataSource);
     }
   };
 
@@ -398,7 +398,7 @@ function createRouteFixture(profile = adminProfile) {
     async runDataSourceTransaction<T>(
       operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
     ) {
-      return operation(dataSource);
+      return operation(dataSource as ApiTenantDataSource);
     },
     async appendManagementAuditEvent(
       input: ManagementAuditEventInput,

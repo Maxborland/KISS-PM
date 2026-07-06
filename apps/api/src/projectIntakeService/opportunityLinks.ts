@@ -51,7 +51,7 @@ export async function resolveOpportunityLinks(
   }
 
   const owner = input.ownerUserId
-    ? await dataSource.findUserById(input.ownerUserId)
+    ? await dataSource.findUserById?.(input.ownerUserId)
     : null;
   if (input.ownerUserId && (!owner || owner.tenantId !== tenantId)) {
     return { ok: false, status: 404, error: "owner_user_not_found" };

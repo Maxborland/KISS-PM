@@ -1,11 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
 import {
-  CommsApiError,
+  guardData,
+  guardMutation,
+  type MutationDataResult,
+  type MutationResult
+} from "../../lib/domain-client";
+import { useDomainClient } from "../../lib/use-domain-client";
+import { useResource, type LoadStatus, type ResourceState } from "../../lib/use-resource";
+import {
   createCommsClient,
   type ActionItemInput,
+  type CommsProject,
   type CommsUser,
   type MeetingActionItemStatus,
   type CallEvent,
@@ -54,105 +62,37 @@ import { useCommsRuntime } from "./comms-runtime";
 // На текущем contract-mock RBAC-стаб (canReadEntity/…) отдаёт true, поэтому 403
 // на сид-данных не активируется; ветка проведена честно и сработает на боевом API
 // (apiOrigin) или при ужесточении стаба — поверхностям менять ничего не нужно.
-export type CommsLoadStatus = "loading" | "ready" | "error" | "forbidden";
-export type CommsMutationResult = { ok: true } | { ok: false; code?: string; message: string };
+export type CommsLoadStatus = LoadStatus;
+export type CommsMutationResult = MutationResult;
 // Результат мутации, ВОЗВРАЩАЮЩЕЙ данные для UI (например, join-token, action-item).
-export type CommsDataResult<T> = { ok: true; data: T } | { ok: false; code?: string; message: string };
-
-/* ============================================================
-   Общий load-state хелпер для 7 хуков блока «Коммуникации».
-   Инкапсулирует data/status/error + загрузку с разводкой 403→forbidden,
-   чтобы не дублировать try/catch и проводку forbidden в каждом хуке.
-   ============================================================ */
-export type CommsLoadState<T> = {
-  data: T | null;
-  status: CommsLoadStatus;
-  error: string | null;
-  setData: Dispatch<SetStateAction<T | null>>;
-  reload: () => Promise<void>;
-};
-
-function useCommsLoad<T>(fetcher: () => Promise<T>): CommsLoadState<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [status, setStatus] = useState<CommsLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
-
-  const reload = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const next = await fetcher();
-      setData(next);
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      // 403 (permission_missing) → forbidden; прочие ошибки → error. error хранит код.
-      if (e instanceof CommsApiError && e.status === 403) {
-        setStatus("forbidden");
-        setError(e.code);
-        return;
-      }
-      setStatus("error");
-      setError(e instanceof CommsApiError ? e.code : e instanceof Error ? e.message : "load_failed");
-    }
-  }, [fetcher]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  return { data, status, error, setData, reload };
-}
+export type CommsDataResult<T> = MutationDataResult<T>;
+// Общий load-state (data/status/error + 403→forbidden) — ядро apps/web/src/lib/use-resource.ts.
+export type CommsLoadState<T> = ResourceState<T>;
 
 // Общий клиент/транспорт. Два режима транспорта (см. CommsRuntimeProvider):
 //  • mock  — ОДИН createMockCommsFetch на весь модуль (общий in-memory стор). Раньше каждый
 //    хук строил свой стор → канал/комната, созданные родительским useChannels()/useCallRooms(),
 //    не были видны детальным useChannel()/useCallRoom() (getChannel(newId) → channel_not_found):
-//    create-then-open ломался. Поэтому все хуки делят ОДИН мок-клиент.
+//    create-then-open ломался. Поэтому все хуки делят ОДИН mock-fetch (стор живёт в fetchImpl).
 //  • live — боевой createCommsClient без fetchImpl: fetch на /api/workspace/* (next.config-прокси
-//    в Hono), credentials:"include" → cookie-сессия. Один общий live-клиент (стора нет — состояние
-//    на сервере), та же причина «один клиент»: согласованность между списком и деталью.
-// Singletons держим на уровне модуля, чтобы все хуки одного режима делили клиент. Режим фиксируется
-// провайдером на монтаж (live не меняется в рамках дерева), поэтому выбор один раз в ref безопасен.
-let sharedMockClient: ReturnType<typeof createCommsClient> | null = null;
-let sharedLiveClient: ReturnType<typeof createCommsClient> | null = null;
-function getSharedMockClient(): ReturnType<typeof createCommsClient> {
-  if (sharedMockClient === null) sharedMockClient = createCommsClient({ apiOrigin: "", fetchImpl: createMockCommsFetch() });
-  return sharedMockClient;
-}
-function getSharedLiveClient(): ReturnType<typeof createCommsClient> {
-  if (sharedLiveClient === null) sharedLiveClient = createCommsClient({ apiOrigin: "" });
-  return sharedLiveClient;
+//    в Hono), credentials:"include" → cookie-сессия (стора нет — состояние на сервере).
+// Общий mock-fetch держим на уровне модуля (ОДИН in-memory стор на все хуки); сами клиенты
+// stateless (замыкание над fetch), поэтому per-mount клиент из useDomainClient безопасен.
+// Режим фиксируется провайдером на монтаж (live не меняется в рамках дерева).
+let sharedMockFetch: typeof fetch | null = null;
+function getSharedMockFetch(): typeof fetch {
+  if (sharedMockFetch === null) sharedMockFetch = createMockCommsFetch();
+  return sharedMockFetch;
 }
 
 function useCommsClient() {
   const { live } = useCommsRuntime();
-  const clientRef = useRef<ReturnType<typeof createCommsClient> | null>(null);
-  if (clientRef.current === null) clientRef.current = live ? getSharedLiveClient() : getSharedMockClient();
-  return clientRef.current;
+  return useDomainClient(live, createCommsClient, getSharedMockFetch);
 }
 
-// Обёртка мутации: CommsApiError → {ok:false, code, message}.
+// Обёртки мутаций — общие guardMutation/guardData ядра.
 function useGuard() {
-  const guard = useCallback(async (fn: () => Promise<void>): Promise<CommsMutationResult> => {
-    try {
-      await fn();
-      return { ok: true };
-    } catch (e) {
-      if (e instanceof CommsApiError) return { ok: false, code: e.code, message: e.code };
-      return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
-    }
-  }, []);
-  // как guard, но возвращает данные мутации для UI.
-  const guardData = useCallback(async <T,>(fn: () => Promise<T>): Promise<CommsDataResult<T>> => {
-    try {
-      const data = await fn();
-      return { ok: true, data };
-    } catch (e) {
-      if (e instanceof CommsApiError) return { ok: false, code: e.code, message: e.code };
-      return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
-    }
-  }, []);
-  return { guard, guardData };
+  return { guard: guardMutation, guardData };
 }
 
 /* ============================================================
@@ -172,6 +112,11 @@ export function useConversation(entityType: EntityType, entityId: string) {
 
   // fetcher для общего load-state: беседы сущности + сообщения первой беседы.
   const fetcher = useCallback(async (): Promise<ConversationData> => {
+    // DM-only режим (проектный scope недоступен: нет прав/проектов) — бесед
+    // сущности нет, сеть не дёргаем; личные сообщения живут отдельной осью.
+    if (!entityId) {
+      return { conversations: [], selectedConversationId: null, messages: [], nextCursor: null };
+    }
     const { conversations } = await client.listConversations(entityType, entityId);
     const first = conversations[0] ?? null;
     let messages: Message[] = [];
@@ -183,7 +128,7 @@ export function useConversation(entityType: EntityType, entityId: string) {
     }
     return { conversations, selectedConversationId: first?.id ?? null, messages, nextCursor };
   }, [client, entityType, entityId]);
-  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
+  const { data, status, error, setData, reload: load } = useResource(fetcher);
 
   // Загрузка сообщений выбранной беседы.
   const loadMessages = useCallback(
@@ -258,14 +203,20 @@ export function useChannels() {
     const { channels } = await client.listChannels();
     return { channels };
   }, [client]);
-  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
+  const { data, status, error, setData, reload: load } = useResource(fetcher);
 
   const createChannel = useCallback(
     (input: ChannelCreateInput) => guard(async () => { const r = await client.createChannel(input); setData((d) => (d ? { ...d, channels: [...d.channels, r.channel] } : d)); }),
     [client, guard]
   );
 
-  return { client, data, status, error, reload: load, createChannel };
+  // Архив канала (мягкое удаление): убираем из списка сразу после успешного DELETE.
+  const archiveChannel = useCallback(
+    (channelId: string) => guard(async () => { await client.archiveChannel(channelId); setData((d) => (d ? { ...d, channels: d.channels.filter((c) => c.id !== channelId) } : d)); }),
+    [client, guard]
+  );
+
+  return { client, data, status, error, reload: load, createChannel, archiveChannel };
 }
 
 /* ============================================================
@@ -281,7 +232,7 @@ export function useChannel(channelId: string) {
     const [detail, conv] = await Promise.all([client.getChannel(channelId), client.getChannelConversation(channelId)]);
     return { channel: detail.channel, members: detail.members, conversation: conv.conversation };
   }, [client, channelId]);
-  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
+  const { data, status, error, setData, reload: load } = useResource(fetcher);
 
   const patchChannel = useCallback(
     (input: ChannelPatchInput) => guard(async () => { const r = await client.patchChannel(channelId, input); setData((d) => (d ? { ...d, channel: r.channel } : d)); }),
@@ -311,7 +262,7 @@ export function useCallRooms(entityType: EntityType, entityId: string) {
     const { callRooms } = await client.listCallRooms(entityType, entityId);
     return { callRooms };
   }, [client, entityType, entityId]);
-  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
+  const { data, status, error, setData, reload: load } = useResource(fetcher);
 
   const createRoom = useCallback(
     (input: CallRoomCreateInput) => guard(async () => { const r = await client.createCallRoom(input); setData((d) => (d ? { ...d, callRooms: [r.callRoom, ...d.callRooms] } : d)); }),
@@ -331,7 +282,7 @@ export function useCallRoom(roomId: string) {
     const res = await client.getCallRoom(roomId);
     return { callRoom: res.callRoom, events: res.events, recordings: res.recordings };
   }, [client, roomId]);
-  const { data, status, error, reload: load } = useCommsLoad(fetcher);
+  const { data, status, error, reload: load } = useResource(fetcher);
 
   const startSession = useCallback((): Promise<CommsDataResult<CallSession>> => guardData(async () => { const r = await client.startSession(roomId); await load(); return r.session; }), [client, guardData, roomId, load]);
   const joinToken = useCallback((sessionId: string): Promise<CommsDataResult<VideoJoinContract>> => guardData(async () => { const r = await client.joinToken(roomId, sessionId); return r.join; }), [client, guardData, roomId]);
@@ -360,7 +311,7 @@ export function useMeetings(entityType: EntityType, entityId: string) {
     const { meetings } = await client.listMeetings(entityType, entityId);
     return { meetings };
   }, [client, entityType, entityId]);
-  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
+  const { data, status, error, setData, reload: load } = useResource(fetcher);
 
   const createMeeting = useCallback(
     (input: MeetingCreateInput) => guard(async () => { const r = await client.createMeeting(input); setData((d) => (d ? { ...d, meetings: [r.meeting, ...d.meetings] } : d)); }),
@@ -389,7 +340,7 @@ export function useMeetingDetail(meetingId: string | null) {
     () => (meetingId ? client.getMeeting(meetingId) : Promise.resolve(null)),
     [client, meetingId]
   );
-  return useCommsLoad(fetcher);
+  return useResource(fetcher);
 }
 
 /* ============================================================
@@ -401,7 +352,7 @@ export function useMeetingDetail(meetingId: string | null) {
 export function useUnreadSummary() {
   const client = useCommsClient();
   const fetcher = useCallback(() => client.getUnreadSummary(), [client]);
-  return useCommsLoad(fetcher);
+  return useResource(fetcher);
 }
 
 /* ============================================================
@@ -439,7 +390,7 @@ export function useDirectMessages() {
     async (): Promise<{ conversations: DirectConversation[] }> => client.listDirectConversations(),
     [client]
   );
-  const { data, status, error, reload } = useCommsLoad(fetcher);
+  const { data, status, error, reload } = useResource(fetcher);
 
   const open = useCallback(
     async (userId: string): Promise<string | null> => {
@@ -465,7 +416,7 @@ export function useNotifications(filterStatus?: "unread" | "read") {
     const { notifications } = await client.listNotifications(filterStatus ? { status: filterStatus } : undefined);
     return { notifications };
   }, [client, filterStatus]);
-  const { data, status, error, reload: load } = useCommsLoad(fetcher);
+  const { data, status, error, reload: load } = useResource(fetcher);
 
   const markRead = useCallback((notificationId: string) => guard(async () => { await client.markNotificationRead(notificationId); await load(); }), [client, guard, load]);
 
@@ -480,7 +431,7 @@ export function useNotificationPreferences() {
     const { preferences } = await client.getNotificationPreferences();
     return { preferences };
   }, [client]);
-  const { data, status, error, setData, reload: load } = useCommsLoad(fetcher);
+  const { data, status, error, setData, reload: load } = useResource(fetcher);
 
   const savePreferences = useCallback(
     (preferences: PreferenceInput[]) => guard(async () => { const r = await client.putNotificationPreferences(preferences); setData({ preferences: r.preferences }); }),
@@ -507,7 +458,19 @@ export function useCommsUsers() {
   }, [client]);
   return useMemo(() => {
     const byId = new Map(list.map((u) => [u.id, u]));
-    return { list, byId, name: (id: string | null): string => (id ? byId.get(id)?.name ?? id : "—") };
+    return { list, byId, name: (id: string | null): string => (id ? byId.get(id)?.name ?? `Участник ${id.slice(-4)}` : "—") };
   }, [list]);
 }
 export type CommsUsersDir = ReturnType<typeof useCommsUsers>;
+
+/* ============================================================
+   Проекты воркспейса — реальный scope entity-привязанных поверхностей
+   (чат/звонки/встречи) вместо прежнего hardcode демо-проекта proj-portal.
+   mock = демо-проект (stories работают как раньше), live = GET /api/workspace/projects.
+   В отличие от useCommsUsers ошибки не глотаем: 403/ошибка загрузки списка
+   проектов = поверхность не может определить scope и честно это показывает.
+   ============================================================ */
+export function useCommsProjects(): CommsLoadState<{ projects: CommsProject[] }> {
+  const client = useCommsClient();
+  return useResource(useCallback(() => client.listProjects(), [client]));
+}

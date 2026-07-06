@@ -49,6 +49,7 @@ const ddmmyyyy = (iso: string | null) => {
 
 // RU-маппер кодов проекта/задач (боевые коды projectWorkRoutes) — для SurfaceState.errorFormat.
 const ERR_RU: Record<string, string> = {
+  permission_missing: "Недостаточно прав для просмотра этого раздела",
   invalid_project_id: "Некорректный идентификатор проекта",
   project_not_found: "Проект не найден или неактивен",
   load_failed: "Не удалось загрузить данные",
@@ -80,19 +81,28 @@ const STATUS_TONE: Record<TaskStatusCategory, "info" | "success" | "warning" | "
 export function ProjectDetailSurface({ initialProjectId }: { initialProjectId?: string } = {}) {
   // Выбор проекта — реальный список активных (GET /api/workspace/projects), старт = MOCK_PROJECT_ID.
   const projectsList = useProjects();
-  // старт = MOCK_PROJECT_ID (mock-fidelity); на live его в списке нет — переключаемся на первый реальный проект.
   const [selectedId, setSelectedId] = useState<string>(initialProjectId ?? MOCK_PROJECT_ID);
+  // Запрошенный по URL проект обязан существовать: молчаливая подмена первым проектом (G3-02)
+  // выглядела как запрошенная карточка. Автопереключение на первый проект — только для
+  // встраивания без initialProjectId (stories, mock-fidelity со стартом MOCK_PROJECT_ID).
+  const requestedMissing = Boolean(
+    initialProjectId &&
+      selectedId === initialProjectId &&
+      projectsList.data &&
+      !projectsList.data.projects.some((p) => p.id === initialProjectId)
+  );
   useEffect(() => {
+    if (initialProjectId) return;
     const projects = projectsList.data?.projects ?? [];
     if (projects.length && !projects.some((p) => p.id === selectedId)) setSelectedId(projects[0]!.id);
-  }, [projectsList.data, selectedId]);
+  }, [initialProjectId, projectsList.data, selectedId]);
   // Карточка проекта + его задачи (GET /api/workspace/projects/:id) — реальный запрос на смену selectedId.
   const { data, status, error, reload } = useProjectDetail(selectedId);
 
   // Статус поверхности: data → ready; иначе loading; error-код project_not_found → можно трактовать как «нет доступа»,
   // но контракт отдаёт 404 (а не 403) — показываем как error с человекочитаемым текстом. forbidden зарезервирован
   // под боевой 403, которого мок не моделирует.
-  const surfaceStatus = status === "loading" ? "loading" : status === "error" ? "error" : data ? "ready" : "loading";
+  const surfaceStatus = requestedMissing ? "empty" : status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : data ? "ready" : "loading";
 
   return (
     <WorkspaceShell activeNav="Проекты">
@@ -117,6 +127,10 @@ export function ProjectDetailSurface({ initialProjectId }: { initialProjectId?: 
           onRetry={() => void reload()}
           errorFormat={wsErr}
           loadingLabel="Загружаем карточку проекта…"
+          empty={{
+            title: "Проект не найден",
+            description: "Проекта с таким адресом нет: возможно, он закрыт/архивирован или ссылка устарела. Выберите проект из списка выше."
+          }}
         >
           {data ? <ProjectContent project={data.project} tasks={data.tasks} /> : <span />}
         </SurfaceState>
@@ -192,7 +206,7 @@ function ProjectHeader({ project, taskCount }: { project: ProjectRecord; taskCou
         <div className="min-w-0">
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <Chip variant={projectStatusTone(project.status)}>{PROJECT_STATUS_LABEL[project.status] ?? project.status}</Chip>
-            <span className="v4-mono text-[length:var(--text-xs)] text-[var(--muted-soft)]">{project.id}</span>
+            {prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-xs)] text-[var(--muted-soft)]">{project.id}</span> : null}
           </div>
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold leading-tight text-[var(--text-strong)]">
             {project.title}
@@ -231,7 +245,13 @@ function ProgressBar({ value }: { value: number }) {
 // Таблица задач проекта: задача / статус-Chip / исполнитель / срок / прогресс.
 function ProjectTasks({ tasks }: { tasks: TaskRecord[] }) {
   const usersDir = useWorkspaceUsers();
-  const userName = (id: string | null) => (id ? usersDir.name(id) : "—");
+  // Фолбэк имени: под ограниченной ролью справочник людей отдаёт 403 — резолвер вернёт сырой id.
+  // Показываем «Участник xxxx» вместо user-… (G8-08, G5-12).
+  const userName = (id: string | null) => {
+    if (!id) return "—";
+    const n = usersDir.name(id);
+    return n === id ? `Участник ${id.slice(-4)}` : n;
+  };
   const userColor = (id: string | null): BemAvatarColor => {
     const i = id ? usersDir.indexOf(id) : -1;
     return i < 0 ? "c5" : AV[i % AV.length]!;
@@ -273,10 +293,12 @@ function ProjectTasks({ tasks }: { tasks: TaskRecord[] }) {
             <tr key={t.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
               <td className="px-3 py-2">
                 <div className="font-medium text-[var(--text-strong)]">{t.title}</div>
-                <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
-                  {t.id}
-                  {t.requiresAcceptance ? " · требует приёмки" : ""}
-                </div>
+                {prototypeNotesEnabled || t.requiresAcceptance ? (
+                  <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
+                    {prototypeNotesEnabled ? t.id : null}
+                    {t.requiresAcceptance ? `${prototypeNotesEnabled ? " · " : ""}требует приёмки` : ""}
+                  </div>
+                ) : null}
               </td>
               <td className="px-3 py-2">
                 <Chip variant={STATUS_TONE[t.statusCategory]}>{t.statusName || STATUS_LABEL[t.statusCategory]}</Chip>
@@ -329,7 +351,7 @@ function ProjectSummary({ project, tasks }: { project: ProjectRecord; tasks: Tas
         onChange={setMode}
         options={[
           { value: "scope", label: "Объём" },
-          { value: "demand", label: "Демэнд" }
+          { value: "demand", label: "Спрос" }
         ]}
       />
 
@@ -367,7 +389,7 @@ function ProjectSummary({ project, tasks }: { project: ProjectRecord; tasks: Tas
             </ul>
           )}
           <p className="mt-1 border-t border-[var(--border-subtle)] pt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
-            Спрос проекта (project.demand из GET /api/workspace/projects/:id) — потребность в часах по позициям.
+            Спрос проекта — потребность в часах по позициям.
           </p>
         </div>
       )}

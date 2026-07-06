@@ -1,0 +1,335 @@
+{
+  "group": "g3-projects",
+  "stand": "web http://127.0.0.1:3000, API http://127.0.0.1:4000, master ab90acc9, дата 2026-07-05, учётки admin + plan-reader",
+  "coverage": [
+    { "route": "/projects", "status": "partial", "notes": "Список рендерится, фильтр Все/Активные есть; создать проект нельзя, поиска нет, сырые ID позиций в колонке СПРОС." },
+    { "route": "/projects/project-vektor-portal", "status": "partial", "notes": "Легаси-«Карточка проекта» без вкладок, дублирует overview с другими цифрами; задачи некликабельны; достижима только по прямому URL." },
+    { "route": "/projects/project-vektor-portal/overview", "status": "fail", "notes": "Шапка — захардкоженный мок-проект; счётчик «0 закрыто · 0 в работе» противоречит плану; данные сигналов при этом реальные." },
+    { "route": "/projects/project-vektor-portal/schedule", "status": "partial", "notes": "CRUD задачи работает через реальный planning-API (create/rename/delete проверены); Gantt-таймлайн визуально отсутствует (заякорен на март 2026); Фильтры/Колонки/Baseline — disabled-заглушки; удаление без подтверждения." },
+    { "route": "/projects/project-vektor-portal/resources", "status": "partial", "notes": "Матрица загрузки работает у админа; в «Команда проекта» — тестовые Audit-пользователи с обрезанными именами; у plan-reader вкладка деградирует непонятно." },
+    { "route": "/projects/project-vektor-portal/assignments", "status": "partial", "notes": "Кривая распределения отображается; колонка роли обрезана («Исполнитель · 100…»); редактирование кривой не прогонялось." },
+    { "route": "/projects/project-vektor-portal/baseline", "status": "partial", "notes": "Сравнение с базовым отображается; форма фиксации снимка открывается (имя+кнопка); «Изменилось 4 из 4 · 100%» игнорирует задачи вне снимка; знак отклонений спорит с бейджем шапки." },
+    { "route": "/projects/project-vektor-portal/calendars", "status": "fail", "notes": "Календарь открывается на марте 2026 (мок), клик по дню создаёт праздник в прошлом (10.03.2026) — проверено сетевым логом." },
+    { "route": "/projects/project-vektor-portal/commits", "status": "partial", "notes": "Лента наполняется после правок, детали есть; заголовки коммитов — сырые типы событий; «Откатить последний» активна всегда и падает 409." },
+    { "route": "/projects/project-vektor-portal/scenarios", "status": "partial", "notes": "Preview сценариев работает, валидация причины есть, но сообщение внизу страницы; копия обещает «три профиля» при двух карточках; сырой пермишен canPreviewPlanningScenarios в UI." },
+    { "route": "/projects/project-vektor-portal/settings", "status": "partial", "notes": "Перенос дедлайна: форма с датой и обязательной причиной, preview/apply; интеграции — disabled-заглушки с roadmap-жаргоном; для plan-reader форма редактируема, но сабмит отклоняется." },
+    { "route": "/projects/does-not-exist-123 (+ /schedule)", "status": "fail", "notes": "Корень молча подменяет проект на «Портал подрядчиков Вектор»; schedule показывает сырой код project_not_found под мок-шапкой «план v17»." }
+  ],
+  "findings": [
+    {
+      "id": "G3-01",
+      "route": "/projects/project-vektor-portal/{overview,schedule,resources,assignments,baseline,calendars,commits,scenarios,settings}",
+      "criterion": "логичность",
+      "severity": "critical",
+      "title": "Шапка всех вкладок проекта показывает захардкоженный мок-проект «Производственный портал · Релиз 2» вместо открытого проекта",
+      "description": "Открыт проект «Портал подрядчиков Вектор» (project-vektor-portal), данные таблиц/плана реальные (задачи Вектора, дедлайн 08.07.2026 совпадает с read-model), но заголовок, код «ПР», статус и бейджи на всех девяти вкладках — константа из кода (apps/web/src/delivery/*/-surface.tsx: const PROJECT = { name: \"Производственный портал · Релиз 2\", planVersion: \"v17\", … }). РП не может доверять тому, какой проект он редактирует; для любого второго проекта (Горсеть, CRM intake) шапка будет так же врать.",
+      "repro": [
+        "Войти админом, открыть /projects, кликнуть строку «Портал подрядчиков Вектор»",
+        "Смотреть на заголовок над вкладками: «Производственный портал · Релиз 2» вместо названия проекта",
+        "Сравнить с /projects/project-vektor-portal (легаси-карточка) — там название верное"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-overview.png", "evidence/screenshots/g3-projects-detail-root.png", "evidence/screenshots/g3-projects-schedule.png"],
+      "suggestedFix": "Брать метаданные проекта (название, код, статус, версия плана) из planning read-model / GET /api/workspace/projects/:id, удалить const PROJECT из всех delivery-поверхностей."
+    },
+    {
+      "id": "G3-02",
+      "route": "/projects/does-not-exist-123",
+      "criterion": "логичность",
+      "severity": "critical",
+      "title": "Невалидный ID проекта в URL молча подменяется первым проектом воркспейса",
+      "description": "GET /projects/does-not-exist-123 рендерит полноценную «Карточку проекта» проекта «Портал подрядчиков Вектор» без какого-либо предупреждения или 404. Пользователь, перешедший по битой/устаревшей ссылке (например, на удалённый проект), уверен, что смотрит нужный проект, и может принимать решения по чужим данным.",
+      "repro": [
+        "Войти админом",
+        "Открыть /projects/does-not-exist-123",
+        "Видна карточка «Портал подрядчиков Вектор» со всеми задачами, URL остаётся does-not-exist-123"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-invalid-id.png", "evidence/g3-projects-tour.json"],
+      "suggestedFix": "При отсутствии проекта показывать состояние «Проект не найден» с ссылкой на список, не фолбэчить на первый проект."
+    },
+    {
+      "id": "G3-03",
+      "route": "/projects/does-not-exist-123/schedule",
+      "criterion": "кривость",
+      "severity": "major",
+      "title": "Ошибка несуществующего проекта — сырой код «project_not_found» под мок-шапкой «план v17 · В работе»",
+      "description": "Вкладка График для несуществующего ID показывает карточку «Не удалось загрузить / project_not_found / Повторить». Код ошибки не переведён; при этом шапка сверху продолжает рисовать мок-проект со статусом «В работе» и «план v17», то есть страница одновременно говорит «проект работает» и «проекта нет». В консоли необработанный 404.",
+      "repro": ["Открыть /projects/does-not-exist-123/schedule", "Смотреть на карточку ошибки и шапку"],
+      "evidence": ["evidence/screenshots/g3-projects-invalid-id-schedule.png"],
+      "suggestedFix": "Человекочитаемое сообщение «Проект не найден» на всю страницу (вместе с шапкой), убрать сырые коды ошибок из UI."
+    },
+    {
+      "id": "G3-04",
+      "route": "/projects/project-vektor-portal/schedule",
+      "criterion": "кривость",
+      "severity": "major",
+      "title": "Gantt-диаграмма фактически отсутствует: таймлайн — колонка ~70px, заякоренная на «Мар 02», баров не видно",
+      "description": "Вкладка называется «График», легенда обещает бары (Задача/Критический путь/Summary/Веха/Baseline B2/Связь), но справа от таблицы виден только заголовок «Мар 02» — таймлайн начинается 02.03.2026 (дата старта мок-сделки), а задачи проекта в июне–июле 2026. Ни в «День», ни в «Неделя», ни в «Месяц» (1440 и 1280 px) ни одного бара не видно, автоскролла к диапазону проекта нет.",
+      "repro": [
+        "Открыть /projects/project-vektor-portal/schedule (вьюпорт 1440×900)",
+        "Переключить Неделя/Месяц — правая колонка остаётся пустой с заголовком «Мар»",
+        "Сравнить с легендой под таблицей"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-schedule.png", "evidence/screenshots/g3-projects-gantt-month.png", "evidence/screenshots/g3-projects-schedule-1280.png"],
+      "suggestedFix": "Стартовать таймлайн от min(plannedStart) плана, дать таймлайну ширину/скролл и автопозиционирование на «сегодня»/диапазон проекта."
+    },
+    {
+      "id": "G3-05",
+      "route": "/projects/project-vektor-portal/schedule",
+      "criterion": "логичность",
+      "severity": "major",
+      "title": "Баннер «Данные in-memory, не сохраняются» противоречит реальному поведению — статус персистентности непонятен",
+      "description": "Баннер ПРОТОТИП утверждает «Данные in-memory, не сохраняются», но создание задачи уходит POST-ом в реальный API (/planning/apply-command-batch → 200, план v1→v2), задача переживает reload страницы и попадает в аудит-ленту Коммитов. При этом позже (между сессиями) созданная задача uiux-eval-задача-1 молча исчезла из плана, а счётчик версий остался (v6). Пользователь не может понять, сохраняется ли его работа: UI говорит «нет», поведение говорит «да», потом данные пропадают.",
+      "repro": [
+        "Открыть График, создать задачу «uiux-eval-задача-1» (+ Задача → имя → Enter) — коммит v2, POST 200",
+        "F5 — задача на месте, вопреки баннеру",
+        "Позже в новой сессии открыть График — задачи нет, версия плана продолжает расти"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-task-after-reload.png", "evidence/g3-projects-interact.json", "evidence/g3-projects-deep.json"],
+      "suggestedFix": "Синхронизировать хранение и копию: либо реальная персистентность в БД и убрать пугающий баннер, либо честное «песочница, сбрасывается при рестарте» + индикатор."
+    },
+    {
+      "id": "G3-06",
+      "route": "/projects/project-vektor-portal/schedule",
+      "criterion": "обратная связь",
+      "severity": "major",
+      "title": "Удаление задачи — мгновенно, без подтверждения, и откат для него недоступен",
+      "description": "ПКМ по задаче → «Удалить» удаляет задачу сразу (task.delete_or_archive mode=delete, POST 200). Диалога подтверждения нет. Кнопка «Откат» в тулбаре после удаления показывает «Откат недоступен для этой операции (создание/перенос/назначение)» — то есть случайный клик по последнему пункту меню безвозвратно уничтожает задачу вместе с назначениями.",
+      "repro": [
+        "Создать задачу uiux-eval-задача-2 на Графике",
+        "ПКМ по ней → Удалить — задача исчезает без вопросов",
+        "Нажать «Откат» — «Откат недоступен для этой операции»"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-task2-context-menu.png", "evidence/screenshots/g3-projects-task2-deleted.png", "evidence/screenshots/g3-projects-task2-undo.png", "evidence/g3-projects-crud.json"],
+      "suggestedFix": "Подтверждение перед удалением (с числом затронутых назначений) и/или обратимый коммит task.delete с восстановлением."
+    },
+    {
+      "id": "G3-07",
+      "route": "/projects/project-vektor-portal/commits",
+      "criterion": "кривость",
+      "severity": "major",
+      "title": "Коммиты: «Откатить последний» всегда активна и падает 409; часть заголовков — сырые типы событий",
+      "description": "Кнопка «Откатить последний» активна даже когда откатывать нечего/нельзя: клик даёт POST /planning/revert-last → 409 {\"error\":\"nothing_to_revert\"} и необработанную ошибку в консоли, обратная связь — только серая строчка внизу «Нет обратимого коммита для отката». Батчевые коммиты в ленте и на Обзоре подписаны сырым типом события «planning.command_batch.applied» (одиночные при этом человекочитаемы: «Изменено название задачи»), в деталях — сырой ID «audit-c4a256c6-…» и кнопка «Показать raw payload».",
+      "repro": [
+        "Создать задачу на Графике (появится коммит v2 planning.command_batch.applied)",
+        "Открыть Коммиты → «Откатить последний» → 409 в консоли, серая строка внизу",
+        "Сравнить подписи batch- и одиночных коммитов в ленте"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-commits-revert-click.png", "evidence/screenshots/g3-projects-overview-1280.png", "evidence/g3-projects-interact.json"],
+      "suggestedFix": "Дизейблить кнопку, когда нет обратимого коммита; человекочитаемые заголовки для batch-коммитов («Создана задача …»); прятать сырые ID за деталями."
+    },
+    {
+      "id": "G3-08",
+      "route": "/projects/project-vektor-portal/calendars",
+      "criterion": "логичность",
+      "severity": "major",
+      "title": "Календарь открывается на марте 2026 — клик по дню создаёт праздник в прошлом, за пределами проекта",
+      "description": "Сегодня 05.07.2026, проект идёт 01.06–10.07.2026, но сетка календаря по умолчанию показывает «Март 2026» (стартовая дата мок-проекта). Клик по дню «10» по подсказке «Клик по дню сетки — добавить/снять праздник» реально создал calendar.exception 2026-03-10 (POST apply-command → 200, «Праздник добавлен · коммит v3») — исключение в прошлом, никак не влияющее на текущий план. Пользователь, не заметив месяц, испортит календарь не тем днём.",
+      "repro": [
+        "Открыть вкладку Календари — заголовок сетки «Март 2026»",
+        "Кликнуть день 10 — в «Исключения · праздники» появляется «праздник 10.03.2026»"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-calendars.png", "evidence/screenshots/g3-projects-calendars-day-click.png", "evidence/g3-projects-interact.json"],
+      "suggestedFix": "Открывать календарь на текущем месяце (или старте проекта), подтверждать создание исключения с датой в тексте."
+    },
+    {
+      "id": "G3-09",
+      "route": "/projects/project-vektor-portal/overview",
+      "criterion": "кривость",
+      "severity": "major",
+      "title": "Обзор: счётчик «ПРОГРЕСС 25% · 0 закрыто · 0 в работе» врёт при 1 закрытой и 2 задачах в работе",
+      "description": "Карточка прогресса на Обзоре всегда показывает «0 закрыто · 0 в работе», хотя read-model содержит task-status-done (Сбор требований, 100%) и два task-status-in-progress (40% и 50%). Легаси-карточка того же проекта показывает правильные «1 закрыто · 2 в работе». Сводке по ядру продукта нельзя верить.",
+      "repro": [
+        "Открыть /projects/project-vektor-portal/overview — «0 закрыто · 0 в работе»",
+        "Открыть /projects/project-vektor-portal — «1 закрыто · 2 в работе»",
+        "Сверить с GET /api/workspace/projects/project-vektor-portal/planning/read-model (statusId задач)"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-overview.png", "evidence/screenshots/g3-projects-detail-root.png"],
+      "suggestedFix": "Считать закрытые/в работе из statusId задач read-model, покрыть счётчик тестом."
+    },
+    {
+      "id": "G3-10",
+      "route": "/projects/project-vektor-portal/{schedule,resources,scenarios}",
+      "criterion": "роли",
+      "severity": "major",
+      "title": "Роль plan-reader: сырые user-ID вместо имён, пустая матрица ресурсов со сваливанием вины на «фильтры», сценарии падают без объяснения",
+      "description": "Под plan-reader-no-resources: (1) колонка «Ресурсы» Графика показывает user-alpha-admin, user-alpha-engineer и т.п. вместо имён — нет graceful-фолбэка при недоступном справочнике ресурсов; (2) вкладка Ресурсы: «Ёмкость 0 ч · 0 чел.» и «Нет ресурсов под фильтры. Снимите фильтр или выберите другой период» — но дело в правах, а не фильтрах, совет бесполезен; (3) Сценарии: красная строка «Не удалось получить сценарии» без причины и без вариантов действий; консоль засыпана 403.",
+      "repro": [
+        "Войти plan-reader-no-resources@kiss-pm.local",
+        "Открыть График — сырые ID в колонке Ресурсы",
+        "Открыть Ресурсы — пустая матрица с советом «снимите фильтр»",
+        "Открыть Сценарии — «Не удалось получить сценарии»"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-reader-schedule.png", "evidence/screenshots/g3-projects-reader-resources.png", "evidence/screenshots/g3-projects-reader-scenarios.png"],
+      "suggestedFix": "При 403 на справочники показывать «Нет доступа к ресурсам (роль …)» и маскировать ID («Участник 1»); различать пустоту из-за фильтров и из-за прав."
+    },
+    {
+      "id": "G3-11",
+      "route": "/projects/project-vektor-portal/{schedule,settings}",
+      "criterion": "роли",
+      "severity": "major",
+      "title": "Фейковые контролы для read-only роли: «+ Задача» и перенос дедлайна дают заполнить форму и отклоняют её кодом «permission_missing»",
+      "description": "Под plan-reader кнопки «+ Задача» (График) и «Изменить» дедлайн (Настройки) активны. Пользователь заполняет диалог задачи / форму переноса, жмёт сабмит → POST 403 permission_missing, а в UI — мелкая серая строка «Отклонено бэком: permission_missing» под таблицей (График) или «Отклонено: permission_missing» в самом низу страницы (Настройки). Введённое название задачи теряется. Это нарушение собственного стандарта репо «no fake controls»: контролы должны быть скрыты/задизейблены по правам, а ошибка — на русском и по месту.",
+      "repro": [
+        "Войти plan-reader, открыть График",
+        "+ Задача → ввести имя → Создать → задача не создана, внизу серым «Отклонено бэком: permission_missing»",
+        "Настройки → Изменить дедлайн → дата+причина → Применить перенос → внизу страницы «Отклонено: permission_missing»"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-reader-task-create.png", "evidence/screenshots/g3-projects-reader-deadline.png", "evidence/g3-projects-reader-write.json"],
+      "suggestedFix": "Дизейблить/скрывать write-контролы по пермишенам read-model; при 403 — заметная русская ошибка рядом с формой, с сохранением ввода."
+    },
+    {
+      "id": "G3-12",
+      "route": "/projects (весь раздел)",
+      "criterion": "недоделанность",
+      "severity": "major",
+      "title": "Глобальный поиск «Найти задачу или ресурс» — задизейбленная заглушка «Поиск появится в следующей версии»",
+      "description": "Поле поиска в шапке присутствует на каждой странице раздела, выглядит как рабочее, но input disabled с title «Поиск появится в следующей версии». Найти задачу в большом плане или проект в списке нечем: в списке проектов поиска нет, «Фильтры» на Графике тоже отключены. Обещание «скоро» в постоянном хроме продукта.",
+      "repro": [
+        "Открыть любую страницу /projects…",
+        "Кликнуть в поле «Найти задачу или ресурс» — ввод невозможен; навести курсор — тултип «Поиск появится в следующей версии»"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-list.png", "evidence/g3-projects-deep.json"],
+      "suggestedFix": "Либо реализовать поиск по задачам/ресурсам/проектам, либо убрать поле из шапки до готовности."
+    },
+    {
+      "id": "G3-13",
+      "route": "/projects",
+      "criterion": "достаточность функционала",
+      "severity": "major",
+      "title": "Создать проект из раздела «Проекты» невозможно, и UI не объясняет, как проекты появляются",
+      "description": "На списке проектов нет ни кнопки «Создать проект», ни подсказки, что проекты создаются активацией сделки в CRM (sourceType=opportunity). Пользователь, пришедший «завести проект», упирается в тупик и должен сам догадаться пойти в Сделки. Сценарий создания проекта из этого раздела занимает неопределённое число шагов.",
+      "repro": ["Открыть /projects — единственные контролы: Все/Активные", "Искать способ создать проект — его нет"],
+      "evidence": ["evidence/screenshots/g3-projects-list.png", "evidence/screenshots/g3-projects-list-recheck.png"],
+      "suggestedFix": "CTA «Создать проект» (мастер или переход к активации сделки) либо явная подсказка «Проекты создаются из сделок CRM → Активировать»."
+    },
+    {
+      "id": "G3-14",
+      "route": "/projects/project-vektor-portal/*",
+      "criterion": "недоделанность",
+      "severity": "major",
+      "title": "Дев-жаргон и API-строки в пользовательском UI: пути эндпоинтов, имена команд, пермишены, «raw payload»",
+      "description": "В интерфейсе для пользователя: подпись таба Демэнд — «Спрос проекта (project.demand из GET /api/workspace/projects/:id)»; на Сценариях в углу сырой пермишен «canPreviewPlanningScenarios» и текст про «пакет команд PlanningCommand… пишется в аудит как planning.scenario.applied»; баннеры ПРОТОТИП оперируют «assignment.upsert / assignment.allocations.replace», «baselineComparison», «project.deadline.move», «@kiss-pm/planning-client»; в Коммитах — «Показать raw payload»; в Настройках бейдж «Phase C» у Bitrix24. Это внутренние термины разработки, бесполезные и пугающие для РП.",
+      "repro": [
+        "Карточка проекта → таб «Демэнд» — в подписи виден путь API",
+        "Сценарии — в правом верхнем углу карточки параметров «canPreviewPlanningScenarios»",
+        "Любая вкладка — баннер ПРОТОТИП с именами команд"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-card-demand.png", "evidence/screenshots/g3-projects-scenarios.png", "evidence/screenshots/g3-projects-assignments.png", "evidence/screenshots/g3-projects-settings.png"],
+      "suggestedFix": "Переписать все пользовательские подписи на язык предметной области; технические контракты — в документацию/дев-режим."
+    },
+    {
+      "id": "G3-15",
+      "route": "/projects/project-vektor-portal + /overview",
+      "criterion": "логичность",
+      "severity": "major",
+      "title": "Две конкурирующие «карточки проекта» с разными цифрами и навигацией",
+      "description": "Существуют /projects/[id] («Карточка проекта», без вкладок, со своим селектором «Проект:», правильным названием и «1 закрыто · 2 в работе») и /projects/[id]/overview (вкладочный Обзор с мок-шапкой и «0 закрыто · 0 в работе»). Клик по строке списка ведёт на overview; легаси-карточка достижима только прямым URL, задачи в ней некликабельны (нет перехода к детали/инспектору). Один и тот же проект показывает разные сводки в двух местах.",
+      "repro": [
+        "Кликнуть проект в списке → /overview (мок-шапка)",
+        "Вручную открыть /projects/project-vektor-portal → другая карточка с другими цифрами",
+        "Кликнуть задачу в легаси-карточке — ничего не происходит"
+      ],
+      "evidence": ["evidence/screenshots/g3-projects-detail-root.png", "evidence/screenshots/g3-projects-overview.png", "evidence/screenshots/g3-projects-card-task-click.png"],
+      "suggestedFix": "Оставить одну поверхность (перенаправлять /projects/[id] → /overview), согласовать цифры, сделать задачи ссылками на График/инспектор."
+    },
+    {
+      "id": "G3-16",
+      "route": "/projects/project-vektor-portal/schedule",
+      "criterion": "недоделанность",
+      "severity": "minor",
+      "title": "Тулбар Графика: «Фильтры», «Колонки», «Baseline» — постоянно неактивные заглушки",
+      "description": "Три кнопки тулбара всегда disabled и ни при каких действиях не активируются (Baseline активируется только после наложения из вкладки Baseline — но из Графика об этом не узнать). Обещанные функции не работают, объяснения нет (нет тултипов «почему недоступно»).",
+      "repro": ["Открыть График — кнопки Фильтры/Колонки/Baseline серые", "Кликать — эффекта нет"],
+      "evidence": ["evidence/screenshots/g3-projects-schedule.png"],
+      "suggestedFix": "Реализовать или убрать; как минимум тултип с причиной недоступности."
+    },
+    {
+      "id": "G3-17",
+      "route": "/projects",
+      "criterion": "кривость",
+      "severity": "minor",
+      "title": "Сырые технические ID в списке и карточках: project-vektor-portal, task-vektor-*, position-engineer",
+      "description": "Под названием каждого проекта в списке и карточке — сырой slug (project-vektor-portal), под задачами — task-vektor-phase-prep, в колонке «СПРОС» — position-engineer вместо названия позиции «Инженер». В Настройках — «project-vektor-portal · v3». Технические идентификаторы подаются как пользовательский контент.",
+      "repro": ["Открыть /projects — вторая строка каждой ячейки ПРОЕКТ и бейджи СПРОС", "Открыть карточку — подписи под задачами"],
+      "evidence": ["evidence/screenshots/g3-projects-list.png", "evidence/screenshots/g3-projects-detail-root.png"],
+      "suggestedFix": "Показывать человекочитаемые названия позиций; slug — только по клику/в деталях."
+    },
+    {
+      "id": "G3-18",
+      "route": "/projects/project-vektor-portal/scenarios",
+      "criterion": "логичность",
+      "severity": "minor",
+      "title": "Копия обещает «три профиля разрешения перегруза», карточек — две",
+      "description": "Подзаголовок: «Бэкенд предлагает три профиля…», под ним только «Агрессивный» и «Устойчивый» (рекомендуется). Куда делся третий — неизвестно; пользователь ищет несуществующий вариант.",
+      "repro": ["Открыть Сценарии, сравнить текст подзаголовка с числом карточек"],
+      "evidence": ["evidence/screenshots/g3-projects-scenarios.png"],
+      "suggestedFix": "Синхронизировать текст с фактическим числом профилей (или показывать все три)."
+    },
+    {
+      "id": "G3-19",
+      "route": "/projects/project-vektor-portal/scenarios",
+      "criterion": "обратная связь",
+      "severity": "minor",
+      "title": "Валидация «Укажите причину принятия риска» показывается в самом низу страницы, далеко от поля и кнопки",
+      "description": "Клик «Применить» агрессивного сценария без причины корректно блокируется, но красный баннер появляется под всеми карточками и дисклеймерами — вне поля зрения, поле причины не подсвечивается дополнительно и фокус туда не переводится.",
+      "repro": ["Сценарии → «Применить» у Агрессивного при пустой причине", "Искать сообщение — оно последним блоком страницы"],
+      "evidence": ["evidence/screenshots/g3-projects-scenarios-apply-noreason.png"],
+      "suggestedFix": "Inline-ошибка у поля причины + автофокус."
+    },
+    {
+      "id": "G3-20",
+      "route": "/projects/project-vektor-portal/{resources,assignments,calendars}",
+      "criterion": "кривость",
+      "severity": "minor",
+      "title": "Обрезанный текст без тултипов: роли назначений («Исполнитель · 100…») и имена ресурсов («Audit Browser User Mana…»)",
+      "description": "В Назначениях колонка «Роль · units · труд» обрезает значения («Исполнитель · 100…», «Соисполнитель · 7…») — юниты не прочитать. В Ресурсах и Календарях имена длинных пользователей обрезаются («Audit Domain Bypass 202…») без title/тултипа. Заодно в «Команда проекта» видны четыре служебных Audit-пользователя с ёмкостью 0/176 ч, замусоривающие матрицу.",
+      "repro": ["Открыть Назначения — колонка роли", "Открыть Ресурсы — группа «Команда проекта»"],
+      "evidence": ["evidence/screenshots/g3-projects-assignments.png", "evidence/screenshots/g3-projects-resources.png"],
+      "suggestedFix": "title/тултип на обрезанных ячейках, расширяемая колонка; фильтровать служебные учётки из команды проекта."
+    },
+    {
+      "id": "G3-21",
+      "route": "/projects/project-vektor-portal/commits",
+      "criterion": "логичность",
+      "severity": "minor",
+      "title": "Терминология «Удалить» vs «Задача архивирована»: одна операция называется по-разному",
+      "description": "Пункт контекстного меню — «Удалить», команда уходит как task.delete_or_archive mode=delete, а в ленте коммитов и на Обзоре операция подписана «Задача архивирована». Пользователь ищет удалённую задачу в «архиве», которого в UI нет.",
+      "repro": ["Удалить задачу на Графике", "Открыть Коммиты/Обзор — запись «Задача архивирована»"],
+      "evidence": ["evidence/screenshots/g3-projects-overview-1280.png", "evidence/g3-projects-crud.json"],
+      "suggestedFix": "Единая терминология (удалена/архивирована) в меню, подтверждении и аудите."
+    },
+    {
+      "id": "G3-22",
+      "route": "/projects/project-vektor-portal/baseline",
+      "criterion": "логичность",
+      "severity": "minor",
+      "title": "Baseline: «Изменилось задач 4 из 4 · 100%» игнорирует задачи вне снимка, знак отклонений спорит с бейджем шапки",
+      "description": "Снимок содержит 4 задачи, план — 7–8; созданные после снимка задачи в сравнение не попадают и никак не помечены («новая, вне базового плана»). При этом все per-task дельты отрицательные (−1…−5 дн., раньше базового), а бейдж шапки и карточка «Финиш» показывают «+1 дн. к базовому плану» — противоположные знаки без объяснения, что финиш проекта тянет веха.",
+      "repro": ["Открыть Baseline при 7+ задачах в плане", "Сравнить «Изменилось 4 из 4», таблицу дельт и бейдж «+1 дн. к базовому плану»"],
+      "evidence": ["evidence/screenshots/g3-projects-baseline.png", "evidence/screenshots/g3-projects-baseline-captured.png"],
+      "suggestedFix": "Показывать задачи вне снимка отдельной группой; объяснять источник +1 дн. (веха/критпуть) в карточке."
+    },
+    {
+      "id": "G3-23",
+      "route": "/projects/project-vektor-portal/*",
+      "criterion": "логичность",
+      "severity": "nit",
+      "title": "EN/RU-мешанина в навигации и бейджах: «Baseline» среди русских вкладок, «Демэнд», «Overlay в График», «ПРОТОТИП · IN-MEMORY»",
+      "description": "Вкладка «Baseline» — единственная английская среди девяти; таб карточки «Демэнд» — транслит; кнопки «Overlay в График», бейджи «IN-MEMORY», «Phase C». Для RU-продукта терминология не выровнена.",
+      "repro": ["Открыть любую вкладку проекта, посмотреть ряд вкладок и бейджи"],
+      "evidence": ["evidence/screenshots/g3-projects-baseline.png", "evidence/screenshots/g3-projects-card-demand.png"],
+      "suggestedFix": "«Базовый план», «Спрос», «Наложить на График», русские бейджи."
+    },
+    {
+      "id": "G3-24",
+      "route": "/projects/project-vektor-portal/overview",
+      "criterion": "кривость",
+      "severity": "nit",
+      "title": "«Контрольные точки»: под «Дедлайн релиза» висит одинокий «—»",
+      "description": "В карточке контрольных точек под названием вехи выводится пустая подпись «—» — артефакт отсутствующего описания.",
+      "repro": ["Открыть Обзор, карточка «Контрольные точки»"],
+      "evidence": ["evidence/screenshots/g3-projects-overview.png"],
+      "suggestedFix": "Не рендерить подпись, если данных нет."
+    }
+  ]
+}

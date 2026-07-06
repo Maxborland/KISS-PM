@@ -1,20 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Hash, Loader2, Lock, Plus, Save, Send, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
+import { Archive, Hash, Loader2, Lock, Plus, Save, Send, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
+import { toast } from "sonner";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FormDialog } from "@/components/domain/form-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { SurfaceState } from "@/components/domain/surface-state";
+import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
-import { useChannel, useChannels, useCommsUsers, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
+import { useChannel, useChannels, useCommsProjects, useCommsUsers, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { avatarColor, commsErr, initials, relTime, RoleChip } from "@/communications/lib/comms-bits";
 import type {
   Channel,
@@ -60,9 +63,6 @@ const ROLE_OPTIONS: { value: CommunicationChannelRole; label: string }[] = [
   { value: "owner", label: "Владелец" }
 ];
 
-// Демо-проект для scope канала project_general (единственный известный моку проект).
-const DEMO_PROJECT_ID = "proj-portal";
-
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
@@ -72,12 +72,11 @@ function ChannelTypeChip({ type }: { type: CommunicationChannelType }) {
 }
 
 export function ChannelsSurface() {
-  const { data, status, error, reload, createChannel } = useChannels();
+  const { data, status, error, reload, createChannel, archiveChannel } = useChannels();
   // Справочник людей тенанта (выбор/имена участников): mock=COMMS_USERS, live=GET /api/workspace/users.
   const users = useCommsUsers();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   // Каналы по типу: системный workspace_general — первым, затем остальные.
   const channels = useMemo(() => {
@@ -94,11 +93,12 @@ export function ChannelsSurface() {
 
   // Верхнеуровневый статус поверхности: forbidden (403) / error / loading.
   // ВНУТРЕННИЙ EmptyState «Нет каналов» (data есть, список пуст) — НЕ top-level: остаётся в ready.
-  if (status === "forbidden" || status === "error" || !data) {
+  const surfaceStatus = surfaceStatusOf(status, Boolean(data));
+  if (surfaceStatus !== "ready") {
     return (
       <CommsFrame activeTab="Каналы">
         <SurfaceState
-          status={status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error"}
+          status={surfaceStatus}
           error={error}
           onRetry={() => void reload()}
           errorFormat={commsErr}
@@ -113,11 +113,9 @@ export function ChannelsSurface() {
 
   async function doCreate(input: Parameters<typeof createChannel>[0]) {
     setBusy(true);
-    setNotice(null);
     const res = await createChannel(input);
     setBusy(false);
-    if (res.ok) setNotice(`Канал «${input.title}» создан`);
-    else setNotice(`Отклонено: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) toast.success(`Канал «${input.title}» создан`);
     return res;
   }
 
@@ -127,15 +125,17 @@ export function ChannelsSurface() {
       subtitle="Каналы рабочей области и проектов"
       actions={<CreateChannelDialog busy={busy} onCreate={doCreate} />}
     >
-      {/* Честный баннер «Прототип» */}
-      <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        <span>
-          Реальный контракт: /api/workspace/communication-channels (список/создание/правка, участники) и /:id/conversation (лента канала).
-          Канал «Общий» — системный (workspace_general), не создаётся и не управляется. Данные in-memory; realtime-доставка появится в приложении —
-          здесь обновление по действию.
-        </span>
-      </div>
+      {/* Честный баннер «Прототип» — только в Storybook/демо (prototypeNotesEnabled). */}
+      {prototypeNotesEnabled ? (
+        <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          <span>
+            Реальный контракт: /api/workspace/communication-channels (список/создание/правка, участники) и /:id/conversation (лента канала).
+            Канал «Общий» — системный (workspace_general), не создаётся и не управляется. Данные in-memory; realtime-доставка появится в приложении —
+            здесь обновление по действию.
+          </span>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
         {/* СЛЕВА: список каналов */}
@@ -178,15 +178,23 @@ export function ChannelsSurface() {
 
         {/* СПРАВА: детальная панель */}
         {selected ? (
-          <ChannelDetail key={selected.id} channelId={selected.id} fallback={selected} users={users} />
+          <ChannelDetail
+            key={selected.id}
+            channelId={selected.id}
+            fallback={selected}
+            users={users}
+            onArchive={async () => {
+              const res = await archiveChannel(selected.id);
+              if (res.ok) { toast.success(`Канал «${selected.title}» архивирован`); setSelectedId(null); }
+              else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
+            }}
+          />
         ) : (
           <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-6 shadow-[var(--shadow-card)]">
             <EmptyState title="Нет каналов" description="Создайте первый канал кнопкой «Канал»." />
           </div>
         )}
       </div>
-
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CommsFrame>
   );
 }
@@ -195,10 +203,9 @@ export function ChannelsSurface() {
    Детальная панель канала (useChannel): инфо + участники + беседа.
    fallback — запись из листинга на время загрузки детали (без мерцания).
    ============================================================ */
-function ChannelDetail({ channelId, fallback, users }: { channelId: string; fallback: Channel; users: CommsUsersDir }) {
+function ChannelDetail({ channelId, fallback, users, onArchive }: { channelId: string; fallback: Channel; users: CommsUsersDir; onArchive: () => Promise<void> }) {
   const { client, data, status, error, reload, patchChannel, addMember, removeMember } = useChannel(channelId);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const channel = data?.channel ?? fallback;
   const members = data?.members ?? [];
@@ -224,20 +231,18 @@ function ChannelDetail({ channelId, fallback, users }: { channelId: string; fall
 
   async function doRemove(userId: string) {
     setBusy(true);
-    setNotice(null);
     const res = await removeMember(userId);
     setBusy(false);
-    if (res.ok) setNotice(`Участник ${users.name(userId)} удалён`);
-    else setNotice(`Отклонено: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) toast.success(`Участник ${users.name(userId)} удалён`);
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
   }
 
   async function doAdd(userId: string, role: CommunicationChannelRole) {
     setBusy(true);
-    setNotice(null);
     const res = await addMember({ userId, role });
     setBusy(false);
-    if (res.ok) setNotice(`Участник ${users.name(userId)} добавлен`);
-    else setNotice(`Отклонено: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
+    if (res.ok) toast.success(`Участник ${users.name(userId)} добавлен`);
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res;
   }
 
@@ -259,21 +264,35 @@ function ChannelDetail({ channelId, fallback, users }: { channelId: string; fall
                 <span className="inline-flex items-center gap-1 text-[length:var(--text-xs)] text-[var(--accent-text)]"><ShieldCheck className="size-3" aria-hidden />управление</span>
               ) : null}
             </div>
-            <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">
-              <span className="v4-mono">{channel.id}</span>
-              {channel.scopeEntityId ? ` · область: ${channel.scopeEntityType} / ${channel.scopeEntityId}` : null}
-            </p>
+            {/* Технический id канала и сырой scope — dev-подсказка, только в Storybook/демо (G5-11). */}
+            {prototypeNotesEnabled ? (
+              <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">
+                <span className="v4-mono">{channel.id}</span>
+                {channel.scopeEntityId ? ` · область: ${channel.scopeEntityType} / ${channel.scopeEntityId}` : null}
+              </p>
+            ) : null}
             {channel.description ? <p className="mt-1 text-[length:var(--text-sm)] text-[var(--muted-strong)]">{channel.description}</p> : null}
           </div>
-          {canManage ? <EditChannelDialog channel={channel} busy={busy} onSave={async (input) => {
-            setBusy(true);
-            setNotice(null);
-            const res = await patchChannel(input);
-            setBusy(false);
-            if (res.ok) setNotice("Канал обновлён");
-            else setNotice(`Отклонено: ${commsErr(res.ok ? undefined : res.code, res.ok ? undefined : res.message)}`);
-            return res;
-          }} /> : null}
+          {canManage ? (
+            <div className="flex shrink-0 items-center gap-1.5">
+              <EditChannelDialog channel={channel} busy={busy} onSave={async (input) => {
+                setBusy(true);
+                const res = await patchChannel(input);
+                setBusy(false);
+                if (res.ok) toast.success("Канал обновлён");
+                return res;
+              }} />
+              {/* Архив канала (G5-08): мягкое удаление — канал уходит из списка, история сохраняется. */}
+              <ConfirmDialog
+                title={`Архивировать канал «${channel.title}»?`}
+                description="Канал исчезнет из списка у всех участников; история сообщений сохранится."
+                confirmLabel="Архивировать"
+                onConfirm={onArchive}
+              >
+                <Button variant="ghost" size="sm" disabled={busy} title="Архивировать канал"><Archive className="size-3.5" aria-hidden /></Button>
+              </ConfirmDialog>
+            </div>
+          ) : null}
         </div>
         {status === "loading" && !data ? (
           <div className="mt-3 flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--muted)]"><Loader2 className="size-3.5 animate-spin" aria-hidden /> Загрузка канала…</div>
@@ -297,7 +316,7 @@ function ChannelDetail({ channelId, fallback, users }: { channelId: string; fall
           ) : (
             <ul className="flex flex-col gap-2">
               {members.map((m) => (
-                <MemberRow key={m.userId} member={m} canManage={canManage} busy={busy} onRemove={() => void doRemove(m.userId)} users={users} />
+                <MemberRow key={m.userId} member={m} canManage={canManage} busy={busy} onRemove={() => doRemove(m.userId)} users={users} />
               ))}
             </ul>
           )}
@@ -310,27 +329,33 @@ function ChannelDetail({ channelId, fallback, users }: { channelId: string; fall
           ) : null}
         </section>
       </div>
-
-      {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </div>
   );
 }
 
 // Строка участника канала.
-function MemberRow({ member, canManage, busy, onRemove, users }: { member: ChannelMember; canManage: boolean; busy: boolean; onRemove: () => void; users: CommsUsersDir }) {
+function MemberRow({ member, canManage, busy, onRemove, users }: { member: ChannelMember; canManage: boolean; busy: boolean; onRemove: () => void | Promise<void>; users: CommsUsersDir }) {
   const name = users.name(member.userId);
   return (
     <li className="flex items-center gap-2.5">
       <BemAvatar initials={initials(name)} color={avatarColor(member.userId)} size="sm" title={name} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{name}</div>
-        <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{member.userId}</div>
+        {/* Сырой userId — dev-подсказка, только в Storybook/демо (рядом уже есть имя). */}
+        {prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{member.userId}</div> : null}
       </div>
       <RoleChip role={member.role} />
       {canManage && member.role !== "owner" ? (
-        <Button variant="ghost" size="icon-sm" disabled={busy} onClick={onRemove} title="Удалить участника">
-          <UserMinus className="size-3.5" aria-hidden />
-        </Button>
+        <ConfirmDialog
+          title={`Удалить участника «${name}»?`}
+          description="Участник будет удалён из канала."
+          confirmLabel="Удалить"
+          onConfirm={onRemove}
+        >
+          <Button variant="ghost" size="icon-sm" disabled={busy} title="Удалить участника">
+            <UserMinus className="size-3.5" aria-hidden />
+          </Button>
+        </ConfirmDialog>
       ) : null}
     </li>
   );
@@ -453,7 +478,8 @@ function ChannelConversation({
     <section className="flex min-h-[280px] flex-col rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-2.5">
         <h3 className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Лента канала</h3>
-        <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">GET /communication-channels/{channelId}/conversation</span>
+        {/* API-путь — dev-подсказка, только в Storybook/демо. */}
+        {prototypeNotesEnabled ? <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">GET /communication-channels/{channelId}/conversation</span> : null}
       </div>
 
       <div className="flex max-h-[360px] min-h-[160px] flex-1 flex-col gap-3 overflow-auto p-4">
@@ -510,86 +536,83 @@ function ChannelConversation({
 /* ============================================================
    Диалог создания канала.
    channelType ∈ {team, project_general, custom}; workspace_general НЕ создаётся.
-   project_general → scopeEntityType="project" + scopeEntityId (demo proj-portal).
+   project_general → scopeEntityType="project" + scopeEntityId (реальный проект воркспейса).
    ============================================================ */
 function CreateChannelDialog({
   busy,
   onCreate
 }: {
   busy: boolean;
-  onCreate: (input: { channelType: "team" | "project_general" | "custom"; title: string; description?: string | null; scopeEntityType?: "project" | "org_unit" | null; scopeEntityId?: string | null }) => Promise<{ ok: boolean }>;
+  onCreate: (input: { channelType: "team" | "project_general" | "custom"; title: string; description?: string | null; scopeEntityType?: "project" | "org_unit" | null; scopeEntityId?: string | null }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
 }) {
-  const [open, setOpen] = useState(false);
   const [channelType, setChannelType] = useState<"team" | "project_general" | "custom">("team");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [scopeEntityId, setScopeEntityId] = useState(DEMO_PROJECT_ID);
+  const [scopeEntityId, setScopeEntityId] = useState("");
 
-  // team → требует org_unit-scope; project_general → project-scope (демо proj-portal).
+  // project_general → project-scope: реальные проекты воркспейса (не демо-hardcode).
+  const projectsLoad = useCommsProjects();
+  const projectOptions = projectsLoad.data?.projects ?? [];
+  const effectiveProjectId = scopeEntityId || projectOptions[0]?.id || "";
+
+  // team → требует org_unit-scope; project_general → project-scope.
   const needsScope = channelType === "team" || channelType === "project_general";
-  const valid = title.trim().length > 0 && (!needsScope || scopeEntityId.trim().length > 0);
-
-  const submit = async () => {
-    if (!valid) return;
-    const input =
-      channelType === "team"
-        ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "org_unit" as const, scopeEntityId: scopeEntityId.trim() }
-        : channelType === "project_general"
-          ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "project" as const, scopeEntityId: scopeEntityId.trim() }
-          : { channelType, title: title.trim(), description: description.trim() || null };
-    const res = await onCreate(input);
-    if (res.ok) {
-      setOpen(false);
-      setTitle("");
-      setDescription("");
-      setChannelType("team");
-      setScopeEntityId(DEMO_PROJECT_ID);
-    }
-  };
+  const scopeValue = channelType === "project_general" ? effectiveProjectId : scopeEntityId.trim();
+  const valid = title.trim().length > 0 && (!needsScope || scopeValue.length > 0);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Канал</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-[520px]">
-        <DialogHeader><DialogTitle>Новый канал</DialogTitle></DialogHeader>
-        <div className="flex flex-col gap-3">
-          <label className={labelCls}>Тип канала
-            <select
-              value={channelType}
-              onChange={(e) => setChannelType(e.target.value as "team" | "project_general" | "custom")}
-              className={selCls}
-            >
-              {CREATABLE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+    <FormDialog
+      title="Новый канал"
+      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Канал</Button>}
+      submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
+      submitDisabled={!valid || busy}
+      contentClassName="max-w-[520px]"
+      // Успех — toast в родителе (doCreate); ошибка остаётся В модалке — по месту действия.
+      onSubmit={async () => {
+        if (!valid) return null;
+        const input =
+          channelType === "team"
+            ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "org_unit" as const, scopeEntityId: scopeValue }
+            : channelType === "project_general"
+              ? { channelType, title: title.trim(), description: description.trim() || null, scopeEntityType: "project" as const, scopeEntityId: scopeValue }
+              : { channelType, title: title.trim(), description: description.trim() || null };
+        const res = await onCreate(input);
+        return res.ok ? null : `Отклонено: ${commsErr(res.code, res.message)}`;
+      }}
+      onSuccess={() => { setTitle(""); setDescription(""); setChannelType("team"); setScopeEntityId(""); }}
+    >
+      <div className="flex flex-col gap-3">
+        <label className={labelCls}>Тип канала
+          <select
+            value={channelType}
+            onChange={(e) => setChannelType(e.target.value as "team" | "project_general" | "custom")}
+            className={selCls}
+          >
+            {CREATABLE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </label>
+        <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Команда портала" /></label>
+        <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
+        {channelType === "project_general" ? (
+          <label className={labelCls}>Проект (область)
+            <select value={effectiveProjectId} onChange={(e) => setScopeEntityId(e.target.value)} className={selCls} disabled={projectOptions.length === 0}>
+              {projectOptions.length === 0 ? <option value="">Нет доступных проектов</option> : null}
+              {projectOptions.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
             </select>
+            <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Канал будет привязан к выбранному проекту.</span>
           </label>
-          <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Команда портала" /></label>
-          <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
-          {channelType === "project_general" ? (
-            <label className={labelCls}>Проект (область)
-              <select value={scopeEntityId} onChange={(e) => setScopeEntityId(e.target.value)} className={selCls}>
-                <option value={DEMO_PROJECT_ID}>Производственный портал ({DEMO_PROJECT_ID})</option>
-              </select>
-              <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">project_general → scopeEntityType=&quot;project&quot;; в демо известен только {DEMO_PROJECT_ID}.</span>
-            </label>
-          ) : channelType === "team" ? (
-            <label className={labelCls}>Подразделение (область)
-              <Input value={scopeEntityId} onChange={(e) => setScopeEntityId(e.target.value)} placeholder="org-portal" />
-              <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">team → scopeEntityType=&quot;org_unit&quot;.</span>
-            </label>
-          ) : null}
-        </div>
-        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
-          POST /communication-channels — создатель становится владельцем (owner). Канал «Общий» (workspace_general) создать нельзя.
-          Тип и область канала после создания не редактируются (только название/описание).
-        </p>
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        ) : channelType === "team" ? (
+          <label className={labelCls}>Подразделение (область)
+            <Input value={scopeEntityId} onChange={(e) => setScopeEntityId(e.target.value)} placeholder="org-portal" />
+            <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Канал будет привязан к указанному подразделению.</span>
+          </label>
+        ) : null}
+      </div>
+      <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
+        Создатель канала становится владельцем. Системный канал «Общий» создать нельзя.
+        Тип и область канала после создания не редактируются (только название и описание).
+      </p>
+    </FormDialog>
   );
 }
 
@@ -601,7 +624,7 @@ function EditChannelDialog({
 }: {
   channel: Channel;
   busy: boolean;
-  onSave: (input: { title?: string; description?: string }) => Promise<{ ok: boolean }>;
+  onSave: (input: { title?: string; description?: string }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(channel.title);
@@ -618,33 +641,31 @@ function EditChannelDialog({
   const dirty = title.trim() !== channel.title || description !== channel.description;
   const valid = title.trim().length > 0 && dirty;
 
-  const submit = async () => {
-    if (!valid) return;
-    // Шлём только изменённые поля (PATCH требует ≥1 поле).
-    const input: { title?: string; description?: string } = {};
-    if (title.trim() !== channel.title) input.title = title.trim();
-    if (description !== channel.description) input.description = description;
-    const res = await onSave(input);
-    if (res.ok) setOpen(false);
-  };
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="secondary" size="sm"><Save className="size-3.5" aria-hidden />Изменить</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-[520px]">
-        <DialogHeader><DialogTitle>Изменить канал</DialogTitle></DialogHeader>
-        <div className="flex flex-col gap-3">
-          <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} /></label>
-          <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
-        </div>
-        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">PATCH /communication-channels/:id — меняются только название и описание; тип и область не редактируемы.</p>
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Save className="size-3.5" aria-hidden />Сохранить</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      title="Изменить канал"
+      trigger={<Button variant="secondary" size="sm"><Save className="size-3.5" aria-hidden />Изменить</Button>}
+      open={open}
+      onOpenChange={setOpen}
+      submitLabel={<><Save className="size-3.5" aria-hidden />Сохранить</>}
+      submitDisabled={!valid || busy}
+      contentClassName="max-w-[520px]"
+      // Успех — toast в родителе (onSave); ошибка остаётся В модалке — по месту действия.
+      onSubmit={async () => {
+        if (!valid) return null;
+        // Шлём только изменённые поля (PATCH требует ≥1 поле).
+        const input: { title?: string; description?: string } = {};
+        if (title.trim() !== channel.title) input.title = title.trim();
+        if (description !== channel.description) input.description = description;
+        const res = await onSave(input);
+        return res.ok ? null : `Отклонено: ${commsErr(res.code, res.message)}`;
+      }}
+    >
+      <div className="flex flex-col gap-3">
+        <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+        <label className={labelCls}>Описание<Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот канал…" /></label>
+      </div>
+      <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Меняются только название и описание; тип и область канала не редактируются.</p>
+    </FormDialog>
   );
 }

@@ -13,14 +13,18 @@ import {
   type AccessProfile,
   type PolicyDecision
 } from "@kiss-pm/access-control";
-import type { TenantUser } from "@kiss-pm/domain";
+import type { CollaborationEntityType, TenantUser } from "@kiss-pm/domain";
 import type { AttachmentEntityType, TaskRecord } from "@kiss-pm/persistence";
 
 import type { EntityLookupDataPort } from "./apiDataPorts";
 import type { ProjectRecord } from "./apiTypes";
 import { resolveCommunicationChannelAccess } from "./communicationChannelAccess";
 
-export type AppEntityType = AttachmentEntityType;
+// Единственный резолвер entityType → (lookup, read/manage policy, sourceEntity, title).
+// Вызывающие контексты (attachments/collaboration/communications) пинуют свой
+// notFoundError через тонкие обёртки; тип входа они не сужают — неизвестные
+// типы (включая "direct") резолвятся fall-through'ом как task.
+export type AppEntityType = AttachmentEntityType | CollaborationEntityType;
 
 export type EntityAccessContext<T extends AppEntityType = AppEntityType> = {
   entityType: T;
@@ -152,7 +156,9 @@ export async function resolveEntityAccessContext<T extends AppEntityType>(input:
 
   const task = await input.dataSource.findTaskById?.(input.actor.tenantId, input.entityId);
   if (!task) return { ok: false, status: 404, error: notFoundError };
-  return ok(input.entityType, {
+  // Литерал "task", а не input.entityType: fall-through достижим и для "direct",
+  // и контекст должен остаться task-контекстом (как в прежних резолверах).
+  return ok("task" as T, {
     entityId: task.id,
     manageDecision: canEditTasks(policyInput),
     readDecision: canReadTask(input.actor, input.profile, task),

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/domain/form-layout";
 import { AuthCard, AuthShell, FormError, PasswordField } from "@/auth/lib/auth-bits";
 import { useAuth } from "@/auth/lib/use-auth";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
    ResetConfirmSurface — экран «Новый пароль» (подтверждение по токену).
@@ -134,6 +135,7 @@ export function ResetConfirmSurface({ token: initialToken = "" }: ResetConfirmSu
 
 // Плашка-прототип: contract-mock боевого контракта подтверждения сброса.
 function PrototypeNote() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">

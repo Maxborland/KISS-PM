@@ -2,25 +2,28 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CheckCheck, MoreHorizontal, Pencil, Pin, Send, Smile, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SurfaceState } from "@/components/domain/surface-state";
+import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useCommsUsers, useConversation, useDirectMessages, usePresence, type CommsUsersDir } from "@/communications/lib/use-comms";
 import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
 import { useCommsRuntime } from "@/communications/lib/comms-runtime";
+import { useCommsEntityScope, type CommsScopeState } from "@/communications/lib/entity-scope";
 import { avatarColor, commsErr, initials, PresenceDot, relTime, UnreadDot } from "@/communications/lib/comms-bits";
 import type { Conversation, DirectConversation, EntityType, Message, PresenceStatus, Reaction } from "@/communications/lib/comms-client";
 
 /* ============================================================
    Поверхность ЧАТ блока «Коммуникации».
-   Двухпанель: слева — беседы demo-сущности (project/proj-portal),
+   Двухпанель: слева — беседы проекта-scope (WithCommsEntityScope),
    справа — лента сообщений выбранной беседы + композер.
    Работает на useConversation (createCommsClient поверх in-memory мока).
    ============================================================ */
@@ -43,11 +46,6 @@ function useSelfUserId(live: boolean): string {
   return id;
 }
 
-// Demo-сущность (entity-scoped): беседы привязаны к проекту proj-portal. Прод-route может
-// передать реальные entityType/entityId пропсами; по умолчанию — демо (для stories).
-const DEMO_ENTITY_TYPE: EntityType = "project";
-const DEMO_ENTITY_ID = "proj-portal";
-
 // Сид-стикеры (StickerAsset не отдаётся клиентом отдельным методом — берём из сид-набора).
 const STICKERS: { id: string; emoji: string; title: string }[] = [
   { id: "sticker-thumbsup", emoji: "👍", title: "Палец вверх" },
@@ -58,8 +56,23 @@ const stickerEmoji = (id: string): string => STICKERS.find((s) => s.id === id)?.
 // Быстрые реакции для попапа под сообщением.
 const QUICK_EMOJI = ["👍", "🎉", "❤️", "🔥", "👀", "✅"];
 
-export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENTITY_ID }: { entityType?: EntityType; entityId?: string } = {}) {
-  const conv = useConversation(entityType, entityId);
+// Scope сущности резолвится из реальных проектов воркспейса (WithCommsEntityScope);
+// явные entityType/entityId пропсы (встраивание, тесты) отключают резолв.
+export function ChatSurface({ entityType, entityId }: { entityType?: EntityType; entityId?: string } = {}) {
+  // Ревью PR #224: DM — НЕ проектная ось. Проектный scope не гейтит чат целиком:
+  // без прав на проекты / без проектов личные сообщения остаются доступными,
+  // состояние scope показывает только левая проектная секция.
+  const scopeState = useCommsEntityScope({
+    ...(entityType ? { explicitEntityType: entityType } : {}),
+    ...(entityId ? { explicitEntityId: entityId } : {})
+  });
+  return <ChatSurfaceScoped scopeState={scopeState} />;
+}
+
+function ChatSurfaceScoped({ scopeState }: { scopeState: CommsScopeState }) {
+  const scope = scopeState.scope;
+  // Без scope useConversation работает в DM-only режиме (пустой entityId → без сети).
+  const conv = useConversation(scope?.entityType ?? "project", scope?.entityId ?? "");
   const { data, status, error, reload, selectConversation } = conv;
   // Справочник людей тенанта (имена авторов): mock=COMMS_USERS, live=GET /api/workspace/users.
   const users = useCommsUsers();
@@ -81,8 +94,7 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
 
   // Верхнеуровневый статус поверхности: forbidden (403) / error / loading / ready.
   // (ВЛОЖЕННЫЙ EmptyState «Нет бесед» — НЕ top-level: остаётся внутри ready-разметки.)
-  const surfaceStatus =
-    status === "forbidden" ? "forbidden" : status === "error" || !data ? (status === "loading" ? "loading" : "error") : "ready";
+  const surfaceStatus = surfaceStatusOf(status, Boolean(data));
   // selected ищем и среди бесед сущности, и среди DM (DM адаптируем к Conversation: title = имя собеседника).
   const selectedDm = dm.data?.conversations.find((c) => c.id === data?.selectedConversationId) ?? null;
   const selected: Conversation | null =
@@ -91,7 +103,7 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
 
   return (
     <SelfUserContext.Provider value={me}>
-    <CommsFrame activeTab="Чат" subtitle={`Беседы · ${entityType} / ${entityId}`}>
+    <CommsFrame activeTab="Чат" subtitle={`Беседы · ${scope?.title ?? "Личные сообщения"}`} {...(scope?.picker ? { actions: scope.picker } : {})}>
       <div className="flex flex-col gap-3">
         {!live ? <PrototypeBanner /> : null}
         <SurfaceState
@@ -105,11 +117,15 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
           {data ? (
             <div className="grid min-h-0 gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
               <div className="flex min-h-0 flex-col gap-3">
-                <ConversationList
-                  conversations={data.conversations}
-                  selectedId={data.selectedConversationId}
-                  onSelect={(id) => void selectConversation(id)}
-                />
+                {scope ? (
+                  <ConversationList
+                    conversations={data.conversations}
+                    selectedId={data.selectedConversationId}
+                    onSelect={(id) => void selectConversation(id)}
+                  />
+                ) : (
+                  <ProjectScopeStatePanel state={scopeState} />
+                )}
                 <DirectMessageList
                   dms={dm.data?.conversations ?? []}
                   users={users}
@@ -126,7 +142,11 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
                 <ChatPane key={selected.id} conv={conv} conversation={selected} messages={data.messages} users={users} presenceOf={presence.status} />
               ) : (
                 <div className="grid min-h-[480px] place-items-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
-                  <EmptyState title="Нет бесед" description="У этой сущности пока нет бесед." />
+                  {scope ? (
+                    <EmptyState title="Нет бесед" description="У этой сущности пока нет бесед." />
+                  ) : (
+                    <EmptyState title="Личные сообщения" description="Выберите личную беседу слева или начните новую." />
+                  )}
                 </div>
               )}
             </div>
@@ -141,7 +161,9 @@ export function ChatSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENT
 }
 
 // Честный баннер «Прототип»: реальные ручки + in-memory + про realtime.
+// Двойной замок: вызов гейтится !live, сам компонент — флагом (Storybook включает его в main.ts).
 function PrototypeBanner() {
+  if (!prototypeNotesEnabled) return null;
   return (
     <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
@@ -149,6 +171,36 @@ function PrototypeBanner() {
         Реальный контракт: /api/workspace/conversations (беседы сущности + readState), .../messages (отправка, правка, удаление, реакции, закрепление), .../read-state (прочитано). Данные in-memory. Realtime-доставка появится в приложении; здесь лента обновляется по действию.
       </span>
     </div>
+  );
+}
+
+// СЛЕВА (вместо списка бесед проекта, когда scope недоступен): состояние резолва
+// проектов — DM-панель ниже живёт независимо от прав на проекты (ревью PR #224).
+function ProjectScopeStatePanel({ state }: { state: CommsScopeState }) {
+  const text =
+    state.status === "loading"
+      ? "Определяем проект…"
+      : state.status === "forbidden"
+        ? "Нет доступа к проектам: беседы проектов скрыты, личные сообщения доступны ниже."
+        : state.status === "error"
+          ? commsErr(state.error ?? undefined)
+          : "Пока нет проектов. Как только появится проект, здесь откроются его беседы.";
+  return (
+    <aside className="flex flex-col rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+      <div className="border-b border-[var(--border)] px-3 py-2 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">
+        Беседы
+      </div>
+      <p className="px-3 py-3 text-[length:var(--text-xs)] text-[var(--muted)]">{text}</p>
+      {state.status === "error" ? (
+        <button
+          type="button"
+          onClick={() => void state.reload()}
+          className="mx-3 mb-3 self-start rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1 text-[length:var(--text-xs)] text-[var(--muted-strong)] hover:bg-[var(--panel-strong)]"
+        >
+          Повторить
+        </button>
+      ) : null}
+    </aside>
   );
 }
 
@@ -330,7 +382,6 @@ function ChatPane({
 }) {
   const me = useContext(SelfUserContext);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const cid = conversation.id;
   const unread = conversation.readState?.unreadCount ?? 0;
 
@@ -355,13 +406,12 @@ function ChatPane({
 
   const run = async (fn: () => Promise<{ ok: true } | { ok: false; code?: string; message: string }>, okMsg?: string) => {
     setBusy(true);
-    setNotice(null);
     const res = await fn();
     setBusy(false);
     if (res.ok) {
-      if (okMsg) setNotice(okMsg);
+      if (okMsg) toast.success(okMsg);
     } else {
-      setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+      toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     }
   };
 
@@ -378,7 +428,8 @@ function ChatPane({
       <header className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
         <div className="mr-auto min-w-0">
           <h2 className="truncate text-[length:var(--text-sm)] font-bold text-[var(--text-strong)]">{conversation.title}</h2>
-          <p className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{ordered.length} сообщ. · {conversation.entityId}</p>
+          {/* Сырой entityId — dev-подсказка, только в Storybook/демо (рядом уже есть название беседы). */}
+          <p className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{ordered.length} сообщ.{prototypeNotesEnabled ? <> · {conversation.entityId}</> : null}</p>
         </div>
         <Button
           variant="ghost"
@@ -437,8 +488,6 @@ function ChatPane({
         onSend={(body) => void run(() => conv.postMessage(cid, { body }))}
         onSticker={(stickerAssetId) => void run(() => conv.postMessage(cid, { stickerAssetId }))}
       />
-
-      {notice ? <div key={notice} className="anim-rise-in-fast border-t border-[var(--border)] px-4 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </section>
   );
 }

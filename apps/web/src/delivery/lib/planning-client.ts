@@ -1,6 +1,8 @@
 import type { PlanningCommand } from "@kiss-pm/domain";
 import { createPlanningApiClient, type PlanningReadModel } from "@kiss-pm/planning-client";
 
+import { createRequestJson } from "../../lib/domain-client";
+
 import { createMockPlanningFetch, RESOURCES, type Resource } from "./mock-planning-backend";
 
 // ── Журнал коммитов (PM-as-code) ──────────────────────────────────────────────
@@ -58,6 +60,9 @@ export function createDeliveryPlanningClient(live: boolean) {
   const base = live
     ? createPlanningApiClient({ apiOrigin: "" })
     : createPlanningApiClient({ apiOrigin: "", fetchImpl: mockFetch! });
+  // Живые вне-planning вызовы (audit-events, users) — через общий транспорт,
+  // политика cookie прежняя (same-origin).
+  const requestJson = createRequestJson({ apiOrigin: "", credentials: "same-origin" });
 
   // ── getCommits ──────────────────────────────────────────────────────────────
   const getCommitsMock = async (_projectId: string, _lastApply: LastApply): Promise<CommitsView> => {
@@ -69,9 +74,11 @@ export function createDeliveryPlanningClient(live: boolean) {
     // live: GET /api/tenant/current/audit-events — planning-события проекта. Откат доступен ТОЛЬКО
     // для последнего применённого этой сессией коммита (before read-model держим в памяти хука —
     // audit.beforeState недостаточен). Произвольный исторический откат — будущая серверная задача.
-    const res = await fetch(`/api/tenant/current/audit-events?projectId=${encodeURIComponent(projectId)}`, { credentials: "same-origin" });
-    if (!res.ok) throw new Error("audit_events_failed");
-    const body = (await res.json()) as { auditEvents: PlanningAuditEvent[] };
+    const body = await requestJson<{ auditEvents: PlanningAuditEvent[] }>(
+      `/api/tenant/current/audit-events?projectId=${encodeURIComponent(projectId)}`
+    ).catch(() => {
+      throw new Error("audit_events_failed");
+    });
     const last = lastApply;
     const commits: CommitMetaView[] = body.auditEvents
       .filter((event) => event.sourceWorkflow === "planning" && event.afterState?.planVersion != null)
@@ -100,9 +107,7 @@ export function createDeliveryPlanningClient(live: boolean) {
   const getResourceDirectoryMock = async (): Promise<Resource[]> => RESOURCES;
   const getResourceDirectoryLive = async (): Promise<Resource[]> => {
     try {
-      const r = await fetch("/api/workspace/users", { credentials: "same-origin" });
-      if (!r.ok) return [];
-      const payload = (await r.json()) as { users?: ApiUser[] };
+      const payload = await requestJson<{ users?: ApiUser[] }>("/api/workspace/users");
       return (payload.users ?? []).map<Resource>((u) => ({
         id: u.id,
         name: u.name,

@@ -555,7 +555,7 @@ async function tenantUserExists(
   tenantId: string,
   userId: string
 ): Promise<boolean> {
-  const users = await dataSource.listUsersByTenantId(tenantId);
+  const users = (await dataSource.listUsersByTenantId?.(tenantId)) ?? [];
   return users.some((user) => user.id === userId);
 }
 

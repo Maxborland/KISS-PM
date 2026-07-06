@@ -1,0 +1,71 @@
+[
+  {
+    "kind": "console",
+    "url": "http://127.0.0.1:3000/admin/users",
+    "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  },
+  {
+    "kind": "modal",
+    "step": "create-open",
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nПользователи рабочей области\n\nСоздать пользователя\nПользователи\nРоли\nБезопасность\nАудит\nПОЛЬЗОВАТЕЛЬ\tEMAIL\tРОЛЬ\tПОЗИЦИЯ\tСТАТУС\t\n\nAudit Browser User Manager 20260705212045\nuser-audit-browser-user-manager-20260705212045\n\taudit-browser-user-manager-20260705212045@kiss-pm.local\tAudit Browser User Manager 20260705212045\t—\tАктивен\t\n\n\nAudit Domain Bypass 20260705205431\nuser-audit-domain-bypass-20260705205431\n\taudit-domain-bypass-20260705205431@not-allowed.example\tАдминистратор\t—\tАктивен\t\n\n\nAudit Escalated Admin 20260705205400\nuser-audit-escalated-admin-20260705205400\n\taudit-escalated-admin-20260705205400@kiss-pm.local\tАдминистратор\t—\tАктивен\t\n\n\nAudit User Manager 20260705205400\nuser-audit-user-manager-20260705205400\n\taudit-user-manager-20260705205400@kiss-pm.local\tAudit User Manager 20260705205400\t—\tАктивен\t\n\n\nАнна Администратор\nuser-alpha-admin\n\tadmin@kiss-pm.local\tАдминистратор\tРуководитель проекта\tАктивен\t\n\n\nИгорь Инженер\nuser-alpha-engineer\n\tengineer@kiss-pm.local\tАдминистратор\tИнженер\tАктивен\t\n\n\nНикита Без Ресурсов\nuser-alpha-plan-reader-no-resources\n\tplan-reader-no-resources@kiss-pm.local\tНаблюдатель плана без ресурсов\tИнженер\tАктивен\t\n\n\nРоман Ресурсный\nuser-alpha-resource-reader\n\tresource-reader@kiss-pm.local\tНаблюдатель ресурсов\tИнженер\tАктивен\t\nНовый пользователь\nEmail\nИмя\nРоль доступа\nАдминистратор\nAudit Browser User Manager 20260705212045\nAudit User Manager 20260705205400\nНаблюдатель плана без ресурсов\nНаблюдатель ресурсов\nПозиция\n— без позиции —\nАналитик\nИнженер\nРуководитель проекта\nТимлид\nПароль (≥ 8 символов)\nОтмена\nСоздать\nClose"
+  },
+  {
+    "kind": "err",
+    "step": "empty-submit",
+    "e": "TimeoutError: locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Создать|Сохранить|Добавить/ }).last()\u001b[22m\n\u001b[2m    - locator resolved to <button disabled data-slot=\"button\" data-size=\"default\" data-variant=\"default\" class=\"relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)] active:translate-y-[0.5px] disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowe…>…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not enabled\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not enabled\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    57 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is not enabled\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n"
+  },
+  {
+    "kind": "modal",
+    "step": "empty-submit",
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nПользователи рабочей области\n\nСоздать пользователя\nПользователи\nРоли\nБезопасность\nАудит\nПОЛЬЗОВАТЕЛЬ\tEMAIL\tРОЛЬ\tПОЗИЦИЯ\tСТАТУС\t\n\nAudit Browser User Manager 20260705212045\nuser-audit-browser-user-manager-20260705212045\n\taudit-browser-user-manager-20260705212045@kiss-pm.local\tAudit Browser User Manager 20260705212045\t—\tАктивен\t\n\n\nAudit Domain Bypass 20260705205431\nuser-audit-domain-bypass-20260705205431\n\taudit-domain-bypass-20260705205431@not-allowed.example\tАдминистратор\t—\tАктивен\t\n\n\nAudit Escalated Admin 20260705205400\nuser-audit-escalated-admin-20260705205400\n\taudit-escalated-admin-20260705205400@kiss-pm.local\tАдминистратор\t—\tАктивен\t\n\n\nAudit User Manager 20260705205400\nuser-audit-user-manager-20260705205400\n\taudit-user-manager-20260705205400@kiss-pm.local\tAudit User Manager 20260705205400\t—\tАктивен\t\n\n\nАнна Администратор\nuser-alpha-admin\n\tadmin@kiss-pm.local\tАдминистратор\tРуководитель проекта\tАктивен\t\n\n\nИгорь Инженер\nuser-alpha-engineer\n\tengineer@kiss-pm.local\tАдминистратор\tИнженер\tАктивен\t\n\n\nНикита Без Ресурсов\nuser-alpha-plan-reader-no-resources\n\tplan-reader-no-resources@kiss-pm.local\tНаблюдатель плана без ресурсов\tИнженер\tАктивен\t\n\n\nРоман Ресурсный\nuser-alpha-resource-reader\n\tresource-reader@kiss-pm.local\tНаблюдатель ресурсов\tИнженер\tАктивен\t\nНовый пользователь\nEmail\nИмя\nРоль доступа\nАдминистратор\nAudit Browser User Manager 20260705212045\nAudit User Manager 20260705205400\nНаблюдатель плана без ресурсов\nНаблюдатель ресурсов\nПозиция\n— без позиции —\nАналитик\nИнженер\nРуководитель проекта\nТимлид\nПароль (≥ 8 символов)\nОтмена\nСоздать\nClose"
+  },
+  {
+    "kind": "info",
+    "inputsCount": 3
+  },
+  {
+    "kind": "form-fields",
+    "dump": [
+      {
+        "i": 0,
+        "name": null,
+        "placeholder": "user@kiss-pm.dev",
+        "type": "email"
+      },
+      {
+        "i": 1,
+        "name": null,
+        "placeholder": "Имя Фамилия",
+        "type": null
+      },
+      {
+        "i": 2,
+        "name": null,
+        "placeholder": "временный пароль",
+        "type": "password"
+      },
+      {
+        "select": 0,
+        "name": null,
+        "options": [
+          "Администратор",
+          "Audit Browser User Manager 20260705212045",
+          "Audit User Manager 20260705205400",
+          "Наблюдатель плана без ресурсов",
+          "Наблюдатель ресурсов"
+        ]
+      },
+      {
+        "select": 1,
+        "name": null,
+        "options": [
+          "— без позиции —",
+          "Аналитик",
+          "Инженер",
+          "Руководитель проекта",
+          "Тимлид"
+        ]
+      }
+    ]
+  }
+]

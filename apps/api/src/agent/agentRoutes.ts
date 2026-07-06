@@ -296,7 +296,11 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
     if (!actor) return context.json({ error: "session_required" }, 401);
     const profile = await deps.getActorProfile(actor);
-    return context.json({ tools: listToolAvailability(actor, profile) });
+    // provider — честный статус LLM-канала инсталляции: demo/mock-модель означает,
+    // что агент отвечает заглушкой, и UI обязан показать деградацию (G7-01).
+    const model = createAgentLlmProviderFromEnv().model;
+    const live = model !== "mock-llm" && model !== "demo-llm";
+    return context.json({ tools: listToolAvailability(actor, profile), provider: { model, live } });
   });
 
   // Общая преамбула /propose и /propose/stream (auth + разбор тела) — единый источник правды,

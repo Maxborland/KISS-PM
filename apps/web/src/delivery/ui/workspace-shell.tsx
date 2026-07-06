@@ -2,26 +2,28 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
 
 import { cn } from "@/lib/cn";
+import { GlobalSearch } from "@/delivery/ui/global-search";
 import { ShellUserMenu } from "@/auth/avatar-menu/shell-user-menu";
 import { useSessionUser } from "@/shell/use-session-user";
 
-// href задан → пункт кликабелен (реальный роут). Без href — пока не подключённый раздел.
-const NAV: { title: string; items: { label: string; href?: string }[] }[] = [
+// href — реальный роут; requires — права, при отсутствии ВСЕХ из которых пункт скрыт
+// (permission-aware навигация: пункты не должны вести в 403, G8-04). Мёртвые
+// заглушки «Ресурсы»/«KPI» убраны: их роутов нет (G8-10) — вернём вместе с разделами.
+type NavItem = { label: string; href: string; requires?: string[] };
+const NAV: { title: string; items: NavItem[] }[] = [
   {
     title: "Работа",
     items: [
-      { label: "Мои задачи", href: "/my-work" },
-      { label: "Проекты", href: "/projects" },
-      { label: "Сделки", href: "/crm/deals" },
-      { label: "Ресурсы" }
+      { label: "Мои задачи", href: "/my-work", requires: ["tenant.projects.read"] },
+      { label: "Проекты", href: "/projects", requires: ["tenant.projects.read"] },
+      { label: "Сделки", href: "/crm/deals", requires: ["tenant.opportunities.read"] }
     ]
   },
-  { title: "Аналитика", items: [{ label: "Дашборд", href: "/dashboard" }, { label: "KPI" }] },
-  { title: "Коммуникации", items: [{ label: "Коммуникации", href: "/communications/chat" }] },
-  { title: "Администрирование", items: [{ label: "Администрирование", href: "/admin" }] }
+  { title: "Аналитика", items: [{ label: "Дашборд", href: "/dashboard", requires: ["tenant.projects.read", "tenant.opportunities.read"] }] },
+  { title: "Коммуникации", items: [{ label: "Коммуникации", href: "/communications/chat", requires: ["tenant.communications.read"] }] },
+  { title: "Администрирование", items: [{ label: "Администрирование", href: "/admin", requires: ["tenant.access_profiles.read", "tenant.access_profiles.manage", "tenant.users.read", "tenant.users.manage", "tenant.audit_events.read", "tenant.workspace_config.read", "tenant.workspace_config.manage"] }] }
 ];
 
 /**
@@ -29,20 +31,19 @@ const NAV: { title: string; items: { label: string; href?: string }[] }[] = [
  * + глобальная панель сверху. Контент (шапка проекта/отчёта + поверхность) —
  * children. Используется и DeliveryFrame (проект), и ReportingFrame (аналитика).
  *
- * Прототип: навигация/поиск/аватар не подключены (handoff-каркас).
+ * Навигация, глобальный поиск (GET /api/workspace/search) и меню пользователя — живые.
  */
-const ADMIN_PERMISSIONS = [
-  "tenant.access_profiles.read",
-  "tenant.access_profiles.manage",
-  "tenant.users.read",
-  "tenant.users.manage",
-  "tenant.audit.read"
-];
-
 export function WorkspaceShell({ activeNav, children }: { activeNav: string; children: ReactNode }) {
-  // SHELL-03: группа «Администрирование» видна только ролям с admin-правами.
-  const perms = useSessionUser()?.permissions ?? [];
-  const nav = NAV.filter((g) => g.title !== "Администрирование" || ADMIN_PERMISSIONS.some((p) => perms.includes(p)));
+  // Пункт виден, если у роли есть хотя бы одно из requires (пока права не
+  // загрузились, показываем всё — иначе меню «мигает» на каждом переходе).
+  const user = useSessionUser();
+  const perms = user?.permissions ?? null;
+  const nav = NAV
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => !i.requires || perms === null || i.requires.some((p) => perms.includes(p)))
+    }))
+    .filter((g) => g.items.length > 0);
   return (
     <div className="flex min-h-screen w-full bg-[var(--canvas)] text-[length:var(--text-md)]">
       <aside className="hidden w-[232px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--panel)] md:flex">
@@ -57,15 +58,10 @@ export function WorkspaceShell({ activeNav, children }: { activeNav: string; chi
               {group.items.map((item) => {
                 const active = item.label === activeNav;
                 const cls = cn(
-                  "flex items-center justify-between rounded-[var(--radius-md)] px-2.5 py-1.5 text-[length:var(--text-sm)]",
-                  active ? "bg-[var(--accent-soft)] font-semibold text-[var(--accent)]" : "font-medium text-[var(--muted-strong)]",
-                  item.href ? "hover:bg-[var(--panel-subtle)]" : "cursor-default text-[var(--muted-soft)]"
+                  "flex items-center justify-between rounded-[var(--radius-md)] px-2.5 py-1.5 text-[length:var(--text-sm)] hover:bg-[var(--panel-subtle)]",
+                  active ? "bg-[var(--accent-soft)] font-semibold text-[var(--accent)]" : "font-medium text-[var(--muted-strong)]"
                 );
-                return item.href ? (
-                  <Link key={item.label} href={item.href} className={cls}>{item.label}</Link>
-                ) : (
-                  <span key={item.label} className={cls} title="Раздел появится в приложении">{item.label}</span>
-                );
+                return <Link key={item.label} href={item.href} className={cls}>{item.label}</Link>;
               })}
             </div>
           ))}
@@ -74,15 +70,7 @@ export function WorkspaceShell({ activeNav, children }: { activeNav: string; chi
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4">
-          <label className="flex h-9 max-w-md flex-1 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 text-[var(--muted)]">
-            <Search className="size-4 shrink-0" aria-hidden />
-            <input
-              className="min-w-0 flex-1 bg-transparent text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--muted-soft)]"
-              placeholder="Найти задачу или ресурс"
-              disabled
-              title="Поиск появится в следующей версии"
-            />
-          </label>
+          <GlobalSearch />
           <ShellUserMenu />
         </header>
         {children}

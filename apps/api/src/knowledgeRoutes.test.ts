@@ -1,3 +1,4 @@
+import { ensureCompleteDataSource } from "./dataSourceCompletion";
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type {
   DecisionLogEntry,
@@ -409,7 +410,7 @@ function fixtureDataSource(fixture: KnowledgeFixture): ApiTenantDataSource {
 }
 
 function createKnowledgeDataSource(fixture: KnowledgeFixture): ApiTenantDataSource {
-  const dataSource: ApiTenantDataSource = {
+  const dataSource = ensureCompleteDataSource({
     listDevUsers: async () => [fixture.actor],
     findTenantById: async () => ({ id: fixture.actor.tenantId, name: "Tenant" }),
     findUserById: async () => fixture.actor,
@@ -572,7 +573,7 @@ function createKnowledgeDataSource(fixture: KnowledgeFixture): ApiTenantDataSour
       )
         ? { id: input.meetingId }
         : undefined
-  } as ApiTenantDataSource;
+  }) as ApiTenantDataSource;
 
   for (const method of fixture.omittedMethods ?? []) {
     delete (dataSource as Record<string, unknown>)[method];

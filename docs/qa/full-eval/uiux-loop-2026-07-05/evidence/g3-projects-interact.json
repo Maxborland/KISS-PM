@@ -1,0 +1,68 @@
+{
+  "notes": [
+    "[list] кнопка Все не нажалась",
+    "[list] после клика Все: строк в таблице = 3",
+    "[list] клик по строке проекта -> url: http://127.0.0.1:3000/projects/project-vektor-portal/overview",
+    "[task-create] после клика +Задача url=http://127.0.0.1:3000/projects/project-vektor-portal/schedule",
+    "[task-create] ввели имя задачи uiux-eval-задача-1 + Enter",
+    "[task-create] есть ли задача в таблице: 1",
+    "[task-persist] после reload задача uiux-eval-задача-1 видна: 1",
+    "[commits] лента: Лента (1)",
+    "[baseline] история снимков: ?",
+    "[calendars] месяц по умолчанию: 08.07.2026",
+    "[settings] Подключить не кликается",
+    "[settings] Импорт MSPDI не кликается"
+  ],
+  "network": [
+    {
+      "phase": "task-create",
+      "method": "POST",
+      "url": "/api/workspace/projects/project-vektor-portal/planning/apply-command-batch",
+      "status": 200,
+      "body": "{\"applied\":{\"commands\":[{\"type\":\"task.create\",\"payload\":{\"id\":\"t-new-1\",\"projectId\":\"project-vektor-portal\",\"title\":\"uiux-eval-задача-1\",\"statusId\":\"task-status-new\",\"plannedStart\":null,\"plannedFinish\":null,\"durationMinutes\":2400,\"workMinutes\":2400,\"assignments\":[]}}],\"changedTaskIds\":[\"t-new-1\"],\"c"
+    },
+    {
+      "phase": "commits",
+      "method": "POST",
+      "url": "/api/workspace/projects/project-vektor-portal/planning/revert-last",
+      "status": 409,
+      "body": "{\"error\":\"nothing_to_revert\"}"
+    },
+    {
+      "phase": "calendars",
+      "method": "POST",
+      "url": "/api/workspace/projects/project-vektor-portal/planning/apply-command",
+      "status": 200,
+      "body": "{\"applied\":{\"commands\":[{\"type\":\"calendar.exception.upsert\",\"payload\":{\"id\":\"hol-n1\",\"calendarId\":\"calendar-vektor-project\",\"resourceId\":null,\"date\":\"2026-03-10\",\"workingMinutes\":0,\"reason\":\"Праздник\"}}],\"changedTaskIds\":[],\"changedAssignmentIds\":[],\"changedDependencyIds\":[],\"acceptedRiskIds\":[]},\"n"
+    },
+    {
+      "phase": "scenarios",
+      "method": "POST",
+      "url": "/api/workspace/projects/project-vektor-portal/planning/scenarios/preview",
+      "status": 200,
+      "body": "{\"proposals\":[{\"id\":\"planning-scenario-0acd1736-6f4b-4128-8965-a4cc4a3f7748\",\"profile\":\"aggressive\",\"conflictEffect\":\"accepted\",\"planDelta\":{\"commands\":[{\"type\":\"risk.accept_overload\",\"payload\":{\"overloadId\":\"user-alpha-engineer:2026-06-02\",\"acceptedRiskReason\":\"Scenario keeps current finish date an"
+    }
+  ],
+  "console": [
+    {
+      "phase": "list",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "phase": "task-create",
+      "type": "warning",
+      "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}."
+    },
+    {
+      "phase": "task-create",
+      "type": "warning",
+      "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}."
+    },
+    {
+      "phase": "commits",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    }
+  ]
+}

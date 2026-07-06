@@ -1,7 +1,12 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 
-// Лендинг «Администрирование» → первая боевая v3-вкладка (Пользователи).
-// (Раньше рендерил v2-монолит 09-admin; теперь — реальная поверхность.)
+import { AdminIndexRedirect } from "@/admin/ui/admin-index-redirect";
+
+// Лендинг «Администрирование» → первая вкладка, ДОСТУПНАЯ правам роли
+// (раньше — безусловный redirect на /admin/users, тупик для роли только
+// с правами конфигурации; ревью PR #224).
+export const metadata: Metadata = { title: "Администрирование — KISS PM" };
+
 export default function AdminPage() {
-  redirect("/admin/users");
+  return <AdminIndexRedirect />;
 }

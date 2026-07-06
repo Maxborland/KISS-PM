@@ -1,0 +1,53 @@
+[
+  {
+    "kind": "console",
+    "type": "error",
+    "url": "http://127.0.0.1:3000/admin/users",
+    "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  },
+  {
+    "kind": "route",
+    "route": "/admin",
+    "finalUrl": "http://127.0.0.1:3000/admin/users",
+    "status": 200,
+    "title": "KISS PM",
+    "textLen": 1429,
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nПользователи рабочей области\n\nСоздать пользователя\nПользователи\nРоли\nБезопасность\nАудит\nПОЛЬЗОВАТЕЛЬ\tEMAIL\tРОЛЬ\tПОЗИЦИЯ\tСТАТУС\t\n\nAudit Browser User Manager 20260705212045\nuser-audit-browser-user-manager-20260705212045\n\taudit-browser-user-manager-20260705212045@kiss-pm.local\tAudit Browser User Manager 20260705212045\t—\tАктивен\t\n\n\nAudit Domain Bypass 20260705205431\nuser-audit-domain-bypass-20260705205431\n\taudit-domain-bypass-20260705205431@not-allowed.example\tАдминистратор\t—\tАктивен\t\n\n\nAudit Escalated Admin 20260705205400\nuser-audit-escalated-admin-20260705205400\n\taudit-escalated-admin-20260705205400@kiss-pm.local\tАдминистратор\t—\tАктивен\t\n\n\nAudit User Manager 20260705205400\nuser-audit-user-manager-20260705205400\n\taudit-user-manager-20260705205400@kiss-pm.local\tAudit User Manager 20260705205400\t—\tАктивен\t\n\n\nАнна Администратор\nuser-alpha-admin\n\tadmin@kiss-pm.local\tАдминистратор\tРуководитель проекта\tАктивен\t\n\n\nИгорь Инженер\nuser-alpha-engineer\n\tengineer@kiss-pm.local\tАдминистратор\tИнженер\tАктивен\t\n\n\nНикита Без Ресурсов\nuser-alpha-plan-reader-no-resources\n\tplan-reader-no-resources@kiss-pm.local\tНаблюдатель плана без ресурсов\tИнженер\tАктивен\t\n\n\nРоман Ресурсный\nuser-alpha-resource-reader\n\tresource-reader@kiss-pm.local\tНаблюдатель ресурсов\tИнженер\tАктивен\t"
+  },
+  {
+    "kind": "route",
+    "route": "/admin/users",
+    "finalUrl": "http://127.0.0.1:3000/admin/users",
+    "status": 200,
+    "title": "KISS PM",
+    "textLen": 1429,
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nПользователи рабочей области\n\nСоздать пользователя\nПользователи\nРоли\nБезопасность\nАудит\nПОЛЬЗОВАТЕЛЬ\tEMAIL\tРОЛЬ\tПОЗИЦИЯ\tСТАТУС\t\n\nAudit Browser User Manager 20260705212045\nuser-audit-browser-user-manager-20260705212045\n\taudit-browser-user-manager-20260705212045@kiss-pm.local\tAudit Browser User Manager 20260705212045\t—\tАктивен\t\n\n\nAudit Domain Bypass 20260705205431\nuser-audit-domain-bypass-20260705205431\n\taudit-domain-bypass-20260705205431@not-allowed.example\tАдминистратор\t—\tАктивен\t\n\n\nAudit Escalated Admin 20260705205400\nuser-audit-escalated-admin-20260705205400\n\taudit-escalated-admin-20260705205400@kiss-pm.local\tАдминистратор\t—\tАктивен\t\n\n\nAudit User Manager 20260705205400\nuser-audit-user-manager-20260705205400\n\taudit-user-manager-20260705205400@kiss-pm.local\tAudit User Manager 20260705205400\t—\tАктивен\t\n\n\nАнна Администратор\nuser-alpha-admin\n\tadmin@kiss-pm.local\tАдминистратор\tРуководитель проекта\tАктивен\t\n\n\nИгорь Инженер\nuser-alpha-engineer\n\tengineer@kiss-pm.local\tАдминистратор\tИнженер\tАктивен\t\n\n\nНикита Без Ресурсов\nuser-alpha-plan-reader-no-resources\n\tplan-reader-no-resources@kiss-pm.local\tНаблюдатель плана без ресурсов\tИнженер\tАктивен\t\n\n\nРоман Ресурсный\nuser-alpha-resource-reader\n\tresource-reader@kiss-pm.local\tНаблюдатель ресурсов\tИнженер\tАктивен\t"
+  },
+  {
+    "kind": "route",
+    "route": "/admin/roles",
+    "finalUrl": "http://127.0.0.1:3000/admin/roles",
+    "status": 200,
+    "title": "KISS PM",
+    "textLen": 651,
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nРоли доступа (access-profiles)\n\nСоздать роль\nПользователи\nРоли\nБезопасность\nАудит\nРОЛЬ\tПРАВ\tНАЗНАЧЕНО\t\n\nАдминистратор\naccess-profile-alpha-admin\n\t57\t4\t\n\n\nAudit Browser User Manager 20260705212045\naccess-profile-audit-browser-user-manager-20260705212045\n\t2\t1\t\n\n\nAudit User Manager 20260705205400\naccess-profile-audit-user-manager-20260705205400\n\t2\t1\t\n\n\nНаблюдатель плана без ресурсов\naccess-profile-plan-reader-no-resources\n\t2\t1\t\n\n\nНаблюдатель ресурсов\naccess-profile-resource-reader\n\t1\t1\t"
+  },
+  {
+    "kind": "route",
+    "route": "/admin/audit",
+    "finalUrl": "http://127.0.0.1:3000/admin/audit",
+    "status": 200,
+    "title": "KISS PM",
+    "textLen": 6056,
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nЖурнал управленческих действий и системных событий\n\nПользователи\nРоли\nБезопасность\nАудит\nПРОТОТИП\nРеальный контракт: GET /api/tenant/current/audit-events (createAdminClient + in-memory mock, swap = apiOrigin). Требует право чтения журнала (canReadAuditEvents). Последние события по убыванию времени.\nДЕЙСТВИЕ\tСУЩНОСТЬ\tРЕЗУЛЬТАТ\tКОГДА\n\nplanning.command_denied\nplanning.command_denied\n\tProject · project-vektor-portal\tОтклонено правами\t05 июл., 21:49\n\nplanning.command_denied\nplanning.command_denied\n\tProject · project-vektor-portal\tОтклонено правами\t05 июл., 21:48\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:48\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:48\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:48\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:48\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:48\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:48\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:48\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:48\n\nНастройки уведомлений обновлены\nnotification.preference_updated\n\tUser · user-alpha-admin\tУспешно\t05 июл., 21:48\n\nНастройки уведомлений обновлены\nnotification.preference_updated\n\tUser · user-alpha-admin\tУспешно\t05 июл., 21:48\n\ntask.status_changed\ntask.status_changed\n\tTask · task-demo-resource-estimate\tУспешно\t05 июл., 21:48\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:47\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:47\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:47\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:47\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:47\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:47\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:47\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:46\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:45\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:45\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:45\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:45\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:45\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:45\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:45\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 21:45\n\nprofile.theme.updated\nprofile.theme.updated\n\tTenantUser · user-alpha-admin\tУспешно\t05 июл., 21:44\n\nprofile.updated\nprofile.updated\n\tTenantUser · user-alpha-admin\tУспешно\t05 июл., 21:44\n\nplanning.task.deleted\nplanning.task.deleted\n\tProject · project-vektor-portal\tУспешно\t05 июл., 21:43\n\nplanning.task.updated\nplanning.task.updated\n\tProject · project-vekt"
+  },
+  {
+    "kind": "route",
+    "route": "/admin/security",
+    "finalUrl": "http://127.0.0.1:3000/admin/security",
+    "status": 200,
+    "title": "KISS PM",
+    "textLen": 929,
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nПолитики безопасности рабочей области\n\nСохранить\nПользователи\nРоли\nБезопасность\nАудит\nПРОТОТИП\nРеальный контракт: GET/PUT /api/tenant/current/security-policy (createAdminClient + in-memory mock, swap = apiOrigin). Изменение требует права управления конфигурацией рабочей области (canManageWorkspaceConfig); каждое сохранение пишется в журнал аудита.\nПолитики безопасности\nОбязательная двухфакторная аутентификация\nВсе пользователи рабочей области обязаны включить 2FA при входе.\nЕдиный вход (SSO, SAML)\nАутентификация через корпоративный SAML-провайдер.\nТайм-аут сессии\nЧерез сколько часов бездействия завершать сессию (1…8760).\nчасов\nРазрешённые email-домены\nПользователей можно приглашать только с этих доменов. Пусто — ограничения нет.\nДобавить\nonly-audit.example"
+  }
+]

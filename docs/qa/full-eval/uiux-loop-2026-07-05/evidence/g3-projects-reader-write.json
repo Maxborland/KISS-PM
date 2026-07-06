@@ -1,0 +1,23 @@
+{
+  "notes": [
+    "[reader-task-create] +Задача disabled=false",
+    "[reader-task-create] создана: 0",
+    "[reader-deadline] Изменить disabled=false"
+  ],
+  "network": [
+    {
+      "phase": "reader-task-create",
+      "m": "POST",
+      "u": "/api/workspace/projects/project-vektor-portal/planning/apply-command-batch",
+      "s": 403,
+      "b": "{\"error\":\"permission_missing\"}"
+    },
+    {
+      "phase": "reader-deadline",
+      "m": "POST",
+      "u": "/api/workspace/projects/project-vektor-portal/planning/apply-command",
+      "s": 403,
+      "b": "{\"error\":\"permission_missing\"}"
+    }
+  ]
+}

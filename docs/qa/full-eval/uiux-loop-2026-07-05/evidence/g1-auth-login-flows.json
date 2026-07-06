@@ -1,0 +1,51 @@
+{
+  "wrongPassword": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "errorText": "Неверный email или пароль",
+    "emailPreserved": "uiux-eval-nobody@example.com",
+    "passwordPreserved": 18
+  },
+  "invalidEmail": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "buttonDisabled": true,
+    "bodyText": "К\nKISS PM\nРабочее пространство\nВход в KISS PM\n\nКорпоративный email и пароль рабочего пространства.\n\nEmail\nПароль\nВойти\nНет аккаунта? Создать аккаунт\nЗабыли пароль?"
+  },
+  "successLogin": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "finalUrl": "http://127.0.0.1:3000/dashboard",
+    "ms": 199
+  },
+  "doubleSubmit": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "loginPosts": 1
+  },
+  "deepLink": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "afterGateUrl": "http://127.0.0.1:3000/login",
+    "afterLoginUrl": "http://127.0.0.1:3000/dashboard"
+  },
+  "authedLoginPage": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "snapshotUrl": "http://127.0.0.1:3000/dashboard",
+    "bodyText": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nМОИ ЗАДАЧИ\n19\n4 в работе\nОТКРЫТЫЕ СДЕЛКИ\n5\n3,1 млн ₽\nАКТИВНЫЕ ПРОЕКТЫ\n3\n530 ч плана\nСДЕЛКИ ВЫИГРАНЫ\n0\nпока нет\nБлижайшие задачи\n\nМои незавершённые задачи по плановому финишу\n\nПроверить результат импорта Gantt\nНа контроле · прогресс 80%\nНа проверке\n19.05.2026\nСогласовать состав команды для Ромашка\nНовая · прогресс 0%\nНовые\n21.05.2026\nПодготовить ресурсную оценку по сделке\nВ работе · прогресс 0%\nВ работе\n22.05.2026\nОбновить описание задачи в проектном контуре\nОжидает · прогресс 0%\nОжидание\n23.05.2026\nЭтап 1. Подготовка\nВ работе · прогресс 40%\nВ работе\n12.06.2026\nПроектирование архитектуры\nВ работе · прогресс 50%\nВ работе\n12.06.2026\nСделки по статусам\n\nРаспределение возможностей CRM\n\nНовые\n3\nПроверка\n1\nГотовы\n1\nМитинги и сигналы\n\nСводка дня\n\nМитинги «на сегодня», фокус-график и tenant-сигналы появятся после агрегирующего контракта — у отдельных ручек (митинги привязаны к сущности; сигналы — к проекту) tenant-широкой сводки пока нет. Здесь честный плейсхолдер вместо фейковых чисел."
+  }
+}

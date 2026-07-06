@@ -1,0 +1,715 @@
+{
+  "planReader": {
+    "routes": {
+      "/dashboard": {
+        "gotoStatus": 200,
+        "finalUrl": "/dashboard",
+        "h1": "Дашборд",
+        "spinners": 0,
+        "textLen": 249,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nДашборд\nПерсональная сводка: задачи, проекты и сделки рабочей области\nДоступ к CRM ограничен\nУ вас нет прав на просмотр сделок — сводка недоступна.",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/opportunities",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/clients",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/deal-stages",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/contacts",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/products",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/project-types",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/pipelines",
+            "status": 403
+          }
+        ]
+      },
+      "/my-work": {
+        "gotoStatus": 200,
+        "finalUrl": "/my-work",
+        "h1": "Мои задачи",
+        "spinners": 0,
+        "textLen": 471,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nМои задачи\nЗадачи, где вы исполнитель — по всем активным проектам\nКанбан\nСписок\nПеретащите карточку в колонку статуса — переход проверяется матрицей (запрет → отклонение).\nНовая\n1\nОбычный\nU\nТестирование портала\nproject-vektor-portal\n0%\n08.07.2026\nчерез 3 дня\nОжидает\n0\nперетащите сюда\nВ работе\n0\nперетащите сюда\nНа контроле\n0\nперетащите сюда\nВыполнено\n0\nперетащите сюда",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          }
+        ]
+      },
+      "/projects": {
+        "gotoStatus": 200,
+        "finalUrl": "/projects",
+        "h1": "Проекты",
+        "spinners": 0,
+        "textLen": 765,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nПроекты\nАктивные проекты рабочей области\nВсе\nАктивные\nПРОЕКТ\tКЛИЕНТ\tСТАТУС\tСРОК\tСУММА\tПЛАН.ЧАСЫ\tСПРОС\nuiux-eval-сделка-02\nproject-3dcc068a-1c31-40fa-9ee8-71deb2da3d49\n\t\nАГ\nАО Горсеть\n\tАктивен\t01.08.2026 — 30.09.2026\t1 млн ₽\t285 ч\t\nposition-analyst · 285 ч\nПортал подрядчиков Вектор\nproject-vektor-portal\n\t\nОВ\nООО Вектор\n\tАктивен\t01.06.2026 — 10.07.2026\t1,2 млн ₽\t220 ч\t\nposition-engineer · 160 ч\nМиграция данных Горсеть\nproject-gorset-migration\n\t\nАГ\nАО Горсеть\n\tАктивен\t12.05.2026 — 20.06.2026\t840 тыс ₽\t150 ч\t\nposition-engineer · 120 ч\nCRM intake\nproject-demo-crm-intake\n\t\nОР\nООО Ромашка\n\tАктивен\t",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          }
+        ]
+      },
+      "/projects/project-vektor-portal/schedule": {
+        "gotoStatus": null,
+        "finalUrl": "/projects/project-vektor-portal/schedule",
+        "h1": "Производственный портал · Релиз 2",
+        "spinners": 0,
+        "textLen": 1722,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nПР\nПроизводственный портал · Релиз 2\nВ работе\nплан v9\nДедлайн 08.07.2026\nФиниш 09.07.2026\n+1 дн. к дедлайну\nОбзор\nГрафик\nРесурсы\nНазначения\nКалендари\nСценарии\nBaseline\nКоммиты\nНастройки\nЗадача\nПодзадача\nПакет\nОткат\nBaseline\nФильтры\nКолонки\nДень\nНеделя\nМесяц\nПРОТОТИП\nРеальный контракт planning · каждая правка = коммит preview→apply через @kiss-pm/planning-client. Данные in-memory, не сохраняются. Нижняя строка — создать задачу (Enter) · 2× клик — правка ячейки · ПКМ — меню · границы колонок — ширина · бар: тяни тело (сдвиг), края (длительность), точку справа — связь.\n#\n\tРЕЖ\n\tWBS\n\tНАЗВАНИЕ\n\tДЛ",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          }
+        ]
+      },
+      "/crm/deals": {
+        "gotoStatus": 200,
+        "finalUrl": "/crm/deals",
+        "h1": "Продажи и клиенты",
+        "spinners": 0,
+        "textLen": 226,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nCRM\nПродажи и клиенты\nСделки\nКлиенты\nКонтакты\nПродукты\nДоступ к сделкам ограничен\nУ вас нет прав на просмотр воронки продаж.",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/opportunities",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/products",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/clients",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/deal-stages",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/contacts",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/project-types",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/pipelines",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          }
+        ]
+      },
+      "/communications/chat": {
+        "gotoStatus": null,
+        "finalUrl": "/communications/chat",
+        "h1": "Коммуникации",
+        "spinners": 0,
+        "textLen": 240,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nКомм.\nКоммуникации\nБеседы · project / proj-portal\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления\nНе удалось загрузить\nСущность не найдена\nПовторить",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/conversations?entityType=project&entityId=proj-portal",
+            "status": 404
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          }
+        ]
+      },
+      "/admin": {
+        "gotoStatus": 200,
+        "finalUrl": "/admin/users",
+        "h1": "Администрирование",
+        "spinners": 0,
+        "textLen": 259,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nНБ\nADMIN\nАдминистрирование\nПользователи рабочей области\nПользователи\nРоли\nБезопасность\nАудит\nНе удалось загрузить\nНедостаточно прав для этого действия\nПовторить",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/access-roles",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/permission-catalog",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/positions",
+            "status": 403
+          }
+        ]
+      },
+      "/agent": {
+        "gotoStatus": 200,
+        "finalUrl": "/agent",
+        "h1": "",
+        "spinners": 0,
+        "textLen": 296,
+        "textHead": "Раскрыть меню\nAI\nИстория\nПлан недели\nСроки согласования\nРиски перед встречей\nПередача проекта\nГенри Гантт\nАгент аккаунта\nСведения об агенте\nЗапрос уже набран. Отправьте его Генри.\nПривязать файл к проекту…\nuiux-eval-сделка-02\nПортал подрядчиков Вектор\nМиграция данных Горсеть\nCRM intake\nОтправить",
+        "consoleErrors": [],
+        "apiFails": []
+      }
+    },
+    "nav": [
+      {
+        "text": "Мои задачи",
+        "href": "/my-work"
+      },
+      {
+        "text": "Проекты",
+        "href": "/projects"
+      },
+      {
+        "text": "Сделки",
+        "href": "/crm/deals"
+      },
+      {
+        "text": "Дашборд",
+        "href": "/dashboard"
+      },
+      {
+        "text": "Коммуникации",
+        "href": "/communications/chat"
+      }
+    ]
+  },
+  "resourceReader": {
+    "routes": {
+      "/dashboard": {
+        "gotoStatus": 200,
+        "finalUrl": "/dashboard",
+        "h1": "Дашборд",
+        "spinners": 0,
+        "textLen": 226,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nРР\nДашборд\nПерсональная сводка: задачи, проекты и сделки рабочей области\nНе удалось собрать сводку\npermission_missing\nПовторить",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/projects",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/clients",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/my-work",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/opportunities",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/deal-stages",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/project-types",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/products",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/contacts",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/pipelines",
+            "status": 403
+          }
+        ]
+      },
+      "/my-work": {
+        "gotoStatus": 200,
+        "finalUrl": "/my-work",
+        "h1": "Мои задачи",
+        "spinners": 0,
+        "textLen": 323,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nРР\nМои задачи\nЗадачи, где вы исполнитель — по всем активным проектам\nКанбан\nСписок\nПеретащите карточку в колонку статуса — переход проверяется матрицей (запрет → отклонение).\nНе удалось загрузить\npermission_missing\nПовторить",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/my-work",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/task-statuses",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          }
+        ]
+      },
+      "/projects": {
+        "gotoStatus": 200,
+        "finalUrl": "/projects",
+        "h1": "Проекты",
+        "spinners": 0,
+        "textLen": 205,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nРР\nПроекты\nАктивные проекты рабочей области\nВсе\nАктивные\nНе удалось загрузить\npermission_missing\nПовторить",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/projects",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          }
+        ]
+      },
+      "/projects/project-vektor-portal/schedule": {
+        "gotoStatus": null,
+        "finalUrl": "/projects/project-vektor-portal/schedule",
+        "h1": "Производственный портал · Релиз 2",
+        "spinners": 0,
+        "textLen": 311,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nРР\nПР\nПроизводственный портал · Релиз 2\nВ работе\nплан v17\nДедлайн —\nФиниш —\nОбзор\nГрафик\nРесурсы\nНазначения\nКалендари\nСценарии\nBaseline\nКоммиты\nНастройки\nДоступ ограничен\nУ вас нет прав на просмотр этого раздела.",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/projects/project-vektor-portal/planning/read-model",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          }
+        ]
+      },
+      "/crm/deals": {
+        "gotoStatus": 200,
+        "finalUrl": "/crm/deals",
+        "h1": "Продажи и клиенты",
+        "spinners": 0,
+        "textLen": 226,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nРР\nCRM\nПродажи и клиенты\nСделки\nКлиенты\nКонтакты\nПродукты\nДоступ к сделкам ограничен\nУ вас нет прав на просмотр воронки продаж.",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/opportunities",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/deal-stages",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/clients",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/contacts",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/products",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/pipelines",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/project-types",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          }
+        ]
+      },
+      "/communications/chat": {
+        "gotoStatus": null,
+        "finalUrl": "/communications/chat",
+        "h1": "Коммуникации",
+        "spinners": 0,
+        "textLen": 241,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nРР\nКомм.\nКоммуникации\nБеседы · project / proj-portal\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\nНе удалось загрузить\nСущность не найдена\nПовторить",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/conversations?entityType=project&entityId=proj-portal",
+            "status": 404
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          }
+        ]
+      },
+      "/admin": {
+        "gotoStatus": 200,
+        "finalUrl": "/admin/users",
+        "h1": "Администрирование",
+        "spinners": 0,
+        "textLen": 259,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nРР\nADMIN\nАдминистрирование\nПользователи рабочей области\nПользователи\nРоли\nБезопасность\nАудит\nНе удалось загрузить\nНедостаточно прав для этого действия\nПовторить",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/permission-catalog",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/users",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/access-roles",
+            "status": 403
+          },
+          {
+            "url": "/api/workspace/positions",
+            "status": 403
+          }
+        ]
+      },
+      "/agent": {
+        "gotoStatus": 200,
+        "finalUrl": "/agent",
+        "h1": "",
+        "spinners": 0,
+        "textLen": 189,
+        "textHead": "Раскрыть меню\nAI\nИстория\nПлан недели\nСроки согласования\nРиски перед встречей\nПередача проекта\nГенри Гантт\nАгент аккаунта\nСведения об агенте\nЗапрос уже набран. Отправьте его Генри.\nОтправить",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/projects",
+            "status": 403
+          }
+        ]
+      }
+    },
+    "nav": [
+      {
+        "text": "Мои задачи",
+        "href": "/my-work"
+      },
+      {
+        "text": "Проекты",
+        "href": "/projects"
+      },
+      {
+        "text": "Сделки",
+        "href": "/crm/deals"
+      },
+      {
+        "text": "Дашборд",
+        "href": "/dashboard"
+      },
+      {
+        "text": "Коммуникации",
+        "href": "/communications/chat"
+      }
+    ]
+  },
+  "engineer": {
+    "routes": {
+      "/dashboard": {
+        "gotoStatus": 200,
+        "finalUrl": "/dashboard",
+        "h1": "Дашборд",
+        "spinners": 0,
+        "textLen": 914,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nИИ\nДашборд\nПерсональная сводка: задачи, проекты и сделки рабочей области\nМОИ ЗАДАЧИ\n7\n1 в работе\nОТКРЫТЫЕ СДЕЛКИ\n5\n3,1 млн ₽\nАКТИВНЫЕ ПРОЕКТЫ\n4\n815 ч плана\nСДЕЛКИ ВЫИГРАНЫ\n1\nзакрыты в плюс\nБлижайшие задачи\nМои незавершённые задачи по плановому финишу\nПроверить результат импорта Gantt\nНа контроле · прогресс 80%\nНа проверке\n19.05.2026\nПроектирование архитектуры\nВ работе · прогресс 50%\nВ работе\n12.06.2026\nСделки по статусам\nРаспределение возможностей CRM\nНовые\n3\nПроверка\n1\nГотовы\n1\nВыиграны\n1\nПроиграны\n1\nМитинги и сигналы\nСводка дня\nМитинги «на сегодня», фокус-г",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "apiFails": []
+      },
+      "/my-work": {
+        "gotoStatus": 200,
+        "finalUrl": "/my-work",
+        "h1": "Мои задачи",
+        "spinners": 0,
+        "textLen": 1016,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nИИ\nМои задачи\nЗадачи, где вы исполнитель — по всем активным проектам\nКанбан\nСписок\nПеретащите карточку в колонку статуса — переход проверяется матрицей (запрет → отклонение).\nНовая\n0\nперетащите сюда\nОжидает\n0\nперетащите сюда\nВ работе\n1\nВысокий\nАА\nПроектирование архитектуры\nproject-vektor-portal\n50%\n12.06.2026\n23 дня назад\nНа контроле\n1\nКритичный\nАА\nПроверить результат импорта Gantt\nproject-demo-crm-intake\n80%\n19.05.2026\n47 дней назад\nВыполнено\n5\nОбычный\nИИ\nСбор требований\nproject-vektor-portal\n100%\n04.06.2026\n31 день назад\nВысокий\nИИ\nЭтап 1. Анализ данных\npro",
+        "consoleErrors": [],
+        "apiFails": []
+      },
+      "/projects": {
+        "gotoStatus": 200,
+        "finalUrl": "/projects",
+        "h1": "Проекты",
+        "spinners": 0,
+        "textLen": 801,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nИИ\nПроекты\nАктивные проекты рабочей области\nВсе\nАктивные\nПРОЕКТ\tКЛИЕНТ\tСТАТУС\tСРОК\tСУММА\tПЛАН.ЧАСЫ\tСПРОС\nuiux-eval-сделка-02\nproject-3dcc068a-1c31-40fa-9ee8-71deb2da3d49\n\t\nАГ\nАО Горсеть\n\tАктивен\t01.08.2026 — 30.09.2026\t1 млн ₽\t285 ч\t\nposition-analyst · 285 ч\nПортал подрядчиков Вектор\nproject-vektor-portal\n\t\nОВ\nООО Вектор\n\tАктивен\t01.06.2026 — 10.07.2026\t1,2 млн ₽\t220 ч\t\nposition-engineer · 160 ч\nМиграция данных Горсеть\nproject-gorset-migration\n\t\nАГ\nАО Горсеть\n\tАктивен\t12.05.2026 — 20.06.2026\t840 тыс ₽\t150 ч\t\nposition-engineer · 120 ч\nCRM intake\nproject-demo-c",
+        "consoleErrors": [],
+        "apiFails": []
+      },
+      "/projects/project-vektor-portal/schedule": {
+        "gotoStatus": 200,
+        "finalUrl": "/projects/project-vektor-portal/schedule",
+        "h1": "Производственный портал · Релиз 2",
+        "spinners": 0,
+        "textLen": 1727,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nИИ\nПР\nПроизводственный портал · Релиз 2\nВ работе\nплан v9\nДедлайн 08.07.2026\nФиниш 09.07.2026\n+1 дн. к дедлайну\nОбзор\nГрафик\nРесурсы\nНазначения\nКалендари\nСценарии\nBaseline\nКоммиты\nНастройки\nЗадача\nПодзадача\nПакет\nОткат\nBaseline\nФильтры\nКолонки\nДень\nНеделя\nМесяц\nПРОТОТИП\nРеальный контракт planning · каждая правка = коммит preview→apply через @kiss-pm/planning-client. Данные in-memory, не сохраняются. Нижняя строка — создать задачу (Enter) · 2× клик — правка ячейки · ПКМ — меню · границы колонок — ширина · бар: тяни тело (сдвиг), края (длительность), точку справ",
+        "consoleErrors": [],
+        "apiFails": []
+      },
+      "/crm/deals": {
+        "gotoStatus": 200,
+        "finalUrl": "/crm/deals",
+        "h1": "Продажи и клиенты",
+        "spinners": 0,
+        "textLen": 1621,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nИИ\nCRM\nПродажи и клиенты\nВоронка продаж и активные сделки\nСделка\nСделки\nКлиенты\nКонтакты\nПродукты\nВоронка:\nОсновная воронка\nПО УМОЛЧ.\nКанбан\nСписок\nПрогноз\nПеретащите карточку между стадиями (переход проверяется условиями воронки)\nНовая\n3,4 млн ₽\n4\nopportunity-f93cc278-a26e-4c2e-a00a-d77939b6a486\nАА\nuiux-eval-сделка-02\nАО Горсеть\n1 млн ₽\nВыиграна\nopportunity-audit-date-20260705205815\nАА\nAudit Date 20260705205815\nООО Вектор\n1 млн ₽\n45%\nopportunity-audit-fake-demand-20260705205642\nАА\nAudit Fake Demand 20260705205642\nООО Вектор\n1 млн ₽\n45%\nopportunity-romashka-s",
+        "consoleErrors": [],
+        "apiFails": []
+      },
+      "/communications/chat": {
+        "gotoStatus": null,
+        "finalUrl": "/communications/chat",
+        "h1": "Коммуникации",
+        "spinners": 0,
+        "textLen": 277,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nИИ\nКомм.\nКоммуникации\nБеседы · project / proj-portal\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления2\nНе удалось загрузить\nСущность не найдена\nПовторить",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/conversations?entityType=project&entityId=proj-portal",
+            "status": 404
+          }
+        ]
+      },
+      "/admin": {
+        "gotoStatus": 200,
+        "finalUrl": "/admin/users",
+        "h1": "Администрирование",
+        "spinners": 0,
+        "textLen": 1696,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nИИ\nADMIN\nАдминистрирование\nПользователи рабочей области\nСоздать пользователя\nПользователи\nРоли\nБезопасность\nАудит\nПОЛЬЗОВАТЕЛЬ\tEMAIL\tРОЛЬ\tПОЗИЦИЯ\tСТАТУС\t\nAudit Browser User Manager 20260705212045\nuser-audit-browser-user-manager-20260705212045\n\taudit-browser-user-manager-20260705212045@kiss-pm.local\tAudit Browser User Manager 20260705212045\t—\tАктивен\t\nAudit Domain Bypass 20260705205431\nuser-audit-domain-bypass-20260705205431\n\taudit-domain-bypass-20260705205431@not-allowed.example\tАдминистратор\t—\tАктивен\t\nAudit Escalated Admin 20260705205400\nuser-audit-escalate",
+        "consoleErrors": [],
+        "apiFails": []
+      },
+      "/agent": {
+        "gotoStatus": 200,
+        "finalUrl": "/agent",
+        "h1": "",
+        "spinners": 0,
+        "textLen": 296,
+        "textHead": "Раскрыть меню\nAI\nИстория\nПлан недели\nСроки согласования\nРиски перед встречей\nПередача проекта\nГенри Гантт\nАгент аккаунта\nСведения об агенте\nЗапрос уже набран. Отправьте его Генри.\nПривязать файл к проекту…\nuiux-eval-сделка-02\nПортал подрядчиков Вектор\nМиграция данных Горсеть\nCRM intake\nОтправить",
+        "consoleErrors": [],
+        "apiFails": []
+      }
+    },
+    "nav": [
+      {
+        "text": "Мои задачи",
+        "href": "/my-work"
+      },
+      {
+        "text": "Проекты",
+        "href": "/projects"
+      },
+      {
+        "text": "Сделки",
+        "href": "/crm/deals"
+      },
+      {
+        "text": "Дашборд",
+        "href": "/dashboard"
+      },
+      {
+        "text": "Коммуникации",
+        "href": "/communications/chat"
+      },
+      {
+        "text": "Администрирование",
+        "href": "/admin"
+      }
+    ]
+  },
+  "beta": {
+    "routes": {
+      "/dashboard": {
+        "gotoStatus": 200,
+        "finalUrl": "/dashboard",
+        "h1": "Дашборд",
+        "spinners": 0,
+        "textLen": 754,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nБА\nДашборд\nПерсональная сводка: задачи, проекты и сделки рабочей области\nМОИ ЗАДАЧИ\n0\n0 в работе\nОТКРЫТЫЕ СДЕЛКИ\n0\n0 тыс ₽\nАКТИВНЫЕ ПРОЕКТЫ\n0\n0 ч плана\nСДЕЛКИ ВЫИГРАНЫ\n0\nпока нет\nБлижайшие задачи\nМои незавершённые задачи по плановому финишу\nНезавершённых задач нет — всё закрыто.\nСделки по статусам\nРаспределение возможностей CRM\nСделок пока нет.\nМитинги и сигналы\nСводка дня\nМитинги «на сегодня», фокус-график и tenant-сигналы появятся после агрегирующего контракта — у отдельных ручек (митинги привязаны к сущности; сигналы — к проекту) tenant-широкой сводки пока",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "apiFails": []
+      },
+      "/my-work": {
+        "gotoStatus": 200,
+        "finalUrl": "/my-work",
+        "h1": "Мои задачи",
+        "spinners": 0,
+        "textLen": 378,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nБА\nМои задачи\nЗадачи, где вы исполнитель — по всем активным проектам\nКанбан\nСписок\nПеретащите карточку в колонку статуса — переход проверяется матрицей (запрет → отклонение).\nЗадач пока нет\nВам не назначено ни одной задачи в активных проектах.",
+        "consoleErrors": [],
+        "apiFails": []
+      },
+      "/projects": {
+        "gotoStatus": 200,
+        "finalUrl": "/projects",
+        "h1": "Проекты",
+        "spinners": 0,
+        "textLen": 250,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nБА\nПроекты\nАктивные проекты рабочей области\nВсе\nАктивные\nНет проектов\nАктивных проектов в рабочей области пока нет.",
+        "consoleErrors": [],
+        "apiFails": []
+      },
+      "/crm/deals": {
+        "gotoStatus": 200,
+        "finalUrl": "/crm/deals",
+        "h1": "Продажи и клиенты",
+        "spinners": 0,
+        "textLen": 483,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nБА\nCRM\nПродажи и клиенты\nВоронка продаж и активные сделки\nСделка\nСделки\nКлиенты\nКонтакты\nПродукты\nВоронка:\nКанбан\nСписок\nПрогноз\nПеретащите карточку между стадиями (переход проверяется условиями воронки)\nУсловия переходов\nворонка «—» · GET /pipelines/:id/stage-transitions\nПереходы не настроены — переносы между стадиями этой воронки не ограничены.",
+        "consoleErrors": [],
+        "apiFails": []
+      },
+      "/communications/chat": {
+        "gotoStatus": null,
+        "finalUrl": "/communications/chat",
+        "h1": "Коммуникации",
+        "spinners": 0,
+        "textLen": 276,
+        "textHead": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nБА\nКомм.\nКоммуникации\nБеседы · project / proj-portal\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления\nНе удалось загрузить\nСущность не найдена\nПовторить",
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        ],
+        "apiFails": [
+          {
+            "url": "/api/workspace/conversations?entityType=project&entityId=proj-portal",
+            "status": 404
+          }
+        ]
+      }
+    },
+    "nav": [
+      {
+        "text": "Мои задачи",
+        "href": "/my-work"
+      },
+      {
+        "text": "Проекты",
+        "href": "/projects"
+      },
+      {
+        "text": "Сделки",
+        "href": "/crm/deals"
+      },
+      {
+        "text": "Дашборд",
+        "href": "/dashboard"
+      },
+      {
+        "text": "Коммуникации",
+        "href": "/communications/chat"
+      },
+      {
+        "text": "Администрирование",
+        "href": "/admin"
+      }
+    ]
+  }
+}

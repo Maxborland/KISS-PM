@@ -1,13 +1,11 @@
 import { listTenantUsers } from "@kiss-pm/domain";
 import { createDemoTenantDataset } from "@kiss-pm/test-fixtures";
-import type {
-  AccessProfileRecord,
-  ApiTenantDataSource,
-  AuditEventListItem
-} from "./apiTypes";
+import type { PostgresTenantDataSource } from "@kiss-pm/persistence";
+
+import type { AccessProfileRecord, AuditEventListItem } from "./apiTypes";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 
-export function createInMemoryTenantDataSource(): ApiTenantDataSource {
+export function createInMemoryTenantDataSource(): Partial<PostgresTenantDataSource> {
   const demo = createDemoTenantDataset();
   const accessProfiles: AccessProfileRecord[] = demo.tenants.map((tenant) => ({
     id: `access-profile-${tenant.id.replace("tenant-", "")}-admin`,

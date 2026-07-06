@@ -1,0 +1,264 @@
+{
+  "group": "G5 Communications",
+  "coverage": [
+    { "route": "/communications/chat", "status": "fail", "notes": "Поверхность мертва: захардкожен entityId=proj-portal, которого нет в живой БД → 404 и вечный экран «Не удалось загрузить». Реальные беседы project-vektor-portal недостижимы. DM-ось тоже заблокирована top-level ошибкой." },
+    { "route": "/communications/channels", "status": "pass", "notes": "Работает на живом API: отправка сообщений, создание/правка канала, участники. Найдены major-проблемы: сырой ввод org_unit ID с неверным предзаполнением, нет удаления канала, техжаргон в UI." },
+    { "route": "/communications/meetings", "status": "fail", "notes": "Мертва по той же причине (proj-portal → 404). Создать встречу нельзя: кнопка «Встреча» не рендерится в error-состоянии." },
+    { "route": "/communications/calls", "status": "fail", "notes": "Мертва (proj-portal → 404). Реальная комната звонка недостижима из UI, кнопка «Комната» недоступна в error-состоянии." },
+    { "route": "/communications/notifications", "status": "pass", "notes": "Лента и настройки работают. Minor: бейдж таба не обновляется после «Прочитать», потеря несохранённых настроек при переключении вида, фидбек малозаметен." },
+    { "route": "/calls/[roomId]", "status": "partial", "notes": "Лобби работает. Деградация при video provider=disabled невнятная: generic «Не удалось подключиться» вместо честного объяснения, чат имитирует отправку, «Завершить» не работает, нет навигации назад." }
+  ],
+  "findings": [
+    {
+      "id": "G5-01",
+      "route": "/communications/chat",
+      "criterion": "логичность",
+      "severity": "critical",
+      "title": "Чат целиком мёртв: захардкоженный демо-проект proj-portal вместо реальных данных",
+      "description": "Прод-страница чата запрашивает беседы сущности project/proj-portal (константа DEMO_ENTITY_ID в chat-surface.tsx, ChatSurface вызывается без пропсов в app/communications/chat/page.tsx). В живой БД такого проекта нет — API отвечает 404 collaboration_entity_not_found, и пользователь видит вечное «Не удалось загрузить · Сущность не найдена». При этом реальная беседа conversation-vektor-portal (проект project-vektor-portal, unreadCount=1) существует и недостижима из UI. «Повторить» бесконечно повторяет тот же 404. Личные сообщения (DM) — отдельная ось, но они тоже заблокированы, потому что top-level SurfaceState закрывает всю поверхность. Основной сценарий «отправить сообщение в беседу проекта» невыполним.",
+      "repro": [
+        "Войти admin@kiss-pm.local / admin12345",
+        "Открыть /communications/chat",
+        "Наблюдать «Не удалось загрузить · Сущность не найдена»; в network — 404 GET /api/workspace/conversations?entityType=project&entityId=proj-portal",
+        "curl GET /api/workspace/conversations?entityType=project&entityId=project-vektor-portal — беседы существуют"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-chat.png", "evidence/g5-comms-tour-report.json"],
+      "suggestedFix": "Убрать DEMO_ENTITY_ID из прод-маршрута: передавать реальный entityType/entityId (селектор проекта или scope из контекста), либо дать серверный резолвинг «бесед моих проектов». Подзаголовок «Беседы · project / proj-portal» заменить на человекочитаемое название проекта."
+    },
+    {
+      "id": "G5-02",
+      "route": "/communications/meetings",
+      "criterion": "логичность",
+      "severity": "critical",
+      "title": "Встречи мертвы: тот же hardcode proj-portal, создать встречу невозможно",
+      "description": "GET /api/workspace/meetings?entityType=project&entityId=proj-portal → 404 collaboration_entity_not_found → вечный экран ошибки. Реальная встреча meeting-alpha-vektor-kickoff (project-vektor-portal) существует, но недостижима. Хуже: в error-состоянии CommsFrame рендерится без actions, поэтому кнопки «Встреча» нет вообще — запланировать встречу из UI нельзя никак. Сценарий «планирование митинга» невыполним.",
+      "repro": [
+        "Войти admin, открыть /communications/meetings",
+        "Экран «Не удалось загрузить · Сущность не найдена», кнопки создания встречи нет",
+        "curl GET /api/workspace/meetings?entityType=project&entityId=project-vektor-portal — встречи существуют"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-meetings.png", "evidence/g5-comms-tour-report.json"],
+      "suggestedFix": "Передавать реальный entityId; в error-состоянии сохранять кнопку создания (или хотя бы объяснять, как попасть к встречам конкретного проекта)."
+    },
+    {
+      "id": "G5-03",
+      "route": "/communications/calls",
+      "criterion": "логичность",
+      "severity": "critical",
+      "title": "Звонки мертвы: hardcode proj-portal; существующая комната недостижима из UI",
+      "description": "GET /api/workspace/call-rooms?entityType=project&entityId=proj-portal → 404 communications_entity_not_found → вечная ошибка. В БД есть живая комната call-room-7b06d2a4-… (project-vektor-portal, provider=livekit), но попасть в неё можно только зная прямую ссылку /calls/<roomId>. Кнопка «Комната» в error-состоянии не рендерится (actions передаются только при data && rooms.length===0), поэтому создать комнату из UI тоже нельзя. Сценарий «список звонков + начать звонок» невыполним.",
+      "repro": [
+        "Войти admin, открыть /communications/calls",
+        "Экран «Не удалось загрузить · Сущность не найдена», кнопки «Комната» нет",
+        "curl GET /api/workspace/call-rooms?entityType=project&entityId=project-vektor-portal — комната существует"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-calls.png", "evidence/g5-comms-tour-report.json"],
+      "suggestedFix": "Реальный entityId + кнопка создания комнаты доступна и в error/empty состояниях."
+    },
+    {
+      "id": "G5-04",
+      "route": "/calls/[roomId]",
+      "criterion": "обратная связь",
+      "severity": "major",
+      "title": "Деградация звонка невнятная: сервер честно отвечает video_provider_disabled, а UI показывает generic «Не удалось подключиться»",
+      "description": "При video provider = disabled нажатие «Присоединиться» приводит к POST .../join-token → 501 {\"error\":\"video_provider_disabled\"}. Но пользователь видит только баннер «Не удалось подключиться к звонку» и мелкую подпись «Ошибка связи» — как будто проблема в сети. Причина (видеозвонки отключены администратором деплоя) не объясняется, действий не предлагается (нет retry, нет «вернуться»). call-runtime-view.tsx:75 рендерит один и тот же текст на любую ошибку. По условиям стенда деградация допустима, но она обязана быть внятной — сейчас это выглядит как поломка.",
+      "repro": [
+        "Войти admin, открыть /calls/call-room-7b06d2a4-c8e9-442d-b2ac-87ea16eb1027",
+        "Нажать «Присоединиться»",
+        "Баннер «Не удалось подключиться к звонку»; в network POST .../join-token → 501 video_provider_disabled"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-call-join-degraded.png", "evidence/g5-comms-call-degraded-report.json"],
+      "suggestedFix": "Различать коды ошибок: для video_provider_disabled показывать честное «Видеозвонки отключены в этой конфигурации, доступен только чат/метаданные» + ссылку назад; generic-текст оставить для настоящих сетевых сбоев."
+    },
+    {
+      "id": "G5-05",
+      "route": "/calls/[roomId]",
+      "criterion": "обратная связь",
+      "severity": "major",
+      "title": "Чат звонка имитирует успешную отправку при отсутствующем соединении",
+      "description": "В degraded-состоянии (join не удался) панель «Чат звонка» остаётся активной: сообщение «uiux-eval-чат-при-ошибке» после «Отправить» отображается в ленте как доставленное («Вы 22:12»), хотя ни одного API-запроса не уходит (сообщение живёт только в локальном состоянии и потеряется при перезагрузке). Пользователь уверен, что коллеги видят его сообщение — ложная обратная связь.",
+      "repro": [
+        "Открыть /calls/<roomId>, нажать «Присоединиться» (join упадёт с 501)",
+        "Написать сообщение в «Чат звонка», нажать «Отправить»",
+        "Сообщение появляется как отправленное; в network нет ни одного запроса на отправку"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-call-degraded-chat-send.png", "evidence/g5-comms-call-degraded-report.json"],
+      "suggestedFix": "При отсутствии соединения дизейблить композер чата звонка с подписью «Чат недоступен: нет соединения», либо показывать статус доставки (не доставлено)."
+    },
+    {
+      "id": "G5-06",
+      "route": "/calls/[roomId]",
+      "criterion": "недоделанность",
+      "severity": "major",
+      "title": "«Завершить» в degraded-звонке не делает ничего; со страницы звонка нет пути назад",
+      "description": "На экране неудавшегося подключения кнопки «Микрофон/Камера/Экран/Фон/Завершить» кликабельны, но «Завершить» не меняет ничего: URL остаётся /calls/<roomId>, экран тот же, баннер тот же. Страница /calls/[roomId] рендерится вообще без шапки приложения и навигации — единственный выход это кнопка «назад» браузера или ручной ввод URL. Пользователь заперт в тупике.",
+      "repro": [
+        "Открыть /calls/<roomId>, «Присоединиться» (join падает)",
+        "Нажать «Завершить» — ничего не происходит",
+        "Осмотреть страницу: нет ни навигации, ни ссылки назад"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-call-degraded-end.png", "evidence/g5-comms-call-degraded-report.json"],
+      "suggestedFix": "«Завершить» должно возвращать в лобби или на список звонков; добавить на /calls/[roomId] шапку с названием комнаты и ссылкой назад."
+    },
+    {
+      "id": "G5-07",
+      "route": "/calls/[roomId]",
+      "criterion": "логичность",
+      "severity": "major",
+      "title": "Несуществующий roomId показывается как «Нет доступа к этому звонку» на голой странице",
+      "description": "/calls/not-a-real-room-id (404 от API) даёт баннер «Нет доступа к этому звонку» — формулировка вводит в заблуждение: комнаты не существует, а не «доступ запрещён». Кроме баннера на странице нет ничего: ни навигации, ни ссылки на список звонков, ни объяснения, что делать. fetchCallRoomEntity сводит 404 и 403 к одному null.",
+      "repro": [
+        "Войти admin, открыть /calls/not-a-real-room-id",
+        "Пустая страница с одним баннером «Нет доступа к этому звонку»; в network 404 GET /api/workspace/call-rooms/not-a-real-room-id"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-call-runtime-invalid.png"],
+      "suggestedFix": "Различать 404 («Звонок не найден — возможно, ссылка устарела») и 403; добавить ссылку «К звонкам» и каркас страницы."
+    },
+    {
+      "id": "G5-08",
+      "route": "/communications/channels",
+      "criterion": "достаточность",
+      "severity": "major",
+      "title": "Канал нельзя удалить или архивировать — разомкнутый CRUD",
+      "description": "Созданный канал живёт вечно: в UI нет ни удаления, ни архивации (только правка названия/описания), и на сервере DELETE/archive для communication-channels тоже отсутствует (в openApiDocument только GET/POST/PATCH/участники). Ошибочно созданный канал (например, мой тестовый с несуществующим scope) навсегда засоряет список у всех пользователей тенанта.",
+      "repro": [
+        "Создать канал через «Канал» → «Создать»",
+        "Открыть его деталь: доступна только кнопка «Изменить» (название/описание)",
+        "Убедиться, что ни в UI, ни в API (openApiDocument.ts, communicationUpgradeRoutes.ts) нет удаления/архивации"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-channel-detail.png", "evidence/g5-comms-channels-report.json"],
+      "suggestedFix": "Добавить архивацию канала (soft-delete) с подтверждением на API и в UI."
+    },
+    {
+      "id": "G5-09",
+      "route": "/communications/channels",
+      "criterion": "удобство",
+      "severity": "major",
+      "title": "Создание team-канала: сырой ввод org_unit ID, предзаполненный НЕВЕРНЫМ значением, без валидации",
+      "description": "В диалоге «Новый канал» для типа «Команда» поле «Подразделение (область)» — свободный текстовый ввод внутреннего ID с placeholder «org-portal», при этом предзаполнено значением proj-portal — это ID демо-ПРОЕКТА, а не подразделения (общий useState с веткой project_general). Пользователь не знает внутренних org-ID и не может их посмотреть. Сервер принимает любую строку: канал со scope org_unit/org-portal (несуществующее подразделение) создался успешно — молча получилась запись с висячей ссылкой. Для типа «Проект» селектор содержит единственный захардкоженный пункт «Производственный портал (proj-portal)» — опять несуществующий демо-ID.",
+      "repro": [
+        "Каналы → «Канал» → тип «Команда»: поле «Подразделение (область)» уже содержит proj-portal",
+        "Ввести любое значение (org-portal), «Создать» — канал создаётся",
+        "curl GET /api/workspace/communication-channels: scope org_unit/org-portal — подразделения не существует"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-channel-create-dialog.png", "evidence/screenshots/g5-comms-channel-detail.png", "evidence/g5-comms-channels-report.json"],
+      "suggestedFix": "Селектор реальных подразделений/проектов тенанта вместо свободного ввода ID; серверная валидация существования scopeEntityId; раздельный state для двух типов scope."
+    },
+    {
+      "id": "G5-10",
+      "route": "/communications/*",
+      "criterion": "недоделанность",
+      "severity": "major",
+      "title": "Плашки «ПРОТОТИП» с API-контрактами и техжаргоном на живых прод-страницах, и они врут про «in-memory»",
+      "description": "Все comms-страницы показывают пользователю баннер «ПРОТОТИП: Реальный контракт: /api/workspace/… Данные in-memory; realtime-доставка появится в приложении». На проде это (а) внутренний жаргон разработчиков (пути эндпоинтов, «полный upsert», «не идемпотентно», POST/PATCH/PUT), (б) ложь: данные НЕ in-memory — моё сообщение в «Общий канал Альфа» сохранилось в БД и видно всем пользователям тенанта после перелогина. Также в заголовке ленты канала выводится сырая строка «GET /communication-channels/<id>/conversation», а в диалоге создания — подсказки вида «team → scopeEntityType=\"org_unit\"».",
+      "repro": [
+        "Открыть /communications/channels или /communications/notifications под admin",
+        "Прочитать баннер «ПРОТОТИП…» и заголовок «Лента канала GET /communication-channels/…»",
+        "Отправить сообщение, перелогиниться — данные сохранились (не in-memory)"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-channels.png", "evidence/screenshots/g5-comms-notifications.png", "evidence/screenshots/g5-comms-channel-create-dialog.png"],
+      "suggestedFix": "Убрать прототип-плашки и все упоминания эндпоинтов/HTTP-методов с прод-маршрутов (оставить только в Storybook), либо гейтить их prototype-флагом."
+    },
+    {
+      "id": "G5-11",
+      "route": "/communications/channels",
+      "criterion": "кривость",
+      "severity": "minor",
+      "title": "Сырые технические ID по всему UI коммуникаций",
+      "description": "В шапке канала — channel-20a61353-61bd-490f-94d1-9bb7bbc21232 и «область: org_unit / org-portal»; под каждым участником — user-alpha-admin, user-audit-browser-user-manager-…; в детали звонка — roomId, в детали встречи — meeting.id. Эти строки не нужны пользователю и создают ощущение недоделанного продукта.",
+      "repro": [
+        "Открыть /communications/channels, выбрать любой канал",
+        "Посмотреть подзаголовок канала и список участников"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-channel-detail.png"],
+      "suggestedFix": "Скрыть ID (или показывать по клику «скопировать ID» для поддержки); scope показывать названием подразделения/проекта."
+    },
+    {
+      "id": "G5-12",
+      "route": "/communications/channels",
+      "criterion": "роли",
+      "severity": "major",
+      "title": "Под ограниченной ролью имена авторов деградируют до сырых user-ID",
+      "description": "Под plan-reader-no-resources лента «Общего канала Альфа» показывает автора сообщения как «user-alpha-admin» с инициалом «U» вместо «Анна Администратор»: справочник пользователей (GET /api/workspace/users) роли недоступен, а UI молча подставляет ID в качестве имени. Читать переписку невозможно — непонятно, кто пишет.",
+      "repro": [
+        "Войти plan-reader-no-resources@kiss-pm.local / reader12345",
+        "Открыть /communications/channels → «Общий канал Альфа»",
+        "Автор сообщения отображается как user-alpha-admin"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-reader-channels.png", "evidence/g5-comms-reader-report.json"],
+      "suggestedFix": "Отдавать имена авторов вместе с сообщениями (или разрешить облегчённый справочник имён всем аутентифицированным ролям тенанта)."
+    },
+    {
+      "id": "G5-13",
+      "route": "/communications/notifications",
+      "criterion": "логичность",
+      "severity": "minor",
+      "title": "Счётчики непрочитанного не синхронизированы: бейдж таба не обновляется после «Прочитать», бейдж «Чат» не видит непрочитанную беседу",
+      "description": "1) После «Прочитать» единственного уведомления карточка становится «прочитано только что», но бейдж «Уведомления 1» на табе остаётся до перезагрузки (сводка перечитывается только по SSE-пушу, не после markRead). 2) У admin беседа conversation-vektor-portal имеет unreadCount=1, но GET /api/workspace/unread-summary возвращает conversations:0 — бейдж «Чат» пуст при реально непрочитанной беседе.",
+      "repro": [
+        "Открыть /communications/notifications, нажать «Прочитать» на непрочитанном",
+        "Бейдж таба «Уведомления» не меняется (скриншот)",
+        "curl: conversations readState.unreadCount=1 vs unread-summary conversations:0"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-notif-read-one.png", "evidence/g5-comms-notif-calls-report.json"],
+      "suggestedFix": "Перечитывать unread-summary после markRead; согласовать расчёт conversations в unread-summary с readState бесед."
+    },
+    {
+      "id": "G5-14",
+      "route": "/communications/*",
+      "criterion": "обратная связь",
+      "severity": "minor",
+      "title": "Фидбек действий — незаметная серая строка в случайном месте, не toast",
+      "description": "Подтверждения («Канал «…» создан», «Настройки сохранены», «Уведомление отмечено прочитанным») выводятся мелким серым текстом под контентом (в channels — под левой колонкой внизу страницы) и не исчезают/не привлекают внимания. При ошибке — та же малозаметная строка «Отклонено: …». Легко пропустить результат действия.",
+      "repro": [
+        "Создать канал: подтверждение появляется мелкой строкой внизу под списком каналов",
+        "Уведомления → «Прочитать»: строка «Уведомление отмечено прочитанным» в самом низу ленты"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-channel-detail.png", "evidence/screenshots/g5-comms-notif-read-one.png"],
+      "suggestedFix": "Единый toast-механизм для успеха/ошибки действий."
+    },
+    {
+      "id": "G5-15",
+      "route": "/communications/notifications",
+      "criterion": "удобство",
+      "severity": "minor",
+      "title": "Настройки уведомлений теряют несохранённые изменения при переключении вида без предупреждения",
+      "description": "Переключил switch в «Настройках», нажал «Лента», вернулся в «Настройки» — изменение молча откатилось к серверному значению. Ни предупреждения о несохранённых изменениях, ни индикации dirty-состояния (кнопка «Сохранить» всегда активна, непонятно, есть ли что сохранять).",
+      "repro": [
+        "Уведомления → «Настройки», переключить любой switch",
+        "Нажать «Лента», затем снова «Настройки»",
+        "Switch вернулся в исходное состояние — ввод потерян"
+      ],
+      "evidence": ["evidence/g5-comms-notif-calls-report.json"],
+      "suggestedFix": "Подтверждение при уходе с несохранёнными изменениями и/или dirty-индикация кнопки «Сохранить»."
+    },
+    {
+      "id": "G5-16",
+      "route": "/communications/channels",
+      "criterion": "обратная связь",
+      "severity": "minor",
+      "title": "Удаление участника канала — один клик по иконке без подтверждения",
+      "description": "Иконка UserMinus в строке участника удаляет его из канала мгновенно, без диалога подтверждения и без «отменить». Деструктивное действие в один misclick.",
+      "repro": [
+        "Открыть управляемый канал, добавить участника",
+        "Кликнуть иконку «Удалить участника» — участник исчезает сразу"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-channel-member-removed.png", "evidence/g5-comms-channels-report.json"],
+      "suggestedFix": "Диалог подтверждения или undo-toast."
+    },
+    {
+      "id": "G5-17",
+      "route": "/communications/*",
+      "criterion": "кривость",
+      "severity": "nit",
+      "title": "Текст «Комм.» вылезает из квадратной иконки шапки и упирается в заголовок",
+      "description": "В шапке области иконка — квадрат 32×32 с текстом «Комм.», который шире квадрата и наезжает на заголовок «Коммуникации» (особенно заметно на /communications/calls, где нет подзаголовка: «Комм.Коммуникации» слитно).",
+      "repro": [
+        "Открыть любой /communications/* и посмотреть на иконку слева от заголовка",
+        "На /communications/calls в error-состоянии текст сливается с заголовком"
+      ],
+      "evidence": ["evidence/screenshots/g5-comms-calls.png", "evidence/screenshots/g5-comms-chat.png"],
+      "suggestedFix": "Иконка вместо текста (или короткая аббревиатура, влезающая в квадрат)."
+    }
+  ]
+}

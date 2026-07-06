@@ -255,7 +255,7 @@ describe("POST /api/auth/password-reset/request", () => {
     });
 
     expect(response.status).toBe(202);
-    await expect(response.json()).resolves.toEqual({ status: "ok" });
+    await expect(response.json()).resolves.toEqual({ status: "ok", delivery: "none" });
     expect(state.resetTokens.size).toBe(1);
     expect(emailProvider.lastPasswordReset?.email).toBe("owner@example.com");
     expect(emailProvider.lastPasswordReset?.rawToken).toMatch(/^[a-f0-9]{64}$/);
@@ -273,7 +273,7 @@ describe("POST /api/auth/password-reset/request", () => {
     });
 
     expect(response.status).toBe(202);
-    await expect(response.json()).resolves.toEqual({ status: "ok" });
+    await expect(response.json()).resolves.toEqual({ status: "ok", delivery: "none" });
     expect(state.resetTokens.size).toBe(0);
     expect(emailProvider.lastPasswordReset).toBeNull();
   });

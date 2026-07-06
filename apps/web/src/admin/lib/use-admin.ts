@@ -1,23 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { guardMutation, type MutationResult } from "../../lib/domain-client";
+import { useDomainClient } from "../../lib/use-domain-client";
+import { useResource, type LoadStatus } from "../../lib/use-resource";
 import {
-  AdminApiError, createAdminClient,
+  createAdminClient,
   type AccessProfile, type AccessRoleCreateInput, type AccessRoleUpdateInput,
   type Permission, type Position, type UserCreateInput, type UserUpdateInput, type WorkspaceUser
 } from "./admin-client";
 import { createMockAdminFetch } from "./mock-admin-backend";
 import { useAdminRuntime } from "./admin-runtime";
 
-export type AdminLoadStatus = "loading" | "ready" | "error";
+// 403 (permission_missing) → forbidden — поверхность показывает «Доступ ограничен».
+export type AdminLoadStatus = LoadStatus;
 export type AdminData = {
   roles: AccessProfile[];
   users: WorkspaceUser[];
   positions: Position[];
   permissions: Permission[];
 };
-export type AdminMutationResult = { ok: true } | { ok: false; code?: string; message: string };
+export type AdminMutationResult = MutationResult;
 
 /**
  * Работает через настоящий createAdminClient. Транспорт выбирается по
@@ -31,55 +35,21 @@ export type AdminMutationResult = { ok: true } | { ok: false; code?: string; mes
  * точечное обновление локального кэша по затронутой сущности.
  */
 export function useAdmin() {
-  // live → боевой createAdminClient (без fetchImpl, fetch на /api/* + cookie-сессия);
-  // mock → contract-mock fetchImpl на каждый монтаж (изолированная in-memory сессия).
   const { live } = useAdminRuntime();
-  const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null && !live) fetchRef.current = createMockAdminFetch();
-  const clientRef = useRef<ReturnType<typeof createAdminClient> | null>(null);
-  if (clientRef.current === null) {
-    clientRef.current = live
-      ? createAdminClient({ apiOrigin: "" })
-      : createAdminClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
-  }
-  const client = clientRef.current;
+  const client = useDomainClient(live, createAdminClient, createMockAdminFetch);
 
-  const [data, setData] = useState<AdminData | null>(null);
-  const [status, setStatus] = useState<AdminLoadStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const [roles, users, positions, catalog] = await Promise.all([
-        client.listAccessRoles(),
-        client.listUsers(),
-        client.listPositions(),
-        client.listPermissionCatalog()
-      ]);
-      setData({ roles: roles.accessRoles, users: users.users, positions: positions.positions, permissions: catalog.permissions });
-      setStatus("ready");
-      setError(null);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
-    }
+  const loader = useCallback(async (): Promise<AdminData> => {
+    const [roles, users, positions, catalog] = await Promise.all([
+      client.listAccessRoles(),
+      client.listUsers(),
+      client.listPositions(),
+      client.listPermissionCatalog()
+    ]);
+    return { roles: roles.accessRoles, users: users.users, positions: positions.positions, permissions: catalog.permissions };
   }, [client]);
+  const { data, status, error, setData, reload: load } = useResource(loader);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  // обёртка мутации: ошибки AdminApiError → {ok:false, code, message}
-  const guard = useCallback(async (fn: () => Promise<void>): Promise<AdminMutationResult> => {
-    try {
-      await fn();
-      return { ok: true };
-    } catch (e) {
-      if (e instanceof AdminApiError) return { ok: false, code: e.code, message: e.code };
-      return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
-    }
-  }, []);
+  const guard = guardMutation;
 
   const patchUser = (u: WorkspaceUser) => setData((d) => (d ? { ...d, users: d.users.map((x) => (x.id === u.id ? u : x)) } : d));
 

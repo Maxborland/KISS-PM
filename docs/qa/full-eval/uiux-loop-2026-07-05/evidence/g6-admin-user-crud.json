@@ -1,0 +1,44 @@
+[
+  {
+    "kind": "console",
+    "url": "http://127.0.0.1:3000/admin/users",
+    "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "loc": {
+      "url": "http://127.0.0.1:3000/favicon.ico",
+      "line": 0,
+      "column": 0,
+      "lineNumber": 0,
+      "columnNumber": 0
+    }
+  },
+  {
+    "kind": "step",
+    "step": "bad-domain-submit",
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nПользователи рабочей области\n\nСоздать пользователя\nПользователи\nРоли\nБезопасность\nАудит\nПОЛЬЗОВАТЕЛЬ\tEMAIL\tРОЛЬ\tПОЗИЦИЯ\tСТАТУС\t\n\nAudit Browser User Manager 20260705212045\nuser-audit-browser-user-manager-20260705212045\n\taudit-browser-user-manager-20260705212045@kiss-pm.local\tAudit Browser User Manager 20260705212045\t—\tАктивен\t\n\n\nAudit Domain Bypass 20260705205431\nuser-audit-domain-bypass-20260705205431\n\taudit-domain-bypass-20260705205431@not-allowed.example\tАдминистратор\t—\tАктивен\t\n\n\nAudit Escalated Admin 20260705205400\nuser-audit-escalated-admin-20260705205400\n\taudit-escalated-admin-20260705205400@kiss-pm.local\tАдминистратор\t—\tАктивен\t\n\n\nAudit User Manager 20260705205400\nuser-audit-user-manager-20260705205400\n\taudit-user-manager-20260705205400@kiss-pm.local\tAudit User Manager 20260705205400\t—\tАктивен\t\n\n\nАнна Администратор\nuser-alpha-admin\n\tadmin@kiss-pm.local\tАдминистратор\tРуководитель проекта\tАктивен\t\n\n\nИгорь Инженер\nuser-alpha-engineer\n\tengineer@kiss-pm.local\tАдминистратор\tИнженер\tАктивен\t\n\n\nНикита Без Ресурсов\nuser-alpha-plan-reader-no-resources\n\tplan-reader-no-resources@kiss-pm.local\tНаблюдатель плана без ресурсов\tИнженер\tАктивен\t\n\n\nРоман Ресурсный\nuser-alpha-resource-reader\n\tresource-reader@kiss-pm.local\tНаблюдатель ресурсов\tИнженер\tАктивен\t\n\n\nuiux-eval-g6-bad-1783263859275\nuser-5cedb2cc-f0a6-447e-8d92-a5f777394d92\n\tuiux-eval-g6-bad-1783263859275@kiss-pm.local\tАдминистратор\t—\tАктивен\t\nПользователь «uiux-eval-g6-bad-1783263859275» создан"
+  },
+  {
+    "kind": "info",
+    "modalStillOpen": 0
+  },
+  {
+    "kind": "step",
+    "step": "created",
+    "text": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nПользователи рабочей области\n\nСоздать пользователя\nПользователи\nРоли\nБезопасность\nАудит\nПОЛЬЗОВАТЕЛЬ\tEMAIL\tРОЛЬ\tПОЗИЦИЯ\tСТАТУС\t\n\nAudit Browser User Manager 20260705212045\nuser-audit-browser-user-manager-20260705212045\n\taudit-browser-user-manager-20260705212045@kiss-pm.local\tAudit Browser User Manager 20260705212045\t—\tАктивен\t\n\n\nAudit Domain Bypass 20260705205431\nuser-audit-domain-bypass-20260705205431\n\taudit-domain-bypass-20260705205431@not-allowed.example\tАдминистратор\t—\tАктивен\t\n\n\nAudit Escalated Admin 20260705205400\nuser-audit-escalated-admin-20260705205400\n\taudit-escalated-admin-20260705205400@kiss-pm.local\tАдминистратор\t—\tАктивен\t\n\n\nAudit User Manager 20260705205400\nuser-audit-user-manager-20260705205400\n\taudit-user-manager-20260705205400@kiss-pm.local\tAudit User Manager 20260705205400\t—\tАктивен\t\n\n\nАнна Администратор\nuser-alpha-admin\n\tadmin@kiss-pm.local\tАдминистратор\tРуководитель проекта\tАктивен\t\n\n\nИгорь Инженер\nuser-alpha-engineer\n\tengineer@kiss-pm.local\tАдминистратор\tИнженер\tАктивен\t\n\n\nНикита Без Ресурсов\nuser-alpha-plan-reader-no-resources\n\tplan-reader-no-resources@kiss-pm.local\tНаблюдатель плана без ресурсов\tИнженер\tАктивен\t\n\n\nРоман Ресурсный\nuser-alpha-resource-reader\n\tresource-reader@kiss-pm.local\tНаблюдатель ресурсов\tИнженер\tАктивен\t\n\n\nuiux-eval-g6-bad-1783263859275\nuser-5cedb2cc-f0a6-447e-8d92-a5f777394d92\n\tuiux-eval-g6-bad-1783263859275@kiss-pm.local\tАдминистратор\t—\tАктивен\t\n\n\nuiux-eval-g6-1783263859275\nuser-b6185f8a-8b7d-4e36-a908-d24bd62d1fd8\n\tuiux-eval-g6-1783263859275@only-audit.example\tАдминистратор\t—\tАктивен\t\nПользователь «uiux-eval-g6-1783263859275» создан"
+  },
+  {
+    "kind": "info",
+    "newUserRowFound": 1
+  },
+  {
+    "kind": "info",
+    "rowButtons": 2,
+    "titles": [
+      "Изменить",
+      "Деактивировать"
+    ],
+    "aria": [
+      null,
+      null
+    ]
+  }
+]

@@ -577,7 +577,7 @@ describe("communications realtime API", () => {
     const baseDataSource = createPostgresTenantDataSource(createDatabase(client));
     let endedAfterPrecheck = false;
     let issuedJoinTokens = 0;
-    const dataSource: ApiTenantDataSource = {
+    const dataSource: Partial<ApiTenantDataSource> = {
       ...baseDataSource,
       async findCallSession(tenantId, requestedSessionId) {
         const session = await baseDataSource.findCallSession(tenantId, requestedSessionId);

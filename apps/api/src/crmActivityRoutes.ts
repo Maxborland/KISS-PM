@@ -35,6 +35,7 @@ import {
 } from "./crmActivityParsers";
 import { serializeAttachment } from "./attachmentSerialization";
 import { isFinalOpportunityStatus } from "./projectIntakeService/opportunityStatus";
+import { authorizeRoute } from "./routeAuth";
 import {
   parseClientIdParam,
   parseContactIdParam,
@@ -107,34 +108,28 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
     const route = parseCrmEntityRouteParams(context);
     if (!route.ok) return context.json({ error: route.error }, 400);
 
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.listCrmActivities) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const profile = await deps.getActorProfile(actor);
-    const readDecision = readDecisionForEntity({
-      actor,
-      entityType: route.value.entityType,
-      profile
+    const auth = await authorizeRoute(context, deps, {
+      permission: ({ actor, profile }) =>
+        readDecisionForEntity({ actor, entityType: route.value.entityType, profile }),
+      capabilities: ["listCrmActivities"]
     });
-    if (!readDecision.allowed) return context.json({ error: readDecision.reason }, 403);
+    if (!auth.ok) return auth.response;
+    const { actor, profile, dataSource } = auth.value;
 
     const entity = await resolveCrmEntity({
       actor,
-      dataSource: deps.dataSource,
+      dataSource,
       entityId: route.value.entityId,
       entityType: route.value.entityType
     });
     if (!entity) return context.json({ error: "crm_entity_not_found" }, 404);
 
-    const activities = await deps.dataSource.listCrmActivities(
+    const activities = await dataSource.listCrmActivities(
       actor.tenantId,
       entity.entityType,
       entity.entityId
     );
-    const auditEvents = (await deps.dataSource.listAuditEventsByTenantId?.(actor.tenantId)) ?? [];
+    const auditEvents = (await dataSource.listAuditEventsByTenantId?.(actor.tenantId)) ?? [];
     const scopedAuditEvents = filterAuditEventsForCrmEntity(auditEvents, entity);
     const visibleSystemEvents = scopedAuditEvents.filter(
       (event) => event.executionResult.status === "succeeded"
@@ -145,7 +140,7 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
       targetTenantId: actor.tenantId
     });
 
-    const attachmentItems = (await deps.dataSource.listAttachmentActivityItems?.({
+    const attachmentItems = (await dataSource.listAttachmentActivityItems?.({
       tenantId: actor.tenantId,
       entityType: entity.entityType,
       entityId: entity.entityId
@@ -166,18 +161,31 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
     const route = parseCrmEntityRouteParams(context);
     if (!route.ok) return context.json({ error: route.error }, 400);
 
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.createCrmActivity || !deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const routeContext = await resolveMutationContext(route.value.entityType, {
-      actor,
-      deps,
-      entityId: route.value.entityId
+    const auth = await authorizeRoute(context, deps, {
+      permission: ({ actor, profile }) =>
+        manageDecisionForEntity({ actor, entityType: route.value.entityType, profile }),
+      capabilities: ["createCrmActivity", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          deps,
+          entityId: route.value.entityId,
+          entityType: route.value.entityType,
+          error: decision.reason,
+          permissionResult: decision
+        })
     });
-    if ("response" in routeContext) return routeContext.response(context);
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
+
+    const entity = await resolveCrmEntity({
+      actor,
+      dataSource,
+      entityId: route.value.entityId,
+      entityType: route.value.entityType
+    });
+    if (!entity) return context.json({ error: "crm_entity_not_found" }, 404);
+    if (entity.isLocked) return context.json({ error: "crm_activity_locked" }, 409);
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -191,8 +199,8 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
       const created = await transactionDataSource.createCrmActivity({
         id: `crm-activity-${randomUUID()}`,
         tenantId: actor.tenantId,
-        entityType: routeContext.entity.entityType,
-        entityId: routeContext.entity.entityId,
+        entityType: entity.entityType,
+        entityId: entity.entityId,
         type: "comment",
         title: null,
         body: parsed.value.body,
@@ -212,12 +220,12 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
         beforeState: null,
         commandInput: {
           body: parsed.value.body,
-          entityId: routeContext.entity.entityId,
-          entityType: routeContext.entity.entityType
+          entityId: entity.entityId,
+          entityType: entity.entityType
         },
         deps,
-        entity: routeContext.entity,
-        permissionResult: routeContext.decision,
+        entity,
+        permissionResult: decision,
         type: "comment.created"
       });
       return created;
@@ -231,18 +239,31 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
     const route = parseCrmEntityRouteParams(context);
     if (!route.ok) return context.json({ error: route.error }, 400);
 
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.createCrmActivity || !deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const routeContext = await resolveMutationContext(route.value.entityType, {
-      actor,
-      deps,
-      entityId: route.value.entityId
+    const auth = await authorizeRoute(context, deps, {
+      permission: ({ actor, profile }) =>
+        manageDecisionForEntity({ actor, entityType: route.value.entityType, profile }),
+      capabilities: ["createCrmActivity", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          deps,
+          entityId: route.value.entityId,
+          entityType: route.value.entityType,
+          error: decision.reason,
+          permissionResult: decision
+        })
     });
-    if ("response" in routeContext) return routeContext.response(context);
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
+
+    const entity = await resolveCrmEntity({
+      actor,
+      dataSource,
+      entityId: route.value.entityId,
+      entityType: route.value.entityType
+    });
+    if (!entity) return context.json({ error: "crm_entity_not_found" }, 404);
+    if (entity.isLocked) return context.json({ error: "crm_activity_locked" }, 409);
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -265,8 +286,8 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
       const created = await transactionDataSource.createCrmActivity({
         id: `crm-activity-${randomUUID()}`,
         tenantId: actor.tenantId,
-        entityType: routeContext.entity.entityType,
-        entityId: routeContext.entity.entityId,
+        entityType: entity.entityType,
+        entityId: entity.entityId,
         type: "task",
         title: parsed.value.title,
         body: parsed.value.body,
@@ -287,13 +308,13 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
         commandInput: {
           assigneeUserId: parsed.value.assigneeUserId,
           dueDate: parsed.value.dueDate?.toISOString() ?? null,
-          entityId: routeContext.entity.entityId,
-          entityType: routeContext.entity.entityType,
+          entityId: entity.entityId,
+          entityType: entity.entityType,
           title: parsed.value.title
         },
         deps,
-        entity: routeContext.entity,
-        permissionResult: routeContext.decision,
+        entity,
+        permissionResult: decision,
         type: "task.created"
       });
       return created;
@@ -307,18 +328,31 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
     const route = parseCrmEntityRouteParams(context);
     if (!route.ok) return context.json({ error: route.error }, 400);
 
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.createCrmActivity || !deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const routeContext = await resolveMutationContext(route.value.entityType, {
-      actor,
-      deps,
-      entityId: route.value.entityId
+    const auth = await authorizeRoute(context, deps, {
+      permission: ({ actor, profile }) =>
+        manageDecisionForEntity({ actor, entityType: route.value.entityType, profile }),
+      capabilities: ["createCrmActivity", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          deps,
+          entityId: route.value.entityId,
+          entityType: route.value.entityType,
+          error: decision.reason,
+          permissionResult: decision
+        })
     });
-    if ("response" in routeContext) return routeContext.response(context);
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
+
+    const entity = await resolveCrmEntity({
+      actor,
+      dataSource,
+      entityId: route.value.entityId,
+      entityType: route.value.entityType
+    });
+    if (!entity) return context.json({ error: "crm_entity_not_found" }, 404);
+    if (entity.isLocked) return context.json({ error: "crm_activity_locked" }, 409);
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -332,8 +366,8 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
       const created = await transactionDataSource.createCrmActivity({
         id: `crm-activity-${randomUUID()}`,
         tenantId: actor.tenantId,
-        entityType: routeContext.entity.entityType,
-        entityId: routeContext.entity.entityId,
+        entityType: entity.entityType,
+        entityId: entity.entityId,
         type: "file",
         title: parsed.value.title,
         body: parsed.value.body,
@@ -352,14 +386,14 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
         auditDataSource: transactionDataSource,
         beforeState: null,
         commandInput: {
-          entityId: routeContext.entity.entityId,
-          entityType: routeContext.entity.entityType,
+          entityId: entity.entityId,
+          entityType: entity.entityType,
           fileUrl: parsed.value.fileUrl,
           title: parsed.value.title
         },
         deps,
-        entity: routeContext.entity,
-        permissionResult: routeContext.decision,
+        entity,
+        permissionResult: decision,
         type: "file.created"
       });
       return created;
@@ -375,18 +409,31 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
     const activityId = parseCrmActivityIdParam(context.req.param("activityId"));
     if (!activityId.ok) return context.json({ error: activityId.error }, 400);
 
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.transitionCrmActivityStatus || !deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const routeContext = await resolveMutationContext(route.value.entityType, {
-      actor,
-      deps,
-      entityId: route.value.entityId
+    const auth = await authorizeRoute(context, deps, {
+      permission: ({ actor, profile }) =>
+        manageDecisionForEntity({ actor, entityType: route.value.entityType, profile }),
+      capabilities: ["transitionCrmActivityStatus", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          deps,
+          entityId: route.value.entityId,
+          entityType: route.value.entityType,
+          error: decision.reason,
+          permissionResult: decision
+        })
     });
-    if ("response" in routeContext) return routeContext.response(context);
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
+
+    const entity = await resolveCrmEntity({
+      actor,
+      dataSource,
+      entityId: route.value.entityId,
+      entityType: route.value.entityType
+    });
+    if (!entity) return context.json({ error: "crm_entity_not_found" }, 404);
+    if (entity.isLocked) return context.json({ error: "crm_activity_locked" }, 409);
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -399,8 +446,8 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
       }
       const transitionResult = await transactionDataSource.transitionCrmActivityStatus({
         tenantId: actor.tenantId,
-        entityType: routeContext.entity.entityType,
-        entityId: routeContext.entity.entityId,
+        entityType: entity.entityType,
+        entityId: entity.entityId,
         activityId: activityId.value,
         status: parsed.value.status
       });
@@ -414,13 +461,13 @@ export function registerCrmActivityRoutes(app: Hono, deps: CrmActivityRouteDeps)
         beforeState: transitionResult.beforeState,
         commandInput: {
           activityId: activityId.value,
-          entityId: routeContext.entity.entityId,
-          entityType: routeContext.entity.entityType,
+          entityId: entity.entityId,
+          entityType: entity.entityType,
           status: parsed.value.status
         },
         deps,
-        entity: routeContext.entity,
-        permissionResult: routeContext.decision,
+        entity,
+        permissionResult: decision,
         type: parsed.value.status === "done" ? "task.completed" : "task.reopened"
       });
 
@@ -468,62 +515,6 @@ function parseCrmEntityRouteParams(context: Context):
       entityId: entityId.value
     }
   };
-}
-
-async function resolveMutationContext(
-  entityType: CrmActivityEntityType,
-  input: {
-    actor: TenantUser;
-    deps: CrmActivityRouteDeps;
-    entityId: string;
-  }
-): Promise<
-  | {
-      decision: PolicyDecision;
-      entity: CrmEntityContext;
-    }
-  | {
-      response: (context: Context) => Response | Promise<Response>;
-    }
-> {
-  const profile = await input.deps.getActorProfile(input.actor);
-  const decision = manageDecisionForEntity({
-    actor: input.actor,
-    entityType,
-    profile
-  });
-  if (!decision.allowed) {
-    await appendDeniedAudit({
-      actor: input.actor,
-      deps: input.deps,
-      entityId: input.entityId,
-      entityType,
-      error: decision.reason,
-      permissionResult: decision
-    });
-    return {
-      response: (context) => context.json({ error: decision.reason }, 403)
-    };
-  }
-
-  const entity = await resolveCrmEntity({
-    actor: input.actor,
-    dataSource: input.deps.dataSource,
-    entityId: input.entityId,
-    entityType
-  });
-  if (!entity) {
-    return {
-      response: (context) => context.json({ error: "crm_entity_not_found" }, 404)
-    };
-  }
-  if (entity.isLocked) {
-    return {
-      response: (context) => context.json({ error: "crm_activity_locked" }, 409)
-    };
-  }
-
-  return { decision, entity };
 }
 
 async function resolveCrmEntity(input: {

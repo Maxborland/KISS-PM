@@ -523,7 +523,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
                   {selOcc.map((occId) => <li key={occId} className="flex items-center gap-2 px-2 py-1 text-[var(--violet)]"><UserPlus className="size-3.5 shrink-0" aria-hidden />Отсутствие (отпуск)</li>)}
                 </ul>
               ) : <p className="text-[var(--muted)]">{selBucket && selBucket.capacityMinutes === 0 ? "Нерабочий день." : "Нет нагрузки в этот период."}</p>}
-              {scope.level === "project" ? <p className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Клик по часам — правка трудозатрат назначения (preview→apply, пересчитает загрузку).</p> : <p className="mt-3 inline-flex items-center gap-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]"><ShieldCheck className="size-3.5" aria-hidden />Отчётный уровень — правки делаются в проекте.</p>}
+              {scope.level === "project" ? <p className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Клик по часам — правка трудозатрат назначения (загрузка пересчитается).</p> : <p className="mt-3 inline-flex items-center gap-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]"><ShieldCheck className="size-3.5" aria-hidden />Отчётный уровень — правки делаются в проекте.</p>}
             </div>
           </aside>
         ) : null}

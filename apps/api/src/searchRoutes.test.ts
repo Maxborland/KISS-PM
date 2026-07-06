@@ -1,3 +1,4 @@
+import { ensureCompleteDataSource } from "./dataSourceCompletion";
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { KnowledgeDocument, TenantUser } from "@kiss-pm/domain";
 import type { ProjectRecord, TaskRecord } from "@kiss-pm/persistence";
@@ -12,7 +13,7 @@ describe("unified search routes", () => {
     const app = new Hono();
 
     registerSearchRoutes(app, {
-      dataSource: {
+      dataSource: ensureCompleteDataSource({
         findTenantById: async () => {
           throw new Error("findTenantById should not be called");
         },
@@ -28,7 +29,7 @@ describe("unified search routes", () => {
         listUsersByTenantId: async () => {
           throw new Error("listUsersByTenantId should not be called");
         }
-      } satisfies ApiTenantDataSource,
+      }) satisfies ApiTenantDataSource,
       getActorProfile: async () => {
         throw new Error("getActorProfile should not be called");
       },
@@ -65,7 +66,7 @@ describe("unified search routes", () => {
     const secondProject = project("project-second", "Второй проект");
 
     registerSearchRoutes(app, {
-      dataSource: {
+      dataSource: ensureCompleteDataSource({
         findTenantById: async () => ({ id: "tenant-alpha", name: "Tenant Alpha" }),
         findUserById: async () => actor,
         listDevUsers: async () => [actor],
@@ -79,7 +80,7 @@ describe("unified search routes", () => {
           return [task("task-target", "договор", secondProject.id)];
         },
         listUsersByTenantId: async () => [actor]
-      } satisfies ApiTenantDataSource,
+      }) satisfies ApiTenantDataSource,
       getActorProfile: async () => profile,
       getSessionActorFromHeaders: async () => actor
     });
@@ -93,7 +94,7 @@ describe("unified search routes", () => {
       results: [
         expect.objectContaining({
           id: "task:task-target",
-          route: "/tasks/task-target",
+          route: "/projects/project-second",
           subtitle: "Второй проект"
         })
       ]
@@ -113,7 +114,7 @@ describe("unified search routes", () => {
     } as AccessProfile;
 
     registerSearchRoutes(app, {
-      dataSource: {
+      dataSource: ensureCompleteDataSource({
         findTenantById: async () => ({ id: "tenant-alpha", name: "Tenant Alpha" }),
         findUserById: async () => actor,
         listDevUsers: async () => [actor],
@@ -124,7 +125,7 @@ describe("unified search routes", () => {
           decisions: [],
           actionItems: []
         })
-      } satisfies ApiTenantDataSource,
+      }) satisfies ApiTenantDataSource,
       getActorProfile: async () => profile,
       getSessionActorFromHeaders: async () => actor
     });

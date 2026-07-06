@@ -1,0 +1,17 @@
+[
+  {
+    "url": "http://127.0.0.1:3000/crm/deals",
+    "type": "error",
+    "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  },
+  {
+    "url": "http://127.0.0.1:3000/crm/deals",
+    "type": "warning",
+    "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}."
+  },
+  {
+    "url": "http://127.0.0.1:3000/crm/deals",
+    "type": "warning",
+    "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}."
+  }
+]

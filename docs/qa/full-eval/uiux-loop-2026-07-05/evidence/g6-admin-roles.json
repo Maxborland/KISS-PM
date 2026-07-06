@@ -1,0 +1,36 @@
+[
+  {
+    "kind": "step",
+    "step": "create-modal",
+    "text": ".read\ntenant.org_structure.manage\ntenant.clients.read\ntenant.clients.manage\ntenant.contacts.read\ntenant.contacts.manage\ntenant.products.read\ntenant.products.manage\ntenant.project_types.read\ntenant.project_types.manage\ntenant.deal_stages.read\ntenant.deal_stages.manage\ntenant.crm_pipelines.read\ntenant.crm_pipelines.manage\ntenant.crm_pipeline_rules.manage\ntenant.crm_pipeline_automations.manage\ntenant.opportunities.read\ntenant.opportunities.manage\ntenant.projects.read\ntenant.projects.manage\ntenant.project_plan.read\ntenant.project_plan.manage\ntenant.project_baselines.manage\ntenant.project_resources.read\ntenant.project_resources.manage\ntenant.planning_scenarios.preview\ntenant.planning_scenarios.apply\ntenant.kpi_definitions.read\ntenant.kpi_definitions.manage\ntenant.control_signals.read\ntenant.control_signals.manage\ntenant.management_actions.execute\ntenant.corrective_actions.manage\ntenant.control_surfaces.read\ntenant.control_surfaces.manage\ntenant.control_surfaces.publish\ntenant.retrospectives.read\ntenant.retrospectives.manage\ntenant.template_improvements.apply\ntenant.background_jobs.read\ntenant.background_jobs.manage\ntenant.communications.read\ntenant.communications.manage\ntenant.tasks.create\ntenant.tasks.edit\ntenant.tasks.delete\ntenant.task_statuses.manage\ntenant.project_activation.manage\ntenant.resource_feasibility.read\nПрофиль (profile.*)\nprofile.read\nprofile.update\nНастройки (workspace.*)\nworkspace.theme.manage\nОтмена\nСоздать\nClose"
+  },
+  {
+    "kind": "info",
+    "inputCount": 64,
+    "checkboxCount": 63
+  },
+  {
+    "kind": "step",
+    "step": "created",
+    "tail": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nРоли доступа (access-profiles)\n\nСоздать роль\nПользователи\nРоли\nБезопасность\nАудит\nРОЛЬ\tПРАВ\tНАЗНАЧЕНО\t\n\nАдминистратор\naccess-profile-alpha-admin\n\t57\t6\t\n\n\nAudit Browser User Manager 20260705212045\naccess-profile-audit-browser-user-manager-20260705212045\n\t2\t1\t\n\n\nAudit User Manager 20260705205400\naccess-profile-audit-user-manager-20260705205400\n\t2\t1\t\n\n\nНаблюдатель плана без ресурсов\naccess-profile-plan-reader-no-resources\n\t2\t1\t\n\n\nНаблюдатель ресурсов\naccess-profile-resource-reader\n\t1\t1\t\n\n\nuiux-eval-g6-role-1783264018137\nrole-uiux-eval-g6-role-1783264018137\n\t2\t0\t\nРоль «uiux-eval-g6-role-1783264018137» создана"
+  },
+  {
+    "kind": "info",
+    "roleRowFound": 1
+  },
+  {
+    "kind": "step",
+    "step": "edit-modal",
+    "text": "sitions.manage\ntenant.audit_events.read\ntenant.workspace_config.read\ntenant.workspace_config.manage\ntenant.absences.read\ntenant.absences.manage\ntenant.org_structure.read\ntenant.org_structure.manage\ntenant.clients.read\ntenant.clients.manage\ntenant.contacts.read\ntenant.contacts.manage\ntenant.products.read\ntenant.products.manage\ntenant.project_types.read\ntenant.project_types.manage\ntenant.deal_stages.read\ntenant.deal_stages.manage\ntenant.crm_pipelines.read\ntenant.crm_pipelines.manage\ntenant.crm_pipeline_rules.manage\ntenant.crm_pipeline_automations.manage\ntenant.opportunities.read\ntenant.opportunities.manage\ntenant.projects.read\ntenant.projects.manage\ntenant.project_plan.read\ntenant.project_plan.manage\ntenant.project_baselines.manage\ntenant.project_resources.read\ntenant.project_resources.manage\ntenant.planning_scenarios.preview\ntenant.planning_scenarios.apply\ntenant.kpi_definitions.read\ntenant.kpi_definitions.manage\ntenant.control_signals.read\ntenant.control_signals.manage\ntenant.management_actions.execute\ntenant.corrective_actions.manage\ntenant.control_surfaces.read\ntenant.control_surfaces.manage\ntenant.control_surfaces.publish\ntenant.retrospectives.read\ntenant.retrospectives.manage\ntenant.template_improvements.apply\ntenant.background_jobs.read\ntenant.background_jobs.manage\ntenant.communications.read\ntenant.communications.manage\ntenant.tasks.create\ntenant.tasks.edit\ntenant.tasks.delete\ntenant.task_statuses.manage\ntenant.project_activation.manage\ntenant.resource_feasibility.read\nПрофиль (profile.*)\nprofile.read\nprofile.update\nНастройки (workspace.*)\nworkspace.theme.manage\nОтмена\nСохранить\nClose"
+  },
+  {
+    "kind": "step",
+    "step": "role-assigned",
+    "tail": "тратор\t—\tАктивен\t\n\n\nAudit User Manager 20260705205400\nuser-audit-user-manager-20260705205400\n\taudit-user-manager-20260705205400@kiss-pm.local\tAudit User Manager 20260705205400\t—\tАктивен\t\n\n\nuiux-eval-g6-1783263859275\nuser-b6185f8a-8b7d-4e36-a908-d24bd62d1fd8\n\tuiux-eval-g6-1783263859275@only-audit.example\tuiux-eval-g6-role-1783264018137\t—\tАктивен\t\n\n\nuiux-eval-g6-bad-1783263859275\nuser-5cedb2cc-f0a6-447e-8d92-a5f777394d92\n\tuiux-eval-g6-bad-1783263859275@kiss-pm.local\tАдминистратор\t—\tНеактивен\t\n\n\nАнна Администратор\nuser-alpha-admin\n\tadmin@kiss-pm.local\tАдминистратор\tРуководитель проекта\tАктивен\t\n\n\nИгорь Инженер\nuser-alpha-engineer\n\tengineer@kiss-pm.local\tАдминистратор\tИнженер\tАктивен\t\n\n\nНикита Без Ресурсов\nuser-alpha-plan-reader-no-resources\n\tplan-reader-no-resources@kiss-pm.local\tНаблюдатель плана без ресурсов\tИнженер\tАктивен\t\n\n\nРоман Ресурсный\nuser-alpha-resource-reader\n\tresource-reader@kiss-pm.local\tНаблюдатель ресурсов\tИнженер\tАктивен\t\nПользователь «uiux-eval-g6-1783263859275» обновлён"
+  },
+  {
+    "kind": "step",
+    "step": "delete-assigned-role",
+    "tail": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nРоли доступа (access-profiles)\n\nСоздать роль\nПользователи\nРоли\nБезопасность\nАудит\nРОЛЬ\tПРАВ\tНАЗНАЧЕНО\t\n\nАдминистратор\naccess-profile-alpha-admin\n\t57\t5\t\n\n\nAudit Browser User Manager 20260705212045\naccess-profile-audit-browser-user-manager-20260705212045\n\t2\t1\t\n\n\nAudit User Manager 20260705205400\naccess-profile-audit-user-manager-20260705205400\n\t2\t1\t\n\n\nНаблюдатель плана без ресурсов\naccess-profile-plan-reader-no-resources\n\t2\t1\t\n\n\nНаблюдатель ресурсов\naccess-profile-resource-reader\n\t1\t1\t\n\n\nuiux-eval-g6-role-1783264018137\nrole-uiux-eval-g6-role-1783264018137\n\t2\t1\t\nУдалить роль «uiux-eval-g6-role-1783264018137»?\n\nРоль назначена пользователям (1). Удаление будет отклонено — сначала переназначьте их.\n\nОтмена\nУдалить роль\nClose"
+  }
+]

@@ -1,5 +1,6 @@
 import { Chip } from "@/components/ui/chip";
 import type { UserStatus } from "@/admin/lib/admin-client";
+import { makeRuError } from "@/lib/error-messages";
 
 /**
  * Общие крошки поверхностей администрирования: RU-маппер кодов ошибок (зеркало crmErr)
@@ -9,6 +10,7 @@ import type { UserStatus } from "@/admin/lib/admin-client";
 const ERR: Record<string, string> = {
   // конфликты (409)
   user_email_taken: "Email уже занят другим пользователем",
+  email_domain_not_allowed: "Домен email не входит в список разрешённых (политики безопасности)",
   user_id_taken: "Идентификатор пользователя уже занят",
   access_role_id_taken: "Идентификатор роли уже занят",
   access_role_name_taken: "Роль с таким названием уже существует",
@@ -37,13 +39,10 @@ const ERR: Record<string, string> = {
   security_policy_domain_allowlist_invalid: "Список доменов: только строки",
   // not-found (404)
   user_not_found: "Пользователь не найден",
-  access_role_not_found: "Роль не найдена",
-  // авторизация (401/403) — BUG-ADM-01/SHELL-06: раньше утекали сырым кодом
-  session_required: "Требуется вход в систему",
-  permission_missing: "Недостаточно прав для этого действия",
-  forbidden: "Доступ запрещён"
+  access_role_not_found: "Роль не найдена"
+  // авторизация (401/403) — BUG-ADM-01/SHELL-06: раньше утекали сырым кодом; теперь из COMMON_ERR
 };
-export const adminErr = (code?: string, fallback?: string) => (code && ERR[code]) || fallback || "Не удалось выполнить действие";
+export const adminErr = makeRuError(ERR, "Не удалось выполнить действие");
 
 export function UserStatusChip({ status }: { status: UserStatus }) {
   return status === "active" ? (
@@ -66,6 +65,82 @@ export function AuditResultChip({ status }: { status?: string | undefined }) {
   if (label === "Ошибка") return <Chip variant="danger">{label}</Chip>;
   if (label === "Отклонено правами") return <Chip variant="warning">{label}</Chip>;
   return <Chip variant="info">{label}</Chip>;
+}
+
+/* ---- Человеческие подписи прав доступа (G6-09) ----
+   Код права: tenant.<ресурс>.<действие> (плюс пара спец-кодов профиля/темы).
+   Неизвестный код показывается как есть. */
+const PERMISSION_RESOURCE: Record<string, string> = {
+  projects: "Проекты",
+  project_plan: "План проекта",
+  project_resources: "Ресурсы проекта",
+  project_baselines: "Базовые планы проекта",
+  project_activation: "Активация проектов",
+  project_types: "Типы проектов",
+  planning_scenarios: "Сценарии планирования",
+  opportunities: "Сделки",
+  clients: "Клиенты",
+  contacts: "Контакты",
+  products: "Продукты",
+  users: "Пользователи",
+  positions: "Должности",
+  org_structure: "Оргструктура",
+  access_profiles: "Роли доступа",
+  audit_events: "Журнал аудита",
+  communications: "Коммуникации",
+  workspace_config: "Настройки рабочей области",
+  absences: "Отсутствия",
+  background_jobs: "Фоновые задачи",
+  control_signals: "Сигналы контроля",
+  control_surfaces: "Панели контроля",
+  corrective_actions: "Корректирующие действия",
+  management_actions: "Управленческие действия",
+  crm_pipelines: "Воронки CRM",
+  crm_pipeline_rules: "Правила воронок",
+  crm_pipeline_automations: "Автоматизации воронок",
+  deal_stages: "Стадии сделок",
+  retrospectives: "Ретроспективы",
+  tasks: "Задачи",
+  task_statuses: "Статусы задач",
+  template_improvements: "Улучшения шаблонов",
+  resource_feasibility: "Осуществимость",
+  production_calendar: "Производственный календарь",
+  kpi_definitions: "KPI"
+};
+const PERMISSION_ACTION: Record<string, string> = {
+  read: "просмотр",
+  manage: "управление",
+  create: "создание",
+  edit: "правка",
+  delete: "удаление",
+  publish: "публикация",
+  apply: "применение",
+  preview: "предпросмотр",
+  execute: "выполнение",
+  update: "правка"
+};
+// Спец-коды вне схемы tenant.<ресурс>.<действие>.
+const PERMISSION_SPECIAL: Record<string, { resourceLabel: string; actionLabel: string }> = {
+  "profile.read": { resourceLabel: "Профиль", actionLabel: "просмотр" },
+  "profile.update": { resourceLabel: "Профиль", actionLabel: "правка" },
+  "workspace.theme.manage": { resourceLabel: "Профиль", actionLabel: "тема оформления" }
+};
+
+/** Разбор кода права: ресурс + действие по-русски; null — код неизвестен (показывать как есть). */
+export function permissionParts(code: string): { resourceLabel: string; actionLabel: string } | null {
+  const special = PERMISSION_SPECIAL[code];
+  if (special) return special;
+  const segments = code.split(".");
+  if (segments.length !== 3 || segments[0] !== "tenant") return null;
+  const resourceLabel = PERMISSION_RESOURCE[segments[1]!];
+  const actionLabel = PERMISSION_ACTION[segments[2]!];
+  return resourceLabel && actionLabel ? { resourceLabel, actionLabel } : null;
+}
+
+/** Человеческая подпись права: «Проекты: просмотр». Неизвестный код — как есть. */
+export function permissionLabel(code: string): string {
+  const parts = permissionParts(code);
+  return parts ? `${parts.resourceLabel}: ${parts.actionLabel}` : code;
 }
 
 // Человекочитаемая метка action-типа аудита. Известные группы → RU; иначе — сам код (mono).
@@ -91,4 +166,19 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
   "workspace.project_template.updated": "Шаблон проекта изменён",
   "notification.preference_updated": "Настройки уведомлений обновлены"
 };
-export const auditActionLabel = (actionType: string): string => AUDIT_ACTION_LABEL[actionType] ?? actionType;
+// Префикс-правила для неизвестных хвостов (G6-06): хотя бы группа события по-русски.
+const AUDIT_ACTION_PREFIX: Array<[string, string]> = [
+  ["workspace.user.", "Пользователь"],
+  ["tenant.access_profile.", "Роль"],
+  ["access_role.", "Роль"],
+  ["workspace.security_policy.", "Политика безопасности"],
+  ["communications.", "Коммуникации"],
+  ["control_surface.", "Панель контроля"]
+];
+export const auditActionLabel = (actionType: string): string => {
+  const exact = AUDIT_ACTION_LABEL[actionType];
+  if (exact) return exact;
+  const prefix = AUDIT_ACTION_PREFIX.find(([p]) => actionType.startsWith(p));
+  if (prefix) return `${prefix[1]} — ${actionType.slice(prefix[0].length)}`;
+  return actionType;
+};

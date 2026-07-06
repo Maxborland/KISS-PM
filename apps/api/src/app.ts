@@ -22,6 +22,7 @@ import type {
   ManagementAuditEventInput
 } from "./apiTypes";
 import { createApiCapabilities } from "./apiDataPorts";
+import { ensureCompleteDataSource } from "./dataSourceCompletion";
 import { createInMemoryEmailProvider } from "./emailProvider";
 import { createInMemoryTenantDataSource } from "./inMemoryTenantDataSource";
 import { registerAccessRoleRoutes } from "./accessRoleRoutes";
@@ -76,7 +77,7 @@ export type { ApiTenantDataSource, CreateAppOptions } from "./apiTypes";
 
 export function createApp(options: CreateAppOptions = {}) {
   const app = new Hono();
-  const dataSource = options.dataSource ?? createInMemoryTenantDataSource();
+  const dataSource = ensureCompleteDataSource(options.dataSource ?? createInMemoryTenantDataSource());
   const capabilities = createApiCapabilities(dataSource);
   const authRateLimiter = options.authRateLimiter ?? createAuthRateLimiter();
   const secureCookies = options.secureCookies ?? shouldUseSecureCookies();
@@ -120,13 +121,13 @@ export function createApp(options: CreateAppOptions = {}) {
     if (!userId) return undefined;
     const parsedUserId = parseUserIdParam(userId);
     if (!parsedUserId.ok) return undefined;
-    const actor = await dataSource.findUserById(parsedUserId.value);
+    const actor = await dataSource.findUserById?.(parsedUserId.value);
     if (!actor) return undefined;
     return (await isWorkspaceUserActive(actor)) ? actor : undefined;
   }
 
   async function getSessionActor(cookieHeader: string | null) {
-    if (!dataSource.findSessionByTokenHash) return undefined;
+    if (!("findSessionByTokenHash" in dataSource)) return undefined;
 
     const token = getSessionTokenFromCookie(cookieHeader);
     if (!token) return undefined;
@@ -139,14 +140,14 @@ export function createApp(options: CreateAppOptions = {}) {
 
     // ponytail: bump «последняя активность» не чаще раза в минуту — иначе UPDATE на каждый
     // авторизованный запрос. Достаточная точность для списка активных сессий.
-    if (dataSource.touchSession) {
+    if ("touchSession" in dataSource) {
       const lastSeen = session.lastSeenAt?.getTime() ?? 0;
       if (Date.now() - lastSeen > 60_000) {
         await dataSource.touchSession(tokenHash, new Date());
       }
     }
 
-    const actor = await dataSource.findUserById(session.userId);
+    const actor = await dataSource.findUserById?.(session.userId);
     if (!actor) return undefined;
     return (await isWorkspaceUserActive(actor)) ? actor : undefined;
   }
@@ -165,8 +166,8 @@ export function createApp(options: CreateAppOptions = {}) {
   }
 
   async function getActorProfile(actor: TenantUser) {
-    if (!dataSource.findAccessProfileById) {
-      if (dataSource.findSessionByTokenHash || dataSource.listWorkspaceUsers) {
+    if (!("findAccessProfileById" in dataSource)) {
+      if ("findSessionByTokenHash" in dataSource || "listWorkspaceUsers" in dataSource) {
         throw new MissingAccessProfileError();
       }
 
@@ -185,7 +186,7 @@ export function createApp(options: CreateAppOptions = {}) {
   async function runDataSourceTransaction<T>(
     operation: (transactionDataSource: ApiTenantDataSource) => Promise<T>
   ): Promise<T> {
-    if (!dataSource.withTransaction) {
+    if (!("withTransaction" in dataSource)) {
       throw new Error("transaction_not_configured");
     }
 
@@ -193,7 +194,7 @@ export function createApp(options: CreateAppOptions = {}) {
   }
 
   async function isWorkspaceUserActive(user: TenantUser) {
-    if (!dataSource.listWorkspaceUsers) return true;
+    if (!("listWorkspaceUsers" in dataSource)) return true;
 
     const workspaceUser = (await dataSource.listWorkspaceUsers(user.tenantId)).find(
       (candidate) => candidate.id === user.id

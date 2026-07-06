@@ -1,0 +1,51 @@
+{
+  "steps": [
+    {
+      "step": "send-message-general",
+      "detail": "Лента канала\nGET /communication-channels/channel-alpha-general/conversation\nАА\nАнна Администратор\nтолько что\n\nuiux-eval-сообщение в общий канал\n\nОтправить"
+    },
+    {
+      "step": "create-empty-disabled",
+      "detail": "disabled=true"
+    },
+    {
+      "step": "team-scope-default",
+      "detail": "\"proj-portal\""
+    },
+    {
+      "step": "team-create-result",
+      "detail": "нет 'Отклонено' в UI"
+    },
+    {
+      "step": "dialog-after-reject",
+      "detail": "visible=false"
+    },
+    {
+      "step": "custom-create-result",
+      "detail": "канал в списке"
+    },
+    {
+      "step": "edit-channel",
+      "detail": "название обновилось"
+    },
+    {
+      "step": "add-member-options",
+      "detail": "[\"Выберите…\",\"Audit Browser User Manager 20260705212045\",\"Audit Domain Bypass 20260705205431\",\"Audit Escalated Admin 20260705205400\",\"Audit User Manager 20260705205400\",\"uiux-eval-g6-1783263859275\",\"uiux-eval-g6-bad-1783263859275\",\"Игорь Инженер\",\"Никита Без Ресурсов\",\"Роман Ресурсный\"]"
+    },
+    {
+      "step": "add-member",
+      "detail": "Участники\n2\nAB\nAudit Browser User Manager 20260705212045\nuser-audit-browser-user-manager-20260705212045\nУчастник\nАА\nАнна Администратор\nuser-alpha-admin\nВладелец\nДобавить участника\nПользователь\nВыберите…\nAudit Domain Bypass 20260705205431\nAudit Escalated Admin 20260705205400\nAudit User Manager 202607"
+    },
+    {
+      "step": "remove-member-no-confirm",
+      "detail": "клик по иконке удалил без подтверждения? см. скриншот"
+    },
+    {
+      "step": "channel-delete-exists",
+      "detail": "кнопки удаления канала НЕТ"
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

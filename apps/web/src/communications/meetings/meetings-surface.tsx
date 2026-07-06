@@ -2,19 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, CheckSquare, Link2, Plus, Send, StickyNote, Users } from "lucide-react";
+import { toast } from "sonner";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/domain/form-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { SurfaceState } from "@/components/domain/surface-state";
+import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useCommsUsers, useMeetingDetail, useMeetings, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { WithCommsEntityScope, type ResolvedCommsScope } from "@/communications/lib/entity-scope";
 import { avatarColor, commsErr, initials, relTime } from "@/communications/lib/comms-bits";
 import type {
   ActionItemInput,
@@ -33,7 +36,7 @@ import type {
 
 /* ============================================================
    Поверхность «Встречи» (Communications/Meetings).
-   Функциональна через useMeetings("project","proj-portal"): список митингов
+   Функциональна через useMeetings(scope): список митингов
    слева + детальная панель справа (повестка, участники, ноты-лента,
    внешние ссылки, action-items). Честность: in-memory, realtime-доставка —
    в приложении; здесь обновление по действию. Эталон стиля — deals-surface.
@@ -44,11 +47,6 @@ import type {
    засеянное содержимое (демо-снимок) + ОПТИМИСТИЧНО добавленные за сессию
    записи (мутация вернула ok). В приложении детали подтянутся с сервера.
    ============================================================ */
-
-// Демо-сущность (entity-scoped): mock/stories показывают встречи проекта proj-portal.
-// Прод-route может передать реальные entityType/entityId через пропсы MeetingsSurface.
-const DEMO_ENTITY_TYPE: EntityType = "project";
-const DEMO_ENTITY_ID = "proj-portal";
 
 const STATUS: Record<MeetingStatus, { label: string; variant: "info" | "success" | "danger" }> = {
   scheduled: { label: "Запланирована", variant: "info" },
@@ -97,13 +95,23 @@ const fromLocalInput = (local: string): string => (local ? new Date(local).toISO
 type MeetingDetail = { participants: MeetingParticipant[]; notes: MeetingNote[]; links: MeetingExternalLink[]; actionItems: MeetingActionItem[] };
 const emptyDetail = (): MeetingDetail => ({ participants: [], notes: [], links: [], actionItems: [] });
 
-export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO_ENTITY_ID }: { entityType?: EntityType; entityId?: string } = {}) {
+// Scope сущности резолвится из реальных проектов воркспейса (WithCommsEntityScope);
+// явные entityType/entityId пропсы (встраивание, тесты) отключают резолв.
+export function MeetingsSurface({ entityType, entityId }: { entityType?: EntityType; entityId?: string } = {}) {
+  return (
+    <WithCommsEntityScope activeTab="Встречи" {...(entityType ? { explicitEntityType: entityType } : {})} {...(entityId ? { explicitEntityId: entityId } : {})}>
+      {(scope) => <MeetingsSurfaceScoped scope={scope} />}
+    </WithCommsEntityScope>
+  );
+}
+
+function MeetingsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
+  const { entityType, entityId } = scope;
   const { data, status, error, reload, createMeeting, patchMeeting, addNote, addExternalLink, addActionItem, patchActionItem } = useMeetings(entityType, entityId);
   // Справочник людей тенанта (участники/ответственные/имена): mock=COMMS_USERS, live=GET /api/workspace/users.
   const users = useCommsUsers();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const meetings = useMemo(() => {
     if (!data) return [];
     return [...data.meetings].sort((a, b) => Date.parse(b.scheduledStart) - Date.parse(a.scheduledStart));
@@ -118,11 +126,12 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
 
   // Верхнеуровневый статус поверхности: forbidden (403) / error / loading.
   // ВНУТРЕННИЙ EmptyState «Встреч пока нет» (data есть, список пуст) — НЕ top-level: остаётся в ready.
-  if (status === "forbidden" || status === "error" || !data) {
+  const surfaceStatus = surfaceStatusOf(status, Boolean(data));
+  if (surfaceStatus !== "ready") {
     return (
-      <CommsFrame activeTab="Встречи" subtitle="Встречи проекта">
+      <CommsFrame activeTab="Встречи" subtitle={`Встречи · ${scope.title}`}>
         <SurfaceState
-          status={status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error"}
+          status={surfaceStatus}
           error={error}
           onRetry={() => void reload()}
           errorFormat={commsErr}
@@ -142,62 +151,66 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
     : emptyDetail();
 
   async function doPatchStatus(meetingId: string, next: MeetingStatus) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await patchMeeting(meetingId, { status: next });
     setBusy(false);
-    setNotice(res.ok ? `Статус: «${STATUS[next].label}»` : `Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) toast.success(`Статус: «${STATUS[next].label}»`);
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
   }
 
   async function doAddNote(meetingId: string, body: string) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await addNote(meetingId, body);
     setBusy(false);
-    if (res.ok) { await meetingDetail.reload(); setNotice("Заметка добавлена"); }
-    else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) { await meetingDetail.reload(); toast.success("Заметка добавлена"); }
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res.ok;
   }
 
   async function doAddLink(meetingId: string, input: { provider: MeetingExternalLinkProvider; url: string; title: string }) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await addExternalLink(meetingId, input);
     setBusy(false);
-    if (res.ok) { await meetingDetail.reload(); setNotice("Ссылка добавлена"); }
-    else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) { await meetingDetail.reload(); toast.success("Ссылка добавлена"); }
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res.ok;
   }
 
   async function doAddAction(meetingId: string, input: ActionItemInput) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await addActionItem(meetingId, input);
     setBusy(false);
-    if (res.ok) { await meetingDetail.reload(); setNotice("Action item добавлен"); }
-    else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) { await meetingDetail.reload(); toast.success("Задача по итогам добавлена"); }
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     return res.ok;
   }
 
   async function doPatchAction(meetingId: string, actionItemId: string, next: MeetingActionItemStatus) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await patchActionItem(meetingId, actionItemId, next);
     if (res.ok) await meetingDetail.reload();
     setBusy(false);
-    setNotice(res.ok ? "Статус задачи обновлён" : `Отклонено: ${commsErr(res.code, res.message)}`);
+    if (res.ok) toast.success("Статус задачи обновлён");
+    else toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
   }
 
   return (
     <CommsFrame
       activeTab="Встречи"
-      subtitle="Встречи проекта «Портал»"
-      actions={<CreateMeetingDialog busy={busy} setBusy={setBusy} setNotice={setNotice} create={createMeeting} users={users} entityType={entityType} entityId={entityId} />}
+      subtitle={`Встречи · ${scope.title}`}
+      actions={<>{scope.picker}<CreateMeetingDialog busy={busy} setBusy={setBusy} create={createMeeting} users={users} entityType={entityType} entityId={entityId} /></>}
     >
       <div className="flex flex-col gap-3">
-        {/* Честный баннер «Прототип» */}
-        <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-          <span>
-            Реальный контракт: /api/workspace/meetings (GET список + GET деталь, POST создать, PATCH статус, POST .../notes, .../external-links, .../action-items). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.
-            {" "}Детали митинга — из GET /meetings/:id; статус action-item меняется селектом (PATCH). Приватные URL отклоняются 400.
-          </span>
-        </div>
+        {/* Честный баннер «Прототип» — только в Storybook/демо (prototypeNotesEnabled). */}
+        {prototypeNotesEnabled ? (
+          <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+            <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+            <span>
+              Реальный контракт: /api/workspace/meetings (GET список + GET деталь, POST создать, PATCH статус, POST .../notes, .../external-links, .../action-items). Данные in-memory; realtime-доставка появится в приложении — здесь обновление по действию.
+              {" "}Детали митинга — из GET /meetings/:id; статус action-item меняется селектом (PATCH). Приватные URL отклоняются 400.
+            </span>
+          </div>
+        ) : null}
 
         <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
           {/* СЛЕВА: список митингов */}
@@ -259,8 +272,6 @@ export function MeetingsSurface({ entityType = DEMO_ENTITY_TYPE, entityId = DEMO
             </section>
           )}
         </div>
-
-        {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
       </div>
     </CommsFrame>
   );
@@ -298,13 +309,15 @@ function MeetingDetailPanel({
           <h2 className="truncate text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">{meeting.title}</h2>
           <p className="flex items-center gap-1.5 truncate text-[length:var(--text-xs)] text-[var(--muted)]">
             <CalendarClock className="size-3.5 shrink-0" aria-hidden />
-            {meetingWhen(meeting)} · <span className="v4-mono">{meeting.id}</span>
+            {meetingWhen(meeting)}
+            {/* Технический id встречи — dev-подсказка, только в Storybook/демо (G5-11). */}
+            {prototypeNotesEnabled ? <> · <span className="v4-mono">{meeting.id}</span></> : null}
           </p>
         </div>
         <Chip variant={STATUS[meeting.status].variant}>{STATUS[meeting.status].label}</Chip>
         <label className={labelCls}>
           Статус
-          <select value={meeting.status} disabled={busy} onChange={(e) => onPatchStatus(e.target.value as MeetingStatus)} className={cn(selCls, "w-[160px]")} title="PATCH /meetings/:id">
+          <select value={meeting.status} disabled={busy} onChange={(e) => onPatchStatus(e.target.value as MeetingStatus)} className={cn(selCls, "w-[160px]")} title="Изменить статус встречи">
             <option value="scheduled">Запланирована</option>
             <option value="completed">Завершена</option>
             <option value="cancelled">Отменена</option>
@@ -327,7 +340,7 @@ function MeetingDetailPanel({
             <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{detail.participants.length}</span>
           </h3>
           {detail.participants.length === 0 ? (
-            <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Участники подтянутся с сервера в приложении.</p>
+            <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Участников пока нет.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {detail.participants.map((p) => {
@@ -442,7 +455,7 @@ function ExternalLinksCard({ links, busy, onAdd }: { links: MeetingExternalLink[
           <label className={labelCls}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Комната встречи" /></label>
         </div>
         <label className={labelCls}>URL<Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://zoom.us/j/…" /></label>
-        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Приватные адреса (localhost/внутренняя сеть) отклоняются сервером — 400.</p>
+        <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Ссылки на приватные адреса (localhost, внутренняя сеть) отклоняются сервером.</p>
         <div className="flex justify-end">
           <Button variant="default" size="sm" disabled={busy || !valid} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Добавить</Button>
         </div>
@@ -469,10 +482,10 @@ function ActionItemsCard({ items, busy, onAdd, onPatchStatus, users }: { items: 
   return (
     <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
       <h3 className="mb-1 flex items-center gap-1.5 text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">
-        <CheckSquare className="size-4" aria-hidden /> Action items
+        <CheckSquare className="size-4" aria-hidden /> Задачи по итогам
         <span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{items.length}</span>
       </h3>
-      <p className="mb-3 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Создаются со статусом «Открыта»; статус меняется селектом (PATCH).</p>
+      <p className="mb-3 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Создаются со статусом «Открыта»; статус можно изменить селектом.</p>
       {items.length === 0 ? (
         <p className="mb-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Задач по итогам встречи пока нет.</p>
       ) : (
@@ -488,7 +501,7 @@ function ActionItemsCard({ items, busy, onAdd, onPatchStatus, users }: { items: 
                     {it.dueDate ? ` · срок ${it.dueDate}` : ""}
                   </p>
                 </div>
-                <select value={it.status} disabled={busy} onChange={(e) => onPatchStatus(it.id, e.target.value as MeetingActionItemStatus)} className={cn(selCls, "h-8 w-[116px]")} title="PATCH статус action-item">
+                <select value={it.status} disabled={busy} onChange={(e) => onPatchStatus(it.id, e.target.value as MeetingActionItemStatus)} className={cn(selCls, "h-8 w-[116px]")} title="Изменить статус задачи">
                   <option value="open">Открыта</option>
                   <option value="done">Готово</option>
                   <option value="cancelled">Отменена</option>
@@ -524,7 +537,6 @@ function ActionItemsCard({ items, busy, onAdd, onPatchStatus, users }: { items: 
 function CreateMeetingDialog({
   busy,
   setBusy,
-  setNotice,
   create,
   users,
   entityType,
@@ -532,13 +544,11 @@ function CreateMeetingDialog({
 }: {
   busy: boolean;
   setBusy: (v: boolean) => void;
-  setNotice: (v: string | null) => void;
   create: ReturnType<typeof useMeetings>["createMeeting"];
   users: CommsUsersDir;
   entityType: EntityType;
   entityId: string;
 }) {
-  const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [agenda, setAgenda] = useState("");
   // Дефолтные времена (от «сейчас», локальные).
@@ -561,66 +571,63 @@ function CreateMeetingDialog({
 
   const reset = () => { setTitle(""); setAgenda(""); setPicked({}); };
 
-  const submit = async () => {
-    if (!valid) return;
-    setBusy(true); setNotice(null);
-    const participants = Object.entries(picked).map(([userId, role]) => ({ userId, role }));
-    // exactOptionalPropertyTypes: опускаем agenda/participants, а не шлём undefined.
-    const input: MeetingCreateInput = {
-      entityType,
-      entityId,
-      title: title.trim(),
-      scheduledStart: fromLocalInput(start),
-      scheduledFinish: fromLocalInput(finish)
-    };
-    if (agenda.trim()) input.agenda = agenda.trim();
-    if (participants.length) input.participants = participants;
-    const res = await create(input);
-    setBusy(false);
-    if (res.ok) { setNotice("Встреча создана"); setOpen(false); reset(); }
-    else setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
-  };
-
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Встреча</Button></DialogTrigger>
-      <DialogContent className="max-w-[560px]">
-        <DialogHeader><DialogTitle>Новая встреча</DialogTitle></DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          <label className={`col-span-2 ${labelCls}`}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Kickoff релиза" /></label>
-          <label className={`col-span-2 ${labelCls}`}>Повестка<Textarea rows={2} value={agenda} onChange={(e) => setAgenda(e.target.value)} placeholder="Цели, распределение задач, риски…" /></label>
-          <label className={labelCls}>Начало<Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} /></label>
-          <label className={labelCls}>Окончание<Input type="datetime-local" value={finish} onChange={(e) => setFinish(e.target.value)} aria-invalid={!schedOk} /></label>
-        </div>
-        {!schedOk ? <p className="text-[length:var(--text-xs)] text-[var(--danger-text)]">Окончание должно быть позже начала.</p> : null}
+    <FormDialog
+      title="Новая встреча"
+      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Встреча</Button>}
+      submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
+      submitDisabled={!valid || busy}
+      successToast="Встреча создана"
+      onClose={reset}
+      // Ошибка остаётся В модалке — по месту действия.
+      onSubmit={async () => {
+        if (!valid) return null;
+        setBusy(true);
+        const participants = Object.entries(picked).map(([userId, role]) => ({ userId, role }));
+        // exactOptionalPropertyTypes: опускаем agenda/participants, а не шлём undefined.
+        const input: MeetingCreateInput = {
+          entityType,
+          entityId,
+          title: title.trim(),
+          scheduledStart: fromLocalInput(start),
+          scheduledFinish: fromLocalInput(finish)
+        };
+        if (agenda.trim()) input.agenda = agenda.trim();
+        if (participants.length) input.participants = participants;
+        const res = await create(input);
+        setBusy(false);
+        return res.ok ? null : `Отклонено: ${commsErr(res.code, res.message)}`;
+      }}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <label className={`col-span-2 ${labelCls}`}>Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Kickoff релиза" /></label>
+        <label className={`col-span-2 ${labelCls}`}>Повестка<Textarea rows={2} value={agenda} onChange={(e) => setAgenda(e.target.value)} placeholder="Цели, распределение задач, риски…" /></label>
+        <label className={labelCls}>Начало<Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} /></label>
+        <label className={labelCls}>Окончание<Input type="datetime-local" value={finish} onChange={(e) => setFinish(e.target.value)} aria-invalid={!schedOk} /></label>
+      </div>
+      {!schedOk ? <p className="text-[length:var(--text-xs)] text-[var(--danger-text)]">Окончание должно быть позже начала.</p> : null}
 
-        <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] p-2.5">
-          <div className="mb-2 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Участники</div>
-          <ul className="flex flex-col gap-2">
-            {users.list.length === 0 ? <li className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Загрузка участников…</li> : null}
-            {users.list.map((u) => {
-              const on = u.id in picked;
-              return (
-                <li key={u.id} className="flex items-center gap-2">
-                  <Switch checked={on} onCheckedChange={(v) => toggle(u.id, v)} />
-                  <BemAvatar initials={initials(u.name)} color={avatarColor(u.id)} size="sm" title={u.name} />
-                  <span className="mr-auto text-[length:var(--text-sm)] text-[var(--text)]">{u.name}</span>
-                  <select value={picked[u.id] ?? "required"} disabled={!on} onChange={(e) => setRole(u.id, e.target.value as MeetingParticipantRole)} className={cn(selCls, "w-[150px]")}>
-                    <option value="required">Обязателен</option>
-                    <option value="optional">Опционально</option>
-                  </select>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Организатором становится текущий пользователь (accepted); выбранным уйдёт meeting_invite.</p>
-        </div>
-
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] p-2.5">
+        <div className="mb-2 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Участники</div>
+        <ul className="flex flex-col gap-2">
+          {users.list.length === 0 ? <li className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Загрузка участников…</li> : null}
+          {users.list.map((u) => {
+            const on = u.id in picked;
+            return (
+              <li key={u.id} className="flex items-center gap-2">
+                <Switch checked={on} onCheckedChange={(v) => toggle(u.id, v)} />
+                <BemAvatar initials={initials(u.name)} color={avatarColor(u.id)} size="sm" title={u.name} />
+                <span className="mr-auto text-[length:var(--text-sm)] text-[var(--text)]">{u.name}</span>
+                <select value={picked[u.id] ?? "required"} disabled={!on} onChange={(e) => setRole(u.id, e.target.value as MeetingParticipantRole)} className={cn(selCls, "w-[150px]")}>
+                  <option value="required">Обязателен</option>
+                  <option value="optional">Опционально</option>
+                </select>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="mt-2 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Организатором становится текущий пользователь; выбранным участникам придёт приглашение на встречу.</p>
+      </div>
+    </FormDialog>
   );
 }

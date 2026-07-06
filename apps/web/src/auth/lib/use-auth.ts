@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { guardData, guardMutation, type MutationDataResult, type MutationResult } from "../../lib/domain-client";
+import { useDomainClient } from "../../lib/use-domain-client";
 import {
   AuthApiError,
   createAuthClient,
@@ -31,45 +33,21 @@ import { useAuthRuntime } from "./auth-runtime";
 
 export type AuthState = "anonymous" | "authenticated";
 export type AuthLoadStatus = "loading" | "ready" | "error";
-// Зеркало CrmMutationResult/CommsMutationResult.
-export type AuthMutationResult = { ok: true } | { ok: false; code?: string; message: string };
+// Зеркало CrmMutationResult/CommsMutationResult (общий MutationResult ядра).
+export type AuthMutationResult = MutationResult;
 // Мутация, ВОЗВРАЩАЮЩАЯ данные для UI (honest-показ reset-токена).
-export type AuthDataResult<T> = { ok: true; data: T } | { ok: false; code?: string; message: string };
+export type AuthDataResult<T> = MutationDataResult<T>;
 
 // Общий фабричный хелпер: один fetch+client на монтаж (изолированная сессия).
 // live (из AuthRuntimeProvider) переключает транспорт: mock fetchImpl vs боевой fetch.
 function useAuthClient() {
   const { live } = useAuthRuntime();
-  const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null && !live) fetchRef.current = createMockAuthFetch();
-  const clientRef = useRef<ReturnType<typeof createAuthClient> | null>(null);
-  if (clientRef.current === null) {
-    clientRef.current = live
-      ? createAuthClient({ apiOrigin: "" })
-      : createAuthClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
-  }
-  return clientRef.current;
+  return useDomainClient(live, createAuthClient, createMockAuthFetch);
 }
 
-// guard: ошибки AuthApiError → {ok:false, code, message} (зеркало useCrm.guard).
-async function guard(fn: () => Promise<void>): Promise<AuthMutationResult> {
-  try {
-    await fn();
-    return { ok: true };
-  } catch (e) {
-    if (e instanceof AuthApiError) return { ok: false, code: e.code, message: e.code };
-    return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
-  }
-}
-// guardData: как guard, но возвращает данные мутации для UI.
-async function guardData<T>(fn: () => Promise<T>): Promise<AuthDataResult<T>> {
-  try {
-    return { ok: true, data: await fn() };
-  } catch (e) {
-    if (e instanceof AuthApiError) return { ok: false, code: e.code, message: e.code };
-    return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
-  }
-}
+// guard: ошибки AuthApiError → {ok:false, code, message} (общий guardMutation ядра).
+const guard = guardMutation;
+// guardData — общий хелпер ядра (как guard, но возвращает данные мутации для UI).
 
 /* ============================================================
    useAuth — гейт сессии.
@@ -166,8 +144,8 @@ export function useAuth() {
 
   // request возвращает данные: devToken для honest-показа (письма нет). Боевой; devToken — демо-замена письма в моке.
   const requestPasswordReset = useCallback(
-    (email: string): Promise<AuthDataResult<{ status: "ok"; devToken?: string }>> =>
-      guardData(() => client.requestPasswordReset(email) as Promise<{ status: "ok"; devToken?: string }>),
+    (email: string): Promise<AuthDataResult<{ status: "ok"; delivery?: "email" | "none"; devToken?: string }>> =>
+      guardData(() => client.requestPasswordReset(email)),
     [client]
   );
 

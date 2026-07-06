@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { CheckCircle2, Circle, FlaskConical, Loader2, Lock, Rocket, Save, Send, Square, Trophy, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { money } from "@/crm/ui/crm-bits";
+import { makeRuError } from "@/lib/error-messages";
 import { useCrm, useCrmUsers, type CrmUsersIndex } from "@/crm/lib/use-crm";
 import type { CrmActivity, FeasibilityAssessment, Opportunity } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
@@ -19,7 +23,9 @@ const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
 const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean); return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—"; };
 // Имя/цвет аватара владельца/автора/исполнителя — резолв из справочника пользователей (useCrmUsers),
 // переданного пропом из родителя (ActivityItem — many-instance, поэтому данные приходят пропом).
-const ownerName = (users: CrmUsersIndex, id: string | null) => users.name(id);
+// Если справочник пользователей недоступен/неполон (например, 403 под ограниченной ролью),
+// НЕ показываем сырой id — даём читабельный фолбэк «Участник xxxx» (G8-08, G5-12).
+const ownerName = (users: CrmUsersIndex, id: string | null) => { if (!id) return "—"; return users.byId.get(id)?.name ?? `Участник ${id.slice(-4)}`; };
 const ownerColor = (users: CrmUsersIndex, id: string | null): BemAvatarColor => { const i = users.indexOf(id); return i < 0 ? "c5" : AV[i % AV.length]!; };
 
 const STATUS_LABEL: Record<Opportunity["status"], string> = { new: "Новая", feasibility: "Проверка", ready_to_activate: "Готова к запуску", won_closed: "Выиграна", lost_rejected: "Проиграна" };
@@ -51,16 +57,19 @@ const ERR_RU: Record<string, string> = {
   invalid_probability: "Вероятность 0…100",
   owner_user_not_found: "Владелец не найден"
 };
-const ruErr = (code?: string, fallback?: string) => (code && ERR_RU[code]) || fallback || code || "Ошибка";
+const ruErr = makeRuError(ERR_RU);
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
 type FormState = { title: string; description: string; stageId: string; ownerUserId: string; probability: string; contractValue: string; plannedHourlyRate: string; plannedStart: string; plannedFinish: string };
+// Живой API отдаёт даты как ISO-datetime («2026-05-01T00:00:00.000Z»), а <input type="date">
+// принимает строго yyyy-MM-dd — без нормализации поля пустели и ЛЮБОЕ сохранение падало 400 (G4-01).
+const dateOnly = (s: string): string => (s.length > 10 ? s.slice(0, 10) : s);
 const formOf = (o: Opportunity): FormState => ({
   title: o.title, description: o.description ?? "", stageId: o.stageId ?? "", ownerUserId: o.ownerUserId ?? "",
   probability: String(o.probability), contractValue: String(o.contractValue), plannedHourlyRate: String(o.plannedHourlyRate),
-  plannedStart: o.plannedStart, plannedFinish: o.plannedFinish
+  plannedStart: dateOnly(o.plannedStart), plannedFinish: dateOnly(o.plannedFinish)
 });
 
 // initialId — стартовая сделка из URL (route app/crm/deals/[id]); по умолчанию пусто → fallback ниже
@@ -71,17 +80,23 @@ export function DealCard({ initialId }: { initialId?: string } = {}) {
   const { data, status, error, reload } = crm;
   const [selectedId, setSelectedId] = useState<string | null>(initialId ?? null);
 
+  // Запрошенный по URL id обязан существовать: молчаливая подмена чужой сделкой (G4-02)
+  // выглядела как запрошенная и провоцировала правку не той записи. Fallback на первую
+  // сделку остаётся только для встраивания без initialId (stories).
+  const requestedMissing = Boolean(
+    initialId && selectedId === initialId && data && !data.opportunities.some((o) => o.id === initialId)
+  );
   const selected = useMemo<Opportunity | null>(() => {
-    if (!data) return null;
+    if (!data || requestedMissing) return null;
     return data.opportunities.find((o) => o.id === selectedId) ?? data.opportunities.find((o) => o.id === "opp-2207") ?? data.opportunities[0] ?? null;
-  }, [data, selectedId]);
+  }, [data, selectedId, requestedMissing]);
 
   // Верхнеуровневые loading/error/forbidden — через SurfaceState (внутри CrmFrame).
   // Тело ниже дереференсит data/selected, поэтому сохраняем early-return для не-ready состояний.
   // НЕ трогаем вложенные состояния (лента активностей, виджет осуществимости) — это ready-контент.
   // selected===null при наличии data = «нет сделок» — показываем как ошибку (как было раньше).
   if ((status === "loading" && !data) || status === "error" || status === "forbidden" || !data || !selected) {
-    const stateStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
+    const stateStatus = requestedMissing && data ? "empty" : status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
       <CrmFrame activeTab="Сделки">
         <SurfaceState
@@ -91,6 +106,11 @@ export function DealCard({ initialId }: { initialId?: string } = {}) {
           errorFormat={ruErr}
           loadingLabel="Загрузка сделки…"
           forbidden={{ title: "Доступ к сделке ограничен", description: "У вас нет прав на просмотр карточки сделки." }}
+          empty={{
+            title: "Сделка не найдена",
+            description: "Сделки с таким адресом нет: возможно, она удалена или ссылка устарела.",
+            action: <Button asChild variant="default"><Link href="/crm/deals">К списку сделок</Link></Button>
+          }}
         >
           <span />
         </SurfaceState>
@@ -120,7 +140,6 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   const [comment, setComment] = useState("");
   const [riskReason, setRiskReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const locked = isFinal(opp);
   const stages = useMemo(() => [...data.dealStages].filter((s) => s.pipelineId === opp.pipelineId).sort((a, b) => a.sortOrder - b.sortOrder), [data.dealStages, opp.pipelineId]);
@@ -140,7 +159,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   const plannedHours = (() => { const v = Number(form.contractValue), r = Number(form.plannedHourlyRate); return r > 0 && v > 0 ? Math.floor(v / r) : 0; })();
 
   async function save() {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.updateOpportunity(opp.id, {
       clientId: opp.clientId ?? "", primaryContactId: opp.primaryContactId ?? "", projectTypeId: opp.projectTypeId ?? "",
       stageId: form.stageId, title: form.title.trim(), description: form.description.trim() || null,
@@ -149,47 +168,49 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
       probability: Math.round(Number(form.probability)), demand: opp.demand, ownerUserId: form.ownerUserId || null
     });
     setBusy(false);
-    setNotice(res.ok ? "Сделка сохранена" : `Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) toast.success("Сделка сохранена");
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   async function check() {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.checkFeasibility(opp.id);
     setBusy(false);
-    if (res.ok) { setFeasibility(res.data); setNotice(`Осуществимость: ${FEAS_LABEL[res.data.status] ?? res.data.status}`); }
-    else setNotice(`Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) { setFeasibility(res.data); toast.success(`Осуществимость: ${FEAS_LABEL[res.data.status] ?? res.data.status}`); }
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   async function activate() {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.activate(opp.id, riskReason.trim() ? { acceptedRiskReason: riskReason.trim() } : undefined);
     setBusy(false);
-    if (res.ok) { setRiskReason(""); setNotice(`Создан проект ${res.data.id} — сделка выиграна`); }
-    else setNotice(`Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) { setRiskReason(""); toast.success(`Создан проект «${res.data.title}» — сделка выиграна`); }
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   async function finalize(stt: "won_closed" | "lost_rejected") {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.finalize(opp.id, stt, stt === "won_closed" ? "Закрыта вручную" : "Отказ клиента");
     setBusy(false);
-    setNotice(res.ok ? (stt === "won_closed" ? "Сделка выиграна" : "Сделка проиграна") : `Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) toast.success(stt === "won_closed" ? "Сделка выиграна" : "Сделка проиграна");
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   async function sendComment() {
     if (!comment.trim()) return;
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.createComment("opportunity", opp.id, comment.trim());
     setBusy(false);
     if (res.ok) { setActivities((a) => [res.data, ...(a ?? [])]); setComment(""); }
-    else setNotice(`Отклонено: ${ruErr(res.code, res.message)}`);
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   async function toggleTask(a: CrmActivity) {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await crm.updateTaskStatus("opportunity", opp.id, a.id, a.status === "done" ? "todo" : "done");
     setBusy(false);
     if (res.ok) setActivities((list) => (list ?? []).map((x) => (x.id === a.id ? res.data : x)));
-    else setNotice(`Отклонено: ${ruErr(res.code, res.message)}`);
+    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   return (
@@ -206,7 +227,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
         <BemAvatar initials={initials(ownerName(users, opp.ownerUserId))} color={ownerColor(users, opp.ownerUserId)} title={ownerName(users, opp.ownerUserId)} />
         <div className="mr-auto min-w-0">
           <h2 className="truncate text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">{opp.title}</h2>
-          <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]"><span className="v4-mono">{opp.id}</span> · {opp.clientName} · {opp.contactName}</p>
+          <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{prototypeNotesEnabled ? <><span className="v4-mono">{opp.id}</span> · </> : null}{opp.clientName} · {opp.contactName}</p>
         </div>
         <Chip variant="info">{pipelineName}</Chip>
         <Chip variant="violet">{stageName(opp.stageId)}</Chip>
@@ -244,7 +265,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
               <div className={labelCls}>Плановые часы<div className="flex h-9 items-center rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--panel-subtle)] px-2.5 v4-num text-[var(--muted-strong)]" title="Считается сервером: сумма / ставка">{plannedHours.toLocaleString("ru-RU")} ч</div></div>
             </div>
             <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] p-2.5">
-              <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Спрос на ресурсы (read-only)</div>
+              <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Спрос на ресурсы (только чтение)</div>
               <div className="flex flex-wrap gap-1.5">
                 {opp.demand.map((d) => <span key={d.positionId} className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--panel)] px-2 py-0.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{d.positionId} · <span className="v4-num">{d.requiredHours} ч</span></span>)}
               </div>
@@ -297,23 +318,36 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
                 ) : null}
                 <Button variant="default" disabled={busy || opp.feasibilityStatus == null} onClick={() => void activate()} title={opp.feasibilityStatus == null ? "Сначала проверьте осуществимость" : undefined}><Rocket className="size-3.5" aria-hidden />Активировать в проект</Button>
                 <div className="flex gap-2">
-                  <Button variant="secondary" size="sm" className="flex-1" disabled={busy} onClick={() => void finalize("won_closed")}><Trophy className="size-3.5" aria-hidden />Выиграна</Button>
-                  <Button variant="ghost" size="sm" className="flex-1" disabled={busy} onClick={() => void finalize("lost_rejected")}><XCircle className="size-3.5" aria-hidden />Проиграна</Button>
+                  {/* Необратимое закрытие сделки — только через подтверждение (G4-06). */}
+                  <ConfirmDialog
+                    title="Закрыть сделку как выигранную?"
+                    description="Сделка будет закрыта, переоткрыть её нельзя."
+                    confirmLabel="Выиграна"
+                    onConfirm={() => finalize("won_closed")}
+                  >
+                    <Button variant="secondary" size="sm" className="flex-1" disabled={busy}><Trophy className="size-3.5" aria-hidden />Выиграна</Button>
+                  </ConfirmDialog>
+                  <ConfirmDialog
+                    title="Закрыть сделку как проигранную?"
+                    description="Сделка будет закрыта, переоткрыть её нельзя."
+                    confirmLabel="Проиграна"
+                    onConfirm={() => finalize("lost_rejected")}
+                  >
+                    <Button variant="ghost" size="sm" className="flex-1" disabled={busy}><XCircle className="size-3.5" aria-hidden />Проиграна</Button>
+                  </ConfirmDialog>
                 </div>
-                {opp.feasibilityStatus == null ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Активация требует пройденной проверки осуществимости (400 feasibility_required).</p> : null}
+                {opp.feasibilityStatus == null ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Активация станет доступна после проверки осуществимости.</p> : null}
               </div>
             )}
             {projects.length ? (
               <div className="mt-3 border-t border-[var(--border-subtle)] pt-2.5">
                 <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Проекты из сделки</div>
-                <ul className="flex flex-col gap-1">{projects.map((p) => <li key={p.id} className="flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--text)]"><Rocket className="size-3 text-[var(--success-text)]" aria-hidden /><span className="v4-mono">{p.id}</span> · {money(p.contractValue)}</li>)}</ul>
+                <ul className="flex flex-col gap-1">{projects.map((p) => <li key={p.id} className="flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--text)]"><Rocket className="size-3 shrink-0 text-[var(--success-text)]" aria-hidden /><span className="truncate font-medium">{p.title}</span>{prototypeNotesEnabled ? <span className="v4-mono text-[var(--muted-soft)]">{p.id}</span> : null}<span className="shrink-0 text-[var(--muted-strong)]">· {money(p.contractValue)}</span></li>)}</ul>
               </div>
             ) : null}
           </section>
         </div>
       </div>
-
-      {notice ? <div key={notice} className="anim-rise-in-fast text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </div>
   );
 }

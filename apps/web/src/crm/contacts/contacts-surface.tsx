@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Archive, Plus, RotateCcw } from "lucide-react";
+import { Archive, Pencil, Plus, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FormDialog } from "@/components/domain/form-dialog";
 import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
@@ -18,7 +20,6 @@ const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--borde
 export function ProjectContacts() {
   const { data, status, error, reload, createContact, updateContact } = useCrm();
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const clientById = useMemo(() => new Map((data?.clients ?? []).map((c) => [c.id, c])), [data]);
 
@@ -34,19 +35,20 @@ export function ProjectContacts() {
             ? "empty"
             : "ready";
 
-  // имя клиента + пометка «(архив)», если клиент архивирован (контакт остаётся при архивации клиента)
-  const clientLabel = (id: string) => { const cl = clientById.get(id); return cl ? `${cl.name}${cl.status === "archived" ? " (архив)" : ""}` : id; };
+  // имя клиента + пометка «(архив)», если клиент архивирован (контакт остаётся при архивации клиента).
+  // Если клиент не нашёлся в справочнике — читабельный фолбэк вместо сырого id (по образцу «Участник xxxx»).
+  const clientLabel = (id: string) => { const cl = clientById.get(id); return cl ? `${cl.name}${cl.status === "archived" ? " (архив)" : ""}` : `Клиент ${id.slice(-4)}`; };
   // архив/восстановление шлёт ПОЛНУЮ запись (боевой PATCH — full-replace, требует name)
   const toggleArchive = async (c: Contact, to: "active" | "archived") => {
-    setBusy(true); setNotice(null);
+    setBusy(true);
     const res = await updateContact(c.id, { clientId: c.clientId, name: c.name, email: c.email, phone: c.phone, telegram: c.telegram, role: c.role, status: to });
     setBusy(false);
-    if (res.ok) setNotice(to === "archived" ? "Контакт в архиве" : "Контакт восстановлен");
-    else setNotice(`Отклонено: ${crmErr(res.code, res.message)}`);
+    if (res.ok) toast.success(to === "archived" ? "Контакт в архиве" : "Контакт восстановлен");
+    else toast.error(`Отклонено: ${crmErr(res.code, res.message)}`);
   };
 
   return (
-    <CrmFrame activeTab="Контакты" subtitle="Справочник контактов" actions={data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createContact} /> : null}>
+    <CrmFrame activeTab="Контакты" subtitle="Справочник контактов" actions={data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} create={createContact} /> : null}>
       {prototypeNotesEnabled && (
         <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
@@ -63,7 +65,7 @@ export function ProjectContacts() {
         empty={{
           title: "Нет контактов",
           description: "Справочник контактов пуст — создайте первый контакт (нужен активный клиент).",
-          action: data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} setNotice={setNotice} create={createContact} /> : undefined
+          action: data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} create={createContact} /> : undefined
         }}
         forbidden={{ title: "Доступ к контактам ограничен", description: "У вас нет прав на просмотр справочника контактов." }}
       >
@@ -75,16 +77,29 @@ export function ProjectContacts() {
             <tbody>
               {(data?.contacts ?? []).map((c) => (
                 <tr key={c.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div><div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{c.id}</div></td>
+                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{c.id}</div> : null}</td>
                   <td className="px-3 py-2 text-[var(--muted-strong)]">{clientLabel(c.clientId)}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{c.role ?? "—"}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{c.email ?? "—"}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{c.phone ?? "—"}</td>
                   <td className="px-3 py-2"><StatusChip status={c.status} /></td>
                   <td className="px-3 py-2 text-right">
-                    {c.status === "active"
-                      ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "archived")} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
-                      : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                    <div className="flex items-center justify-end gap-1">
+                      <EditContactDialog contact={c} clientName={clientLabel(c.clientId)} busy={busy} setBusy={setBusy} update={updateContact} />
+                      {c.status === "active"
+                        ? (
+                          // Архивирование — только через подтверждение (G4-19).
+                          <ConfirmDialog
+                            title={`Архивировать «${c.name}»?`}
+                            description="Запись будет перенесена в архив."
+                            confirmLabel="В архив"
+                            onConfirm={() => toggleArchive(c, "archived")}
+                          >
+                            <Button variant="ghost" size="sm" disabled={busy} title="В архив"><Archive className="size-3.5" aria-hidden /></Button>
+                          </ConfirmDialog>
+                        )
+                        : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleArchive(c, "active")} title="Восстановить"><RotateCcw className="size-3.5" aria-hidden /></Button>}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -92,13 +107,53 @@ export function ProjectContacts() {
           </table>
         </div>
       </SurfaceState>
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </CrmFrame>
   );
 }
 
-function CreateContactDialog({ data, busy, setBusy, setNotice, create }: { data: NonNullable<ReturnType<typeof useCrm>["data"]>; busy: boolean; setBusy: (v: boolean) => void; setNotice: (v: string | null) => void; create: ReturnType<typeof useCrm>["createContact"] }) {
-  const [open, setOpen] = useState(false);
+// Редактирование контакта (G4-07): управляемый диалог по образцу EditUserDialog; клиент НЕ меняется (показан справочно).
+function EditContactDialog({ contact, clientName, busy, setBusy, update }: { contact: Contact; clientName: string; busy: boolean; setBusy: (v: boolean) => void; update: ReturnType<typeof useCrm>["updateContact"] }) {
+  const [name, setName] = useState(contact.name);
+  const [email, setEmail] = useState(contact.email ?? "");
+  const [phone, setPhone] = useState(contact.phone ?? "");
+  const [telegram, setTelegram] = useState(contact.telegram ?? "");
+  const [role, setRole] = useState(contact.role ?? "");
+  return (
+    <FormDialog
+      title="Изменить контакт"
+      trigger={<Button variant="ghost" size="sm" disabled={busy} title="Изменить"><Pencil className="size-3.5" aria-hidden /></Button>}
+      // при открытии диалога синхронизируем форму с текущей записью
+      onOpenChange={(v) => { if (v) { setName(contact.name); setEmail(contact.email ?? ""); setPhone(contact.phone ?? ""); setTelegram(contact.telegram ?? ""); setRole(contact.role ?? ""); } }}
+      submitLabel={<><Pencil className="size-3.5" aria-hidden />Сохранить</>}
+      submitDisabled={!name.trim() || busy}
+      successToast={`Контакт «${name.trim()}» обновлён`}
+      contentClassName="max-w-[500px]"
+      // Ошибка остаётся В модалке — по месту действия.
+      onSubmit={async () => {
+        if (!name.trim()) return null;
+        setBusy(true);
+        // PATCH — полная запись (боевой full-replace); clientId и статус не меняем — сохраняем текущие.
+        const res = await update(contact.id, { clientId: contact.clientId, name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, telegram: telegram.trim() || null, role: role.trim() || null, status: contact.status });
+        setBusy(false);
+        return res.ok ? null : crmErr(res.code, res.message);
+      }}
+    >
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 flex flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-2.5 py-1.5">
+            <span className="text-[length:var(--text-xs)] font-medium text-[var(--text-strong)]">{clientName}</span>
+            {prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{contact.id}</span> : null}
+          </div>
+          <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Имя<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Петрова Анна" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Email<Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="anna@example.ru" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Телефон<Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7…" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Telegram<Input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@username" /></label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Должность<Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Директор по ИТ" /></label>
+        </div>
+    </FormDialog>
+  );
+}
+
+function CreateContactDialog({ data, busy, setBusy, create }: { data: NonNullable<ReturnType<typeof useCrm>["data"]>; busy: boolean; setBusy: (v: boolean) => void; create: ReturnType<typeof useCrm>["createContact"] }) {
   const [clientId, setClientId] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -106,19 +161,24 @@ function CreateContactDialog({ data, busy, setBusy, setNotice, create }: { data:
   const [role, setRole] = useState("");
   const clients = data.clients.filter((c) => c.status === "active");
   const valid = clientId && name.trim();
-  const submit = async () => {
-    if (!valid) return;
-    setBusy(true); setNotice(null);
-    const res = await create({ clientId, name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, role: role.trim() || null });
-    setBusy(false);
-    if (res.ok) { setNotice("Контакт создан"); setOpen(false); setClientId(""); setName(""); setEmail(""); setPhone(""); setRole(""); }
-    else setNotice(`Отклонено: ${crmErr(res.code, res.message)}`);
-  };
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Контакт</Button></DialogTrigger>
-      <DialogContent className="max-w-[500px]">
-        <DialogHeader><DialogTitle>Новый контакт</DialogTitle></DialogHeader>
+    <FormDialog
+      title="Новый контакт"
+      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Контакт</Button>}
+      submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
+      submitDisabled={!valid || busy}
+      successToast="Контакт создан"
+      contentClassName="max-w-[500px]"
+      // Ошибка остаётся В модалке — раньше уходила строкой внизу страницы.
+      onSubmit={async () => {
+        if (!valid) return null;
+        setBusy(true);
+        const res = await create({ clientId, name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, role: role.trim() || null });
+        setBusy(false);
+        return res.ok ? null : crmErr(res.code, res.message);
+      }}
+      onSuccess={() => { setClientId(""); setName(""); setEmail(""); setPhone(""); setRole(""); }}
+    >
         <div className="grid grid-cols-2 gap-3">
           <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Клиент
             <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={selCls}><option value="" disabled>Выберите активного клиента…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
@@ -128,11 +188,6 @@ function CreateContactDialog({ data, busy, setBusy, setNotice, create }: { data:
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Телефон<Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7…" /></label>
           <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Должность<Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Директор по ИТ" /></label>
         </div>
-        <DialogFooter>
-          <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
-          <Button variant="default" disabled={!valid || busy} onClick={() => void submit()}><Plus className="size-3.5" aria-hidden />Создать</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 }

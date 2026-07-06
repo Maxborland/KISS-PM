@@ -26,14 +26,19 @@ function isSessionToken(value: string | undefined): value is string {
 
 type CookieOptions = {
   secure?: boolean;
+  // Срок жизни cookie в секундах. По умолчанию — sessionTtlSeconds; логин передаёт
+  // тайм-аут из политики безопасности тенанта, чтобы cookie не пережила серверную
+  // сессию и не умирала раньше неё (политики > 7 дней тоже работают).
+  maxAgeSeconds?: number;
 };
 
 export function buildSessionCookieHeader(
   rawToken: string,
   options: CookieOptions = {}
 ) {
+  const maxAge = options.maxAgeSeconds ?? sessionTtlSeconds;
   return appendSecureFlag(
-    `${sessionCookieName}=${rawToken}; HttpOnly; Path=/; SameSite=Lax; Priority=High; Max-Age=${sessionTtlSeconds}`,
+    `${sessionCookieName}=${rawToken}; HttpOnly; Path=/; SameSite=Lax; Priority=High; Max-Age=${maxAge}`,
     options
   );
 }

@@ -10,6 +10,21 @@ import { cn } from "@/lib/cn";
 
 export type SurfaceStatus = "loading" | "error" | "forbidden" | "empty" | "ready";
 
+/**
+ * Статус SurfaceState из LoadStatus доменного хука + готовности данных.
+ * Семантика прежних рукописных лестниц: loading-с-данными остаётся ready
+ * (reload не гасит контент), отсутствие данных вне loading — error.
+ */
+export function surfaceStatusOf(
+  status: "loading" | "ready" | "error" | "forbidden",
+  hasData: boolean
+): SurfaceStatus {
+  if (status === "forbidden") return "forbidden";
+  if (status === "error") return "error";
+  if (!hasData) return status === "loading" ? "loading" : "error";
+  return "ready";
+}
+
 export type SurfaceStateProps = {
   /** Текущий статус поверхности. "ready" рендерит children. */
   status: SurfaceStatus;

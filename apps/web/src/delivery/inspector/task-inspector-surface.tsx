@@ -15,13 +15,15 @@ import {
   TriangleAlert,
   X
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { BemAvatar } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SurfaceState } from "@/components/domain/surface-state";
+import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
@@ -165,7 +167,7 @@ export function TaskInspector() {
           </span>
         ) : null}
         <div className="ml-auto flex items-center gap-1.5">
-          <Button variant="secondary" size="sm" {...demoAction("открытие в Gantt")}>Открыть в Gantt</Button>
+          <Button variant="secondary" size="sm" {...demoAction("открытие в «Графике»")}>Открыть в «Графике»</Button>
           <Button variant="destructive-soft" size="sm" {...demoAction("удаление задачи")}>Удалить</Button>
         </div>
       </div>
@@ -275,8 +277,7 @@ function TaskHero({ taskId, taskTitle }: { taskId: string; taskTitle: string }) 
   const cid = conversation?.id ?? null;
 
   // Верхнеуровневый статус ленты: forbidden(403)/error/loading/ready.
-  const feedStatus =
-    status === "forbidden" ? "forbidden" : status === "error" || !data ? (status === "loading" ? "loading" : "error") : "ready";
+  const feedStatus = surfaceStatusOf(status, Boolean(data));
 
   return (
     <>
@@ -320,7 +321,7 @@ function TaskHero({ taskId, taskTitle }: { taskId: string; taskTitle: string }) 
         <div className="grid flex-1 place-items-center text-center">
           <div>
             <div className="text-[length:var(--text-md)] font-semibold text-[var(--text-strong)]">Раздел «{tab}»</div>
-            <div className="mt-1 text-[length:var(--text-sm)] text-[var(--muted)]">Появится в рабочем приложении</div>
+            <div className="mt-1 text-[length:var(--text-sm)] text-[var(--muted)]">Появится в одном из следующих обновлений</div>
           </div>
         </div>
       )}
@@ -341,7 +342,6 @@ function ChatPane({
   messages: Message[];
 }) {
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const cid = conversationId;
 
   // Хронологический порядок (мок отдаёт обратную курсорную пагинацию).
@@ -356,13 +356,12 @@ function ChatPane({
 
   const run = async (fn: () => Promise<{ ok: true } | { ok: false; code?: string; message: string }>, okMsg?: string) => {
     setBusy(true);
-    setNotice(null);
     const res = await fn();
     setBusy(false);
     if (res.ok) {
-      if (okMsg) setNotice(okMsg);
+      if (okMsg) toast.success(okMsg);
     } else {
-      setNotice(`Отклонено: ${commsErr(res.code, res.message)}`);
+      toast.error(`Отклонено: ${commsErr(res.code, res.message)}`);
     }
   };
 
@@ -379,7 +378,7 @@ function ChatPane({
       <header className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
         <div className="mr-auto min-w-0">
           <h3 className="truncate text-[length:var(--text-sm)] font-bold text-[var(--text-strong)]">Обсуждение · {title}</h3>
-          <p className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{ordered.length} сообщ. · entity task</p>
+          <p className="truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{ordered.length} сообщ.{prototypeNotesEnabled ? " · entity task" : ""}</p>
         </div>
       </header>
 
@@ -420,8 +419,6 @@ function ChatPane({
 
       {/* Композер: «Отправить» → реальный postMessage; вложения/упоминания/эмодзи — честно demoAction */}
       <Composer busy={busy} onSend={(body) => void run(() => conv.postMessage(cid, { body }))} />
-
-      {notice ? <div key={notice} className="anim-rise-in-fast border-t border-[var(--border)] px-4 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </>
   );
 }
@@ -447,6 +444,8 @@ function MessageBubble({
   const archived = Boolean(m.archivedAt);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(m.body);
+  // подтверждение необратимого удаления сообщения (триггер в поповер-меню → контролируемый диалог)
+  const [confirmDel, setConfirmDel] = useState(false);
 
   if (archived) {
     return (
@@ -485,9 +484,23 @@ function MessageBubble({
               <PopoverContent align="end" className="w-44 p-1">
                 {mine ? <MenuItem icon={<Pencil className="size-3.5" aria-hidden />} label="Изменить" onClick={() => { setDraft(m.body); setEditing(true); }} disabled={busy} /> : null}
                 <MenuItem icon={<Pin className="size-3.5" aria-hidden />} label="Закрепить" onClick={onPin} disabled={busy} />
-                <MenuItem icon={<Trash2 className="size-3.5" aria-hidden />} label="Удалить" onClick={onDelete} disabled={busy} danger />
+                <MenuItem icon={<Trash2 className="size-3.5" aria-hidden />} label="Удалить" onClick={() => setConfirmDel(true)} disabled={busy} danger />
               </PopoverContent>
             </Popover>
+            {confirmDel ? (
+              <Dialog open onOpenChange={(o) => { if (!o) setConfirmDel(false); }}>
+                <DialogContent className="max-w-[440px]">
+                  <DialogHeader>
+                    <DialogTitle>Удалить сообщение?</DialogTitle>
+                    <DialogDescription>Сообщение будет помечено как удалённое; восстановить его из интерфейса нельзя.</DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
+                    <Button variant="destructive" disabled={busy} onClick={() => { setConfirmDel(false); onDelete(); }}>Удалить</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            ) : null}
           </div>
         </div>
 

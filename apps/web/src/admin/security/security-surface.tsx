@@ -1,7 +1,9 @@
 "use client";
 
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Save, ShieldCheck, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,14 +28,13 @@ export function AdminSecuritySurface() {
   const [form, setForm] = useState<SecurityPolicy | null>(null);
   const [domainDraft, setDomainDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   // Синхронизируем локальную форму при загрузке/перезагрузке политики.
   useEffect(() => {
     if (policy) setForm(policy);
   }, [policy]);
 
-  const surfaceStatus = status === "loading" ? "loading" : status === "error" ? "error" : !form ? "loading" : "ready";
+  const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : !form ? "loading" : "ready";
 
   const dirty = useMemo(() => {
     if (!policy || !form) return false;
@@ -61,11 +62,10 @@ export function AdminSecuritySurface() {
   const submit = async () => {
     if (!form || !timeoutValid) return;
     setBusy(true);
-    setNotice(null);
     const res = await save({ ...form, domainAllowlist: normalizeList(form.domainAllowlist) });
     setBusy(false);
-    if (res.ok) setNotice("Политика безопасности сохранена");
-    else setNotice(`Отклонено: ${adminErr(res.code, res.message)}`);
+    if (res.ok) toast.success("Политика безопасности сохранена");
+    else toast.error(`Отклонено: ${adminErr(res.code, res.message)}`);
   };
 
   return (
@@ -79,10 +79,12 @@ export function AdminSecuritySurface() {
         </Button>
       }
     >
-      <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        <span>Реальный контракт: GET/PUT /api/tenant/current/security-policy (createAdminClient + in-memory mock, swap = apiOrigin). Изменение требует права управления конфигурацией рабочей области (canManageWorkspaceConfig); каждое сохранение пишется в журнал аудита.</span>
-      </div>
+      {prototypeNotesEnabled ? (
+        <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          <span>Реальный контракт: GET/PUT /api/tenant/current/security-policy (createAdminClient + in-memory mock, swap = apiOrigin). Изменение требует права управления конфигурацией рабочей области (canManageWorkspaceConfig); каждое сохранение пишется в журнал аудита.</span>
+        </div>
+      ) : null}
 
       <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={(c) => adminErr(c)}>
         {form ? (
@@ -93,29 +95,30 @@ export function AdminSecuritySurface() {
             </div>
 
             <div className="flex flex-col divide-y divide-[var(--border-subtle)]">
-              {/* 2FA */}
-              <label className="flex items-center justify-between gap-4 px-4 py-3">
+              {/* 2FA — капабилити в auth-стеке ещё нет: контрол честно недоступен,
+                  а не делает вид, что применяется (G6-01, no-fake-controls). */}
+              <label className="flex items-center justify-between gap-4 px-4 py-3 opacity-70">
                 <span className="flex flex-col gap-0.5">
                   <span className={labelCls}>Обязательная двухфакторная аутентификация</span>
-                  <span className={hintCls}>Все пользователи рабочей области обязаны включить 2FA при входе.</span>
+                  <span className={hintCls}>Пока недоступна в этой версии: механизм 2FA ещё не реализован — настройка не применяется и поэтому отключена.</span>
                 </span>
-                <Switch checked={form.twoFactorRequired} onCheckedChange={(v) => setForm({ ...form, twoFactorRequired: v })} aria-label="Обязательная двухфакторная аутентификация" />
+                <Switch checked={form.twoFactorRequired} disabled aria-label="Обязательная двухфакторная аутентификация (недоступно в этой версии)" />
               </label>
 
-              {/* SSO */}
-              <label className="flex items-center justify-between gap-4 px-4 py-3">
+              {/* SSO — аналогично: SAML-интеграции нет, честно недоступен. */}
+              <label className="flex items-center justify-between gap-4 px-4 py-3 opacity-70">
                 <span className="flex flex-col gap-0.5">
                   <span className={labelCls}>Единый вход (SSO, SAML)</span>
-                  <span className={hintCls}>Аутентификация через корпоративный SAML-провайдер.</span>
+                  <span className={hintCls}>Пока недоступен в этой версии: SAML-интеграция ещё не реализована — настройка не применяется и поэтому отключена.</span>
                 </span>
-                <Switch checked={form.ssoSamlEnabled} onCheckedChange={(v) => setForm({ ...form, ssoSamlEnabled: v })} aria-label="Единый вход (SSO, SAML)" />
+                <Switch checked={form.ssoSamlEnabled} disabled aria-label="Единый вход (SSO, SAML) (недоступно в этой версии)" />
               </label>
 
-              {/* Тайм-аут сессии */}
+              {/* Тайм-аут сессии — применяется при входе (срок жизни новой сессии). */}
               <div className="flex items-center justify-between gap-4 px-4 py-3">
                 <span className="flex flex-col gap-0.5">
                   <span className={labelCls}>Тайм-аут сессии</span>
-                  <span className={hintCls}>Через сколько часов бездействия завершать сессию (1…8760).</span>
+                  <span className={hintCls}>Срок жизни сессии в часах (1…8760). Применяется к новым входам.</span>
                 </span>
                 <div className="flex items-center gap-2">
                   <Input
@@ -135,7 +138,7 @@ export function AdminSecuritySurface() {
               <div className="flex flex-col gap-2 px-4 py-3">
                 <span className="flex flex-col gap-0.5">
                   <span className={labelCls}>Разрешённые email-домены</span>
-                  <span className={hintCls}>Пользователей можно приглашать только с этих доменов. Пусто — ограничения нет.</span>
+                  <span className={hintCls}>Создать пользователя или сменить email можно только на этих доменах. Пусто — ограничения нет.</span>
                 </span>
                 <div className="flex items-center gap-2">
                   <Input
@@ -169,7 +172,6 @@ export function AdminSecuritySurface() {
           </div>
         ) : null}
       </SurfaceState>
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{notice}</div> : null}
     </AdminFrame>
   );
 }

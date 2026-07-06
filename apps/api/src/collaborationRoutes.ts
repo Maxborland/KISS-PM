@@ -39,6 +39,7 @@ import {
   type CollaborationEntityAccessContext
 } from "./collaboration/entityAccess";
 import { readLimitedJsonBody } from "./jsonBody";
+import { authenticateRoute } from "./routeAuth";
 
 export type CollaborationRouteDeps = {
   dataSource: ApiTenantDataSource;
@@ -55,8 +56,9 @@ export type CollaborationRouteDeps = {
 
 export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteDeps) {
   app.get("/api/workspace/conversations", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const profile = await deps.getActorProfile(actor);
     const entity = parseEntityQuery(context.req.query("entityType"), context.req.query("entityId"));
     if (!entity.ok) return context.json({ error: entity.error }, 400);
@@ -108,19 +110,20 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
 
   // P4.2 — список DM текущего пользователя (беседы conversationType="direct", где он участник).
   app.get("/api/workspace/conversations/direct", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.listDirectConversationsForUser) {
-      return context.json({ error: "collaboration_not_configured" }, 501);
-    }
-    const directConversations = await deps.dataSource.listDirectConversationsForUser(actor.tenantId, actor.id);
+    const auth = await authenticateRoute(context, deps, {
+      capabilities: ["listDirectConversationsForUser"],
+      capabilityError: "collaboration_not_configured"
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
+    const directConversations = await dataSource.listDirectConversationsForUser(actor.tenantId, actor.id);
     const result = [];
     for (const conversation of directConversations) {
-      const memberUserIds = deps.dataSource.listConversationMemberIds
-        ? await deps.dataSource.listConversationMemberIds(actor.tenantId, conversation.id)
+      const memberUserIds = dataSource.listConversationMemberIds
+        ? await dataSource.listConversationMemberIds(actor.tenantId, conversation.id)
         : [];
-      const readState = deps.dataSource.getConversationReadState
-        ? await deps.dataSource.getConversationReadState({ tenantId: actor.tenantId, conversationId: conversation.id, userId: actor.id })
+      const readState = dataSource.getConversationReadState
+        ? await dataSource.getConversationReadState({ tenantId: actor.tenantId, conversationId: conversation.id, userId: actor.id })
         : null;
       result.push({
         ...serializeConversation(conversation),
@@ -134,11 +137,12 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
 
   // P4.2 — открыть/получить DM с пользователем (create-or-get по детерминированной паре).
   app.post("/api/workspace/conversations/direct", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.ensureConversation || !deps.dataSource.addConversationMembers || !deps.dataSource.listUsersByTenantId) {
-      return context.json({ error: "collaboration_not_configured" }, 501);
-    }
+    const auth = await authenticateRoute(context, deps, {
+      capabilities: ["ensureConversation", "addConversationMembers", "listUsersByTenantId"],
+      capabilityError: "collaboration_not_configured"
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const targetParse = parseCollaborationId(readRecord(body.value).userId, "direct_user_id_invalid");
@@ -146,7 +150,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const targetId = targetParse.value;
     if (targetId === actor.id) return context.json({ error: "direct_self_forbidden" }, 400);
 
-    const tenantUsers = await deps.dataSource.listUsersByTenantId(actor.tenantId);
+    const tenantUsers = await dataSource.listUsersByTenantId(actor.tenantId);
     if (!tenantUsers.some((user) => user.id === targetId)) {
       return context.json({ error: "direct_user_not_found" }, 404);
     }
@@ -154,7 +158,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     // Детерминированный id пары → create-or-get идемпотентен (ensureConversation по entity-tuple).
     const pair = [actor.id, targetId].sort();
     const dmId = `dm-${pair.join("--")}`;
-    const conversation = await deps.dataSource.ensureConversation({
+    const conversation = await dataSource.ensureConversation({
       id: dmId,
       tenantId: actor.tenantId,
       entityType: "direct",
@@ -163,9 +167,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       title: "",
       createdByUserId: actor.id
     });
-    await deps.dataSource.addConversationMembers({ tenantId: actor.tenantId, conversationId: conversation.id, userIds: pair });
-    const memberUserIds = deps.dataSource.listConversationMemberIds
-      ? await deps.dataSource.listConversationMemberIds(actor.tenantId, conversation.id)
+    await dataSource.addConversationMembers({ tenantId: actor.tenantId, conversationId: conversation.id, userIds: pair });
+    const memberUserIds = dataSource.listConversationMemberIds
+      ? await dataSource.listConversationMemberIds(actor.tenantId, conversation.id)
       : pair;
     return context.json({
       conversation: serializeConversation(conversation),
@@ -175,8 +179,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.get("/api/workspace/conversations/:conversationId/messages", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const limit = parseLimit(context.req.query("limit"), 50);
@@ -208,8 +213,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.post("/api/workspace/conversations/:conversationId/messages", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const body = await readLimitedJsonBody(context);
@@ -311,8 +317,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.post("/api/workspace/conversations/:conversationId/messages/:messageId/reactions", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const message = await deps.dataSource.findDiscussionMessage?.(
@@ -348,8 +355,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.delete("/api/workspace/conversations/:conversationId/messages/:messageId/reactions/:reactionId", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const message = await deps.dataSource.findDiscussionMessage?.(
@@ -382,8 +390,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.patch("/api/workspace/conversations/:conversationId/messages/:messageId", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const message = await deps.dataSource.findDiscussionMessage?.(
@@ -436,8 +445,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.post("/api/workspace/conversations/:conversationId/messages/:messageId/pin", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     if (!conversation.value.access.manageDecision.allowed) {
@@ -485,8 +495,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
 
   // COMM-06: снятие закрепления — раньше закрепление было необратимо (не было роута).
   app.delete("/api/workspace/conversations/:conversationId/messages/:messageId/pin", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     if (!conversation.value.access.manageDecision.allowed) {
@@ -532,8 +543,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.delete("/api/workspace/conversations/:conversationId/messages/:messageId", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const message = await deps.dataSource.findDiscussionMessage?.(
@@ -580,8 +592,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.post("/api/workspace/conversations/:conversationId/read-state", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const readState = await deps.dataSource.markConversationRead?.({
@@ -595,19 +608,20 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
 
   // Сводка непрочитанного для бейджа nav/comms — один дешёвый запрос, без перебора сущностей.
   app.get("/api/workspace/unread-summary", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.listUserNotifications || !deps.dataSource.countUnreadConversationMessagesForUser) {
-      return context.json({ error: "collaboration_not_configured" }, 501);
-    }
+    const auth = await authenticateRoute(context, deps, {
+      capabilities: ["listUserNotifications", "countUnreadConversationMessagesForUser"],
+      capabilityError: "collaboration_not_configured"
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
     // limit=200: бейдж насыщается («200+»); точное число сверх этого не нужно.
-    const unread = await deps.dataSource.listUserNotifications({
+    const unread = await dataSource.listUserNotifications({
       tenantId: actor.tenantId,
       userId: actor.id,
       status: "unread",
       limit: 200
     });
-    const conversations = await deps.dataSource.countUnreadConversationMessagesForUser({
+    const conversations = await dataSource.countUnreadConversationMessagesForUser({
       tenantId: actor.tenantId,
       userId: actor.id
     });
@@ -615,8 +629,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.get("/api/workspace/notifications", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const status = parseNotificationStatus(context.req.query("status"));
     if (!status.ok) return context.json({ error: status.error }, 400);
     const notificationQuery = {
@@ -650,8 +665,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.post("/api/workspace/notifications/:notificationId/read", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const notificationId = parseCollaborationId(
       context.req.param("notificationId"),
       "notification_id_invalid"
@@ -667,8 +683,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.get("/api/workspace/notification-preferences", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const preferences = await deps.dataSource.listNotificationPreferences?.(
       actor.tenantId,
       actor.id
@@ -678,8 +695,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.put("/api/workspace/notification-preferences", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parsePreferences(readRecord(body.value).preferences, actor);
@@ -703,8 +721,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.get("/api/workspace/meetings", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const profile = await deps.getActorProfile(actor);
     const entity = parseEntityQuery(context.req.query("entityType"), context.req.query("entityId"));
     if (!entity.ok) return context.json({ error: entity.error }, 400);
@@ -727,8 +746,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.post("/api/workspace/meetings", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const profile = await deps.getActorProfile(actor);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -818,8 +838,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.patch("/api/workspace/meetings/:meetingId", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const meeting = await resolveMeetingForActor(context.req.param("meetingId"), actor, deps);
     if (!meeting.ok) return context.json({ error: meeting.error }, meeting.status);
     if (!meeting.value.access.manageDecision.allowed) {
@@ -867,8 +888,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   // Read-доступ уже проверяет resolveMeetingForActor (readDecision). POST-ы создают эти под-ресурсы,
   // здесь — единственный GET, чтобы фронт перечитывал детали (раньше детали были только в payload списка).
   app.get("/api/workspace/meetings/:meetingId", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const meeting = await resolveMeetingForActor(context.req.param("meetingId"), actor, deps);
     if (!meeting.ok) return context.json({ error: meeting.error }, meeting.status);
     const dataSource = deps.dataSource;
@@ -897,8 +919,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.post("/api/workspace/meetings/:meetingId/external-links", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const meeting = await resolveMeetingForActor(context.req.param("meetingId"), actor, deps);
     if (!meeting.ok) return context.json({ error: meeting.error }, meeting.status);
     if (!meeting.value.access.manageDecision.allowed) {
@@ -947,8 +970,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.post("/api/workspace/meetings/:meetingId/notes", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const meeting = await resolveMeetingForActor(context.req.param("meetingId"), actor, deps);
     if (!meeting.ok) return context.json({ error: meeting.error }, meeting.status);
     const participants = await deps.dataSource.listMeetingParticipants?.(
@@ -997,8 +1021,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   });
 
   app.post("/api/workspace/meetings/:meetingId/action-items", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const meeting = await resolveMeetingForActor(context.req.param("meetingId"), actor, deps);
     if (!meeting.ok) return context.json({ error: meeting.error }, meeting.status);
     if (!meeting.value.access.manageDecision.allowed) {
@@ -1066,8 +1091,9 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
   // Смена статуса задачи встречи (open/done/cancelled). Manage-гейт как у POST; раньше статус
   // был всегда "open" — фронт показывал инертный чекбокс.
   app.patch("/api/workspace/meetings/:meetingId/action-items/:actionItemId", async (context) => {
-    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
-    if (!actor) return context.json({ error: "session_required" }, 401);
+    const auth = await authenticateRoute(context, deps);
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
     const meeting = await resolveMeetingForActor(context.req.param("meetingId"), actor, deps);
     if (!meeting.ok) return context.json({ error: meeting.error }, meeting.status);
     if (!meeting.value.access.manageDecision.allowed) {
@@ -1110,10 +1136,6 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!updated) return context.json({ error: "meeting_action_item_not_found" }, 404);
     return context.json({ actionItem: serializeMeetingActionItem(updated) });
   });
-}
-
-async function requireActor(cookie: string | null, deps: CollaborationRouteDeps) {
-  return deps.getSessionActorFromHeaders(cookie);
 }
 
 function parseEntityQuery(entityType: unknown, entityId: unknown) {
@@ -1431,7 +1453,7 @@ async function validateTenantUserIds(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const uniqueIds = [...new Set(userIds)];
   if (uniqueIds.length === 0) return { ok: true };
-  const tenantUsers = await dataSource.listUsersByTenantId(tenantId);
+  const tenantUsers = (await dataSource.listUsersByTenantId?.(tenantId)) ?? [];
   const existing = new Set(tenantUsers.map((user) => user.id));
   return uniqueIds.every((userId) => existing.has(userId))
     ? { ok: true }

@@ -821,7 +821,7 @@ async function validateMeetingLink(
 }
 
 async function validateTenantUser(dataSource: ApiTenantDataSource, tenantId: string, userId: string) {
-  const users = await dataSource.listUsersByTenantId(tenantId);
+  const users = (await dataSource.listUsersByTenantId?.(tenantId)) ?? [];
   return users.some((user) => user.id === userId)
     ? { ok: true as const }
     : { ok: false as const, error: "tenant_user_not_found" };

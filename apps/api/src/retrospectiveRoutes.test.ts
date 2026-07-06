@@ -520,7 +520,7 @@ function createRetrospectiveDataSource(
   const auditEvents: AuditEventListItem[] = [];
   const failAuditActionTypes = new Set<string>();
 
-  const dataSource: ApiTenantDataSource = {
+  const dataSource: Partial<ApiTenantDataSource> = {
     async listDevUsers() {
       return [actor];
     },
@@ -550,7 +550,7 @@ function createRetrospectiveDataSource(
       const readModelSnapshot = readModel;
       const auditEventsSnapshot = [...auditEvents];
       try {
-        return await operation(dataSource);
+        return await operation(dataSource as ApiTenantDataSource);
       } catch (error) {
         projects.splice(0, projects.length, ...projectSnapshot);
         readModel = readModelSnapshot;

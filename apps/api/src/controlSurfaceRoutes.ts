@@ -15,6 +15,7 @@ import {
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import { parseIncludeArchivedQuery } from "./controlSurfaceQuery";
 import { readLimitedJsonBody } from "./jsonBody";
+import { authorizeRoute } from "./routeAuth";
 import { parseControlSurfaceIdParam } from "./routeParamParsers";
 
 export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
@@ -22,26 +23,23 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const includeArchived = parseIncludeArchivedQuery(context.req.query("includeArchived"));
     if (!includeArchived.ok) return context.json({ error: includeArchived.error }, 400);
 
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.listControlSurfaces) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canReadControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: "control_surface.read_denied",
-        surfaceId: "__list__",
-        permissionResult: decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadControlSurfaces,
+      capabilities: ["listControlSurfaces"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.read_denied",
+          surfaceId: "__list__",
+          permissionResult: decision
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, profile, dataSource } = auth.value;
     const canReadBuilderState = canReadControlSurfaceBuilderState({ actor, profile });
 
-    const surfaces = (await deps.dataSource.listControlSurfaces(actor.tenantId))
+    const surfaces = (await dataSource.listControlSurfaces(actor.tenantId))
       .filter((surface) => includeArchived.value || surface.status !== "archived")
       .filter((surface) => canReadBuilderState || surface.status === "published")
       .map((surface) => canReadBuilderState ? surface : toPublishedSurfaceReadModel(surface, profile))
@@ -50,20 +48,19 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.get("/api/tenant/current/control-surfaces/presets", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    const profile = await deps.getActorProfile(actor);
-    const decision = canReadControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: "control_surface.presets_read_denied",
-        surfaceId: "__presets__",
-        permissionResult: decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadControlSurfaces,
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.presets_read_denied",
+          surfaceId: "__presets__",
+          permissionResult: decision
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor } = auth.value;
 
     return context.json({
       presets: createDefaultControlSurfacePresets(actor.tenantId).map((definition) => ({
@@ -77,54 +74,48 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsedSurfaceId = parseControlSurfaceIdParam(context.req.param("surfaceId"));
     if (!parsedSurfaceId.ok) return context.json({ error: parsedSurfaceId.error }, 400);
     const surfaceId = parsedSurfaceId.value;
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.findControlSurface || !deps.dataSource.listControlSurfaceVersions) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canReadControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: "control_surface.read_denied",
-        surfaceId,
-        permissionResult: decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadControlSurfaces,
+      capabilities: ["findControlSurface", "listControlSurfaceVersions"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.read_denied",
+          surfaceId,
+          permissionResult: decision
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, profile, dataSource } = auth.value;
     const canReadBuilderState = canReadControlSurfaceBuilderState({ actor, profile });
 
-    const surface = await deps.dataSource.findControlSurface(actor.tenantId, surfaceId);
+    const surface = await dataSource.findControlSurface(actor.tenantId, surfaceId);
     if (!surface) return context.json({ error: "control_surface_not_found" }, 404);
     if (!canReadBuilderState) {
       const publishedSurface = toPublishedSurfaceReadModel(surface, profile);
       if (!publishedSurface) return context.json({ error: "control_surface_not_found" }, 404);
       return context.json({ surface: publishedSurface });
     }
-    const versions = await deps.dataSource.listControlSurfaceVersions(actor.tenantId, surface.id);
+    const versions = await dataSource.listControlSurfaceVersions(actor.tenantId, surface.id);
     return context.json({ surface, versions });
   });
 
   app.post("/api/tenant/current/control-surfaces", async (context) => {
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.upsertControlSurfaceDraft || !deps.dataSource.appendAuditEvent || !deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: "control_surface.draft_save_denied",
-        surfaceId: "__new__",
-        permissionResult: decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageControlSurfaces,
+      capabilities: ["upsertControlSurfaceDraft", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.draft_save_denied",
+          surfaceId: "__new__",
+          permissionResult: decision
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -181,29 +172,26 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsedSurfaceId = parseControlSurfaceIdParam(context.req.param("surfaceId"));
     if (!parsedSurfaceId.ok) return context.json({ error: parsedSurfaceId.error }, 400);
     const surfaceId = parsedSurfaceId.value;
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.findControlSurface) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canManageControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: "control_surface.preview_denied",
-        surfaceId,
-        permissionResult: decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageControlSurfaces,
+      capabilities: ["findControlSurface"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.preview_denied",
+          surfaceId,
+          permissionResult: decision
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseOptionalSurfaceDefinitionBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const stored = await deps.dataSource.findControlSurface(actor.tenantId, surfaceId);
+    const stored = await dataSource.findControlSurface(actor.tenantId, surfaceId);
     if (!stored && !parsed.value) return context.json({ error: "control_surface_not_found" }, 404);
     const definition = parsed.value ?? stored?.draftDefinition;
     if (!definition) return context.json({ error: "control_surface_not_found" }, 404);
@@ -227,28 +215,20 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsedSurfaceId = parseControlSurfaceIdParam(context.req.param("surfaceId"));
     if (!parsedSurfaceId.ok) return context.json({ error: parsedSurfaceId.error }, 400);
     const surfaceId = parsedSurfaceId.value;
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (
-      !deps.dataSource.findControlSurface ||
-      !deps.dataSource.publishControlSurface ||
-      !deps.dataSource.appendAuditEvent ||
-      !deps.dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canPublishControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: "control_surface.publish_denied",
-        surfaceId,
-        permissionResult: decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canPublishControlSurfaces,
+      capabilities: ["findControlSurface", "publishControlSurface", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.publish_denied",
+          surfaceId,
+          permissionResult: decision
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
 
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.findControlSurface || !transactionDataSource.publishControlSurface) {
@@ -333,23 +313,20 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsedSurfaceId = parseControlSurfaceIdParam(context.req.param("surfaceId"));
     if (!parsedSurfaceId.ok) return context.json({ error: parsedSurfaceId.error }, 400);
     const surfaceId = parsedSurfaceId.value;
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.rollbackControlSurfaceToVersion || !deps.dataSource.appendAuditEvent || !deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canPublishControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: "control_surface.rollback_denied",
-        surfaceId,
-        permissionResult: decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canPublishControlSurfaces,
+      capabilities: ["rollbackControlSurfaceToVersion", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.rollback_denied",
+          surfaceId,
+          permissionResult: decision
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -426,23 +403,20 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsedSurfaceId = parseControlSurfaceIdParam(context.req.param("surfaceId"));
     if (!parsedSurfaceId.ok) return context.json({ error: parsedSurfaceId.error }, 400);
     const surfaceId = parsedSurfaceId.value;
-    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!deps.dataSource.archiveControlSurface || !deps.dataSource.appendAuditEvent || !deps.dataSource.withTransaction) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const profile = await deps.getActorProfile(actor);
-    const decision = canPublishControlSurfaces({ actor, profile, targetTenantId: actor.tenantId });
-    if (!decision.allowed) {
-      await appendDeniedAuditIfConfigured(deps, {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: "control_surface.archive_denied",
-        surfaceId,
-        permissionResult: decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    const auth = await authorizeRoute(context, deps, {
+      permission: canPublishControlSurfaces,
+      capabilities: ["archiveControlSurface", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAuditIfConfigured(deps, {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "control_surface.archive_denied",
+          surfaceId,
+          permissionResult: decision
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
 
     const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.findControlSurface || !transactionDataSource.archiveControlSurface) {

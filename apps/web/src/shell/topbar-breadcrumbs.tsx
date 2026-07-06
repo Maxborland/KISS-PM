@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 import { DEMO_NAV_TITLE } from "@/views/lib/demo";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 export type Crumb = { label: string; current?: boolean };
 
@@ -16,7 +17,7 @@ export function TopbarBreadcrumbs({ items, className }: { items: Crumb[]; classN
             <span className="u-text-strong">{item.label}</span>
           ) : (
             // Прототип: навигация не подключена — путь как текст, без fake-ссылки.
-            <span className="crumb-parent" title={DEMO_NAV_TITLE}>
+            <span className="crumb-parent" title={prototypeNotesEnabled ? DEMO_NAV_TITLE : undefined}>
               {item.label}
             </span>
           )}

@@ -1,0 +1,46 @@
+[
+  {
+    "kind": "http",
+    "status": 409,
+    "url": "http://127.0.0.1:3000/api/workspace/access-roles/role-uiux-eval-g6-role-1783264018137",
+    "method": "DELETE"
+  },
+  {
+    "kind": "console",
+    "text": "Failed to load resource: the server responded with a status of 409 (Conflict)"
+  },
+  {
+    "kind": "step",
+    "step": "delete-assigned-confirmed",
+    "tail": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nРоли доступа (access-profiles)\n\nСоздать роль\nПользователи\nРоли\nБезопасность\nАудит\nРОЛЬ\tПРАВ\tНАЗНАЧЕНО\t\n\nАдминистратор\naccess-profile-alpha-admin\n\t57\t5\t\n\n\nAudit Browser User Manager 20260705212045\naccess-profile-audit-browser-user-manager-20260705212045\n\t2\t1\t\n\n\nAudit User Manager 20260705205400\naccess-profile-audit-user-manager-20260705205400\n\t2\t1\t\n\n\nНаблюдатель плана без ресурсов\naccess-profile-plan-reader-no-resources\n\t2\t1\t\n\n\nНаблюдатель ресурсов\naccess-profile-resource-reader\n\t1\t1\t\n\n\nuiux-eval-g6-role-1783264018137\nrole-uiux-eval-g6-role-1783264018137\n\t2\t1\t\nОтклонено: Роль назначена пользователям — сначала переназначьте их"
+  },
+  {
+    "kind": "step",
+    "step": "delete-clean-confirm",
+    "tail": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nРесурсы\nАНАЛИТИКА\nДашборд\nKPI\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nРоли доступа (access-profiles)\n\nСоздать роль\nПользователи\nРоли\nБезопасность\nАудит\nРОЛЬ\tПРАВ\tНАЗНАЧЕНО\t\n\nАдминистратор\naccess-profile-alpha-admin\n\t57\t6\t\n\n\nAudit Browser User Manager 20260705212045\naccess-profile-audit-browser-user-manager-20260705212045\n\t2\t1\t\n\n\nAudit User Manager 20260705205400\naccess-profile-audit-user-manager-20260705205400\n\t2\t1\t\n\n\nНаблюдатель плана без ресурсов\naccess-profile-plan-reader-no-resources\n\t2\t1\t\n\n\nНаблюдатель ресурсов\naccess-profile-resource-reader\n\t1\t1\t\n\n\nuiux-eval-g6-role-1783264018137\nrole-uiux-eval-g6-role-1783264018137\n\t2\t0\t\nУдалить роль «uiux-eval-g6-role-1783264018137»?\n\nДействие необратимо. Роль будет удалена из рабочей области.\n\nОтмена\nУдалить роль\nClose"
+  },
+  {
+    "kind": "step",
+    "step": "delete-clean-done",
+    "stillThere": true,
+    "tail": "\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nРоли доступа (access-profiles)\n\nСоздать роль\nПользователи\nРоли\nБезопасность\nАудит\nРОЛЬ\tПРАВ\tНАЗНАЧЕНО\t\n\nАдминистратор\naccess-profile-alpha-admin\n\t57\t6\t\n\n\nAudit Browser User Manager 20260705212045\naccess-profile-audit-browser-user-manager-20260705212045\n\t2\t1\t\n\n\nAudit User Manager 20260705205400\naccess-profile-audit-user-manager-20260705205400\n\t2\t1\t\n\n\nНаблюдатель плана без ресурсов\naccess-profile-plan-reader-no-resources\n\t2\t1\t\n\n\nНаблюдатель ресурсов\naccess-profile-resource-reader\n\t1\t1\t\nРоль «uiux-eval-g6-role-1783264018137» удалена"
+  },
+  {
+    "kind": "audit-controls",
+    "controls": {
+      "inputs": 0,
+      "selects": 0,
+      "buttons": [],
+      "rows": 51
+    }
+  },
+  {
+    "kind": "audit-row-click",
+    "modalOpened": 0,
+    "urlAfter": "http://127.0.0.1:3000/admin/audit"
+  },
+  {
+    "kind": "audit-tail",
+    "tailText": "User · users\tОтклонено правами\t05 июл., 22:01\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 22:01\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 22:01\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 22:01\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 22:01\n\nworkspace.user.read_denied\nworkspace.user.read_denied\n\tTenantUser · users\tОтклонено правами\t05 июл., 22:01\n\nplanning.command_denied\nplanning.command_denied\n\tProject · project-vektor-portal\tОтклонено правами\t05 июл., 21:49"
+  }
+]

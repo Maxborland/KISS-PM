@@ -6,6 +6,7 @@ import {
 } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 import { readLimitedJsonBody } from "./jsonBody";
+import { authorizeRoute } from "./routeAuth";
 import { parseAccessRoleIdParam } from "./routeParamParsers";
 import { parseAccessProfileCreateBody } from "./workspaceParsers";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
@@ -20,76 +21,46 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
   } = deps;
 
   app.get("/api/tenant/current/access-profiles", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-
-    if (!actor) {
-      return context.json({ error: "dev_session_required" }, 401);
-    }
-
-    if (!dataSource.listAccessProfilesByTenantId) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const actorProfile = await getActorProfile(actor);
-    const decision = canReadAccessProfiles({
-      actor,
-      profile: actorProfile,
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadAccessProfiles,
+      capabilities: ["listAccessProfilesByTenantId"],
+      unauthorizedError: "dev_session_required",
+      onDenied: ({ actor, decision }) =>
+        appendAccessRoleDeniedAudit(deps, actor, {
+          actionType: "tenant.access_profile.read_denied",
+          entityId: "access-profiles",
+          commandInput: { resource: "access-profiles" },
+          decision
+        })
     });
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
-    if (!decision.allowed) {
-      await appendAccessRoleDeniedAudit(deps, actor, {
-        actionType: "tenant.access_profile.read_denied",
-        entityId: "access-profiles",
-        commandInput: { resource: "access-profiles" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
-
-    const accessProfiles = await dataSource.listAccessProfilesByTenantId(
-      actor.tenantId
-    );
-
-    return context.json({ accessProfiles });
+    return context.json({
+      accessProfiles: await dataSource.listAccessProfilesByTenantId(actor.tenantId)
+    });
   });
 
   app.post("/api/tenant/current/access-profiles", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-
-    if (!actor) {
-      return context.json({ error: "dev_session_required" }, 401);
-    }
-
-    if (
-      !dataSource.createAccessProfile ||
-      !dataSource.appendAuditEvent ||
-      !dataSource.listAccessProfilesByTenantId ||
-      !dataSource.withTransaction
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const actorProfile = await getActorProfile(actor);
-    const decision = canManageAccessProfiles({
-      actor,
-      profile: actorProfile,
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageAccessProfiles,
+      capabilities: [
+        "createAccessProfile",
+        "appendAuditEvent",
+        "listAccessProfilesByTenantId",
+        "withTransaction"
+      ],
+      unauthorizedError: "dev_session_required",
+      onDenied: ({ actor, decision }) =>
+        appendAccessRoleDeniedAudit(deps, actor, {
+          actionType: "tenant.access_profile.create_denied",
+          entityId: "new",
+          commandInput: { operation: "create_access_profile" },
+          decision
+        })
     });
-
-    if (!decision.allowed) {
-      await appendAccessRoleDeniedAudit(deps, actor, {
-        actionType: "tenant.access_profile.create_denied",
-        entityId: "new",
-        commandInput: { operation: "create_access_profile" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, profile: actorProfile, decision, dataSource } = auth.value;
 
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -151,27 +122,19 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 
   app.get("/api/workspace/access-roles", async (context) => {
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    if (!dataSource.listAccessProfilesByTenantId) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-    const decision = canReadAccessProfiles({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canReadAccessProfiles,
+      capabilities: ["listAccessProfilesByTenantId"],
+      onDenied: ({ actor, decision }) =>
+        appendAccessRoleDeniedAudit(deps, actor, {
+          actionType: "tenant.access_profile.read_denied",
+          entityId: "access-roles",
+          commandInput: { resource: "access-roles" },
+          decision
+        })
     });
-    if (!decision.allowed) {
-      await appendAccessRoleDeniedAudit(deps, actor, {
-        actionType: "tenant.access_profile.read_denied",
-        entityId: "access-roles",
-        commandInput: { resource: "access-roles" },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, dataSource } = auth.value;
 
     return context.json({
       accessRoles: await dataSource.listAccessProfilesByTenantId(actor.tenantId)
@@ -180,14 +143,8 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
   // Каталог назначаемых прав (статический список из @kiss-pm/access-control) — для редактора ролей.
   app.get("/api/workspace/permission-catalog", async (context) => {
-    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
-    if (!actor) return context.json({ error: "session_required" }, 401);
-    const decision = canReadAccessProfiles({
-      actor,
-      profile: await getActorProfile(actor),
-      targetTenantId: actor.tenantId
-    });
-    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    const auth = await authorizeRoute(context, deps, { permission: canReadAccessProfiles });
+    if (!auth.ok) return auth.response;
     return context.json({ permissions });
   });
 
@@ -195,39 +152,24 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsedRoleId = parseAccessRoleIdParam(context.req.param("roleId"));
     if (!parsedRoleId.ok) return context.json({ error: parsedRoleId.error }, 400);
     const roleId = parsedRoleId.value;
-    const actor = await getSessionActorFromHeaders(
-      context.req.header("cookie") ?? null
-    );
-
-    if (!actor) {
-      return context.json({ error: "session_required" }, 401);
-    }
-
-    if (
-      !dataSource.updateAccessProfile ||
-      !dataSource.listAccessProfilesByTenantId ||
-      !dataSource.withTransaction ||
-      !dataSource.appendAuditEvent
-    ) {
-      return context.json({ error: "persistence_not_configured" }, 501);
-    }
-
-    const actorProfile = await getActorProfile(actor);
-    const decision = canManageAccessProfiles({
-      actor,
-      profile: actorProfile,
-      targetTenantId: actor.tenantId
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageAccessProfiles,
+      capabilities: [
+        "updateAccessProfile",
+        "listAccessProfilesByTenantId",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendAccessRoleDeniedAudit(deps, actor, {
+          actionType: "tenant.access_profile.update_denied",
+          entityId: roleId,
+          commandInput: { roleId },
+          decision
+        })
     });
-
-    if (!decision.allowed) {
-      await appendAccessRoleDeniedAudit(deps, actor, {
-        actionType: "tenant.access_profile.update_denied",
-        entityId: roleId,
-        commandInput: { roleId },
-        decision
-      });
-      return context.json({ error: decision.reason }, 403);
-    }
+    if (!auth.ok) return auth.response;
+    const { actor, profile: actorProfile, decision, dataSource } = auth.value;
 
     const beforeState =
       (await dataSource.listAccessProfilesByTenantId(actor.tenantId)).find(

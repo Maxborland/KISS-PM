@@ -129,6 +129,10 @@ export type CollaborationRepository = {
     title?: string;
     description?: string;
   }): Promise<CommunicationChannel | undefined>;
+  archiveCommunicationChannel(input: {
+    tenantId: TenantId;
+    channelId: string;
+  }): Promise<CommunicationChannel | undefined>;
   findCommunicationChannel(
     tenantId: TenantId,
     channelId: string
@@ -454,6 +458,23 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
             eq(communicationChannels.tenantId, input.tenantId),
             eq(communicationChannels.id, input.channelId),
             isNull(communicationChannels.archivedAt)
+          )
+        )
+        .returning();
+      return row ? mapCommunicationChannel(row) : undefined;
+    },
+    async archiveCommunicationChannel(input) {
+      // Мягкое удаление: archivedAt скрывает канал из listCommunicationChannels.
+      // Системный workspace_general не архивируется (guard на уровне роута и здесь).
+      const [row] = await db
+        .update(communicationChannels)
+        .set({ archivedAt: new Date(), updatedAt: new Date() })
+        .where(
+          and(
+            eq(communicationChannels.tenantId, input.tenantId),
+            eq(communicationChannels.id, input.channelId),
+            isNull(communicationChannels.archivedAt),
+            sql`${communicationChannels.channelType} <> 'workspace_general'`
           )
         )
         .returning();

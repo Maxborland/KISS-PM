@@ -1,0 +1,33 @@
+{
+  "notes": [
+    "[create] создана: 1",
+    "[edit] переименована: 2",
+    "[context-menu] пункты ПКМ: [\"Открыть инспектор\",\"Редактировать…\",\"Создать подзадачу\",\"Создать задачу рядом\",\"На уровень глубже\",\"На уровень выше\",\"Сделать вехой\",\"Удалить\"]",
+    "[context-menu] удаление БЕЗ подтверждения",
+    "[context-menu] после удаления видна: 0",
+    "[undo] после Отката задача видна: 0"
+  ],
+  "network": [
+    {
+      "phase": "create",
+      "m": "POST",
+      "u": "/api/workspace/projects/project-vektor-portal/planning/apply-command-batch",
+      "s": 200,
+      "b": "{\"applied\":{\"commands\":[{\"type\":\"task.create\",\"payload\":{\"id\":\"t-new-1\",\"projectId\":\"project-vektor-portal\",\"title\":\"uiux-eval-задача-2\",\"statusId\":\"task-status-new\",\"plannedStart\":null,\"plannedFinish\":null,\"durationMinutes\":2400,\"workMinutes\":2400,\""
+    },
+    {
+      "phase": "edit",
+      "m": "POST",
+      "u": "/api/workspace/projects/project-vektor-portal/planning/apply-command",
+      "s": 200,
+      "b": "{\"applied\":{\"commands\":[{\"type\":\"task.update_identity\",\"payload\":{\"taskId\":\"t-new-1\",\"title\":\"uiux-eval-задача-2-ред\"}}],\"changedTaskIds\":[\"t-new-1\"],\"changedAssignmentIds\":[],\"changedDependencyIds\":[],\"acceptedRiskIds\":[]},\"newPlanVersion\":8,\"auditE"
+    },
+    {
+      "phase": "context-menu",
+      "m": "POST",
+      "u": "/api/workspace/projects/project-vektor-portal/planning/apply-command",
+      "s": 200,
+      "b": "{\"applied\":{\"commands\":[{\"type\":\"task.delete_or_archive\",\"payload\":{\"taskId\":\"t-new-1\",\"mode\":\"delete\"}}],\"changedTaskIds\":[\"t-new-1\"],\"changedAssignmentIds\":[],\"changedDependencyIds\":[],\"acceptedRiskIds\":[]},\"newPlanVersion\":9,\"auditEventId\":\"audit-"
+    }
+  ]
+}

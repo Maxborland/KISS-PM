@@ -2,13 +2,16 @@
 
 import { Fragment, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Columns3, Filter, GitBranch, IndentDecrease, IndentIncrease, Layers, Plus, TriangleAlert, Undo2, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
-import { PROJECT_FALLBACK, deriveProjectMeta, planningErr } from "@/delivery/lib/project-chrome";
+import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { demoAction } from "@/views/lib/demo";
+import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { usePointerDrag } from "@/delivery/lib/use-pointer-drag";
@@ -104,7 +107,7 @@ const PROJECT: ProjectMeta = {
   planVersion: "v17",
   deadline: "12.07.2026",
   finish: "14.06.2026",
-  variance: { label: "+2 дня к baseline B2", tone: "warning" }
+  variance: { label: "+2 дня к базовому плану B2", tone: "warning" }
 };
 
 const ROW_H = 36;
@@ -167,7 +170,14 @@ const cellBtn = "block w-full cursor-pointer truncate rounded-[var(--radius-xs)]
 
 export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, setReadModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
+  const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
+  // Фолбэк имени ресурса: под ограниченной ролью справочник людей может отдать 403 —
+  // резолвер вернёт сырой id; показываем «Участник xxxx» вместо user-/r-идентификатора (G8-08).
+  const resName = useMemo(() => {
+    const name = resDir.name;
+    return (id: string) => { const n = name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
+  }, [resDir.name]);
   const [zoom, setZoom] = useState<Zoom>("week");
   const [sel, setSel] = useState<string | null>("t-3.2.1");
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -184,7 +194,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const skipBlurRef = useRef(false);
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  // инлайн-валидация строк создания задачи (мин. 3 символа) — у поля, не в toast
+  const [createError, setCreateError] = useState<{ scope: "bottom" | "inline"; msg: string } | null>(null);
+  // подтверждение архивации задачи (необратимое действие) — из ПКМ-меню строки
+  const [confirmDelete, setConfirmDelete] = useState<Row | null>(null);
   const [errors, setErrors] = useState<Map<string, string>>(() => new Map());
   const [batchMode, setBatchMode] = useState(false);
   const [staged, setStaged] = useState<PlanningCommand[]>([]);
@@ -194,7 +207,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; parentId: string | null; taskId?: string; asgId?: string; initial: TaskModalValues } | null>(null);
   const [colW, setColW] = useState<number[]>(() => [...DEFAULT_COLW]);
 
-  const mapped = useMemo(() => (readModel ? mapRows(readModel, resDir.name) : null), [readModel, resDir.name]);
+  const mapped = useMemo(() => (readModel ? mapRows(readModel, resName) : null), [readModel, resName]);
   const dayW = ZOOM_DAY_W[zoom];
   const lastCommitRef = useRef<{ commands: PlanningCommand[]; before: PlanningReadModel } | null>(null);
   const batchBaseRef = useRef<PlanningReadModel | null>(null);
@@ -325,29 +338,29 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       setCanUndo(base != null);
       setErrors(new Map());
       setFlash(new Set(res.changed));
-      setNotice(`Пакет применён: коммит v${res.planVersion} · затронуто задач: ${res.changed.length}`);
+      toast.success(`Пакет применён: коммит v${res.planVersion} · затронуто задач: ${res.changed.length}`);
       window.setTimeout(() => setFlash(new Set()), 1700);
     } else if (res.conflict) {
-      setNotice("Конфликт версий плана — перезагружено");
+      toast.error("Конфликт версий плана — перезагружено");
     } else {
       const m = new Map<string, string>();
       (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); });
       setErrors(m);
-      setNotice(`Пакет отклонён: ${res.issues?.[0]?.message ?? res.message}`);
+      toast.error(`Пакет отклонён: ${res.issues?.[0]?.message ?? res.message}`);
       await reload();
     }
   }
   function discardStaged() {
     setStaged([]);
     setErrors(new Map());
-    setNotice("Пакет сброшен");
+    toast.success("Пакет сброшен");
     void reload();
   }
   async function undo() {
     const lc = lastCommitRef.current;
     if (!lc) return;
     const inverses = lc.commands.slice().reverse().flatMap((c) => buildCompensatingCommands(c, lc.before));
-    if (inverses.length === 0) { setNotice("Откат недоступен для этой операции (создание/перенос/назначение)"); return; }
+    if (inverses.length === 0) { toast.error("Откат недоступен для этой операции (создание/перенос/назначение)"); return; }
     setBusy(true);
     const res = await applyBatch(inverses);
     setBusy(false);
@@ -356,10 +369,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     if (res.ok) {
       setErrors(new Map());
       setFlash(new Set(res.changed));
-      setNotice(`Откат применён — компенсирующий коммит v${res.planVersion}`);
+      toast.success(`Откат применён — компенсирующий коммит v${res.planVersion}`);
       window.setTimeout(() => setFlash(new Set()), 1700);
     } else {
-      setNotice(res.conflict ? "Конфликт версий — перезагружено" : `Откат отклонён: ${res.issues?.[0]?.message ?? res.message}`);
+      toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Откат отклонён: ${res.issues?.[0]?.message ?? res.message}`);
     }
   }
 
@@ -369,11 +382,9 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       if (staged.length === 0) batchBaseRef.current = readModel;
       setStaged((s) => [...s, command]);
       if (readModel) { const opt = optimisticPatch(readModel, command); if (opt !== readModel) setReadModel(opt); }
-      setNotice(null);
       return;
     }
     const prev = readModel;
-    setNotice(null);
     // 1) оптимистично применяем на фронте — мгновенный отклик
     if (prev) { const opt = optimisticPatch(prev, command); if (opt !== prev) setReadModel(opt); }
     setBusy(true);
@@ -385,17 +396,17 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       setCanUndo(prev != null);
       setErrors(new Map());
       setFlash(new Set(res.changed));
-      setNotice(`Коммит v${res.planVersion} применён · затронуто задач: ${res.changed.length}`);
+      toast.success(`Коммит v${res.planVersion} применён · затронуто задач: ${res.changed.length}`);
       window.setTimeout(() => setFlash(new Set()), 1700);
     } else if (res.conflict) {
-      setNotice("Конфликт версий плана — перезагружено");
+      toast.error("Конфликт версий плана — перезагружено");
     } else {
       // 3) бэк отклонил → откат оптимистики + подсветка где/как
       if (prev) setReadModel(prev);
       const m = new Map<string, string>();
       (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); });
       setErrors(m);
-      setNotice(`Отклонено бэком: ${res.issues?.[0]?.message ?? res.message}`);
+      toast.error(`Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
     }
   }
 
@@ -406,15 +417,15 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   if (status !== "ready" || !mapped || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="График">
-        <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка плана из read-model…">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="График">
+        <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка плана…">
           <span />
         </SurfaceState>
       </DeliveryFrame>
     );
   }
 
-  const projectMeta = deriveProjectMeta(readModel, PROJECT);
+  const projectMeta = deriveProjectMeta(readModel, projectBase);
   const { rows, deadlineDay, projectFinishDay } = mapped;
   const totalDays = Math.max(7, Math.ceil((Math.max(projectFinishDay, deadlineDay ?? 0, ...rows.map((r) => r.dayStart + r.dayDur)) + 6) / 7) * 7);
   const weeks = totalDays / 7;
@@ -550,10 +561,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       setCanUndo(base != null);
       setErrors(new Map());
       setFlash(new Set(res.changed));
-      setNotice(`Коммит v${res.planVersion} применён · затронуто задач: ${res.changed.length}`);
+      toast.success(`Коммит v${res.planVersion} применён · затронуто задач: ${res.changed.length}`);
       window.setTimeout(() => setFlash(new Set()), 1700);
-    } else if (res.conflict) setNotice("Конфликт версий плана — перезагружено");
-    else { const m = new Map<string, string>(); (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); }); setErrors(m); setNotice(`Отклонено бэком: ${res.issues?.[0]?.message ?? res.message}`); }
+    } else if (res.conflict) toast.error("Конфликт версий плана — перезагружено");
+    else { const m = new Map<string, string>(); (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); }); setErrors(m); toast.error(`Отклонено: ${res.issues?.[0]?.message ?? res.message}`); }
   }
   const addFinish = (iso: string, dur: number) => dayToIso(isoToDay(iso) + dur);
   const openCreate = (parentId: string | null) => setTaskModal({ mode: "create", parentId, initial: { title: "", assigneeId: "", startIso: "", durDays: 5, workH: 40, pct: 0 } });
@@ -590,9 +601,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // Дефолты как в openCreate (5 дн / 40 ч, авто-планирование). Идёт через applyCmd →
   // task.create-команда (оптимистично + откат при reject), контракт уже боевой.
   // Возвращает true, если задача отправлена на создание (для очистки/закрытия строки).
-  function createInline(title: string, parentId: string | null = null): boolean {
+  function createInline(title: string, parentId: string | null = null, scope: "bottom" | "inline" = "bottom"): boolean {
     const t = title.trim();
-    if (t.length < 3) { setNotice("Название задачи: минимум 3 символа"); return false; } // домен: title 3–160
+    if (t.length < 3) { setCreateError({ scope, msg: "Название задачи: минимум 3 символа" }); return false; } // домен: title 3–160
+    setCreateError(null);
     void applyCmd(createPlanningCommand({
       type: "task.create",
       payload: {
@@ -616,7 +628,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
   // Общая инлайн-ячейка ввода имени новой задачи (нижняя строка + позиционированная из ПКМ).
   // Enter — создать; Tab — создать подзадачей (на уровень глубже); Esc — отмена.
-  const newTaskCell = (o: { value: string; onChange: (v: string) => void; onEnter: () => void; onTab: () => void; onEsc: () => void; level: number; autoFocus?: boolean; inputRef?: RefObject<HTMLInputElement | null>; placeholder: string }) => (
+  const newTaskCell = (o: { value: string; onChange: (v: string) => void; onEnter: () => void; onTab: () => void; onEsc: () => void; level: number; autoFocus?: boolean; inputRef?: RefObject<HTMLInputElement | null>; placeholder: string; error?: string | null }) => (
     <span className="name-cell" style={{ paddingLeft: o.level * 14 }}>
       <span className="w-3.5 shrink-0" />
       <input
@@ -624,6 +636,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         {...(o.inputRef ? { ref: o.inputRef } : {})}
         value={o.value}
         onClick={stop}
+        aria-invalid={o.error ? true : undefined}
         onChange={(e) => o.onChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") { e.preventDefault(); o.onEnter(); }
@@ -634,6 +647,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         aria-label="Создать задачу (Enter; Tab — подзадачей)"
         className="w-full rounded-[var(--radius-xs)] border border-transparent bg-transparent px-1 text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--muted-soft)] focus:border-[var(--accent)]"
       />
+      {o.error ? <span role="alert" className="shrink-0 px-1 text-[length:var(--text-2xs)] text-[var(--danger-text)]">{o.error}</span> : null}
     </span>
   );
 
@@ -644,7 +658,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     const n = Number(draft);
     if (f === "name") { if (draft.trim() && draft !== r.name) editName(r, draft.trim()); return; }
     if (Number.isNaN(n)) return;
-    if (f === "dur") { if (n > 0 && n !== r.durDays) editDuration(r, n); else if (n <= 0) setNotice("Длительность задачи должна быть больше 0 (для вехи — пункт меню «Сделать вехой»)"); }
+    if (f === "dur") { if (n > 0 && n !== r.durDays) editDuration(r, n); else if (n <= 0) setErrors((prev) => new Map(prev).set(r.id, "Длительность задачи должна быть больше 0 (для вехи — пункт меню «Сделать вехой»)")); }
     else if (f === "work" && n >= 0 && n !== r.workH) editWork(r, n);
     else if (f === "pct" && n !== r.pct) editPct(r, n);
     else if (f === "units" && n > 0) editUnits(r, n);
@@ -727,10 +741,12 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-        Реальный контракт planning · каждая правка = коммит preview→apply через @kiss-pm/planning-client. Данные in-memory, не сохраняются. Нижняя строка — создать задачу (Enter) · 2× клик — правка ячейки · ПКМ — меню · границы колонок — ширина · бар: тяни тело (сдвиг), края (длительность), точку справа — связь.
-      </div>
+      {prototypeNotesEnabled ? (
+        <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+          <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
+          Реальный контракт planning · каждая правка = коммит preview→apply через @kiss-pm/planning-client. Данные in-memory, не сохраняются. Нижняя строка — создать задачу (Enter) · 2× клик — правка ячейки · ПКМ — меню · границы колонок — ширина · бар: тяни тело (сдвиг), края (длительность), точку справа — связь.
+        </div>
+      ) : null}
 
       {errors.size > 0 ? (
         <div className="mb-2 flex flex-col gap-1 rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--danger-text)]">
@@ -784,7 +800,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       onIndent={() => indent(r)}
                       onOutdent={() => outdent(r)}
                       onMakeMilestone={() => makeMilestone(r)}
-                      onDelete={() => deleteTask(r)}
+                      onDelete={() => setConfirmDelete(r)}
                     >
                       <tr onClick={() => openRow(r.id)} className={cn(r.kind === "summary" && "is-summary", sel === r.id && "is-selected", flash.has(r.id) && "bg-[var(--success-soft)]", errors.has(r.id) && "bg-[var(--danger-soft)]")}>
                         <td className="num muted text-[length:var(--text-xs)]">{i + 1}</td>
@@ -835,14 +851,15 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                         <td colSpan={COLS.length - 3}>
                           {newTaskCell({
                             value: inlineNew.draft,
-                            onChange: (v) => setInlineNew((s) => (s ? { ...s, draft: v } : s)),
-                            onEnter: () => { if (createInline(inlineNew.draft, inlineNew.parentId)) setInlineNew((s) => (s ? { ...s, draft: "" } : s)); },
-                            onTab: () => { if (createInline(inlineNew.draft, inlineNew.afterId)) setInlineNew((s) => (s ? { ...s, draft: "" } : s)); },
-                            onEsc: () => setInlineNew(null),
+                            onChange: (v) => { setCreateError(null); setInlineNew((s) => (s ? { ...s, draft: v } : s)); },
+                            onEnter: () => { if (createInline(inlineNew.draft, inlineNew.parentId, "inline")) setInlineNew((s) => (s ? { ...s, draft: "" } : s)); },
+                            onTab: () => { if (createInline(inlineNew.draft, inlineNew.afterId, "inline")) setInlineNew((s) => (s ? { ...s, draft: "" } : s)); },
+                            onEsc: () => { setCreateError(null); setInlineNew(null); },
                             level: levelOf(inlineNew.parentId),
                             autoFocus: true,
                             inputRef: inlineRef,
-                            placeholder: inlineNew.parentId === r.id ? "Подзадача — Enter (Esc — отмена)" : "Задача рядом — Enter (Tab — подзадачей)"
+                            placeholder: inlineNew.parentId === r.id ? "Подзадача — Enter (Esc — отмена)" : "Задача рядом — Enter (Tab — подзадачей)",
+                            error: createError?.scope === "inline" ? createError.msg : null
                           })}
                         </td>
                       </tr>
@@ -857,12 +874,13 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                     <td colSpan={COLS.length - 3}>
                       {newTaskCell({
                         value: newTask,
-                        onChange: setNewTask,
+                        onChange: (v) => { setCreateError(null); setNewTask(v); },
                         onEnter: () => { if (createInline(newTask)) setNewTask(""); },
                         onTab: () => { const last = visibleRows[visibleRows.length - 1]; if (createInline(newTask, last ? last.id : null)) setNewTask(""); },
-                        onEsc: () => setNewTask(""),
+                        onEsc: () => { setCreateError(null); setNewTask(""); },
                         level: 0,
-                        placeholder: "Новая задача — Enter (Tab — подзадачей)"
+                        placeholder: "Новая задача — Enter (Tab — подзадачей)",
+                        error: createError?.scope === "bottom" ? createError.msg : null
                       })}
                     </td>
                   </tr>
@@ -966,7 +984,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 <Fact label="Слак" value={selected.slackDays != null ? `${selected.slackDays} дн` : "—"} />
                 <Fact label="Ресурсы" value={selected.res} span />
               </dl>
-              <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">Триангл: Труд = Длит × {HPD}ч × Единицы. Изменишь длительность — пересчитается труд; изменишь труд — изменятся единицы.</p>
+              <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">Треугольник планирования: Труд = Длительность × {HPD} ч × Единицы. Изменишь длительность — пересчитается труд; изменишь труд — изменятся единицы.</p>
               <div className="mt-3 border-t border-[var(--border)] pt-3">
                 <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Зависимости</div>
                 {selected.predList.length ? (
@@ -990,13 +1008,12 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           </div>
         </div>
       ) : null}
-      {notice ? <div key={notice} className="anim-rise-in-fast mt-2 flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]"><GitBranch className="size-3.5 text-[var(--accent)]" aria-hidden />{notice}</div> : null}
 
       {/* Legend */}
       <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[length:var(--text-sm)] text-[var(--muted)]">
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-5 rounded-[3px] bg-[var(--success)]" /> Задача</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-5 rounded-[3px] bg-[var(--critical-stripe)]" /> Критический путь</span>
-        <span className="flex items-center gap-1.5"><span className="h-1.5 w-5 rounded-[3px] bg-[var(--text-strong)]" /> Summary</span>
+        <span className="flex items-center gap-1.5"><span className="h-1.5 w-5 rounded-[3px] bg-[var(--text-strong)]" /> Суммарная задача</span>
         <span className="flex items-center gap-1.5"><span className="size-2.5 rotate-45 rounded-[2px] bg-[var(--text-strong)]" /> Веха</span>
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-5 rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" /> Baseline B2</span>
         <span className="flex items-center gap-1.5"><svg width="22" height="8" aria-hidden><polyline points="1,4 14,4" fill="none" stroke="var(--muted-soft)" strokeWidth="1.25" /><polygon points="21,4 15,1.5 15,6.5" fill="var(--muted-soft)" /></svg> Связь</span>
@@ -1004,6 +1021,25 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       </div>
 
       {taskModal ? <TaskModal open mode={taskModal.mode} initial={taskModal.initial} onOpenChange={(o) => { if (!o) setTaskModal(null); }} onSubmit={submitTaskModal} /> : null}
+
+      {/* Подтверждение необратимого удаления (G3-06): вызов из ПКМ-меню, поэтому контролируемый диалог, а не asChild-триггер */}
+      {confirmDelete ? (
+        <Dialog open onOpenChange={(o) => { if (!o) setConfirmDelete(null); }}>
+          <DialogContent className="max-w-[440px]">
+            <DialogHeader>
+              <DialogTitle>{`Удалить задачу «${confirmDelete.name}»?`}</DialogTitle>
+              <DialogDescription>
+                Задача будет архивирована; откатить это действие из интерфейса нельзя.
+                {confirmDelete.kind === "summary" ? " Вместе с суммарной задачей будут архивированы все её подзадачи." : ""}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
+              <Button variant="destructive" disabled={busy} onClick={() => { const r = confirmDelete; setConfirmDelete(null); deleteTask(r); }}>Удалить</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </DeliveryFrame>
   );
 }

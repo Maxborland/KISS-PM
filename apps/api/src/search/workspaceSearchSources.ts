@@ -95,7 +95,10 @@ async function searchTasks(input: WorkspaceSearchInput, limit: number): Promise<
       snippet: task.description ?? task.statusName,
       entityType: "task",
       entityId: task.id,
-      route: `/tasks/${task.id}`,
+      // Детальной страницы задачи нет: ведём в карточку проекта (доступна с
+      // tenant.projects.read — как и сам поиск задач; график требовал бы ещё
+      // project_plan.read и давал 403). Без проекта — в «Мои задачи».
+      route: project ? `/projects/${project.id}` : "/my-work",
       updatedAt: task.updatedAt.toISOString(),
       score: score(input.query, task.title, task.description ?? "", task.statusName),
       source: "tasks"
@@ -116,7 +119,7 @@ async function searchOpportunities(input: WorkspaceSearchInput, limit: number): 
       snippet: item.status,
       entityType: "opportunity",
       entityId: item.id,
-      route: `/opportunities/${item.id}`,
+      route: `/crm/deals/${item.id}`,
       updatedAt: item.updatedAt.toISOString(),
       score: score(input.query, item.title, item.clientName, item.contactName),
       source: "opportunities"
@@ -137,7 +140,7 @@ async function searchClients(input: WorkspaceSearchInput, limit: number): Promis
       snippet: item.description ?? item.status,
       entityType: "client",
       entityId: item.id,
-      route: `/clients/${item.id}`,
+      route: "/crm/clients",
       updatedAt: item.updatedAt.toISOString(),
       score: score(input.query, item.name, item.description ?? ""),
       source: "clients"
@@ -158,7 +161,7 @@ async function searchContacts(input: WorkspaceSearchInput, limit: number): Promi
       snippet: item.role ?? item.phone ?? "",
       entityType: "contact",
       entityId: item.id,
-      route: `/contacts/${item.id}`,
+      route: "/crm/contacts",
       updatedAt: item.updatedAt.toISOString(),
       score: score(input.query, item.name, item.email ?? "", item.role ?? ""),
       source: "contacts"
@@ -179,7 +182,7 @@ async function searchProducts(input: WorkspaceSearchInput, limit: number): Promi
       snippet: item.description ?? item.type,
       entityType: "product",
       entityId: item.id,
-      route: `/products/${item.id}`,
+      route: "/crm/products",
       updatedAt: item.updatedAt.toISOString(),
       score: score(input.query, item.name, item.sku ?? "", item.description ?? ""),
       source: "products"

@@ -1,3 +1,4 @@
+import { ensureCompleteDataSource } from "./dataSourceCompletion";
 import { describe, expect, it } from "vitest";
 import { tenantAdminProfile } from "./tenantAdminProfile";
 import { createProjectIntakeService } from "./projectIntakeService";
@@ -5,7 +6,8 @@ import { isSingleUseActivationError } from "./projectIntakeService/activationErr
 import type {
   ApiTenantDataSource,
   ManagementAuditEventInput,
-  OpportunityInput
+  OpportunityInput,
+  OpportunityRecord
 } from "./apiTypes";
 import type { TenantUser } from "@kiss-pm/domain";
 
@@ -53,7 +55,7 @@ describe("project intake application service", () => {
     let createdInput: OpportunityInput | null = null;
     let transactionUsed = false;
 
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -110,7 +112,9 @@ describe("project intake application service", () => {
         return {
           id: "deal-stage-alpha",
           tenantId: "tenant-alpha",
-          pipelineId: null,
+          // Legacy-кейс: стадия без воронки. Канонический контракт уже string,
+          // тест сохраняет старое runtime-значение null для толерантных путей сервиса.
+          pipelineId: null as unknown as string,
           name: "Квалификация",
           sortOrder: 10,
           status: "active",
@@ -134,12 +138,12 @@ describe("project intake application service", () => {
       },
       async withTransaction(operation) {
         transactionUsed = true;
-        return operation(dataSource);
+        return operation(dataSource as ApiTenantDataSource);
       },
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
 
     const service = createProjectIntakeService({
       dataSource,
@@ -195,7 +199,7 @@ describe("project intake application service", () => {
     const audits: ManagementAuditEventInput[] = [];
     let updatedInput: OpportunityInput | null = null;
     let transactionUsed = false;
-    const existingOpportunity = {
+    const existingOpportunity: OpportunityRecord = {
       ...opportunityInput,
       ownerUserId: opportunityInput.ownerUserId ?? null,
       pipelineId: null,
@@ -208,7 +212,7 @@ describe("project intake application service", () => {
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
 
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -268,7 +272,9 @@ describe("project intake application service", () => {
         return {
           id: "deal-stage-alpha",
           tenantId: "tenant-alpha",
-          pipelineId: null,
+          // Legacy-кейс: стадия без воронки. Канонический контракт уже string,
+          // тест сохраняет старое runtime-значение null для толерантных путей сервиса.
+          pipelineId: null as unknown as string,
           name: "Квалификация",
           sortOrder: 10,
           status: "active",
@@ -292,12 +298,12 @@ describe("project intake application service", () => {
       },
       async withTransaction(operation) {
         transactionUsed = true;
-        return operation(dataSource);
+        return operation(dataSource as ApiTenantDataSource);
       },
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
 
     const service = createProjectIntakeService({
       dataSource,
@@ -363,7 +369,7 @@ describe("project intake application service", () => {
 
   it("returns conflict instead of throwing when opportunity update loses a finalization race", async () => {
     const audits: ManagementAuditEventInput[] = [];
-    const existingOpportunity = {
+    const existingOpportunity: OpportunityRecord = {
       ...opportunityInput,
       ownerUserId: opportunityInput.ownerUserId ?? null,
       pipelineId: null,
@@ -374,7 +380,7 @@ describe("project intake application service", () => {
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -431,7 +437,9 @@ describe("project intake application service", () => {
         return {
           id: "deal-stage-alpha",
           tenantId: "tenant-alpha",
-          pipelineId: null,
+          // Legacy-кейс: стадия без воронки. Канонический контракт уже string,
+          // тест сохраняет старое runtime-значение null для толерантных путей сервиса.
+          pipelineId: null as unknown as string,
           name: "Квалификация",
           sortOrder: 10,
           status: "active",
@@ -443,12 +451,12 @@ describe("project intake application service", () => {
         return undefined;
       },
       async withTransaction(operation) {
-        return operation(dataSource);
+        return operation(dataSource as ApiTenantDataSource);
       },
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
     const service = createProjectIntakeService({
       dataSource,
       getActorProfile: async () => tenantAdminProfile,
@@ -475,7 +483,7 @@ describe("project intake application service", () => {
 
   it("returns conflict instead of throwing when stage update loses a finalization race", async () => {
     const audits: ManagementAuditEventInput[] = [];
-    const existingOpportunity = {
+    const existingOpportunity: OpportunityRecord = {
       ...opportunityInput,
       ownerUserId: opportunityInput.ownerUserId ?? null,
       pipelineId: null,
@@ -486,7 +494,7 @@ describe("project intake application service", () => {
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -506,7 +514,8 @@ describe("project intake application service", () => {
         return {
           id: "deal-stage-next",
           tenantId: "tenant-alpha",
-          pipelineId: null,
+          // Legacy-кейс: см. комментарий выше у deal-stage-alpha.
+          pipelineId: null as unknown as string,
           name: "Следующий этап",
           sortOrder: 20,
           status: "active",
@@ -518,12 +527,12 @@ describe("project intake application service", () => {
         return undefined;
       },
       async withTransaction(operation) {
-        return operation(dataSource);
+        return operation(dataSource as ApiTenantDataSource);
       },
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
     const service = createProjectIntakeService({
       dataSource,
       getActorProfile: async () => tenantAdminProfile,
@@ -550,7 +559,7 @@ describe("project intake application service", () => {
 
   it("returns conflict instead of throwing when feasibility update loses a finalization race", async () => {
     const audits: ManagementAuditEventInput[] = [];
-    const existingOpportunity = {
+    const existingOpportunity: OpportunityRecord = {
       ...opportunityInput,
       ownerUserId: opportunityInput.ownerUserId ?? null,
       pipelineId: null,
@@ -561,7 +570,7 @@ describe("project intake application service", () => {
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -590,12 +599,12 @@ describe("project intake application service", () => {
         return undefined;
       },
       async withTransaction(operation) {
-        return operation(dataSource);
+        return operation(dataSource as ApiTenantDataSource);
       },
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
     const service = createProjectIntakeService({
       dataSource,
       getActorProfile: async () => tenantAdminProfile,
@@ -622,7 +631,7 @@ describe("project intake application service", () => {
   it("blocks a stage transition with 422 when the probability guard is not met", async () => {
     const audits: ManagementAuditEventInput[] = [];
     let stageUpdateCalled = false;
-    const existingOpportunity = {
+    const existingOpportunity: OpportunityRecord = {
       ...opportunityInput,
       ownerUserId: opportunityInput.ownerUserId ?? null,
       pipelineId: "pipeline-sales",
@@ -634,7 +643,7 @@ describe("project intake application service", () => {
       createdAt: new Date("2026-05-18T00:00:00.000Z"),
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -683,12 +692,12 @@ describe("project intake application service", () => {
         return undefined;
       },
       async withTransaction(operation) {
-        return operation(dataSource);
+        return operation(dataSource as ApiTenantDataSource);
       },
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
     const service = createProjectIntakeService({
       dataSource,
       getActorProfile: async () => tenantAdminProfile,
@@ -718,7 +727,7 @@ describe("project intake application service", () => {
     const audits: ManagementAuditEventInput[] = [];
     let finalizedInput: { tenantId: string; opportunityId: string; status: string } | null =
       null;
-    const existingOpportunity = {
+    const existingOpportunity: OpportunityRecord = {
       ...opportunityInput,
       ownerUserId: opportunityInput.ownerUserId ?? null,
       pipelineId: null,
@@ -731,7 +740,7 @@ describe("project intake application service", () => {
       updatedAt: new Date("2026-05-19T00:00:00.000Z")
     };
 
-    const dataSource: ApiTenantDataSource = {
+    const dataSource = ensureCompleteDataSource({
       async listDevUsers() {
         return [];
       },
@@ -757,12 +766,12 @@ describe("project intake application service", () => {
         };
       },
       async withTransaction(operation) {
-        return operation(dataSource);
+        return operation(dataSource as ApiTenantDataSource);
       },
       async appendAuditEvent() {
         throw new Error("service test uses appendManagementAuditEvent dependency");
       }
-    };
+    });
 
     const service = createProjectIntakeService({
       dataSource,
