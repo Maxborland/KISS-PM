@@ -83,6 +83,12 @@ export type PolicyDecision = {
   reason: PolicyDecisionReason;
 };
 
+export type TenantPolicyInput = {
+  actor: TenantUser;
+  profile: AccessProfile;
+  targetTenantId: TenantId;
+};
+
 export function createAccessProfile(input: AccessProfile): AccessProfile {
   return {
     id: input.id,
@@ -94,695 +100,79 @@ export function isPermission(value: string): value is Permission {
   return permissions.includes(value as Permission);
 }
 
-export function canReadTenantUsers(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.users.read"
-  });
+// Каждый can* — типизированный фасад над одним permission: даёт greppable-имя
+// и единственное место, где живёт строка права.
+function tenantPermission(permission: Permission) {
+  return (input: TenantPolicyInput): PolicyDecision =>
+    evaluateTenantPermission({ ...input, permission });
 }
 
-export function canManageTenantUsers(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.users.manage"
-  });
-}
+export const canReadTenantUsers = tenantPermission("tenant.users.read");
+export const canManageTenantUsers = tenantPermission("tenant.users.manage");
+export const canReadAccessProfiles = tenantPermission("tenant.access_profiles.read");
+export const canManageAccessProfiles = tenantPermission("tenant.access_profiles.manage");
+export const canReadAuditEvents = tenantPermission("tenant.audit_events.read");
+export const canReadBackgroundJobs = tenantPermission("tenant.background_jobs.read");
+export const canManageBackgroundJobs = tenantPermission("tenant.background_jobs.manage");
+export const canReadPositions = tenantPermission("tenant.positions.read");
+export const canManagePositions = tenantPermission("tenant.positions.manage");
+export const canReadWorkspaceConfig = tenantPermission("tenant.workspace_config.read");
+export const canManageWorkspaceConfig = tenantPermission("tenant.workspace_config.manage");
+export const canReadAbsences = tenantPermission("tenant.absences.read");
+export const canManageAbsences = tenantPermission("tenant.absences.manage");
+export const canReadOrgStructure = tenantPermission("tenant.org_structure.read");
+export const canManageOrgStructure = tenantPermission("tenant.org_structure.manage");
+export const canReadClients = tenantPermission("tenant.clients.read");
+export const canManageClients = tenantPermission("tenant.clients.manage");
+export const canReadContacts = tenantPermission("tenant.contacts.read");
+export const canManageContacts = tenantPermission("tenant.contacts.manage");
+export const canReadProducts = tenantPermission("tenant.products.read");
+export const canManageProducts = tenantPermission("tenant.products.manage");
+export const canReadCommunications = tenantPermission("tenant.communications.read");
+export const canManageCommunications = tenantPermission("tenant.communications.manage");
+export const canReadProjectTypes = tenantPermission("tenant.project_types.read");
+export const canManageProjectTypes = tenantPermission("tenant.project_types.manage");
+export const canReadDealStages = tenantPermission("tenant.deal_stages.read");
+export const canManageDealStages = tenantPermission("tenant.deal_stages.manage");
+export const canReadCrmPipelines = tenantPermission("tenant.crm_pipelines.read");
+export const canManageCrmPipelines = tenantPermission("tenant.crm_pipelines.manage");
+export const canManageCrmPipelineRules = tenantPermission("tenant.crm_pipeline_rules.manage");
+export const canManageCrmPipelineAutomations = tenantPermission(
+  "tenant.crm_pipeline_automations.manage"
+);
+export const canReadOpportunities = tenantPermission("tenant.opportunities.read");
+export const canManageOpportunities = tenantPermission("tenant.opportunities.manage");
+export const canReadProjects = tenantPermission("tenant.projects.read");
+export const canManageProjects = tenantPermission("tenant.projects.manage");
+export const canReadProjectPlan = tenantPermission("tenant.project_plan.read");
+export const canManageProjectPlan = tenantPermission("tenant.project_plan.manage");
+export const canManageProjectBaselines = tenantPermission("tenant.project_baselines.manage");
+export const canReadProjectResources = tenantPermission("tenant.project_resources.read");
+export const canManageProjectResources = tenantPermission("tenant.project_resources.manage");
+export const canPreviewPlanningScenarios = tenantPermission("tenant.planning_scenarios.preview");
+export const canApplyPlanningScenarios = tenantPermission("tenant.planning_scenarios.apply");
+export const canReadKpiDefinitions = tenantPermission("tenant.kpi_definitions.read");
+export const canManageKpiDefinitions = tenantPermission("tenant.kpi_definitions.manage");
+export const canReadControlSignals = tenantPermission("tenant.control_signals.read");
+export const canManageControlSignals = tenantPermission("tenant.control_signals.manage");
+export const canExecuteManagementActions = tenantPermission("tenant.management_actions.execute");
+export const canManageCorrectiveActions = tenantPermission("tenant.corrective_actions.manage");
+export const canReadControlSurfaces = tenantPermission("tenant.control_surfaces.read");
+export const canManageControlSurfaces = tenantPermission("tenant.control_surfaces.manage");
+export const canPublishControlSurfaces = tenantPermission("tenant.control_surfaces.publish");
+export const canReadRetrospectives = tenantPermission("tenant.retrospectives.read");
+export const canManageRetrospectives = tenantPermission("tenant.retrospectives.manage");
+export const canApplyTemplateImprovements = tenantPermission("tenant.template_improvements.apply");
+export const canCreateTasks = tenantPermission("tenant.tasks.create");
+export const canEditTasks = tenantPermission("tenant.tasks.edit");
+export const canDeleteTasks = tenantPermission("tenant.tasks.delete");
+export const canManageTaskStatuses = tenantPermission("tenant.task_statuses.manage");
+export const canManageProjectActivation = tenantPermission("tenant.project_activation.manage");
+export const canReadResourceFeasibility = tenantPermission("tenant.resource_feasibility.read");
+export const canUpdateProfile = tenantPermission("profile.update");
+export const canManageWorkspaceTheme = tenantPermission("workspace.theme.manage");
 
-export function canReadAccessProfiles(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.access_profiles.read"
-  });
-}
-
-export function canManageAccessProfiles(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.access_profiles.manage"
-  });
-}
-
-export function canReadAuditEvents(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.audit_events.read"
-  });
-}
-
-export function canReadBackgroundJobs(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.background_jobs.read"
-  });
-}
-
-export function canManageBackgroundJobs(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.background_jobs.manage"
-  });
-}
-
-export function canReadPositions(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.positions.read"
-  });
-}
-
-export function canReadWorkspaceConfig(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.workspace_config.read"
-  });
-}
-
-export function canManageWorkspaceConfig(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.workspace_config.manage"
-  });
-}
-
-export function canReadAbsences(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.absences.read"
-  });
-}
-
-export function canManageAbsences(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.absences.manage"
-  });
-}
-
-export function canReadOrgStructure(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.org_structure.read"
-  });
-}
-
-export function canManageOrgStructure(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.org_structure.manage"
-  });
-}
-
-export function canReadOpportunities(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.opportunities.read"
-  });
-}
-
-export function canReadClients(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.clients.read"
-  });
-}
-
-export function canManageClients(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.clients.manage"
-  });
-}
-
-export function canReadContacts(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.contacts.read"
-  });
-}
-
-export function canManageContacts(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.contacts.manage"
-  });
-}
-
-export function canReadProducts(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.products.read"
-  });
-}
-
-export function canManageProducts(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.products.manage"
-  });
-}
-
-export function canReadCommunications(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.communications.read"
-  });
-}
-
-export function canManageCommunications(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.communications.manage"
-  });
-}
-
-export function canReadProjectTypes(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.project_types.read"
-  });
-}
-
-export function canManageProjectTypes(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.project_types.manage"
-  });
-}
-
-export function canReadDealStages(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.deal_stages.read"
-  });
-}
-
-export function canManageDealStages(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.deal_stages.manage"
-  });
-}
-
-
-export function canReadCrmPipelines(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.crm_pipelines.read"
-  });
-}
-
-export function canManageCrmPipelines(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.crm_pipelines.manage"
-  });
-}
-
-export function canManageCrmPipelineRules(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.crm_pipeline_rules.manage"
-  });
-}
-
-export function canManageCrmPipelineAutomations(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.crm_pipeline_automations.manage"
-  });
-}
-
-export function canManageOpportunities(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.opportunities.manage"
-  });
-}
-
-export function canReadProjects(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.projects.read"
-  });
-}
-
-export function canManageProjects(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.projects.manage"
-  });
-}
-
-export function canReadProjectPlan(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.project_plan.read"
-  });
-}
-
-export function canManageProjectPlan(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.project_plan.manage"
-  });
-}
-
-export function canManageProjectBaselines(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.project_baselines.manage"
-  });
-}
-
-export function canReadProjectResources(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.project_resources.read"
-  });
-}
-
-export function canManageProjectResources(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.project_resources.manage"
-  });
-}
-
-export function canPreviewPlanningScenarios(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.planning_scenarios.preview"
-  });
-}
-
-export function canApplyPlanningScenarios(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.planning_scenarios.apply"
-  });
-}
-
-export function canReadKpiDefinitions(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.kpi_definitions.read"
-  });
-}
-
-export function canManageKpiDefinitions(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.kpi_definitions.manage"
-  });
-}
-
-export function canReadControlSignals(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.control_signals.read"
-  });
-}
-
-export function canManageControlSignals(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.control_signals.manage"
-  });
-}
-
-export function canExecuteManagementActions(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.management_actions.execute"
-  });
-}
-
-export function canManageCorrectiveActions(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.corrective_actions.manage"
-  });
-}
-
-export function canReadControlSurfaces(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.control_surfaces.read"
-  });
-}
-
-export function canManageControlSurfaces(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.control_surfaces.manage"
-  });
-}
-
-export function canPublishControlSurfaces(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.control_surfaces.publish"
-  });
-}
-
-export function canReadRetrospectives(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.retrospectives.read"
-  });
-}
-
-export function canManageRetrospectives(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.retrospectives.manage"
-  });
-}
-
-export function canApplyTemplateImprovements(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.template_improvements.apply"
-  });
-}
-
-export function canCreateTasks(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.tasks.create"
-  });
-}
-
-export function canEditTasks(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.tasks.edit"
-  });
-}
-
-export function canDeleteTasks(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.tasks.delete"
-  });
-}
-
-export function canManageTaskStatuses(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.task_statuses.manage"
-  });
-}
-
-export function canManageProjectActivation(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.project_activation.manage"
-  });
-}
-
-export function canReadResourceFeasibility(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.resource_feasibility.read"
-  });
-}
-
-export function canManagePositions(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "tenant.positions.manage"
-  });
-}
-
-export function canUpdateProfile(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "profile.update"
-  });
-}
-
-export function canManageWorkspaceTheme(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-}): PolicyDecision {
-  return evaluateTenantPermission({
-    ...input,
-    permission: "workspace.theme.manage"
-  });
-}
-
-function evaluateTenantPermission(input: {
-  actor: TenantUser;
-  profile: AccessProfile;
-  targetTenantId: TenantId;
-  permission: Permission;
-}): PolicyDecision {
+function evaluateTenantPermission(input: TenantPolicyInput & { permission: Permission }): PolicyDecision {
   if (input.actor.tenantId !== input.targetTenantId) {
     return {
       allowed: false,
