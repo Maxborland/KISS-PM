@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { type MutationResult } from "../../lib/domain-client";
+import { useDomainClient } from "../../lib/use-domain-client";
 import {
   WorkspaceApiError,
   createWorkspaceClient,
@@ -16,22 +18,14 @@ import { useWorkspaceRuntime } from "./workspace-runtime";
 
 export type WorkspaceLoadStatus = "loading" | "ready" | "error";
 // Результат мутации смены статуса: {ok} либо {ok,code,message} (как guard в use-crm).
-export type WorkspaceMutationResult = { ok: true } | { ok: false; code?: string; message: string };
+export type WorkspaceMutationResult = MutationResult;
 
 /* Изолированный клиент на каждый монтаж: свой fetchImpl-мок (отдельная
    in-memory сессия) + свой createWorkspaceClient. Переключение на боевой
    API = смена apiOrigin + удаление fetchImpl. Зеркало useCrm/usePlanning. */
 function useWorkspaceClient(): WorkspaceClient {
   const { live } = useWorkspaceRuntime();
-  const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null && !live) fetchRef.current = createMockWorkspaceFetch();
-  const clientRef = useRef<WorkspaceClient | null>(null);
-  if (clientRef.current === null) {
-    clientRef.current = live
-      ? createWorkspaceClient({ apiOrigin: "" })
-      : createWorkspaceClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
-  }
-  return clientRef.current;
+  return useDomainClient(live, createWorkspaceClient, createMockWorkspaceFetch);
 }
 
 // ---- useProjects: активные проекты рабочей области ----

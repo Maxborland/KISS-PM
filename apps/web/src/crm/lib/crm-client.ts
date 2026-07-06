@@ -35,20 +35,12 @@ export type FeasibilityRow = OpportunityFeasibilityRow;
 export type FeasibilityBlocker = OpportunityFeasibilityBlocker;
 export type FeasibilityWarning = OpportunityFeasibilityWarning;
 
-export type CrmApiClientOptions = { apiOrigin: string; fetchImpl?: typeof fetch; credentials?: RequestCredentials };
+import { createRequestJson, DomainApiError, type DomainClientOptions } from "../../lib/domain-client";
 
-export class CrmApiError extends Error {
-  readonly status: number;
-  readonly code: string;
-  readonly body: Record<string, unknown>;
-  constructor(status: number, code: string, body: Record<string, unknown>) {
-    super(code);
-    this.name = "CrmApiError";
-    this.status = status;
-    this.code = code;
-    this.body = body;
-  }
-}
+export type CrmApiClientOptions = DomainClientOptions;
+
+// Общий класс ошибки транспорта; алиас сохраняет прежнее имя для instanceof-проверок.
+export { DomainApiError as CrmApiError };
 
 /* ---- View-типы (форма боевых записей; даты пересекают провод как ISO-строки) ---- */
 export type CrmStatus = "active" | "archived";
@@ -129,30 +121,7 @@ export type CrmActivityFeed = {
 };
 
 export function createCrmClient(options: CrmApiClientOptions) {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const credentials = options.credentials ?? "include";
-
-  async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetchImpl(`${options.apiOrigin}${path}`, {
-      ...init,
-      credentials,
-      headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin", ...(init?.headers ?? {}) }
-    });
-    const rawText = await response.text();
-    let body: Record<string, unknown> = {};
-    if (rawText.length > 0) {
-      try {
-        const parsed: unknown = JSON.parse(rawText);
-        body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : { error: "invalid_json_response" };
-      } catch {
-        body = { error: "invalid_json_response" };
-      }
-    }
-    if (!response.ok) {
-      throw new CrmApiError(response.status, typeof body.error === "string" ? body.error : "request_failed", body);
-    }
-    return body as T;
-  }
+  const requestJson = createRequestJson(options);
 
   const enc = encodeURIComponent;
   return {

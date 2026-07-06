@@ -8,18 +8,13 @@
    x-kiss-pm-action:same-origin. Переключение на боевой = apiOrigin без fetchImpl-мока.
    ============================================================ */
 
-export type AgentApiClientOptions = { apiOrigin: string; fetchImpl?: typeof fetch; credentials?: RequestCredentials };
+import { createRequestJson, DomainApiError, type DomainClientOptions } from "../../lib/domain-client";
 
-export class AgentApiError extends Error {
-  readonly status: number;
-  readonly code: string;
-  constructor(status: number, code: string) {
-    super(code);
-    this.name = "AgentApiError";
-    this.status = status;
-    this.code = code;
-  }
-}
+export type AgentApiClientOptions = DomainClientOptions;
+
+// Общий класс ошибки транспорта; алиас сохраняет прежнее имя для instanceof-проверок.
+// Надмножество прежнего AgentApiError: добавилось поле body (раньше тела не было).
+export { DomainApiError as AgentApiError };
 
 export type AgentToolKind = "analyze" | "mutation";
 export type AgentToolAvailability = { name: string; title: string; description: string; kind: AgentToolKind; allowed: boolean; reason: string };
@@ -54,28 +49,11 @@ export type AgentExecuteResponse = { results: AgentExecuteResultItem[]; applied:
 export type AgentActionInput = { tool: string; input: Record<string, unknown> };
 
 export function createAgentClient(options: AgentApiClientOptions) {
+  // fetchImpl/credentials остаются нужны напрямую: uploadAttachment (multipart без
+  // content-type json) и proposeStream (SSE) не проходят через requestJson.
   const fetchImpl = options.fetchImpl ?? fetch;
   const credentials = options.credentials ?? "include";
-
-  async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetchImpl(`${options.apiOrigin}${path}`, {
-      ...init,
-      credentials,
-      headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin", ...(init?.headers ?? {}) }
-    });
-    const raw = await response.text();
-    let body: Record<string, unknown> = {};
-    if (raw.length > 0) {
-      try {
-        const parsed: unknown = JSON.parse(raw);
-        body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : { error: "invalid_json_response" };
-      } catch {
-        body = { error: "invalid_json_response" };
-      }
-    }
-    if (!response.ok) throw new AgentApiError(response.status, typeof body.error === "string" ? body.error : "request_failed");
-    return body as T;
-  }
+  const requestJson = createRequestJson(options);
 
   return {
     listTools() {
@@ -100,7 +78,7 @@ export function createAgentClient(options: AgentApiClientOptions) {
       const raw = await response.text();
       let body: Record<string, unknown> = {};
       try { const parsed: unknown = JSON.parse(raw); if (parsed && typeof parsed === "object") body = parsed as Record<string, unknown>; } catch { /* keep */ }
-      if (!response.ok) throw new AgentApiError(response.status, typeof body.error === "string" ? body.error : "upload_failed");
+      if (!response.ok) throw new DomainApiError(response.status, typeof body.error === "string" ? body.error : "upload_failed", body);
       // serializeAttachment кладёт имя под fileAsset (наверху только id) — берём оттуда.
       const attachment = (body.attachment ?? {}) as { id?: unknown; fileAsset?: { safeDisplayName?: unknown; originalName?: unknown } };
       const fileAsset = attachment.fileAsset ?? {};
@@ -123,9 +101,9 @@ export function createAgentClient(options: AgentApiClientOptions) {
         const raw = await response.text();
         let err = "request_failed";
         try { const parsed = JSON.parse(raw) as { error?: string }; if (typeof parsed.error === "string") err = parsed.error; } catch { /* keep */ }
-        throw new AgentApiError(response.status, err);
+        throw new DomainApiError(response.status, err, { error: err });
       }
-      if (!response.body) throw new AgentApiError(500, "stream_unsupported");
+      if (!response.body) throw new DomainApiError(500, "stream_unsupported", { error: "stream_unsupported" });
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -133,7 +111,7 @@ export function createAgentClient(options: AgentApiClientOptions) {
       const handleEvent = (eventName: string, data: string) => {
         if (data.length === 0) return;
         if (eventName === "done") { done = JSON.parse(data) as AgentProposeResponse; return; }
-        if (eventName === "error") { const e = JSON.parse(data) as { error?: string }; throw new AgentApiError(500, e.error ?? "agent_failed"); }
+        if (eventName === "error") { const e = JSON.parse(data) as { error?: string }; throw new DomainApiError(500, e.error ?? "agent_failed", e as Record<string, unknown>); }
         onEvent(JSON.parse(data) as AgentStreamEvent);
       };
       try {
@@ -160,7 +138,7 @@ export function createAgentClient(options: AgentApiClientOptions) {
         // Всегда отпускаем поток — в т.ч. когда handleEvent бросил на `event: error`.
         await reader.cancel().catch(() => {});
       }
-      if (!done) throw new AgentApiError(500, "stream_incomplete");
+      if (!done) throw new DomainApiError(500, "stream_incomplete", { error: "stream_incomplete" });
       return done;
     },
     execute(actions: AgentActionInput[]) {

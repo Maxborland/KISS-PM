@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { guardMutation, type MutationResult } from "../../lib/domain-client";
+import { useDomainClient } from "../../lib/use-domain-client";
 import { CrmApiError, createCrmClient, type Client, type Contact, type CrmActivity, type CrmActivityEntityType, type CrmClient, type CrmStatus, type CrmUser, type DealStage, type FeasibilityAssessment, type Opportunity, type OpportunityCreateInput, type OpportunityUpdateInput, type Pipeline, type Product, type ProjectActivationInput, type ProjectRecord, type ProjectType, type StageTransition } from "./crm-client";
 import { createMockCrmFetch } from "./mock-crm-backend";
 import { useCrmRuntime } from "./crm-runtime";
@@ -20,7 +22,7 @@ export type CrmData = {
   stageTransitions: StageTransition[]; // плоский список переходов ВСЕХ воронок
   projects: ProjectRecord[]; // активные проекты (источник списка «Проекты» + активаций сделок)
 };
-export type CrmMutationResult = { ok: true } | { ok: false; code?: string; message: string };
+export type CrmMutationResult = MutationResult;
 // Результат мутации, ВОЗВРАЩАЮЩЕЙ данные для UI (feasibility-оценка, проект, лента активностей).
 export type CrmDataResult<T> = { ok: true; data: T } | { ok: false; code?: string; message: string };
 
@@ -38,15 +40,7 @@ export type CrmDataResult<T> = { ok: true; data: T } | { ok: false; code?: strin
    Зеркало useWorkspaceClient/usePlanning. */
 function useCrmClient(): CrmClient {
   const { live } = useCrmRuntime();
-  const fetchRef = useRef<typeof fetch | null>(null);
-  if (fetchRef.current === null && !live) fetchRef.current = createMockCrmFetch();
-  const clientRef = useRef<CrmClient | null>(null);
-  if (clientRef.current === null) {
-    clientRef.current = live
-      ? createCrmClient({ apiOrigin: "" })
-      : createCrmClient({ apiOrigin: "", fetchImpl: fetchRef.current! });
-  }
-  return clientRef.current;
+  return useDomainClient(live, createCrmClient, createMockCrmFetch);
 }
 
 export function useCrm() {
@@ -100,15 +94,7 @@ export function useCrm() {
   }, [load]);
 
   // обёртка мутации: ошибки CrmApiError → {ok:false, code, message}
-  const guard = useCallback(async (fn: () => Promise<void>): Promise<CrmMutationResult> => {
-    try {
-      await fn();
-      return { ok: true };
-    } catch (e) {
-      if (e instanceof CrmApiError) return { ok: false, code: e.code, message: e.code };
-      return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
-    }
-  }, []);
+  const guard = guardMutation;
 
   // как guard, но возвращает данные мутации для UI (feasibility-оценка, проект, активность).
   const guardData = useCallback(async <T,>(fn: () => Promise<T>): Promise<CrmDataResult<T>> => {
