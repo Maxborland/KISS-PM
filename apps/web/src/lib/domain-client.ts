@@ -75,12 +75,26 @@ export function createRequestJson(options: DomainClientOptions) {
 }
 
 export type MutationResult = { ok: true } | { ok: false; code?: string; message: string };
+// Результат мутации, возвращающей данные для UI (join-token, оценка, созданная запись).
+export type MutationDataResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; code?: string; message: string };
 
 // Обёртка мутации: DomainApiError.code → {ok:false, code, message} для форм/тостов.
 export async function guardMutation(fn: () => Promise<void>): Promise<MutationResult> {
   try {
     await fn();
     return { ok: true };
+  } catch (e) {
+    if (e instanceof DomainApiError) return { ok: false, code: e.code, message: e.code };
+    return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
+  }
+}
+
+// Как guardMutation, но пробрасывает данные мутации.
+export async function guardData<T>(fn: () => Promise<T>): Promise<MutationDataResult<T>> {
+  try {
+    return { ok: true, data: await fn() };
   } catch (e) {
     if (e instanceof DomainApiError) return { ok: false, code: e.code, message: e.code };
     return { ok: false, message: e instanceof Error ? e.message : "request_failed" };

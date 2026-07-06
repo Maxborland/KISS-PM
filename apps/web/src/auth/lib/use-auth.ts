@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { guardMutation, type MutationResult } from "../../lib/domain-client";
+import { guardData, guardMutation, type MutationDataResult, type MutationResult } from "../../lib/domain-client";
 import { useDomainClient } from "../../lib/use-domain-client";
 import {
   AuthApiError,
@@ -36,7 +36,7 @@ export type AuthLoadStatus = "loading" | "ready" | "error";
 // Зеркало CrmMutationResult/CommsMutationResult (общий MutationResult ядра).
 export type AuthMutationResult = MutationResult;
 // Мутация, ВОЗВРАЩАЮЩАЯ данные для UI (honest-показ reset-токена).
-export type AuthDataResult<T> = { ok: true; data: T } | { ok: false; code?: string; message: string };
+export type AuthDataResult<T> = MutationDataResult<T>;
 
 // Общий фабричный хелпер: один fetch+client на монтаж (изолированная сессия).
 // live (из AuthRuntimeProvider) переключает транспорт: mock fetchImpl vs боевой fetch.
@@ -47,15 +47,7 @@ function useAuthClient() {
 
 // guard: ошибки AuthApiError → {ok:false, code, message} (общий guardMutation ядра).
 const guard = guardMutation;
-// guardData: как guard, но возвращает данные мутации для UI.
-async function guardData<T>(fn: () => Promise<T>): Promise<AuthDataResult<T>> {
-  try {
-    return { ok: true, data: await fn() };
-  } catch (e) {
-    if (e instanceof AuthApiError) return { ok: false, code: e.code, message: e.code };
-    return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
-  }
-}
+// guardData — общий хелпер ядра (как guard, но возвращает данные мутации для UI).
 
 /* ============================================================
    useAuth — гейт сессии.
