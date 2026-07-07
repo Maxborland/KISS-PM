@@ -1,0 +1,56 @@
+{
+  "id": "RISK-AGENT-GENERIC-COMMS-REDISPATCH-2026-07-08",
+  "generatedAt": "2026-07-07T20:20:06.7200524Z",
+  "linkedRiskZones": [
+    "RISK-AGENT-REAL-LLM-SSE",
+    "BUG-SHELL-12"
+  ],
+  "status": "pass-partial-risk-not-closed",
+  "scope": "Live in-app browser traversal of generic bound tool create_communication_channel against API 4160 and Web 3160 with OpenRouter configured.",
+  "secretsPolicy": "OpenRouter key was loaded from ignored .env.local and is not emitted. No cookies or credentials are stored in this evidence.",
+  "environment": {
+    "apiOrigin": "http://127.0.0.1:4160",
+    "webOrigin": "http://127.0.0.1:3160",
+    "provider": {
+      "model": "anthropic/claude-sonnet-4.6",
+      "live": true,
+      "configured": true
+    }
+  },
+  "steps": [
+    "Submitted browser prompt instructing exactly one generic mutation tool create_communication_channel with channelType custom, title Agent generic redispatch evidence 2026-07-08 1783455511719, and description Live agent generic redispatch evidence.",
+    "Observed live assistant response and review panel with selected action Создать канал.",
+    "Clicked Применить выбранное in browser; UI reported Применил 1 изменение and selected action status became применено.",
+    "Read back GET /api/workspace/communication-channels and found the created custom channel."
+  ],
+  "expected": "A configured live provider should propose a generic bound communications mutation, execute it through /api/workspace/communication-channels, and the created channel should be visible via readback.",
+  "actual": "Pass for the communications generic redispatch browser variant: the UI applied create_communication_channel and backend readback found the channel.",
+  "readback": {
+    "endpoint": "GET /api/workspace/communication-channels",
+    "matchedChannel": {
+      "id": "channel-b2a0c84b-9f95-4e5a-9273-abad82df41f6",
+      "channelType": "custom",
+      "title": "Agent generic redispatch evidence 2026-07-08 1783455511719",
+      "description": "Live agent generic redispatch evidence",
+      "scopeEntityType": null,
+      "scopeEntityId": null,
+      "canManage": true,
+      "createdByUserId": "user-alpha-admin",
+      "createdAt": "2026-07-07T20:19:17.943Z"
+    }
+  },
+  "evidence": [
+    "docs/qa/full-eval/evidence/browser-agent-generic-comms-redispatch-2026-07-08/agent-generic-comms-channel-applied.png",
+    "Browser UI showed Создать канал selected/applied.",
+    "API communication channel readback matched created title, channelType, description, and creator."
+  ],
+  "observations": [
+    "The review drawer again displayed 5 proposed changes while only 1 action was selected/applied.",
+    "After applying one selected action, the drawer again displayed “4 изменения записаны в журнал проекта”; this repeated copy/count inconsistency should be tracked separately if not already covered."
+  ],
+  "remainingForRisk": [
+    "CRM generic redispatch browser execution/readback remains open.",
+    "Per-role /agent/tools matrix remains open.",
+    "Provider matrix beyond OpenRouter remains open unless intentionally scoped out."
+  ]
+}
