@@ -1,0 +1,198 @@
+{
+  "generatedAt": "2026-07-07T20:57:16.090Z",
+  "note": "Settled admin control traversal for admin routes.",
+  "adminControl": {
+    "role": "tenant-admin-control",
+    "login": {
+      "adminLinks": [
+        {
+          "href": "/admin",
+          "text": "Администрирование"
+        }
+      ],
+      "buttons": [
+        {
+          "role": null,
+          "text": "АА",
+          "title": "Анна Администратор"
+        }
+      ],
+      "hasDeniedText": false,
+      "hasRawError": false,
+      "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nМОИ ЗАДАЧИ\n13\n4 в работе\nОТКРЫТЫЕ СДЕЛКИ\n3\n1,1 млн ₽\nАКТИВНЫЕ ПРОЕКТЫ\n3\n530 ч плана\nСДЕЛКИ ВЫИГРАНЫ\n0\nпока нет\nБлижайшие задачи\n\nМои незавершённые задачи по плановому финишу\n\nПроверить результат импорта Gantt\nНа контроле · прогресс 80%\nНа проверке\n19.05.2026\nСогласовать состав команды для Ромашка\nНовая · прогресс 0%\nНовые\n21.05.2026\nПодготовить ресурсную оценку по сделке\nВ работе · прогресс 0%\nВ работе\n22.05.2026\nОбновить описание задачи в проектном контуре\nОжидает · прогресс 0%\nОжидание\n23.05.2026\nЭтап 1. Подготовка\nВ работе · прогресс 40%\nВ работе\n12.06.2026\nПроектирование архитектуры\nВ работе · прогресс 50%\nВ работе\n12.06.2026\nСделки по статусам\n\nРаспределение возможностей CRM\n\nНовые\n1\nПроверка\n1\nГотовы\n1\nВстречи и сигналы\n\nСводка дня\n\nСводка встреч и сигналов дня появится в одном из следующих обновлений.",
+      "title": "Дашборд — KISS PM",
+      "url": "http://127.0.0.1:3160/dashboard"
+    },
+    "dashboard": {
+      "adminLinks": [
+        {
+          "href": "/admin",
+          "text": "Администрирование"
+        }
+      ],
+      "hasRawError": false,
+      "hasReadableDeny": false,
+      "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nМОИ ЗАДАЧИ\n13\n4 в работе\nОТКРЫТЫЕ СДЕЛКИ\n3\n1,1 млн ₽\nАКТИВНЫЕ ПРОЕКТЫ\n3\n530 ч плана\nСДЕЛКИ ВЫИГРАНЫ\n0\nпока нет\nБлижайшие задачи\n\nМои незавершённые задачи по плановому финишу\n\nПроверить результат импорта Gantt\nНа контроле · прогресс 80%\nНа проверке\n19.05.2026\nСогласовать состав команды для Ромашка\nНовая · прогресс 0%\nНовые\n21.05.2026\nПодготовить ресурсную оценку по сделке\nВ работе · прогресс 0%\nВ работе\n22.05.2026\nОбновить описание задачи в проектном контуре\nОжидает · прогресс 0%\nОжидание\n23.05.2026\nЭтап 1. Подготовка\nВ работе · прогресс 40%\nВ работе\n12.06.2026\nПроектирование архитектуры\nВ работе · прогресс 50%\nВ работе\n12.06.2026\nСделки по статусам\n\nРаспределение возможностей CRM\n\nНовые\n1\nПроверка\n1\nГотовы\n1\nВстречи и сигналы\n\nСводка дня\n\nСводка встреч и сигналов дня появится в одном из следующих обновлений.",
+      "title": "Дашборд — KISS PM",
+      "url": "http://127.0.0.1:3160/dashboard"
+    },
+    "pages": [
+      {
+        "route": "/admin",
+        "screenshot": "tenant-admin-control-recheck-admin.png",
+        "adminLinks": [
+          {
+            "href": "/admin",
+            "text": "Администрирование"
+          },
+          {
+            "href": "/admin/users",
+            "text": "Пользователи"
+          },
+          {
+            "href": "/admin/roles",
+            "text": "Роли"
+          },
+          {
+            "href": "/admin/security",
+            "text": "Безопасность"
+          },
+          {
+            "href": "/admin/audit",
+            "text": "Аудит"
+          }
+        ],
+        "hasRawError": false,
+        "hasReadableDeny": false,
+        "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nПользователи рабочей области\n\nСоздать пользователя\nПользователи\nРоли\nБезопасность\nАудит\nПОЛЬЗОВАТЕЛЬ\tEMAIL\tРОЛЬ\tПОЗИЦИЯ\tСТАТУС\t\n\nАнна Администратор\n\tadmin@kiss-pm.local\tАдминистратор\tРуководитель проекта\tАктивен\t\n\n\nИгорь Инженер\n\tengineer@kiss-pm.local\tАдминистратор\tИнженер\tАктивен\t\n\n\nНикита Без Ресурсов\n\tplan-reader-no-resources@kiss-pm.local\tНаблюдатель плана без ресурсов\tИнженер\tАктивен\t\n\n\nРоман Ресурсный\n\tresource-reader@kiss-pm.local\tНаблюдатель ресурсов\tИнженер\tАктивен\t",
+        "title": "Пользователи — Администрирование — KISS PM",
+        "url": "http://127.0.0.1:3160/admin/users"
+      },
+      {
+        "route": "/admin/users",
+        "screenshot": "tenant-admin-control-recheck-admin_users.png",
+        "adminLinks": [
+          {
+            "href": "/admin",
+            "text": "Администрирование"
+          },
+          {
+            "href": "/admin/users",
+            "text": "Пользователи"
+          },
+          {
+            "href": "/admin/roles",
+            "text": "Роли"
+          },
+          {
+            "href": "/admin/security",
+            "text": "Безопасность"
+          },
+          {
+            "href": "/admin/audit",
+            "text": "Аудит"
+          }
+        ],
+        "hasRawError": false,
+        "hasReadableDeny": false,
+        "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nПользователи рабочей области\n\nСоздать пользователя\nПользователи\nРоли\nБезопасность\nАудит\nПОЛЬЗОВАТЕЛЬ\tEMAIL\tРОЛЬ\tПОЗИЦИЯ\tСТАТУС\t\n\nАнна Администратор\n\tadmin@kiss-pm.local\tАдминистратор\tРуководитель проекта\tАктивен\t\n\n\nИгорь Инженер\n\tengineer@kiss-pm.local\tАдминистратор\tИнженер\tАктивен\t\n\n\nНикита Без Ресурсов\n\tplan-reader-no-resources@kiss-pm.local\tНаблюдатель плана без ресурсов\tИнженер\tАктивен\t\n\n\nРоман Ресурсный\n\tresource-reader@kiss-pm.local\tНаблюдатель ресурсов\tИнженер\tАктивен\t",
+        "title": "Пользователи — Администрирование — KISS PM",
+        "url": "http://127.0.0.1:3160/admin/users"
+      },
+      {
+        "route": "/admin/roles",
+        "screenshot": "tenant-admin-control-recheck-admin_roles.png",
+        "adminLinks": [
+          {
+            "href": "/admin",
+            "text": "Администрирование"
+          },
+          {
+            "href": "/admin/users",
+            "text": "Пользователи"
+          },
+          {
+            "href": "/admin/roles",
+            "text": "Роли"
+          },
+          {
+            "href": "/admin/security",
+            "text": "Безопасность"
+          },
+          {
+            "href": "/admin/audit",
+            "text": "Аудит"
+          }
+        ],
+        "hasRawError": false,
+        "hasReadableDeny": false,
+        "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nРоли доступа\n\nСоздать роль\nПользователи\nРоли\nБезопасность\nАудит\nРОЛЬ\tПРАВ\tНАЗНАЧЕНО\t\n\nАдминистратор\n\t61\t2\t\n\n\nНаблюдатель плана без ресурсов\n\t2\t1\t\n\n\nНаблюдатель ресурсов\n\t1\t1\t",
+        "title": "Роли — Администрирование — KISS PM",
+        "url": "http://127.0.0.1:3160/admin/roles"
+      },
+      {
+        "route": "/admin/security",
+        "screenshot": "tenant-admin-control-recheck-admin_security.png",
+        "adminLinks": [
+          {
+            "href": "/admin",
+            "text": "Администрирование"
+          },
+          {
+            "href": "/admin/users",
+            "text": "Пользователи"
+          },
+          {
+            "href": "/admin/roles",
+            "text": "Роли"
+          },
+          {
+            "href": "/admin/security",
+            "text": "Безопасность"
+          },
+          {
+            "href": "/admin/audit",
+            "text": "Аудит"
+          }
+        ],
+        "hasRawError": false,
+        "hasReadableDeny": true,
+        "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nПолитики безопасности рабочей области\n\nСохранить\nПользователи\nРоли\nБезопасность\nАудит\nПолитики безопасности\nОбязательная двухфакторная аутентификация\nПока недоступна в этой версии: механизм 2FA ещё не реализован — настройка не применяется и поэтому отключена.\nЕдиный вход (SSO, SAML)\nПока недоступен в этой версии: SAML-интеграция ещё не реализована — настройка не применяется и поэтому отключена.\nТайм-аут сессии\nСрок жизни сессии в часах (1…8760). Применяется к новым входам.\nчасов\nРазрешённые email-домены\nСоздать пользователя или сменить email можно только на этих доменах. Пусто — ограничения нет.\nДобавить\nСписок пуст — приглашать можно с любого домена.",
+        "title": "Безопасность — Администрирование — KISS PM",
+        "url": "http://127.0.0.1:3160/admin/security"
+      },
+      {
+        "route": "/admin/audit",
+        "screenshot": "tenant-admin-control-recheck-admin_audit.png",
+        "adminLinks": [
+          {
+            "href": "/admin",
+            "text": "Администрирование"
+          },
+          {
+            "href": "/admin/users",
+            "text": "Пользователи"
+          },
+          {
+            "href": "/admin/roles",
+            "text": "Роли"
+          },
+          {
+            "href": "/admin/security",
+            "text": "Безопасность"
+          },
+          {
+            "href": "/admin/audit",
+            "text": "Аудит"
+          }
+        ],
+        "hasRawError": false,
+        "hasReadableDeny": false,
+        "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nADMIN\nАдминистрирование\n\nЖурнал управленческих действий и системных событий\n\nПользователи\nРоли\nБезопасность\nАудит\nТип события\nВсе типы\nРоль — read_denied\nworkspace.position.read_denied\nПользователь — read_denied\nworkspace.config.read_denied\nДЕЙСТВИЕ\tКТО\tСУЩНОСТЬ\tРЕЗУЛЬТАТ\tКОГДА\n\nРоль — read_denied\n\t\nРоман Ресурсный\n\tAccessProfile · access-roles\tОтклонено правами\t08 июл., 03:56\n\nworkspace.position.read_denied\n\t\nРоман Ресурсный\n\tPosition · positions\tОтклонено правами\t08 июл., 03:56\n\nПользователь — read_denied\n\t\nРоман Ресурсный\n\tTenantUser · users\tОтклонено правами\t08 июл., 03:56\n\nworkspace.config.read_denied\n\t\nРоман Ресурсный\n\tWorkspaceConfig · security-policy\tОтклонено правами\t08 июл., 03:56\n\nПользователь — read_denied\n\t\nРоман Ресурсный\n\tTenantUser · users\tОтклонено правами\t08 июл., 03:56\n\nРоль — read_denied\n\t\nРоман Ресурсный\n\tAccessProfile · access-roles\tОтклонено правами\t08 июл., 03:56\n\nРоль — read_denied\n\t\nРоман Ресурсный\n\tAccessProfile · access-roles\tОтклонено правами\t08 июл., 03:56\n\nПользователь — read_denied\n\t\nРоман Ресурсный\n\tTenantUser · users\tОтклонено правами\t08 июл., 03:56\n\nworkspace.position.read_denied\n\t\nРоман Ресурсный\n\tPosition · positions\tОтклонено правами\t08 июл., 03:56\n\nРоль — read_denied\n\t\nРоман Ресурсный\n\tAccessProfile · access-roles\tОтклонено правами\t08 июл., 03:56\n\nПользователь — read_denied\n\t\nРоман Ресурсный\n\tTenantUser · users\tОтклонено правами\t08 июл., 03:56\n\nworkspace.position.read_denied\n\t\nРоман Ресурсный\n\tPosition · positions\tОтклонено правами\t08 июл., 03:56\n\nРоль — read_denied\n\t\nРоман Ресурсный\n\tAccessProfile · access-roles\tОтклонено правами\t08 июл., 03:56\n\nworkspace.position.read_denied\n\t\nРоман Ресурсный\n\tPosition · p",
+        "title": "Аудит — Администрирование — KISS PM",
+        "url": "http://127.0.0.1:3160/admin/audit"
+      }
+    ],
+    "dashboardScreenshot": "tenant-admin-control-recheck-00-dashboard.png"
+  }
+}

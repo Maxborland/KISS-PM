@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 60,
+    "fixedByCurrentBranchItems": 61,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 4,
@@ -1152,7 +1152,25 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows the write-flow matrix for profile contact and theme preference duplicate-submit stability only; broader write-flow duplicate/race/idempotency coverage remains open outside this atom."
-    }  ],
+    },
+    {
+      "id": "CURRENT-RISK-FULL-BROWSER-ADMIN-DIRECT-DENIED-READABLE",
+      "source": "current branch in-app Browser traversal after dev seed restore",
+      "surface": "/dashboard plus direct /admin, /admin/users, /admin/roles, /admin/security, /admin/audit for plan-reader-no-resources, resource-reader, tenant-admin-control",
+      "evidence": "docs/qa/full-eval/evidence/browser-admin-direct-denied-readable-2026-07-08/risk-full-browser-admin-direct-denied-readable-2026-07-08.json: restricted roles have no dashboard admin links; direct admin routes settle to readable denial with no raw crash; tenant admin control can render admin routes. Screenshots and raw state JSON are stored in the same folder.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "scripts/seed-dev.ts restored local PostgreSQL 55433 before browser run -> seed success",
+        "API login health-check for admin/plan-reader/resource-reader/beta -> 200 each after seed",
+        "browser:control-in-app-browser traversal on http://127.0.0.1:3160 with UI login/logout and direct admin route screenshots -> pass for this slice"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-FULL-BROWSER-TRAVERSAL for admin direct-denied route behavior only. Full every-role/every-route/every-action traversal remains open; security-readonly variant was not covered because no seeded login exists. One UX inconsistency remains documented: resource-reader /admin redirect denied page can show admin tabs, although deeper direct denied pages hide them."
+    }
+  ],
   "confirmedOpen": [],
   "unverified": [],
   "notABugOrSuperseded": [

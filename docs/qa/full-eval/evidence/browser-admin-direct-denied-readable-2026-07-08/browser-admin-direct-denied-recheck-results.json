@@ -1,0 +1,181 @@
+{
+  "generatedAt": "2026-07-07T20:55:58.325Z",
+  "note": "Settled recheck waits for loading/redirect copy to disappear before recording direct admin route state.",
+  "roles": [
+    {
+      "role": "plan-reader-no-resources",
+      "login": {
+        "adminLinks": [],
+        "buttons": [
+          {
+            "role": null,
+            "text": "НБ",
+            "title": "Никита Без Ресурсов"
+          }
+        ],
+        "hasDeniedText": true,
+        "hasRawError": false,
+        "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nАНАЛИТИКА\nДашборд\nНБ\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nМОИ ЗАДАЧИ\n1\n0 в работе\nОТКРЫТЫЕ СДЕЛКИ\n—\nнет доступа\nАКТИВНЫЕ ПРОЕКТЫ\n3\n530 ч плана\nСДЕЛКИ ВЫИГРАНЫ\n—\nнет доступа\nБлижайшие задачи\n\nМои незавершённые задачи по плановому финишу\n\nТестирование портала\nНовая · прогресс 0%\nНовые\n08.07.2026\nСделки по статусам\n\nРаспределение возможностей CRM\n\nСделки недоступны вашей роли.\n\nВстречи и сигналы\n\nСводка дня\n\nСводка встреч и сигналов дня появится в одном из следующих обновлений.",
+        "title": "Дашборд — KISS PM",
+        "url": "http://127.0.0.1:3160/dashboard"
+      },
+      "dashboard": {
+        "adminLinks": [],
+        "hasRawError": false,
+        "hasReadableDeny": true,
+        "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nАНАЛИТИКА\nДашборд\nНБ\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nМОИ ЗАДАЧИ\n1\n0 в работе\nОТКРЫТЫЕ СДЕЛКИ\n—\nнет доступа\nАКТИВНЫЕ ПРОЕКТЫ\n3\n530 ч плана\nСДЕЛКИ ВЫИГРАНЫ\n—\nнет доступа\nБлижайшие задачи\n\nМои незавершённые задачи по плановому финишу\n\nТестирование портала\nНовая · прогресс 0%\nНовые\n08.07.2026\nСделки по статусам\n\nРаспределение возможностей CRM\n\nСделки недоступны вашей роли.\n\nВстречи и сигналы\n\nСводка дня\n\nСводка встреч и сигналов дня появится в одном из следующих обновлений.",
+        "title": "Дашборд — KISS PM",
+        "url": "http://127.0.0.1:3160/dashboard"
+      },
+      "pages": [
+        {
+          "route": "/admin",
+          "screenshot": "plan-reader-no-resources-recheck-admin.png",
+          "adminLinks": [],
+          "hasRawError": false,
+          "hasReadableDeny": true,
+          "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nАНАЛИТИКА\nДашборд\nНБ\n\nАдминистрирование недоступно\n\nЭтот раздел виден только ролям с правами управления рабочей областью. Если доступ нужен — обратитесь к администратору.",
+          "title": "Пользователи — Администрирование — KISS PM",
+          "url": "http://127.0.0.1:3160/admin/users"
+        },
+        {
+          "route": "/admin/users",
+          "screenshot": "plan-reader-no-resources-recheck-admin_users.png",
+          "adminLinks": [],
+          "hasRawError": false,
+          "hasReadableDeny": true,
+          "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nАНАЛИТИКА\nДашборд\nНБ\n\nАдминистрирование недоступно\n\nЭтот раздел виден только ролям с правами управления рабочей областью. Если доступ нужен — обратитесь к администратору.",
+          "title": "Пользователи — Администрирование — KISS PM",
+          "url": "http://127.0.0.1:3160/admin/users"
+        },
+        {
+          "route": "/admin/roles",
+          "screenshot": "plan-reader-no-resources-recheck-admin_roles.png",
+          "adminLinks": [],
+          "hasRawError": false,
+          "hasReadableDeny": true,
+          "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nАНАЛИТИКА\nДашборд\nНБ\n\nАдминистрирование недоступно\n\nЭтот раздел виден только ролям с правами управления рабочей областью. Если доступ нужен — обратитесь к администратору.",
+          "title": "Роли — Администрирование — KISS PM",
+          "url": "http://127.0.0.1:3160/admin/roles"
+        },
+        {
+          "route": "/admin/security",
+          "screenshot": "plan-reader-no-resources-recheck-admin_security.png",
+          "adminLinks": [],
+          "hasRawError": false,
+          "hasReadableDeny": true,
+          "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nАНАЛИТИКА\nДашборд\nНБ\n\nАдминистрирование недоступно\n\nЭтот раздел виден только ролям с правами управления рабочей областью. Если доступ нужен — обратитесь к администратору.",
+          "title": "Безопасность — Администрирование — KISS PM",
+          "url": "http://127.0.0.1:3160/admin/security"
+        },
+        {
+          "route": "/admin/audit",
+          "screenshot": "plan-reader-no-resources-recheck-admin_audit.png",
+          "adminLinks": [],
+          "hasRawError": false,
+          "hasReadableDeny": true,
+          "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nАНАЛИТИКА\nДашборд\nНБ\n\nАдминистрирование недоступно\n\nЭтот раздел виден только ролям с правами управления рабочей областью. Если доступ нужен — обратитесь к администратору.",
+          "title": "Аудит — Администрирование — KISS PM",
+          "url": "http://127.0.0.1:3160/admin/audit"
+        }
+      ],
+      "dashboardScreenshot": "plan-reader-no-resources-recheck-00-dashboard.png"
+    },
+    {
+      "role": "resource-reader",
+      "login": {
+        "adminLinks": [],
+        "buttons": [
+          {
+            "role": null,
+            "text": "РР",
+            "title": "Роман Ресурсный"
+          }
+        ],
+        "hasDeniedText": true,
+        "hasRawError": false,
+        "textSample": "К\nKISS PM\nРР\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nДашборд недоступен вашей роли\n\nНет прав ни на один из разделов сводки (задачи, проекты, CRM). Доступные вам разделы — в меню слева; за расширением прав обратитесь к администратору.",
+        "title": "Дашборд — KISS PM",
+        "url": "http://127.0.0.1:3160/dashboard"
+      },
+      "dashboard": {
+        "adminLinks": [],
+        "hasRawError": false,
+        "hasReadableDeny": true,
+        "textSample": "К\nKISS PM\nРР\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nДашборд недоступен вашей роли\n\nНет прав ни на один из разделов сводки (задачи, проекты, CRM). Доступные вам разделы — в меню слева; за расширением прав обратитесь к администратору.",
+        "title": "Дашборд — KISS PM",
+        "url": "http://127.0.0.1:3160/dashboard"
+      },
+      "pages": [
+        {
+          "route": "/admin",
+          "screenshot": "resource-reader-recheck-admin.png",
+          "adminLinks": [
+            {
+              "href": "/admin/users",
+              "text": "Пользователи"
+            },
+            {
+              "href": "/admin/roles",
+              "text": "Роли"
+            },
+            {
+              "href": "/admin/security",
+              "text": "Безопасность"
+            },
+            {
+              "href": "/admin/audit",
+              "text": "Аудит"
+            }
+          ],
+          "hasRawError": false,
+          "hasReadableDeny": true,
+          "textSample": "К\nKISS PM\nРР\nADMIN\nАдминистрирование\n\nПользователи рабочей области\n\nПользователи\nРоли\nБезопасность\nАудит\n\nДоступ ограничен\n\nУ вас нет прав на просмотр этого раздела.",
+          "title": "Пользователи — Администрирование — KISS PM",
+          "url": "http://127.0.0.1:3160/admin/users"
+        },
+        {
+          "route": "/admin/users",
+          "screenshot": "resource-reader-recheck-admin_users.png",
+          "adminLinks": [],
+          "hasRawError": false,
+          "hasReadableDeny": true,
+          "textSample": "К\nKISS PM\nРР\n\nАдминистрирование недоступно\n\nЭтот раздел виден только ролям с правами управления рабочей областью. Если доступ нужен — обратитесь к администратору.",
+          "title": "Пользователи — Администрирование — KISS PM",
+          "url": "http://127.0.0.1:3160/admin/users"
+        },
+        {
+          "route": "/admin/roles",
+          "screenshot": "resource-reader-recheck-admin_roles.png",
+          "adminLinks": [],
+          "hasRawError": false,
+          "hasReadableDeny": true,
+          "textSample": "К\nKISS PM\nРР\n\nАдминистрирование недоступно\n\nЭтот раздел виден только ролям с правами управления рабочей областью. Если доступ нужен — обратитесь к администратору.",
+          "title": "Роли — Администрирование — KISS PM",
+          "url": "http://127.0.0.1:3160/admin/roles"
+        },
+        {
+          "route": "/admin/security",
+          "screenshot": "resource-reader-recheck-admin_security.png",
+          "adminLinks": [],
+          "hasRawError": false,
+          "hasReadableDeny": true,
+          "textSample": "К\nKISS PM\nРР\n\nАдминистрирование недоступно\n\nЭтот раздел виден только ролям с правами управления рабочей областью. Если доступ нужен — обратитесь к администратору.",
+          "title": "Безопасность — Администрирование — KISS PM",
+          "url": "http://127.0.0.1:3160/admin/security"
+        },
+        {
+          "route": "/admin/audit",
+          "screenshot": "resource-reader-recheck-admin_audit.png",
+          "adminLinks": [],
+          "hasRawError": false,
+          "hasReadableDeny": true,
+          "textSample": "К\nKISS PM\nРР\n\nАдминистрирование недоступно\n\nЭтот раздел виден только ролям с правами управления рабочей областью. Если доступ нужен — обратитесь к администратору.",
+          "title": "Аудит — Администрирование — KISS PM",
+          "url": "http://127.0.0.1:3160/admin/audit"
+        }
+      ],
+      "dashboardScreenshot": "resource-reader-recheck-00-dashboard.png"
+    }
+  ]
+}
