@@ -899,6 +899,59 @@ describe("collaboration and communications API", () => {
       member.userId === "user-alpha-executor" && !member.archivedAt
     )).toBe(false);
   });
+
+  it("keeps concurrent channel member adds idempotent at the active membership row", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const channelResponse = await app.request("/api/workspace/communication-channels", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        channelType: "custom",
+        title: "Concurrent member room"
+      })
+    });
+    expect(channelResponse.status).toBe(201);
+    const channelPayload = await channelResponse.json() as { channel: { id: string } };
+
+    const memberBody = JSON.stringify({ userId: "user-alpha-executor", role: "member" });
+    const [firstAdd, secondAdd] = await Promise.all([
+      app.request(`/api/workspace/communication-channels/${channelPayload.channel.id}/members`, {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: memberBody
+      }),
+      app.request(`/api/workspace/communication-channels/${channelPayload.channel.id}/members`, {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: memberBody
+      })
+    ]);
+    expect([firstAdd.status, secondAdd.status]).toEqual([201, 201]);
+
+    const readback = await app.request(
+      `/api/workspace/communication-channels/${channelPayload.channel.id}`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(readback.status).toBe(200);
+    const readbackPayload = await readback.json() as {
+      members: Array<{ userId: string; role: string; archivedAt: string | null }>;
+    };
+    const executorMembers = readbackPayload.members.filter(
+      (member) => member.userId === "user-alpha-executor"
+    );
+    expect(executorMembers).toHaveLength(1);
+    expect(executorMembers[0]).toMatchObject({ role: "member", archivedAt: null });
+
+    const memberRows = await client`
+      SELECT count(*)::int AS count
+      FROM communication_channel_members
+      WHERE tenant_id = 'tenant-alpha'
+        AND channel_id = ${channelPayload.channel.id}
+        AND user_id = 'user-alpha-executor'
+        AND archived_at IS NULL`;
+    expect(Number(memberRows[0]?.count ?? 0)).toBe(1);
+  });
+
   it("lists the latest conversation messages and pages older history by cursor", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const conversations = await app.request(
@@ -1187,6 +1240,65 @@ describe("collaboration and communications API", () => {
         expect.objectContaining({ channel: "in_app", notificationType: "mention" })
       ]
     });
+  });
+
+  it("keeps concurrent notification preference writes unique with readback", async () => {
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+    const preferenceBody = JSON.stringify({
+      preferences: [
+        {
+          channel: "digest",
+          notificationType: "mention",
+          enabled: true,
+          digestFrequency: "weekly"
+        }
+      ]
+    });
+
+    const [firstWrite, secondWrite] = await Promise.all([
+      app.request("/api/workspace/notification-preferences", {
+        method: "PUT",
+        headers: jsonHeaders(executorCookie),
+        body: preferenceBody
+      }),
+      app.request("/api/workspace/notification-preferences", {
+        method: "PUT",
+        headers: jsonHeaders(executorCookie),
+        body: preferenceBody
+      })
+    ]);
+    expect([firstWrite.status, secondWrite.status]).toEqual([200, 200]);
+
+    const list = await app.request("/api/workspace/notification-preferences", {
+      headers: { cookie: executorCookie }
+    });
+    expect(list.status).toBe(200);
+    const listPayload = await list.json() as {
+      preferences: Array<{
+        channel: string;
+        notificationType: string;
+        enabled: boolean;
+        digestFrequency: string;
+      }>;
+    };
+    const mentionDigestPreferences = listPayload.preferences.filter(
+      (preference) =>
+        preference.channel === "digest" && preference.notificationType === "mention"
+    );
+    expect(mentionDigestPreferences).toHaveLength(1);
+    expect(mentionDigestPreferences[0]).toMatchObject({
+      enabled: true,
+      digestFrequency: "weekly"
+    });
+
+    const preferenceRows = await client`
+      SELECT count(*)::int AS count
+      FROM notification_preferences
+      WHERE tenant_id = 'tenant-alpha'
+        AND user_id = 'user-alpha-executor'
+        AND channel = 'digest'
+        AND notification_type = 'mention'`;
+    expect(Number(preferenceRows[0]?.count ?? 0)).toBe(1);
   });
 
   it("rolls back message edits when success audit cannot be written", async () => {

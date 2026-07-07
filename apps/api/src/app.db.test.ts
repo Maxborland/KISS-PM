@@ -2118,6 +2118,189 @@ describe("API with PostgreSQL data source", () => {
     ).toHaveLength(1);
   });
 
+  it("keeps tenant security policy save idempotent under duplicate concurrent writes", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+    const body = {
+      securityPolicy: {
+        twoFactorRequired: true,
+        sessionTimeoutHours: 12,
+        ssoSamlEnabled: false,
+        domainAllowlist: ["KISS-PM.LOCAL", " kiss-pm.local ", "Example.TEST"]
+      }
+    };
+
+    const [first, second] = await Promise.all([
+      app.request("/api/tenant/current/security-policy", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(body)
+      }),
+      app.request("/api/tenant/current/security-policy", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(body)
+      })
+    ]);
+    const readback = await app.request("/api/tenant/current/security-policy", {
+      headers: { cookie }
+    });
+    const policyRows =
+      await client`SELECT count(*)::text AS count FROM tenant_security_policies WHERE tenant_id = 'tenant-alpha'`;
+
+    expect([first.status, second.status]).toEqual([200, 200]);
+    await expect(first.json()).resolves.toEqual({
+      securityPolicy: {
+        twoFactorRequired: true,
+        sessionTimeoutHours: 12,
+        ssoSamlEnabled: false,
+        domainAllowlist: ["kiss-pm.local", "example.test"]
+      }
+    });
+    await expect(second.json()).resolves.toEqual({
+      securityPolicy: {
+        twoFactorRequired: true,
+        sessionTimeoutHours: 12,
+        ssoSamlEnabled: false,
+        domainAllowlist: ["kiss-pm.local", "example.test"]
+      }
+    });
+    await expect(readback.json()).resolves.toEqual({
+      securityPolicy: {
+        twoFactorRequired: true,
+        sessionTimeoutHours: 12,
+        ssoSamlEnabled: false,
+        domainAllowlist: ["kiss-pm.local", "example.test"]
+      }
+    });
+    expect(policyRows[0]?.count).toBe("1");
+  });
+
+  it("keeps repeated user deactivate and reactivate writes stable with readback", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+    const createUser = await app.request("/api/workspace/users", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "user-repeat-status",
+        email: "repeat-status@kiss-pm.local",
+        name: "Повтор Статуса",
+        accessProfileId: "access-profile-alpha-reader",
+        password: "repeat12345"
+      })
+    });
+    expect(createUser.status).toBe(201);
+
+    const userLogin = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "repeat-status@kiss-pm.local",
+        password: "repeat12345"
+      })
+    });
+    expect(userLogin.status).toBe(200);
+    const userSessionToken = sessionTokenFromCookie(
+      userLogin.headers.get("set-cookie") ?? ""
+    );
+    const sessionRepository = createPostgresTenantDataSource(createDatabase(client));
+    await expect(
+      sessionRepository.findSessionByTokenHash(hashSessionToken(userSessionToken))
+    ).resolves.toMatchObject({
+      tenantId: "tenant-alpha",
+      userId: "user-repeat-status"
+    });
+
+    const inactiveBody = {
+      email: "repeat-status@kiss-pm.local",
+      name: "Повтор Статуса",
+      accessProfileId: "access-profile-alpha-reader",
+      status: "inactive"
+    };
+    const [firstDisable, secondDisable] = await Promise.all([
+      app.request("/api/workspace/users/user-repeat-status", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(inactiveBody)
+      }),
+      app.request("/api/workspace/users/user-repeat-status", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(inactiveBody)
+      })
+    ]);
+    const inactiveUsers = await app.request("/api/workspace/users", {
+      headers: { cookie }
+    });
+    const inactiveLogin = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "repeat-status@kiss-pm.local",
+        password: "repeat12345"
+      })
+    });
+
+    expect([firstDisable.status, secondDisable.status]).toEqual([200, 200]);
+    await expect(
+      sessionRepository.findSessionByTokenHash(hashSessionToken(userSessionToken))
+    ).resolves.toBeUndefined();
+    await expect(inactiveUsers.json()).resolves.toMatchObject({
+      users: expect.arrayContaining([
+        expect.objectContaining({
+          id: "user-repeat-status",
+          status: "inactive"
+        })
+      ])
+    });
+    expect(inactiveLogin.status).toBe(403);
+    await expect(inactiveLogin.json()).resolves.toEqual({ error: "user_inactive" });
+
+    const activeBody = { ...inactiveBody, status: "active" };
+    const [firstReactivate, secondReactivate] = await Promise.all([
+      app.request("/api/workspace/users/user-repeat-status", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(activeBody)
+      }),
+      app.request("/api/workspace/users/user-repeat-status", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(activeBody)
+      })
+    ]);
+    const activeUsers = await app.request("/api/workspace/users", {
+      headers: { cookie }
+    });
+    const activeLogin = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "repeat-status@kiss-pm.local",
+        password: "repeat12345"
+      })
+    });
+
+    expect([firstReactivate.status, secondReactivate.status]).toEqual([200, 200]);
+    await expect(activeUsers.json()).resolves.toMatchObject({
+      users: expect.arrayContaining([
+        expect.objectContaining({
+          id: "user-repeat-status",
+          status: "active"
+        })
+      ])
+    });
+    expect(activeLogin.status).toBe(200);
+  });
   it("logs in with password, reads session user and manages workspace users and positions", async () => {
     const login = await app.request("/api/auth/login", {
       method: "POST",

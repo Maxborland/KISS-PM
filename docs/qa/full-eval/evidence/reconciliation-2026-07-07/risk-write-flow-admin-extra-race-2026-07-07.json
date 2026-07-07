@@ -1,0 +1,79 @@
+{
+  "id": "risk-write-flow-admin-extra-race-2026-07-07",
+  "date": "2026-07-07",
+  "status": "DONE",
+  "scope": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY admin/security/settings write flows beyond covered duplicate user/access role checks",
+  "productionChanged": false,
+  "e2eTouched": false,
+  "reconciliationMatrixTouched": false,
+  "testsAdded": [
+    {
+      "file": "apps/api/src/app.db.test.ts",
+      "name": "keeps tenant security policy save idempotent under duplicate concurrent writes",
+      "covers": [
+        "tenant security settings save",
+        "duplicate concurrent write",
+        "idempotency",
+        "readback",
+        "single persisted row"
+      ]
+    },
+    {
+      "file": "apps/api/src/app.db.test.ts",
+      "name": "keeps repeated user deactivate and reactivate writes stable with readback",
+      "covers": [
+        "user deactivate",
+        "user reactivate",
+        "duplicate concurrent write",
+        "session revocation",
+        "readback",
+        "login after reactivate"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "command": "codegraph sync",
+      "result": "passed before exploration"
+    },
+    {
+      "command": "pnpm vitest run --config vitest.db.config.ts apps/api/src/app.db.test.ts",
+      "result": "blocked before tests by ERR_PNPM_IGNORED_BUILDS"
+    },
+    {
+      "command": "node_modules/.bin/vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts",
+      "result": "sandboxed run blocked by spawn EPERM"
+    },
+    {
+      "command": "node_modules/.bin/vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts",
+      "result": "executed escalated; all 30 tests failed at DB setup with password authentication failed for user kiss_pm"
+    },
+    {
+      "command": "node_modules/.bin/tsc.cmd -p apps/api/tsconfig.json --noEmit --pretty false",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check -- apps/api/src/app.db.test.ts",
+      "result": "passed; Git line-ending warning only"
+    },
+    {
+      "command": "codegraph sync",
+      "result": "passed after changes; reported Already up to date"
+    },
+    {
+      "command": "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"\"security policy save|deactivate and reactivate\"\"\"",
+      "result": "orchestrator rerun passed; 1 file passed, 2 tests passed, 28 skipped."
+    }
+  ],
+  "blockers": [],
+  "changedFiles": [
+    "apps/api/src/app.db.test.ts",
+    "docs/qa/full-eval/agent-reports/admin-write-race-2026-07-07.md",
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-admin-extra-race-2026-07-07.json"
+  ],
+  "untouchedByRequest": [
+    "e2e/**",
+    "docs/qa/full-eval/reconciliation-matrix-2026-07-07.json"
+  ]
+}
+

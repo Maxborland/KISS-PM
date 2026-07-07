@@ -1,0 +1,72 @@
+{
+  "generatedAt": "2026-07-07T21:30:00+07:00",
+  "id": "RISK-WRITE-FLOW-CRM-EXTRA-RACE",
+  "status": "done",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "scope": "CRM remaining write-flow race/idempotency beyond contact duplicate email and opportunity duplicate-id",
+  "flows": [
+    "client duplicate name create",
+    "client duplicate name update",
+    "product duplicate sku create",
+    "product duplicate name create",
+    "product duplicate sku update",
+    "product duplicate name update"
+  ],
+  "spec": {
+    "expected": [
+      "Concurrent client creates with the same name return exactly one 201 and one 409 client_name_taken, with one DB row for the name.",
+      "Concurrent client updates to the same name return exactly one 200 and one 409 client_name_taken, with one DB row for the name.",
+      "Concurrent product creates with the same SKU return exactly one 201 and one 409 product_sku_taken, with one DB row for the SKU.",
+      "Concurrent product creates with the same name return exactly one 201 and one 409 product_name_taken, with one DB row for the name.",
+      "Concurrent product updates to the same SKU return exactly one 200 and one 409 product_sku_taken, with one DB row for the SKU.",
+      "Concurrent product updates to the same name return exactly one 200 and one 409 product_name_taken, with one DB row for the name."
+    ],
+    "nonGoals": [
+      "No e2e/deals-kanban files touched.",
+      "No reconciliation matrix JSON touched.",
+      "No production code change unless tests expose a real bug."
+    ]
+  },
+  "evidence": {
+    "testsAdded": [
+      "apps/api/src/crmRoutes.db.test.ts: keeps client name writes conflict-safe under concurrent create and update",
+      "apps/api/src/crmRoutes.db.test.ts: keeps product SKU and name writes conflict-safe under concurrent create and update"
+    ],
+    "commands": [
+      {
+        "command": "codegraph sync",
+        "result": "passed; already up to date"
+      },
+      {
+        "command": "pnpm vitest run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts",
+        "result": "blocked before Vitest by ERR_PNPM_IGNORED_BUILDS during pnpm dependency status/install check"
+      },
+      {
+        "command": ".\\node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts",
+        "result": "blocked in sandbox by esbuild spawn EPERM while loading Vitest config"
+      },
+      {
+        "command": ".\\node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts",
+        "result": "escalated run started Vitest and collected 14 tests; all failed at DB setup with PostgresError password authentication failed for user kiss_pm"
+      },
+      {
+        "command": "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts -t \"\"client name writes|product SKU and name\"\"\"",
+        "result": "orchestrator rerun passed; 1 file passed, 2 tests passed, 12 skipped."
+      }
+    ],
+    "warnings": [
+      "Vitest emitted the pre-existing Vite/esbuild warning about duplicate case assignment.delete in packages/domain/src/planning/commandReducer.ts.",
+      "Runtime DB assertions are not counted as passing evidence in this session because local Postgres authentication failed."
+    ]
+  },
+  "fix": {
+    "files": [
+      "apps/api/src/crmRoutes.db.test.ts"
+    ],
+    "behavior": "Coverage-only slice. Existing client/product unique-conflict handling appeared already present; added concurrent API/DB readback evidence tests."
+  },
+  "remainingRisk": "Audit-event idempotency counts are not covered by this slice; opportunity stage move/pipeline writes remain separate risk atoms if required."
+}
+

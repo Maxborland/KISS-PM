@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 34,
+    "fixedByCurrentBranchItems": 37,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 1,
     "notABugOrSupersededOldBugIds": 4,
@@ -742,6 +742,53 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for planning scenario apply only; remaining planning preview/create and non-planning write flows still need their own race/idempotency evidence."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-ADMIN-EXTRA-RACE",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "PUT /api/tenant/current/security-policy, PATCH /api/workspace/users/:userId, auth session readback",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-admin-extra-race-2026-07-07.json: concurrent duplicate security-policy saves return 200/200 with one normalized tenant_security_policies row; repeated concurrent user deactivate/reactivate returns stable readback, revokes inactive sessions, blocks inactive login, and allows login after reactivate.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"\"security policy save|deactivate and reactivate\"\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows admin/security/user-status write-flow race coverage; audit side-effect counts and other admin settings remain separate atoms if required."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-COMMUNICATIONS-EXTRA-RACE",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "POST /api/workspace/communication-channels/:channelId/members, PUT /api/workspace/notification-preferences",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-communications-extra-race-2026-07-07.json: concurrent duplicate channel member add leaves one active communication_channel_members row with API readback; concurrent notification preference PUT leaves one notification_preferences row with API readback.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"\"channel member add|notification preferences\"\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows communications write-flow row-level idempotency/readback coverage; audit side-effect de-duplication remains outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-CRM-EXTRA-RACE",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "POST/PATCH /api/workspace/clients, POST/PATCH /api/workspace/products",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-extra-race-2026-07-07.json: concurrent client duplicate-name create/update and product duplicate SKU/name create/update return stable success/conflict pairs with one-row DB readback.",
+      "linkedOldIds": [
+        "BUG-CRM-06"
+      ],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts -t \"\"client name writes|product SKU and name\"\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows CRM write-flow race coverage for client/product uniqueness; opportunity stage move/pipeline writes and audit side-effect idempotency remain separate atoms if required."
     }
   ],
   "confirmedOpen": [],
@@ -820,9 +867,12 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: auth reset concurrent confirm consumes one token once and returns reset_token_used for the duplicate request.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-communication-channel-rename-concurrency-2026-07-07.json: communication channel rename retry is idempotent without duplicate audit and divergent concurrent renames return one 200/one 409 with winner readback.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-contact-opportunity-concurrency-2026-07-07.json: CRM contact duplicate create/update and opportunity duplicate-id concurrent writes return stable success/conflict pairs with exactly-one-row readback.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-scenario-race-2026-07-07.json: planning scenario apply concurrent duplicate requests are single-use with one success, one conflict, one planVersion bump, and one applied scenario run row."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-scenario-race-2026-07-07.json: planning scenario apply concurrent duplicate requests are single-use with one success, one conflict, one planVersion bump, and one applied scenario run row.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-admin-extra-race-2026-07-07.json: admin security policy duplicate saves and user deactivate/reactivate duplicate writes now have targeted DB/API readback coverage.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-communications-extra-race-2026-07-07.json: communication channel member add and notification preference duplicate writes now have targeted DB/API readback coverage.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-extra-race-2026-07-07.json: CRM client/product duplicate name/SKU create/update races now have targeted DB/API readback coverage."
       ],
-      "remainingEvidence": "Remaining write flows outside the covered planning/admin/notification/CRM/auth/access-role/comms slices still need duplicate/race/idempotency evidence; planning scenario preview/create remains a separate optional atom if required."
+      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms slices still need duplicate/race/idempotency evidence; audit side-effect de-duplication and CRM opportunity stage/pipeline writes remain separate optional atoms if required."
     }
   ],
   "nextAction": "Remaining old-bug work: real provider/live SSE verification remains provider-blocked; live external auth email delivery remains mail-infra-blocked. Risk zones still require full browser traversal, live media provider browser checks, real agent provider smoke, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, CRM contact/opportunity concurrency, auth reset route/browser degraded flow, access-role name uniqueness, communication channel rename version conflicts/idempotent retry, media participant cleanup, Jitsi/API join-token contract behavior, and agent degraded/local SSE/apply filtering."

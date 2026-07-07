@@ -607,6 +607,259 @@ describe("Phase 3.1 CRM API", () => {
     expect(duplicateName.status).toBe(409);
     await expect(duplicateName.json()).resolves.toEqual({ error: "product_name_taken" });
   });
+  it("keeps client name writes conflict-safe under concurrent create and update", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const concurrentCreates = await Promise.all([
+      app.request("/api/workspace/clients", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ id: "client-race-create-a", name: "Клиент race name" })
+      }),
+      app.request("/api/workspace/clients", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ id: "client-race-create-b", name: "Клиент race name" })
+      })
+    ]);
+    expect(concurrentCreates.map((response) => response.status).sort()).toEqual([201, 409]);
+    const createConflict = concurrentCreates.find((response) => response.status === 409);
+    expect(createConflict).toBeDefined();
+    await expect(createConflict!.json()).resolves.toEqual({ error: "client_name_taken" });
+    const createRows = await client`
+      SELECT count(*)::int AS count
+      FROM clients
+      WHERE tenant_id = 'tenant-alpha'
+        AND name = 'Клиент race name'
+    `;
+    expect(Number(createRows[0]?.count ?? 0)).toBe(1);
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-race-update-a", name: "Клиент race update A" })
+    });
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-race-update-b", name: "Клиент race update B" })
+    });
+
+    const concurrentUpdates = await Promise.all([
+      app.request("/api/workspace/clients/client-race-update-a", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ name: "Клиент shared update", status: "active" })
+      }),
+      app.request("/api/workspace/clients/client-race-update-b", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ name: "Клиент shared update", status: "active" })
+      })
+    ]);
+    expect(concurrentUpdates.map((response) => response.status).sort()).toEqual([200, 409]);
+    const updateConflict = concurrentUpdates.find((response) => response.status === 409);
+    expect(updateConflict).toBeDefined();
+    await expect(updateConflict!.json()).resolves.toEqual({ error: "client_name_taken" });
+    const updateRows = await client`
+      SELECT count(*)::int AS count
+      FROM clients
+      WHERE tenant_id = 'tenant-alpha'
+        AND name = 'Клиент shared update'
+    `;
+    expect(Number(updateRows[0]?.count ?? 0)).toBe(1);
+  });
+
+  it("keeps product SKU and name writes conflict-safe under concurrent create and update", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const concurrentSkuCreates = await Promise.all([
+      app.request("/api/workspace/products", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "product-race-sku-create-a",
+          name: "Продукт race SKU A",
+          sku: "RACE-SKU",
+          type: "service",
+          unit: "час",
+          price: 1000
+        })
+      }),
+      app.request("/api/workspace/products", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "product-race-sku-create-b",
+          name: "Продукт race SKU B",
+          sku: "RACE-SKU",
+          type: "service",
+          unit: "час",
+          price: 2000
+        })
+      })
+    ]);
+    expect(concurrentSkuCreates.map((response) => response.status).sort()).toEqual([201, 409]);
+    const skuCreateConflict = concurrentSkuCreates.find((response) => response.status === 409);
+    expect(skuCreateConflict).toBeDefined();
+    await expect(skuCreateConflict!.json()).resolves.toEqual({ error: "product_sku_taken" });
+    const skuCreateRows = await client`
+      SELECT count(*)::int AS count
+      FROM products
+      WHERE tenant_id = 'tenant-alpha'
+        AND sku = 'RACE-SKU'
+    `;
+    expect(Number(skuCreateRows[0]?.count ?? 0)).toBe(1);
+
+    const concurrentNameCreates = await Promise.all([
+      app.request("/api/workspace/products", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "product-race-name-create-a",
+          name: "Продукт race name",
+          sku: "RACE-NAME-A",
+          type: "service",
+          unit: "час",
+          price: 1000
+        })
+      }),
+      app.request("/api/workspace/products", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "product-race-name-create-b",
+          name: "Продукт race name",
+          sku: "RACE-NAME-B",
+          type: "service",
+          unit: "час",
+          price: 2000
+        })
+      })
+    ]);
+    expect(concurrentNameCreates.map((response) => response.status).sort()).toEqual([201, 409]);
+    const nameCreateConflict = concurrentNameCreates.find((response) => response.status === 409);
+    expect(nameCreateConflict).toBeDefined();
+    await expect(nameCreateConflict!.json()).resolves.toEqual({ error: "product_name_taken" });
+    const nameCreateRows = await client`
+      SELECT count(*)::int AS count
+      FROM products
+      WHERE tenant_id = 'tenant-alpha'
+        AND name = 'Продукт race name'
+    `;
+    expect(Number(nameCreateRows[0]?.count ?? 0)).toBe(1);
+
+    await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-race-update-a",
+        name: "Продукт race update A",
+        sku: "RACE-UPDATE-A",
+        type: "service",
+        unit: "час",
+        price: 1000
+      })
+    });
+    await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-race-update-b",
+        name: "Продукт race update B",
+        sku: "RACE-UPDATE-B",
+        type: "service",
+        unit: "час",
+        price: 2000
+      })
+    });
+
+    const concurrentSkuUpdates = await Promise.all([
+      app.request("/api/workspace/products/product-race-update-a", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          name: "Продукт race update A",
+          sku: "RACE-UPDATE-SHARED",
+          type: "service",
+          unit: "час",
+          price: 1000,
+          status: "active"
+        })
+      }),
+      app.request("/api/workspace/products/product-race-update-b", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          name: "Продукт race update B",
+          sku: "RACE-UPDATE-SHARED",
+          type: "service",
+          unit: "час",
+          price: 2000,
+          status: "active"
+        })
+      })
+    ]);
+    expect(concurrentSkuUpdates.map((response) => response.status).sort()).toEqual([200, 409]);
+    const skuUpdateConflict = concurrentSkuUpdates.find((response) => response.status === 409);
+    expect(skuUpdateConflict).toBeDefined();
+    await expect(skuUpdateConflict!.json()).resolves.toEqual({ error: "product_sku_taken" });
+    const skuUpdateRows = await client`
+      SELECT count(*)::int AS count
+      FROM products
+      WHERE tenant_id = 'tenant-alpha'
+        AND sku = 'RACE-UPDATE-SHARED'
+    `;
+    expect(Number(skuUpdateRows[0]?.count ?? 0)).toBe(1);
+
+    const concurrentNameUpdates = await Promise.all([
+      app.request("/api/workspace/products/product-race-update-a", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          name: "Продукт shared update",
+          sku: "RACE-UPDATE-A-NAME",
+          type: "service",
+          unit: "час",
+          price: 1000,
+          status: "active"
+        })
+      }),
+      app.request("/api/workspace/products/product-race-update-b", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          name: "Продукт shared update",
+          sku: "RACE-UPDATE-B-NAME",
+          type: "service",
+          unit: "час",
+          price: 2000,
+          status: "active"
+        })
+      })
+    ]);
+    expect(concurrentNameUpdates.map((response) => response.status).sort()).toEqual([200, 409]);
+    const nameUpdateConflict = concurrentNameUpdates.find((response) => response.status === 409);
+    expect(nameUpdateConflict).toBeDefined();
+    await expect(nameUpdateConflict!.json()).resolves.toEqual({ error: "product_name_taken" });
+    const nameUpdateRows = await client`
+      SELECT count(*)::int AS count
+      FROM products
+      WHERE tenant_id = 'tenant-alpha'
+        AND name = 'Продукт shared update'
+    `;
+    expect(Number(nameUpdateRows[0]?.count ?? 0)).toBe(1);
+  });
   it("updates CRM foundation entities with tenant-scoped audit trail", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {
