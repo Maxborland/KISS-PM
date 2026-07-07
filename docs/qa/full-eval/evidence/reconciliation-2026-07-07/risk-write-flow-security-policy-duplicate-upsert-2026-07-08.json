@@ -1,0 +1,21 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-SECURITY-POLICY-DUPLICATE-UPDATES",
+  "generatedAt": "2026-07-07T21:02:27.657Z",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "surface": "PUT /api/tenant/current/security-policy, GET /api/tenant/current/security-policy, tenant_security_policies persistence",
+  "scenario": "Tenant admin submits the same security policy save twice concurrently, then reads policy back.",
+  "expected": "Both duplicate writes are stable 200 responses, normalized policy readback matches the submitted body, and the single-row tenant policy invariant is preserved.",
+  "actual": "Targeted DB/API regression passes: two concurrent PUT calls return 200/200, both response bodies equal normalized policy, GET readback matches, tenant_security_policies row count for tenant-alpha remains 1.",
+  "evidence": [
+    "apps/api/src/app.db.test.ts: keeps tenant security policy save idempotent under duplicate concurrent writes",
+    "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"tenant security policy save idempotent\" -> pass; 1 selected test passed, 30 skipped",
+    "scripts/seed-dev.ts rerun after DB test to restore local dev seed"
+  ],
+  "notes": [
+    "No source-code change in this atom; the regression test already existed on the current branch, this commit attaches fresh evidence and matrix accounting.",
+    "Vitest emitted an existing warning about duplicate assignment.delete case in packages/domain/src/planning/commandReducer.ts; not caused by this slice."
+  ],
+  "coverageStatus": "partial-risk-zone"
+}

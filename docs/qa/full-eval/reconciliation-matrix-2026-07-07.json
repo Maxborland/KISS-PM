@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 61,
+    "fixedByCurrentBranchItems": 62,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 4,
@@ -1169,6 +1169,21 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows RISK-FULL-BROWSER-TRAVERSAL for admin direct-denied route behavior only. Full every-role/every-route/every-action traversal remains open; security-readonly variant was not covered because no seeded login exists. One UX inconsistency remains documented: resource-reader /admin redirect denied page can show admin tabs, although deeper direct denied pages hide them."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-SECURITY-POLICY-DUPLICATE-UPDATES",
+      "source": "current branch targeted DB/API write-flow regression coverage",
+      "surface": "PUT /api/tenant/current/security-policy, GET /api/tenant/current/security-policy, tenant_security_policies persistence",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-security-policy-duplicate-upsert-2026-07-08.json: duplicate concurrent security-policy saves return stable 200/200, readback matches, and tenant_security_policies preserves one row for tenant-alpha.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"tenant security policy save idempotent\" -> pass; 1 selected test passed, 30 skipped",
+        "scripts/seed-dev.ts rerun after DB test to restore local dev seed"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows the write-flow duplicate/race/idempotency matrix for tenant security-policy upsert only; broader write-flow coverage remains open outside this atom."
     }
   ],
   "confirmedOpen": [],
