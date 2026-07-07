@@ -1,0 +1,58 @@
+{
+  "id": "RISK-LIVE-OPENROUTER-SMTP-IMAP-SMOKE-2026-07-07",
+  "generatedAt": "2026-07-07T15:45:39.078Z",
+  "purpose": "Fresh live provider smoke after OpenRouter and REG.RU mail credentials were supplied in local ignored env.",
+  "secretsPolicy": "Secret values were loaded from .env.local/user env and were not written to this evidence file.",
+  "commands": [
+    {
+      "command": "node_modules\\.bin\\tsx.cmd .tmp\\live-provider-smoke.ts",
+      "network": "live HTTPS/SMTP/IMAP",
+      "status": "completed"
+    },
+    {
+      "command": "node_modules\\.bin\\tsx.cmd .tmp\\mail-readback-smoke.ts",
+      "network": "live SMTP/IMAP/POP3",
+      "status": "not-run",
+      "reason": "Sandbox escalation was rejected by approval reviewer due Codex usage limit before command execution."
+    }
+  ],
+  "openRouter": {
+    "status": "pass",
+    "provider": "openrouter",
+    "model": "anthropic/claude-sonnet-4.6",
+    "stopReason": "end_turn",
+    "expectedMarkerMatched": true,
+    "textLength": 16,
+    "usage": {
+      "inputTokens": 36,
+      "outputTokens": 12
+    }
+  },
+  "mail": {
+    "status": "partial",
+    "smtp": {
+      "acceptedByProviderPath": true,
+      "provider": "smtp",
+      "host": "mail.hosting.reg.ru",
+      "port": 465,
+      "secure": true,
+      "requireTls": true
+    },
+    "imap": {
+      "status": "fail",
+      "host": "mail.hosting.reg.ru",
+      "port": 993,
+      "loginAndMailboxList": "pass",
+      "mailboxCount": 5,
+      "readback": "imap_no_messages after polling INBOX for approximately 50 seconds"
+    },
+    "pop3": {
+      "status": "not-run",
+      "reason": "Follow-up readback probe was blocked before execution by sandbox approval/usage limit."
+    }
+  },
+  "coverageImpact": {
+    "RISK-AGENT-REAL-LLM-SSE": "Narrows real-provider risk: OpenRouter key/model are live and provider call succeeds. Full browser SSE proposal/apply traversal remains open.",
+    "RISK-AUTH-EMAIL-RESET-HAPPY-PATH": "Narrows external mail risk: SMTP provider path accepted a reset email send, but mailbox delivery/extraction did not pass; full reset via email remains open."
+  }
+}

@@ -914,7 +914,7 @@
                                        "BUG-SHELL-12"
                                    ],
                            "source":  "docs/qa/full-eval/bugs/shell-dashboard.md",
-                           "reason":  "No-provider degraded behavior is fixed in current branch. Real OpenRouter/Anthropic provider proposal quality and live SSE browser traversal still require configured provider keys; tracked together with RISK-AGENT-REAL-LLM-SSE."
+                           "reason":  "No-provider degraded behavior is fixed in current branch. OpenRouter provider live smoke now passes with supplied env, but real browser SSE proposal/apply traversal still requires fresh browser evidence; tracked together with RISK-AGENT-REAL-LLM-SSE."
                        }
                    ],
     "notABugOrSuperseded":  [
@@ -939,9 +939,10 @@
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-happy-path-route-2026-07-07.json: route-level SMTP-like delivery contract and true concurrent same-token confirm behavior are covered by targeted tests.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: route-level reset request, token delivery, confirm, login with new password, SMTP-like resetUrl payload, and concurrent token consume covered.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-browser-mail-gap-2026-07-07.json: browser forgot-password/reset request/no-mail state/confirm token prefill covered; no dev token or 64-hex token leaks in DOM.",
-                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-local-provider-extraction-2026-07-07.json: local in-memory provider token extraction covers old-password rejection and new-password session login after reset."
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-local-provider-extraction-2026-07-07.json: local in-memory provider token extraction covers old-password rejection and new-password session login after reset.",
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-live-openrouter-smtp-imap-smoke-2026-07-07.json: live SMTP provider path accepted a reset email send through REG.RU SMTP, but IMAP readback did not find the message after polling INBOX."
                                                         ],
-                                    "remainingEvidence":  "Live external SMTP/email-client or local mailcatcher delivery/extraction remains unverified; current runtime has delivery=none and no guarded token extraction hook."
+                                    "remainingEvidence":  "Live external SMTP/email-client delivery/extraction remains unverified: SMTP accepted the send, but IMAP mailbox readback did not find the reset email; POP3/all-folder readback and full request -> delivered token -> confirm -> login browser flow still need a fresh run."
                                 },
                                 {
                                     "id":  "RISK-AGENT-REAL-LLM-SSE",
@@ -950,9 +951,10 @@
                                     "requiredEvidence":  "Configured provider or explicit degraded state, streamed reasoning/proposal, apply/reject UX, no silent mock success.",
                                     "partialEvidence":  [
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-llm-sse-configured-provider-2026-07-07.json: no-provider degraded behavior, OpenRouter adapter translation, loop/SSE events, web stream parser, and apply/reject filtering covered by targeted tests.",
-                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-real-llm-sse-parser-tail-2026-07-07.json: CRLF SSE parser and stream_incomplete tail handling covered; live provider keys remain absent."
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-real-llm-sse-parser-tail-2026-07-07.json: CRLF SSE parser and stream_incomplete tail handling covered; live provider keys were absent at that time.",
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-live-openrouter-smtp-imap-smoke-2026-07-07.json: supplied OpenRouter key/model passed a live provider smoke and returned the expected marker."
                                                         ],
-                                    "remainingEvidence":  "Live OpenRouter/Anthropic provider smoke and live browser SSE traversal remain unverified because OPENROUTER_API_KEY and ANTHROPIC_API_KEY are absent in the runtime environment."
+                                    "remainingEvidence":  "Live OpenRouter provider smoke now passes. Live browser SSE traversal remains unverified: real agent proposal stream, apply/reject UX, reload/readback, and no silent mock fallback still need browser evidence."
                                 },
                                 {
                                     "id":  "RISK-MEDIA-LIVEKIT-JITSI-CALL",
