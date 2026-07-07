@@ -1817,6 +1817,180 @@ describe("API with PostgreSQL data source", () => {
     });
   });
 
+  it("returns a stable conflict when concurrent workspace user creates reuse an email", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+    const body = {
+      email: "race-user@kiss-pm.local",
+      name: "Гонка Пользователя",
+      accessProfileId: "access-profile-alpha-reader",
+      password: "race12345"
+    };
+
+    const [first, second] = await Promise.all([
+      app.request("/api/workspace/users", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...body, id: "user-race-a" })
+      }),
+      app.request("/api/workspace/users", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...body, id: "user-race-b" })
+      })
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+    const users = await app.request("/api/workspace/users", {
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      }
+    });
+    const usersBody = await users.json() as {
+      users: Array<{ email: string }>;
+    };
+
+    expect(statuses).toEqual([201, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "user_email_taken"
+    });
+    expect(
+      usersBody.users.filter((user) => user.email === "race-user@kiss-pm.local")
+    ).toHaveLength(1);
+  });
+
+  it("returns a stable conflict when concurrent workspace user updates reuse an email", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const createA = await app.request("/api/workspace/users", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "user-email-race-a",
+        email: "email-race-a@kiss-pm.local",
+        name: "Гонка Email A",
+        accessProfileId: "access-profile-alpha-reader",
+        password: "raceA12345"
+      })
+    });
+    const createB = await app.request("/api/workspace/users", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "user-email-race-b",
+        email: "email-race-b@kiss-pm.local",
+        name: "Гонка Email B",
+        accessProfileId: "access-profile-alpha-reader",
+        password: "raceB12345"
+      })
+    });
+    expect([createA.status, createB.status]).toEqual([201, 201]);
+
+    const [first, second] = await Promise.all([
+      app.request("/api/workspace/users/user-email-race-a", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          email: "email-race-shared@kiss-pm.local",
+          name: "Гонка Email A",
+          accessProfileId: "access-profile-alpha-reader",
+          status: "active"
+        })
+      }),
+      app.request("/api/workspace/users/user-email-race-b", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          email: "email-race-shared@kiss-pm.local",
+          name: "Гонка Email B",
+          accessProfileId: "access-profile-alpha-reader",
+          status: "active"
+        })
+      })
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+    const users = await app.request("/api/workspace/users", {
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      }
+    });
+    const usersBody = await users.json() as {
+      users: Array<{ email: string }>;
+    };
+
+    expect(statuses).toEqual([200, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "user_email_taken"
+    });
+    expect(
+      usersBody.users.filter(
+        (user) => user.email === "email-race-shared@kiss-pm.local"
+      )
+    ).toHaveLength(1);
+  });
+
+  it("returns a stable conflict when concurrent access role creates reuse an id", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const [first, second] = await Promise.all([
+      app.request("/api/tenant/current/access-profiles", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "access-profile-alpha-race",
+          name: "Роль Гонка A",
+          permissions: ["tenant.users.read"]
+        })
+      }),
+      app.request("/api/tenant/current/access-profiles", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "access-profile-alpha-race",
+          name: "Роль Гонка B",
+          permissions: ["tenant.users.read"]
+        })
+      })
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+    const profiles = await app.request("/api/tenant/current/access-profiles", {
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      }
+    });
+    const profilesBody = await profiles.json() as {
+      accessProfiles: Array<{ id: string }>;
+    };
+
+    expect(statuses).toEqual([201, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "access_role_id_taken"
+    });
+    expect(
+      profilesBody.accessProfiles.filter(
+        (profile) => profile.id === "access-profile-alpha-race"
+      )
+    ).toHaveLength(1);
+  });
   it("logs in with password, reads session user and manages workspace users and positions", async () => {
     const login = await app.request("/api/auth/login", {
       method: "POST",

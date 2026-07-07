@@ -1,0 +1,53 @@
+{
+  "id": "RISK-WRITE-FLOW-ADMIN-DUPLICATE-CONFLICTS",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "status": "targeted-coverage-added",
+  "coverageStatus": "partial-risk-zone",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "generatedAt": "2026-07-07",
+  "surface": [
+    "POST /api/workspace/users",
+    "PATCH /api/workspace/users/:userId",
+    "POST /api/tenant/current/access-profiles",
+    "PATCH /api/workspace/access-roles/:roleId"
+  ],
+  "writeFlowsCovered": [
+    "Concurrent workspace user create with duplicate email",
+    "Concurrent workspace user email update to the same email",
+    "Concurrent access role create with duplicate id",
+    "Access role update DB unique/not-found race mapping"
+  ],
+  "expected": [
+    "Concurrent duplicate user email creates return one success and one stable 409 user_email_taken, with exactly one persisted email.",
+    "Concurrent duplicate user email updates return one success and one stable 409 user_email_taken, with exactly one persisted target email.",
+    "Concurrent duplicate access role id creates return one success and one stable 409 access_role_id_taken, with exactly one persisted role.",
+    "Access role DB unique conflicts are mapped to the same public 409 contract as route pre-checks; update-after-delete race maps to 404 access_role_not_found instead of 500."
+  ],
+  "redEvidence": [
+    "Before the fix, cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \\\"concurrent workspace user creates\\\"\" failed: expected [201,409], received [201,500]."
+  ],
+  "fixApplied": [
+    "workspaceUserRoutes now maps Postgres 23505 on tenant_users_tenant_id_id_uidx, tenant_users_tenant_id_email_uidx and user_credentials_email_uidx to user_id_taken/user_email_taken 409 responses around transactional create/update.",
+    "accessRoleRoutes now maps Postgres 23505 on access_profiles_pkey/access_profiles_tenant_id_id_uidx to access_role_id_taken and future access_profiles_tenant_id_name_uidx to access_role_name_taken.",
+    "accessRoleRoutes now maps update-after-precheck missing-row races to 404 access_role_not_found."
+  ],
+  "changedFiles": [
+    "apps/api/src/workspaceUserRoutes.ts",
+    "apps/api/src/accessRoleRoutes.ts",
+    "apps/api/src/app.db.test.ts"
+  ],
+  "greenEvidence": [
+    "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \\\"concurrent workspace user creates\\\"\" -> 1 selected test passed, 23 skipped.",
+    "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \\\"concurrent workspace user updates\\\"\" -> 1 selected test passed, 24 skipped.",
+    "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \\\"concurrent\\\"\" -> 4 selected tests passed, 22 skipped.",
+    "corepack pnpm --filter @kiss-pm/api typecheck -> passed."
+  ],
+  "limitations": [
+    "This closes only the admin user/access-role duplicate-conflict slice of RISK-WRITE-FLOW-RACE-IDEMPOTENCY.",
+    "Access role name race is still not fully DB-enforced because access_profiles currently has no unique index on (tenant_id, name); the route mapper is ready for access_profiles_tenant_id_name_uidx, but schema/migration is a separate follow-up if product requires strict concurrent name uniqueness.",
+    "Communication channel rename races, auth reset concurrent confirm/email-provider happy path, CRM/contact remaining races, and the full write-flow matrix remain separate slices."
+  ],
+  "regressionRisk": "Low-to-medium. The change only maps DB conflict errors to existing public 409/404 contracts, but it affects admin write error handling paths."
+}

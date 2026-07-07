@@ -100,49 +100,56 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
     }
 
-    const user = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.createWorkspaceUser ||
-        !transactionDataSource.upsertCredential
-      ) {
-        throw new Error("transactional_user_create_not_configured");
-      }
+    let user: TenantUser;
+    try {
+      user = await runDataSourceTransaction(async (transactionDataSource) => {
+        if (
+          !transactionDataSource.createWorkspaceUser ||
+          !transactionDataSource.upsertCredential
+        ) {
+          throw new Error("transactional_user_create_not_configured");
+        }
 
-      const createdUser = await transactionDataSource.createWorkspaceUser(
-        parsed.value
-      );
-      if (parsed.password) {
-        await transactionDataSource.upsertCredential({
-          userId: createdUser.id,
-          tenantId: createdUser.tenantId,
-          email: createdUser.email,
-          ...hashPassword(parsed.password)
-        });
-      }
+        const createdUser = await transactionDataSource.createWorkspaceUser(
+          parsed.value
+        );
+        if (parsed.password) {
+          await transactionDataSource.upsertCredential({
+            userId: createdUser.id,
+            tenantId: createdUser.tenantId,
+            email: createdUser.email,
+            ...hashPassword(parsed.password)
+          });
+        }
 
-      await appendManagementAuditEvent(
-        {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
-          actionType: "workspace.user.created",
-          sourceWorkflow: "single_workspace_users",
-          sourceEntity: {
-            type: "TenantUser",
-            id: createdUser.id
+        await appendManagementAuditEvent(
+          {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "workspace.user.created",
+            sourceWorkflow: "single_workspace_users",
+            sourceEntity: {
+              type: "TenantUser",
+              id: createdUser.id
+            },
+            commandInput: {
+              ...parsed.value,
+              password: parsed.password ? "***" : undefined
+            },
+            beforeState: null,
+            afterState: createdUser,
+            permissionResult: decision
           },
-          commandInput: {
-            ...parsed.value,
-            password: parsed.password ? "***" : undefined
-          },
-          beforeState: null,
-          afterState: createdUser,
-          permissionResult: decision
-        },
-        transactionDataSource
-      );
+          transactionDataSource
+        );
 
-      return createdUser;
-    });
+        return createdUser;
+      });
+    } catch (error) {
+      const conflict = workspaceUserUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ user }, 201);
@@ -227,54 +234,61 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
         return context.json({ error: "invalid_position" }, 400);
       }
     }
-    const user = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (
-        !transactionDataSource.updateWorkspaceUser ||
-        !transactionDataSource.updateCredentialEmail
-      ) {
-        throw new Error("transactional_user_update_not_configured");
-      }
+    let user: TenantUser;
+    try {
+      user = await runDataSourceTransaction(async (transactionDataSource) => {
+        if (
+          !transactionDataSource.updateWorkspaceUser ||
+          !transactionDataSource.updateCredentialEmail
+        ) {
+          throw new Error("transactional_user_update_not_configured");
+        }
 
-      const updatedUser = await transactionDataSource.updateWorkspaceUser(
-        parsed.value
-      );
-      if (beforeState.email !== updatedUser.email) {
-        await transactionDataSource.updateCredentialEmail(
-          updatedUser.tenantId,
-          updatedUser.id,
-          updatedUser.email
+        const updatedUser = await transactionDataSource.updateWorkspaceUser(
+          parsed.value
         );
-      }
-      if (
-        shouldRevokeSessionsAfterUserUpdate(beforeState, updatedUser) &&
-        transactionDataSource.deleteSessionsByUserId
-      ) {
-        await transactionDataSource.deleteSessionsByUserId(
-          updatedUser.tenantId,
-          updatedUser.id
-        );
-      }
+        if (beforeState.email !== updatedUser.email) {
+          await transactionDataSource.updateCredentialEmail(
+            updatedUser.tenantId,
+            updatedUser.id,
+            updatedUser.email
+          );
+        }
+        if (
+          shouldRevokeSessionsAfterUserUpdate(beforeState, updatedUser) &&
+          transactionDataSource.deleteSessionsByUserId
+        ) {
+          await transactionDataSource.deleteSessionsByUserId(
+            updatedUser.tenantId,
+            updatedUser.id
+          );
+        }
 
-      await appendManagementAuditEvent(
-        {
-          tenantId: actor.tenantId,
-          actorUserId: actor.id,
-          actionType: "workspace.user.updated",
-          sourceWorkflow: "single_workspace_users",
-          sourceEntity: {
-            type: "TenantUser",
-            id: updatedUser.id
+        await appendManagementAuditEvent(
+          {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "workspace.user.updated",
+            sourceWorkflow: "single_workspace_users",
+            sourceEntity: {
+              type: "TenantUser",
+              id: updatedUser.id
+            },
+            commandInput: parsed.value,
+            beforeState,
+            afterState: updatedUser,
+            permissionResult: decision
           },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updatedUser,
-          permissionResult: decision
-        },
-        transactionDataSource
-      );
+          transactionDataSource
+        );
 
-      return updatedUser;
-    });
+        return updatedUser;
+      });
+    } catch (error) {
+      const conflict = workspaceUserUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ user });
@@ -381,6 +395,28 @@ async function appendWorkspaceUserDeniedAudit(
   });
 }
 
+function workspaceUserUniqueConflict(
+  error: unknown
+): "user_id_taken" | "user_email_taken" | null {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 8; depth += 1) {
+    const rec = current as {
+      code?: unknown;
+      constraint?: unknown;
+      constraint_name?: unknown;
+      message?: unknown;
+      cause?: unknown;
+    };
+    if (rec.code === "23505") {
+      const marker = String(rec.constraint ?? rec.constraint_name ?? rec.message ?? "");
+      if (marker.includes("tenant_users_tenant_id_id_uidx")) return "user_id_taken";
+      if (marker.includes("tenant_users_tenant_id_email_uidx")) return "user_email_taken";
+      if (marker.includes("user_credentials_email_uidx")) return "user_email_taken";
+    }
+    current = rec.cause;
+  }
+  return null;
+}
 function shouldRevokeSessionsAfterUserUpdate(
   before: {
     accessProfileId: string;

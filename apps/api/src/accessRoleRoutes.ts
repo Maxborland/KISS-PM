@@ -116,7 +116,13 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       );
 
       return createdProfile;
+    }).catch((error: unknown) => {
+      const conflict = accessRoleUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
     });
+
+    if (accessProfile instanceof Response) return accessProfile;
 
     return context.json({ accessProfile }, 201);
   });
@@ -244,7 +250,16 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
       );
 
       return updatedRole;
+    }).catch((error: unknown) => {
+      const conflict = accessRoleUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      if (isAccessRoleMissingAfterPrecheck(error)) {
+        return context.json({ error: "access_role_not_found" }, 404);
+      }
+      throw error;
     });
+
+    if (accessRole instanceof Response) return accessRole;
 
     return context.json({ accessRole });
   });
@@ -337,6 +352,38 @@ export function registerAccessRoleRoutes(app: ApiApp, deps: ApiRouteDeps) {
   });
 }
 
+function accessRoleUniqueConflict(
+  error: unknown
+): "access_role_id_taken" | "access_role_name_taken" | null {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 8; depth += 1) {
+    const rec = current as {
+      code?: unknown;
+      constraint?: unknown;
+      constraint_name?: unknown;
+      message?: unknown;
+      cause?: unknown;
+    };
+    if (rec.code === "23505") {
+      const marker = String(rec.constraint ?? rec.constraint_name ?? rec.message ?? "");
+      if (
+        marker.includes("access_profiles_pkey") ||
+        marker.includes("access_profiles_tenant_id_id_uidx")
+      ) {
+        return "access_role_id_taken";
+      }
+      if (marker.includes("access_profiles_tenant_id_name_uidx")) {
+        return "access_role_name_taken";
+      }
+    }
+    current = rec.cause;
+  }
+  return null;
+}
+
+function isAccessRoleMissingAfterPrecheck(error: unknown): boolean {
+  return error instanceof Error && error.message === "Access profile update returned no row";
+}
 async function appendAccessRoleDeniedAudit(
   deps: ApiRouteDeps,
   actor: TenantUser,
