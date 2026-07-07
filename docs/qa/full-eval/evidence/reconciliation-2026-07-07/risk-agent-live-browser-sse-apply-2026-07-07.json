@@ -75,6 +75,18 @@
         "rejectedTitleFound": false
       },
       "result": "Reject/apply UX and backend readback passed: only the selected create_task action was applied."
+    },
+    {
+      "name": "UI reload/readback in My Work",
+      "screenshot": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-browser-mywork-readback-2026-07-07.png",
+      "network": [
+        "GET /api/workspace/my-work -> 200 application/json"
+      ],
+      "readback": {
+        "appliedTitle": "Agent live apply 1783446804314",
+        "appliedTitleFoundInUi": true
+      },
+      "result": "A fresh browser session opened /my-work and rendered the task created by the live agent apply flow."
     }
   ],
   "verification": [
@@ -84,7 +96,7 @@
   ],
   "knownTestHarnessIssue": "apps/api/src/agent/agentExecute.test.ts currently fails in its auth harness with 401/undefined results before the changed create_task branch; it was not used as pass evidence for this slice.",
   "coverageImpact": {
-    "RISK-AGENT-REAL-LLM-SSE": "Covers live browser stream rendering, structured proposal rendering, reject/apply UX, /execute success, and data readback for create_task with OpenRouter. Remaining agent risk is limited to broader per-role/provider variants and other action tools, not the core live SSE/apply path."
+    "RISK-AGENT-REAL-LLM-SSE": "Covers live browser stream rendering, structured proposal rendering, reject/apply UX, /execute success, API readback, and UI reload/readback in /my-work for create_task with OpenRouter. Remaining agent risk is limited to broader per-role/provider variants and other action tools."
   },
   "status": "pass"
 }
