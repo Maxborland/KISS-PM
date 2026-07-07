@@ -1,0 +1,87 @@
+{
+  "id": "CURRENT-RISK-MEDIA-BROWSER-PROVIDER-DISABLED-CONNECT",
+  "date": "2026-07-08",
+  "status": "partial-pass",
+  "riskZones": [
+    "RISK-MEDIA-LIVEKIT-JITSI-CALL",
+    "RISK-FULL-BROWSER-TRAVERSAL"
+  ],
+  "scope": "Admin Chromium/in-app Browser traversal for /communications/calls when no live video provider is configured: create Jitsi video room, start session, attempt connect, verify visible degraded denial instead of fake join success.",
+  "environment": {
+    "baseUrl": "http://127.0.0.1:3108",
+    "apiOrigin": "http://127.0.0.1:4108",
+    "database": "local 55433 dev seed",
+    "browserSurface": "browser:control-in-app-browser"
+  },
+  "steps": [
+    "Seed dev data after DB test reset.",
+    "Login as seeded admin through /login.",
+    "Navigate to /communications/calls.",
+    "Create a Jitsi video call room from the empty-state room dialog.",
+    "Start the session.",
+    "Click Connect without accepting camera/microphone permission prompts.",
+    "Verify visible degraded error state."
+  ],
+  "expected": [
+    "No silent fake join success when provider is disabled/unconfigured.",
+    "The UI keeps the session management controls visible and reports the provider-disabled denial.",
+    "This does not request or accept camera/microphone permission."
+  ],
+  "actual": {
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "АА"
+      },
+      {
+        "disabled": false,
+        "text": "Комната"
+      },
+      {
+        "disabled": false,
+        "text": "Browser media room 1783448257140\nОткрыт\nJitsi\nВидео"
+      },
+      {
+        "disabled": false,
+        "text": "Подключиться"
+      },
+      {
+        "disabled": false,
+        "text": "Я вошёл"
+      },
+      {
+        "disabled": false,
+        "text": "Я вышел"
+      },
+      {
+        "disabled": false,
+        "text": "Завершить сессию"
+      }
+    ],
+    "textIncludes": {
+      "disabledVideo": true,
+      "rejected": false,
+      "roomTitle": true,
+      "sessionStarted": true,
+      "rejectedToast": "transient toast observed during run but not used as stable pass criterion"
+    },
+    "title": "Звонки — Коммуникации — KISS PM",
+    "url": "http://127.0.0.1:3108/communications/calls",
+    "visibleTextExcerpt": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nКомм.\nКоммуникации\n\nЗвонки · Портал подрядчиков Вектор\n\nПроект\nПортал подрядчиков Вектор\nМиграция данных Горсеть\nCRM intake\nКомната\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\nBrowser media room 1783448257140\nОткрыт\nJitsi\nВидео\nBrowser media room 1783448257140\n\nсоздал Анна Администратор · только что\n\nИдёт\nJitsi\nВидео\nВидеосвязь отключена. Сервер отклонил действие.\nУправление сессией\nПодключиться\nЯ вошёл\nЯ вышел\nЗавершить сессию\nЛента событий\nСессия начата\nтолько что\n\nАнна Администратор · Jitsi\n\nКомната создана\nтолько что\n\nАнна Администратор · Jitsi\n\nЗаписи\n\nЗаписей нет. Запись прикрепляется к звонку после загрузки вложения."
+  },
+  "screenshots": [
+    "docs/qa/full-eval/evidence/browser-media-provider-disabled-connect-2026-07-08/provider-disabled-connect-denied.png"
+  ],
+  "consoleLogs": [],
+  "limitations": [
+    "Does not verify real Chrome camera/microphone permission prompt because accepting those prompts needs action-time user confirmation.",
+    "Does not verify OBS virtual camera, real microphone, LiveKit media publishing, external Jitsi page, remote participant, reconnect, or leave/rejoin.",
+    "This covers the explicit no-provider/degraded browser path only."
+  ],
+  "pass": true,
+  "passCriteria": [
+    "Persistent page text includes provider-disabled denial: Видеосвязь отключена. Сервер отклонил действие.",
+    "Session remains started/managed with Подключиться, Я вошёл, Я вышел, Завершить сессию controls.",
+    "No camera/microphone permission prompt was accepted."
+  ]
+}

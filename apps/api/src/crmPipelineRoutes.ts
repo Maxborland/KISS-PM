@@ -36,6 +36,9 @@ function crmPipelineUniqueConflict(
   | "crm_pipeline_stage_id_taken"
   | "crm_pipeline_stage_name_taken"
   | "crm_pipeline_stage_sort_order_taken"
+  | "crm_pipeline_transition_rule_id_taken"
+  | "crm_pipeline_transition_rule_edge_taken"
+  | "crm_pipeline_stage_automation_id_taken"
   | null {
   let current: unknown = error;
   for (let depth = 0; current != null && depth < 8; depth += 1) {
@@ -59,6 +62,15 @@ function crmPipelineUniqueConflict(
       }
       if (marker.includes("crm_pipeline_stages_tenant_pipeline_sort_order_uidx")) {
         return "crm_pipeline_stage_sort_order_taken";
+      }
+      if (marker.includes("crm_pipeline_transition_rules_pkey")) {
+        return "crm_pipeline_transition_rule_id_taken";
+      }
+      if (marker.includes("crm_pipeline_transition_rules_edge_uidx")) {
+        return "crm_pipeline_transition_rule_edge_taken";
+      }
+      if (marker.includes("crm_pipeline_stage_automation_definitions_pkey")) {
+        return "crm_pipeline_stage_automation_id_taken";
       }
       if (marker.includes("crm_pipelines_pkey")) return "crm_pipeline_id_taken";
       if (marker.includes("crm_pipelines_tenant_id_name_uidx")) return "crm_pipeline_name_taken";
@@ -373,22 +385,29 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       return context.json({ error: "crm_pipeline_stage_not_found" }, 404);
     }
 
-    const transitionRule = await runMutationWithAudit({
-      actor,
-      decision,
-      actionType: "crm_pipeline_transition_rule.created",
-      sourceEntityType: "CrmPipelineTransitionRule",
-      commandInput: parsed.value,
-      beforeState: null,
-      mutate: async (transactionDataSource) => {
-        if (!transactionDataSource.createCrmPipelineTransitionRule || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
-          throw new Error("transactional_crm_pipeline_transition_rule_create_not_configured");
+    let transitionRule;
+    try {
+      transitionRule = await runMutationWithAudit({
+        actor,
+        decision,
+        actionType: "crm_pipeline_transition_rule.created",
+        sourceEntityType: "CrmPipelineTransitionRule",
+        commandInput: parsed.value,
+        beforeState: null,
+        mutate: async (transactionDataSource) => {
+          if (!transactionDataSource.createCrmPipelineTransitionRule || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
+            throw new Error("transactional_crm_pipeline_transition_rule_create_not_configured");
+          }
+          const created = await transactionDataSource.createCrmPipelineTransitionRule(parsed.value);
+          await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
+          return created;
         }
-        const created = await transactionDataSource.createCrmPipelineTransitionRule(parsed.value);
-        await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
-        return created;
-      }
-    });
+      });
+    } catch (error) {
+      const conflict = crmPipelineUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     return context.json({ transitionRule }, 201);
   });
@@ -513,20 +532,27 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
       return context.json({ error: "crm_pipeline_stage_not_found" }, 404);
     }
 
-    const automation = await runMutationWithAudit({
-      actor,
-      decision,
-      actionType: "crm_pipeline_stage_automation.created",
-      sourceEntityType: "CrmPipelineStageAutomationDefinition",
-      commandInput: parsed.value,
-      beforeState: null,
-      mutate: async (transactionDataSource) => {
-        if (!transactionDataSource.createCrmPipelineStageAutomationDefinition) {
-          throw new Error("transactional_crm_pipeline_automation_create_not_configured");
+    let automation;
+    try {
+      automation = await runMutationWithAudit({
+        actor,
+        decision,
+        actionType: "crm_pipeline_stage_automation.created",
+        sourceEntityType: "CrmPipelineStageAutomationDefinition",
+        commandInput: parsed.value,
+        beforeState: null,
+        mutate: async (transactionDataSource) => {
+          if (!transactionDataSource.createCrmPipelineStageAutomationDefinition) {
+            throw new Error("transactional_crm_pipeline_automation_create_not_configured");
+          }
+          return transactionDataSource.createCrmPipelineStageAutomationDefinition(parsed.value);
         }
-        return transactionDataSource.createCrmPipelineStageAutomationDefinition(parsed.value);
-      }
-    });
+      });
+    } catch (error) {
+      const conflict = crmPipelineUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     return context.json({ automation }, 201);
   });

@@ -1,0 +1,52 @@
+{
+  "id": "RISK-AGENT-NON-CREATE-TASK-EXECUTE-TAIL-2026-07-08",
+  "generatedAt": "2026-07-08T01:18:00+07:00",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "scope": "Remaining real LLM/SSE agent atom outside create_task: non-create_task execute paths, SSE/client event handling, reject filtering, and degraded provider fail-closed behavior.",
+  "secretsPolicy": "No provider secrets were read, printed, or written. This evidence uses deterministic route/client tests only.",
+  "result": "pass-after-test-harness-fix",
+  "productionBugFound": false,
+  "testHarnessFix": {
+    "file": "apps/api/src/agent/agentExecute.test.ts",
+    "rootCause": "The harness session expired on 2026-07-01, so current-date runs authenticated as 401 before reaching agent execute behavior.",
+    "change": "Moved the fake session expiry to 2099-01-01 and renamed a misleading version-lock test that was previously labeled as permission-denied coverage. No production code changed."
+  },
+  "verifiedAtoms": [
+    {
+      "atom": "non-create_task mutation: comment_task",
+      "evidence": "agent /execute redispatches comment_task to the governed comments route and does not return tool_not_executable_yet. In this harness the governed route returns persistence_not_configured/task_not_found/permission_missing rather than a fake agent success."
+    },
+    {
+      "atom": "non-create_task mutation: apply_resource_resolution",
+      "evidence": "agent /execute applies a previewed planning scenario through the governed scenario apply route, bumps planVersion from 5 to 6, records planning.scenario.applied, and records agent.apply_resource_resolution.applied provenance."
+    },
+    {
+      "atom": "governed rejection/no fake success",
+      "evidence": "stale clientPlanVersion through agent /execute returns 422 plan_version_conflict and applies no planning commands."
+    },
+    {
+      "atom": "SSE/client parser and reject filtering",
+      "evidence": "web tests cover reasoning/analyze/proposal/done SSE parsing, CRLF/chunking/error/incomplete-stream behavior, and reject-one/apply-one UI filtering where only the selected change_task_status action is sent to execute."
+    },
+    {
+      "atom": "provider degraded/no silent mock",
+      "evidence": "absent provider configuration reports mock-llm live=false configured=false and both /propose and /propose/stream return 503 agent_provider_not_configured."
+    }
+  ],
+  "commands": [
+    {
+      "command": "codegraph sync",
+      "result": "pass; Already up to date"
+    },
+    {
+      "command": "& .\\node_modules\\.bin\\vitest.cmd run apps/api/src/agent/agentExecute.test.ts apps/api/src/agent/agentProviderDegraded.test.ts apps/api/src/agent/agentLoop.test.ts apps/web/src/workspace/agent/agent-stream.test.ts apps/web/src/workspace/agent/agent-surface.test.tsx",
+      "resultBeforeFix": "failed; apps/api/src/agent/agentExecute.test.ts 3 failed because the test session was expired and requests returned 401/undefined results",
+      "resultAfterFix": "pass; 5 files passed, 22 tests passed"
+    }
+  ],
+  "remainingGaps": [
+    "This evidence does not run live OpenRouter/Anthropic network calls or browser UI traversal; those remain covered only by previous live evidence when provider credentials were available.",
+    "True permission-denied apply for scenario-apply was not added here; the checked rejection variant is governed plan_version_conflict."
+  ],
+  "status": "pass"
+}

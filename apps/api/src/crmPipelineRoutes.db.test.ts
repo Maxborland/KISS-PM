@@ -387,6 +387,167 @@ describe("CRM pipeline API", () => {
       { action_type: "crm_pipeline_stage.created", count: 1 }
     ]);
   });
+  it("keeps transition rule and automation duplicate submits conflict-safe with readback and one audit event", async () => {
+    const cookie = await loginAs("admin@alpha.test", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const pipelineResponse = await app.request("/api/workspace/crm/pipelines", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "pipeline-rule-race", name: "Rule race pipeline" })
+    });
+    expect(pipelineResponse.status).toBe(201);
+
+    const fromStageResponse = await app.request(
+      "/api/workspace/crm/pipelines/pipeline-rule-race/stages",
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ id: "pipeline-rule-race-from", name: "From", sortOrder: 10 })
+      }
+    );
+    const toStageResponse = await app.request(
+      "/api/workspace/crm/pipelines/pipeline-rule-race/stages",
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ id: "pipeline-rule-race-to", name: "To", sortOrder: 20 })
+      }
+    );
+    expect(fromStageResponse.status).toBe(201);
+    expect(toStageResponse.status).toBe(201);
+
+    const transitionRuleBody = {
+      fromStageId: "pipeline-rule-race-from",
+      toStageId: "pipeline-rule-race-to",
+      requiredPermission: "tenant.opportunities.manage",
+      requiredFields: ["contractValue"],
+      requireReason: true
+    };
+    const transitionRuleResponses = await Promise.all([
+      app.request("/api/workspace/crm/pipelines/pipeline-rule-race/transition-rules", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...transitionRuleBody, id: "pipeline-rule-race-edge-a" })
+      }),
+      app.request("/api/workspace/crm/pipelines/pipeline-rule-race/transition-rules", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...transitionRuleBody, id: "pipeline-rule-race-edge-b" })
+      })
+    ]);
+
+    expect(transitionRuleResponses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const transitionRuleCreated = transitionRuleResponses.find((response) => response.status === 201);
+    const transitionRuleConflict = transitionRuleResponses.find((response) => response.status === 409);
+    expect(transitionRuleCreated).toBeDefined();
+    expect(transitionRuleConflict).toBeDefined();
+    const createdTransitionRule = (await transitionRuleCreated!.json()).transitionRule;
+    expect(["pipeline-rule-race-edge-a", "pipeline-rule-race-edge-b"]).toContain(createdTransitionRule.id);
+    await expect(transitionRuleConflict!.json()).resolves.toEqual({
+      error: "crm_pipeline_transition_rule_edge_taken"
+    });
+
+    const automationBody = {
+      id: "pipeline-automation-race-id",
+      stageId: "pipeline-rule-race-to",
+      trigger: "stage_entered",
+      actionType: "create_task",
+      actionConfig: { title: "Prepare handoff" }
+    };
+    const automationResponses = await Promise.all([
+      app.request("/api/workspace/crm/pipelines/pipeline-rule-race/automations", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(automationBody)
+      }),
+      app.request("/api/workspace/crm/pipelines/pipeline-rule-race/automations", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(automationBody)
+      })
+    ]);
+
+    expect(automationResponses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const automationConflict = automationResponses.find((response) => response.status === 409);
+    expect(automationConflict).toBeDefined();
+    await expect(automationConflict!.json()).resolves.toEqual({
+      error: "crm_pipeline_stage_automation_id_taken"
+    });
+
+    const transitionRulesList = await app.request(
+      "/api/workspace/crm/pipelines/pipeline-rule-race/transition-rules",
+      { headers: { cookie } }
+    );
+    expect(transitionRulesList.status).toBe(200);
+    await expect(transitionRulesList.json()).resolves.toMatchObject({
+      transitionRules: [
+        {
+          id: createdTransitionRule.id,
+          fromStageId: "pipeline-rule-race-from",
+          toStageId: "pipeline-rule-race-to"
+        }
+      ]
+    });
+
+    const automationsList = await app.request(
+      "/api/workspace/crm/pipelines/pipeline-rule-race/automations",
+      { headers: { cookie } }
+    );
+    expect(automationsList.status).toBe(200);
+    await expect(automationsList.json()).resolves.toMatchObject({
+      automations: [
+        {
+          id: "pipeline-automation-race-id",
+          stageId: "pipeline-rule-race-to",
+          trigger: "stage_entered",
+          actionType: "create_task"
+        }
+      ]
+    });
+
+    const pipelinesList = await app.request("/api/workspace/crm/pipelines", {
+      headers: { cookie }
+    });
+    expect(pipelinesList.status).toBe(200);
+    await expect(pipelinesList.json()).resolves.toMatchObject({
+      pipelines: [
+        {
+          id: "pipeline-rule-race",
+          lifecycleGraphMetadata: {
+            transitions: [
+              {
+                ruleId: createdTransitionRule.id,
+                fromStageId: "pipeline-rule-race-from",
+                toStageId: "pipeline-rule-race-to"
+              }
+            ]
+          }
+        }
+      ]
+    });
+
+    const auditRows = await client`
+      SELECT action_type, count(*)::int AS count
+      FROM audit_events
+      WHERE tenant_id = 'tenant-alpha'
+        AND source_workflow = 'crm_pipeline_management'
+        AND action_type IN (
+          'crm_pipeline_transition_rule.created',
+          'crm_pipeline_stage_automation.created'
+        )
+      GROUP BY action_type
+      ORDER BY action_type ASC
+    `;
+    expect(auditRows).toEqual([
+      { action_type: "crm_pipeline_stage_automation.created", count: 1 },
+      { action_type: "crm_pipeline_transition_rule.created", count: 1 }
+    ]);
+  });
   it("keeps pipeline lists tenant scoped", async () => {
     const alphaCookie = await loginAs("admin@alpha.test", "admin12345");
     const betaCookie = await loginAs("admin@beta.test", "admin12345");

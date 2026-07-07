@@ -1,0 +1,54 @@
+{
+  "generatedAt": "2026-07-08T01:20:00+07:00",
+  "id": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY-CRM-PIPELINE-RULES-AUTOMATION",
+  "status": "fixed-by-current-branch",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "scope": "First-class CRM pipeline transition-rule and stage-automation create routes: duplicate/race conflict handling and audit/readback coverage.",
+  "spec": {
+    "expected": [
+      "Concurrent duplicate transition-rule edge creates exactly one rule and returns one 409 conflict for the loser.",
+      "Concurrent duplicate automation id creates exactly one automation and returns one 409 conflict for the loser.",
+      "Successful creates remain audited exactly once per created entity because mutation and audit stay in the existing transaction wrapper.",
+      "Readback endpoints expose exactly one transition rule and one automation after the duplicate race; pipeline lifecycle graph references the surviving rule."
+    ],
+    "nonGoals": [
+      "No schema migration or new uniqueness model was added.",
+      "No idempotency-key protocol was introduced; this slice follows the existing CRM pipeline/stage 409 conflict contract.",
+      "No reconciliation matrix edit; orchestrator owns integration."
+    ]
+  },
+  "fix": {
+    "files": [
+      "apps/api/src/crmPipelineRoutes.ts",
+      "apps/api/src/crmPipelineRoutes.db.test.ts"
+    ],
+    "behavior": "Maps Postgres 23505 constraints for transition-rule id, transition-rule edge, and automation id to stable 409 JSON errors; wraps transition-rule and automation create mutations in the same conflict handling used by pipeline/stage creates."
+  },
+  "evidence": {
+    "testsAdded": [
+      "apps/api/src/crmPipelineRoutes.db.test.ts: keeps transition rule and automation duplicate submits conflict-safe with readback and one audit event"
+    ],
+    "commands": [
+      {
+        "command": ".\\node_modules\\.bin\\tsc.CMD -b --pretty false",
+        "result": "PASS"
+      },
+      {
+        "command": ".\\node_modules\\.bin\\vitest.CMD run apps/api/src/crmPipelineRoutes.test.ts",
+        "result": "PASS: 1 file, 3 tests. Pre-existing Vite/esbuild warning about duplicate case assignment.delete in packages/domain/src/planning/commandReducer.ts."
+      },
+      {
+        "command": ".\\node_modules\\.bin\\vitest.CMD run --config vitest.db.config.ts apps/api/src/crmPipelineRoutes.db.test.ts",
+        "result": "PASS after orchestrator rerun with DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm: 1 file passed; 1 test passed; 4 skipped. Transition-rule edge duplicate and automation-id duplicate both returned stable 201/409 with readback/audit assertions."
+      },
+      {
+        "command": "pnpm vitest run --config vitest.db.config.ts apps/api/src/crmPipelineRoutes.db.test.ts",
+        "result": "BLOCKED: pnpm attempted install/deps status and stopped on ERR_PNPM_IGNORED_BUILDS before running Vitest."
+      }
+    ]
+  },
+  "remainingRisk": "Broader write-flow matrix remains open outside this atom; this transition-rule/automation duplicate-submit slice is verified green locally.",
+  "integrationVerifiedAt": "2026-07-08T01:22:19+07:00"
+}

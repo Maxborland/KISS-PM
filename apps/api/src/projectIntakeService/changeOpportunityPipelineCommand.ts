@@ -40,6 +40,10 @@ export async function changeOpportunityPipeline(
   );
   if (!stage) return { ok: false, status: 404, error: "deal_stage_not_found" };
 
+  if (pipeline.id === opportunity.pipelineId && stage.id === opportunity.stageId) {
+    return { ok: true, status: 200, opportunity };
+  }
+
   // Перенос ВНУТРИ той же воронки — это не смена воронки, а смена стадии: её гварды
   // (stage_transitions / minProbability / requireFeasibilityOk) проверяет только /stage.
   // evaluatePipelineChange их не загружает, поэтому здесь блокируем no-op-воронку, чтобы

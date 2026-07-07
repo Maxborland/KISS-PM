@@ -452,6 +452,380 @@ describe("Phase 3.1 CRM API", () => {
     `;
     expect(Number(opportunityRows[0]?.count ?? 0)).toBe(1);
   });
+  it("keeps opportunity stage and pipeline writes idempotent and race-safe", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-opportunity-write-risk", name: "Клиент write risk" })
+    });
+    await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "contact-opportunity-write-risk",
+        clientId: "client-opportunity-write-risk",
+        name: "Контакт write risk"
+      })
+    });
+    await app.request("/api/workspace/project-types", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "project-type-opportunity-write-risk", name: "Write risk" })
+    });
+
+    const firstStageResponse = await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-risk-a", name: "Risk A", sortOrder: 10 })
+    });
+    const firstStageBody = (await firstStageResponse.json()) as {
+      dealStage: { pipelineId: string };
+    };
+    const defaultPipelineId = firstStageBody.dealStage.pipelineId;
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-risk-b", name: "Risk B", sortOrder: 20 })
+    });
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-risk-c", name: "Risk C", sortOrder: 30 })
+    });
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-risk-d", name: "Risk D", sortOrder: 40 })
+    });
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-risk-archived", name: "Risk archived", sortOrder: 50 })
+    });
+    await app.request("/api/workspace/deal-stages/deal-stage-risk-archived", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        name: "Risk archived",
+        sortOrder: 50,
+        status: "archived"
+      })
+    });
+    await app.request("/api/workspace/pipelines", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "pipeline-opportunity-write-risk-target",
+        name: "Write risk target",
+        sortOrder: 20
+      })
+    });
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "deal-stage-risk-target",
+        pipelineId: "pipeline-opportunity-write-risk-target",
+        name: "Risk target",
+        sortOrder: 10
+      })
+    });
+
+    const opportunityBody = {
+      clientId: "client-opportunity-write-risk",
+      primaryContactId: "contact-opportunity-write-risk",
+      projectTypeId: "project-type-opportunity-write-risk",
+      description: null,
+      plannedStart: "2026-06-01",
+      plannedFinish: "2026-06-12",
+      contractValue: 960000,
+      plannedHourlyRate: 6000,
+      probability: 80,
+      templateId: null,
+      demand: [{ positionId: "position-engineer", requiredHours: 120 }]
+    };
+
+    const missingStageCreate = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        ...opportunityBody,
+        id: "opportunity-risk-missing-stage",
+        stageId: "deal-stage-risk-missing",
+        title: "Missing stage"
+      })
+    });
+    expect(missingStageCreate.status).toBe(404);
+    await expect(missingStageCreate.json()).resolves.toEqual({
+      error: "deal_stage_not_found"
+    });
+    const archivedStageCreate = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        ...opportunityBody,
+        id: "opportunity-risk-archived-stage",
+        stageId: "deal-stage-risk-archived",
+        title: "Archived stage"
+      })
+    });
+    expect(archivedStageCreate.status).toBe(404);
+    await expect(archivedStageCreate.json()).resolves.toEqual({
+      error: "deal_stage_not_found"
+    });
+
+    const duplicateTitleResponses = await Promise.all([
+      app.request("/api/workspace/opportunities", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          ...opportunityBody,
+          id: "opportunity-risk-title-a",
+          stageId: "deal-stage-risk-a",
+          title: "Duplicate title allowed"
+        })
+      }),
+      app.request("/api/workspace/opportunities", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          ...opportunityBody,
+          id: "opportunity-risk-title-b",
+          stageId: "deal-stage-risk-a",
+          title: "Duplicate title allowed"
+        })
+      })
+    ]);
+    expect(duplicateTitleResponses.map((response) => response.status).sort()).toEqual([
+      201,
+      201
+    ]);
+    const duplicateTitleRows = await client`
+      SELECT count(*)::int AS count
+      FROM opportunities
+      WHERE tenant_id = 'tenant-alpha'
+        AND title = 'Duplicate title allowed'
+    `;
+    expect(Number(duplicateTitleRows[0]?.count ?? 0)).toBe(2);
+
+    const opportunityResponse = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        ...opportunityBody,
+        id: "opportunity-risk-stage-pipeline",
+        stageId: "deal-stage-risk-a",
+        title: "Stage pipeline race"
+      })
+    });
+    expect(opportunityResponse.status).toBe(201);
+    await expect(opportunityResponse.json()).resolves.toMatchObject({
+      opportunity: {
+        id: "opportunity-risk-stage-pipeline",
+        stageId: "deal-stage-risk-a",
+        pipelineId: defaultPipelineId
+      }
+    });
+
+    const missingStageMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/stage",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ stageId: "deal-stage-risk-missing" })
+      }
+    );
+    const archivedStageMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/stage",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ stageId: "deal-stage-risk-archived" })
+      }
+    );
+    expect(missingStageMove.status).toBe(404);
+    await expect(missingStageMove.json()).resolves.toEqual({
+      error: "deal_stage_not_found"
+    });
+    expect(archivedStageMove.status).toBe(404);
+    await expect(archivedStageMove.json()).resolves.toEqual({
+      error: "deal_stage_not_found"
+    });
+
+    const firstStageMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/stage",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ stageId: "deal-stage-risk-b" })
+      }
+    );
+    expect(firstStageMove.status).toBe(200);
+    await expect(firstStageMove.json()).resolves.toMatchObject({
+      opportunity: { stageId: "deal-stage-risk-b", pipelineId: defaultPipelineId }
+    });
+    expect(await countOpportunityAuditEvents("opportunity.stage_updated")).toBe(1);
+
+    const duplicateStageMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/stage",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ stageId: "deal-stage-risk-b" })
+      }
+    );
+    expect(duplicateStageMove.status).toBe(200);
+    await expect(duplicateStageMove.json()).resolves.toMatchObject({
+      opportunity: { stageId: "deal-stage-risk-b", pipelineId: defaultPipelineId }
+    });
+    expect(await countOpportunityAuditEvents("opportunity.stage_updated")).toBe(1);
+
+    const concurrentStageMoves = await Promise.all(
+      ["deal-stage-risk-c", "deal-stage-risk-d"].map(async (stageId) => {
+        const response = await app.request(
+          "/api/workspace/opportunities/opportunity-risk-stage-pipeline/stage",
+          {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ stageId })
+          }
+        );
+        return { status: response.status, body: await response.json() };
+      })
+    );
+    expect(concurrentStageMoves.map((result) => result.status).sort()).toEqual([
+      200,
+      200
+    ]);
+    expect(
+      concurrentStageMoves.map((result) => result.body.opportunity.stageId).sort()
+    ).toEqual(["deal-stage-risk-c", "deal-stage-risk-d"]);
+    const stageReadback = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline",
+      { headers: { "x-kiss-pm-action": "same-origin", cookie } }
+    );
+    expect(stageReadback.status).toBe(200);
+    const stageReadbackBody = await stageReadback.json();
+    expect(["deal-stage-risk-c", "deal-stage-risk-d"]).toContain(
+      stageReadbackBody.opportunity.stageId
+    );
+    expect(stageReadbackBody.opportunity.pipelineId).toBe(defaultPipelineId);
+    expect(await countOpportunityAuditEvents("opportunity.stage_updated")).toBe(3);
+
+    const missingPipelineMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/pipeline",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          pipelineId: "pipeline-opportunity-write-risk-missing",
+          stageId: "deal-stage-risk-target"
+        })
+      }
+    );
+    expect(missingPipelineMove.status).toBe(404);
+    await expect(missingPipelineMove.json()).resolves.toEqual({
+      error: "pipeline_not_found"
+    });
+    const wrongStagePipelineMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/pipeline",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          pipelineId: "pipeline-opportunity-write-risk-target",
+          stageId: "deal-stage-risk-a"
+        })
+      }
+    );
+    expect(wrongStagePipelineMove.status).toBe(409);
+    await expect(wrongStagePipelineMove.json()).resolves.toEqual({
+      error: "stage_not_in_pipeline"
+    });
+    expect(await countOpportunityAuditEvents("opportunity.pipeline_changed")).toBe(0);
+
+    const pipelineMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/pipeline",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          pipelineId: "pipeline-opportunity-write-risk-target",
+          stageId: "deal-stage-risk-target"
+        })
+      }
+    );
+    expect(pipelineMove.status).toBe(200);
+    await expect(pipelineMove.json()).resolves.toMatchObject({
+      opportunity: {
+        stageId: "deal-stage-risk-target",
+        pipelineId: "pipeline-opportunity-write-risk-target"
+      }
+    });
+    expect(await countOpportunityAuditEvents("opportunity.pipeline_changed")).toBe(1);
+
+    const duplicatePipelineMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/pipeline",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          pipelineId: "pipeline-opportunity-write-risk-target",
+          stageId: "deal-stage-risk-target"
+        })
+      }
+    );
+    expect(duplicatePipelineMove.status).toBe(200);
+    await expect(duplicatePipelineMove.json()).resolves.toMatchObject({
+      opportunity: {
+        stageId: "deal-stage-risk-target",
+        pipelineId: "pipeline-opportunity-write-risk-target"
+      }
+    });
+    expect(await countOpportunityAuditEvents("opportunity.pipeline_changed")).toBe(1);
+
+    const invalidOpportunityRows = await client`
+      SELECT count(*)::int AS count
+      FROM opportunities
+      WHERE tenant_id = 'tenant-alpha'
+        AND id IN ('opportunity-risk-missing-stage', 'opportunity-risk-archived-stage')
+    `;
+    expect(Number(invalidOpportunityRows[0]?.count ?? 0)).toBe(0);
+    expect(
+      await countOpportunityAuditEvents(
+        "opportunity.created",
+        "opportunity-risk-missing-stage"
+      )
+    ).toBe(0);
+    expect(
+      await countOpportunityAuditEvents(
+        "opportunity.created",
+        "opportunity-risk-archived-stage"
+      )
+    ).toBe(0);
+
+    async function countOpportunityAuditEvents(
+      actionType: string,
+      opportunityId = "opportunity-risk-stage-pipeline"
+    ) {
+      const rows = await client`
+        SELECT count(*)::int AS count
+        FROM audit_events
+        WHERE tenant_id = 'tenant-alpha'
+          AND action_type = ${actionType}
+          AND source_entity ->> 'type' = 'Opportunity'
+          AND source_entity ->> 'id' = ${opportunityId}
+      `;
+      return Number(rows[0]?.count ?? 0);
+    }
+  });
   // Регресс BUG-CRM-01: дубликат SKU/имени продукта должен давать 409, а не 500.
   it("returns 409 (not 500) when creating a product with a duplicate SKU or name", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");

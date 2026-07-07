@@ -62,7 +62,7 @@ function createHarness() {
     async listUsersByTenantId() { return []; },
     async listWorkspaceUsers() { return []; },
     async findSessionByTokenHash() {
-      return { id: "s", tenantId: "tenant-1", userId: "user-planner", tokenHash: "ignored", expiresAt: new Date("2026-07-01T00:00:00.000Z") };
+      return { id: "s", tenantId: "tenant-1", userId: "user-planner", tokenHash: "ignored", expiresAt: new Date("2099-01-01T00:00:00.000Z") };
     },
     async withTransaction(operation) { return operation(dataSource as ApiTenantDataSource); },
     async lockTenantResourcePlanning() { return; },
@@ -142,10 +142,10 @@ describe("agent /execute → governed scenario apply (internal re-dispatch)", ()
     expect(harness.auditActionTypes).toContain("agent.apply_resource_resolution.applied");
   });
 
-  it("rejects apply when the actor lacks scenario-apply permission (RBAC at the governed route)", async () => {
+  it("rejects apply when the governed scenario route reports a plan version conflict", async () => {
     const harness = createHarness();
-    // Понизить права нельзя на лету (профиль фиксирован), поэтому проверяем version-lock как
-    // доказательство, что переотправка реально доходит до governed-проверок, а не фейк-успех.
+    // Проверяем version-lock как доказательство, что переотправка реально доходит до
+    // governed-проверок, а не фейк-успех.
     const overload = createPlanningReadModel(overloadedSnapshot()).resourceLoad.overloads[0]!;
     const preview = await post(harness.app, "/api/workspace/projects/project-1/planning/scenarios/preview", {
       clientPlanVersion: 5,

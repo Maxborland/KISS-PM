@@ -1,0 +1,81 @@
+{
+  "atom": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "area": "CRM opportunity stage/pipeline writes",
+  "date": "2026-07-08",
+  "status": "fixed_and_verified",
+  "scope": {
+    "routes_under_test": [
+      "POST /api/workspace/opportunities",
+      "PATCH /api/workspace/opportunities/:opportunityId/stage",
+      "PATCH /api/workspace/opportunities/:opportunityId/pipeline",
+      "GET /api/workspace/opportunities/:opportunityId"
+    ],
+    "files_touched": [
+      "apps/api/src/projectIntakeService/changeOpportunityStageCommand.ts",
+      "apps/api/src/projectIntakeService/changeOpportunityPipelineCommand.ts",
+      "apps/api/src/crmRoutes.db.test.ts"
+    ],
+    "matrix_edited": false
+  },
+  "risk_checks": [
+    {
+      "check": "stale/nonexistent stage on opportunity create",
+      "result": "404 deal_stage_not_found; no opportunity row; no opportunity.created audit for rejected ids"
+    },
+    {
+      "check": "stale/nonexistent stage on stage move",
+      "result": "404 deal_stage_not_found; opportunity readback unchanged; no successful stage audit for rejected move"
+    },
+    {
+      "check": "duplicate opportunity id race",
+      "result": "existing DB test confirms one 201 and one 409 opportunity_id_taken, with exactly one row"
+    },
+    {
+      "check": "duplicate opportunity title/name constraint",
+      "result": "two different opportunity ids with the same title both return 201; schema has no opportunity title/name unique constraint, only tenant+id primary key"
+    },
+    {
+      "check": "concurrent stage move",
+      "result": "two concurrent moves return 200/200; final readback has one target stage and the expected pipeline; audit count matches successful real moves"
+    },
+    {
+      "check": "duplicate same-stage submit",
+      "result": "production bug reproduced before fix: second same-stage PATCH returned 200 but wrote a duplicate opportunity.stage_updated audit; fixed to return current readback without write/audit"
+    },
+    {
+      "check": "pipeline move stale refs and wrong stage/pipeline pair",
+      "result": "missing pipeline returns 404 pipeline_not_found; stage from another pipeline returns 409 stage_not_in_pipeline; no opportunity.pipeline_changed audit"
+    },
+    {
+      "check": "duplicate same-pipeline submit",
+      "result": "fixed exact duplicate /pipeline move to return 200 current readback without write/audit instead of 409/no-op confusion"
+    }
+  ],
+  "fix_summary": [
+    "changeOpportunityStage now treats exact current stage+pipeline as an idempotent no-op after auth and target-stage validation, before transaction/audit.",
+    "changeOpportunityPipeline now treats exact current pipeline+stage as an idempotent no-op after auth and target refs validation, before cross_pipeline_move rejection and transaction/audit."
+  ],
+  "verification": [
+    {
+      "command": "local vitest run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts with DATABASE_URL pointed at compose postgres port",
+      "red_result": "failed as expected before fix: expected 2 opportunity.stage_updated audit events to be 1 for duplicate same-stage submit"
+    },
+    {
+      "command": "local vitest run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts with DATABASE_URL pointed at compose postgres port",
+      "green_result": "PASS: 1 test file, 15 tests passed"
+    },
+    {
+      "command": "local tsc -b --pretty false",
+      "result": "PASS"
+    }
+  ],
+  "notes": [
+    "Initial pnpm vitest command did not run tests because pnpm attempted install and hit ERR_PNPM_IGNORED_BUILDS.",
+    "Initial local vitest command needed escalation because sandbox blocked esbuild child process spawn.",
+    "Default DB port 55432 rejected auth in this environment; compose postgres was healthy on 55433, so targeted DB verification used the active compose port without recording credentials."
+  ],
+  "unverified_gaps": [
+    "No browser/UI smoke was run for CRM deal board duplicate submits; this atom was API/DB scoped.",
+    "Full repository test suite was not run; targeted CRM DB suite and TypeScript build check passed."
+  ]
+}
