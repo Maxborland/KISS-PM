@@ -1951,6 +1951,80 @@ describe("planning API routes", () => {
     });
   });
 
+  it("deduplicates concurrent apply-command-batch requests with the same idempotency key", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-batch-race-a",
+      title: "Batch race A",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
+    await createTask(adminCookie, {
+      id: "task-batch-race-b",
+      title: "Batch race B",
+      start: "2026-06-04",
+      finish: "2026-06-05"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    expect(initial.status).toBe(200);
+
+    const commands = [
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-batch-race-a", title: "Concurrent batch rename A" }
+      },
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-batch-race-b", title: "Concurrent batch rename B" }
+      }
+    ];
+    const request = () =>
+      app.request("/api/workspace/projects/project-alpha/planning/apply-command-batch", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-batch-race-key"
+        })
+      });
+
+    const [first, second] = await Promise.all([request(), request()]);
+    const firstBody = await first.json();
+    const secondBody = await second.json();
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(secondBody).toEqual(firstBody);
+    expect(firstBody.newPlanVersion).toBe(initialBody.planVersion + 1);
+    expect(firstBody.readModel.authored.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "task-batch-race-a", title: "Concurrent batch rename A" }),
+        expect.objectContaining({ id: "task-batch-race-b", title: "Concurrent batch rename B" })
+      ])
+    );
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    expect(after.status).toBe(200);
+    expect(afterBody.planVersion).toBe(initialBody.planVersion + 1);
+    expect(afterBody.authored.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "task-batch-race-a", title: "Concurrent batch rename A" }),
+        expect.objectContaining({ id: "task-batch-race-b", title: "Concurrent batch rename B" })
+      ])
+    );
+  });
+
   it("deduplicates concurrent baseline.capture apply requests with the same idempotency key", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask(adminCookie, {
