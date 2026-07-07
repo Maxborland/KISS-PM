@@ -1,4 +1,4 @@
-﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabase,
@@ -1533,6 +1533,80 @@ describe("API with PostgreSQL data source", () => {
         id: "user-alpha-admin",
         phone: null,
         telegram: null
+      }
+    });
+  });
+
+
+  it("keeps duplicate profile and theme updates stable with readback", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", ["admin", "12345"].join(""));
+    const profilePayload = {
+      name: "Анна Duplicate Stable",
+      phone: "+7 999 222-33-44",
+      telegram: "@anna_stable"
+    };
+    const themePayload = {
+      theme: "dark",
+      accentColor: "#123ABC"
+    };
+
+    const profileResponses = await Promise.all([
+      app.request("/api/profile", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify(profilePayload)
+      }),
+      app.request("/api/profile", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify(profilePayload)
+      })
+    ]);
+    const themeResponses = await Promise.all([
+      app.request("/api/profile/theme", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify(themePayload)
+      }),
+      app.request("/api/profile/theme", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify(themePayload)
+      })
+    ]);
+
+    expect(profileResponses.map((response) => response.status)).toEqual([200, 200]);
+    expect(themeResponses.map((response) => response.status)).toEqual([200, 200]);
+
+    const me = await app.request("/api/auth/me", {
+      headers: { cookie }
+    });
+
+    expect(me.status).toBe(200);
+    await expect(me.json()).resolves.toMatchObject({
+      user: {
+        id: "user-alpha-admin",
+        name: profilePayload.name,
+        phone: profilePayload.phone,
+        telegram: profilePayload.telegram,
+        theme: themePayload.theme,
+        accentColor: "#123abc"
       }
     });
   });

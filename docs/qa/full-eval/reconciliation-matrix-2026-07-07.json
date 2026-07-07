@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 59,
+    "fixedByCurrentBranchItems": 60,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 4,
@@ -1138,8 +1138,21 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows the write-flow matrix for knowledge document-version stale/conflict handling only; broader write-flow duplicate/race/idempotency coverage remains open outside this atom."
-    }
-  ],
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PROFILE-THEME-DUPLICATE-UPDATES",
+      "source": "current branch targeted DB/API write-flow regression coverage",
+      "surface": "PATCH /api/profile, PATCH /api/profile/theme, GET /api/auth/me",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-profile-theme-duplicate-updates-2026-07-08.json: duplicate identical profile/theme PATCH calls return stable 200/200 pairs and session readback reflects the submitted profile fields plus normalized theme accent color.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"duplicate profile and theme\" -> pass; 1 selected test passed, 30 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows the write-flow matrix for profile contact and theme preference duplicate-submit stability only; broader write-flow duplicate/race/idempotency coverage remains open outside this atom."
+    }  ],
   "confirmedOpen": [],
   "unverified": [],
   "notABugOrSuperseded": [
@@ -1225,7 +1238,8 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-opportunity-stage-pipeline-idempotency-2026-07-08.json: CRM opportunity stage/pipeline duplicate submits are idempotent with readback and no duplicate audit side effects; concurrent divergent stage moves preserve final readback and bounded audit count.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-status-duplicate-archive-2026-07-08.json: Project Work task status duplicate create returns stable 201/409 with single-row/readback and single create audit; duplicate archive is idempotent with single archive audit.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-create-archive-idempotency-2026-07-08.json: Project Work project task duplicate create returns stable 201/409 with single task/readback, single create audit and created system activity; duplicate archive is idempotent with single archive audit.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-knowledge-version-conflict-2026-07-08.json: knowledge document version numbering collision returns stable 409 with no partial version row/audit side effects."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-knowledge-version-conflict-2026-07-08.json: knowledge document version numbering collision returns stable 409 with no partial version row/audit side effects.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-profile-theme-duplicate-updates-2026-07-08.json: profile contact and theme duplicate PATCH submissions return stable 200/200 pairs with session readback of the final values."
       ],
       "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work-task-status/project-work-project-task slices still need duplicate/race/idempotency evidence. CRM pipeline/stage, transition-rule/automation, opportunity stage/pipeline, Project Work task status, and Project Work project task create/archive duplicate-submit atoms are now covered."
     }
