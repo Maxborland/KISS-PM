@@ -128,6 +128,7 @@ export type CollaborationRepository = {
     channelId: string;
     title?: string;
     description?: string;
+    clientUpdatedAt?: Date;
   }): Promise<CommunicationChannel | undefined>;
   archiveCommunicationChannel(input: {
     tenantId: TenantId;
@@ -445,8 +446,22 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
       return mapCommunicationChannel(row);
     },
     async updateCommunicationChannel(input) {
+      const [current] = await db
+        .select({ updatedAt: communicationChannels.updatedAt })
+        .from(communicationChannels)
+        .where(
+          and(
+            eq(communicationChannels.tenantId, input.tenantId),
+            eq(communicationChannels.id, input.channelId),
+            isNull(communicationChannels.archivedAt)
+          )
+        )
+        .limit(1);
+      if (!current) return undefined;
+
+      const nextUpdatedAt = new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1));
       const updates: Partial<typeof communicationChannels.$inferInsert> = {
-        updatedAt: new Date()
+        updatedAt: nextUpdatedAt
       };
       if (input.title !== undefined) updates.title = input.title;
       if (input.description !== undefined) updates.description = input.description;
@@ -457,7 +472,10 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
           and(
             eq(communicationChannels.tenantId, input.tenantId),
             eq(communicationChannels.id, input.channelId),
-            isNull(communicationChannels.archivedAt)
+            isNull(communicationChannels.archivedAt),
+            input.clientUpdatedAt
+              ? eq(communicationChannels.updatedAt, input.clientUpdatedAt)
+              : sql`true`
           )
         )
         .returning();

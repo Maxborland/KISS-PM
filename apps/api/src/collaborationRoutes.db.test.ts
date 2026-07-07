@@ -726,6 +726,130 @@ describe("collaboration and communications API", () => {
     });
   });
 
+  it("keeps communication channel rename retry idempotent without duplicate audit", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const idempotentChannel = await app.request("/api/workspace/communication-channels", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        channelType: "custom",
+        title: "Канал для retry"
+      })
+    });
+    expect(idempotentChannel.status).toBe(201);
+    const idempotentChannelPayload = await idempotentChannel.json() as {
+      channel: { id: string; updatedAt: string };
+    };
+    const retryPatchBody = {
+      title: "Канал после retry",
+      description: "Повтор не должен двигать версию",
+      clientUpdatedAt: idempotentChannelPayload.channel.updatedAt
+    };
+    const firstRetryPatch = await app.request(
+      `/api/workspace/communication-channels/${idempotentChannelPayload.channel.id}`,
+      {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(retryPatchBody)
+      }
+    );
+    expect(firstRetryPatch.status).toBe(200);
+    const firstRetryPatchPayload = await firstRetryPatch.json() as {
+      channel: { title: string; description: string; updatedAt: string };
+    };
+    const secondRetryPatch = await app.request(
+      `/api/workspace/communication-channels/${idempotentChannelPayload.channel.id}`,
+      {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(retryPatchBody)
+      }
+    );
+    expect(secondRetryPatch.status).toBe(200);
+    const secondRetryPatchPayload = await secondRetryPatch.json() as {
+      channel: { title: string; description: string; updatedAt: string };
+    };
+    expect(secondRetryPatchPayload.channel).toMatchObject({
+      title: firstRetryPatchPayload.channel.title,
+      description: firstRetryPatchPayload.channel.description
+    });
+    expect(secondRetryPatchPayload.channel.updatedAt).toBe(firstRetryPatchPayload.channel.updatedAt);
+    const retryAuditRows = await client`
+      SELECT count(*)::int AS count
+      FROM audit_events
+      WHERE tenant_id = 'tenant-alpha'
+        AND action_type = 'communications.channel_updated'
+        AND source_entity ->> 'id' = ${idempotentChannelPayload.channel.id}`;
+    expect(Number(retryAuditRows[0]?.count ?? 0)).toBe(1);
+  });
+
+  it("rejects divergent concurrent communication channel rename from the same version", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const conflictChannel = await app.request("/api/workspace/communication-channels", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        channelType: "custom",
+        title: "Канал для конфликта"
+      })
+    });
+    expect(conflictChannel.status).toBe(201);
+    const conflictChannelPayload = await conflictChannel.json() as {
+      channel: { id: string; updatedAt: string };
+    };
+    const baseClientUpdatedAt = conflictChannelPayload.channel.updatedAt;
+    const [firstConflictPatch, secondConflictPatch] = await Promise.all([
+      app.request(`/api/workspace/communication-channels/${conflictChannelPayload.channel.id}`, {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({
+          title: "Победитель A",
+          description: "Версия A",
+          clientUpdatedAt: baseClientUpdatedAt
+        })
+      }),
+      app.request(`/api/workspace/communication-channels/${conflictChannelPayload.channel.id}`, {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({
+          title: "Победитель B",
+          description: "Версия B",
+          clientUpdatedAt: baseClientUpdatedAt
+        })
+      })
+    ]);
+    const conflictResponses = [firstConflictPatch, secondConflictPatch];
+    expect(conflictResponses.map((response) => response.status).sort()).toEqual([200, 409]);
+    const winnerResponse = conflictResponses.find((response) => response.status === 200);
+    const conflictResponse = conflictResponses.find((response) => response.status === 409);
+    expect(winnerResponse).toBeTruthy();
+    expect(conflictResponse).toBeTruthy();
+    await expect(conflictResponse?.json()).resolves.toEqual({
+      error: "communication_channel_version_conflict"
+    });
+    const winnerPayload = await winnerResponse!.json() as {
+      channel: { title: string; description: string };
+    };
+    const finalConflictRead = await app.request(
+      `/api/workspace/communication-channels/${conflictChannelPayload.channel.id}`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(finalConflictRead.status).toBe(200);
+    await expect(finalConflictRead.json()).resolves.toMatchObject({
+      channel: {
+        title: winnerPayload.channel.title,
+        description: winnerPayload.channel.description
+      }
+    });
+    const conflictAuditRows = await client`
+      SELECT count(*)::int AS count
+      FROM audit_events
+      WHERE tenant_id = 'tenant-alpha'
+        AND action_type = 'communications.channel_updated'
+        AND source_entity ->> 'id' = ${conflictChannelPayload.channel.id}`;
+    expect(Number(conflictAuditRows[0]?.count ?? 0)).toBe(1);
+  });
+
   it("rolls back channel member mutations when management audit fails", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const channelResponse = await app.request("/api/workspace/communication-channels", {

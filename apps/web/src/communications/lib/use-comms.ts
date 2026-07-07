@@ -250,8 +250,16 @@ export function useChannel(channelId: string) {
   const { data, status, error, setData, reload: load } = useResource(fetcher);
 
   const patchChannel = useCallback(
-    (input: ChannelPatchInput) => guardData(async () => { const r = await client.patchChannel(channelId, input); setData((d) => (d ? { ...d, channel: r.channel } : d)); return r.channel; }),
-    [client, guardData, channelId]
+    (input: ChannelPatchInput) => guardData(async () => {
+      const currentUpdatedAt = input.clientUpdatedAt ?? data?.channel.updatedAt;
+      const r = await client.patchChannel(
+        channelId,
+        currentUpdatedAt ? { ...input, clientUpdatedAt: currentUpdatedAt } : input
+      );
+      setData((d) => (d ? { ...d, channel: r.channel } : d));
+      return r.channel;
+    }),
+    [client, guardData, channelId, data?.channel.updatedAt]
   );
   const addMember = useCallback(
     (input: { userId: string; role?: CommunicationChannelRole }) => guard(async () => { await client.addChannelMember(channelId, input); await load(); }),

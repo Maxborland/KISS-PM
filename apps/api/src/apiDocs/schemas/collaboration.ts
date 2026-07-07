@@ -465,7 +465,7 @@ export const collaborationSchemas = openApiSchemaFragment({
   CommunicationChannelType: communicationChannelTypeSchema,
   CommunicationChannel: {
     type: "object",
-    required: ["id", "tenantId", "channelType", "title", "description", "scopeEntityType", "scopeEntityId", "createdByUserId", "createdAt", "archivedAt"],
+    required: ["id", "tenantId", "channelType", "title", "description", "scopeEntityType", "scopeEntityId", "createdByUserId", "createdAt", "updatedAt", "archivedAt"],
     properties: {
       id: stringIdSchema,
       tenantId: stringIdSchema,
@@ -476,6 +476,7 @@ export const collaborationSchemas = openApiSchemaFragment({
       scopeEntityId: nullableStringSchema,
       createdByUserId: stringIdSchema,
       createdAt: dateTimeSchema,
+      updatedAt: dateTimeSchema,
       archivedAt: { type: ["string", "null"], format: "date-time" },
       canManage: { type: "boolean" }
     },
@@ -510,7 +511,8 @@ export const collaborationSchemas = openApiSchemaFragment({
     type: "object",
     properties: {
       title: { type: "string", minLength: 1 },
-      description: nullableStringSchema
+      description: nullableStringSchema,
+      clientUpdatedAt: dateTimeSchema
     },
     additionalProperties: false
   },

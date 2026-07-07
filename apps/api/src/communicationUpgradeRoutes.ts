@@ -185,12 +185,12 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
         channelId: resolved.value.channel.id,
         ...parsed.value
       });
-      if (!channel) return null;
+      if (!channel) return { kind: "not_updated" as const };
       await deps.appendManagementAuditEvent(
         communicationAudit({
           actionType: "communications.channel_updated",
           actor,
-          commandInput: { channelId: channel.id, ...parsed.value },
+          commandInput: { channelId: channel.id, ...serializeChannelPatchCommand(parsed.value) },
           permissionResult: resolved.value.access.manageDecision,
           sourceEntity: { type: "CommunicationChannel", id: channel.id },
           beforeState: serializeChannel(resolved.value.channel, resolved.value.access),
@@ -198,10 +198,21 @@ export function registerCommunicationUpgradeRoutes(app: Hono, deps: ApiRouteDeps
         }),
         transactionDataSource
       );
-      return channel;
+      return { kind: "updated" as const, channel };
     });
-    if (!updated) return context.json({ error: "communication_channel_not_found" }, 404);
-    return context.json({ channel: serializeChannel(updated, resolved.value.access) });
+    if (updated.kind === "updated") {
+      return context.json({ channel: serializeChannel(updated.channel, resolved.value.access) });
+    }
+
+    const current = await deps.dataSource.findCommunicationChannel?.(
+      actor.tenantId,
+      resolved.value.channel.id
+    );
+    if (!current) return context.json({ error: "communication_channel_not_found" }, 404);
+    if (parsed.value.clientUpdatedAt && channelPatchMatches(current, parsed.value)) {
+      return context.json({ channel: serializeChannel(current, resolved.value.access) });
+    }
+    return context.json({ error: "communication_channel_version_conflict" }, 409);
   });
 
   // Архив канала (мягкое удаление): канал исчезает из списка, история сохраняется.
@@ -687,7 +698,7 @@ function parseChannelCreateBody(value: unknown) {
 
 function parseChannelPatchBody(value: unknown) {
   const record = readRecord(value);
-  const patch: { title?: string; description?: string } = {};
+  const patch: { title?: string; description?: string; clientUpdatedAt?: Date } = {};
   if (record.title !== undefined) {
     const title = parseConversationTitle(record.title);
     if (!title.ok) return title;
@@ -698,10 +709,46 @@ function parseChannelPatchBody(value: unknown) {
     if (!description.ok) return description;
     patch.description = description.value;
   }
+  if (record.clientUpdatedAt !== undefined) {
+    const clientUpdatedAt = parseClientUpdatedAt(record.clientUpdatedAt);
+    if (!clientUpdatedAt.ok) return clientUpdatedAt;
+    patch.clientUpdatedAt = clientUpdatedAt.value;
+  }
   if (patch.title === undefined && patch.description === undefined) {
     return { ok: false as const, error: "communication_channel_patch_empty" };
   }
   return { ok: true as const, value: patch };
+}
+
+function parseClientUpdatedAt(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return { ok: false as const, error: "communication_channel_client_updated_at_invalid" };
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return { ok: false as const, error: "communication_channel_client_updated_at_invalid" };
+  }
+  return { ok: true as const, value: date };
+}
+
+function channelPatchMatches(
+  channel: CommunicationChannel,
+  patch: { title?: string; description?: string }
+) {
+  return (patch.title === undefined || channel.title === patch.title) &&
+    (patch.description === undefined || channel.description === patch.description);
+}
+
+function serializeChannelPatchCommand(patch: {
+  title?: string;
+  description?: string;
+  clientUpdatedAt?: Date;
+}) {
+  return {
+    ...(patch.title !== undefined ? { title: patch.title } : {}),
+    ...(patch.description !== undefined ? { description: patch.description } : {}),
+    ...(patch.clientUpdatedAt ? { clientUpdatedAt: patch.clientUpdatedAt.toISOString() } : {})
+  };
 }
 
 function parseMemberBody(value: unknown) {

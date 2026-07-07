@@ -625,7 +625,7 @@ function EditChannelDialog({
 }: {
   channel: Channel;
   busy: boolean;
-  onSave: (input: { title?: string; description?: string }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
+  onSave: (input: { title?: string; description?: string; clientUpdatedAt?: string }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(channel.title);
@@ -655,7 +655,7 @@ function EditChannelDialog({
       onSubmit={async () => {
         if (!valid) return null;
         // Шлём только изменённые поля (PATCH требует ≥1 поле).
-        const input: { title?: string; description?: string } = {};
+        const input: { title?: string; description?: string; clientUpdatedAt?: string } = { clientUpdatedAt: channel.updatedAt };
         if (title.trim() !== channel.title) input.title = title.trim();
         if (description !== channel.description) input.description = description;
         const res = await onSave(input);

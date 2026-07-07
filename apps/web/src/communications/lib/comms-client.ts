@@ -370,7 +370,7 @@ export type ChannelCreateInput = {
   scopeEntityType?: "project" | "org_unit" | null;
   scopeEntityId?: string | null;
 };
-export type ChannelPatchInput = { title?: string; description?: string };
+export type ChannelPatchInput = { title?: string; description?: string; clientUpdatedAt?: string };
 export type CallRoomCreateInput = {
   entityType: EntityType;
   entityId: string;
