@@ -1,0 +1,22 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-SECURITY-POLICY-PERMISSION-DENIED",
+  "generatedAt": "2026-07-07T21:06:00.765Z",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "surface": "GET /api/tenant/current/security-policy, PUT /api/tenant/current/security-policy",
+  "scenario": "Reader without tenant.workspace_config.read/manage attempts to read and update tenant security policy.",
+  "expected": "Both read and write are denied with 403 permission_missing; write requires same-origin header but still cannot mutate without manage permission.",
+  "actual": "Targeted DB/API regression passes: reader receives 403 permission_missing for security-policy GET and PUT, alongside existing custom-fields/project-template config denials.",
+  "codeChange": "apps/api/src/app.db.test.ts extends the existing workspace config permission test with security-policy read/update assertions.",
+  "evidence": [
+    "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"denies workspace config read and mutation\" -> pass; 1 selected test passed, 30 skipped",
+    "scripts/seed-dev.ts rerun after DB test to restore local dev seed",
+    "codegraph sync -> Already up to date after source edit"
+  ],
+  "notes": [
+    "Vitest emitted an existing warning about duplicate assignment.delete case in packages/domain/src/planning/commandReducer.ts; not caused by this slice.",
+    "This is permission/write-denied coverage, not duplicate/race semantics for security-policy upsert; duplicate upsert coverage is tracked separately."
+  ],
+  "coverageStatus": "partial-risk-zone"
+}

@@ -1398,6 +1398,9 @@ describe("API with PostgreSQL data source", () => {
     const fields = await app.request("/api/workspace/config/custom-fields", {
       headers: { cookie }
     });
+    const securityPolicy = await app.request("/api/tenant/current/security-policy", {
+      headers: { cookie }
+    });
     const templateCreate = await app.request("/api/workspace/config/project-templates", {
       method: "POST",
       headers: {
@@ -1412,11 +1415,33 @@ describe("API with PostgreSQL data source", () => {
         status: "draft"
       })
     });
+    const securityPolicyUpdate = await app.request("/api/tenant/current/security-policy", {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        securityPolicy: {
+          twoFactorRequired: true,
+          sessionTimeoutHours: 12,
+          ssoSamlEnabled: false,
+          domainAllowlist: ["example.test"]
+        }
+      })
+    });
 
     expect(fields.status).toBe(403);
     await expect(fields.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(securityPolicy.status).toBe(403);
+    await expect(securityPolicy.json()).resolves.toEqual({ error: "permission_missing" });
     expect(templateCreate.status).toBe(403);
     await expect(templateCreate.json()).resolves.toEqual({
+      error: "permission_missing"
+    });
+    expect(securityPolicyUpdate.status).toBe(403);
+    await expect(securityPolicyUpdate.json()).resolves.toEqual({
       error: "permission_missing"
     });
   });

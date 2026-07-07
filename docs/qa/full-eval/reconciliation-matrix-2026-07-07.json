@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 62,
+    "fixedByCurrentBranchItems": 63,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 4,
@@ -1184,6 +1184,22 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows the write-flow duplicate/race/idempotency matrix for tenant security-policy upsert only; broader write-flow coverage remains open outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-SECURITY-POLICY-PERMISSION-DENIED",
+      "source": "current branch targeted DB/API permission regression coverage",
+      "surface": "GET /api/tenant/current/security-policy, PUT /api/tenant/current/security-policy",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-security-policy-permission-denied-2026-07-08.json: reader without workspace config permissions receives 403 permission_missing for security-policy GET and PUT.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"denies workspace config read and mutation\" -> pass; 1 selected test passed, 30 skipped",
+        "scripts/seed-dev.ts rerun after DB test to restore local dev seed",
+        "codegraph sync -> Already up to date"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows the write-flow/permission matrix for tenant security-policy read/write denied behavior only; broader write-flow duplicate/race/idempotency coverage remains open outside this atom."
     }
   ],
   "confirmedOpen": [],
