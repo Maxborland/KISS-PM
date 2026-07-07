@@ -1157,9 +1157,10 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-openrouter-api-sse-2026-07-07.json: authenticated API /tools reports live/configured OpenRouter and /propose/stream emits reasoning plus done over text/event-stream.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-browser-sse-apply-2026-07-07.json: live Chrome traversal covers stream rendering, structured proposal review, reject one/apply one, /execute success, API readback, and /my-work UI reload/readback.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-non-create-task-execute-tail-2026-07-08.json: non-create_task execute paths route through governed handlers without fake success; stale plan version returns plan_version_conflict; degraded provider and SSE reject/apply parser variants remain covered.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-denied-apply-audit-2026-07-08.json: denied confirmed apply_resource_resolution attempts via /agent/execute now leave sourceWorkflow=agent denied audit provenance without plan mutation."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-denied-apply-audit-2026-07-08.json: denied confirmed apply_resource_resolution attempts via /agent/execute now leave sourceWorkflow=agent denied audit provenance without plan mutation.",
+        "docs/qa/full-eval/evidence/browser-agent-live-non-create-comment-2026-07-08/risk-agent-live-browser-non-create-comment-2026-07-08.json: in-app browser traversal against live/configured OpenRouter covers non-create comment_task proposal, selected apply, UI applied state, and backend task-activity readback; risk still open for per-role tools and generic CRM/comms redispatch."
       ],
-      "remainingEvidence": "Live/browser agent coverage still required: per-role /agent/tools traversal, non-create live/browser apply variants, generic CRM/comms redispatch browser execution, configured-provider SSE, and provider matrix beyond the denied apply audit atom."
+      "remainingEvidence": "Live/browser agent coverage still required: per-role /agent/tools traversal, generic CRM/comms redispatch browser execution, configured-provider/provider-matrix evidence beyond OpenRouter, and browser-level denied/degraded UI. Live browser non-create comment_task proposal/apply/readback is now covered."
     },
     {
       "id": "RISK-MEDIA-LIVEKIT-JITSI-CALL",

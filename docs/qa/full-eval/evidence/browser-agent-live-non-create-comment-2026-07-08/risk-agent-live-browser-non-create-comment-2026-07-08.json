@@ -1,0 +1,56 @@
+{
+  "id": "RISK-AGENT-LIVE-BROWSER-NON-CREATE-COMMENT-2026-07-08",
+  "generatedAt": "2026-07-07T20:15:40.5601171Z",
+  "linkedRiskZones": [
+    "RISK-AGENT-REAL-LLM-SSE",
+    "BUG-SHELL-12"
+  ],
+  "status": "pass-partial-risk-not-closed",
+  "scope": "Live in-app browser traversal of /agent against API 4160 and Web 3160 with OpenRouter configured; non-create task mutation comment_task proposed and applied through UI.",
+  "secretsPolicy": "OpenRouter key was loaded from ignored .env.local and is not emitted. No cookies or credentials are stored in this evidence.",
+  "environment": {
+    "apiOrigin": "http://127.0.0.1:4160",
+    "webOrigin": "http://127.0.0.1:3160",
+    "provider": {
+      "model": "anthropic/claude-sonnet-4.6",
+      "live": true,
+      "configured": true
+    }
+  },
+  "steps": [
+    "Opened http://127.0.0.1:3160/agent in the in-app browser; page rendered authenticated AgentSurface, not login/degraded mock.",
+    "Verified GET /api/workspace/agent/tools via authenticated API session: status 200, provider live=true configured=true, comment_task allowed=true.",
+    "Submitted browser prompt instructing exactly one mutation tool comment_task for task-vektor-phase-prep with body Live agent non-create browser evidence 2026-07-08.",
+    "Observed live assistant response and review panel: 5 proposed changes, 1 selected; selected action title was Прокомментировать задачу.",
+    "Clicked Применить выбранное in browser; UI reported Применил 1 изменение and selected action status became применено.",
+    "Read back GET /api/workspace/tasks/task-vektor-phase-prep/activity and found persisted comment activity."
+  ],
+  "expected": "A configured live provider should stream a proposal, render a reviewable non-create mutation, execute only the selected action through governed backend routes, and persist/read back the task comment.",
+  "actual": "Pass for the non-create comment_task browser variant: OpenRouter provider was live/configured, browser proposal was applied, and backend task activity readback found the comment.",
+  "readback": {
+    "endpoint": "GET /api/workspace/tasks/task-vektor-phase-prep/activity",
+    "matchedActivity": {
+      "id": "task-activity-ccf86664-f501-4601-b27e-ffdde38e6bbc",
+      "tenantId": "tenant-alpha",
+      "taskId": "task-vektor-phase-prep",
+      "type": "comment",
+      "body": "Live agent non-create browser evidence 2026-07-08",
+      "authorUserId": "user-alpha-admin",
+      "createdAt": "2026-07-07T20:14:33.046Z"
+    }
+  },
+  "evidence": [
+    "docs/qa/full-eval/evidence/browser-agent-live-non-create-comment-2026-07-08/agent-live-comment-applied.png",
+    "API /agent/tools response: status 200, provider live/configured true, comment_task allowed true.",
+    "API task activity readback matched persisted comment body and task id."
+  ],
+  "observations": [
+    "The review drawer displayed 5 proposed changes while the prompt requested one mutation; only one action was selected/applied.",
+    "After applying one selected action, the drawer also displayed “4 изменения записаны в журнал проекта”, which is a UX copy/count inconsistency to track separately if reproducible."
+  ],
+  "remainingForRisk": [
+    "Per-role /agent/tools matrix still needs explicit browser/API evidence.",
+    "Generic bound tool redispatch still needs browser execution/readback for at least CRM and communications mutations.",
+    "Provider matrix beyond OpenRouter remains not covered unless intentionally scoped out."
+  ]
+}
