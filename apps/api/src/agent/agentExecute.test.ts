@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import { reducePlanningCommand, type PlanSnapshot } from "@kiss-pm/domain";
-import type { PlanningScenarioRunRecord } from "@kiss-pm/persistence";
+import type { AuditEventRecordInput, PlanningScenarioRunRecord } from "@kiss-pm/persistence";
 
 import type { ApiTenantDataSource } from "../apiTypes";
 import { createApp } from "../app";
@@ -37,12 +37,13 @@ function overloadedSnapshot(): PlanSnapshot {
   };
 }
 
-function createHarness() {
+function createHarness(options: { permissions?: AccessProfile["permissions"] } = {}) {
   let snapshot = overloadedSnapshot();
   const runs = new Map<string, PlanningScenarioRunRecord>();
   const appliedCommandTypes: string[] = [];
   const auditActionTypes: string[] = [];
-  const permissions: AccessProfile["permissions"] = [
+  const auditEvents: AuditEventRecordInput[] = [];
+  const permissions: AccessProfile["permissions"] = options.permissions ?? [
     "tenant.projects.read",
     "tenant.project_plan.read",
     "tenant.project_plan.manage",
@@ -82,10 +83,10 @@ function createHarness() {
       snapshot = reducePlanningCommand(snapshot, command).nextSnapshot;
     },
     async incrementPlanVersion() { snapshot = { ...snapshot, planVersion: snapshot.planVersion + 1 }; return snapshot.planVersion; },
-    async appendAuditEvent(input) { auditActionTypes.push(input.actionType); }
+    async appendAuditEvent(input) { auditActionTypes.push(input.actionType); auditEvents.push(input); }
   };
 
-  return { app: createApp({ dataSource: dataSource as ApiTenantDataSource }), appliedCommandTypes, auditActionTypes, get planVersion() { return snapshot.planVersion; } };
+  return { app: createApp({ dataSource: dataSource as ApiTenantDataSource }), appliedCommandTypes, auditActionTypes, auditEvents, get planVersion() { return snapshot.planVersion; } };
 }
 
 async function post(app: ReturnType<typeof createApp>, path: string, body: unknown) {
@@ -142,6 +143,40 @@ describe("agent /execute → governed scenario apply (internal re-dispatch)", ()
     expect(harness.auditActionTypes).toContain("agent.apply_resource_resolution.applied");
   });
 
+  it("audits denied scenario apply attempts without changing the plan", async () => {
+    const harness = createHarness({
+      permissions: [
+        "tenant.projects.read",
+        "tenant.project_plan.read",
+        "tenant.project_plan.manage",
+        "tenant.project_resources.read",
+        "tenant.project_resources.manage",
+        "tenant.planning_scenarios.preview"
+      ]
+    });
+    const overload = createPlanningReadModel(overloadedSnapshot()).resourceLoad.overloads[0]!;
+    const preview = await post(harness.app, "/api/workspace/projects/project-1/planning/scenarios/preview", {
+      clientPlanVersion: 5,
+      target: { type: "resource_overload", resourceId: overload.resourceId, date: overload.date, overloadMinutes: overload.overloadMinutes, taskIds: overload.taskIds }
+    });
+    const scenarioId = (preview.body.proposals as Array<{ id: string }>)[0]!.id;
+
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "apply_resource_resolution", input: { projectId: "project-1", scenarioId, clientPlanVersion: 5, acceptedRiskReason: "e2e" } }]
+    });
+
+    expect(execute.status).toBe(422);
+    const results = execute.body.results as Array<{ tool: string; ok: boolean; status?: number; error?: string }>;
+    expect(results[0]).toMatchObject({ tool: "apply_resource_resolution", ok: false, status: 403, error: "permission_missing" });
+    expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.planVersion).toBe(5);
+    expect(harness.auditActionTypes).toContain("agent.apply_resource_resolution.denied");
+    expect(harness.auditEvents.find((event) => event.actionType === "agent.apply_resource_resolution.denied")).toMatchObject({
+      sourceWorkflow: "agent",
+      permissionResult: { allowed: false, reason: "permission_missing", via: "agent" },
+      executionResult: { status: "denied" }
+    });
+  });
   it("rejects apply when the governed scenario route reports a plan version conflict", async () => {
     const harness = createHarness();
     // Проверяем version-lock как доказательство, что переотправка реально доходит до

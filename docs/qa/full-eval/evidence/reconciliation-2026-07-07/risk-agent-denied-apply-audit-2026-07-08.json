@@ -1,0 +1,42 @@
+{
+  "id": "CURRENT-RISK-AGENT-DENIED-APPLY-AUDIT",
+  "generatedAt": "2026-07-08",
+  "riskZone": "RISK-AGENT-REAL-LLM-SSE",
+  "surface": "POST /api/workspace/agent/execute with apply_resource_resolution mutation denied by actor permissions",
+  "scope": [
+    "confirmed denied agent apply_resource_resolution does not change plan state",
+    "records sourceWorkflow=agent denied audit event for RBAC-denied mutation attempts",
+    "preserves existing successful apply and plan-version-conflict behavior"
+  ],
+  "redEvidence": [
+    {
+      "command": "node_modules\\.bin\\vitest.cmd run apps/api/src/agent/agentExecute.test.ts -t \"audits denied scenario apply\"",
+      "status": "failed-before-fix",
+      "observed": "denied execute returned without plan mutation, but auditActionTypes only contained planning.scenario.previewed and did not include agent.apply_resource_resolution.denied"
+    }
+  ],
+  "codeChanges": [
+    "apps/api/src/agent/agentRoutes.ts now writes agent.<tool>.denied audit events for 403 denied confirmed actions, with sourceWorkflow=agent, denied permissionResult, and denied executionResult.",
+    "apps/api/src/agent/agentExecute.test.ts adds a denied apply_resource_resolution harness case and asserts no plan mutation plus agent denied audit provenance."
+  ],
+  "verification": [
+    {
+      "command": "node_modules\\.bin\\vitest.cmd run apps/api/src/agent/agentExecute.test.ts -t \"audits denied scenario apply\"",
+      "status": "passed",
+      "notes": "Targeted GREEN passed after provenance fix."
+    },
+    {
+      "command": "node_modules\\.bin\\vitest.cmd run apps/api/src/agent/agentExecute.test.ts",
+      "status": "passed",
+      "notes": "Full agent execute suite passed: 1 file, 4 tests."
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false",
+      "status": "passed",
+      "notes": "API TypeScript project typecheck completed successfully."
+    }
+  ],
+  "coverageStatus": "partial-risk-zone",
+  "remainingEvidence": "Broader RISK-AGENT-REAL-LLM-SSE remains open: per-role /agent/tools browser traversal, non-create live/browser apply variants, generic CRM/comms redispatch browser execution, and real provider SSE across configured providers still need evidence.",
+  "integrationVerifiedAt": "2026-07-08T02:18:11+07:00"
+}

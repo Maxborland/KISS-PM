@@ -567,28 +567,33 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       results.push({ tool: tool.name, ok: false, status: 501, error: "tool_not_executable_yet" });
     }
 
-    // Провенанс агента: на каждое применённое действие — ОТДЕЛЬНОЕ audit-событие
-    // sourceWorkflow:"agent" (сверх штатного аудита governed-команды, который тегает свой workflow),
-    // чтобы действие агента было отличимо от ручного. results[i] выровнен с actions[i].
+    // Провенанс агента: на каждое применённое или отклонённое правами действие — ОТДЕЛЬНОЕ
+    // audit-событие sourceWorkflow:"agent". Успешные события идут сверх штатного аудита
+    // governed-команды; denied-события не дают попыткам агента исчезнуть из governance trail.
     if (deps.dataSource.appendAuditEvent) {
       const correlationId = `agent-execute-${randomUUID()}`;
       for (let i = 0; i < results.length; i += 1) {
         const item = results[i]!;
-        if (!item.ok) continue;
+        if (!item.ok && item.status !== 403) continue;
         const action = (actions[i] ?? {}) as { input?: unknown };
         const input = (action.input && typeof action.input === "object" ? action.input : {}) as Record<string, unknown>;
+        const deniedReason = item.error ?? "permission_missing";
         await deps.dataSource.appendAuditEvent({
           id: `agent-action-${randomUUID()}`,
           tenantId: actor.tenantId,
           actorUserId: actor.id,
-          actionType: `agent.${item.tool}.applied`,
+          actionType: `agent.${item.tool}.${item.ok ? "applied" : "denied"}`,
           sourceWorkflow: "agent",
           sourceEntity: agentSourceEntity(input),
           input: { tool: item.tool, input },
           beforeState: null,
-          afterState: (item.result ?? null) as Record<string, unknown> | null,
-          permissionResult: { allowed: true, via: "agent" },
-          executionResult: { status: "succeeded" },
+          afterState: item.ok ? ((item.result ?? null) as Record<string, unknown> | null) : null,
+          permissionResult: item.ok
+            ? { allowed: true, via: "agent" }
+            : { allowed: false, reason: deniedReason, via: "agent" },
+          executionResult: item.ok
+            ? { status: "succeeded" }
+            : { status: "denied", reason: deniedReason },
           correlationId,
           createdAt: new Date()
         });
