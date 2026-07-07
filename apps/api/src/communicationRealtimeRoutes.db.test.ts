@@ -1081,6 +1081,78 @@ describe("communications realtime API", () => {
     expect(events.some((event) => event.eventType === "recording_started")).toBe(true);
   });
 
+  it("rejects duplicate recording start without starting a second egress", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-start-duplicate",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Запись дубль",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-start-duplicate",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-start-duplicate",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+
+    const startedTracks: string[] = [];
+    const fakeEgress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [{ trackId: "track-duplicate", kind: "video", participantIdentity: "user-alpha-admin" }];
+      },
+      async startTrackEgress(input) {
+        startedTracks.push(input.trackId);
+        return `egress-start-${startedTracks.length}`;
+      },
+      async stopEgress() {},
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, fakeEgress);
+    const adminCookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+    const startUrl = `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/recordings/start`;
+
+    const first = await recApp.request(startUrl, { method: "POST", headers: jsonHeaders(adminCookie) });
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as {
+      recordingGroupId: string;
+      recordings: { trackId: string; status: string }[];
+    };
+    expect(firstBody.recordings).toHaveLength(1);
+
+    const second = await recApp.request(startUrl, { method: "POST", headers: jsonHeaders(adminCookie) });
+    expect(second.status).toBe(409);
+    await expect(second.json()).resolves.toEqual({ error: "call_recording_already_active" });
+    expect(startedTracks).toEqual(["track-duplicate"]);
+
+    const recordings = await dataSource.listCallRecordings({ tenantId, roomId: room.id });
+    expect(recordings).toHaveLength(1);
+    expect(recordings[0]).toMatchObject({
+      sessionId: session.id,
+      status: "recording",
+      trackId: "track-duplicate",
+      egressId: "egress-start-1"
+    });
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    expect(events.filter((event) => event.eventType === "recording_started")).toHaveLength(1);
+    const auditEvents = await dataSource.listAuditEventsByTenantId(tenantId);
+    expect(
+      auditEvents.filter((event) => event.actionType === "communications.call_recording_started")
+    ).toHaveLength(1);
+  });
+
   it("rejects recording start for non-LiveKit rooms", async () => {
     const tenantId = "tenant-alpha";
     const dataSource = createPostgresTenantDataSource(createDatabase(client));
