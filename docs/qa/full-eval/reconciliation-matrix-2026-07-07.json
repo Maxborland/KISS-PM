@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 55,
+    "fixedByCurrentBranchItems": 56,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 1,
     "notABugOrSupersededOldBugIds": 4,
@@ -1053,6 +1053,24 @@
       "note": "This closes the Project Work task status duplicate-create/archive-idempotency atom. Broader write-flow matrix remains open outside this atom."
     },
     {
+      "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-WORK-TASK-CREATE-ARCHIVE-IDEMPOTENCY",
+      "source": "current branch targeted DB integration coverage and project task conflict/idempotency fix",
+      "surface": "POST /api/workspace/projects/:projectId/tasks and DELETE /api/workspace/tasks/:taskId",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-create-archive-idempotency-2026-07-08.json: concurrent duplicate project task create returns stable 201/409 with one active task readback, one create audit and one created system activity; duplicate archive returns idempotent 200/200 with archived readback hidden from project detail and one archive audit.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"project task duplicate create\" -> pass",
+        "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"creates a project task|requires resource management permission|blocks task field edits and archive|project task duplicate create\" -> 1 file passed; 4 tests passed; 19 skipped",
+        "node_modules\\.bin\\tsc.cmd -p apps/api/tsconfig.json --pretty false -> pass",
+        "node_modules\\.bin\\tsc.cmd -p packages/persistence/tsconfig.json --pretty false -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes the Project Work project task duplicate-create/archive-idempotency atom. Broader write-flow matrix remains open outside this atom."
+    },
+    {
       "id": "CURRENT-RISK-AGENT-DENIED-APPLY-AUDIT",
       "source": "current branch targeted API unit/integration harness coverage and agent provenance fix",
       "surface": "POST /api/workspace/agent/execute apply_resource_resolution denied by RBAC",
@@ -1173,10 +1191,11 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-pipeline-stage-duplicate-submit-2026-07-08.json: first-class CRM pipeline and stage duplicate submits return stable 201/409 pairs with one-row DB readback and one success audit per operation.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-race-crm-pipeline-rules-automation-2026-07-08.json: CRM transition-rule edge and stage automation duplicate submits return stable 201/409 pairs with readback, lifecycle graph readback, and one success audit per operation.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-opportunity-stage-pipeline-idempotency-2026-07-08.json: CRM opportunity stage/pipeline duplicate submits are idempotent with readback and no duplicate audit side effects; concurrent divergent stage moves preserve final readback and bounded audit count.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-status-duplicate-archive-2026-07-08.json: Project Work task status duplicate create returns stable 201/409 with single-row/readback and single create audit; duplicate archive is idempotent with single archive audit."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-status-duplicate-archive-2026-07-08.json: Project Work task status duplicate create returns stable 201/409 with single-row/readback and single create audit; duplicate archive is idempotent with single archive audit.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-create-archive-idempotency-2026-07-08.json: Project Work project task duplicate create returns stable 201/409 with single task/readback, single create audit and created system activity; duplicate archive is idempotent with single archive audit."
       ],
-      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work-task-status slices still need duplicate/race/idempotency evidence. CRM pipeline/stage, transition-rule/automation, opportunity stage/pipeline, and Project Work task status duplicate-submit atoms are now covered."
+      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work-task-status/project-work-project-task slices still need duplicate/race/idempotency evidence. CRM pipeline/stage, transition-rule/automation, opportunity stage/pipeline, Project Work task status, and Project Work project task create/archive duplicate-submit atoms are now covered."
     }
   ],
-  "nextAction": "Continue remaining risk-zone atoms: CRM read-only browser write-denied traversal, real Jitsi OBS/microphone browser handoff, project task create/archive duplicate/idempotency, live provider/LLM agent browser variants, live email reset inbox readback, and any uncovered write-flow race/idempotency surfaces."
+  "nextAction": "Continue remaining risk-zone atoms: CRM read-only browser write-denied traversal, real Jitsi OBS/microphone browser handoff, live provider/LLM agent browser variants, live email reset inbox readback, and any uncovered write-flow race/idempotency surfaces."
 }

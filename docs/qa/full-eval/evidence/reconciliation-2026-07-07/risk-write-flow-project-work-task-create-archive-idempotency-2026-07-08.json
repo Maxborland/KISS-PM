@@ -1,0 +1,74 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-WORK-TASK-CREATE-ARCHIVE-IDEMPOTENCY",
+  "generatedAt": "2026-07-08",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "surface": "POST /api/workspace/projects/:projectId/tasks and DELETE /api/workspace/tasks/:taskId",
+  "scope": [
+    "concurrent duplicate project task create with the same tenant/project/id",
+    "single task readback through project detail after duplicate create",
+    "exactly one task.created audit event and one created system activity",
+    "duplicate archive/delete request returns idempotent 200 readback without duplicate task.archived audit",
+    "archived task is hidden from active project detail after archive"
+  ],
+  "redEvidence": [
+    {
+      "command": "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"project task duplicate create\"",
+      "status": "failed-before-fix",
+      "observed": "duplicate concurrent project task create returned [201,500] instead of [201,409]"
+    }
+  ],
+  "codeChanges": [
+    "apps/api/src/project-work/taskCreateCommands.ts maps tasks_pkey unique violations from project task creation to stable 409 task_id_taken at the outer transaction boundary.",
+    "packages/persistence/src/projectWorkRepository.ts adds findTaskByIdIncludingArchived for command-layer idempotent delete readback without changing active task list/read semantics.",
+    "apps/api/src/project-work/taskLifecycleCommands.ts treats repeat archive/delete of an already archived task as idempotent 200 without a second planning command, plan-version bump, or audit event.",
+    "apps/api/src/projectWorkRoutes.db.test.ts adds targeted DB/API coverage for duplicate create, active readback, create audit/activity counts, duplicate archive, archived readback, and archive audit count."
+  ],
+  "expectedConflictErrors": {
+    "duplicateProjectTaskId": "task_id_taken"
+  },
+  "verification": [
+    {
+      "command": "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"project task duplicate create\"",
+      "status": "passed",
+      "notes": "Fresh integration rerun passed: duplicate project task create returned stable 201/409, active readback showed one task, and repeat archive returned 200/200 with one archive audit."
+    },
+    {
+      "command": "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"creates a project task|requires resource management permission|blocks task field edits and archive|project task duplicate create\"",
+      "status": "passed",
+      "notes": "Fresh regression slice passed: project task create/readback/audit, duplicate create/archive idempotency, resource-management create denial, and executor edit/archive denial."
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.cmd -p apps/api/tsconfig.json --pretty false",
+      "status": "passed",
+      "notes": "API TypeScript project typecheck completed successfully."
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.cmd -p packages/persistence/tsconfig.json --pretty false",
+      "status": "passed",
+      "notes": "Persistence TypeScript project typecheck completed successfully."
+    },
+    {
+      "command": "pnpm --filter @kiss-pm/api typecheck",
+      "status": "blocked-before-tsc",
+      "notes": "pnpm preflight failed on ERR_PNPM_IGNORED_BUILDS before running TS; direct tsc was used for type verification."
+    },
+    {
+      "command": "node -e JSON.parse(...) for reconciliation matrix and this evidence JSON",
+      "status": "passed",
+      "notes": "JSON evidence and matrix parse successfully."
+    },
+    {
+      "command": "git diff --check -- <touched files>",
+      "status": "passed",
+      "notes": "No whitespace errors; Git reported only CRLF-to-LF normalization warnings."
+    },
+    {
+      "command": "codegraph sync",
+      "status": "passed",
+      "notes": "CodeGraph reported already up to date after the final edits."
+    }
+  ],
+  "coverageStatus": "partial-risk-zone",
+  "remainingEvidence": "Broader write-flow matrix remains open outside this Project Work project-task create/archive atom: every remaining route/action still needs single submit, double submit, concurrent duplicate API calls, stale/conflict, refresh/readback, and permission-denied role evidence.",
+  "integrationVerifiedAt": "2026-07-08T02:31:00+07:00"
+}

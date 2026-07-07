@@ -406,6 +406,106 @@ describe("project work API routes", () => {
     });
   });
 
+  it("keeps project task duplicate create conflict-safe and archive idempotent", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie: adminCookie
+    };
+    const body = {
+      id: "task-project-write-risk",
+      title: "Проверка дублей задачи",
+      plannedStart: "2026-06-02",
+      plannedFinish: "2026-06-03",
+      durationWorkingDays: 2,
+      plannedWork: 8,
+      participants: [{ userId: "user-alpha-executor", role: "executor" }]
+    };
+
+    const duplicateCreates = await Promise.all(
+      [0, 1].map(async () => {
+        const response = await app.request("/api/workspace/projects/project-alpha/tasks", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body)
+        });
+        return { status: response.status, body: await response.json() };
+      })
+    );
+
+    expect(duplicateCreates.map((entry) => entry.status).sort()).toEqual([201, 409]);
+    expect(duplicateCreates.find((entry) => entry.status === 409)?.body).toEqual({
+      error: "task_id_taken"
+    });
+
+    const detailAfterCreate = await app.request("/api/workspace/projects/project-alpha", {
+      headers: { cookie: adminCookie }
+    });
+    const detailAfterCreateBody = await detailAfterCreate.json();
+    expect(
+      detailAfterCreateBody.tasks.filter((task: { id: string }) =>
+        task.id === "task-project-write-risk"
+      )
+    ).toHaveLength(1);
+    expect(await countTaskAuditEvents("task.created")).toBe(1);
+    expect(await countTaskActivities()).toBe(1);
+
+    const firstArchive = await app.request("/api/workspace/tasks/task-project-write-risk", {
+      method: "DELETE",
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      }
+    });
+    const secondArchive = await app.request("/api/workspace/tasks/task-project-write-risk", {
+      method: "DELETE",
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      }
+    });
+
+    expect(firstArchive.status).toBe(200);
+    expect(secondArchive.status).toBe(200);
+    await expect(secondArchive.json()).resolves.toMatchObject({
+      task: { id: "task-project-write-risk" }
+    });
+    const detailAfterArchive = await app.request("/api/workspace/projects/project-alpha", {
+      headers: { cookie: adminCookie }
+    });
+    const detailAfterArchiveBody = await detailAfterArchive.json();
+    expect(
+      detailAfterArchiveBody.tasks.filter((task: { id: string }) =>
+        task.id === "task-project-write-risk"
+      )
+    ).toHaveLength(0);
+    expect(await countTaskAuditEvents("task.archived")).toBe(1);
+
+    async function countTaskAuditEvents(actionType: string) {
+      const rows = await client`
+        SELECT count(*)::int AS count
+        FROM audit_events
+        WHERE tenant_id = 'tenant-alpha'
+          AND action_type = ${actionType}
+          AND source_entity ->> 'type' = 'Task'
+          AND source_entity ->> 'id' = 'task-project-write-risk'
+      `;
+      return Number(rows[0]?.count ?? 0);
+    }
+
+    async function countTaskActivities() {
+      const rows = await client`
+        SELECT count(*)::int AS count
+        FROM task_activities
+        WHERE tenant_id = 'tenant-alpha'
+          AND task_id = 'task-project-write-risk'
+          AND type = 'system'
+          AND title = 'Задача создана'
+      `;
+      return Number(rows[0]?.count ?? 0);
+    }
+  });
   it("requires resource management permission when task creation creates executor assignments", async () => {
     const creatorCookie = await loginAs(
       "task-creator-no-resource-manage@kiss-pm.local",

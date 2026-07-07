@@ -26,7 +26,7 @@ export async function archiveTask(
   input: ArchiveTaskInput
 ): Promise<TaskResult> {
   if (
-    !deps.dataSource.findTaskById ||
+    !deps.dataSource.findTaskByIdIncludingArchived ||
     !deps.dataSource.applyPlanningCommand ||
     !deps.dataSource.incrementPlanVersion ||
     !deps.dataSource.withTransaction
@@ -34,21 +34,25 @@ export async function archiveTask(
     return { ok: false, status: 501, error: "persistence_not_configured" };
   }
 
-  const task = await deps.dataSource.findTaskById(input.actor.tenantId, input.taskId);
+  const task = await deps.dataSource.findTaskByIdIncludingArchived(
+    input.actor.tenantId,
+    input.taskId
+  );
   if (!task) return { ok: false, status: 404, error: "task_not_found" };
   const deleteDecision = canDeleteTask(input.actor, input.profile, task);
   if (!deleteDecision.allowed) return { ok: false, status: 403, error: deleteDecision.reason };
+  if (task.archivedAt) return { ok: true as const, task };
 
   return deps.runDataSourceTransaction(async (transactionDataSource) => {
     if (
-      !transactionDataSource.findTaskById ||
+      !transactionDataSource.findTaskByIdIncludingArchived ||
       !transactionDataSource.applyPlanningCommand ||
       !transactionDataSource.incrementPlanVersion
     ) {
       throw new Error("persistence_not_configured");
     }
     await transactionDataSource.lockTenantResourcePlanning?.(input.actor.tenantId);
-    const currentTask = await transactionDataSource.findTaskById(
+    const currentTask = await transactionDataSource.findTaskByIdIncludingArchived(
       input.actor.tenantId,
       task.id
     );
@@ -61,6 +65,9 @@ export async function archiveTask(
       return { ok: false as const, status: 403, error: currentDeleteDecision.reason };
     }
 
+    if (currentTask.archivedAt) {
+      return { ok: true as const, task: currentTask };
+    }
     const currentPlanningCommand = buildArchiveTaskPlanningCommand(currentTask.id);
     await transactionDataSource.applyPlanningCommand({
       tenantId: input.actor.tenantId,

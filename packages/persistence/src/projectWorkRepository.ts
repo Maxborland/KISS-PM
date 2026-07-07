@@ -154,6 +154,10 @@ export type ProjectWorkRepository = {
   listProjectTasks(tenantId: TenantId, projectId: string): Promise<TaskRecord[]>;
   listMyWorkTasks(tenantId: TenantId, userId: UserId): Promise<TaskRecord[]>;
   findTaskById(tenantId: TenantId, taskId: string): Promise<TaskRecord | undefined>;
+  findTaskByIdIncludingArchived(
+    tenantId: TenantId,
+    taskId: string
+  ): Promise<TaskRecord | undefined>;
   createTask(input: TaskInput): Promise<TaskRecord>;
   updateTask(input: TaskInput): Promise<TaskRecord | undefined>;
   updateTaskMetadata(input: TaskMetadataInput): Promise<TaskRecord | undefined>;
@@ -416,6 +420,23 @@ export function createProjectWorkRepository(db: KissPmDatabase): ProjectWorkRepo
       const task = rows.find((row) => row.task.id === taskId);
       if (!task) return undefined;
       return (await hydrateTasks(tenantId, [task]))[0];
+    },
+    async findTaskByIdIncludingArchived(tenantId, taskId) {
+      const [row] = await db
+        .select({ task: tasks, status: taskStatuses })
+        .from(tasks)
+        .leftJoin(
+          taskStatuses,
+          and(
+            eq(taskStatuses.tenantId, tasks.tenantId),
+            eq(taskStatuses.id, tasks.statusId)
+          )
+        )
+        .where(and(eq(tasks.tenantId, tenantId), eq(tasks.id, taskId)))
+        .limit(1);
+
+      if (!row) return undefined;
+      return (await hydrateTasks(tenantId, [row]))[0];
     },
     async createTask(input) {
       return db.transaction(async (transaction) => {
