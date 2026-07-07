@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 56,
+    "fixedByCurrentBranchItems": 57,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 1,
     "notABugOrSupersededOldBugIds": 4,
@@ -1086,6 +1086,24 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This closes the agent denied confirmed-action provenance atom only. Broader live provider/SSE/browser agent matrix remains open."
+    },
+    {
+      "id": "CURRENT-RISK-FULL-BROWSER-TRAVERSAL-CRM-READONLY-WRITE-DENIED",
+      "source": "current branch in-app Browser traversal and UI permission fix",
+      "surface": "/login, /dashboard redirect, /crm/deals kanban/list/forecast, direct opportunity write APIs",
+      "evidence": "docs/qa/full-eval/evidence/browser-crm-readonly-write-denied-2026-07-08/risk-full-browser-traversal-crm-readonly-write-denied-2026-07-08.json: CRM read-only user logs in, reads deals, create/stage writes return 403 with unchanged readback; kanban cards no longer expose draggable=true; list stage selects and pipeline buttons are disabled; forecast remains read-only.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "browser:control-in-app-browser traversal on http://127.0.0.1:3130/login and /crm/deals with screenshot evidence -> pass after fix",
+        "node_modules\\.bin\\tsc.cmd -p apps/web/tsconfig.json --pretty false -> pass",
+        "git diff --check -> pass with CRLF warnings only",
+        "pnpm --filter @kiss-pm/web typecheck -> blocked before TS by ERR_PNPM_IGNORED_BUILDS; direct tsc used instead"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes the CRM read-only browser write-denied traversal atom. Broader full-browser matrix remains open for other roles/routes/actions."
     }
   ],
   "confirmedOpen": [],
@@ -1166,8 +1184,10 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-full-browser-core-traversal-2026-07-07.json: admin and limited profile.read core browser traversal passed for login, shell, CRM, admin users, deal stage write/readback/reload, and permission-denied API checks.",
         "docs/qa/full-eval/evidence/browser-limited-crm-write-denied-2026-07-08/risk-full-browser-limited-crm-write-denied-2026-07-08.json: limited profile.read Chromium traversal passed for settled sidebar hiding, direct /crm/deals restricted surface, no CRM action UI, and 403 read/create opportunity API checks with screenshots and network log.",
         "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/admin-communications-readonly-traversal-2026-07-08.json: admin read-only communications traversal passed for channels, chat, meetings, calls, and notifications with route-specific 200 API evidence, screenshots, and network logs.",
-        "docs/qa/full-eval/evidence/browser-media-provider-disabled-connect-2026-07-08/risk-media-browser-provider-disabled-connect-2026-07-08.json: admin /communications/calls browser traversal covers empty state, create room modal, session start, connect denial, stable controls, and screenshot evidence."
-      ]
+        "docs/qa/full-eval/evidence/browser-media-provider-disabled-connect-2026-07-08/risk-media-browser-provider-disabled-connect-2026-07-08.json: admin /communications/calls browser traversal covers empty state, create room modal, session start, connect denial, stable controls, and screenshot evidence.",
+        "docs/qa/full-eval/evidence/browser-crm-readonly-write-denied-2026-07-08/risk-full-browser-traversal-crm-readonly-write-denied-2026-07-08.json: CRM read-only in-app Browser traversal covers login, /crm/deals kanban/list/forecast, disabled/no-drag write controls, direct 403 create/stage writes, and unchanged readback."
+      ],
+      "remainingEvidence": "Remaining full-browser traversal still required for other roles/routes/actions: real Jitsi OBS/microphone media provider behavior, live/browser agent provider variants, live email reset inbox readback, mobile/responsive passes, and any routes not yet covered by role-specific traversal evidence."
     },
     {
       "id": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
@@ -1197,5 +1217,5 @@
       "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work-task-status/project-work-project-task slices still need duplicate/race/idempotency evidence. CRM pipeline/stage, transition-rule/automation, opportunity stage/pipeline, Project Work task status, and Project Work project task create/archive duplicate-submit atoms are now covered."
     }
   ],
-  "nextAction": "Continue remaining risk-zone atoms: CRM read-only browser write-denied traversal, real Jitsi OBS/microphone browser handoff, live provider/LLM agent browser variants, live email reset inbox readback, and any uncovered write-flow race/idempotency surfaces."
+  "nextAction": "Continue remaining risk-zone atoms: real Jitsi OBS/microphone browser handoff, live provider/LLM agent browser variants, live email reset inbox readback, and any uncovered write-flow race/idempotency surfaces."
 }

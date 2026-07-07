@@ -64,6 +64,7 @@ export function ProjectDeals() {
   const createDealCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.opportunities.manage" });
   const createPipelineCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.crm_pipelines.manage" });
   const createStageCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.deal_stages.manage" });
+  const canManageDeals = createDealCapability.allowed;
   const createPipelineDisabledReason = createPipelineCapability.disabledReason ?? createStageCapability.disabledReason;
   const crm = useCrm();
   const { data, status, error, reload, moveStage, movePipeline, createOpportunity } = crm;
@@ -149,6 +150,7 @@ export function ProjectDeals() {
 
   const dropOn = (stageId: string) => {
     const id = dragId; setDragId(null); setOverStage(null);
+    if (!canManageDeals) return;
     if (!id) return;
     const opp = model.opps.find((o) => o.id === id);
     if (opp && !isFinal(opp) && opp.stageId !== stageId) void doMove(id, stageId);
@@ -248,7 +250,7 @@ export function ProjectDeals() {
             return (
               <div
                 key={s.id}
-                onDragOver={(e) => { e.preventDefault(); if (overStage !== s.id) setOverStage(s.id); }}
+                onDragOver={(e) => { if (!canManageDeals) return; e.preventDefault(); if (overStage !== s.id) setOverStage(s.id); }}
                 onDrop={() => dropOn(s.id)}
                 className={cn("flex w-[260px] shrink-0 flex-col rounded-[var(--radius-card)] border bg-[var(--panel-subtle)]", overStage === s.id ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)]")}
               >
@@ -259,13 +261,14 @@ export function ProjectDeals() {
                 <div className="flex min-h-[120px] flex-col gap-2 p-2">
                   {items.map((o) => {
                     const final = isFinal(o);
+                    const draggable = canManageDeals && !final && !busy;
                     return (
                       <article
                         key={o.id}
-                        draggable={!final && !busy}
-                        onDragStart={() => setDragId(o.id)}
+                        draggable={draggable}
+                        onDragStart={() => { if (draggable) setDragId(o.id); }}
                         onDragEnd={() => { setDragId(null); setOverStage(null); }}
-                        className={cn("hover-lift rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]", !final && !busy ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50")}
+                        className={cn("hover-lift rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]", draggable ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50")}
                       >
                         <div className="mb-1 flex items-center justify-between gap-2">
                           {prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</span> : <span />}
@@ -313,7 +316,7 @@ export function ProjectDeals() {
                   <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{o.title}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</div> : null}</td>
                   <td className="px-3 py-2 text-[var(--muted-strong)]">{o.clientName}</td>
                   <td className="px-3 py-2">
-                    <select value={o.stageId ?? ""} disabled={busy || isFinal(o)} onChange={(e) => void doMove(o.id, e.target.value)} className="h-7 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-1.5 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60">
+                    <select value={o.stageId ?? ""} disabled={busy || isFinal(o) || !canManageDeals} onChange={(e) => void doMove(o.id, e.target.value)} title={canManageDeals ? "Изменить стадию" : createDealCapability.disabledReason ?? "Недостаточно прав для создания или изменения"} className="h-7 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-1.5 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60">
                       {model.stages.some((s) => s.id === o.stageId) ? null : <option value={o.stageId ?? ""}>— без стадии —</option>}
                       {model.stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
@@ -322,7 +325,7 @@ export function ProjectDeals() {
                   <td className="px-3 py-2 text-right"><span className="v4-num font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</span></td>
                   <td className="px-3 py-2 text-right"><span className="v4-num text-[var(--muted-strong)]">{o.probability}%</span></td>
                   <td className="px-3 py-2"><span className="flex items-center gap-1.5"><BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" /><span className="text-[length:var(--text-xs)] text-[var(--muted)]">{ownerName(o.ownerUserId)}</span></span></td>
-                  <td className="px-3 py-2 text-right"><Button variant="ghost" size="sm" disabled={busy || isFinal(o)} onClick={() => setMoveTarget(o)} title="Перенести в другую воронку"><ArrowLeftRight className="size-3.5" aria-hidden />Воронка</Button></td>
+                  <td className="px-3 py-2 text-right"><Button variant="ghost" size="sm" disabled={busy || isFinal(o) || !canManageDeals} onClick={() => setMoveTarget(o)} title={canManageDeals ? "Перенести в другую воронку" : createDealCapability.disabledReason ?? "Недостаточно прав для создания или изменения"}><ArrowLeftRight className="size-3.5" aria-hidden />Воронка</Button></td>
                 </tr>
               ))}
             </tbody>
