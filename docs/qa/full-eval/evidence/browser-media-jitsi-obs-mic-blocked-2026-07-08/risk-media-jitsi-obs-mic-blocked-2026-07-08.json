@@ -1,0 +1,386 @@
+{
+  "scenarioId": "RISK-MEDIA-JITSI-OBS-MIC-BROWSER-HANDOFF",
+  "timestamp": "2026-07-07T19:59:12.051Z",
+  "status": "blocked-partial-evidence-not-pass",
+  "apiEvidence": {
+    "apiBase": "http://127.0.0.1:4140",
+    "webBase": "http://127.0.0.1:3140",
+    "selectedProject": {
+      "id": "project-vektor-portal",
+      "name": "Портал подрядчиков Вектор"
+    },
+    "providerRoomId": "kiss-pm-jitsi-loop-1783453997210",
+    "projectsStatus": 200,
+    "createStatus": 201,
+    "room": {
+      "roomId": "call-room-7dc22c42-2077-4ed1-8631-aa7d4ec3fcad",
+      "provider": "jitsi",
+      "status": "open",
+      "mediaKind": "video"
+    },
+    "startStatus": 201,
+    "session": {
+      "id": "call-session-d9f593d9-fa37-4ac0-ab84-884180e50608",
+      "status": "active"
+    },
+    "joinStatus": 200,
+    "join": {
+      "provider": "jitsi",
+      "joinUrl": "https://meet.jit.si/kiss-pm-jitsi-loop-1783453997210",
+      "token": null,
+      "expiresAt": null
+    },
+    "roomUrl": "http://127.0.0.1:3140/calls/call-room-7dc22c42-2077-4ed1-8631-aa7d4ec3fcad"
+  },
+  "kissPmBrowserEvidence": {
+    "route": "http://127.0.0.1:3140/calls/call-room-7dc22c42-2077-4ed1-8631-aa7d4ec3fcad",
+    "handoffLink": "https://meet.jit.si/kiss-pm-jitsi-loop-1783453997210",
+    "inAppBrowserAfterJoin": {
+      "controls": [
+        {
+          "disabled": false,
+          "href": "https://meet.jit.si/kiss-pm-jitsi-loop-1783453997210",
+          "tag": "a",
+          "target": null,
+          "text": "Открыть звонок",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "href": "/communications/calls",
+          "tag": "a",
+          "target": null,
+          "text": "← К списку звонков",
+          "title": null,
+          "type": null
+        }
+      ],
+      "href": "http://127.0.0.1:3140/calls/call-room-7dc22c42-2077-4ed1-8631-aa7d4ec3fcad",
+      "text": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (n) {} })(\"class\",\"theme\",\"light\",null,[\"light\",\"dark\"],null,false,true)Звонок готов к открытию в JitsiОткрыть звонок← К списку звонковself.__next_r=\"P49xvA2onnPpvGrl-9zVv\"(self.__next_f=self.__next_f||[]).push([0])self.__next_f.push([1,\"d:I[\\\"[project]/node_modules/.pnpm/next@16.2.6_@babel+core@7.2_949d1c200b22aab22ef72478c44dd10b/node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.js [app-client] (ecmascript)\\\",[\\\"/_next/static/chunks/node_modules__pnpm_10~fqho._.js\\\",\\\"/_next/static/chunks/apps_web_src_0_n61y3._.js\\\",\\\"/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js\\\"],\\\"SegmentViewNode\\\"]\\nf:\\\"$Sreact.fragment\\\"\\n21:I[\\\"[project]/apps/web/src/app/providers.tsx [app-client] (ecmascript)\\\",[\\\"/_next/static/chunks/node_modules__pnpm_10~fqho._.js\\\",\\\"/_next/static/chunks/apps_web_src_0_n61y3._.js\\\",\\\"/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js\\\"],\\\"Providers\\\"]\\n23:I[\\\"[project]/node_modules/.pnpm/next@16.2.6_@babel+core@7.2_949d1c200b22aab22ef72478c44dd10b/node_modules/next/dist/client/components/layout-router.js [app-client] (ecmascript)\\\",[\\\"/_next/static/chunks/node_modules__pnpm_10~fqho._.js\\\",\\\"/_next/static/chunks/apps_web_src_0_n61y3._.js\\\",\\\"/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js\\\"],\\\"default\\\"]\\n24:I[\\\"[project]/apps/web/src/app/error.tsx [app-client] (ecmascript)\\\",[\\\"/_next/static/chunks/node_modules__pnpm_10~fqho._.js\\\",\\\"/_next/static/chunks/apps_web_src_0_n61y3._.js\\\",\\\"/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js\\\",\\\"/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js\\\",\\\"/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js\\\"],\\\"default\\\"]\\n29:I[\\\"[project]/node_modules/.pnpm/next@16.2.6_@babel+core@7.2_949d1c200b22aab22ef72478c44dd10b/node_modules/next/dist/client/components/render-from-template-context.js [app-client] (ecmascript)\\\",[\\\"/_next/",
+      "title": "KISS PM"
+    },
+    "inAppPermissionGrantAttempt": {
+      "error": "Error: This method is not supported through raw CDP."
+    },
+    "screenshot": "kisspm-jitsi-handoff.png"
+  },
+  "chromeJitsiEvidence": {
+    "url": "https://meet.jit.si/kiss-pm-jitsi-loop-1783453997210",
+    "title": "Kiss Pm Jitsi Loop 1783453997210 | Jitsi Meet",
+    "initialState": {
+      "controls": [
+        {
+          "disabled": false,
+          "href": "https://jitsi.org",
+          "tag": "a",
+          "text": "Jitsi Meet Логотип, ссылки на главную страницу",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "href": null,
+          "tag": "input",
+          "text": "Пожалуйста, введите свое имя",
+          "title": null,
+          "type": "text"
+        }
+      ],
+      "href": "https://meet.jit.si/kiss-pm-jitsi-loop-1783453997210",
+      "text": "<div>JavaScript is disabled. </br>For this site to work you have to enable JavaScript.</div> Присоединиться к встречеKiss Pm Jitsi Loop 1783453997210Присоединиться к встречеНастраиваются устройства…",
+      "title": "Kiss Pm Jitsi Loop 1783453997210 | Jitsi Meet",
+      "videos": [
+        {
+          "autoplay": true,
+          "height": 1263,
+          "muted": true,
+          "srcObject": false,
+          "width": 1932
+        }
+      ]
+    },
+    "delayedState": {
+      "controls": [
+        {
+          "disabled": false,
+          "href": "https://jitsi.org",
+          "tag": "a",
+          "text": "Jitsi Meet Логотип, ссылки на главную страницу",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "href": null,
+          "tag": "input",
+          "text": "Пожалуйста, введите свое имя",
+          "title": null,
+          "type": "text"
+        }
+      ],
+      "href": "https://meet.jit.si/kiss-pm-jitsi-loop-1783453997210",
+      "text": "<div>JavaScript is disabled. </br>For this site to work you have to enable JavaScript.</div> Присоединиться к встречеKiss Pm Jitsi Loop 1783453997210Присоединиться к встречеНастраиваются устройства…",
+      "title": "Kiss Pm Jitsi Loop 1783453997210 | Jitsi Meet",
+      "videos": [
+        {
+          "autoplay": true,
+          "height": 1263,
+          "muted": true,
+          "srcObject": false,
+          "width": 1932
+        }
+      ]
+    },
+    "settingsState": {
+      "controls": [
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "a",
+          "text": "Jitsi Meet Логотип, ссылки на главную страницу",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "input",
+          "text": "Пожалуйста, введите свое имя",
+          "title": null,
+          "type": "text"
+        },
+        {
+          "disabled": false,
+          "role": "tab",
+          "tag": "div",
+          "text": "Звук",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "tab",
+          "tag": "div",
+          "text": "Видео",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "tab",
+          "tag": "div",
+          "text": "Виртуальные фоны",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "tab",
+          "tag": "div",
+          "text": "Оповещения",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "tab",
+          "tag": "div",
+          "text": "Профиль",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "tab",
+          "tag": "div",
+          "text": "Календарь",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "tab",
+          "tag": "div",
+          "text": "Сочетания клавиш",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "tab",
+          "tag": "div",
+          "text": "Больше опций",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "input",
+          "text": "",
+          "title": null,
+          "type": "checkbox"
+        },
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "input",
+          "text": "",
+          "title": null,
+          "type": "checkbox"
+        },
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "input",
+          "text": "",
+          "title": null,
+          "type": "checkbox"
+        },
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "input",
+          "text": "",
+          "title": null,
+          "type": "checkbox"
+        },
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "input",
+          "text": "",
+          "title": null,
+          "type": "checkbox"
+        },
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "button",
+          "text": "Сопряжение устройства",
+          "title": "Сопряжение устройства",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "button",
+          "text": "Закрыть диалоговое окно",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "button",
+          "text": "Отмена",
+          "title": "Отмена (закрыть диалоговое окно)",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "button",
+          "text": "Ok",
+          "title": "OK (сохранить и закрыть диалоговое окно)",
+          "type": "button"
+        }
+      ],
+      "text": "<div>JavaScript is disabled. </br>For this site to work you have to enable JavaScript.</div> Присоединиться к встречеKiss Pm Jitsi Loop 1783453997210Присоединиться к встречеНастраиваются устройства…НастройкиЗвукВидеоВиртуальные фоныОповещенияПрофильКалендарьСочетания клавишБольше опцийНет доступаAcoustic echo cancellationStereoAutomatic gain controlNoise suppressionВключить шумоподавлениеНет доступаУправление вызовамиСопряжение устройстваОтменаOk"
+    },
+    "chromePermissionGrantAttempt": {
+      "error": "Error: This method is not supported through raw CDP."
+    },
+    "finalState": {
+      "controls": [
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "a",
+          "text": "Jitsi Meet Логотип, ссылки на главную страницу",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": null,
+          "tag": "button",
+          "text": "Я организатор",
+          "title": null,
+          "type": "button"
+        },
+        {
+          "disabled": true,
+          "role": "button",
+          "tag": "div",
+          "text": "Включить микрофон",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "button",
+          "tag": "div",
+          "text": "Включить камеру",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "button",
+          "tag": "div",
+          "text": "Пригласить",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "button",
+          "tag": "div",
+          "text": "Выберите фон",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "button",
+          "tag": "div",
+          "text": "Вкл/Выкл меню настроек",
+          "title": null,
+          "type": null
+        },
+        {
+          "disabled": false,
+          "role": "button",
+          "tag": "div",
+          "text": "Завершить звонок",
+          "title": null,
+          "type": null
+        }
+      ],
+      "href": "https://meet.jit.si/kiss-pm-jitsi-loop-1783453997210",
+      "text": "<div>JavaScript is disabled. </br>For this site to work you have to enable JavaScript.</div> KAПросьба присоединиться к встрече…Kiss Pm Jitsi Loop 1783453997210The conference has not yet started because no moderators have yet arrived. If you'd like to become a moderator please log-in. Otherwise, please wait.Я организаторKA",
+      "title": "Kiss Pm Jitsi Loop 1783453997210 | Jitsi Meet",
+      "videos": [
+        {
+          "autoplay": true,
+          "height": 1263,
+          "muted": true,
+          "srcObject": false,
+          "width": 1932
+        }
+      ]
+    },
+    "screenshot": "jitsi-chrome-waiting-room.png"
+  },
+  "blocker": {
+    "summary": "Real OBS/microphone pass is blocked in Chrome/Jitsi, not passed.",
+    "details": [
+      "In-app browser reaches KISS PM Jitsi handoff but reports camera access denied; Browser.grantPermissions is unsupported through raw CDP.",
+      "Chrome reaches meet.jit.si lobby but devices remain stuck/denied: microphone/camera controls are disabled or no-access in settings; Browser.grantPermissions is unsupported through raw CDP.",
+      "Joining without audio reaches Jitsi waiting room, but public meet.jit.si requires a moderator/login before the conference starts."
+    ],
+    "requiredNext": "User must manually allow camera/microphone for meet.jit.si in Chrome and/or provide a moderated/self-hosted Jitsi/LiveKit room where OBS Virtual Camera and microphone can be selected and joined."
+  }
+}
