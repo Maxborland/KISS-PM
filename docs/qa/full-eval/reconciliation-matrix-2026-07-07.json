@@ -25,7 +25,7 @@
     "summary":  {
                     "oldBugIdsReviewed":  84,
                     "fixedByMasterOldBugIds":  64,
-                    "fixedByCurrentBranchItems":  44,
+                    "fixedByCurrentBranchItems":  45,
                     "confirmedOpen":  0,
                     "unverifiedOldBugIds":  1,
                     "notABugOrSupersededOldBugIds":  4,
@@ -734,7 +734,7 @@
                                      "id":  "CURRENT-RISK-AGENT-LLM-SSE-CONFIGURED-PROVIDER",
                                      "source":  "current branch targeted API/web tests and provider env check",
                                      "surface":  "GET/POST /api/workspace/agent provider/propose/stream behavior, OpenRouter adapter, agent loop events, web SSE parser, AgentSurface apply/reject UX",
-                                     "evidence":  "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-llm-sse-configured-provider-2026-07-07.json: degraded no-provider behavior, OpenRouter adapter mapping, agent loop/SSE events, web stream parsing, and rejected-action filtering are covered by targeted tests; live provider keys are absent.",
+                                     "evidence":  "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-llm-sse-configured-provider-2026-07-07.json: degraded no-provider behavior, OpenRouter adapter mapping, agent loop/SSE events, web stream parsing, and rejected-action filtering are covered by targeted tests; this older evidence predated the supplied live provider keys.",
                                      "linkedOldIds":  [
                                                           "BUG-SHELL-12"
                                                       ],
@@ -747,7 +747,24 @@
                                                    "corepack pnpm --filter @kiss-pm/web typecheck"
                                                ],
                                      "coverageStatus":  "partial-risk-zone",
-                                     "note":  "This narrows RISK-AGENT-REAL-LLM-SSE for degraded/provider-adapter/local SSE/parser/apply UX only; real provider network smoke remains blocked by absent keys."
+                                     "note":  "This narrows RISK-AGENT-REAL-LLM-SSE for degraded/provider-adapter/local SSE/parser/apply UX only; real provider network smoke was later covered by the live API SSE smoke, while browser traversal remains open."
+                                 },
+                                 {
+                                     "id":  "CURRENT-RISK-AGENT-LIVE-OPENROUTER-API-SSE",
+                                     "source":  "current branch live API/SSE smoke with supplied OpenRouter env",
+                                     "surface":  "GET /api/workspace/agent/tools and POST /api/workspace/agent/propose/stream",
+                                     "evidence":  "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-openrouter-api-sse-2026-07-07.json: authenticated local API runtime on PORT=4108 reports OpenRouter live/configured, opens text/event-stream, emits reasoning and done, and returns model anthropic/claude-sonnet-4.6 with no error event.",
+                                     "linkedOldIds":  [
+                                                          "BUG-SHELL-12"
+                                                      ],
+                                     "linkedRiskZones":  [
+                                                             "RISK-AGENT-REAL-LLM-SSE"
+                                                         ],
+                                     "tests":  [
+                                                   "inline node smoke: GET /health, POST /api/auth/login, GET /api/workspace/agent/tools, POST /api/workspace/agent/propose/stream -> pass"
+                                               ],
+                                     "coverageStatus":  "partial-risk-zone",
+                                     "note":  "This narrows RISK-AGENT-REAL-LLM-SSE for live authenticated API SSE only. Browser UI rendering/apply/reject/reload traversal under live provider remains open."
                                  },
                                  {
                                      "id":  "CURRENT-RISK-AUTH-RESET-BROWSER-MAIL-GAP",
@@ -867,7 +884,7 @@
                                                    "node_modules/.bin/vitest.cmd run apps/web/src/workspace/agent/agent-stream.test.ts apps/api/src/agent/agentProviderDegraded.test.ts"
                                                ],
                                      "coverageStatus":  "partial-risk-zone",
-                                     "note":  "This narrows local SSE parser tail behavior only; real provider/network/browser SSE remains blocked by absent keys."
+                                     "note":  "This narrows local SSE parser tail behavior only; later live API SSE evidence covers provider/network, while browser SSE remains open."
                                  },
                                  {
                                      "id":  "CURRENT-RISK-AUTH-RESET-LOCAL-PROVIDER-EXTRACTION",
@@ -933,7 +950,7 @@
                                        "BUG-SHELL-12"
                                    ],
                            "source":  "docs/qa/full-eval/bugs/shell-dashboard.md",
-                           "reason":  "No-provider degraded behavior is fixed in current branch. OpenRouter provider live smoke now passes with supplied env, but real browser SSE proposal/apply traversal still requires fresh browser evidence; tracked together with RISK-AGENT-REAL-LLM-SSE."
+                           "reason":  "No-provider degraded behavior is fixed in current branch. OpenRouter direct provider smoke and authenticated API SSE smoke now pass with supplied env, but real browser SSE proposal/apply traversal still requires fresh browser evidence; tracked together with RISK-AGENT-REAL-LLM-SSE."
                        }
                    ],
     "notABugOrSuperseded":  [
@@ -971,9 +988,10 @@
                                     "partialEvidence":  [
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-llm-sse-configured-provider-2026-07-07.json: no-provider degraded behavior, OpenRouter adapter translation, loop/SSE events, web stream parser, and apply/reject filtering covered by targeted tests.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-real-llm-sse-parser-tail-2026-07-07.json: CRLF SSE parser and stream_incomplete tail handling covered; live provider keys were absent at that time.",
-                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-live-openrouter-smtp-imap-smoke-2026-07-07.json: supplied OpenRouter key/model passed a live provider smoke and returned the expected marker."
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-live-openrouter-smtp-imap-smoke-2026-07-07.json: supplied OpenRouter key/model passed a live provider smoke and returned the expected marker.",
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-openrouter-api-sse-2026-07-07.json: authenticated API /tools reports live/configured OpenRouter and /propose/stream emits reasoning plus done over text/event-stream."
                                                         ],
-                                    "remainingEvidence":  "Live OpenRouter provider smoke now passes. Live browser SSE traversal remains unverified: real agent proposal stream, apply/reject UX, reload/readback, and no silent mock fallback still need browser evidence."
+                                    "remainingEvidence":  "Live OpenRouter direct provider and authenticated API SSE smoke now pass. Live browser SSE traversal remains unverified: stream rendering, real proposal/action review, apply/reject UX, reload/readback, and no silent mock fallback still need browser evidence."
                                 },
                                 {
                                     "id":  "RISK-MEDIA-LIVEKIT-JITSI-CALL",

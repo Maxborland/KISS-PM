@@ -1,0 +1,66 @@
+{
+  "id": "RISK-AGENT-LIVE-OPENROUTER-API-SSE-2026-07-07",
+  "generatedAt": "2026-07-07T17:31:33.417Z",
+  "purpose": "Fresh live API/SSE smoke for RISK-AGENT-REAL-LLM-SSE after OpenRouter credentials were supplied in local ignored env.",
+  "secretsPolicy": "Secret values were loaded from .env.local/user env and were not written to this evidence file.",
+  "server": {
+    "apiOrigin": "http://127.0.0.1:4108",
+    "database": "local PostgreSQL on 127.0.0.1:55433",
+    "env": {
+      "KISS_PM_AGENT_PROVIDER": "openrouter",
+      "KISS_PM_AGENT_MODEL": "anthropic/claude-sonnet-4.6",
+      "KISS_PM_AGENT_MAX_TOKENS": 128,
+      "KISS_PM_AGENT_MAX_ITERATIONS": 1,
+      "KISS_PM_AGENT_MAX_OUTPUT_TOKENS": 256,
+      "KISS_PM_AGENT_TIMEOUT_MS": 45000
+    }
+  },
+  "commands": [
+    {
+      "command": "Start API with node_modules\\.bin\\tsx.cmd apps/api/src/server.ts on PORT=4108 after loading .env.local",
+      "status": "completed",
+      "notes": "pnpm dev was not used because pnpm attempted auto-install and failed on ignored build scripts; direct tsx reused installed dependencies."
+    },
+    {
+      "command": "node inline smoke: GET /health, POST /api/auth/login, GET /api/workspace/agent/tools, POST /api/workspace/agent/propose/stream",
+      "status": "completed"
+    }
+  ],
+  "results": {
+    "healthStatus": 200,
+    "loginStatus": 200,
+    "toolsStatus": 200,
+    "provider": {
+      "model": "anthropic/claude-sonnet-4.6",
+      "live": true,
+      "configured": true
+    },
+    "allowedToolCount": 52,
+    "stream": {
+      "status": 200,
+      "contentType": "text/event-stream",
+      "eventCounts": {
+        "reasoning": 1,
+        "done": 1
+      },
+      "eventSequence": [
+        "reasoning",
+        "done"
+      ],
+      "done": {
+        "model": "anthropic/claude-sonnet-4.6",
+        "iterations": 1,
+        "stopReason": "completed",
+        "outputTokens": 39,
+        "proposedActionsCount": 0,
+        "analyzeResultsCount": 0,
+        "reasoningPreview": "Готов к работе: помогу с задачами, проектами и CRM — просто скажи, что нужно сделать."
+      },
+      "errorEvent": null
+    }
+  },
+  "coverageImpact": {
+    "RISK-AGENT-REAL-LLM-SSE": "Narrows real-agent risk from provider-only smoke to authenticated API SSE pass: live OpenRouter provider is configured, /tools reports live/configured, /propose/stream opens text/event-stream and returns reasoning plus done. Remaining evidence is browser UI traversal: real stream rendering, apply/reject UX under live provider, reload/readback, and no silent mock fallback in-browser."
+  },
+  "status": "pass-partial-risk-zone"
+}

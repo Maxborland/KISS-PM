@@ -120,14 +120,17 @@ Escalated direct Vitest passed:
 - `.\node_modules\.bin\vitest.CMD run apps/web/src/workspace/agent/agent-stream.test.ts apps/web/src/workspace/agent/agent-surface.test.tsx`
   - Result: 2 files passed, 6 tests passed.
 
-## Live provider blocker
+## Live provider/API SSE smoke
 
-Environment evidence in this shell:
+Updated after credentials were supplied in local ignored env:
 
-- `OPENROUTER_API_KEY=ABSENT`
-- `ANTHROPIC_API_KEY=ABSENT`
+- `.env.local` / process env provided `OPENROUTER_API_KEY` without writing the secret to evidence.
+- API was started on `http://127.0.0.1:4108` with `KISS_PM_AGENT_PROVIDER=openrouter`, model `anthropic/claude-sonnet-4.6`, `KISS_PM_AGENT_MAX_TOKENS=128`, and `KISS_PM_AGENT_MAX_ITERATIONS=1`.
+- Authenticated smoke covered `GET /api/workspace/agent/tools` and `POST /api/workspace/agent/propose/stream`.
+- `/tools` returned provider `{ model: "anthropic/claude-sonnet-4.6", live: true, configured: true }`.
+- `/propose/stream` returned `text/event-stream`, emitted `reasoning` and `done`, completed in 1 iteration, and produced no error event.
 
-Because live provider keys are absent, no live OpenRouter/Anthropic smoke was run. This is intentionally recorded as remaining blocker/evidence gap, not replaced with a fake pass.
+Evidence: `docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-openrouter-api-sse-2026-07-07.json`.
 
 ## Remaining concerns
 
@@ -159,7 +162,7 @@ Touched-by-this-slice change index:
 Caveat: the workspace is concurrently dirty with unrelated auth/e2e/marketing files. The global CodeGraph file-count delta may include that existing workspace drift; the only source file changed by this slice is the agent surface test above.
 ## Final disposition
 
-DONE_WITH_CONCERNS: configured-provider degraded behavior, OpenRouter adapter translation, agent loop/SSE parsing, and apply/reject filtering are covered by passing targeted tests. Live provider smoke remains blocked by absent provider keys.
+DONE_WITH_CONCERNS: configured-provider degraded behavior, OpenRouter adapter translation, agent loop/SSE parsing, apply/reject filtering, live OpenRouter direct provider smoke, and authenticated API SSE smoke are covered. Browser UI proposal/apply traversal remains open.
 ## Orchestrator verification after integration
 
 - `cmd /c "node_modules\.bin\vitest.cmd run apps/api/src/agent/agentProviderDegraded.test.ts apps/api/src/agent/openRouterProvider.test.ts apps/api/src/agent/agentLoop.test.ts"`
@@ -168,8 +171,9 @@ DONE_WITH_CONCERNS: configured-provider degraded behavior, OpenRouter adapter tr
   - Result: passed; 2 files passed; 6 tests passed.
 - `corepack pnpm --filter @kiss-pm/web typecheck`
   - Result: passed.
-- Provider env check:
-  - `OPENROUTER_API_KEY=ABSENT`
-  - `ANTHROPIC_API_KEY=ABSENT`
+- Provider env/API SSE check after credentials were supplied:
+  - OpenRouter secret loaded from ignored env; value not written to evidence.
+  - /api/workspace/agent/tools provider status: live/configured, model anthropic/claude-sonnet-4.6.
+  - /api/workspace/agent/propose/stream: reasoning + done, no error event.
 
-Updated final status: local degraded/provider-adapter/loop/SSE/parser/apply-filter evidence is complete for this bounded slice. Real provider smoke remains blocked by missing provider keys and is not counted as passed.
+Updated final status: local degraded/provider-adapter/loop/SSE/parser/apply-filter evidence is complete for this bounded slice. Real provider smoke and authenticated API SSE now pass with supplied OpenRouter env; live browser SSE proposal/apply traversal remains open and is not counted as passed.

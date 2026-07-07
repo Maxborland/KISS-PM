@@ -361,7 +361,7 @@
 
 **Verification:** agent provider/loop/openrouter/web stream tests passed; API and web typecheck passed.
 
-**Remaining:** real OpenRouter/Anthropic provider proposal and live SSE browser traversal with configured keys.
+**Remaining:** live OpenRouter provider and authenticated API SSE now pass with supplied env; browser UI stream rendering, apply/reject/readback, and full live traversal remain under `RISK-AGENT-REAL-LLM-SSE`.
 
 ## Batch 15 — Schedule project action controls
 
@@ -434,7 +434,7 @@
 
 **Verification:** `cmd /c ..\..\node_modules\.bin\vitest.cmd run --config vitest.config.ts src/workspace/agent/agent-surface.test.tsx` → 3 tests passed; `corepack pnpm --filter @kiss-pm/web typecheck` → passed.
 
-**Remaining:** real provider proposal and live SSE verification remain under `BUG-SHELL-12` / `RISK-AGENT-REAL-LLM-SSE`.
+**Remaining:** live provider/API SSE verification is now covered by `risk-agent-live-openrouter-api-sse-2026-07-07.json`; browser UI proposal/apply traversal remains under `BUG-SHELL-12` / `RISK-AGENT-REAL-LLM-SSE`.
 
 
 ## Batch 18 — Media participant cleanup state
