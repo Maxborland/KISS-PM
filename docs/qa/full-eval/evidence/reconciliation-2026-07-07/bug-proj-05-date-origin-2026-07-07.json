@@ -1,0 +1,20 @@
+{
+  "id": "BUG-PROJ-05",
+  "linkedOldIds": ["BUG-PROJ-05"],
+  "status": "fixed-by-current-branch",
+  "coverageStatus": "targeted",
+  "date": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "surface": ["/projects/[id]/schedule", "/projects/[id]/overview", "/projects/[id]/calendars", "apps/web/src/delivery/lib/date-origin.ts"],
+  "expected": "Schedule today/timeline, overview overdue counts, and calendar month origin are derived from current/project/read-model dates instead of hardcoded March/April/June 2026 constants.",
+  "redEvidence": ["date-origin.test.ts was added before the production helper; initial pnpm/vitest run was blocked by node_modules infra while the imported helper did not exist."],
+  "greenEvidence": [
+    "cmd /c ..\\..\\node_modules\\.bin\\vitest.exe run --config vitest.config.ts src/delivery/lib/date-origin.test.ts src/delivery/overview/overview-status.test.ts src/delivery/project-action-links.test.ts src/delivery/schedule/schedule-rows.test.ts src/workspace/projects/projects-list-surface.test.ts -> 5 files / 12 tests passed.",
+    "corepack pnpm --filter @kiss-pm/web typecheck -> passed.",
+    "rg TODAY_DAY|const TODAY =|BASE_MS|Date.UTC(2026, 2, 2) in current delivery schedule/overview/calendars -> no current-source matches per agent report."
+  ],
+  "changedFiles": ["apps/web/src/delivery/lib/date-origin.ts", "apps/web/src/delivery/lib/date-origin.test.ts", "apps/web/src/delivery/schedule/schedule-surface.tsx", "apps/web/src/delivery/calendars/calendars-surface.tsx", "apps/web/src/delivery/overview/overview-surface.tsx"],
+  "fixApplied": "Added shared date-origin helpers for current plan date, schedule timeline, project month keys/grid, and overdue checks; schedule, calendars, and overview now consume those helpers instead of old mock epoch constants.",
+  "limitations": ["Browser screenshot traversal was not run in this slice."],
+  "regressionRisk": "Medium-low. Date math is centralized and tested; visual placement still needs full browser traversal."
+}

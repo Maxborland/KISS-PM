@@ -1,0 +1,610 @@
+{
+  "generatedAt": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "purpose": "Current-truth reconciliation after origin/master merge and the current hardening batch. Old bug docs are historical inputs, not current-open truth unless fresh evidence confirms failure.",
+  "statusVocabulary": [
+    "fixed-by-master",
+    "fixed-by-current-branch",
+    "confirmed-open",
+    "unverified",
+    "not-a-bug",
+    "superseded"
+  ],
+  "sourceDocuments": [
+    "docs/qa/full-eval/bugs.md",
+    "docs/qa/full-eval/bugs/auth.md",
+    "docs/qa/full-eval/bugs/shell-dashboard.md",
+    "docs/qa/full-eval/bugs/projects.md",
+    "docs/qa/full-eval/bugs/crm.md",
+    "docs/qa/full-eval/bugs/communications.md",
+    "docs/qa/full-eval/bugs/admin.md",
+    "docs/qa/full-eval/phase5-outcome.md",
+    "docs/qa/full-eval/uiux-loop-2026-07-05/report.md",
+    "docs/qa/full-eval/reconciliation-2026-07-07.md"
+  ],
+  "summary": {
+    "oldBugIdsReviewed": 84,
+    "fixedByMasterOldBugIds": 64,
+    "fixedByCurrentBranchItems": 23,
+    "confirmedOpen": 0,
+    "unverifiedOldBugIds": 1,
+    "notABugOrSupersededOldBugIds": 4,
+    "unverifiedRiskZones": 5
+  },
+  "fixedByMaster": [
+    {
+      "ids": [
+        "BUG-001",
+        "BUG-002",
+        "BUG-003",
+        "BUG-004",
+        "BUG-005",
+        "BUG-006",
+        "BUG-007",
+        "BUG-008",
+        "BUG-009",
+        "BUG-011",
+        "BUG-012",
+        "BUG-013",
+        "BUG-014"
+      ],
+      "source": "docs/qa/full-eval/bugs.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:24-28 cluster A fixed prototype blocks",
+        "docs/qa/full-eval/phase5-outcome.md:36-48 clusters B/E fixed navigation and auth redirects",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:79-84 P0 fixed comms scope, real headers, search, providers, security policies",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:101-111 P2/P3 fixed prototype gates, display names, favicon/title polish"
+      ],
+      "nextAction": "Do not reopen without fresh post-merge browser/API evidence."
+    },
+    {
+      "ids": [
+        "BUG-AUTH-02",
+        "BUG-AUTH-03",
+        "BUG-AUTH-04",
+        "BUG-AUTH-05",
+        "BUG-AUTH-06",
+        "BUG-AUTH-07",
+        "BUG-AUTH-08",
+        "BUG-AUTH-09"
+      ],
+      "source": "docs/qa/full-eval/bugs/auth.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:43-48 route protection, login redirect, internal from validation",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:79-84 P0 provider/auth UX fixes",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:105 P2 prototype notes gated"
+      ],
+      "nextAction": "Fresh auth traversal still required before clean-pass, but these are not current confirmed-open items."
+    },
+    {
+      "ids": [
+        "BUG-SHELL-01",
+        "BUG-SHELL-02",
+        "BUG-SHELL-03",
+        "BUG-SHELL-04",
+        "BUG-SHELL-05",
+        "BUG-SHELL-06",
+        "BUG-SHELL-07",
+        "BUG-SHELL-08",
+        "BUG-SHELL-09",
+        "BUG-SHELL-10",
+        "BUG-SHELL-14",
+        "BUG-SHELL-15"
+      ],
+      "source": "docs/qa/full-eval/bugs/shell-dashboard.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:36-48 navigation, admin visibility, redirects",
+        "docs/qa/full-eval/phase5-outcome.md:56-60 dashboard mock leakage and resource directory fixed",
+        "docs/qa/full-eval/phase5-outcome.md:76-85 profile null clearing and login/Gantt polish",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:94-97 permission-aware nav, dashboard, my-work, settings, global theme",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:105-111 prototype/display-name/nits fixed"
+      ],
+      "nextAction": "Fresh role traversal required; no old shell item here should be treated as open without new evidence."
+    },
+    {
+      "ids": [
+        "BUG-PROJ-01",
+        "BUG-PROJ-02",
+        "BUG-PROJ-03",
+        "BUG-PROJ-04",
+        "BUG-PROJ-06",
+        "BUG-PROJ-07",
+        "BUG-PROJ-08",
+        "BUG-PROJ-10",
+        "BUG-PROJ-12",
+        "BUG-PROJ-14",
+        "BUG-PROJ-15",
+        "BUG-PROJ-17",
+        "BUG-PROJ-18",
+        "BUG-PROJ-19",
+        "BUG-PROJ-20",
+        "BUG-PROJ-22",
+        "BUG-PROJ-23",
+        "BUG-PROJ-24",
+        "BUG-PROJ-25",
+        "BUG-PROJ-26"
+      ],
+      "source": "docs/qa/full-eval/bugs/projects.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:50-60 task/status/resource hardcodes and mock leakage fixed",
+        "docs/qa/full-eval/phase5-outcome.md:62-74 planning domain M/H fixes, baseline, overloads, scenarios, revert",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:79-83 real project header, not-found, comms scope, provider UX",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:94-111 feedback, permissions, display names, prototype gates"
+      ],
+      "nextAction": "Do not reopen from the historical projects.md file alone."
+    },
+    {
+      "ids": [
+        "BUG-CRM-01",
+        "BUG-CRM-02",
+        "BUG-CRM-04",
+        "BUG-CRM-05",
+        "BUG-CRM-07",
+        "BUG-CRM-09"
+      ],
+      "source": "docs/qa/full-eval/bugs/crm.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:19-23 CRM duplicate product conflict fixed",
+        "docs/qa/full-eval/phase5-outcome.md:50-54 opportunity demand position normalization fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:80-81 CRM dates and not-found fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:94-108 feedback, permission-aware nav, CRUD, display names fixed"
+      ],
+      "nextAction": "Fresh CRM write-flow checks still needed for clean-pass."
+    },
+    {
+      "ids": [
+        "BUG-COMM-02",
+        "BUG-COMM-03",
+        "BUG-COMM-04",
+        "BUG-COMM-06"
+      ],
+      "source": "docs/qa/full-eval/bugs/communications.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:36-42 live tab navigation fixed",
+        "docs/qa/full-eval/phase5-outcome.md:76-81 notification link and unpin route fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:79 P0 comms scope fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:94-96 feedback/CRUD fixes"
+      ],
+      "nextAction": "Fresh media/provider traversal remains separate."
+    },
+    {
+      "ids": [
+        "BUG-ADM-01",
+        "BUG-ADM-02",
+        "BUG-ADM-03",
+        "BUG-ADM-04",
+        "BUG-ADM-05"
+      ],
+      "source": "docs/qa/full-eval/bugs/admin.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:30-33 admin RU errors and audit labels fixed",
+        "docs/qa/full-eval/phase5-outcome.md:76-78 ADM-02 and ADM-04 destructive guards fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:84 P0-6 honest security policies fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:94-108 permission-aware UX, role labels and audit UX fixed"
+      ],
+      "nextAction": "ADM-02 and ADM-03 are not current open bugs unless fresh checks fail."
+    },
+    {
+      "ids": [
+        "G5-01",
+        "G5-02",
+        "G5-03",
+        "G8-07",
+        "G4-01",
+        "G3-01",
+        "G3-02",
+        "G4-02",
+        "G6-01",
+        "G2-01",
+        "G3-12",
+        "G4-16",
+        "G1-AUTH-02",
+        "G7-01"
+      ],
+      "source": "docs/qa/full-eval/uiux-loop-2026-07-05/report.md",
+      "evidence": [
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:79-84 all P0 items fixed with live checks",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:86 regression sweep 17/17; video live join not exercised"
+      ],
+      "nextAction": "P0 product/UI degraded states are fixed by master; real provider happy paths remain unverified zones."
+    },
+    {
+      "ids": [
+        "BUG-008",
+        "BUG-AUTH-11",
+        "BUG-SHELL-01",
+        "BUG-SHELL-14"
+      ],
+      "source": "fresh browser evidence on current branch",
+      "evidence": [
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/auth-shell-browser-2026-07-07.json: BUG-008 links navigate to /register and /password-reset",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/auth-shell-browser-2026-07-07.json: BUG-AUTH-11 profile logout then 'Войти снова' navigates to /login?from=%2Fprofile",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/auth-shell-browser-2026-07-07.json and auth-shell-extra-browser-2026-07-07.json: / redirects to /login anonymous and /dashboard logged-in; no dead design-v3 root",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/auth-shell-browser-2026-07-07.json: anonymous /agent redirects to /login?from=%2Fagent"
+      ],
+      "nextAction": "No fix needed; keep in regression traversal."
+    }
+  ],
+  "fixedByCurrentBranch": [
+    {
+      "id": "CURRENT-ADMIN-RBAC-LIMITED-USER",
+      "source": "current branch browser verification",
+      "surface": "/admin/users, /admin/roles",
+      "evidence": "Limited role with tenant.users.read/manage + tenant.access_profiles.read saw admin users/roles without forbidden and without create/edit/delete role actions.",
+      "linkedOldIds": [
+        "BUG-ADM-01"
+      ]
+    },
+    {
+      "id": "CURRENT-DEV-LOOPBACK-LOGOUT",
+      "source": "current branch API test and browser verification",
+      "surface": "/login, logout menu",
+      "evidence": "POST /api/auth/logout from web localhost:3012 through API 127.0.0.1:4021 returned 200; subsequent /api/auth/me returned 401; UI returned to login.",
+      "linkedOldIds": [
+        "BUG-AUTH-01",
+        "BUG-AUTH-10"
+      ]
+    },
+    {
+      "id": "CURRENT-PROJ-11-OVERVIEW-STATUS",
+      "source": "current branch test and browser verification",
+      "surface": "/projects/project-vektor-portal/overview",
+      "evidence": "overview status helper counts live ids like task-status-done/task-status-in-progress; browser showed '25% 1 закрыто · 2 в работе'.",
+      "linkedOldIds": [
+        "BUG-PROJ-11"
+      ]
+    },
+    {
+      "id": "CURRENT-PROJ-09-OVERVIEW-LINKS",
+      "source": "current branch browser verification",
+      "surface": "/projects/project-vektor-portal/overview",
+      "evidence": "Overview actions are anchors to schedule/scenarios/baseline/commits instead of disabled demoAction buttons.",
+      "linkedOldIds": [
+        "BUG-PROJ-09"
+      ],
+      "note": "Overview actions were verified separately; remaining non-schedule and schedule action scopes are covered by CURRENT-PROJ-09-NON-SCHEDULE-ACTIONS-PARTIAL and CURRENT-PROJ-09-SCHEDULE-ACTIONS."
+    },
+    {
+      "id": "CURRENT-REQUEST-SECURITY-TESTS",
+      "source": "current branch targeted tests",
+      "surface": "apps/api/src/requestSecurity.ts",
+      "evidence": "requestSecurity tests pass for non-production loopback wildcard defaults while production default remains empty.",
+      "linkedOldIds": [
+        "BUG-AUTH-01"
+      ]
+    },
+    {
+      "id": "CURRENT-SHELL-11-PROFILE-PERMISSION-AWARE",
+      "source": "current branch unit tests and fresh in-app browser verification",
+      "surface": "/profile",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-shell-11-profile-after-fix-browser-2026-07-07.json: plan-reader inputs/theme buttons/save disabled and permission warning visible; admin inputs enabled and save enables after dirty edit.",
+      "linkedOldIds": [
+        "BUG-SHELL-11"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/auth/profile/profile-surface.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ]
+    },
+    {
+      "id": "CURRENT-COMM-05-NOTIFICATION-READ-IDEMPOTENCY",
+      "source": "current branch DB integration test",
+      "surface": "POST /api/workspace/notifications/:notificationId/read, GET /api/workspace/unread-summary",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-comm-05-notification-read-idempotency-2026-07-07.json: RED showed readAt overwrite; GREEN shows repeated read keeps readAt stable and unread summary stays 0.",
+      "linkedOldIds": [
+        "BUG-COMM-05"
+      ],
+      "tests": [
+        "$env:DATABASE_URL='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55436/kiss_pm'; corepack pnpm exec vitest run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts",
+        "corepack pnpm --filter @kiss-pm/api typecheck"
+      ]
+    },
+    {
+      "id": "CURRENT-CRM-08-MONEY-FORMATTER",
+      "source": "current branch formatter unit test and typecheck",
+      "surface": "CRM deals money formatting",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-crm-08-money-formatting-2026-07-07.json: RED covered missing shared formatter; GREEN shows sub-thousand values render as rubles and compact thousands/millions remain stable.",
+      "linkedOldIds": [
+        "BUG-CRM-08"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/crm/ui/money.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ]
+    },
+    {
+      "id": "CURRENT-CRM-09-PERMISSION-AWARE-CREATE-CONTROLS",
+      "source": "current branch capability unit test and typecheck",
+      "surface": "CRM create controls: clients, contacts, products, deals, pipeline setup",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-crm-09-permission-aware-create-controls-2026-07-07.json: RED covered missing capability helper; GREEN shows live users without required manage permission get disabled write controls while mock mode remains allowed.",
+      "linkedOldIds": [
+        "BUG-CRM-09"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/crm/ui/permissions.test.ts src/crm/ui/money.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ]
+    },
+    {
+      "id": "CURRENT-CRM-06-CONTACT-EMAIL-UNIQUE",
+      "source": "current branch API DB integration, web mock contract, migration test and typechecks",
+      "surface": "CRM contacts create/update duplicate email policy",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-crm-06-contact-email-unique-2026-07-07.json: RED covered duplicate create/update succeeding; GREEN shows API and mock return 409 contact_email_taken and persistence adds contacts_tenant_id_email_uidx.",
+      "linkedOldIds": [
+        "BUG-CRM-06"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/crm/lib/mock-crm-backend.test.ts",
+        "$env:DATABASE_URL='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55436/kiss_pm'; corepack pnpm exec vitest run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts",
+        "corepack pnpm --filter @kiss-pm/persistence test -- src/migration.test.ts",
+        "corepack pnpm --filter @kiss-pm/api typecheck",
+        "corepack pnpm --filter @kiss-pm/web typecheck",
+        "corepack pnpm --filter @kiss-pm/persistence typecheck"
+      ],
+      "note": "Before applying migration to a non-empty production database, run a duplicate non-null contact email precheck per tenant."
+    },
+    {
+      "id": "CURRENT-CRM-03-LEGACY-STAGE-SELECT",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/crm/deals/[id] stage select for legacy opportunity.pipelineId=null rows",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-crm-03-legacy-stage-select-2026-07-07.json: RED covered missing legacy fallback; GREEN verifies stage select options resolve through current stage pipeline and explicit pipelineId remains authoritative.",
+      "linkedOldIds": [
+        "BUG-CRM-03"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/crm/deals/deal-card-surface.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "note": "Full browser traversal for every route/action remains a separate unverified risk zone; this closes the known stage-option calculation bug."
+    },
+    {
+      "id": "CURRENT-COMM-01-CHANNEL-RENAME-SIDEBAR",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/communications/channels sidebar list after channel PATCH rename",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-comm-01-channel-rename-sidebar-2026-07-07.json: RED covered missing list replacement primitive; GREEN verifies renamed channel replaces the existing sidebar list item without dropping others.",
+      "linkedOldIds": [
+        "BUG-COMM-01"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/communications/lib/use-comms.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "note": "Full browser traversal for every route/action remains a separate unverified risk zone; this closes the known stale sidebar state bug."
+    },
+    {
+      "id": "CURRENT-AUTH-13-RESET-TOKEN-REPEAT",
+      "source": "current branch targeted API test and typechecks",
+      "surface": "POST /api/auth/password-reset/confirm repeated token policy",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-auth-13-reset-token-repeat-2026-07-07.json: RED covered repeated confirm returning invalid_reset_token after success; GREEN verifies first confirm succeeds, second confirm returns reset_token_used, other reset tokens are removed, and API/persistence typechecks pass.",
+      "linkedOldIds": [
+        "BUG-AUTH-13"
+      ],
+      "tests": [
+        "corepack pnpm exec vitest run --config vitest.config.ts apps/api/src/authRegistrationRoutes.test.ts",
+        "corepack pnpm --filter @kiss-pm/api typecheck",
+        "corepack pnpm --filter @kiss-pm/persistence typecheck"
+      ],
+      "note": "Full email-provider delivery happy path remains tracked separately as RISK-AUTH-EMAIL-RESET-HAPPY-PATH; this closes the known repeat-token error classification bug."
+    },
+    {
+      "id": "CURRENT-PROJ-21-BASELINE-LABEL",
+      "source": "current branch DB integration, web mock test, domain/persistence typechecks",
+      "surface": "/projects/[id]/baseline baseline.capture label readback",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-21-baseline-label-2026-07-07.json: RED showed authored.baselines label missing after capture; GREEN verifies DB readback label, web mock baseline capture, and domain/persistence typechecks.",
+      "linkedOldIds": [
+        "BUG-PROJ-21"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55436/kiss_pm&& node_modules\\\\.bin\\\\vitest.exe run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"\"shows zero deltas immediately after capturing a baseline\"\"\"",
+        "cmd /c ..\\\\..\\\\node_modules\\\\.bin\\\\vitest.exe run --config vitest.config.ts src/delivery/lib/mock-planning-backend.test.ts",
+        "corepack pnpm --filter @kiss-pm/domain typecheck",
+        "corepack pnpm --filter @kiss-pm/persistence typecheck"
+      ],
+      "coverageStatus": "targeted",
+      "note": "Full browser traversal remains tracked under RISK-FULL-BROWSER-TRAVERSAL. Full API/web typecheck currently has concurrent-agent blockers unrelated to this baseline-label slice."
+    },
+    {
+      "id": "CURRENT-PROJ-05-DATE-ORIGIN",
+      "source": "current branch targeted web tests and typecheck",
+      "surface": "/projects/[id]/schedule, /overview, /calendars date origin",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-05-date-origin-2026-07-07.json: schedule today/timeline, overview overdue, and calendars month origin now use project/current date helpers instead of hardcoded 2026 mock epoch.",
+      "linkedOldIds": [
+        "BUG-PROJ-05"
+      ],
+      "tests": [
+        "cmd /c ..\\\\..\\\\node_modules\\\\.bin\\\\vitest.exe run --config vitest.config.ts src/delivery/lib/date-origin.test.ts src/delivery/overview/overview-status.test.ts src/delivery/project-action-links.test.ts src/delivery/schedule/schedule-rows.test.ts src/workspace/projects/projects-list-surface.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "targeted"
+    },
+    {
+      "id": "CURRENT-PROJ-13-SUMMARY-PARENT-CHAIN",
+      "source": "current branch targeted web tests and typecheck",
+      "surface": "/projects/[id]/schedule summary/non-leaf rows",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-13-summary-parent-chain-2026-07-07.json: rows with parentTaskId children are summary/non-leaf without mock kind/WBS heuristics; edit/drag guards updated.",
+      "linkedOldIds": [
+        "BUG-PROJ-13"
+      ],
+      "tests": [
+        "bun test apps/web/src/delivery/lib/mock-planning-backend.test.ts apps/web/src/delivery/schedule/schedule-rows.test.ts apps/web/src/workspace/projects/projects-list-surface.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "targeted"
+    },
+    {
+      "id": "CURRENT-PROJ-16-PROJECTS-LIST-HONEST-SCOPE",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/projects list filters/search/sort promise",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-16-projects-list-honest-scope-2026-07-07.json: unsupported all/active fake filter removed; active-only helper and story copy match API contract.",
+      "linkedOldIds": [
+        "BUG-PROJ-16"
+      ],
+      "tests": [
+        "bun test apps/web/src/workspace/projects/projects-list-surface.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "targeted"
+    },
+    {
+      "id": "CURRENT-PROJ-09-NON-SCHEDULE-ACTIONS-PARTIAL",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/baseline, /calendars, /settings project action links",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-09-non-schedule-actions-partial-2026-07-07.json: non-schedule project actions now link to existing routes; schedule scope was closed separately by CURRENT-PROJ-09-SCHEDULE-ACTIONS.",
+      "linkedOldIds": [
+        "BUG-PROJ-09"
+      ],
+      "tests": [
+        "cmd /c ..\\\\..\\\\node_modules\\\\.bin\\\\vitest.exe run --config vitest.config.ts src/delivery/project-action-links.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "partial",
+      "remainingScope": [
+        "No non-schedule BUG-PROJ-09 scope remains; full browser traversal remains tracked under RISK-FULL-BROWSER-TRAVERSAL."
+      ]
+    },
+    {
+      "id": "CURRENT-SHELL-12-13-AGENT-NO-PROVIDER-DEGRADED-PARTIAL",
+      "source": "current branch targeted API/web tests and typechecks",
+      "surface": "/agent provider degraded state, /agent/propose, /agent/propose/stream",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-shell-12-13-agent-provider-degraded-partial-2026-07-07.json: no-provider mode exposes provider.configured=false and returns 503 instead of fake proposal/SSE success; production demo chrome was closed separately by CURRENT-SHELL-13-AGENT-PRODUCTION-CHROME.",
+      "linkedOldIds": [
+        "BUG-SHELL-12",
+        "BUG-SHELL-13"
+      ],
+      "tests": [
+        "cmd /c node_modules\\\\.bin\\\\vitest.exe run --config vitest.config.ts apps/api/src/agent/agentProviderDegraded.test.ts apps/api/src/agent/agentLoop.test.ts apps/api/src/agent/openRouterProvider.test.ts apps/web/src/workspace/agent/agent-stream.test.ts",
+        "corepack pnpm --filter @kiss-pm/api typecheck",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "partial",
+      "remainingScope": [
+        "Real OpenRouter/Anthropic provider proposal and live SSE browser traversal with configured keys"
+      ]
+    },
+    {
+      "id": "CURRENT-PROJ-09-SCHEDULE-ACTIONS",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/projects/[id]/schedule",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-09-schedule-actions-2026-07-07.json: schedule Baseline is a real route link and unsupported filter/column fake controls were removed.",
+      "linkedOldIds": [
+        "BUG-PROJ-09"
+      ],
+      "tests": [
+        "./node_modules/.bin/vitest.cmd run apps/web/src/delivery/project-action-links.test.ts",
+        "from apps/web: ../../node_modules/.bin/next.cmd typegen",
+        "from apps/web: ../../node_modules/.bin/tsc.cmd -p tsconfig.json --pretty false"
+      ],
+      "coverageStatus": "targeted",
+      "note": "Together with overview and non-schedule project action fixes, this closes the known BUG-PROJ-09 fake-action scope. Full role x route x action traversal remains tracked under RISK-FULL-BROWSER-TRAVERSAL."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PLANNING-IDEMPOTENCY",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "POST /api/workspace/projects/:projectId/planning/apply-command baseline.capture and task.update_schedule",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-idempotency-coverage-2026-07-07.json: concurrent same-key baseline.capture and task.update_schedule deduplicate; same-key different payload returns 409 idempotency_key_conflict.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "$env:DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm; .\\node_modules\\.bin\\vitest.CMD run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"deduplicates concurrent\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for planning apply-command only; admin, comms, auth, CRM and notification race/idempotency slices remain."
+    },
+    {
+      "id": "CURRENT-SHELL-13-AGENT-PRODUCTION-CHROME",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/agent production history/nav/message timestamps",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-shell-13-agent-production-chrome-2026-07-07.json: production /agent no longer renders landing-demo history, nav uses real route links, and message timestamps use current Date.",
+      "linkedOldIds": [
+        "BUG-SHELL-13"
+      ],
+      "tests": [
+        "cmd /c ..\\..\\node_modules\\.bin\\vitest.cmd run --config vitest.config.ts src/workspace/agent/agent-surface.test.tsx",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "targeted",
+      "note": "This closes the known BUG-SHELL-13 demo chrome/timestamp scope. Real provider proposal/SSE remains tracked under BUG-SHELL-12 and RISK-AGENT-REAL-LLM-SSE."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-PARTICIPANT-LEFT-ON-CLEANUP",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/calls/[roomId] LiveKit participant state cleanup",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-participant-left-on-cleanup-2026-07-07.json: cleanup/unmount after successful join posts participantState left exactly once; explicit leave remains idempotent.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+      ],
+      "tests": [
+        "cmd /c ..\\..\\node_modules\\.bin\\vitest.cmd run --config vitest.config.ts src/lib/call/call-engine.test.tsx",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes only the participant cleanup bug found during media audit; full LiveKit/Jitsi provider browser traversal remains unverified."
+    }
+  ],
+  "confirmedOpen": [],
+  "unverified": [
+    {
+      "ids": [
+        "BUG-SHELL-12"
+      ],
+      "source": "docs/qa/full-eval/bugs/shell-dashboard.md",
+      "reason": "No-provider degraded behavior is fixed in current branch. Real OpenRouter/Anthropic provider proposal quality and live SSE browser traversal still require configured provider keys; tracked together with RISK-AGENT-REAL-LLM-SSE."
+    }
+  ],
+  "notABugOrSuperseded": [
+    {
+      "ids": [
+        "BUG-010",
+        "BUG-AUTH-01",
+        "BUG-AUTH-10",
+        "BUG-AUTH-12"
+      ],
+      "source": "docs/qa/full-eval/bugs.md and docs/qa/full-eval/bugs/auth.md",
+      "reason": "Historical environment artifacts or superseded observations. Current branch still hardens loopback dev origins for the same class of environment issue."
+    }
+  ],
+  "unverifiedRiskZones": [
+    {
+      "id": "RISK-AUTH-EMAIL-RESET-HAPPY-PATH",
+      "status": "unverified",
+      "evidence": "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:66 says valid reset-token happy path through email provider was not checked.",
+      "requiredEvidence": "Real or explicitly degraded email provider status, reset request, token delivery/extraction path, confirm, login with new password, repeat-token behavior."
+    },
+    {
+      "id": "RISK-AGENT-REAL-LLM-SSE",
+      "status": "unverified",
+      "evidence": "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:67 says real agent proposals and live SSE were not checked.",
+      "requiredEvidence": "Configured provider or explicit degraded state, streamed reasoning/proposal, apply/reject UX, no silent mock success."
+    },
+    {
+      "id": "RISK-MEDIA-LIVEKIT-JITSI-CALL",
+      "status": "unverified",
+      "evidence": "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:68 says video provider was disabled and real media plan was not tested.",
+      "requiredEvidence": "Provider config, prejoin, join, permissions, media failure/degraded UI, leave/rejoin, participant state.",
+      "partialEvidence": [
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-participant-left-on-cleanup-2026-07-07.json: participantState left on cleanup/unmount fixed and tested without real provider."
+      ],
+      "remainingEvidence": "Live provider browser traversal still required: provider config, prejoin, permissions, join, media denied, leave/rejoin, remote participant, reconnect."
+    },
+    {
+      "id": "RISK-FULL-BROWSER-TRAVERSAL",
+      "status": "unverified",
+      "evidence": "docs/qa/full-eval/reconciliation-2026-07-07.md:36 says a fresh role × route × action matrix was not re-run after all master fixes.",
+      "requiredEvidence": "Per-role route/action JSON with screenshot/network logs and pass/fail/expected-forbidden status."
+    },
+    {
+      "id": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+      "status": "unverified",
+      "evidence": "docs/qa/full-eval/reconciliation-2026-07-07.md:56 calls for duplicate/race/idempotency checks before further fixes.",
+      "requiredEvidence": "Every write-flow checked for single submit, double submit, concurrent duplicate API calls, stale version/conflict, refresh/readback, and permission-denied role.",
+      "partialEvidence": [
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-idempotency-coverage-2026-07-07.json: planning baseline.capture and task.update_schedule concurrent idempotency coverage added."
+      ],
+      "remainingEvidence": "Admin user/role writes, communication channel rename races, auth reset concurrent confirm, CRM contact concurrent uniqueness, notification read concurrency, and remaining write flows still need duplicate/race/idempotency evidence."
+    }
+  ],
+  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, media provider checks, auth email reset happy path, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency and media participant cleanup."
+}

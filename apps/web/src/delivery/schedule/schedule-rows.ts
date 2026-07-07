@@ -1,5 +1,4 @@
 import { dayToIso, isoToDay, MIN_PER_DAY } from "@/delivery/lib/mock-planning-backend";
-import { DEP_RU } from "@/delivery/schedule/schedule-editors";
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
 
 // Чистое отображение канонического read-model в строки Гантта (WBS + summary-rollup + предшественники).
@@ -7,12 +6,14 @@ import type { PlanningReadModel } from "@kiss-pm/planning-client";
 export type Kind = "summary" | "task" | "milestone";
 export type Mode = "auto" | "manual";
 export type Pred = { depId: string; predId: string; type: string; lagDays: number };
+const DEP_RU: Record<string, string> = { FS: "ОН", SS: "НН", FF: "ОО", SF: "НО" };
 export type Row = {
   id: string;
   wbs: string;
   name: string;
   level: number;
   kind: Kind;
+  hasChildren: boolean;
   mode: Mode;
   parentId: string | null;
   durDays: number;
@@ -46,6 +47,29 @@ export function mapRows(
 
   const calcById = new Map(calc.map((c) => [c.id, c]));
   const wbsById = new Map(authored.tasks.map((t) => [t.id, t.wbsCode]));
+  const taskById = new Map(authored.tasks.map((t) => [t.id, t]));
+  const childrenByParent = new Map<string, typeof authored.tasks>();
+  for (const t of authored.tasks) {
+    if (!t.parentTaskId) continue;
+    const arr = childrenByParent.get(t.parentTaskId) ?? [];
+    arr.push(t);
+    childrenByParent.set(t.parentTaskId, arr);
+  }
+  const levelCache = new Map<string, number>();
+  const levelOfTask = (taskId: string, seen = new Set<string>()): number => {
+    const cached = levelCache.get(taskId);
+    if (cached != null) return cached;
+    const t = taskById.get(taskId);
+    if (!t?.parentTaskId || seen.has(taskId)) {
+      const fallback = Math.max(0, (t?.wbsCode ?? "").split(".").filter(Boolean).length - 1);
+      levelCache.set(taskId, fallback);
+      return fallback;
+    }
+    seen.add(taskId);
+    const level = levelOfTask(t.parentTaskId, seen) + 1;
+    levelCache.set(taskId, level);
+    return level;
+  };
   const baseById = new Map(baseCmp.map((b) => [b.taskId, b]));
   const warned = issues.filter((i) => i.severity !== "info" && i.entity);
   const warnSet = new Set(warned.map((i) => i.entity!.id));
@@ -74,8 +98,10 @@ export function mapRows(
     const dayDur = start && finish ? isoToDay(finish) - dayStart : 0;
     // customFields в домене — намеренно открытый Record<string,unknown>; типизируем ожидаемые ключи.
     const cf = (t.customFields ?? {}) as { resLabel?: string; kind?: Kind };
-    // веха: пользовательское поле kind=milestone (как в overview/inspector/settings) ИЛИ нулевая длительность
-    const kind: Kind = cf.kind === "summary" ? "summary" : cf.kind === "milestone" || t.durationMinutes === 0 ? "milestone" : "task";
+    const hasChildren = (childrenByParent.get(t.id)?.length ?? 0) > 0;
+    // summary определяется структурой live read-model (parentTaskId), а не только mock customFields/WBS.
+    // Веха остаётся листом: если у строки есть дети, summary выигрывает над нулевой длительностью.
+    const kind: Kind = hasChildren || cf.kind === "summary" ? "summary" : cf.kind === "milestone" || t.durationMinutes === 0 ? "milestone" : "task";
     const predList = predsBySucc.get(t.id) ?? [];
     const predDisplay = predList.length
       ? predList.map((p) => `${wbsById.get(p.predId) ?? "?"} ${DEP_RU[p.type] ?? p.type}${p.lagDays ? ` +${p.lagDays}д` : ""}`).join(", ")
@@ -88,8 +114,9 @@ export function mapRows(
       id: t.id,
       wbs: t.wbsCode,
       name: t.title,
-      level: t.wbsCode.split(".").length - 1,
+      level: levelOfTask(t.id),
       kind,
+      hasChildren,
       mode: t.schedulingMode,
       parentId: t.parentTaskId,
       durDays: t.durationMinutes != null ? Math.round(t.durationMinutes / MIN_PER_DAY) : dayDur,
@@ -111,13 +138,32 @@ export function mapRows(
     };
   });
 
+  const rowsByParent = new Map<string, Row[]>();
+  for (const row of rows) {
+    if (!row.parentId) continue;
+    const arr = rowsByParent.get(row.parentId) ?? [];
+    arr.push(row);
+    rowsByParent.set(row.parentId, arr);
+  }
+  const descendantsOf = (id: string): Row[] => {
+    const out: Row[] = [];
+    const visit = (parentId: string) => {
+      for (const child of rowsByParent.get(parentId) ?? []) {
+        out.push(child);
+        visit(child.id);
+      }
+    };
+    visit(id);
+    return out;
+  };
+
   // полный rollup суммарных задач НА ФРОНТЕ: труд = Σ листьев, % — взвешенно по труду,
-  // старт/финиш/длительность = span подзадач. По убыванию уровня — вложенные summary сворачиваются раньше.
+  // старт/финиш/длительность = span подзадач. Дерево берём из parentTaskId; WBS — только метка.
   const summariesDesc = rows.filter((r) => r.kind === "summary").sort((a, b) => b.level - a.level);
   for (const s of summariesDesc) {
-    const directKids = rows.filter((r) => r.level === s.level + 1 && r.wbs.startsWith(s.wbs + "."));
+    const directKids = rowsByParent.get(s.id) ?? [];
     if (directKids.length === 0) continue;
-    const leaves = rows.filter((r) => r.kind !== "summary" && r.wbs.startsWith(s.wbs + "."));
+    const leaves = descendantsOf(s.id).filter((r) => r.kind !== "summary");
     const work = leaves.reduce((a, k) => a + k.workH, 0);
     const minStart = Math.min(...directKids.map((k) => k.dayStart));
     const maxEnd = Math.max(...directKids.map((k) => k.dayStart + k.dayDur));

@@ -109,6 +109,13 @@ function createAuthFakeDataSource() {
         }
       }
     },
+    async deleteOtherPasswordResetTokensByUserId(tenantId, userId, preservedTokenId) {
+      for (const [id, token] of resetTokens) {
+        if (token.tenantId === tenantId && token.userId === userId && id !== preservedTokenId) {
+          resetTokens.delete(id);
+        }
+      }
+    },
     async appendAuditEvent() {
       return;
     },
@@ -329,6 +336,16 @@ describe("POST /api/auth/password-reset/confirm", () => {
   it("меняет пароль, гасит сессии и помечает токен использованным (200)", async () => {
     const { dataSource, state } = createAuthFakeDataSource();
     const rawToken = seedResetToken(state);
+    state.resetTokens.set("token-2", {
+      id: "token-2",
+      tenantId: "tenant-1",
+      userId: "user-1",
+      tokenHash: hashResetToken("b".repeat(64)),
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+      requestedIp: null,
+      createdAt: new Date()
+    });
     const app = createApp({ dataSource });
 
     const response = await app.request("/api/auth/password-reset/confirm", {
@@ -349,8 +366,8 @@ describe("POST /api/auth/password-reset/confirm", () => {
       })
     ).toBe(true);
     expect(state.sessions.size).toBe(0);
-    // Токены сброса пользователя удалены (инвалидация прочих).
-    expect(state.resetTokens.size).toBe(0);
+    expect([...state.resetTokens.keys()]).toEqual(["token-1"]);
+    expect(state.resetTokens.get("token-1")?.consumedAt).toBeInstanceOf(Date);
   });
 
   it("возвращает 400 invalid_reset_token для неизвестного токена", async () => {
@@ -399,9 +416,42 @@ describe("POST /api/auth/password-reset/confirm", () => {
     await expect(response.json()).resolves.toEqual({ error: "reset_token_used" });
   });
 
+  it("возвращает 400 reset_token_used при повторном confirm того же токена после успешной смены пароля", async () => {
+    const { dataSource, state } = createAuthFakeDataSource();
+    const rawToken = seedResetToken(state);
+    state.resetTokens.set("token-2", {
+      id: "token-2",
+      tenantId: "tenant-1",
+      userId: "user-1",
+      tokenHash: hashResetToken("b".repeat(64)),
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+      requestedIp: null,
+      createdAt: new Date()
+    });
+    const app = createApp({ dataSource });
+
+    const firstResponse = await app.request("/api/auth/password-reset/confirm", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({ token: rawToken, password: "brandnewpass" })
+    });
+    expect(firstResponse.status).toBe(200);
+
+    const secondResponse = await app.request("/api/auth/password-reset/confirm", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({ token: rawToken, password: "anothernewpass" })
+    });
+
+    expect(secondResponse.status).toBe(400);
+    await expect(secondResponse.json()).resolves.toEqual({ error: "reset_token_used" });
+  });
+
   it("возвращает 400 weak_password при слабом новом пароле", async () => {
     const { dataSource, state } = createAuthFakeDataSource();
     const rawToken = seedResetToken(state);
+
     const app = createApp({ dataSource });
 
     const response = await app.request("/api/auth/password-reset/confirm", {

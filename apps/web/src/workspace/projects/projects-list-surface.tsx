@@ -1,13 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { Segmented } from "@/components/ui/segmented";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { useProjects, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
@@ -23,16 +22,19 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
    - Баннер «Прототип»: боевой контракт GET /api/workspace/projects
      (только status === "active"); транспорт — contract-mock,
      переключение на боевой = apiOrigin; данные in-memory.
-   - Фильтр «Все/Активные»: контракт отдаёт ТОЛЬКО активные проекты,
-     поэтому «Активные» — настоящий вид, а «Все» — демо-переключатель
-     (архив/закрытые в этой ручке недоступны).
+   - Контракт отдаёт ТОЛЬКО активные проекты, поэтому список не показывает
+     фильтр «Все»: архив/закрытые в этой ручке недоступны.
    - Клик по строке навигации НЕ выполняет (cursor-default + title):
      карточка проекта — отдельный экран рабочего приложения.
 
    Состояния — только через <SurfaceState> (loading/error/empty).
    ============================================================ */
 
-type Filter = "active" | "all";
+export const PROJECTS_LIST_AVAILABLE_FILTERS = [{ value: "active", label: "Активные" }] as const;
+
+export function getVisibleProjects(projects: ProjectRecord[]): ProjectRecord[] {
+  return projects.filter((p) => p.status === "active");
+}
 
 // Аватары/инициалы/цвет — по образцу deals-surface (детерминированно по справочнику).
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
@@ -78,14 +80,11 @@ export function ProjectsListSurface() {
     return i < 0 ? "c5" : AV[i % AV.length]!;
   };
   const { data, status, error, reload } = useProjects();
-  const [filter, setFilter] = useState<Filter>("active");
 
-  // Контракт отдаёт только активные → оба таба показывают один и тот же список.
-  // «Активные» честно фильтрует по status==="active"; «Все» — демо (архив недоступен).
+  // Контракт отдаёт только активные; локальная защита не даёт не-active строкам попасть в UI.
   const projects = useMemo<ProjectRecord[]>(() => {
-    const all = data?.projects ?? [];
-    return filter === "active" ? all.filter((p) => p.status === "active") : all;
-  }, [data, filter]);
+    return getVisibleProjects(data?.projects ?? []);
+  }, [data]);
 
   // Статус поверхности: есть данные → ready; ошибка → error; иначе loading.
   // Пустой список активных проектов → empty.
@@ -110,22 +109,6 @@ export function ProjectsListSurface() {
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Активные проекты рабочей области</p>
         </div>
 
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <Segmented
-            name="projects-filter"
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { value: "all", label: "Все" },
-              { value: "active", label: "Активные" }
-            ]}
-          />
-          {filter === "all" && prototypeNotesEnabled ? (
-            <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">
-              Демо-переключатель: GET /api/workspace/projects отдаёт только активные — архив/закрытые в этой ручке недоступны.
-            </span>
-          ) : null}
-        </div>
 
         <SurfaceState
           status={surfaceStatus}

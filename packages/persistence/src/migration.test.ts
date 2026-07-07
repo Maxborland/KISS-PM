@@ -214,6 +214,10 @@ const crmPipelineSchemaContractMigration = readFileSync(
   ),
   "utf8"
 );
+const contactEmailUniqueMigration = readFileSync(
+  new URL("../migrations/0049_contact_email_unique.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -808,6 +812,17 @@ describe("CRM pipeline schema contract SQL migration", () => {
   it("keeps CRM pipeline stage finality consistent with lifecycle state", () => {
     expect(crmPipelineSchemaContractMigration).toContain(
       'CONSTRAINT "crm_pipeline_stages_final_lifecycle_state_chk"'
+    );
+  });
+});
+
+describe("CRM contact email SQL migration", () => {
+  it("keeps contact email unique per tenant when present", () => {
+    expect(contactEmailUniqueMigration).toContain(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "contacts_tenant_id_email_uidx"'
+    );
+    expect(contactEmailUniqueMigration).toContain(
+      'ON "contacts" USING btree ("tenant_id","email")'
     );
   });
 });

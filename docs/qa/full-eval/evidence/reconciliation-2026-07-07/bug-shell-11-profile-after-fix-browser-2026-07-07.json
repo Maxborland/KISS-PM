@@ -1,0 +1,213 @@
+{
+  "generatedAt": "2026-07-07T11:19:52.290Z",
+  "web": "http://127.0.0.1:3012",
+  "checks": [
+    {
+      "buttons": [
+        {
+          "ariaPressed": "true",
+          "disabled": true,
+          "text": "Светлая",
+          "type": "button"
+        },
+        {
+          "ariaPressed": "false",
+          "disabled": true,
+          "text": "Тёмная",
+          "type": "button"
+        },
+        {
+          "ariaPressed": null,
+          "disabled": true,
+          "text": "Сохранить",
+          "type": "submit"
+        }
+      ],
+      "formFound": true,
+      "inputs": [
+        {
+          "disabled": true,
+          "placeholder": "Имя сотрудника",
+          "readOnly": false,
+          "type": null,
+          "value": "Никита Без Ресурсов"
+        },
+        {
+          "disabled": true,
+          "placeholder": "+7 999 000-00-00",
+          "readOnly": false,
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": true,
+          "placeholder": "@username",
+          "readOnly": false,
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": true,
+          "placeholder": null,
+          "readOnly": false,
+          "type": "color",
+          "value": "#0f766e"
+        },
+        {
+          "disabled": true,
+          "placeholder": "#0f766e",
+          "readOnly": false,
+          "type": null,
+          "value": "#0f766e"
+        }
+      ],
+      "label": "BUG-SHELL-11-plan-reader-profile-after-fix",
+      "roleSignal": "plan-reader-no-resources",
+      "saveButton": {
+        "disabled": true,
+        "text": "Сохранить"
+      },
+      "title": "Профиль — KISS PM",
+      "url": "http://127.0.0.1:3012/profile",
+      "warningVisible": true
+    },
+    {
+      "buttons": [
+        {
+          "ariaPressed": "true",
+          "disabled": false,
+          "text": "Светлая",
+          "type": "button"
+        },
+        {
+          "ariaPressed": "false",
+          "disabled": false,
+          "text": "Тёмная",
+          "type": "button"
+        },
+        {
+          "ariaPressed": null,
+          "disabled": true,
+          "text": "Сохранить",
+          "type": "submit"
+        }
+      ],
+      "formFound": true,
+      "inputs": [
+        {
+          "disabled": false,
+          "placeholder": "Имя сотрудника",
+          "readOnly": false,
+          "type": null,
+          "value": "Анна Администратор"
+        },
+        {
+          "disabled": false,
+          "placeholder": "+7 999 000-00-00",
+          "readOnly": false,
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "placeholder": "@username",
+          "readOnly": false,
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "placeholder": null,
+          "readOnly": false,
+          "type": "color",
+          "value": "#0f766e"
+        },
+        {
+          "disabled": false,
+          "placeholder": "#0f766e",
+          "readOnly": false,
+          "type": null,
+          "value": "#0f766e"
+        }
+      ],
+      "label": "BUG-SHELL-11-admin-profile-clean-after-fix",
+      "roleSignal": "admin",
+      "saveButton": {
+        "disabled": true,
+        "text": "Сохранить"
+      },
+      "title": "Профиль — KISS PM",
+      "url": "http://127.0.0.1:3012/profile",
+      "warningVisible": false
+    },
+    {
+      "buttons": [
+        {
+          "ariaPressed": "true",
+          "disabled": false,
+          "text": "Светлая",
+          "type": "button"
+        },
+        {
+          "ariaPressed": "false",
+          "disabled": false,
+          "text": "Тёмная",
+          "type": "button"
+        },
+        {
+          "ariaPressed": null,
+          "disabled": false,
+          "text": "Сохранить",
+          "type": "submit"
+        }
+      ],
+      "formFound": true,
+      "inputs": [
+        {
+          "disabled": false,
+          "placeholder": "Имя сотрудника",
+          "readOnly": false,
+          "type": null,
+          "value": "Анна Администратор QA local"
+        },
+        {
+          "disabled": false,
+          "placeholder": "+7 999 000-00-00",
+          "readOnly": false,
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "placeholder": "@username",
+          "readOnly": false,
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "placeholder": null,
+          "readOnly": false,
+          "type": "color",
+          "value": "#0f766e"
+        },
+        {
+          "disabled": false,
+          "placeholder": "#0f766e",
+          "readOnly": false,
+          "type": null,
+          "value": "#0f766e"
+        }
+      ],
+      "label": "BUG-SHELL-11-admin-profile-dirty-after-fix",
+      "roleSignal": "admin",
+      "saveButton": {
+        "disabled": false,
+        "text": "Сохранить"
+      },
+      "title": "Профиль — KISS PM",
+      "url": "http://127.0.0.1:3012/profile",
+      "warningVisible": false
+    }
+  ]
+}

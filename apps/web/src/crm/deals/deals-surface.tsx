@@ -16,15 +16,17 @@ import { StatTile } from "@/delivery/ui/bento";
 import { cn } from "@/lib/cn";
 import { makeRuError } from "@/lib/error-messages";
 import { CrmFrame } from "@/crm/ui/crm-frame";
+import { money } from "@/crm/ui/crm-bits";
+import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { useCrm, useCrmUsers } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import type { DealStage, Opportunity, Pipeline, StageTransition } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
+import { useSessionUser } from "@/shell/use-session-user";
 
 type Mode = "kanban" | "list" | "forecast";
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
 const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean); return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—"; };
-const money = (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} млн ₽` : `${Math.round(v / 1000).toLocaleString("ru-RU")} тыс ₽`);
 // Дефолты дат формы «Новая сделка» (G4-15): старт = сегодня, финиш = +N месяцев (локальная дата).
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const isoToday = () => isoOf(new Date());
@@ -58,6 +60,11 @@ const ruErr = makeRuError(ERR_RU);
 
 export function ProjectDeals() {
   const { live } = useCrmRuntime();
+  const sessionUser = useSessionUser();
+  const createDealCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.opportunities.manage" });
+  const createPipelineCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.crm_pipelines.manage" });
+  const createStageCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.deal_stages.manage" });
+  const createPipelineDisabledReason = createPipelineCapability.disabledReason ?? createStageCapability.disabledReason;
   const crm = useCrm();
   const { data, status, error, reload, moveStage, movePipeline, createOpportunity } = crm;
   const users = useCrmUsers();
@@ -178,7 +185,7 @@ export function ProjectDeals() {
             title: "Воронка продаж ещё не настроена",
             description: "Создайте первую воронку — в ней появятся стадии, и сделки можно будет вести по канбану.",
             action: (
-              <Button variant="default" disabled={busy} onClick={() => void createDefaultPipeline()}>
+              <Button variant="default" disabled={busy || Boolean(createPipelineDisabledReason)} title={createPipelineDisabledReason ?? "Создать воронку"} onClick={() => void createDefaultPipeline()}>
                 <Plus className="size-3.5" aria-hidden />Создать воронку
               </Button>
             )
@@ -190,8 +197,10 @@ export function ProjectDeals() {
     );
   }
 
+  const createDealDialog = <CreateDealDialog stages={model.stages} data={data} busy={busy} setBusy={setBusy} create={createOpportunity} disabledReason={createDealCapability.disabledReason} />;
+
   return (
-    <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={<CreateDealDialog stages={model.stages} data={data} busy={busy} setBusy={setBusy} create={createOpportunity} />}>
+    <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={createDealDialog}>
       {/* мультиворонки: выбор воронки — фильтрует стадии/сделки/переходы */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Воронка:</span>
@@ -453,12 +462,13 @@ function MovePipelineDialog({ target, pipelines, allStages, currentPipelineId, b
   );
 }
 
-function CreateDealDialog({ stages, data, busy, setBusy, create }: {
+function CreateDealDialog({ stages, data, busy, setBusy, create, disabledReason }: {
   stages: DealStage[];
   data: ReturnType<typeof useCrm>["data"];
   busy: boolean;
   setBusy: (v: boolean) => void;
   create: ReturnType<typeof useCrm>["createOpportunity"];
+  disabledReason?: string | null;
 }) {
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState("");
@@ -490,7 +500,7 @@ function CreateDealDialog({ stages, data, busy, setBusy, create }: {
   return (
     <FormDialog
       title="Новая сделка"
-      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Сделка</Button>}
+      trigger={<Button variant="default" size="sm" disabled={busy || Boolean(disabledReason)} title={disabledReason ?? "Создать сделку"}><Plus className="size-3.5" aria-hidden />Сделка</Button>}
       submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
       submitDisabled={!valid || busy}
       successToast="Сделка создана"

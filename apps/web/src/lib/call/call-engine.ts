@@ -157,12 +157,20 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
   const backgroundSupported = useMemo(() => backgroundProcessorsSupported(), []);
   const conversationIdRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const joinedSessionIdRef = useRef<string | null>(null);
   // Remote audio is attached to detached <audio> elements the engine owns (the tile only
   // renders video); kept here so they are removed on teardown.
   const audioElementsRef = useRef<HTMLMediaElement[]>([]);
   // In-call messages sent before the durable conversation resolves are queued, then flushed.
   const pendingMessagesRef = useRef<string[]>([]);
 
+  const markParticipantLeft = useCallback(() => {
+    const sessionId = joinedSessionIdRef.current;
+    if (!sessionId) return;
+    joinedSessionIdRef.current = null;
+    sessionIdRef.current = null;
+    void postParticipantState(roomId, sessionId, "left");
+  }, [roomId]);
   const refresh = useCallback(() => {
     const room = roomRef.current;
     if (!room) return;
@@ -298,6 +306,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
         void room.startAudio();
         refresh();
         // Record presence so the call shows up in occupancy (the recipe is connect → state).
+        joinedSessionIdRef.current = session.id;
         void postParticipantState(roomId, session.id, "joined");
         // Resolve the durable conversation for the room's parent entity (best-effort).
         const entity = await fetchCallRoomEntity(roomId);
@@ -329,6 +338,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     return () => {
       disposed = true;
       room.removeAllListeners();
+      markParticipantLeft();
       void room.disconnect();
       void backgroundRef.current?.dispose();
       for (const element of audioElementsRef.current) element.remove();
@@ -336,9 +346,10 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
       pendingMessagesRef.current = [];
       conversationIdRef.current = null;
       sessionIdRef.current = null;
+      joinedSessionIdRef.current = null;
       roomRef.current = null;
     };
-  }, [roomId, refresh, options]);
+  }, [roomId, refresh, options, markParticipantLeft]);
 
   const handlers = useMemo<CallControlHandlers>(
     () => ({
@@ -364,17 +375,13 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
           .then(refresh);
       },
       onLeave: () => {
-        const sessionId = sessionIdRef.current;
-        if (sessionId) {
-          // Record that this participant left. The session is NOT ended here — others may
-          // still be in it, and the next participant joins this same active session.
-          void postParticipantState(roomId, sessionId, "left");
-          sessionIdRef.current = null;
-        }
+        // Record that this participant left. The session is NOT ended here - others may
+        // still be in it, and the next participant joins this same active session.
+        markParticipantLeft();
         void roomRef.current?.disconnect();
       }
     }),
-    [refresh, roomId]
+    [markParticipantLeft, refresh]
   );
 
   const sendChat = useCallback((text: string) => {

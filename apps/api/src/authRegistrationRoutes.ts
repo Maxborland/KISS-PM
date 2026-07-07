@@ -286,7 +286,7 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
       !dataSource.findPasswordResetTokenByHash ||
       !dataSource.updateCredentialPassword ||
       !dataSource.markPasswordResetTokenConsumed ||
-      !dataSource.deletePasswordResetTokensByUserId ||
+      !dataSource.deleteOtherPasswordResetTokensByUserId ||
       !dataSource.deleteSessionsByUserId ||
       !dataSource.withTransaction ||
       !dataSource.appendAuditEvent
@@ -349,7 +349,7 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
         if (
           !tx.updateCredentialPassword ||
           !tx.markPasswordResetTokenConsumed ||
-          !tx.deletePasswordResetTokensByUserId ||
+          !tx.deleteOtherPasswordResetTokensByUserId ||
           !tx.deleteSessionsByUserId
         ) {
           throw new Error("transactional_password_reset_not_configured");
@@ -370,8 +370,8 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
           record.userId,
           hashPassword(password)
         );
-        // Инвалидируем прочие токены сброса и разлогиниваем все сессии пользователя.
-        await tx.deletePasswordResetTokensByUserId(record.tenantId, record.userId);
+        // Инвалидируем прочие токены сброса, сохраняя consumed-токен как evidence для стабильного reset_token_used.
+        await tx.deleteOtherPasswordResetTokensByUserId(record.tenantId, record.userId, record.id);
         await tx.deleteSessionsByUserId(record.tenantId, record.userId);
 
         await appendManagementAuditEvent(

@@ -1,0 +1,20 @@
+{
+  "id": "BUG-PROJ-09-PARTIAL-NON-SCHEDULE-ACTIONS",
+  "linkedOldIds": ["BUG-PROJ-09"],
+  "status": "partial-fixed-by-current-branch",
+  "coverageStatus": "partial",
+  "date": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "surface": ["/projects/[id]/baseline", "/projects/[id]/calendars", "/projects/[id]/settings"],
+  "expected": "Controls pointing to existing project routes are real navigation links instead of disabled demoAction/fake controls.",
+  "redEvidence": ["project-action-links.test.ts initially failed 3/3 because baseline/calendar/settings actions were not real links."],
+  "greenEvidence": [
+    "cmd /c ..\\..\\node_modules\\.bin\\vitest.exe run --config vitest.config.ts src/delivery/project-action-links.test.ts -> 3 tests passed.",
+    "corepack pnpm --filter @kiss-pm/web typecheck -> passed."
+  ],
+  "changedFiles": ["apps/web/src/delivery/baseline/baseline-surface.tsx", "apps/web/src/delivery/calendars/calendars-surface.tsx", "apps/web/src/delivery/settings/settings-surface.tsx", "apps/web/src/delivery/project-action-links.test.ts"],
+  "fixApplied": "Converted baseline 'Слой в Графике', calendar conflict 'Открыть График', and settings 'Открыть Календарь' controls to Next Link-backed buttons.",
+  "remainingScope": ["/projects/[id]/schedule remaining fake controls such as Baseline/filters/columns still require verification/fix."],
+  "limitations": ["This is partial; BUG-PROJ-09 remains in unverified until schedule scope is closed and browser traversal confirms actions."],
+  "regressionRisk": "Low for touched controls; partial coverage only."
+}

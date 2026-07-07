@@ -11,14 +11,20 @@ import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr } from "@/crm/ui/crm-bits";
+import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { useCrm } from "@/crm/lib/use-crm";
+import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import type { Contact } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
+import { useSessionUser } from "@/shell/use-session-user";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 
 export function ProjectContacts() {
+  const { live } = useCrmRuntime();
   const { data, status, error, reload, createContact, updateContact } = useCrm();
+  const sessionUser = useSessionUser();
+  const createCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.contacts.manage" });
   const [busy, setBusy] = useState(false);
 
   const clientById = useMemo(() => new Map((data?.clients ?? []).map((c) => [c.id, c])), [data]);
@@ -47,8 +53,10 @@ export function ProjectContacts() {
     else toast.error(`Отклонено: ${crmErr(res.code, res.message)}`);
   };
 
+  const createContactDialog = data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} create={createContact} disabledReason={createCapability.disabledReason} /> : null;
+
   return (
-    <CrmFrame activeTab="Контакты" subtitle="Справочник контактов" actions={data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} create={createContact} /> : null}>
+    <CrmFrame activeTab="Контакты" subtitle="Справочник контактов" actions={createContactDialog}>
       {prototypeNotesEnabled && (
         <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
@@ -65,7 +73,7 @@ export function ProjectContacts() {
         empty={{
           title: "Нет контактов",
           description: "Справочник контактов пуст — создайте первый контакт (нужен активный клиент).",
-          action: data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} create={createContact} /> : undefined
+          action: createContactDialog ?? undefined
         }}
         forbidden={{ title: "Доступ к контактам ограничен", description: "У вас нет прав на просмотр справочника контактов." }}
       >
@@ -153,7 +161,7 @@ function EditContactDialog({ contact, clientName, busy, setBusy, update }: { con
   );
 }
 
-function CreateContactDialog({ data, busy, setBusy, create }: { data: NonNullable<ReturnType<typeof useCrm>["data"]>; busy: boolean; setBusy: (v: boolean) => void; create: ReturnType<typeof useCrm>["createContact"] }) {
+function CreateContactDialog({ data, busy, setBusy, create, disabledReason }: { data: NonNullable<ReturnType<typeof useCrm>["data"]>; busy: boolean; setBusy: (v: boolean) => void; create: ReturnType<typeof useCrm>["createContact"]; disabledReason?: string | null }) {
   const [clientId, setClientId] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -164,7 +172,7 @@ function CreateContactDialog({ data, busy, setBusy, create }: { data: NonNullabl
   return (
     <FormDialog
       title="Новый контакт"
-      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Контакт</Button>}
+      trigger={<Button variant="default" size="sm" disabled={busy || Boolean(disabledReason)} title={disabledReason ?? "Создать контакт"}><Plus className="size-3.5" aria-hidden />Контакт</Button>}
       submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
       submitDisabled={!valid || busy}
       successToast="Контакт создан"

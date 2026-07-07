@@ -627,6 +627,48 @@ describe("Phase 3.1 CRM API", () => {
     });
   });
 
+  it("rejects duplicate contact emails on create and update with 409", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-dup-email", name: "Клиент дублей" })
+    });
+    const first = await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "contact-email-first", clientId: "client-dup-email", name: "Первый", email: "Dup@Example.test" })
+    });
+    const second = await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "contact-email-second", clientId: "client-dup-email", name: "Второй", email: "other@example.test" })
+    });
+    const duplicateCreate = await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "contact-email-duplicate", clientId: "client-dup-email", name: "Дубль", email: "dup@example.test" })
+    });
+    const duplicateUpdate = await app.request("/api/workspace/contacts/contact-email-second", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ clientId: "client-dup-email", name: "Второй", email: "dup@example.test", status: "active" })
+    });
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(duplicateCreate.status).toBe(409);
+    await expect(duplicateCreate.json()).resolves.toEqual({ error: "contact_email_taken" });
+    expect(duplicateUpdate.status).toBe(409);
+    await expect(duplicateUpdate.json()).resolves.toEqual({ error: "contact_email_taken" });
+  });
+
   it("allows editing a contact on its archived current client but rejects reassignment to archived clients", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {

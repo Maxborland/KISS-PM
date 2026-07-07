@@ -31,7 +31,7 @@ export function useAgent() {
   const [tools, setTools] = useState<AgentToolAvailability[]>([]);
   // Статус LLM-провайдера инсталляции: live=false (demo/mock) → UI показывает
   // честный баннер деградации вместо неотличимого «Предложений нет» (G7-01).
-  const [provider, setProvider] = useState<{ model: string; live: boolean } | null>(null);
+  const [provider, setProvider] = useState<{ model: string; live: boolean; configured?: boolean } | null>(null);
   const [proposal, setProposal] = useState<AgentProposeResponse | null>(null);
   const [status, setStatus] = useState<AgentStatus>("loading");
   const [error, setError] = useState<string | null>(null);

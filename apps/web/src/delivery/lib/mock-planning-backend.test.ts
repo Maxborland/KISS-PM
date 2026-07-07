@@ -293,7 +293,8 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     expect(bc.baselineId).toBe("baseline-b3");
     expect(bc.tasks.length).toBeGreaterThan(0);
     expect(bc.tasks.every((t) => t.startDeltaDays === 0 && t.finishDeltaDays === 0)).toBe(true);
-    expect((res.readModel.authored as unknown as { baselines: Array<{ id: string }> }).baselines.some((b) => b.id === "baseline-b3")).toBe(true);
+    const baselines = (res.readModel.authored as unknown as { baselines: Array<{ id: string; label: string }> }).baselines;
+    expect(baselines.some((b) => b.id === "baseline-b3" && b.label === "Контроль")).toBe(true);
   });
 
   it("commit log seeds the session history with a revertible latest commit (commands + before)", async () => {

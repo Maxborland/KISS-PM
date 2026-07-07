@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, TriangleAlert, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
+import { buildProjectMonthKeys, currentPlanDate, monthGridDays, planDateFromDay, utcDayOfWeek } from "@/delivery/lib/date-origin";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
@@ -21,8 +23,7 @@ import type { PlanningCommand, PlanCalendar, PlanCalendarException, PlanTask } f
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const MONTHS_CAP = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 const DOW_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-const BASE_MS = Date.UTC(2026, 2, 2);const ddmm = (iso: string) => { const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
-const jsDow = (day: number) => { const d = new Date(BASE_MS + day * 86_400_000).getUTCDay(); return d === 0 ? 7 : d; }; // 1..7 (Пн..Вс)
+const ddmm = (iso: string) => { const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 
 let NID = 0;
 const nid = (p: string) => `${p}-n${(NID += 1)}`;
@@ -76,11 +77,13 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       for (let d = es; d < Math.max(ef, es + 1); d++) if (holidayByDay.has(d)) return { task: t, day: d };
       return null;
     }).filter((x): x is { task: PlanTask; day: number } => x !== null);
-    // диапазон месяцев
-    let maxDay = 34;
-    // calculatedFinish nullable — null дал бы NaN maxDay → пустая сетка месяцев; пропускаем недатированные.
-    for (const c of calc) if (c.calculatedFinish) maxDay = Math.max(maxDay, isoToDay(c.calculatedFinish));
-    const monthsList = [...new Set(Array.from({ length: maxDay + 1 }, (_, i) => dayToIso(i).slice(0, 7)))].sort();
+    const monthsList = buildProjectMonthKeys({
+      projectStartIso: readModel.project.plannedStart,
+      projectFinishIso: readModel.project.plannedFinish,
+      calculatedStarts: calc.map((c) => c.calculatedStart),
+      calculatedFinishes: calc.map((c) => c.calculatedFinish),
+      fallbackIso: currentPlanDate()
+    });
     return { cal, full, holidayByDay, absByResDay, anyHolidayByDay, anyAbsByResDay, leafTasks, conflicts, monthsList };
   }, [readModel]);
 
@@ -105,16 +108,10 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const absMap = isResourceView ? model.absByResDay.get(selCal) ?? new Map<number, PlanCalendarException>() : new Map<number, PlanCalendarException>();
 
   // сетка месяца: 6 недель × 7 дней, начиная с понедельника
-  const grid: number[] = [];
-  if (focusMonth) {
-    const y = Number(focusMonth.slice(0, 4)), m = Number(focusMonth.slice(5, 7)) - 1;
-    const first = Math.round((Date.UTC(y, m, 1) - BASE_MS) / 86_400_000);
-    const start = first - (jsDow(first) - 1);
-    for (let i = 0; i < 42; i++) grid.push(start + i);
-  }
+  const grid: number[] = focusMonth ? monthGridDays(focusMonth) : [];
   const dayState = (day: number) => {
     const inMonth = dayToIso(day).slice(0, 7) === focusMonth;
-    const weekend = !model.cal.workingWeekdays.includes(new Date(BASE_MS + day * 86_400_000).getUTCDay());
+    const weekend = !model.cal.workingWeekdays.includes(utcDayOfWeek(day));
     const holiday = model.holidayByDay.get(day) ?? null;
     const absence = isResourceView ? absMap.get(day) ?? null : null;
     return { inMonth, weekend, holiday, absence, working: !weekend && !holiday && !absence };
@@ -149,7 +146,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     const end = isoToDay(finish);
     for (let d = isoToDay(start); d <= end; d += 1) {
       // только рабочие дни диапазона: пропускаем выходные и праздники
-      if (!model.cal.workingWeekdays.includes(new Date(BASE_MS + d * 86_400_000).getUTCDay()) || model.holidayByDay.has(d)) continue;
+      if (!model.cal.workingWeekdays.includes(utcDayOfWeek(d)) || model.holidayByDay.has(d)) continue;
       cmds.push(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: model.cal.id, resourceId, date: dayToIso(d), workingMinutes: 0, reason: typeLabel } }));
     }
     if (cmds.length === 0) return;
@@ -230,7 +227,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
             {DOW_SHORT.map((d) => <div key={d} className="py-1 text-center text-[length:var(--text-xs)] font-semibold text-[var(--muted-soft)]">{d}</div>)}
             {grid.map((day) => {
               const st = dayState(day);
-              const dt = new Date(BASE_MS + day * 86_400_000);
+              const dt = planDateFromDay(day);
               const clickable = st.inMonth && !st.weekend && !(isResourceView && st.holiday);
               const dayTone = st.holiday ? NON_WORKING_TONE.holiday : st.absence ? NON_WORKING_TONE.absence : st.weekend ? NON_WORKING_TONE.weekend : { bg: "var(--panel-subtle)", fg: "var(--text)", border: "var(--border-subtle)" };
               return (
@@ -268,7 +265,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
             <div className="rounded-[var(--radius-card)] border border-[var(--warning)] bg-[var(--warning-soft)] p-3 text-[length:var(--text-xs)] text-[var(--warning-text)]">
               <div className="mb-1 flex items-center gap-1.5 font-semibold"><TriangleAlert className="size-3.5" aria-hidden />Конфликт с расписанием</div>
               <p>Задача «{model.conflicts[0]!.task.wbsCode} {model.conflicts[0]!.task.title}» запланирована на нерабочий день ({ddmm(dayToIso(model.conflicts[0]!.day))}).{model.conflicts.length > 1 ? ` И ещё ${model.conflicts.length - 1}.` : ""}</p>
-              <button type="button" title="Переход к «Графику» отсюда появится в одном из следующих обновлений" className="mt-2 cursor-default rounded-[var(--radius-sm)] border border-[var(--warning)] bg-[var(--panel)] px-2 py-1 font-medium text-[var(--warning-text)]">Открыть График</button>
+              <Button asChild variant="secondary" size="sm" className="mt-2"><Link href={`/projects/${projectId}/schedule`}>Открыть График</Link></Button>
             </div>
           ) : null}
         </div>

@@ -1186,9 +1186,24 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
       return rows.map(mapUserNotification);
     },
     async markUserNotificationRead(input) {
-      const [row] = await db
+      const [updated] = await db
         .update(userNotifications)
         .set({ readAt: new Date() })
+        .where(
+          and(
+            eq(userNotifications.tenantId, input.tenantId),
+            eq(userNotifications.id, input.notificationId),
+            eq(userNotifications.userId, input.userId),
+            isNull(userNotifications.archivedAt),
+            isNull(userNotifications.readAt)
+          )
+        )
+        .returning();
+      if (updated) return mapUserNotification(updated);
+
+      const [existing] = await db
+        .select()
+        .from(userNotifications)
         .where(
           and(
             eq(userNotifications.tenantId, input.tenantId),
@@ -1197,8 +1212,8 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
             isNull(userNotifications.archivedAt)
           )
         )
-        .returning();
-      return row ? mapUserNotification(row) : undefined;
+        .limit(1);
+      return existing ? mapUserNotification(existing) : undefined;
     },
     async listNotificationPreferences(tenantId, userId) {
       const rows = await db

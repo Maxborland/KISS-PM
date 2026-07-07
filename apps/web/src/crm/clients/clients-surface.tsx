@@ -11,14 +11,18 @@ import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr, money } from "@/crm/ui/crm-bits";
+import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { useCrm } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import type { Client } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
+import { useSessionUser } from "@/shell/use-session-user";
 
 export function ProjectClients() {
   const { live } = useCrmRuntime();
   const { data, status, error, reload, createClient, updateClient } = useCrm();
+  const sessionUser = useSessionUser();
+  const createCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.clients.manage" });
   const [busy, setBusy] = useState(false);
 
   const model = useMemo(() => {
@@ -53,8 +57,10 @@ export function ProjectClients() {
     else toast.error(`Отклонено: ${crmErr(res.code, res.message)}`);
   };
 
+  const createClientDialog = <CreateClientDialog busy={busy} setBusy={setBusy} create={createClient} disabledReason={createCapability.disabledReason} />;
+
   return (
-    <CrmFrame activeTab="Клиенты" subtitle="Справочник клиентов" actions={<CreateClientDialog busy={busy} setBusy={setBusy} create={createClient} />}>
+    <CrmFrame activeTab="Клиенты" subtitle="Справочник клиентов" actions={createClientDialog}>
       {/* Плашка-прототип: только вне live (раньше пряталась display:none и оставалась в DOM). */}
       {!live ? (
       <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
@@ -72,7 +78,7 @@ export function ProjectClients() {
         empty={{
           title: "Нет клиентов",
           description: "Справочник клиентов пуст — создайте первого клиента.",
-          action: <CreateClientDialog busy={busy} setBusy={setBusy} create={createClient} />
+          action: createClientDialog
         }}
         forbidden={{ title: "Доступ к клиентам ограничен", description: "У вас нет прав на просмотр справочника клиентов." }}
       >
@@ -158,13 +164,13 @@ function EditClientDialog({ client, busy, setBusy, update }: { client: Client; b
   );
 }
 
-function CreateClientDialog({ busy, setBusy, create }: { busy: boolean; setBusy: (v: boolean) => void; create: ReturnType<typeof useCrm>["createClient"] }) {
+function CreateClientDialog({ busy, setBusy, create, disabledReason }: { busy: boolean; setBusy: (v: boolean) => void; create: ReturnType<typeof useCrm>["createClient"]; disabledReason?: string | null }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   return (
     <FormDialog
       title="Новый клиент"
-      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Клиент</Button>}
+      trigger={<Button variant="default" size="sm" disabled={busy || Boolean(disabledReason)} title={disabledReason ?? "Создать клиента"}><Plus className="size-3.5" aria-hidden />Клиент</Button>}
       submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
       submitDisabled={!name.trim() || busy}
       successToast="Клиент создан"

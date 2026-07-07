@@ -49,16 +49,21 @@ export function AgentWorkspaceFrame({ children, mobile }: AgentWorkspaceFramePro
   );
 }
 
+type AppNavItem = { label: string; href?: string };
+
 type CollapsedAppNavProps = {
   expanded: boolean;
   mobileOpen?: boolean | undefined;
   onToggle: () => void;
+  items?: AppNavItem[];
+  activeHref?: string;
 };
 
 const navIcons = [Bot, FolderKanban, ListChecks, Users, CalendarDays, FileText, Settings];
 const historyIcons = [CalendarDays, Clock3, Users, FileText];
 
-export function CollapsedAppNav({ expanded, mobileOpen, onToggle }: CollapsedAppNavProps) {
+export function CollapsedAppNav({ expanded, mobileOpen, onToggle, items, activeHref }: CollapsedAppNavProps) {
+  const navItems: AppNavItem[] = items ?? NAV_ITEMS.map((label) => ({ label }));
   return (
     <nav
       className={cn(
@@ -73,16 +78,30 @@ export function CollapsedAppNav({ expanded, mobileOpen, onToggle }: CollapsedApp
         <span className="lad-sr">Раскрыть меню</span>
       </button>
       <div className="lad-app-nav__items">
-        {NAV_ITEMS.map((item, index) => {
+        {navItems.map((item, index) => {
           const Icon = navIcons[index] ?? ListChecks;
-          return (
+          const active = item.href ? item.href === activeHref : item.label === "Агент";
+          const content = (
+            <>
+              <Icon aria-hidden />
+              <span>{item.label}</span>
+            </>
+          );
+          return item.href ? (
+            <a
+              key={item.href}
+              className={cn("lad-app-nav__item", active && "is-active")}
+              href={item.href}
+            >
+              {content}
+            </a>
+          ) : (
             <button
-              key={item}
-              className={cn("lad-app-nav__item", item === "Агент" && "is-active")}
+              key={item.label}
+              className={cn("lad-app-nav__item", active && "is-active")}
               type="button"
             >
-              <Icon aria-hidden />
-              <span>{item}</span>
+              {content}
             </button>
           );
         })}
@@ -95,7 +114,10 @@ export function CollapsedAppNav({ expanded, mobileOpen, onToggle }: CollapsedApp
   );
 }
 
-export function AgentConversationList() {
+type AgentHistoryItem = { id: string; label: string; active?: boolean };
+
+export function AgentConversationList({ items }: { items?: AgentHistoryItem[] }) {
+  const historyItems = items ?? HISTORY_ITEMS.map((label) => ({ id: label, label, active: label === "Сроки согласования" }));
   return (
     <aside className="lad-history" aria-label="История запусков">
       <div className="lad-history__title">
@@ -103,16 +125,19 @@ export function AgentConversationList() {
         <span>История</span>
       </div>
       <div className="lad-history__items">
-        {HISTORY_ITEMS.map((item, index) => {
+        {historyItems.length === 0 ? (
+          <span className="lad-history__empty">История запросов появится после первого обращения.</span>
+        ) : null}
+        {historyItems.map((item, index) => {
           const Icon = historyIcons[index] ?? History;
           return (
           <button
-            key={item}
+            key={item.id}
             type="button"
-            className={cn("lad-history__item", item === "Сроки согласования" && "is-active")}
+            className={cn("lad-history__item", item.active && "is-active")}
           >
             <Icon aria-hidden />
-            {item}
+            {item.label}
           </button>
           );
         })}

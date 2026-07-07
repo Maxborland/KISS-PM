@@ -208,7 +208,7 @@ export function RowMenu({
             инлайн-строки создания (ПКМ → подзадача/задача рядом). */}
         <ContextMenu.Content className={MENU} onCloseAutoFocus={(e) => e.preventDefault()}>
           <ContextMenu.Item className={ITEM} onSelect={onOpen}>Открыть инспектор</ContextMenu.Item>
-          <ContextMenu.Item className={ITEM} onSelect={onEdit}>Редактировать…</ContextMenu.Item>
+          <ContextMenu.Item className={isLeaf ? ITEM : itemDisabled} disabled={!isLeaf} onSelect={onEdit}>Редактировать…</ContextMenu.Item>
           <ContextMenu.Separator className="my-1 h-px bg-[var(--border)]" />
           <ContextMenu.Item className={ITEM} onSelect={onAddSub}><Plus className="size-3.5" aria-hidden />Создать подзадачу</ContextMenu.Item>
           <ContextMenu.Item className={ITEM} onSelect={onAddBelow}><Plus className="size-3.5" aria-hidden />Создать задачу рядом</ContextMenu.Item>

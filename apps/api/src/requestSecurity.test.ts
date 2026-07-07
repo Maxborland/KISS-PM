@@ -65,6 +65,40 @@ describe("request security helpers", () => {
     );
   });
 
+  it("accepts loopback web origins on non-default dev ports", () => {
+    const request = new Request("http://127.0.0.1:4000/api/auth/logout", {
+      method: "POST",
+      headers: {
+        origin: "http://localhost:3011",
+        "sec-fetch-site": "same-site"
+      }
+    });
+
+    expect(
+      isTrustedBrowserMutationRequest(
+        request,
+        trustedMutationOriginsFromEnv({ NODE_ENV: "development" })
+      )
+    ).toBe(true);
+  });
+
+  it("does not trust loopback dev ports by default in production", () => {
+    const request = new Request("http://127.0.0.1:4000/api/auth/logout", {
+      method: "POST",
+      headers: {
+        origin: "http://localhost:3011",
+        "sec-fetch-site": "same-site"
+      }
+    });
+
+    expect(
+      isTrustedBrowserMutationRequest(
+        request,
+        trustedMutationOriginsFromEnv({ NODE_ENV: "production" })
+      )
+    ).toBe(false);
+  });
+
   it("requires explicit trusted origins in production", () => {
     expect(trustedMutationOriginsFromEnv({ NODE_ENV: "production" })).toEqual([]);
     expect(

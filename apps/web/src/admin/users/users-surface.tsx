@@ -21,7 +21,7 @@ const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium t
 
 export function AdminUsersSurface() {
   const { live } = useAdminRuntime();
-  const admin = useAdmin();
+  const admin = useAdmin("users");
   const { data, status, error, reload, createUser, updateUser, deactivateUser } = admin;
   const [busy, setBusy] = useState(false);
 
@@ -33,6 +33,9 @@ export function AdminUsersSurface() {
   }, [data]);
 
   const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : !data ? "error" : data.users.length === 0 ? "empty" : "ready";
+  const createDisabledReason = data && data.roles.length === 0
+    ? "Создание пользователя недоступно: у роли нет доступа к справочнику ролей."
+    : undefined;
 
   // Деактивация: PATCH status:"inactive" — только через подтверждение (G6-03).
   const deactivate = async (u: WorkspaceUser) => {
@@ -56,7 +59,7 @@ export function AdminUsersSurface() {
     <AdminFrame
       activeTab="Пользователи"
       subtitle="Пользователи рабочей области"
-      actions={data ? <CreateUserDialog roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} create={createUser} /> : undefined}
+      actions={data ? <CreateUserDialog roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} create={createUser} disabledReason={createDisabledReason} /> : undefined}
     >
       {!live ? (
         <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
@@ -114,10 +117,11 @@ export function AdminUsersSurface() {
   );
 }
 
-function CreateUserDialog({ roles, positions, busy, setBusy, create }: {
+function CreateUserDialog({ roles, positions, busy, setBusy, create, disabledReason }: {
   roles: AccessProfile[]; positions: Position[];
   busy: boolean; setBusy: (v: boolean) => void;
   create: ReturnType<typeof useAdmin>["createUser"];
+  disabledReason?: string | undefined;
 }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -129,13 +133,14 @@ function CreateUserDialog({ roles, positions, busy, setBusy, create }: {
   return (
     <FormDialog
       title="Новый пользователь"
-      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Создать пользователя</Button>}
+      trigger={<Button variant="default" size="sm" disabled={busy || Boolean(disabledReason)} title={disabledReason ?? "Создать пользователя"}><Plus className="size-3.5" aria-hidden />Создать пользователя</Button>}
       submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
-      submitDisabled={!valid || busy}
+      submitDisabled={!valid || busy || Boolean(disabledReason)}
       contentClassName="max-w-[480px]"
       successToast={`Пользователь «${name.trim()}» создан`}
       // Ошибка остаётся В модалке — раньше уходила строкой позади оверлея (G6-02).
       onSubmit={async () => {
+        if (disabledReason) return disabledReason;
         if (!valid) return null;
         setBusy(true);
         // password обязателен (≥ 8) — боевой контракт; positionId опционален.
@@ -149,12 +154,12 @@ function CreateUserDialog({ roles, positions, busy, setBusy, create }: {
         <label className={labelCls}>Email<Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@kiss-pm.dev" /></label>
         <label className={labelCls}>Имя<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя Фамилия" /></label>
         <label className={labelCls}>Роль доступа
-          <select value={accessProfileId} onChange={(e) => setAccessProfileId(e.target.value)} className={selCls}>
+          <select value={accessProfileId} onChange={(e) => setAccessProfileId(e.target.value)} className={selCls} disabled={roles.length === 0}>
             {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
         </label>
         <label className={labelCls}>Позиция
-          <select value={positionId} onChange={(e) => setPositionId(e.target.value)} className={selCls}>
+          <select value={positionId} onChange={(e) => setPositionId(e.target.value)} className={selCls} disabled={positions.length === 0}>
             <option value="">— без позиции —</option>
             {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
@@ -211,12 +216,12 @@ function EditUserDialog({ user, roles, positions, busy, setBusy, update }: {
         </label>
         <label className={labelCls}>Имя<Input value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className={labelCls}>Роль доступа
-          <select value={accessProfileId} onChange={(e) => setAccessProfileId(e.target.value)} className={selCls}>
+          <select value={accessProfileId} onChange={(e) => setAccessProfileId(e.target.value)} className={selCls} disabled={roles.length === 0}>
             {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
         </label>
         <label className={labelCls}>Позиция
-          <select value={positionId} onChange={(e) => setPositionId(e.target.value)} className={selCls}>
+          <select value={positionId} onChange={(e) => setPositionId(e.target.value)} className={selCls} disabled={positions.length === 0}>
             <option value="">— без позиции —</option>
             {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>

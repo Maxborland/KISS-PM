@@ -1,0 +1,45 @@
+{
+  "id": "BUG-SHELL-13-AGENT-PRODUCTION-CHROME",
+  "linkedOldIds": [
+    "BUG-SHELL-13"
+  ],
+  "status": "fixed-by-current-branch",
+  "coverageStatus": "targeted",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "generatedAt": "2026-07-07",
+  "surface": [
+    "/agent"
+  ],
+  "expected": [
+    "Production /agent history must be backed by real sessions or not rendered as clickable demo history.",
+    "Production /agent mini-navigation must use real product route links, not inert demo buttons.",
+    "New production chat messages must use the real current Date at creation time."
+  ],
+  "actualBefore": [
+    "Production /agent inherited HISTORY_ITEMS from the landing demo component.",
+    "Mini-navigation rendered button-only demo controls without hrefs.",
+    "Message timestamps came from a deterministic synthetic sequence."
+  ],
+  "fixApplied": [
+    "Added production nav items with real hrefs and passed them into CollapsedAppNav on /agent.",
+    "Passed an empty production history list into AgentConversationList so demo HISTORY_ITEMS stay landing-only.",
+    "Replaced synthetic sequence timestamps with new Date() formatting at message creation.",
+    "Kept landing demo defaults intact through opt-in component props."
+  ],
+  "changedFiles": [
+    "apps/web/src/workspace/agent/agent-surface.tsx",
+    "apps/web/src/widgets/landing-agent-demo/components.tsx",
+    "apps/web/src/workspace/agent/agent-surface.test.tsx"
+  ],
+  "redEvidence": [
+    ".\\node_modules\\.bin\\vitest.CMD run src/workspace/agent/agent-surface.test.tsx -> 3 failures before implementation: demo history contained План недели, nav links were [], timestamp was synthetic 17:41 instead of mocked current Date 13:37."
+  ],
+  "greenEvidence": [
+    "cmd /c ..\\..\\node_modules\\.bin\\vitest.cmd run --config vitest.config.ts src/workspace/agent/agent-surface.test.tsx -> 3 tests passed.",
+    "corepack pnpm --filter @kiss-pm/web typecheck -> passed."
+  ],
+  "limitations": [
+    "Real OpenRouter/Anthropic proposal quality and live SSE browser traversal remain provider-blocked under BUG-SHELL-12 and RISK-AGENT-REAL-LLM-SSE."
+  ],
+  "regressionRisk": "Medium. Production /agent and landing demo share components; tests lock that production no longer renders fake demo chrome while component defaults keep the landing demo behavior."
+}

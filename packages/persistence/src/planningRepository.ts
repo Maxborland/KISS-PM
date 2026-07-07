@@ -1778,6 +1778,7 @@ function mapBaselines(
 ): PlanBaseline[] {
   return baselineRows.map((baseline) => ({
     id: baseline.id,
+    label: baseline.label,
     capturedAt: baseline.capturedAt.toISOString(),
     tasks: baselineTaskRows
       .filter((task) => task.baselineId === baseline.id)

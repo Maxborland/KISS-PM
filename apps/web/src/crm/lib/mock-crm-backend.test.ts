@@ -119,8 +119,17 @@ describe("contract-mock CRM backend", () => {
   it("lowercases and validates contact email (400 invalid_contact_email)", async () => {
     const c = client();
     await expect(c.createContact({ clientId: "client-romashka", name: "Бад", email: "not-an-email" })).rejects.toMatchObject({ status: 400, code: "invalid_contact_email" });
-    const ok = await c.createContact({ clientId: "client-romashka", name: "Ок", email: "Anna@ROMASHKA.RU" });
-    expect(ok.contact.email).toBe("anna@romashka.ru");
+    const ok = await c.createContact({ clientId: "client-romashka", name: "Ок", email: "Unique@ROMASHKA.RU" });
+    expect(ok.contact.email).toBe("unique@romashka.ru");
+  });
+
+  it("rejects duplicate contact emails on create and update (409 contact_email_taken)", async () => {
+    const c = client();
+    const first = await c.createContact({ clientId: "client-romashka", name: "Первый", email: "Dup@Example.test" });
+    const second = await c.createContact({ clientId: "client-romashka", name: "Второй", email: "other@example.test" });
+
+    await expect(c.createContact({ clientId: "client-romashka", name: "Дубль", email: "dup@example.test" })).rejects.toMatchObject({ status: 409, code: "contact_email_taken" });
+    await expect(c.updateContact(second.contact.id, { clientId: second.contact.clientId, name: second.contact.name, email: first.contact.email, phone: null, telegram: null, role: null, status: second.contact.status })).rejects.toMatchObject({ status: 409, code: "contact_email_taken" });
   });
 
   it("stage move with malformed stageId returns invalid_deal_stage_id (400)", async () => {

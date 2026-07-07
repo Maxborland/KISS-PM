@@ -1,0 +1,27 @@
+{
+  "id": "BUG-AUTH-13",
+  "status": "fixed-by-current-branch",
+  "date": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "surface": [
+    "POST /api/auth/password-reset/confirm",
+    "password_reset_tokens persistence",
+    "authRegistrationRoutes reset-token repeat policy"
+  ],
+  "expected": "A valid reset token succeeds once; a second confirm with the same token returns 400 reset_token_used, while other reset tokens for the same user are invalidated after password change.",
+  "redEvidence": [
+    "corepack pnpm exec vitest run --config vitest.config.ts apps/api/src/authRegistrationRoutes.test.ts -> RED: repeated confirm after a successful password reset returned { error: 'invalid_reset_token' } instead of { error: 'reset_token_used' }. The broader package-script run also surfaced unrelated pre-existing failures in apiDocs/agentExecute."
+  ],
+  "greenEvidence": [
+    "corepack pnpm exec vitest run --config vitest.config.ts apps/api/src/authRegistrationRoutes.test.ts -> 1 file / 14 tests passed.",
+    "corepack pnpm --filter @kiss-pm/api typecheck -> passed.",
+    "corepack pnpm --filter @kiss-pm/persistence typecheck -> passed."
+  ],
+  "changedFiles": [
+    "apps/api/src/authRegistrationRoutes.ts",
+    "apps/api/src/authRegistrationRoutes.test.ts",
+    "packages/persistence/src/repositories.ts"
+  ],
+  "fixApplied": "The password-reset confirm transaction now preserves the consumed token row as evidence for stable repeat-token classification and deletes only other reset tokens for the same user. Persistence exposes deleteOtherPasswordResetTokensByUserId for this exact policy.",
+  "regressionRisk": "Low-medium. Security posture stays intact because other reset tokens are still invalidated and sessions are still deleted. Consumed reset-token rows now remain until normal data retention/cleanup; if long-term cleanup is added, it must not remove rows before the repeat-token UX/security window expected by the product."
+}

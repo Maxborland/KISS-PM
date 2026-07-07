@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Camera, Check, GitCommitVertical, X } from "lucide-react";
 import { toast } from "sonner";
@@ -97,7 +98,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Сравнение текущего плана с зафиксированным базовым: отклонения по срокам и трудозатратам.</p>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          <button type="button" title="Наложение базового плана на «График» появится в одном из следующих обновлений" className="inline-flex cursor-default items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1 text-[length:var(--text-sm)] text-[var(--muted-soft)]">Слой в «Графике»</button>
+          <Button asChild variant="secondary" size="sm"><Link href={`/projects/${projectId}/schedule`}>Слой в «Графике»</Link></Button>
           {capturing ? (
             <div className="flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-1.5 py-1">
               <input autoFocus value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Название снимка" className="h-7 w-[160px] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]" />
@@ -126,7 +127,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 <div key={b.id} className={cn("flex items-start gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0", active && "bg-[var(--info-soft)]")}>
                   <GitCommitVertical className={cn("mt-0.5 size-4 shrink-0", active ? "text-[var(--info)]" : "text-[var(--muted-soft)]")} aria-hidden />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">{/* PlanBaseline не хранит label: команда baseline.capture принимает label, но редьюсер его не сохраняет — снимок всегда безымянный. */}<span className="truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Снимок плана</span>
+                    <div className="flex items-center gap-1.5"><span className="truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{b.label || "Снимок плана"}</span>
                       <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", active ? "bg-[var(--info-soft)] text-[var(--info)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{active ? "активный" : "архив"}</span>
                     </div>
                     <div className="mono mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{dt(b.capturedAt)} · {b.tasks.length} задач</div>

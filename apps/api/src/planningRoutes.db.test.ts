@@ -1369,6 +1369,8 @@ describe("planning API routes", () => {
       baselineId: string;
       tasks: Array<{ startDeltaDays: number | null; finishDeltaDays: number | null; workDeltaMinutes: number | null }>;
     };
+    const freshBaseline = (afterBody.authored.baselines as Array<{ id: string; label: string }>).find((baseline) => baseline.id === "baseline-fresh");
+    expect(freshBaseline?.label).toBe("Свежий");
     expect(comparison.baselineId).toBe("baseline-fresh");
     expect(comparison.tasks.length).toBeGreaterThan(0);
     for (const t of comparison.tasks) {
@@ -1949,6 +1951,163 @@ describe("planning API routes", () => {
     });
   });
 
+  it("deduplicates concurrent baseline.capture apply requests with the same idempotency key", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-baseline-race",
+      title: "Baseline race",
+      start: "2026-06-02",
+      finish: "2026-06-03"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    const command = {
+      type: "baseline.capture",
+      payload: {
+        baselineId: "baseline-race",
+        label: "Race baseline"
+      }
+    };
+    const request = () =>
+      app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "baseline-capture-race-key"
+        })
+      });
+
+    const [first, second] = await Promise.all([request(), request()]);
+    const firstBody = await first.json();
+    const secondBody = await second.json();
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(secondBody).toEqual(firstBody);
+    expect(firstBody.newPlanVersion).toBe(initialBody.planVersion + 1);
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    const capturedBaselines = (afterBody.authored.baselines as Array<{ id: string; label: string }>).filter(
+      (baseline) => baseline.id === "baseline-race"
+    );
+    expect(afterBody.planVersion).toBe(initialBody.planVersion + 1);
+    expect(capturedBaselines).toHaveLength(1);
+    expect(capturedBaselines[0]).toMatchObject({ id: "baseline-race", label: "Race baseline" });
+
+    const conflicting = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        command: {
+          ...command,
+          payload: { ...command.payload, label: "Conflicting race baseline" }
+        },
+        clientPlanVersion: initialBody.planVersion,
+        idempotencyKey: "baseline-capture-race-key"
+      })
+    });
+
+    expect(conflicting.status).toBe(409);
+    await expect(conflicting.json()).resolves.toEqual({ error: "idempotency_key_conflict" });
+  });
+
+  it("deduplicates concurrent task.update_schedule apply requests with the same idempotency key", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-schedule-race",
+      title: "Schedule race",
+      start: "2026-06-02",
+      finish: "2026-06-03"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    const command = {
+      type: "task.update_schedule",
+      payload: {
+        taskId: "task-schedule-race",
+        plannedStart: "2026-06-05",
+        plannedFinish: "2026-06-08"
+      }
+    };
+    const request = () =>
+      app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "task-update-schedule-race-key"
+        })
+      });
+
+    const [first, second] = await Promise.all([request(), request()]);
+    const firstBody = await first.json();
+    const secondBody = await second.json();
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(secondBody).toEqual(firstBody);
+    expect(firstBody.newPlanVersion).toBe(initialBody.planVersion + 1);
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    const updatedTask = (afterBody.authored.tasks as Array<{
+      id: string;
+      plannedStart: string | null;
+      plannedFinish: string | null;
+    }>).find((task) => task.id === "task-schedule-race");
+    expect(afterBody.planVersion).toBe(initialBody.planVersion + 1);
+    expect(updatedTask).toMatchObject({
+      plannedStart: "2026-06-05",
+      plannedFinish: "2026-06-08"
+    });
+
+    const conflicting = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        command: {
+          ...command,
+          payload: {
+            ...command.payload,
+            plannedFinish: "2026-06-09"
+          }
+        },
+        clientPlanVersion: initialBody.planVersion,
+        idempotencyKey: "task-update-schedule-race-key"
+      })
+    });
+
+    expect(conflicting.status).toBe(409);
+    await expect(conflicting.json()).resolves.toEqual({ error: "idempotency_key_conflict" });
+  });
   it("rejects batch when a middle command has blocking validation", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask(adminCookie, {

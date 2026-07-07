@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CalendarDays, Pencil, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
@@ -140,7 +141,7 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                   <CalendarDays className="size-4 shrink-0 text-[var(--muted)]" aria-hidden />{calendarText}
                 </div>
               </Field>
-              <Button variant="secondary" size="sm" {...demoAction("переход на вкладку «Календари»")}>Открыть Календарь</Button>
+              <Button asChild variant="secondary" size="sm"><Link href={`/projects/${projectId}/calendars`}>Открыть Календарь</Link></Button>
             </div>
             <p className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Смена календаря по умолчанию появится в одном из следующих обновлений — пока поле только для чтения. Исключения и рабочая неделя — на вкладке «Календари».</p>
           </Section>

@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Columns3, Filter, GitBranch, IndentDecrease, IndentIncrease, Layers, Plus, TriangleAlert, Undo2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, GitBranch, IndentDecrease, IndentIncrease, Plus, TriangleAlert, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -10,9 +11,9 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
-import { demoAction } from "@/views/lib/demo";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/planning-demo-data";
+import { currentPlanDate, deriveScheduleTimeline, formatWeekLabel } from "@/delivery/lib/date-origin";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { usePointerDrag } from "@/delivery/lib/use-pointer-drag";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
@@ -112,9 +113,6 @@ const PROJECT: ProjectMeta = {
 
 const ROW_H = 36;
 const HEADER_H = 36;
-const TODAY_DAY = isoToDay("2026-04-28");
-const MONTHS = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
-const BASE_MS = Date.UTC(2026, 2, 2);
 
 function fmtDate(iso: string): string {
   if (!iso) return "—";
@@ -124,16 +122,6 @@ function fmtDate(iso: string): string {
 function unitsPct(durDays: number, workH: number): number {
   return durDays > 0 ? Math.round((workH / (durDays * HPD)) * 100) : 100;
 }
-function weekLabel(weekIndex: number): string {
-  const day = weekIndex * 7;
-  const d = new Date(BASE_MS + day * 86_400_000);
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const mon = MONTHS[d.getUTCMonth()] ?? "";
-  const prev = new Date(BASE_MS + (day - 7) * 86_400_000);
-  const newMonth = weekIndex === 0 || prev.getUTCMonth() !== d.getUTCMonth();
-  return newMonth ? `${mon[0]?.toUpperCase()}${mon.slice(1)} ${dd}` : dd;
-}
-
 const ZOOM_DAY_W = { day: 36, week: 20, month: 8 } as const;
 type Zoom = keyof typeof ZOOM_DAY_W;
 type DragMode = "move" | "resize" | "resizeLeft" | "progress";
@@ -224,6 +212,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   mappedRef.current = mapped;
   const dayWRef = useRef(dayW);
   dayWRef.current = dayW;
+  const timelineOriginDayRef = useRef(0);
+  function toTimelineX(day: number): number {
+    return (day - timelineOriginDayRef.current) * dayWRef.current;
+  }
 
   // drag/resize баров: общий window-жест (usePointerDrag: зеркало-реф + слушатели + очистка)
   const barDrag = usePointerDrag<DragState>({
@@ -232,7 +224,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         const rect = ganttRef.current?.getBoundingClientRect();
         if (!rect) return;
         const x = e.clientX - rect.left;
-        const pct = Math.max(0, Math.min(100, Math.round(((x - cur.origStart * dayW) / Math.max(1, cur.origDur * dayW)) * 100)));
+        const pct = Math.max(0, Math.min(100, Math.round(((x - toTimelineX(cur.origStart)) / Math.max(1, cur.origDur * dayW)) * 100)));
         if (pct !== cur.curPct) set({ ...cur, curPct: pct });
         return;
       }
@@ -309,7 +301,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       const tr = mappedRef.current?.rows.find((x) => x.id === targetId);
       const rect = ganttRef.current?.getBoundingClientRect();
       let toEdge: "start" | "finish" = "start";
-      if (tr && rect) { const x = e.clientX - rect.left; const mid = (tr.dayStart + tr.dayDur / 2) * dayWRef.current; toEdge = x < mid ? "start" : "finish"; }
+      if (tr && rect) { const x = e.clientX - rect.left; const mid = toTimelineX(tr.dayStart) + (tr.dayDur / 2) * dayWRef.current; toEdge = x < mid ? "start" : "finish"; }
       const type = cur.fromEdge === "finish" ? (toEdge === "start" ? "FS" : "FF") : toEdge === "start" ? "SS" : "SF";
       void applyCmd(createPlanningCommand({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: cur.fromId, successorTaskId: targetId, dependencyType: type, lagMinutes: 0 } }));
     }
@@ -427,15 +419,32 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
   const projectMeta = deriveProjectMeta(readModel, projectBase);
   const { rows, deadlineDay, projectFinishDay } = mapped;
-  const totalDays = Math.max(7, Math.ceil((Math.max(projectFinishDay, deadlineDay ?? 0, ...rows.map((r) => r.dayStart + r.dayDur)) + 6) / 7) * 7);
+  const timeline = deriveScheduleTimeline({
+    projectStartIso: readModel.project.plannedStart,
+    projectFinishDay,
+    rowStartDays: rows.map((r) => r.dayStart),
+    rowFinishDays: rows.map((r) => r.dayStart + r.dayDur),
+    deadlineDay,
+    todayIso: currentPlanDate()
+  });
+  const totalDays = timeline.totalDays;
   const weeks = totalDays / 7;
   const timelineW = totalDays * dayW;
   const weekW = 7 * dayW;
+  timelineOriginDayRef.current = timeline.originDay;
 
-  const isHidden = (wbs: string) => { for (const c of collapsed) if (wbs.startsWith(c + ".")) return true; return false; };
-  const visibleRows = rows.filter((r) => !isHidden(r.wbs));
-  const hasChildren = (wbs: string) => rows.some((r) => r.wbs.startsWith(wbs + "."));
-  const toggle = (wbs: string) => setCollapsed((prev) => { const n = new Set(prev); if (n.has(wbs)) n.delete(wbs); else n.add(wbs); return n; });
+  const allRowsById = new Map(rows.map((r) => [r.id, r] as const));
+  const isHidden = (row: Row) => {
+    let parentId = row.parentId;
+    while (parentId) {
+      if (collapsed.has(parentId)) return true;
+      parentId = allRowsById.get(parentId)?.parentId ?? null;
+    }
+    return false;
+  };
+  const visibleRows = rows.filter((r) => !isHidden(r));
+  const hasChildren = (row: Row) => row.hasChildren || rows.some((r) => r.parentId === row.id);
+  const toggle = (id: string) => setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   // связи
   const indexById = new Map(visibleRows.map((r, i) => [r.id, i] as const));
@@ -449,8 +458,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       if (!pred || si == null || di == null) continue;
       const sFromRight = p.type === "FS" || p.type === "FF";
       const dToRight = p.type === "FF" || p.type === "SF";
-      const sx = (sFromRight ? pred.dayStart + pred.dayDur : pred.dayStart) * dayW;
-      const dx = (dToRight ? succ.dayStart + succ.dayDur : succ.dayStart) * dayW;
+      const sx = toTimelineX(sFromRight ? pred.dayStart + pred.dayDur : pred.dayStart);
+      const dx = toTimelineX(dToRight ? succ.dayStart + succ.dayDur : succ.dayStart);
       const sy = si * ROW_H + ROW_H / 2;
       const dy = di * ROW_H + ROW_H / 2;
       const ex = sx + (sFromRight ? 10 : -10);
@@ -522,9 +531,17 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     // Удаление summary: реальный редьюсер сносит только саму задачу и оставляет детей сиротами.
     // Шлём явный пакет удаления всего поддерева (summary + потомки по wbs), а не один delete.
     if (r.kind === "summary") {
-      const subtree = rows.filter((x) => x.id === r.id || x.wbs.startsWith(r.wbs + "."));
+      const subtree = rows.filter((x) => {
+        if (x.id === r.id) return true;
+        let parentId = x.parentId;
+        while (parentId) {
+          if (parentId === r.id) return true;
+          parentId = allRowsById.get(parentId)?.parentId ?? null;
+        }
+        return false;
+      });
       // снизу вверх (сначала листья), чтобы не удалять родителя раньше детей
-      const ordered = subtree.slice().sort((a, b) => b.wbs.length - a.wbs.length);
+      const ordered = subtree.slice().sort((a, b) => b.level - a.level);
       void runBatch(ordered.map((x) => createPlanningCommand({ type: "task.delete_or_archive", payload: { taskId: x.id, mode: "delete" } })));
       return;
     }
@@ -569,6 +586,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const addFinish = (iso: string, dur: number) => dayToIso(isoToDay(iso) + dur);
   const openCreate = (parentId: string | null) => setTaskModal({ mode: "create", parentId, initial: { title: "", assigneeId: "", startIso: "", durDays: 5, workH: 40, pct: 0 } });
   const openEdit = (r: Row) => {
+    if (r.kind === "summary") { openRow(r.id); return; }
     const asg = currentAsg(r.id);
     setTaskModal({ mode: "edit", parentId: r.parentId, taskId: r.id, ...(asg ? { asgId: asg.id } : {}), initial: { title: r.name, assigneeId: asg?.resourceId ?? "", startIso: r.startIso, durDays: r.durDays, workH: r.workH, pct: r.pct } });
   };
@@ -655,6 +673,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     const f = edit?.field;
     setEdit(null);
     if (!f) return;
+    if (r.kind !== "task" && f !== "name") return;
     const n = Number(draft);
     if (f === "name") { if (draft.trim() && draft !== r.name) editName(r, draft.trim()); return; }
     if (Number.isNaN(n)) return;
@@ -694,15 +713,24 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // Коммит по потере фокуса (клик мимо), но НЕ при Tab-навигации (там коммит уже сделан).
   const cellBlur = (r: Row) => { if (skipBlurRef.current) { skipBlurRef.current = false; return; } commitInline(r); };
 
+  const isDescendantOf = (row: Row, parentId: string) => {
+    let current = row.parentId;
+    while (current) {
+      if (current === parentId) return true;
+      current = allRowsById.get(current)?.parentId ?? null;
+    }
+    return false;
+  };
   function depOptions(r: Row) {
     const banned = new Set([r.id, ...r.predList.map((p) => p.predId)]);
-    return rows.filter((t) => t.id !== r.id && !t.wbs.startsWith(r.wbs + ".") && !banned.has(t.id) && t.kind !== "summary").map((t) => ({ id: t.id, label: `${t.wbs} ${t.name}` }));
+    return rows.filter((t) => t.id !== r.id && !isDescendantOf(t, r.id) && !banned.has(t.id) && t.kind !== "summary").map((t) => ({ id: t.id, label: `${t.wbs} ${t.name}` }));
   }
   const predRows = (r: Row) => r.predList.map((p) => ({ depId: p.depId, predId: p.predId, predLabel: rowById.get(p.predId)?.wbs ?? rows.find((x) => x.id === p.predId)?.wbs ?? "?", type: p.type, lagDays: p.lagDays }));
 
   // --- drag/resize/link ---
   const startDrag = (e: ReactPointerEvent, r: Row, mode: DragMode) => {
     e.stopPropagation();
+    if (r.kind !== "task") return;
     barDrag.begin({ id: r.id, mode, startX: e.clientX, origStart: r.dayStart, origDur: r.dayDur, origWorkH: r.workH, origPct: r.pct, deltaDays: 0, curPct: r.pct });
   };
   const startColResize = (e: ReactPointerEvent, index: number) => {
@@ -712,7 +740,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   };
   const startLink = (e: ReactPointerEvent, r: Row, edge: "start" | "finish") => {
     e.stopPropagation();
-    const fromX = (edge === "finish" ? r.dayStart + r.dayDur : r.dayStart) * dayW;
+    const fromX = toTimelineX(edge === "finish" ? r.dayStart + r.dayDur : r.dayStart);
     const fromY = (indexById.get(r.id) ?? 0) * ROW_H + ROW_H / 2;
     linkDrag.begin({ fromId: r.id, fromEdge: edge, fromX, fromY, curX: fromX, curY: fromY });
   };
@@ -729,9 +757,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         <span className="mx-1 h-5 w-px bg-[var(--border)]" />
         <Button variant={batchMode ? "default" : "ghost"} size="sm" onClick={() => setBatchMode((v) => !v)} title="Режим пакета: копить правки и применить одним коммитом"><GitBranch className="size-3.5" aria-hidden />Пакет{staged.length ? ` · ${staged.length}` : ""}</Button>
         <Button variant="ghost" size="sm" onClick={() => void undo()} disabled={busy || !canUndo} title="Откатить последний коммит (компенсирующий коммит)"><Undo2 className="size-3.5" aria-hidden />Откат</Button>
-        <Button variant="ghost" size="sm" {...demoAction("снимок baseline")}><Layers className="size-3.5" aria-hidden />Baseline</Button>
-        <Button variant="ghost" size="sm" {...demoAction("фильтры")}><Filter className="size-3.5" aria-hidden />Фильтры</Button>
-        <Button variant="ghost" size="sm" {...demoAction("настройка колонок")}><Columns3 className="size-3.5" aria-hidden />Колонки</Button>
+        <Button asChild variant="ghost" size="sm"><Link href={`/projects/${projectId}/baseline`}>Baseline</Link></Button>
         <div className="ml-auto flex items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-0.5">
           {(["day", "week", "month"] as Zoom[]).map((z) => (
             <button key={z} type="button" onClick={() => setZoom(z)} className={cn("rounded-[var(--radius-sm)] px-2.5 py-1 text-[length:var(--text-sm)] font-medium transition-colors", zoom === z ? "bg-[var(--panel-strong)] text-[var(--text-strong)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>
@@ -808,9 +834,9 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                         <td className="mono muted text-[length:var(--text-xs)]">{r.wbs}</td>
                         <td title={r.name} onDoubleClick={(e) => { stop(e); beginEdit(r, "name", r.name); }}>
                           <span className="name-cell" style={{ paddingLeft: r.level * 14 }}>
-                            {r.kind === "summary" && hasChildren(r.wbs) ? (
-                              <button type="button" onClick={(e) => { stop(e); toggle(r.wbs); }} className="grid size-3.5 shrink-0 place-items-center rounded-[var(--radius-xs)] text-[var(--muted)] transition-colors hover:bg-[var(--panel-strong)] hover:text-[var(--text)]" aria-label={collapsed.has(r.wbs) ? "Развернуть группу" : "Свернуть группу"}>
-                                {collapsed.has(r.wbs) ? <ChevronRight className="size-3.5" aria-hidden /> : <ChevronDown className="size-3.5" aria-hidden />}
+                            {r.kind === "summary" && hasChildren(r) ? (
+                              <button type="button" onClick={(e) => { stop(e); toggle(r.id); }} className="grid size-3.5 shrink-0 place-items-center rounded-[var(--radius-xs)] text-[var(--muted)] transition-colors hover:bg-[var(--panel-strong)] hover:text-[var(--text)]" aria-label={collapsed.has(r.id) ? "Развернуть группу" : "Свернуть группу"}>
+                                {collapsed.has(r.id) ? <ChevronRight className="size-3.5" aria-hidden /> : <ChevronDown className="size-3.5" aria-hidden />}
                               </button>
                             ) : <span className="w-3.5 shrink-0" />}
                             {r.critical ? <span className="size-1.5 shrink-0 rounded-full bg-[var(--critical-stripe)]" title="На критическом пути" /> : null}
@@ -891,16 +917,16 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
             {/* Gantt pane */}
             <div ref={ganttRef} className="relative min-w-0 flex-1" style={{ width: timelineW }}>
               <div className="sticky top-0 z-10 flex h-9 border-b border-[var(--border-strong)] bg-[var(--panel-subtle)]">
-                {Array.from({ length: weeks }, (_, i) => <span key={i} className="v4-num shrink-0 border-r border-[var(--border-subtle)] px-2 text-[length:var(--text-xs)] leading-9 text-[var(--muted)]" style={{ width: weekW }}>{weekLabel(i)}</span>)}
+                {Array.from({ length: weeks }, (_, i) => <span key={i} className="v4-num shrink-0 border-r border-[var(--border-subtle)] px-2 text-[length:var(--text-xs)] leading-9 text-[var(--muted)]" style={{ width: weekW }}>{formatWeekLabel(i, timeline.originDay)}</span>)}
               </div>
-              <span className="pointer-events-none absolute bottom-0 top-9 z-[1] w-px bg-[var(--accent)]" style={{ left: TODAY_DAY * dayW }} title="Сегодня" />
-              {deadlineDay !== null && <span className="pointer-events-none absolute bottom-0 top-9 z-[1] w-px border-l border-dashed border-[var(--danger)]" style={{ left: deadlineDay * dayW }} title="Дедлайн" />}
+              <span className="pointer-events-none absolute bottom-0 top-9 z-[1] w-px bg-[var(--accent)]" style={{ left: timeline.todayOffsetDays * dayW }} title="Сегодня" />
+              {deadlineDay !== null && <span className="pointer-events-none absolute bottom-0 top-9 z-[1] w-px border-l border-dashed border-[var(--danger)]" style={{ left: toTimelineX(deadlineDay) }} title="Дедлайн" />}
               {visibleRows.map((r) => {
                 const dragging = drag?.id === r.id;
                 const dMove = dragging && drag.mode === "move" ? drag.deltaDays : 0;
                 const dLeft = dragging && drag.mode === "resizeLeft" ? drag.deltaDays : 0;
                 const dRight = dragging && drag.mode === "resize" ? drag.deltaDays : 0;
-                const left = (r.dayStart + dMove + dLeft) * dayW;
+                const left = toTimelineX(r.dayStart + dMove + dLeft);
                 const width = Math.max((r.dayDur + dRight - dLeft) * dayW, 6);
                 const barRight = left + width;
                 const fillPct = dragging && drag.mode === "progress" ? drag.curPct : r.pct;
@@ -912,7 +938,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       <span className="absolute top-1/2 -translate-y-1/2 rounded-[3px] bg-[var(--text-strong)]" style={{ left, width, height: 8 }} title={`${r.name} · ${r.pct}%`} />
                     ) : (
                       <>
-                        {r.baseDay != null && r.baseDur != null ? <span className="absolute rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" style={{ left: r.baseDay * dayW, width: Math.max(r.baseDur * dayW, 6), height: 6, bottom: 5 }} title="Baseline B2" /> : null}
+                        {r.baseDay != null && r.baseDur != null ? <span className="absolute rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" style={{ left: toTimelineX(r.baseDay), width: Math.max(r.baseDur * dayW, 6), height: 6, bottom: 5 }} title="Baseline B2" /> : null}
                         <span
                           className={cn("gantt-bar absolute top-1/2 flex -translate-y-1/2 cursor-grab items-center overflow-hidden rounded-[5px] shadow-[var(--shadow-card)] active:cursor-grabbing", r.critical && "gantt-bar--crit", dragging && "opacity-90 outline-dashed outline-2 outline-offset-1 outline-[var(--accent)]", flash.has(r.id) && "ring-2 ring-[var(--success)]")}
                           style={{ left, width, height: 18 }}

@@ -169,7 +169,7 @@ function createSnapshot(input: Partial<PlanSnapshot> = {}): PlanSnapshot {
     assignments: [],
     assignmentAllocations: [],
     dependencies: [],
-    baselines: [{ id: "baseline-1", capturedAt: "2026-05-01T00:00:00.000Z", tasks: [] }],
+    baselines: [{ id: "baseline-1", label: "Baseline 1", capturedAt: "2026-05-01T00:00:00.000Z", tasks: [] }],
     calendars: [],
     calendarExceptions: [],
     resources: [],

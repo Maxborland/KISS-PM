@@ -1,0 +1,38 @@
+{
+  "id": "BUG-CRM-06",
+  "status": "fixed-by-current-branch",
+  "date": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "surface": [
+    "POST /api/workspace/contacts",
+    "PATCH /api/workspace/contacts/:contactId",
+    "apps/web/src/crm/lib/mock-crm-backend.ts",
+    "packages/persistence/src/schema/crm.ts",
+    "packages/persistence/migrations/0049_contact_email_unique.sql"
+  ],
+  "expected": "Contact email is unique per tenant when present. Duplicate create/update returns 409 contact_email_taken. Null email remains allowed by the nullable Postgres unique index.",
+  "redEvidence": [
+    "corepack pnpm --filter @kiss-pm/web test -- src/crm/lib/mock-crm-backend.test.ts: duplicate create resolved before implementation instead of rejecting.",
+    "$env:DATABASE_URL='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55436/kiss_pm'; corepack pnpm exec vitest run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts: duplicateCreate returned 201 before implementation."
+  ],
+  "greenEvidence": [
+    "corepack pnpm --filter @kiss-pm/web test -- src/crm/lib/mock-crm-backend.test.ts -> 18 files / 257 tests passed; duplicate contact create/update test passed.",
+    "$env:DATABASE_URL='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55436/kiss_pm'; corepack pnpm exec vitest run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts -> 1 file / 8 tests passed; duplicate contact create/update API test passed.",
+    "corepack pnpm --filter @kiss-pm/persistence test -- src/migration.test.ts -> 6 files / 69 tests passed; 0049 migration contract test passed.",
+    "corepack pnpm --filter @kiss-pm/api typecheck -> passed.",
+    "corepack pnpm --filter @kiss-pm/web typecheck -> passed.",
+    "corepack pnpm --filter @kiss-pm/persistence typecheck -> passed."
+  ],
+  "changedFiles": [
+    "apps/api/src/crmRoutes.ts",
+    "apps/api/src/crmRoutes.db.test.ts",
+    "apps/web/src/crm/lib/mock-crm-backend.ts",
+    "apps/web/src/crm/lib/mock-crm-backend.test.ts",
+    "apps/web/src/crm/ui/crm-bits.tsx",
+    "packages/persistence/src/schema/crm.ts",
+    "packages/persistence/src/migration.test.ts",
+    "packages/persistence/migrations/0049_contact_email_unique.sql"
+  ],
+  "fixApplied": "API and mock now pre-check active duplicate contact email, API maps DB 23505 contacts_tenant_id_email_uidx to 409 contact_email_taken, persistence adds a tenant/email unique index, and CRM UI has a Russian message for contact_email_taken.",
+  "regressionRisk": "Medium-low. New uniqueness can reject previously duplicated non-null emails during migration if existing production data already contains duplicates; needs pre-deploy data check or cleanup before applying migration. Multiple null emails remain allowed."
+}

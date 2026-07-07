@@ -130,6 +130,18 @@ function agentSourceEntity(input: Record<string, unknown>): { type: string; id: 
 }
 
 const HISTORY_MAX_TURNS = 12; // память чата: последние N реплик (защита от раздувания контекста)
+type AgentProviderStatus = { model: string; live: boolean; configured: boolean };
+
+function agentProviderStatus(provider: { model: string }): AgentProviderStatus {
+  const live = provider.model !== "mock-llm" && provider.model !== "demo-llm";
+  return { model: provider.model, live, configured: provider.model !== "mock-llm" };
+}
+
+function createAgentProviderRuntime() {
+  const provider = createAgentLlmProviderFromEnv();
+  return { provider, status: agentProviderStatus(provider) };
+}
+
 // История треда из тела: [{role|author, text}] → реплики LLM. henry/assistant → assistant.
 function parseHistory(value: unknown): Array<{ role: "user" | "assistant"; content: string }> {
   if (!Array.isArray(value)) return [];
@@ -298,9 +310,8 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     // provider — честный статус LLM-канала инсталляции: demo/mock-модель означает,
     // что агент отвечает заглушкой, и UI обязан показать деградацию (G7-01).
-    const model = createAgentLlmProviderFromEnv().model;
-    const live = model !== "mock-llm" && model !== "demo-llm";
-    return context.json({ tools: listToolAvailability(actor, profile), provider: { model, live } });
+    const { status } = createAgentProviderRuntime();
+    return context.json({ tools: listToolAvailability(actor, profile), provider: status });
   });
 
   // Общая преамбула /propose и /propose/stream (auth + разбор тела) — единый источник правды,
@@ -323,6 +334,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   // Ядро предложения — общее для /propose (JSON) и /propose/stream (SSE).
   async function runProposeLoop(
     request: ProposeRequest,
+    provider: ReturnType<typeof createAgentLlmProviderFromEnv>,
     onEvent?: (event: AgentLoopEvent) => void | Promise<void>
   ) {
     const { cookie, actor, profile, goal, attachmentIds, history } = request;
@@ -336,7 +348,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     );
     const attachments = attachmentIds.length > 0 ? await resolveAttachments(app, cookie, attachmentIds) : [];
     const result = await runAgentLoop({
-      provider: createAgentLlmProviderFromEnv(),
+      provider,
       system: AGENT_SYSTEM_PROMPT,
       goal,
       tools: offered,
@@ -367,11 +379,13 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/workspace/agent/propose", async (context) => {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
+    const runtime = createAgentProviderRuntime();
+    if (!runtime.status.configured) return context.json({ error: "agent_provider_not_configured", provider: runtime.status }, 503);
     const { actor } = parsed.value;
     const slot = agentLlmConcurrency.tryAcquire(`${actor.tenantId}:${actor.id}`);
     if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
     try {
-      return context.json(await runProposeLoop(parsed.value));
+      return context.json(await runProposeLoop(parsed.value, runtime.provider));
     } finally {
       slot.release();
     }
@@ -382,12 +396,14 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/workspace/agent/propose/stream", async (context) => {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
+    const runtime = createAgentProviderRuntime();
+    if (!runtime.status.configured) return context.json({ error: "agent_provider_not_configured", provider: runtime.status }, 503);
     const { actor } = parsed.value;
     const slot = agentLlmConcurrency.tryAcquire(`${actor.tenantId}:${actor.id}`);
     if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
     return streamSSE(context, async (stream) => {
       try {
-        const result = await runProposeLoop(parsed.value, async (event) => {
+        const result = await runProposeLoop(parsed.value, runtime.provider, async (event) => {
           await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
         });
         await stream.writeSSE({ event: "done", data: JSON.stringify(result) });

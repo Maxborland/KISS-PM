@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { guardMutation, type MutationResult } from "../../lib/domain-client";
+import { DomainApiError, guardMutation, type MutationResult } from "../../lib/domain-client";
 import { useDomainClient } from "../../lib/use-domain-client";
 import { useResource, type LoadStatus } from "../../lib/use-resource";
 import {
@@ -22,6 +22,16 @@ export type AdminData = {
   permissions: Permission[];
 };
 export type AdminMutationResult = MutationResult;
+export type AdminLoadScope = "all" | "roles" | "users";
+
+async function optionalForbidden<T>(request: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await request;
+  } catch (e) {
+    if (e instanceof DomainApiError && e.status === 403) return fallback;
+    throw e;
+  }
+}
 
 /**
  * Работает через настоящий createAdminClient. Транспорт выбирается по
@@ -34,11 +44,39 @@ export type AdminMutationResult = MutationResult;
  * guard-обёртка мутаций (AdminApiError.code → {ok:false,code,message}),
  * точечное обновление локального кэша по затронутой сущности.
  */
-export function useAdmin() {
+export function useAdmin(scope: AdminLoadScope = "all") {
   const { live } = useAdminRuntime();
   const client = useDomainClient(live, createAdminClient, createMockAdminFetch);
 
   const loader = useCallback(async (): Promise<AdminData> => {
+    if (scope === "users") {
+      const [users, roles, positions] = await Promise.all([
+        client.listUsers(),
+        optionalForbidden(client.listAccessRoles(), { accessRoles: [] }),
+        optionalForbidden(client.listPositions(), { positions: [] })
+      ]);
+      return {
+        roles: roles.accessRoles,
+        users: users.users,
+        positions: positions.positions,
+        permissions: []
+      };
+    }
+
+    if (scope === "roles") {
+      const [roles, users, catalog] = await Promise.all([
+        client.listAccessRoles(),
+        optionalForbidden(client.listUsers(), { users: [] }),
+        client.listPermissionCatalog()
+      ]);
+      return {
+        roles: roles.accessRoles,
+        users: users.users,
+        positions: [],
+        permissions: catalog.permissions
+      };
+    }
+
     const [roles, users, positions, catalog] = await Promise.all([
       client.listAccessRoles(),
       client.listUsers(),
@@ -46,7 +84,7 @@ export function useAdmin() {
       client.listPermissionCatalog()
     ]);
     return { roles: roles.accessRoles, users: users.users, positions: positions.positions, permissions: catalog.permissions };
-  }, [client]);
+  }, [client, scope]);
   const { data, status, error, setData, reload: load } = useResource(loader);
 
   const guard = guardMutation;

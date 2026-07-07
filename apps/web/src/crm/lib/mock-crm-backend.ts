@@ -418,6 +418,8 @@ export function createMockCrmFetch(): typeof fetch {
 
     /* ---- contacts ---- */
     if (path === "/api/workspace/contacts" && method === "GET") return json({ contacts: db.contacts });
+    const contactEmailTaken = (email: string | null, exceptId?: string): boolean =>
+      Boolean(email && db.contacts.some((x) => x.email === email && x.id !== exceptId));
     if (path === "/api/workspace/contacts" && method === "POST") {
       const clientId = str(body.clientId);
       const name = str(body.name);
@@ -427,6 +429,7 @@ export function createMockCrmFetch(): typeof fetch {
       if (email && (email.length > 254 || !EMAIL_RE.test(email))) return err("invalid_contact_email", 400); // как боевой: lowercase + emailPattern
       const client = db.clients.find((x) => x.id === clientId);
       if (!client || client.status !== "active") return err("client_not_found", 404); // контакт только к АКТИВНОМУ клиенту
+      if (contactEmailTaken(email)) return err("contact_email_taken", 409);
       const c: Contact = { id: genId("ctc"), tenantId: TENANT, clientId, name, email, phone: body.phone == null ? null : str(body.phone) || null, telegram: body.telegram == null ? null : str(body.telegram) || null, role: body.role == null ? null : str(body.role) || null, status: "active", createdAt: nowIso(), updatedAt: nowIso() };
       db.contacts.unshift(c);
       return json({ contact: c }, 201);
@@ -443,6 +446,7 @@ export function createMockCrmFetch(): typeof fetch {
       const email = body.email == null ? null : str(body.email).toLowerCase() || null;
       if (email && (email.length > 254 || !EMAIL_RE.test(email))) return err("invalid_contact_email", 400);
       if (clientId !== c.clientId) { const client = db.clients.find((x) => x.id === clientId); if (!client || client.status !== "active") return err("client_not_found", 404); }
+      if (contactEmailTaken(email, c.id)) return err("contact_email_taken", 409);
       c.clientId = clientId; c.name = name; c.email = email;
       c.phone = body.phone == null ? null : str(body.phone) || null;
       c.telegram = body.telegram == null ? null : str(body.telegram) || null;

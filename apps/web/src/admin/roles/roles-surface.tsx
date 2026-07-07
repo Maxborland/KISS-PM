@@ -15,6 +15,7 @@ import { adminErr, permissionParts } from "@/admin/ui/admin-bits";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useAdmin } from "@/admin/lib/use-admin";
 import { useAdminRuntime } from "@/admin/lib/admin-runtime";
+import { useSessionUser } from "@/shell/use-session-user";
 import { ALL_PERMISSIONS } from "@/admin/lib/permissions-catalog";
 import type { AccessProfile, Permission } from "@/admin/lib/admin-client";
 
@@ -51,11 +52,13 @@ const slugify = (name: string): string => {
 
 export function AdminRolesSurface() {
   const { live } = useAdminRuntime();
-  const admin = useAdmin();
+  const admin = useAdmin("roles");
   const { data, status, error, reload, createRole, updateRole, deleteRole } = admin;
   // Каталог прав из бэка (GET /permission-catalog); ALL_PERMISSIONS — типизированный fallback на время загрузки.
   const groups = useMemo(() => buildPermissionGroups(data?.permissions ?? ALL_PERMISSIONS), [data?.permissions]);
   const [busy, setBusy] = useState(false);
+  const sessionUser = useSessionUser();
+  const canManageRoles = !live || Boolean(sessionUser?.permissions.includes("tenant.access_profiles.manage"));
 
   // число пользователей на каждую роль (для колонки «Назначено»)
   const assigned = useMemo(() => {
@@ -79,7 +82,7 @@ export function AdminRolesSurface() {
     <AdminFrame
       activeTab="Роли"
       subtitle="Роли доступа"
-      actions={<CreateRoleDialog busy={busy} setBusy={setBusy} create={createRole} groups={groups} />}
+      actions={canManageRoles ? <CreateRoleDialog busy={busy} setBusy={setBusy} create={createRole} groups={groups} /> : undefined}
     >
       {/* Плашка-прототип: только вне live (раньше пряталась display:none и оставалась в DOM). */}
       {!live ? (
@@ -111,19 +114,21 @@ export function AdminRolesSurface() {
                       <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{r.permissions.length}</td>
                       <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{count}</td>
                       <td className="px-3 py-2">
-                        <div className="flex items-center justify-end gap-1">
-                          <EditRoleDialog role={r} assignedCount={count} busy={busy} setBusy={setBusy} update={updateRole} groups={groups} />
-                          <ConfirmDialog
-                            title={`Удалить роль «${r.name}»?`}
-                            description={count > 0
-                              ? `Роль назначена пользователям (${count}). Удаление будет отклонено — сначала переназначьте их.`
-                              : "Действие необратимо. Роль будет удалена из рабочей области."}
-                            confirmLabel="Удалить роль"
-                            onConfirm={() => remove(r)}
-                          >
-                            <Button variant="ghost" size="sm" disabled={busy} title={count > 0 ? "Назначена пользователям — удаление отклонится" : "Удалить роль"}><Trash2 className="size-3.5" aria-hidden /></Button>
-                          </ConfirmDialog>
-                        </div>
+                        {canManageRoles ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <EditRoleDialog role={r} assignedCount={count} busy={busy} setBusy={setBusy} update={updateRole} groups={groups} />
+                            <ConfirmDialog
+                              title={`Удалить роль «${r.name}»?`}
+                              description={count > 0
+                                ? `Роль назначена пользователям (${count}). Удаление будет отклонено — сначала переназначьте их.`
+                                : "Действие необратимо. Роль будет удалена из рабочей области."}
+                              confirmLabel="Удалить роль"
+                              onConfirm={() => remove(r)}
+                            >
+                              <Button variant="ghost" size="sm" disabled={busy} title={count > 0 ? "Назначена пользователям — удаление отклонится" : "Удалить роль"}><Trash2 className="size-3.5" aria-hidden /></Button>
+                            </ConfirmDialog>
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   );

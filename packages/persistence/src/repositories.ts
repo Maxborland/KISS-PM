@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
@@ -218,6 +218,11 @@ export type PostgresTenantDataSource = CrmRepository &
   deletePasswordResetTokensByUserId(
     tenantId: TenantId,
     userId: UserId
+  ): Promise<void>;
+  deleteOtherPasswordResetTokensByUserId(
+    tenantId: TenantId,
+    userId: UserId,
+    preservedTokenId: string
   ): Promise<void>;
   withTransaction<T>(
     operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
@@ -700,6 +705,17 @@ export function createPostgresTenantDataSource(
           and(
             eq(passwordResetTokens.tenantId, tenantId),
             eq(passwordResetTokens.userId, userId)
+          )
+        );
+    },
+    async deleteOtherPasswordResetTokensByUserId(tenantId, userId, preservedTokenId) {
+      await db
+        .delete(passwordResetTokens)
+        .where(
+          and(
+            eq(passwordResetTokens.tenantId, tenantId),
+            eq(passwordResetTokens.userId, userId),
+            ne(passwordResetTokens.id, preservedTokenId)
           )
         );
     },

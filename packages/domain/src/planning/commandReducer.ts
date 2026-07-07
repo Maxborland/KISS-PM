@@ -339,6 +339,7 @@ function reduceBaselineCapture(
 ): CommandReductionResult {
   const baseline: PlanBaseline = {
     id: command.payload.baselineId,
+    label: command.payload.label.trim() || "Снимок плана",
     capturedAt: snapshot.capturedAt,
     tasks: snapshot.tasks.map((task) => ({
       taskId: task.id,

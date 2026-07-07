@@ -190,6 +190,64 @@ describe("collaboration and communications API", () => {
     expect(executorPayload.conversations[0]?.readState.unreadCount).toBe(1);
   });
 
+  it("keeps notification read timestamps stable on repeated read requests", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+
+    const conversations = await app.request(
+      "/api/workspace/conversations?entityType=project&entityId=project-alpha",
+      { headers: { cookie: adminCookie } }
+    );
+    expect(conversations.status).toBe(200);
+    const conversationsPayload = await conversations.json() as {
+      conversations: Array<{ id: string }>;
+    };
+    const conversationId = conversationsPayload.conversations[0]?.id;
+    expect(conversationId).toBeTruthy();
+
+    const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({ body: "Егор, проверь повторное прочтение @user-alpha-executor" })
+    });
+    expect(message.status).toBe(201);
+
+    const unread = await app.request("/api/workspace/notifications?status=unread", {
+      headers: { cookie: executorCookie }
+    });
+    expect(unread.status).toBe(200);
+    const unreadPayload = await unread.json() as {
+      notifications: Array<{ id: string; readAt: string | null }>;
+    };
+    const notificationId = unreadPayload.notifications[0]?.id;
+    expect(notificationId).toBeTruthy();
+    expect(unreadPayload.notifications[0]?.readAt).toBeNull();
+
+    const firstRead = await app.request(`/api/workspace/notifications/${notificationId}/read`, {
+      method: "POST",
+      headers: jsonHeaders(executorCookie)
+    });
+    expect(firstRead.status).toBe(200);
+    const firstReadPayload = await firstRead.json() as { notification: { readAt: string | null } };
+    expect(firstReadPayload.notification.readAt).toBeTruthy();
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const secondRead = await app.request(`/api/workspace/notifications/${notificationId}/read`, {
+      method: "POST",
+      headers: jsonHeaders(executorCookie)
+    });
+    expect(secondRead.status).toBe(200);
+    const secondReadPayload = await secondRead.json() as { notification: { readAt: string | null } };
+    expect(secondReadPayload.notification.readAt).toBe(firstReadPayload.notification.readAt);
+
+    const summary = await app.request("/api/workspace/unread-summary", {
+      headers: { cookie: executorCookie }
+    });
+    expect(summary.status).toBe(200);
+    await expect(summary.json()).resolves.toMatchObject({ notifications: 0 });
+  });
+
   it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
