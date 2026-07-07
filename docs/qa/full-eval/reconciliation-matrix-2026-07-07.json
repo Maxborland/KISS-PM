@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 32,
+    "fixedByCurrentBranchItems": 33,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 1,
     "notABugOrSupersededOldBugIds": 4,
@@ -711,6 +711,22 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows RISK-AGENT-REAL-LLM-SSE for degraded/provider-adapter/local SSE/parser/apply UX only; real provider network smoke remains blocked by absent keys."
+    },
+    {
+      "id": "CURRENT-RISK-AUTH-RESET-BROWSER-MAIL-GAP",
+      "source": "current branch targeted Playwright browser test and auth reset route tests",
+      "surface": "/login, /password-reset, /password-reset/confirm, POST /api/auth/password-reset/request, POST /api/auth/password-reset/confirm",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-browser-mail-gap-2026-07-07.json: browser traverses forgot-password request, verifies explicit delivery=none no-mail UI without token leak, verifies confirm route token prefill, and route-level reset tests remain green.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-AUTH-EMAIL-RESET-HAPPY-PATH"
+      ],
+      "tests": [
+        "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/authRegistrationRoutes.test.ts -t \\\"password-reset\\\"\"",
+        "cmd /c \"set E2E_WEB_PORT=3000&& node_modules\\\\.bin\\\\playwright.cmd test --config playwright.config.ts e2e/smoke/auth-password-reset-mail-gap.spec.ts --no-deps\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-AUTH-EMAIL-RESET-HAPPY-PATH for browser traversal and explicit no-mail degraded state only; live mailbox delivery/extraction remains blocked."
     }
   ],
   "confirmedOpen": [],
@@ -743,9 +759,10 @@
       "requiredEvidence": "Real or explicitly degraded email provider status, reset request, token delivery/extraction path, confirm, login with new password, repeat-token behavior.",
       "partialEvidence": [
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-happy-path-route-2026-07-07.json: route-level SMTP-like delivery contract and true concurrent same-token confirm behavior are covered by targeted tests.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: route-level reset request, token delivery, confirm, login with new password, SMTP-like resetUrl payload, and concurrent token consume covered."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: route-level reset request, token delivery, confirm, login with new password, SMTP-like resetUrl payload, and concurrent token consume covered.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-browser-mail-gap-2026-07-07.json: browser forgot-password/reset request/no-mail state/confirm token prefill covered; no dev token or 64-hex token leaks in DOM."
       ],
-      "remainingEvidence": "Full browser traversal through the login/reset screens and live external SMTP/email-client delivery remain unverified."
+      "remainingEvidence": "Live external SMTP/email-client or local mailcatcher delivery/extraction remains unverified; current runtime has delivery=none and no guarded token extraction hook."
     },
     {
       "id": "RISK-AGENT-REAL-LLM-SSE",
@@ -792,5 +809,5 @@
       "remainingEvidence": "Remaining write flows outside the covered planning/admin/notification/CRM/auth/access-role/comms slices still need duplicate/race/idempotency evidence."
     }
   ],
-  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, live media provider browser checks, live external auth email delivery, real agent provider smoke, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, CRM contact/opportunity concurrency, auth reset route concurrency/happy path, access-role name uniqueness, communication channel rename version conflicts/idempotent retry, media participant cleanup, Jitsi/API join-token contract behavior, and agent degraded/local SSE/apply filtering."
+  "nextAction": "Remaining old-bug work: real provider/live SSE verification remains provider-blocked; live external auth email delivery remains mail-infra-blocked. Risk zones still require full browser traversal, live media provider browser checks, real agent provider smoke, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, CRM contact/opportunity concurrency, auth reset route/browser degraded flow, access-role name uniqueness, communication channel rename version conflicts/idempotent retry, media participant cleanup, Jitsi/API join-token contract behavior, and agent degraded/local SSE/apply filtering."
 }
