@@ -1,0 +1,25 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-KNOWLEDGE-VERSION-CONFLICT",
+  "generatedAt": "2026-07-07T20:39:23.5939329Z",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "status": "pass",
+  "scope": "Knowledge document version write conflict/stale version route-level evidence.",
+  "surfaces": [
+    "POST /api/workspace/projects/:projectId/knowledge/documents/:documentId/versions"
+  ],
+  "expected": "A document version numbering collision must return a stable public 409 conflict, must not create a partial version row, and must not write misleading audit side effects.",
+  "actual": "Pass: targeted route test returned 409 knowledge_version_conflict and fixture readback showed zero new versions/audit side effects for the collision path.",
+  "verification": [
+    {
+      "observed": "1 test passed, 9 skipped",
+      "notes": "Initial sandboxed attempt failed with spawn EPERM while loading Vite/esbuild; rerun outside sandbox passed. Vitest emitted an existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts, unrelated to this slice.",
+      "command": "node_modules\\.bin\\vitest.cmd run apps/api/src/knowledgeRoutes.test.ts -t \"concurrent document version numbering\"",
+      "result": "pass"
+    }
+  ],
+  "changedFiles": [
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-knowledge-version-conflict-2026-07-08.json",
+    "docs/qa/full-eval/reconciliation-matrix-2026-07-07.json"
+  ],
+  "coverageImpact": "Adds fresh evidence for the knowledge document-version stale/conflict write-flow slice. Broader RISK-WRITE-FLOW-RACE-IDEMPOTENCY remains open for write surfaces outside the covered atoms."
+}
