@@ -1,6 +1,6 @@
 {
   "id": "RISK-LIVE-OPENROUTER-SMTP-IMAP-SMOKE-2026-07-07",
-  "generatedAt": "2026-07-07T15:45:39.078Z",
+  "generatedAt": "2026-07-07T16:19:07.723Z",
   "purpose": "Fresh live provider smoke after OpenRouter and REG.RU mail credentials were supplied in local ignored env.",
   "secretsPolicy": "Secret values were loaded from .env.local/user env and were not written to this evidence file.",
   "commands": [
@@ -12,8 +12,7 @@
     {
       "command": "node_modules\\.bin\\tsx.cmd .tmp\\mail-readback-smoke.ts",
       "network": "live SMTP/IMAP/POP3",
-      "status": "not-run",
-      "reason": "Sandbox escalation was rejected by approval reviewer due Codex usage limit before command execution."
+      "status": "completed-after-retry"
     }
   ],
   "openRouter": {
@@ -44,11 +43,21 @@
       "port": 993,
       "loginAndMailboxList": "pass",
       "mailboxCount": 5,
-      "readback": "imap_no_messages after polling INBOX for approximately 50 seconds"
+      "foldersChecked": [
+        { "folder": "Trash", "uidCount": 0 },
+        { "folder": "Junk", "uidCount": 0 },
+        { "folder": "Sent", "uidCount": 0 },
+        { "folder": "Drafts", "uidCount": 0 },
+        { "folder": "INBOX", "uidCount": 0 }
+      ],
+      "readback": "No reset email was found after a fresh send, 30 second wait, and all-folder IMAP scan."
     },
     "pop3": {
-      "status": "not-run",
-      "reason": "Follow-up readback probe was blocked before execution by sandbox approval/usage limit."
+      "status": "fail",
+      "host": "mail.hosting.reg.ru",
+      "port": 995,
+      "recentCount": 0,
+      "readback": "POP3 mailbox had zero messages after the fresh SMTP-accepted send."
     }
   },
   "coverageImpact": {
