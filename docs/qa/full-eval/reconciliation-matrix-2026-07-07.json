@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 65,
+    "fixedByCurrentBranchItems": 66,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 4,
@@ -1229,6 +1229,21 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows the write-flow/media matrix for duplicate recording start after an active recording exists. It does not close full LiveKit/Jitsi browser/media provider traversal or a simultaneous first-start race lock."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-MEDIA-RECORDING-CONCURRENT-START-LOCK",
+      "source": "current branch backend fix plus targeted DB/API write-flow regression coverage",
+      "surface": "POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/recordings/start simultaneous first-start race",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-concurrent-start-lock-2026-07-08.json: pre-fix simultaneous first-start returned [201,201]; after adding per-session advisory transaction lock, recording-start cluster passes with one 201/one 409, one egress, one recording row, and one recording_started event.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \"startRecording starts|rejects duplicate recording start|deduplicates simultaneous first recording starts\" -> pass; 3 selected tests passed, 23 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This fixes and covers the media recording simultaneous first-start race. It is still DB/API/injected-egress coverage, not full real browser/provider LiveKit/Jitsi media traversal."
     }
   ],
   "confirmedOpen": [],
@@ -1275,9 +1290,10 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-device-denied-lobby-degraded-2026-07-08.json: NotAllowedError from camera preview now surfaces the denied-camera warning, turns lobby camera state off, preserves micOn, and keeps a joinable no-camera prejoin selection.",
         "docs/qa/full-eval/evidence/browser-media-provider-disabled-connect-2026-07-08/risk-media-browser-provider-disabled-connect-2026-07-08.json: admin browser traversal creates a Jitsi video room, starts a session, attempts connect, and shows persistent provider-disabled denial instead of fake join success.",
         "docs/qa/full-eval/evidence/browser-media-jitsi-obs-mic-blocked-2026-07-08/risk-media-jitsi-obs-mic-blocked-2026-07-08.json: KISS PM Jitsi provider path reaches active session, join-token URL, external meet.jit.si lobby, and Chrome waiting room, but OBS/mic media pass is blocked by camera/microphone no-access plus meet.jit.si moderator/auth gate; not counted as pass.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-duplicate-start-2026-07-08.json: recording start duplicate-submit suppression is covered at DB/API level with injected LiveKit egress; not a real browser/provider media pass."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-duplicate-start-2026-07-08.json: recording start duplicate-submit suppression is covered at DB/API level with injected LiveKit egress; not a real browser/provider media pass.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-concurrent-start-lock-2026-07-08.json: injected LiveKit egress recording-start race is backend-locked and covered; not a real browser/provider media pass."
       ],
-      "remainingEvidence": "Live provider browser traversal still required: real browser permission prompt/device labels, accepted camera/microphone with OBS/mic, provider join, leave/rejoin, remote participant, reconnect, and real LiveKit/Jitsi infrastructure behavior. Latest Chrome/Jitsi attempt reached external lobby but was blocked by device no-access/CDP grant unsupported and meet.jit.si moderator/auth gate. Recording duplicate-start DB/API evidence now narrows only the media write-flow sub-surface."
+      "remainingEvidence": "Live provider browser traversal still required: real browser permission prompt/device labels, accepted camera/microphone with OBS/mic, provider join, leave/rejoin, remote participant, reconnect, and real LiveKit/Jitsi infrastructure behavior. Latest Chrome/Jitsi attempt reached external lobby but was blocked by device no-access/CDP grant unsupported and meet.jit.si moderator/auth gate. Recording duplicate and concurrent-start DB/API evidence narrows only media write-flow sub-surfaces."
     },
     {
       "id": "RISK-FULL-BROWSER-TRAVERSAL",
@@ -1320,10 +1336,11 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-knowledge-version-conflict-2026-07-08.json: knowledge document version numbering collision returns stable 409 with no partial version row/audit side effects.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-profile-theme-duplicate-updates-2026-07-08.json: profile contact and theme duplicate PATCH submissions return stable 200/200 pairs with session readback of the final values.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-batch-concurrent-idempotency-2026-07-08.json: planning apply-command-batch concurrent duplicate requests with the same idempotency key return equal 200 responses, one planVersion bump, and read back the batch once.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-duplicate-start-2026-07-08.json: duplicate recording start after an active session recording returns 409 without a second egress, recording row, event, or audit side effect."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-duplicate-start-2026-07-08.json: duplicate recording start after an active session recording returns 409 without a second egress, recording row, event, or audit side effect.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-concurrent-start-lock-2026-07-08.json: simultaneous first recording-start race now serializes with one 201/one 409 and one recording/event readback after advisory transaction lock."
       ],
-      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work/profile/knowledge/media-recording slices still need duplicate/race/idempotency evidence. Media recording duplicate-start after active recording is covered; simultaneous first-start race lock remains a separate unverified atom."
+      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work/profile/knowledge/media-recording slices still need duplicate/race/idempotency evidence. Media recording duplicate-start and simultaneous first-start race are now covered at DB/API level."
     }
   ],
-  "nextAction": "Continue remaining risk-zone atoms: real Jitsi OBS/microphone browser handoff, live provider/LLM agent browser variants, live email reset inbox readback, simultaneous media recording first-start race lock, and any uncovered write-flow race/idempotency surfaces."
+  "nextAction": "Continue remaining risk-zone atoms: real Jitsi OBS/microphone browser handoff, live provider/LLM agent browser variants, live email reset inbox readback, and any uncovered write-flow race/idempotency surfaces."
 }

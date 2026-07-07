@@ -228,6 +228,7 @@ export type PostgresTenantDataSource = CrmRepository &
     operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
   ): Promise<T>;
   lockTenantResourcePlanning(tenantId: TenantId): Promise<void>;
+  lockCallRecordingStart(tenantId: TenantId, roomId: string, sessionId: string): Promise<void>;
   appendAuditEvent(input: AuditEventRecordInput): Promise<void>;
   listAuditEventsByTenantId(
     tenantId: TenantId,
@@ -733,6 +734,14 @@ export function createPostgresTenantDataSource(
         SELECT pg_advisory_xact_lock(
           hashtext(${tenantId}),
           hashtext('kiss_pm_resource_planning')
+        )
+      `);
+    },
+    async lockCallRecordingStart(tenantId, roomId, sessionId) {
+      await db.execute(sql`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${tenantId}),
+          hashtext(${`call_recording_start:${roomId}:${sessionId}`})
         )
       `);
     },

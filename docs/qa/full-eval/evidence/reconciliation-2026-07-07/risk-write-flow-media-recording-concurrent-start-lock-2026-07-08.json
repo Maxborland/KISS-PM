@@ -1,0 +1,56 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-MEDIA-RECORDING-CONCURRENT-START-LOCK",
+  "generatedAt": "2026-07-08T00:00:00Z",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "status": "pass",
+  "scope": "Communication call recording simultaneous first-start race lock.",
+  "surfaces": [
+    "POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/recordings/start",
+    "PostgresTenantDataSource.withTransaction",
+    "PostgresTenantDataSource.lockCallRecordingStart",
+    "dataSource.listCallRecordings/listCallEvents"
+  ],
+  "expected": "Two simultaneous first recording-start requests for the same active session must serialize so exactly one request starts LiveKit egress/recording and the other returns 409 call_recording_already_active, with one recording row and one recording_started event after readback.",
+  "actual": "Pass after fix: recording start now takes a per-tenant/session advisory transaction lock before checking active recordings and starting egress. The final targeted cluster returned green: happy-path start, duplicate active start, and simultaneous first-start race all passed.",
+  "diagnosis": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \"deduplicates simultaneous first recording starts\"",
+      "observed": "Pre-fix targeted test failed: statuses were [201, 201] instead of expected [201, 409].",
+      "result": "fail-before-fix"
+    }
+  ],
+  "verification": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \"startRecording starts|rejects duplicate recording start|deduplicates simultaneous first recording starts\"",
+      "observed": "1 file passed; 3 selected tests passed, 23 skipped",
+      "notes": "Vitest emitted the existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts, unrelated to this slice.",
+      "result": "pass"
+    },
+    {
+      "command": "DATABASE_URL=<local-dev-db> node_modules\\.bin\\tsx.cmd scripts\\seed-dev.ts",
+      "observed": "Seeded dev tenants, users, org structure, CRM, projects and communications data",
+      "notes": "Restored local browser/dev seed state after the targeted DB tests.",
+      "result": "pass"
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.cmd -p packages\\persistence\\tsconfig.json --pretty false",
+      "observed": "typecheck passed with no output",
+      "notes": "Used direct local tsc because pnpm --filter typecheck was blocked before tsc by pnpm ignored-builds approval state.",
+      "result": "pass"
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.cmd -p apps\\api\\tsconfig.json --pretty false",
+      "observed": "typecheck passed with no output",
+      "notes": "Covers ApiTenantDataSource/PostgresTenantDataSource and recording workspace type wiring.",
+      "result": "pass"
+    }
+  ],
+  "changedFiles": [
+    "apps/api/src/communications/recording/recordingWorkspace.ts",
+    "apps/api/src/communicationRealtimeRoutes.db.test.ts",
+    "packages/persistence/src/repositories.ts",
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-concurrent-start-lock-2026-07-08.json",
+    "docs/qa/full-eval/reconciliation-matrix-2026-07-07.json"
+  ],
+  "coverageImpact": "Closes the specific media recording simultaneous first-start race atom with a backend advisory transaction lock and DB/API regression coverage. Broader RISK-WRITE-FLOW-RACE-IDEMPOTENCY remains open for other write surfaces."
+}
