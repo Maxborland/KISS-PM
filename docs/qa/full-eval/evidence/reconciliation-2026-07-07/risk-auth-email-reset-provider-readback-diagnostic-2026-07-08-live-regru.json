@@ -1,0 +1,62 @@
+{
+  "id": "RISK-AUTH-EMAIL-RESET-PROVIDER-READBACK-DIAGNOSTIC",
+  "generatedAt": "2026-07-07T20:08:46.544Z",
+  "linkedRiskZones": [
+    "RISK-AUTH-EMAIL-RESET-HAPPY-PATH"
+  ],
+  "scope": "Provider-level SMTP send plus IMAP/POP3 mailbox readback for password reset email marker. This does not exercise browser confirm/login.",
+  "secretsPolicy": "Loaded .env.local/user env values are not emitted. Recipient, credentials, and reset token are intentionally omitted.",
+  "status": "partial",
+  "provider": {
+    "selected": "smtp",
+    "smtp": {
+      "acceptedByProviderPath": true,
+      "host": "mail.hosting.reg.ru",
+      "port": 465,
+      "secure": true,
+      "requireTls": false
+    },
+    "recipientSource": "KISS_PM_MAIL_READBACK_TO"
+  },
+  "readback": {
+    "waitMs": 60000,
+    "imap": {
+      "status": "fail",
+      "host": "mail.hosting.reg.ru",
+      "port": 993,
+      "found": false,
+      "folders": [
+        {
+          "folder": "Trash",
+          "uidCount": 0
+        },
+        {
+          "folder": "Junk",
+          "uidCount": 0
+        },
+        {
+          "folder": "Sent",
+          "uidCount": 0
+        },
+        {
+          "folder": "Drafts",
+          "uidCount": 0
+        },
+        {
+          "folder": "INBOX",
+          "uidCount": 0
+        }
+      ]
+    },
+    "pop3": {
+      "status": "fail",
+      "host": "mail.hosting.reg.ru",
+      "port": 995,
+      "found": false,
+      "recentCount": 0
+    }
+  },
+  "coverageImpact": {
+    "RISK-AUTH-EMAIL-RESET-HAPPY-PATH": "SMTP provider accepted the reset email, but mailbox readback did not find it; full live reset via email remains open."
+  }
+}
