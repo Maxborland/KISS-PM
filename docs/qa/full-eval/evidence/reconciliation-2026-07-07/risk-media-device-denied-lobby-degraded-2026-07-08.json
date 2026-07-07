@@ -1,0 +1,44 @@
+{
+  "id": "RISK-MEDIA-DEVICE-DENIED-LOBBY-DEGRADED",
+  "linkedRiskZones": [
+    "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+  ],
+  "status": "fixed-by-current-branch",
+  "coverageStatus": "partial-risk-zone",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "generatedAt": "2026-07-08T01:01:00+07:00",
+  "scope": "Local prejoin lobby behavior when camera preview permission is denied before any LiveKit/Jitsi provider join.",
+  "surface": [
+    "/calls/[roomId] prejoin lobby",
+    "apps/web/src/lib/call/use-lobby-preview.ts",
+    "apps/web/src/widgets/call/call-lobby.tsx"
+  ],
+  "expected": [
+    "A NotAllowedError from createLocalVideoTrack surfaces a visible camera permission warning.",
+    "The lobby camera state degrades to off so the UI shows the avatar/off state instead of a blank enabled preview.",
+    "Microphone selection remains on and the user can still proceed with a no-camera lobby selection."
+  ],
+  "actualBefore": [
+    "The hook surfaced the permission warning but left selection.cameraOn=true, so the pure lobby kept rendering the enabled video preview path even though no camera track existed."
+  ],
+  "fixApplied": [
+    "On preview startup failure, useLobbyPreview now sets selection.cameraOn=false after setting the user-facing permission/camera error."
+  ],
+  "changedFiles": [
+    "apps/web/src/lib/call/use-lobby-preview.ts",
+    "apps/web/src/lib/call/use-lobby-preview.test.tsx"
+  ],
+  "redEvidence": [
+    "node_modules\\.bin\\vitest.cmd run apps/web/src/lib/call/use-lobby-preview.test.tsx -> failed: expected selection.cameraOn false, received true."
+  ],
+  "greenEvidence": [
+    "node_modules\\.bin\\vitest.cmd run apps/web/src/lib/call/use-lobby-preview.test.tsx -> 1 file passed; 1 test passed.",
+    "node_modules\\.bin\\vitest.cmd run apps/web/src/lib/call/call-engine.test.tsx -> 1 file passed; 5 tests passed.",
+    "node_modules\\.bin\\tsc.CMD -p apps/web/tsconfig.json --pretty false -> passed with empty output."
+  ],
+  "limitations": [
+    "This closes only the local device-denied/degraded lobby UI atom without external provider credentials.",
+    "It does not verify the real Chrome permission prompt, real device labels, external Jitsi page behavior, LiveKit media publishing, remote participant state, reconnect, or leave/rejoin traversal."
+  ],
+  "matrixImpact": "Narrows RISK-MEDIA-LIVEKIT-JITSI-CALL for device denied/degraded prejoin UI without LiveKit/Jitsi credentials; the overall risk zone remains unverified."
+}

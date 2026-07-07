@@ -1,0 +1,515 @@
+{
+  "id": "CURRENT-RISK-FULL-BROWSER-TRAVERSAL-LIMITED-CRM-WRITE-DENIED",
+  "date": "2026-07-08",
+  "status": "partial-pass",
+  "riskZones": [
+    "RISK-FULL-BROWSER-TRAVERSAL"
+  ],
+  "scope": "One compact role x route/action gap: limited profile.read user direct CRM deals route and CRM create/write action denial in Chromium browser.",
+  "environment": {
+    "baseUrl": "http://127.0.0.1:3108",
+    "apiViaWebProxy": "http://127.0.0.1:3108/api",
+    "databaseUrl": "postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm"
+  },
+  "setup": {
+    "migrate": "node packages/persistence/scripts/migrate.mjs -> No pending migrations",
+    "seed": "node_modules/.bin/tsx.CMD scripts/seed-dev.ts -> Seeded dev tenants, users, org structure, CRM, projects and communications data",
+    "adminUser": "admin@kiss-pm.local",
+    "limitedRoleId": "limited-crm-denied-role-mrayoi5c",
+    "limitedUserId": "limited-crm-denied-user-mrayoi5c",
+    "limitedEmail": "limited-crm-denied-mrayoi5c@kiss-pm.local"
+  },
+  "checks": [
+    {
+      "check": "limited login through UI",
+      "expected": "dashboard visible",
+      "actual": "dashboard visible",
+      "pass": true
+    },
+    {
+      "check": "limited sidebar CRM link after auth/me settled",
+      "expected": "hidden",
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "check": "limited sidebar admin link after auth/me settled",
+      "expected": "hidden",
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "check": "direct /crm/deals route",
+      "expected": "restricted/degraded surface, no deal list action UI",
+      "actual": {
+        "currentUrl": "http://127.0.0.1:3108/crm/deals",
+        "createDealButtonCount": 0,
+        "stageSelectCount": 0
+      },
+      "pass": true
+    },
+    {
+      "check": "limited API read opportunities",
+      "expectedStatus": 403,
+      "actualStatus": 403,
+      "pass": true
+    },
+    {
+      "check": "limited API create opportunity action",
+      "expectedStatus": 403,
+      "actualStatus": 403,
+      "pass": true
+    }
+  ],
+  "screenshots": {
+    "dashboard": "docs/qa/full-eval/evidence/browser-limited-crm-write-denied-2026-07-08/limited-dashboard-no-crm-link.png",
+    "crmDenied": "docs/qa/full-eval/evidence/browser-limited-crm-write-denied-2026-07-08/limited-crm-deals-denied.png"
+  },
+  "network": [
+    {
+      "url": "/api/auth/me",
+      "status": 401,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/login",
+      "status": 200,
+      "method": "POST"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/my-work",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/projects",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/clients",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/opportunities",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/deal-stages",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/contacts",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/project-types",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/products",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/pipelines",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/projects",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/my-work",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/clients",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/deal-stages",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/opportunities",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/contacts",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/products",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/project-types",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/pipelines",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/projects",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 401,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/login",
+      "status": 200,
+      "method": "POST"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/projects",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/my-work",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/deal-stages",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/opportunities",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/clients",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/contacts",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/products",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/project-types",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/pipelines",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/projects",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/my-work",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/deal-stages",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/opportunities",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/clients",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/products",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/contacts",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/project-types",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/pipelines",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/crm/deals",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/opportunities",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/deal-stages",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/contacts",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/products",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/clients",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/project-types",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/pipelines",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/workspace/users",
+      "status": 403,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "url": "/api/auth/me",
+      "status": 200,
+      "method": "GET"
+    }
+  ],
+  "consoleMessages": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    }
+  ],
+  "notCovered": [
+    "Full role x route x action traversal",
+    "CRM read-capable limited role with no write permission",
+    "all CRM detail/edit modals",
+    "mobile/responsive traversal"
+  ],
+  "notes": [
+    "This narrows RISK-FULL-BROWSER-TRAVERSAL only; it does not close the full risk zone.",
+    "Navigation is asserted after /api/auth/me has settled so the intentional loading state is not counted as failure."
+  ],
+  "pass": true
+}

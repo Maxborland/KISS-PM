@@ -303,6 +303,90 @@ describe("CRM pipeline API", () => {
     ]);
   });
 
+  it("keeps pipeline and stage duplicate submits conflict-safe with one audit event", async () => {
+    const cookie = await loginAs("admin@alpha.test", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const pipelineBody = {
+      id: "pipeline-race-id",
+      name: "Race pipeline"
+    };
+    const pipelineResponses = await Promise.all([
+      app.request("/api/workspace/crm/pipelines", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(pipelineBody)
+      }),
+      app.request("/api/workspace/crm/pipelines", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(pipelineBody)
+      })
+    ]);
+
+    expect(pipelineResponses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const pipelineConflict = pipelineResponses.find((response) => response.status === 409);
+    expect(pipelineConflict).toBeDefined();
+    await expect(pipelineConflict!.json()).resolves.toEqual({ error: "crm_pipeline_id_taken" });
+
+    const pipelineRows = await client`
+      SELECT count(*)::int AS count
+      FROM crm_pipelines
+      WHERE tenant_id = 'tenant-alpha'
+        AND id = 'pipeline-race-id'
+    `;
+    expect(Number(pipelineRows[0]?.count ?? 0)).toBe(1);
+
+    const stageBody = {
+      id: "pipeline-stage-race-id",
+      name: "Race stage",
+      sortOrder: 10
+    };
+    const stageResponses = await Promise.all([
+      app.request("/api/workspace/crm/pipelines/pipeline-race-id/stages", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(stageBody)
+      }),
+      app.request("/api/workspace/crm/pipelines/pipeline-race-id/stages", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(stageBody)
+      })
+    ]);
+
+    expect(stageResponses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const stageConflict = stageResponses.find((response) => response.status === 409);
+    expect(stageConflict).toBeDefined();
+    await expect(stageConflict!.json()).resolves.toEqual({ error: "crm_pipeline_stage_id_taken" });
+
+    const stageRows = await client`
+      SELECT count(*)::int AS count
+      FROM crm_pipeline_stages
+      WHERE tenant_id = 'tenant-alpha'
+        AND pipeline_id = 'pipeline-race-id'
+        AND id = 'pipeline-stage-race-id'
+    `;
+    expect(Number(stageRows[0]?.count ?? 0)).toBe(1);
+
+    const auditRows = await client`
+      SELECT action_type, count(*)::int AS count
+      FROM audit_events
+      WHERE tenant_id = 'tenant-alpha'
+        AND source_workflow = 'crm_pipeline_management'
+        AND action_type IN ('crm_pipeline.created', 'crm_pipeline_stage.created')
+      GROUP BY action_type
+      ORDER BY action_type ASC
+    `;
+    expect(auditRows).toEqual([
+      { action_type: "crm_pipeline.created", count: 1 },
+      { action_type: "crm_pipeline_stage.created", count: 1 }
+    ]);
+  });
   it("keeps pipeline lists tenant scoped", async () => {
     const alphaCookie = await loginAs("admin@alpha.test", "admin12345");
     const betaCookie = await loginAs("admin@beta.test", "admin12345");

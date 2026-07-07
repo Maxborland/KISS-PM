@@ -25,7 +25,7 @@
     "summary":  {
                     "oldBugIdsReviewed":  84,
                     "fixedByMasterOldBugIds":  64,
-                    "fixedByCurrentBranchItems":  46,
+                    "fixedByCurrentBranchItems":  48,
                     "confirmedOpen":  0,
                     "unverifiedOldBugIds":  1,
                     "notABugOrSupersededOldBugIds":  4,
@@ -569,6 +569,24 @@
                                      "note":  "This narrows CRM write-flow conflict handling for client duplicate names and product update duplicate SKU/name. Contact/opportunity true concurrent duplicate evidence remains separate."
                                  },
                                  {
+                                     "id":  "CURRENT-RISK-WRITE-FLOW-CRM-PIPELINE-STAGE-DUPLICATE-SUBMIT",
+                                     "source":  "current branch targeted DB integration coverage and route conflict mapping",
+                                     "surface":  "POST /api/workspace/crm/pipelines, POST /api/workspace/crm/pipelines/:pipelineId/stages",
+                                     "evidence":  "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-pipeline-stage-duplicate-submit-2026-07-08.json: concurrent duplicate CRM pipeline and stage creates return stable 201/409 pairs with one-row DB readback and one success audit per operation.",
+                                     "linkedOldIds":  [
+
+                                                      ],
+                                     "linkedRiskZones":  [
+                                                             "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+                                                         ],
+                                     "tests":  [
+                                                   "node_modules\\.bin\\vitest.cmd run apps/api/src/crmPipelineRoutes.db.test.ts -t \"keeps pipeline and stage duplicate submits conflict-safe\"",
+                                                   "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false"
+                                               ],
+                                     "coverageStatus":  "partial-risk-zone",
+                                     "note":  "This narrows first-class CRM pipeline/stage duplicate-submit behavior. CRM transition-rule/automation races, audit side-effect de-duplication, opportunity stage/pipeline writes, and the full write-flow matrix remain open."
+                                 },
+                                 {
                                      "id":  "CURRENT-RISK-AUTH-RESET-HAPPY-PATH-CONCURRENCY",
                                      "source":  "current branch targeted route tests and typecheck",
                                      "surface":  "POST /api/auth/password-reset/request, POST /api/auth/password-reset/confirm, POST /api/auth/login",
@@ -959,6 +977,25 @@
                                                ],
                                      "coverageStatus":  "partial-risk-zone",
                                      "note":  "This narrows Jitsi provider browser behavior for product handoff only. Actual Chrome/OBS permission prompt, device selection, media presence, leave/rejoin, and remote participant behavior remain unverified."
+                                 },
+                                 {
+                                     "id":  "CURRENT-RISK-MEDIA-DEVICE-DENIED-LOBBY-DEGRADED",
+                                     "source":  "current branch targeted web hook test and typecheck",
+                                     "surface":  "/calls/[roomId] prejoin lobby camera permission denied/degraded UI",
+                                     "evidence":  "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-device-denied-lobby-degraded-2026-07-08.json: NotAllowedError from LiveKit camera preview now shows the denied-camera warning, turns lobby camera state off, preserves micOn, and leaves the user with a joinable no-camera selection.",
+                                     "linkedOldIds":  [
+
+                                                      ],
+                                     "linkedRiskZones":  [
+                                                             "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+                                                         ],
+                                     "tests":  [
+                                                   "node_modules\\.bin\\vitest.cmd run apps/web/src/lib/call/use-lobby-preview.test.tsx -> 1 file passed; 1 test passed",
+                                                   "node_modules\\.bin\\vitest.cmd run apps/web/src/lib/call/call-engine.test.tsx -> 1 file passed; 5 tests passed",
+                                                   "node_modules\\.bin\\tsc.CMD -p apps/web/tsconfig.json --pretty false -> pass"
+                                               ],
+                                     "coverageStatus":  "partial-risk-zone",
+                                     "note":  "This narrows local browser prejoin media denied/degraded UI without external LiveKit/Jitsi credentials. Real Chrome permission prompt, provider join, leave/rejoin, reconnect, and remote participant behavior remain unverified."
                                  }
                              ],
     "confirmedOpen":  [
@@ -996,9 +1033,10 @@
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: route-level reset request, token delivery, confirm, login with new password, SMTP-like resetUrl payload, and concurrent token consume covered.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-browser-mail-gap-2026-07-07.json: browser forgot-password/reset request/no-mail state/confirm token prefill covered; no dev token or 64-hex token leaks in DOM.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-local-provider-extraction-2026-07-07.json: local in-memory provider token extraction covers old-password rejection and new-password session login after reset.",
-                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-live-openrouter-smtp-imap-smoke-2026-07-07.json: live SMTP provider path accepted reset email sends through REG.RU SMTP, but all-folder IMAP and POP3 readback found zero delivered messages."
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-live-openrouter-smtp-imap-smoke-2026-07-07.json: live SMTP provider path accepted reset email sends through REG.RU SMTP, but all-folder IMAP and POP3 readback found zero delivered messages.",
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-provider-readback-diagnostic-2026-07-08.json: provider-level SMTP diagnostic again accepted the reset email path, but IMAP all-folder and POP3 readback still found zero messages."
                                                         ],
-                                    "remainingEvidence":  "Live external SMTP/email-client delivery/extraction remains blocked: SMTP accepted sends, but all-folder IMAP and POP3 readback found no delivered messages. Full request -> delivered token -> confirm -> login browser flow cannot be passed until mailbox delivery/routing is fixed or a working mailcatcher/provider is configured."
+                                    "remainingEvidence":  "Live external SMTP/email-client delivery/extraction remains blocked: repeated SMTP accepted sends, but all-folder IMAP and POP3 readback found no delivered messages. Full request -> delivered token -> confirm -> login browser flow cannot be passed until mailbox delivery/routing is fixed or a working mailcatcher/provider is configured."
                                 },
                                 {
                                     "id":  "RISK-AGENT-REAL-LLM-SSE",
@@ -1023,9 +1061,10 @@
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-participant-left-on-cleanup-2026-07-07.json: participantState left on cleanup/unmount fixed and tested without real provider.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-contract-join-race-2026-07-07.json: Jitsi API create/readback/start/join URL-only contract covered, schema enums aligned with runtime, and late session-end join-token race no longer calls provider issuance.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-provider-disabled-join-token-2026-07-07.json: API degraded no-provider join-token path returns 501 video_provider_disabled and does not emit join_token_issued event/audit.",
-                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-browser-handoff-2026-07-07.json: /calls/[roomId] now handles URL-only Jitsi provider contracts as an external handoff; Chromium smoke verifies start-session, join-token, and visible meet.jit.si link."
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-browser-handoff-2026-07-07.json: /calls/[roomId] now handles URL-only Jitsi provider contracts as an external handoff; Chromium smoke verifies start-session, join-token, and visible meet.jit.si link.",
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-device-denied-lobby-degraded-2026-07-08.json: NotAllowedError from camera preview now surfaces the denied-camera warning, turns lobby camera state off, preserves micOn, and keeps a joinable no-camera prejoin selection."
                                                         ],
-                                    "remainingEvidence":  "Live provider browser traversal still required: provider config, prejoin, permissions, join, media denied, leave/rejoin, remote participant, reconnect, and real LiveKit/Jitsi infrastructure behavior."
+                                    "remainingEvidence":  "Live provider browser traversal still required: provider config, real browser permission prompt/device labels, provider join, leave/rejoin, remote participant, reconnect, and real LiveKit/Jitsi infrastructure behavior. Local device-denied prejoin degraded UI is covered without provider creds."
                                 },
                                 {
                                     "id":  "RISK-FULL-BROWSER-TRAVERSAL",
@@ -1033,7 +1072,8 @@
                                     "evidence":  "docs/qa/full-eval/reconciliation-2026-07-07.md:36 says a fresh role Г— route Г— action matrix was not re-run after all master fixes.",
                                     "requiredEvidence":  "Per-role route/action JSON with screenshot/network logs and pass/fail/expected-forbidden status.",
                                     "partialEvidence":  [
-                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-full-browser-core-traversal-2026-07-07.json: admin and limited profile.read core browser traversal passed for login, shell, CRM, admin users, deal stage write/readback/reload, and permission-denied API checks."
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-full-browser-core-traversal-2026-07-07.json: admin and limited profile.read core browser traversal passed for login, shell, CRM, admin users, deal stage write/readback/reload, and permission-denied API checks.",
+                                                            "docs/qa/full-eval/evidence/browser-limited-crm-write-denied-2026-07-08/risk-full-browser-limited-crm-write-denied-2026-07-08.json: limited profile.read Chromium traversal passed for settled sidebar hiding, direct /crm/deals restricted surface, no CRM action UI, and 403 read/create opportunity API checks with screenshots and network log."
                                                         ]
                                 },
                                 {
@@ -1054,10 +1094,11 @@
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-admin-extra-race-2026-07-07.json: admin security policy duplicate saves and user deactivate/reactivate duplicate writes now have targeted DB/API readback coverage.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-communications-extra-race-2026-07-07.json: communication channel member add and notification preference duplicate writes now have targeted DB/API readback coverage.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-extra-race-2026-07-07.json: CRM client/product duplicate name/SKU create/update races now have targeted DB/API readback coverage.",
-                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-intake-activation-duplicate-submit-2026-07-07.json: project intake activation duplicate submit is single-use with one project/audit and duplicate 409."
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-intake-activation-duplicate-submit-2026-07-07.json: project intake activation duplicate submit is single-use with one project/audit and duplicate 409.",
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-pipeline-stage-duplicate-submit-2026-07-08.json: first-class CRM pipeline and stage duplicate submits return stable 201/409 pairs with one-row DB readback and one success audit per operation."
                                                         ],
-                                    "remainingEvidence":  "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms slices still need duplicate/race/idempotency evidence; audit side-effect de-duplication and CRM opportunity stage/pipeline writes remain separate optional atoms if required."
+                                    "remainingEvidence":  "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms slices still need duplicate/race/idempotency evidence; audit side-effect de-duplication, CRM transition-rule/automation races, and CRM opportunity stage/pipeline writes remain separate atoms if required."
                                 }
                             ],
-    "nextAction":  "Remaining work: full literal browser traversal for every role/route/action, live media provider browser checks, real agent provider smoke/browser SSE, live external auth email delivery, and remaining exhaustive write-flow race/idempotency atoms. Current branch now has additional partial coverage for core browser traversal, media disabled-provider join-token behavior, agent SSE parser tail handling, auth reset local-provider extraction, and project-intake activation duplicate submit."
+    "nextAction":  "Remaining work: full literal browser traversal for every role/route/action, live media provider browser checks, live external auth email delivery, and remaining exhaustive write-flow race/idempotency atoms. Current branch now has additional partial coverage for core browser traversal, media disabled-provider join-token behavior, media device-denied lobby degradation, agent SSE parser tail handling, live agent API/browser SSE apply/readback, auth reset local-provider extraction, external auth provider readback diagnostics, project-intake activation duplicate submit, and CRM pipeline/stage duplicate submits."
 }

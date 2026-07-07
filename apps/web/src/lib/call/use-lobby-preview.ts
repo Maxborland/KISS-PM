@@ -59,6 +59,7 @@ export function useLobbyPreview(): LobbyPreview {
         if (disposedRef.current || epoch !== epochRef.current) return;
         const denied = cause instanceof Error && cause.name === "NotAllowedError";
         setPermissionError(denied ? "Доступ к камере запрещён" : "Камера недоступна");
+        setSelection((previous) => ({ ...previous, cameraOn: false }));
       }
     },
     [stopPreview]

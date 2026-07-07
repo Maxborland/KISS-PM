@@ -28,6 +28,45 @@ type AuditEntity = {
   type: string;
   id: string;
 };
+function crmPipelineUniqueConflict(
+  error: unknown
+):
+  | "crm_pipeline_id_taken"
+  | "crm_pipeline_name_taken"
+  | "crm_pipeline_stage_id_taken"
+  | "crm_pipeline_stage_name_taken"
+  | "crm_pipeline_stage_sort_order_taken"
+  | null {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 8; depth += 1) {
+    const rec = current as {
+      code?: unknown;
+      constraint?: unknown;
+      constraint_name?: unknown;
+      message?: unknown;
+      cause?: unknown;
+    };
+    if (rec.code === "23505") {
+      const marker = String(rec.constraint ?? rec.constraint_name ?? rec.message ?? "");
+      if (
+        marker.includes("crm_pipeline_stages_pkey") ||
+        marker.includes("crm_pipeline_stages_tenant_pipeline_id_uidx")
+      ) {
+        return "crm_pipeline_stage_id_taken";
+      }
+      if (marker.includes("crm_pipeline_stages_tenant_pipeline_name_uidx")) {
+        return "crm_pipeline_stage_name_taken";
+      }
+      if (marker.includes("crm_pipeline_stages_tenant_pipeline_sort_order_uidx")) {
+        return "crm_pipeline_stage_sort_order_taken";
+      }
+      if (marker.includes("crm_pipelines_pkey")) return "crm_pipeline_id_taken";
+      if (marker.includes("crm_pipelines_tenant_id_name_uidx")) return "crm_pipeline_name_taken";
+    }
+    current = rec.cause;
+  }
+  return null;
+}
 
 export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
   const { appendManagementAuditEvent, runDataSourceTransaction } = deps;
@@ -65,20 +104,27 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     const parsed = parseCrmPipelineBody(body.value, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const pipeline = await runMutationWithAudit({
-      actor,
-      decision,
-      actionType: "crm_pipeline.created",
-      sourceEntityType: "CrmPipeline",
-      commandInput: parsed.value,
-      beforeState: null,
-      mutate: async (transactionDataSource) => {
-        if (!transactionDataSource.createCrmPipeline) {
-          throw new Error("transactional_crm_pipeline_create_not_configured");
+    let pipeline;
+    try {
+      pipeline = await runMutationWithAudit({
+        actor,
+        decision,
+        actionType: "crm_pipeline.created",
+        sourceEntityType: "CrmPipeline",
+        commandInput: parsed.value,
+        beforeState: null,
+        mutate: async (transactionDataSource) => {
+          if (!transactionDataSource.createCrmPipeline) {
+            throw new Error("transactional_crm_pipeline_create_not_configured");
+          }
+          return transactionDataSource.createCrmPipeline(parsed.value);
         }
-        return transactionDataSource.createCrmPipeline(parsed.value);
-      }
-    });
+      });
+    } catch (error) {
+      const conflict = crmPipelineUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     return context.json({ pipeline }, 201);
   });
@@ -183,22 +229,29 @@ export function registerCrmPipelineRoutes(app: Hono, deps: ApiRouteDeps) {
     const parsed = parseCrmPipelineStageBody(body.value, actor.tenantId, pipelineId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const stage = await runMutationWithAudit({
-      actor,
-      decision,
-      actionType: "crm_pipeline_stage.created",
-      sourceEntityType: "CrmPipelineStage",
-      commandInput: parsed.value,
-      beforeState: null,
-      mutate: async (transactionDataSource) => {
-        if (!transactionDataSource.createCrmPipelineStage || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
-          throw new Error("transactional_crm_pipeline_stage_create_not_configured");
+    let stage;
+    try {
+      stage = await runMutationWithAudit({
+        actor,
+        decision,
+        actionType: "crm_pipeline_stage.created",
+        sourceEntityType: "CrmPipelineStage",
+        commandInput: parsed.value,
+        beforeState: null,
+        mutate: async (transactionDataSource) => {
+          if (!transactionDataSource.createCrmPipelineStage || !transactionDataSource.refreshCrmPipelineLifecycleGraph) {
+            throw new Error("transactional_crm_pipeline_stage_create_not_configured");
+          }
+          const created = await transactionDataSource.createCrmPipelineStage(parsed.value);
+          await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
+          return created;
         }
-        const created = await transactionDataSource.createCrmPipelineStage(parsed.value);
-        await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
-        return created;
-      }
-    });
+      });
+    } catch (error) {
+      const conflict = crmPipelineUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     return context.json({ stage }, 201);
   });
