@@ -25,7 +25,7 @@
     "summary":  {
                     "oldBugIdsReviewed":  84,
                     "fixedByMasterOldBugIds":  64,
-                    "fixedByCurrentBranchItems":  43,
+                    "fixedByCurrentBranchItems":  44,
                     "confirmedOpen":  0,
                     "unverifiedOldBugIds":  1,
                     "notABugOrSupersededOldBugIds":  4,
@@ -903,6 +903,25 @@
                                                ],
                                      "coverageStatus":  "partial-risk-zone",
                                      "note":  "This narrows project-intake service duplicate-submit behavior only; full route/browser write-flow matrix remains open."
+                                 },
+                                 {
+                                     "id":  "CURRENT-RISK-MEDIA-JITSI-BROWSER-HANDOFF",
+                                     "source":  "current branch runtime fix, targeted web unit test, and Chromium browser smoke",
+                                     "surface":  "/calls/[roomId] Jitsi/manual external provider handoff",
+                                     "evidence":  "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-browser-handoff-2026-07-07.json: /calls runtime no longer treats Jitsi URL-only join contracts as video_provider_unavailable; browser smoke verifies start-session, join-token, and visible external meet.jit.si handoff link.",
+                                     "linkedOldIds":  [
+
+                                                      ],
+                                     "linkedRiskZones":  [
+                                                             "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+                                                         ],
+                                     "tests":  [
+                                                   "node_modules\\.bin\\vitest.cmd run apps/web/src/lib/call/call-engine.test.tsx -> 1 file passed; 5 tests passed",
+                                                   "node_modules\\.bin\\tsc.CMD -p apps/web/tsconfig.json --pretty false -> pass",
+                                                   "node .tmp\\jitsi-handoff-smoke.mjs -> pass"
+                                               ],
+                                     "coverageStatus":  "partial-risk-zone",
+                                     "note":  "This narrows Jitsi provider browser behavior for product handoff only. Actual Chrome/OBS permission prompt, device selection, media presence, leave/rejoin, and remote participant behavior remain unverified."
                                  }
                              ],
     "confirmedOpen":  [
@@ -964,7 +983,8 @@
                                     "partialEvidence":  [
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-participant-left-on-cleanup-2026-07-07.json: participantState left on cleanup/unmount fixed and tested without real provider.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-contract-join-race-2026-07-07.json: Jitsi API create/readback/start/join URL-only contract covered, schema enums aligned with runtime, and late session-end join-token race no longer calls provider issuance.",
-                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-provider-disabled-join-token-2026-07-07.json: API degraded no-provider join-token path returns 501 video_provider_disabled and does not emit join_token_issued event/audit."
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-provider-disabled-join-token-2026-07-07.json: API degraded no-provider join-token path returns 501 video_provider_disabled and does not emit join_token_issued event/audit.",
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-browser-handoff-2026-07-07.json: /calls/[roomId] now handles URL-only Jitsi provider contracts as an external handoff; Chromium smoke verifies start-session, join-token, and visible meet.jit.si link."
                                                         ],
                                     "remainingEvidence":  "Live provider browser traversal still required: provider config, prejoin, permissions, join, media denied, leave/rejoin, remote participant, reconnect, and real LiveKit/Jitsi infrastructure behavior."
                                 },

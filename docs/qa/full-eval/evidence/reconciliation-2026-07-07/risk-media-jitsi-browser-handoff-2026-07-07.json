@@ -1,0 +1,56 @@
+{
+  "id": "RISK-MEDIA-JITSI-BROWSER-HANDOFF-2026-07-07",
+  "generatedAt": "2026-07-07T16:34:00.000Z",
+  "scope": "Browser-level Jitsi handoff for /calls/[roomId] after API provider returns URL-only join contract.",
+  "codeChange": {
+    "summary": "/calls runtime now treats jitsi/manual join contracts as external provider handoff instead of surfacing video_provider_unavailable.",
+    "files": [
+      "apps/web/src/lib/call/call-engine.ts",
+      "apps/web/src/views/screens/call-runtime-view.tsx",
+      "apps/web/src/lib/call/call-engine.test.tsx"
+    ]
+  },
+  "environment": {
+    "database": "postgres://127.0.0.1:55433/kiss_pm",
+    "api": "http://127.0.0.1:4107",
+    "web": "http://127.0.0.1:3107",
+    "videoProvider": "jitsi",
+    "jitsiBaseUrl": "https://meet.jit.si"
+  },
+  "verification": [
+    {
+      "command": "node_modules\\.bin\\vitest.cmd run apps/web/src/lib/call/call-engine.test.tsx",
+      "status": "pass",
+      "result": "1 file passed; 5 tests passed"
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.CMD -p apps/web/tsconfig.json --pretty false",
+      "status": "pass",
+      "result": "empty output"
+    },
+    {
+      "command": "node .tmp\\jitsi-handoff-smoke.mjs",
+      "status": "pass",
+      "result": {
+        "roomId": "call-room-1b7803f5-a845-4400-a2ed-a2dc948e0275",
+        "provider": "jitsi",
+        "handoffHref": "https://meet.jit.si/kiss-pm-jitsi-handoff-1783445143426",
+        "bodyContainsJitsi": true,
+        "startRequestSeen": true,
+        "joinTokenRequestSeen": true
+      }
+    }
+  ],
+  "chromeAttempt": {
+    "status": "blocked",
+    "surface": "Chrome extension browser control against http://127.0.0.1:3107/calls/call-room-fc58e488-e57a-4e3e-975c-8ad80dbf379e",
+    "observed": [
+      "Lobby rendered with Join button and disabled camera/microphone selects.",
+      "Playwright locator click, DOM-CUA click, and coordinate CUA click on the Join button produced no POST /sessions/start or /join-token network events.",
+      "Chrome CDP Browser.grantPermissions was not supported in this runtime.",
+      "Browser screenshot capture timed out through CDP."
+    ],
+    "impact": "OBS virtual webcam / real Chrome permission traversal remains unverified; this evidence covers product Jitsi handoff behavior in Chromium, not actual Chrome media-device selection."
+  },
+  "remainingRisk": "Full media matrix still needs actual Chrome/OBS or another controllable real-browser setup for permission prompt, device selection, external Jitsi join, audio/video presence, leave/rejoin, and remote participant behavior."
+}

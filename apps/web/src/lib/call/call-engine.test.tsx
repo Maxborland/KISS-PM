@@ -234,6 +234,34 @@ describe("useCallEngine participant state lifecycle", () => {
     expect(livekitMock.instances[0]?.disconnect).toHaveBeenCalledTimes(1);
   });
 
+  it("exposes an external Jitsi join URL without trying to connect to LiveKit", async () => {
+    callClientMock.fetchJoinToken.mockResolvedValueOnce({
+      joinUrl: "https://meet.jit.si/kiss-room-1",
+      provider: "jitsi",
+      token: null
+    });
+    let latestState: CallEngineState | null = null;
+    const { root } = await renderEngine("room-1", (state) => {
+      latestState = state;
+    });
+
+    await waitForExpectation(() => {
+      expect(latestState?.externalJoin).toEqual({
+        provider: "jitsi",
+        joinUrl: "https://meet.jit.si/kiss-room-1"
+      });
+    });
+
+    expect((latestState as CallEngineState | null)?.error).toBeNull();
+    expect(livekitMock.instances[0]?.connect).not.toHaveBeenCalled();
+    expect(callClientMock.postParticipantState).not.toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+
+    expect(callClientMock.postParticipantState).not.toHaveBeenCalled();
+  });
   it("does not send left when the join token cannot connect to LiveKit", async () => {
     callClientMock.fetchJoinToken.mockResolvedValueOnce({
       joinUrl: "",

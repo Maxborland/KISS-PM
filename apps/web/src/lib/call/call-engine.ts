@@ -139,6 +139,7 @@ export type CallEngineState = {
   controls: CallLocalControls;
   handlers: CallControlHandlers;
   error: string | null;
+  externalJoin: { provider: "jitsi" | "manual"; joinUrl: string } | null;
   chat: MessageView[];
   sendChat: (text: string) => void;
 };
@@ -148,6 +149,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
   const [stage, setStage] = useState<CallStageView>({ phase: "idle", participants: [] });
   const [controls, setControls] = useState<CallLocalControls>({ micOn: false, cameraOn: false });
   const [error, setError] = useState<string | null>(null);
+  const [externalJoin, setExternalJoin] = useState<CallEngineState["externalJoin"]>(null);
   const [chat, setChat] = useState<MessageView[]>([]);
   const backgroundRef = useRef<CallBackgroundController | null>(null);
   if (!backgroundRef.current) {
@@ -286,6 +288,10 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
           fetchJoinToken(roomId, session.id),
           fetchTurnCredentials(roomId, session.id)
         ]);
+        if ((join.provider === "jitsi" || join.provider === "manual") && join.joinUrl) {
+          setExternalJoin({ provider: join.provider, joinUrl: join.joinUrl });
+          return;
+        }
         if (join.provider !== "livekit" || !join.token) {
           throw new Error("video_provider_unavailable");
         }
@@ -418,6 +424,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     controls: { ...controls, background, backgroundSupported },
     handlers: { ...handlers, onCycleBackground },
     error,
+    externalJoin,
     chat,
     sendChat
   };
