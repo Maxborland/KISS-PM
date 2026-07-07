@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 26,
+    "fixedByCurrentBranchItems": 27,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 1,
     "notABugOrSupersededOldBugIds": 4,
@@ -528,7 +528,7 @@
         "corepack pnpm --filter @kiss-pm/api typecheck"
       ],
       "coverageStatus": "partial-risk-zone",
-      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for admin user/access-role duplicate conflicts. Access role name race still needs a DB unique index on (tenant_id, name) before it can be fully closed under concurrency."
+      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for admin user/access-role duplicate conflicts. Access role name race is closed separately by CURRENT-RISK-WRITE-FLOW-ACCESS-ROLE-NAME-UNIQUE."
     },
     {
       "id": "CURRENT-RISK-WRITE-FLOW-NOTIFICATION-READ-CONCURRENCY",
@@ -561,6 +561,23 @@
       "note": "This narrows CRM write-flow conflict handling for client duplicate names and product update duplicate SKU/name. Contact/opportunity true concurrent duplicate evidence remains separate."
     },
     {
+      "id": "CURRENT-RISK-AUTH-RESET-HAPPY-PATH-CONCURRENCY",
+      "source": "current branch targeted route tests and typecheck",
+      "surface": "POST /api/auth/password-reset/request, POST /api/auth/password-reset/confirm, POST /api/auth/login",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: reset request delivers rawToken/resetUrl, confirm changes password, login succeeds with new password, and concurrent confirm consumes token once.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-AUTH-EMAIL-RESET-HAPPY-PATH",
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/authRegistrationRoutes.test.ts -t \\\"password-reset\\\"\"",
+        "corepack pnpm --filter @kiss-pm/api typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows auth reset happy path and write-flow concurrency at route level. It does not replace full browser traversal or a live external SMTP provider check."
+    },
+    {
       "id": "CURRENT-SHELL-13-AGENT-PRODUCTION-CHROME",
       "source": "current branch targeted web test and typecheck",
       "surface": "/agent production history/nav/message timestamps",
@@ -590,6 +607,39 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This closes only the participant cleanup bug found during media audit; full LiveKit/Jitsi provider browser traversal remains unverified."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-ACCESS-ROLE-NAME-UNIQUE",
+      "source": "current branch targeted DB integration, migration and schema coverage",
+      "surface": "POST /api/tenant/current/access-profiles, PATCH /api/workspace/access-roles/:roleId, access_profiles unique index",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-access-role-name-unique-2026-07-07.json: access_profiles_tenant_id_name_uidx added on (tenant_id, name); concurrent create/update same-name races return stable access_role_name_taken conflicts and read back one target role name.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        ".\\node_modules\\.bin\\vitest.cmd run --root . packages/persistence/src/migration.test.ts packages/persistence/src/schema.test.ts",
+        "$env:DATABASE_URL='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm'; corepack pnpm db:migrate",
+        "$env:DATABASE_URL='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm'; .\\node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"access role\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "Before applying to a non-empty environment, precheck duplicate access_profiles rows grouped by tenant_id/name; the unique index migration will fail if duplicates exist."
+    },
+    {
+      "id": "CURRENT-RISK-AUTH-EMAIL-RESET-HAPPY-PATH-ROUTE",
+      "source": "current branch targeted route-level coverage",
+      "surface": "POST /api/auth/password-reset/request and POST /api/auth/password-reset/confirm",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-happy-path-route-2026-07-07.json: smtp-like reset request returns 202 delivery=email with resetUrl /password-reset/confirm?token=...; true concurrent same-token confirm returns exactly one 200 and one 400 reset_token_used, final password is the 200 winner, sessions are cleared, token is consumed, and injectable auth limiter records one success and one failure.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-AUTH-EMAIL-RESET-HAPPY-PATH",
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "node_modules\\.bin\\vitest.cmd run apps/api/src/authRegistrationRoutes.test.ts -t \"password-reset\" -> 1 file passed; 11 tests passed, 5 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows the auth reset happy-path and write-flow race risk at route level only. Browser UI traversal and real/configured provider delivery remain unverified."
     }
   ],
   "confirmedOpen": [],
@@ -619,7 +669,12 @@
       "id": "RISK-AUTH-EMAIL-RESET-HAPPY-PATH",
       "status": "unverified",
       "evidence": "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:66 says valid reset-token happy path through email provider was not checked.",
-      "requiredEvidence": "Real or explicitly degraded email provider status, reset request, token delivery/extraction path, confirm, login with new password, repeat-token behavior."
+      "requiredEvidence": "Real or explicitly degraded email provider status, reset request, token delivery/extraction path, confirm, login with new password, repeat-token behavior.",
+      "partialEvidence": [
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-happy-path-route-2026-07-07.json: route-level SMTP-like delivery contract and true concurrent same-token confirm behavior are covered by targeted tests.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: route-level reset request, token delivery, confirm, login with new password, SMTP-like resetUrl payload, and concurrent token consume covered."
+      ],
+      "remainingEvidence": "Full browser traversal through the login/reset screens and live external SMTP/email-client delivery remain unverified."
     },
     {
       "id": "RISK-AGENT-REAL-LLM-SSE",
@@ -652,10 +707,12 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-idempotency-coverage-2026-07-07.json: planning baseline.capture and task.update_schedule concurrent idempotency coverage added.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-admin-duplicate-conflicts-2026-07-07.json: admin user create/update duplicate email conflicts and access-role duplicate id conflicts now have targeted concurrent coverage.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-notification-read-concurrency-2026-07-07.json: notification read duplicate/concurrent requests preserve a single readAt and read back one read notification.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-conflict-mapping-2026-07-07.json: CRM client duplicate-name and product update duplicate SKU/name conflicts now return stable 409 instead of 500."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-conflict-mapping-2026-07-07.json: CRM client duplicate-name and product update duplicate SKU/name conflicts now return stable 409 instead of 500.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-access-role-name-unique-2026-07-07.json: access-role name DB uniqueness and concurrent create/update conflict coverage added.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: auth reset concurrent confirm consumes one token once and returns reset_token_used for the duplicate request."
       ],
-      "remainingEvidence": "Communication channel rename races, auth reset concurrent confirm/email-provider happy path, CRM contact/opportunity concurrent duplicate evidence, access-role name DB uniqueness, and remaining write flows still need duplicate/race/idempotency evidence."
+      "remainingEvidence": "Communication channel rename races, CRM contact/opportunity concurrent duplicate evidence, access-role name DB uniqueness, and remaining write flows still need duplicate/race/idempotency evidence."
     }
   ],
-  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, media provider checks, auth email reset happy path, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, and media participant cleanup."
+  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, media provider checks, live external auth email delivery, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, auth reset route concurrency/happy path, and media participant cleanup."
 }
