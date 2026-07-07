@@ -8,6 +8,16 @@ import type {
   ProjectIntakeServiceDeps
 } from "./types";
 
+function isPostgresUniqueViolation(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 8; depth += 1) {
+    const rec = current as { code?: unknown; cause?: unknown };
+    if (rec.code === "23505") return true;
+    current = rec.cause;
+  }
+  return false;
+}
+
 // Приводим demand-позиции к реальным id тенанта. Неизвестные → первая доступная
 // позиция; дубли после подстановки схлопываем (иначе duplicate_demand_position).
 async function normalizeDemandPositions(
@@ -118,7 +128,7 @@ export async function createOpportunity(
   } catch (error) {
     // Гонка pre-check (listOpportunities выше) не транзакционен: два параллельных create с одним id
     // оба проходят проверку, проигравший ловит opportunities_pkey (23505) → отдаём 409, а не 500.
-    if ((error as { code?: unknown }).code === "23505") {
+    if (isPostgresUniqueViolation(error)) {
       return { ok: false, status: 409, error: "opportunity_id_taken" };
     }
     throw error;

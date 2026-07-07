@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 29,
+    "fixedByCurrentBranchItems": 30,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 1,
     "notABugOrSupersededOldBugIds": 4,
@@ -657,6 +657,24 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for communication channel rename/description updates only; it is not full write-flow matrix completion."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-CRM-CONTACT-OPPORTUNITY-CONCURRENCY",
+      "source": "current branch targeted DB integration coverage and opportunity unique-conflict hardening",
+      "surface": "POST /api/workspace/contacts, PATCH /api/workspace/contacts/:contactId, POST /api/workspace/opportunities, createOpportunity duplicate-id catch path",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-contact-opportunity-concurrency-2026-07-07.json: concurrent contact duplicate create/update and concurrent opportunity duplicate-id create return stable success/conflict pairs with DB readback proving exactly one target row.",
+      "linkedOldIds": [
+        "BUG-CRM-06"
+      ],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts -t \\\"concurrent duplicate|conflict-safe\\\"\"",
+        "corepack pnpm --filter @kiss-pm/api typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for CRM contact email and opportunity duplicate-id writes only; remaining CRM write actions and non-CRM writes still require their own duplicate/race/idempotency checks."
     }
   ],
   "confirmedOpen": [],
@@ -727,10 +745,11 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-conflict-mapping-2026-07-07.json: CRM client duplicate-name and product update duplicate SKU/name conflicts now return stable 409 instead of 500.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-access-role-name-unique-2026-07-07.json: access-role name DB uniqueness and concurrent create/update conflict coverage added.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: auth reset concurrent confirm consumes one token once and returns reset_token_used for the duplicate request.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-communication-channel-rename-concurrency-2026-07-07.json: communication channel rename retry is idempotent without duplicate audit and divergent concurrent renames return one 200/one 409 with winner readback."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-communication-channel-rename-concurrency-2026-07-07.json: communication channel rename retry is idempotent without duplicate audit and divergent concurrent renames return one 200/one 409 with winner readback.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-contact-opportunity-concurrency-2026-07-07.json: CRM contact duplicate create/update and opportunity duplicate-id concurrent writes return stable success/conflict pairs with exactly-one-row readback."
       ],
-      "remainingEvidence": "CRM contact/opportunity concurrent duplicate evidence and remaining write flows still need duplicate/race/idempotency evidence."
+      "remainingEvidence": "Remaining write flows outside the covered planning/admin/notification/CRM/auth/access-role/comms slices still need duplicate/race/idempotency evidence."
     }
   ],
-  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, media provider checks, live external auth email delivery, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, auth reset route concurrency/happy path, access-role name uniqueness, communication channel rename version conflicts/idempotent retry, and media participant cleanup."
+  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, media provider checks, live external auth email delivery, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, CRM contact/opportunity concurrency, auth reset route concurrency/happy path, access-role name uniqueness, communication channel rename version conflicts/idempotent retry, and media participant cleanup."
 }

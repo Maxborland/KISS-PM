@@ -377,6 +377,81 @@ describe("Phase 3.1 CRM API", () => {
     );
   });
 
+  it("returns one created opportunity and one 409 conflict for concurrent duplicate opportunity ids", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-opportunity-race", name: "Клиент race opportunity" })
+    });
+    await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "contact-opportunity-race",
+        clientId: "client-opportunity-race",
+        name: "Контакт race opportunity"
+      })
+    });
+    await app.request("/api/workspace/project-types", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "project-type-opportunity-race", name: "Race implementation" })
+    });
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-opportunity-race", name: "Race stage", sortOrder: 10 })
+    });
+
+    const opportunityBody = {
+      id: "opportunity-race-duplicate",
+      clientId: "client-opportunity-race",
+      primaryContactId: "contact-opportunity-race",
+      projectTypeId: "project-type-opportunity-race",
+      stageId: "deal-stage-opportunity-race",
+      title: "Race opportunity",
+      description: null,
+      plannedStart: "2026-06-01",
+      plannedFinish: "2026-06-12",
+      contractValue: 960000,
+      plannedHourlyRate: 6000,
+      probability: 80,
+      templateId: null,
+      demand: [{ positionId: "position-engineer", requiredHours: 120 }]
+    };
+
+    const responses = await Promise.all([
+      app.request("/api/workspace/opportunities", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(opportunityBody)
+      }),
+      app.request("/api/workspace/opportunities", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(opportunityBody)
+      })
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const conflict = responses.find((response) => response.status === 409);
+    expect(conflict).toBeDefined();
+    await expect(conflict!.json()).resolves.toEqual({ error: "opportunity_id_taken" });
+    const opportunityRows = await client`
+      SELECT count(*)::int AS count
+      FROM opportunities
+      WHERE tenant_id = 'tenant-alpha'
+        AND id = 'opportunity-race-duplicate'
+    `;
+    expect(Number(opportunityRows[0]?.count ?? 0)).toBe(1);
+  });
   // Регресс BUG-CRM-01: дубликат SKU/имени продукта должен давать 409, а не 500.
   it("returns 409 (not 500) when creating a product with a duplicate SKU or name", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
@@ -770,6 +845,109 @@ describe("Phase 3.1 CRM API", () => {
     await expect(duplicateUpdate.json()).resolves.toEqual({ error: "contact_email_taken" });
   });
 
+  it("keeps contact email writes conflict-safe under concurrent create and update", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-contact-race", name: "Клиент race contacts" })
+    });
+
+    const concurrentCreates = await Promise.all([
+      app.request("/api/workspace/contacts", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "contact-race-create-a",
+          clientId: "client-contact-race",
+          name: "Race create A",
+          email: "race@example.test"
+        })
+      }),
+      app.request("/api/workspace/contacts", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "contact-race-create-b",
+          clientId: "client-contact-race",
+          name: "Race create B",
+          email: "race@example.test"
+        })
+      })
+    ]);
+    expect(concurrentCreates.map((response) => response.status).sort()).toEqual([201, 409]);
+    const createConflict = concurrentCreates.find((response) => response.status === 409);
+    expect(createConflict).toBeDefined();
+    await expect(createConflict!.json()).resolves.toEqual({ error: "contact_email_taken" });
+    const createRows = await client`
+      SELECT count(*)::int AS count
+      FROM contacts
+      WHERE tenant_id = 'tenant-alpha'
+        AND lower(email) = 'race@example.test'
+    `;
+    expect(Number(createRows[0]?.count ?? 0)).toBe(1);
+
+    await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "contact-race-update-a",
+        clientId: "client-contact-race",
+        name: "Race update A",
+        email: "update-a@example.test"
+      })
+    });
+    await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "contact-race-update-b",
+        clientId: "client-contact-race",
+        name: "Race update B",
+        email: "update-b@example.test"
+      })
+    });
+
+    const concurrentUpdates = await Promise.all([
+      app.request("/api/workspace/contacts/contact-race-update-a", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          clientId: "client-contact-race",
+          name: "Race update A",
+          email: "shared-update@example.test",
+          status: "active"
+        })
+      }),
+      app.request("/api/workspace/contacts/contact-race-update-b", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          clientId: "client-contact-race",
+          name: "Race update B",
+          email: "shared-update@example.test",
+          status: "active"
+        })
+      })
+    ]);
+    expect(concurrentUpdates.map((response) => response.status).sort()).toEqual([200, 409]);
+    const updateConflict = concurrentUpdates.find((response) => response.status === 409);
+    expect(updateConflict).toBeDefined();
+    await expect(updateConflict!.json()).resolves.toEqual({ error: "contact_email_taken" });
+    const updateRows = await client`
+      SELECT count(*)::int AS count
+      FROM contacts
+      WHERE tenant_id = 'tenant-alpha'
+        AND lower(email) = 'shared-update@example.test'
+    `;
+    expect(Number(updateRows[0]?.count ?? 0)).toBe(1);
+  });
   it("allows editing a contact on its archived current client but rejects reassignment to archived clients", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {
