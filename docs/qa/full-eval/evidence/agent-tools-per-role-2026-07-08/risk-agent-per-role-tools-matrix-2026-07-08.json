@@ -1,0 +1,195 @@
+{
+  "id": "RISK-AGENT-PER-ROLE-TOOLS-MATRIX-2026-07-08",
+  "generatedAt": "2026-07-07T20:25:25.3593794Z",
+  "linkedRiskZones": [
+    "RISK-AGENT-REAL-LLM-SSE"
+  ],
+  "status": "pass-partial-risk-not-closed",
+  "scope": "Authenticated API traversal of GET /api/workspace/agent/tools for seeded roles/users against live API 4160 with OpenRouter configured.",
+  "secretsPolicy": "Passwords and cookies were used only in-memory during the run and are not emitted. Emails are redacted to domain-level.",
+  "environment": {
+    "apiOrigin": "http://127.0.0.1:4160",
+    "providerExpected": "OpenRouter live/configured"
+  },
+  "results": [
+    {
+      "role": "alpha-admin",
+      "emailRedacted": "<user>@kiss-pm.local",
+      "loginStatus": 200,
+      "tenantId": "tenant-alpha",
+      "userId": "user-alpha-admin",
+      "permissionCount": 61,
+      "provider": {
+        "model": "anthropic/claude-sonnet-4.6",
+        "live": true,
+        "configured": true
+      },
+      "totalTools": 52,
+      "allowedTools": 52,
+      "deniedTools": 0,
+      "allowedAnalyzeTools": 20,
+      "allowedMutationTools": 32,
+      "deniedReasons": [],
+      "allowedSample": [
+        "list_my_tasks",
+        "read_project_plan",
+        "detect_resource_overloads",
+        "preview_resource_resolution",
+        "change_task_status",
+        "update_task",
+        "create_task",
+        "comment_task"
+      ],
+      "deniedSample": []
+    },
+    {
+      "role": "alpha-engineer-admin-profile",
+      "emailRedacted": "<user>@kiss-pm.local",
+      "loginStatus": 200,
+      "tenantId": "tenant-alpha",
+      "userId": "user-alpha-engineer",
+      "permissionCount": 61,
+      "provider": {
+        "model": "anthropic/claude-sonnet-4.6",
+        "live": true,
+        "configured": true
+      },
+      "totalTools": 52,
+      "allowedTools": 52,
+      "deniedTools": 0,
+      "allowedAnalyzeTools": 20,
+      "allowedMutationTools": 32,
+      "deniedReasons": [],
+      "allowedSample": [
+        "list_my_tasks",
+        "read_project_plan",
+        "detect_resource_overloads",
+        "preview_resource_resolution",
+        "change_task_status",
+        "update_task",
+        "create_task",
+        "comment_task"
+      ],
+      "deniedSample": []
+    },
+    {
+      "role": "alpha-plan-reader-no-resources",
+      "emailRedacted": "<user>@kiss-pm.local",
+      "loginStatus": 200,
+      "tenantId": "tenant-alpha",
+      "userId": "user-alpha-plan-reader-no-resources",
+      "permissionCount": 2,
+      "provider": {
+        "model": "anthropic/claude-sonnet-4.6",
+        "live": true,
+        "configured": true
+      },
+      "totalTools": 52,
+      "allowedTools": 5,
+      "deniedTools": 47,
+      "allowedAnalyzeTools": 3,
+      "allowedMutationTools": 2,
+      "deniedReasons": [
+        {
+          "reason": "permission_missing",
+          "count": 47
+        }
+      ],
+      "allowedSample": [
+        "list_my_tasks",
+        "read_project_plan",
+        "change_task_status",
+        "comment_task",
+        "list_projects"
+      ],
+      "deniedSample": [
+        "detect_resource_overloads",
+        "preview_resource_resolution",
+        "update_task",
+        "create_task",
+        "apply_resource_resolution",
+        "apply_plan_commands",
+        "list_crm_clients",
+        "create_crm_client"
+      ]
+    },
+    {
+      "role": "alpha-resource-reader",
+      "emailRedacted": "<user>@kiss-pm.local",
+      "loginStatus": 200,
+      "tenantId": "tenant-alpha",
+      "userId": "user-alpha-resource-reader",
+      "permissionCount": 1,
+      "provider": {
+        "model": "anthropic/claude-sonnet-4.6",
+        "live": true,
+        "configured": true
+      },
+      "totalTools": 52,
+      "allowedTools": 1,
+      "deniedTools": 51,
+      "allowedAnalyzeTools": 1,
+      "allowedMutationTools": 0,
+      "deniedReasons": [
+        {
+          "reason": "permission_missing",
+          "count": 51
+        }
+      ],
+      "allowedSample": [
+        "detect_resource_overloads"
+      ],
+      "deniedSample": [
+        "list_my_tasks",
+        "read_project_plan",
+        "preview_resource_resolution",
+        "change_task_status",
+        "update_task",
+        "create_task",
+        "comment_task",
+        "apply_resource_resolution"
+      ]
+    },
+    {
+      "role": "beta-admin",
+      "emailRedacted": "<user>@kiss-pm.local",
+      "loginStatus": 200,
+      "tenantId": "tenant-beta",
+      "userId": "user-beta-admin",
+      "permissionCount": 61,
+      "provider": {
+        "model": "anthropic/claude-sonnet-4.6",
+        "live": true,
+        "configured": true
+      },
+      "totalTools": 52,
+      "allowedTools": 52,
+      "deniedTools": 0,
+      "allowedAnalyzeTools": 20,
+      "allowedMutationTools": 32,
+      "deniedReasons": [],
+      "allowedSample": [
+        "list_my_tasks",
+        "read_project_plan",
+        "detect_resource_overloads",
+        "preview_resource_resolution",
+        "change_task_status",
+        "update_task",
+        "create_task",
+        "comment_task"
+      ],
+      "deniedSample": []
+    }
+  ],
+  "expected": "Each role should receive the same tool catalog with allowed flags reflecting its permissions, and provider should report live/configured without leaking secrets.",
+  "actual": "All tested seeded users logged in and received /agent/tools with provider live/configured. Tool allowed/denied counts vary by role permissions.",
+  "remainingForRisk": [
+    "Provider matrix beyond OpenRouter remains open unless scoped out.",
+    "Browser-level denied/degraded UI for missing provider remains open."
+  ],
+  "observations": [
+    "Task participant-governed mutation tools change_task_status/comment_task are coarse-listed as allowed for roles with tenant.projects.read; agent execute still rechecks task/project preflight and governed routes before writing.",
+    "Resource-reader with only tenant.project_resources.read sees only detect_resource_overloads allowed, which confirms no broad mutation leakage for that role.",
+    "Beta admin sees the same total tool catalog/provider status as alpha admin, scoped to tenant-beta."
+  ]
+}
