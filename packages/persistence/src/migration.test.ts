@@ -218,6 +218,10 @@ const contactEmailUniqueMigration = readFileSync(
   new URL("../migrations/0049_contact_email_unique.sql", import.meta.url),
   "utf8"
 );
+const accessProfileNameUniqueMigration = readFileSync(
+  new URL("../migrations/0050_access_profiles_name_unique.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -823,6 +827,17 @@ describe("CRM contact email SQL migration", () => {
     );
     expect(contactEmailUniqueMigration).toContain(
       'ON "contacts" USING btree ("tenant_id","email")'
+    );
+  });
+});
+
+describe("Access profile name SQL migration", () => {
+  it("keeps access profile names unique per tenant", () => {
+    expect(accessProfileNameUniqueMigration).toContain(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "access_profiles_tenant_id_name_uidx"'
+    );
+    expect(accessProfileNameUniqueMigration).toContain(
+      'ON "access_profiles" USING btree ("tenant_id","name")'
     );
   });
 });

@@ -1991,6 +1991,133 @@ describe("API with PostgreSQL data source", () => {
       )
     ).toHaveLength(1);
   });
+
+  it("returns a stable conflict when concurrent access role creates reuse a name", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const [first, second] = await Promise.all([
+      app.request("/api/tenant/current/access-profiles", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "access-profile-alpha-name-race-a",
+          name: "Роль Гонка Имени",
+          permissions: ["tenant.users.read"]
+        })
+      }),
+      app.request("/api/tenant/current/access-profiles", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "access-profile-alpha-name-race-b",
+          name: "Роль Гонка Имени",
+          permissions: ["tenant.users.read"]
+        })
+      })
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+    const profiles = await app.request("/api/tenant/current/access-profiles", {
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      }
+    });
+    const profilesBody = await profiles.json() as {
+      accessProfiles: Array<{ name: string }>;
+    };
+
+    expect(statuses).toEqual([201, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "access_role_name_taken"
+    });
+    expect(
+      profilesBody.accessProfiles.filter(
+        (profile) => profile.name === "Роль Гонка Имени"
+      )
+    ).toHaveLength(1);
+  });
+
+  it("returns a stable conflict when concurrent access role updates reuse a name", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const createA = await app.request("/api/tenant/current/access-profiles", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "access-profile-alpha-name-update-race-a",
+        name: "Роль Update Race A",
+        permissions: ["tenant.users.read"]
+      })
+    });
+    const createB = await app.request("/api/tenant/current/access-profiles", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "access-profile-alpha-name-update-race-b",
+        name: "Роль Update Race B",
+        permissions: ["tenant.users.read"]
+      })
+    });
+    expect([createA.status, createB.status]).toEqual([201, 201]);
+
+    const [first, second] = await Promise.all([
+      app.request(
+        "/api/workspace/access-roles/access-profile-alpha-name-update-race-a",
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({
+            name: "Роль Общая После Гонки",
+            permissions: ["tenant.users.read"]
+          })
+        }
+      ),
+      app.request(
+        "/api/workspace/access-roles/access-profile-alpha-name-update-race-b",
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({
+            name: "Роль Общая После Гонки",
+            permissions: ["tenant.users.read"]
+          })
+        }
+      )
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+    const profiles = await app.request("/api/tenant/current/access-profiles", {
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      }
+    });
+    const profilesBody = await profiles.json() as {
+      accessProfiles: Array<{ name: string }>;
+    };
+
+    expect(statuses).toEqual([200, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "access_role_name_taken"
+    });
+    expect(
+      profilesBody.accessProfiles.filter(
+        (profile) => profile.name === "Роль Общая После Гонки"
+      )
+    ).toHaveLength(1);
+  });
+
   it("logs in with password, reads session user and manages workspace users and positions", async () => {
     const login = await app.request("/api/auth/login", {
       method: "POST",

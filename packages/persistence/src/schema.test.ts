@@ -2,6 +2,7 @@ import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import {
+  accessProfiles,
   crmPipelineStages,
   crmPipelines,
   getPersistenceTableColumns,
@@ -214,6 +215,14 @@ describe("PostgreSQL persistence schema", () => {
         "user_id"
       ])
     );
+  });
+
+  it("keeps access profile names unique per tenant", () => {
+    const indexes = getTableConfig(accessProfiles).indexes.map(
+      (index) => index.config.name
+    );
+
+    expect(indexes).toContain("access_profiles_tenant_id_name_uidx");
   });
 
   it("stores unified first-class CRM pipeline contract (multi-funnel)", () => {

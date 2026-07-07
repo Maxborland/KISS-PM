@@ -1,0 +1,48 @@
+{
+  "generatedAt": "2026-07-07T20:36:20+07:00",
+  "id": "RISK-WRITE-FLOW-ACCESS-ROLE-NAME-UNIQUE",
+  "status": "fixed-by-current-branch",
+  "coverageStatus": "partial-risk-zone",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "scope": "Access role name uniqueness race for tenant-scoped access profiles",
+  "surface": [
+    "POST /api/tenant/current/access-profiles",
+    "PATCH /api/workspace/access-roles/:roleId",
+    "access_profiles (tenant_id, name) database uniqueness"
+  ],
+  "expected": [
+    "DB schema and migration define unique index access_profiles_tenant_id_name_uidx on (tenant_id, name).",
+    "Concurrent access role create requests with different ids and the same name return one 201 and one 409 access_role_name_taken.",
+    "Concurrent access role updates for two roles to the same name return one 200 and one 409 access_role_name_taken.",
+    "Readback after each race shows exactly one role with the contested name."
+  ],
+  "red": {
+    "command": ".\\node_modules\\.bin\\vitest.cmd run --root . packages/persistence/src/migration.test.ts packages/persistence/src/schema.test.ts",
+    "result": "failed as expected before fix: migration file 0050_access_profiles_name_unique.sql missing and schema indexes only contained access_profiles_tenant_id_idx.",
+    "appDbNote": "The first app.db RED attempt was blocked by local DATABASE_URL pointing at another Postgres on 55432: password authentication failed for user kiss_pm. docker compose Postgres was healthy on 55433, so GREEN was run with explicit DATABASE_URL."
+  },
+  "fix": {
+    "files": [
+      "packages/persistence/src/schema/core.ts",
+      "packages/persistence/migrations/0050_access_profiles_name_unique.sql",
+      "packages/persistence/src/migration.test.ts",
+      "packages/persistence/src/schema.test.ts",
+      "apps/api/src/app.db.test.ts"
+    ],
+    "behavior": [
+      "Added uniqueIndex(\"access_profiles_tenant_id_name_uidx\").on(table.tenantId, table.name) to accessProfiles schema.",
+      "Added migration 0050_access_profiles_name_unique.sql creating the same unique index if not exists.",
+      "Added DB race coverage for concurrent create/update access-role name conflicts and readback cardinality."
+    ]
+  },
+  "green": {
+    "migration": "Duplicate precheck returned []; corepack pnpm db:migrate against DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm reported no pending migrations; pg_indexes verified access_profiles_tenant_id_name_uidx exists.",
+    "persistenceTests": "corepack pnpm --filter @kiss-pm/persistence test -- packages/persistence/src/migration.test.ts packages/persistence/src/schema.test.ts -> 6 files passed; 71 tests passed.",
+    "appDbTests": "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\\\.bin\\\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \\\"access role\\\"\" -> 1 file passed; 5 tests passed; 23 skipped.",
+    "warning": "Existing Vite/esbuild warning about duplicate assignment.delete case in packages/domain/src/planning/commandReducer.ts remains unrelated."
+  },
+  "migrationRisk": "Before applying to a non-empty environment, precheck duplicate access_profiles rows grouped by tenant_id/name. CREATE UNIQUE INDEX will fail if duplicates already exist.",
+  "remainingRisk": "This closes only access-role name DB uniqueness race coverage. Broader write-flow race/idempotency matrix remains open for unrelated flows."
+}

@@ -31,7 +31,8 @@ export const accessProfiles = pgTable(
       name: "access_profiles_pkey",
       columns: [table.tenantId, table.id]
     }),
-    index("access_profiles_tenant_id_idx").on(table.tenantId)
+    index("access_profiles_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("access_profiles_tenant_id_name_uidx").on(table.tenantId, table.name)
   ]
 );
 
