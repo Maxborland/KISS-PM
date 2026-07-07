@@ -816,6 +816,95 @@ describe("project work API routes", () => {
     });
   });
 
+  it("keeps task status duplicate writes conflict-safe and archive idempotent", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie: adminCookie
+    };
+
+    const duplicateCreates = await Promise.all(
+      [0, 1].map(async () => {
+        const response = await app.request("/api/workspace/task-statuses", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            id: "task-status-write-risk",
+            name: "Проверка дублей",
+            category: "waiting",
+            sortOrder: 41
+          })
+        });
+        return { status: response.status, body: await response.json() };
+      })
+    );
+    expect(duplicateCreates.map((entry) => entry.status).sort()).toEqual([201, 409]);
+    expect(duplicateCreates.find((entry) => entry.status === 409)?.body).toEqual({
+      error: "task_status_id_taken"
+    });
+
+    const listAfterCreate = await app.request("/api/workspace/task-statuses", {
+      headers: { cookie: adminCookie }
+    });
+    const listAfterCreateBody = await listAfterCreate.json();
+    expect(
+      listAfterCreateBody.taskStatuses.filter((status: { id: string }) =>
+        status.id === "task-status-write-risk"
+      )
+    ).toHaveLength(1);
+    expect(listAfterCreateBody).toMatchObject({
+      taskStatuses: expect.arrayContaining([
+        expect.objectContaining({
+          id: "task-status-write-risk",
+          name: "Проверка дублей",
+          status: "active"
+        })
+      ])
+    });
+    expect(await countTaskStatusAuditEvents("task_status.created")).toBe(1);
+
+    const firstArchive = await app.request(
+      "/api/workspace/task-statuses/task-status-write-risk",
+      {
+        method: "DELETE",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        }
+      }
+    );
+    const secondArchive = await app.request(
+      "/api/workspace/task-statuses/task-status-write-risk",
+      {
+        method: "DELETE",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        }
+      }
+    );
+
+    expect(firstArchive.status).toBe(200);
+    expect(secondArchive.status).toBe(200);
+    await expect(secondArchive.json()).resolves.toMatchObject({
+      taskStatus: { id: "task-status-write-risk", status: "archived" }
+    });
+    expect(await countTaskStatusAuditEvents("task_status.archived")).toBe(1);
+
+    async function countTaskStatusAuditEvents(actionType: string) {
+      const rows = await client`
+        SELECT count(*)::int AS count
+        FROM audit_events
+        WHERE tenant_id = 'tenant-alpha'
+          AND action_type = ${actionType}
+          AND source_entity ->> 'type' = 'TaskStatus'
+          AND source_entity ->> 'id' = 'task-status-write-risk'
+      `;
+      return Number(rows[0]?.count ?? 0);
+    }
+  });
+
   it("lets requester accept review tasks without manage permission", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const requesterCookie = await loginAs("executor@kiss-pm.local", "executor12345");

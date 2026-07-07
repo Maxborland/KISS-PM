@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 53,
+    "fixedByCurrentBranchItems": 54,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 1,
     "notABugOrSupersededOldBugIds": 4,
@@ -1034,6 +1034,23 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This closes the CRM opportunity stage/pipeline duplicate-submit/idempotency atom. Broader write-flow matrix remains open outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-WORK-TASK-STATUS-DUPLICATE-ARCHIVE",
+      "source": "current branch targeted DB integration coverage and route conflict/idempotency fix",
+      "surface": "POST /api/workspace/task-statuses and DELETE /api/workspace/task-statuses/:statusId",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-status-duplicate-archive-2026-07-08.json: concurrent duplicate task status create returns stable 201/409 with one-row readback and one create audit; duplicate archive returns idempotent 200 archived readback with one archive audit.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"task status duplicate writes\" -> pass",
+        "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"manages tenant task statuses\" -> pass",
+        "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes the Project Work task status duplicate-create/archive-idempotency atom. Broader write-flow matrix remains open outside this atom."
     }
   ],
   "confirmedOpen": [],
@@ -1137,10 +1154,11 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-intake-activation-duplicate-submit-2026-07-07.json: project intake activation duplicate submit is single-use with one project/audit and duplicate 409.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-pipeline-stage-duplicate-submit-2026-07-08.json: first-class CRM pipeline and stage duplicate submits return stable 201/409 pairs with one-row DB readback and one success audit per operation.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-race-crm-pipeline-rules-automation-2026-07-08.json: CRM transition-rule edge and stage automation duplicate submits return stable 201/409 pairs with readback, lifecycle graph readback, and one success audit per operation.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-opportunity-stage-pipeline-idempotency-2026-07-08.json: CRM opportunity stage/pipeline duplicate submits are idempotent with readback and no duplicate audit side effects; concurrent divergent stage moves preserve final readback and bounded audit count."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-opportunity-stage-pipeline-idempotency-2026-07-08.json: CRM opportunity stage/pipeline duplicate submits are idempotent with readback and no duplicate audit side effects; concurrent divergent stage moves preserve final readback and bounded audit count.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-status-duplicate-archive-2026-07-08.json: Project Work task status duplicate create returns stable 201/409 with single-row/readback and single create audit; duplicate archive is idempotent with single archive audit."
       ],
-      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms slices still need duplicate/race/idempotency evidence. CRM pipeline/stage, transition-rule/automation, and opportunity stage/pipeline duplicate-submit atoms are now covered."
+      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work-task-status slices still need duplicate/race/idempotency evidence. CRM pipeline/stage, transition-rule/automation, opportunity stage/pipeline, and Project Work task status duplicate-submit atoms are now covered."
     }
   ],
-  "nextAction": "Continue remaining risk-zone atoms: real LiveKit/Jitsi/OBS/microphone media traversal, exhaustive remaining browser traversal by every role/action, live provider/LLM agent tool variants, live email reset inbox readback, and any uncovered write-flow race/idempotency surfaces outside the CRM/planning/admin/comms/auth/access-role slices already evidenced."
+  "nextAction": "Continue remaining risk-zone atoms: real LiveKit/Jitsi/OBS/microphone media traversal, exhaustive remaining browser traversal by every role/action, live provider/LLM agent tool variants, live email reset inbox readback, and any uncovered write-flow race/idempotency surfaces outside the CRM/planning/admin/comms/auth/access-role/project-intake/project-work-task-status slices already evidenced."
 }

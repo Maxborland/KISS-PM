@@ -1,0 +1,63 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-WORK-TASK-STATUS-DUPLICATE-ARCHIVE",
+  "generatedAt": "2026-07-08",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "surface": "POST /api/workspace/task-statuses and DELETE /api/workspace/task-statuses/:statusId",
+  "scope": [
+    "concurrent duplicate task status create with the same tenant/id",
+    "single-row API readback and exactly one create audit event",
+    "duplicate archive/delete request returns idempotent archived readback without duplicate archive audit"
+  ],
+  "redEvidence": [
+    {
+      "command": "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"task status duplicate writes\"",
+      "status": "failed-before-fix",
+      "observed": "duplicate concurrent create returned [201,500] instead of [201,409]"
+    }
+  ],
+  "codeChanges": [
+    "apps/api/src/project-work/taskStatusWorkspace.ts maps task_statuses unique constraint failures to stable 409 conflict errors at the outer transaction boundary.",
+    "apps/api/src/project-work/taskStatusWorkspace.ts treats duplicate archive of an already archived non-system task status as idempotent 200 readback without appending a second archive audit event.",
+    "apps/api/src/projectWorkRoutes.db.test.ts adds targeted DB/API coverage for duplicate create, readback, create audit count, duplicate archive, archived readback, and archive audit count."
+  ],
+  "expectedConflictErrors": {
+    "duplicateId": "task_status_id_taken",
+    "duplicateName": "task_status_name_taken",
+    "duplicateSortOrder": "task_status_sort_order_taken"
+  },
+  "verification": [
+    {
+      "command": "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"task status duplicate writes\"",
+      "status": "passed",
+      "notes": "Fresh sequential integration rerun passed: duplicate create returned stable success/conflict pair and duplicate archive produced one archive audit."
+    },
+    {
+      "command": "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"manages tenant task statuses\"",
+      "status": "passed",
+      "notes": "Existing tenant task status management regression test passed after the idempotent archive/conflict mapping change."
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false",
+      "status": "passed",
+      "notes": "API TypeScript project typecheck completed successfully."
+    },
+    {
+      "command": "node -e JSON.parse(...) for reconciliation matrix and this evidence JSON",
+      "status": "passed",
+      "notes": "JSON evidence and matrix parse successfully."
+    },
+    {
+      "command": "git diff --check -- <touched files>",
+      "status": "passed",
+      "notes": "No whitespace errors; Git reported only CRLF-to-LF normalization warnings."
+    },
+    {
+      "command": "codegraph sync",
+      "status": "passed",
+      "notes": "CodeGraph reported already up to date."
+    }
+  ],
+  "coverageStatus": "partial-risk-zone",
+  "remainingEvidence": "Broader write-flow matrix remains open outside this Project Work task status atom: every remaining route/action still needs single submit, double submit, concurrent duplicate API calls, stale/conflict, refresh/readback, and permission-denied role evidence.",
+  "integrationVerifiedAt": "2026-07-08T02:12:26+07:00"
+}

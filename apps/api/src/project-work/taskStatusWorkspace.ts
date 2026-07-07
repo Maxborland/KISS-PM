@@ -30,6 +30,30 @@ type TaskStatusListResult = { ok: true; taskStatuses: TaskStatusRecord[] } | Wor
 
 type TaskStatusResult = { ok: true; taskStatus: TaskStatusRecord } | WorkspaceError;
 
+function taskStatusUniqueConflict(
+  error: unknown
+): "task_status_id_taken" | "task_status_name_taken" | "task_status_sort_order_taken" | null {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 8; depth += 1) {
+    const rec = current as {
+      code?: unknown;
+      constraint?: unknown;
+      constraint_name?: unknown;
+      message?: unknown;
+      cause?: unknown;
+    };
+    const marker = [rec.constraint, rec.constraint_name, rec.message, String(current)]
+      .filter(Boolean)
+      .join(" ");
+    if (rec.code === "23505" || marker.includes("task_statuses_")) {
+      if (marker.includes("task_statuses_pkey")) return "task_status_id_taken";
+      if (marker.includes("task_statuses_tenant_name_uidx")) return "task_status_name_taken";
+      if (marker.includes("task_statuses_tenant_sort_order_uidx")) return "task_status_sort_order_taken";
+    }
+    current = rec.cause;
+  }
+  return null;
+}
 export function createTaskStatusWorkspace(deps: TaskStatusWorkspaceDeps) {
   return {
     listTaskStatuses(input: WorkspaceInput) {
@@ -83,30 +107,38 @@ async function createTaskStatus(
   });
   if (!decision.allowed) return { ok: false, status: 403, error: decision.reason };
 
-  return deps.runDataSourceTransaction(async (transactionDataSource) => {
-    if (!transactionDataSource.createTaskStatus || !transactionDataSource.appendAuditEvent) {
-      return { ok: false, status: 501, error: "persistence_not_configured" };
-    }
-    const taskStatus = await transactionDataSource.createTaskStatus({
-      ...input.value,
-      tenantId: input.actor.tenantId
-    });
-    await appendTaskStatusAudit(
-      deps,
-      {
-        actor: input.actor,
-        actionType: "task_status.created",
-        taskStatusId: taskStatus.id,
-        commandInput: input.value,
-        beforeState: null,
-        afterState: { id: taskStatus.id, category: taskStatus.category },
-        permissionReason: decision.reason
-      },
-      transactionDataSource
-    );
+  try {
+    return await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.createTaskStatus || !transactionDataSource.appendAuditEvent) {
+        return { ok: false, status: 501, error: "persistence_not_configured" };
+      }
+      const taskStatus = await transactionDataSource.createTaskStatus({
+        ...input.value,
+        tenantId: input.actor.tenantId
+      });
+      await appendTaskStatusAudit(
+        deps,
+        {
+          actor: input.actor,
+          actionType: "task_status.created",
+          taskStatusId: taskStatus.id,
+          commandInput: input.value,
+          beforeState: null,
+          afterState: { id: taskStatus.id, category: taskStatus.category },
+          permissionReason: decision.reason
+        },
+        transactionDataSource
+      );
 
-    return { ok: true, taskStatus };
-  });
+      return { ok: true, taskStatus };
+    });
+  } catch (error) {
+    const conflict = taskStatusUniqueConflict(error);
+    if (conflict) {
+      return { ok: false, status: 409, error: conflict };
+    }
+    throw error;
+  }
 }
 
 async function updateTaskStatus(
@@ -216,6 +248,9 @@ async function archiveTaskStatus(
     if (!before) return { ok: false, status: 404, error: "task_status_not_found" };
     if (before.isSystem) {
       return { ok: false, status: 409, error: "system_task_status_required" };
+    }
+    if (before.status === "archived") {
+      return { ok: true, taskStatus: before };
     }
 
     const taskStatus = await transactionDataSource.archiveTaskStatus(
