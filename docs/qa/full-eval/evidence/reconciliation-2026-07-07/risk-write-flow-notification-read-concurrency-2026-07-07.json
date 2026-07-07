@@ -1,0 +1,33 @@
+{
+  "generatedAt": "2026-07-07T20:28:18+07:00",
+  "id": "RISK-WRITE-FLOW-NOTIFICATION-READ-CONCURRENCY",
+  "status": "fixed-by-current-branch",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "scope": "POST /api/workspace/notifications/:notificationId/read concurrent duplicate reads",
+  "spec": {
+    "expected": [
+      "Two concurrent read requests for the same unread notification both return 200.",
+      "Both responses expose the same non-null readAt timestamp; the losing request returns the already-read row instead of overwriting readAt.",
+      "Unread summary becomes zero and readback status=read contains one notification row."
+    ],
+    "nonGoals": [
+      "No production behavior change was needed; existing repository idempotency was verified with fresh concurrent DB evidence."
+    ]
+  },
+  "evidence": {
+    "testAdded": "apps/api/src/collaborationRoutes.db.test.ts: keeps notification read timestamps stable on concurrent read requests",
+    "command": "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \\\"concurrent read\\\"\"",
+    "result": "1 test passed, 12 skipped in apps/api/src/collaborationRoutes.db.test.ts",
+    "readback": "Test asserts status=read returns exactly one target notification with the same readAt.",
+    "warning": "Existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts remains unrelated."
+  },
+  "fix": {
+    "files": [
+      "apps/api/src/collaborationRoutes.db.test.ts"
+    ],
+    "behavior": "Coverage-only slice. Production code already updates only unread rows and returns the existing row for duplicate reads."
+  },
+  "remainingRisk": "Other write-flow duplicate/race/idempotency slices remain open: communication channel rename, auth reset confirm/email delivery, CRM conflicts, access-role name DB uniqueness, and remaining write flows."
+}

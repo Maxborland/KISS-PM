@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 24,
+    "fixedByCurrentBranchItems": 25,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 1,
     "notABugOrSupersededOldBugIds": 4,
@@ -529,7 +529,23 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for admin user/access-role duplicate conflicts. Access role name race still needs a DB unique index on (tenant_id, name) before it can be fully closed under concurrency."
-    },    {
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-NOTIFICATION-READ-CONCURRENCY",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "POST /api/workspace/notifications/:notificationId/read, GET /api/workspace/unread-summary, GET /api/workspace/notifications?status=read",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-notification-read-concurrency-2026-07-07.json: concurrent duplicate notification read requests both return 200, preserve one readAt timestamp, clear unread summary, and read back one read notification.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \\\"concurrent read\\\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for notification read duplicate/concurrent requests. No production code change was needed because repository read marking was already idempotent under concurrent API calls."
+    },
+    {
       "id": "CURRENT-SHELL-13-AGENT-PRODUCTION-CHROME",
       "source": "current branch targeted web test and typecheck",
       "surface": "/agent production history/nav/message timestamps",
@@ -619,10 +635,11 @@
       "requiredEvidence": "Every write-flow checked for single submit, double submit, concurrent duplicate API calls, stale version/conflict, refresh/readback, and permission-denied role.",
       "partialEvidence": [
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-idempotency-coverage-2026-07-07.json: planning baseline.capture and task.update_schedule concurrent idempotency coverage added.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-admin-duplicate-conflicts-2026-07-07.json: admin user create/update duplicate email conflicts and access-role duplicate id conflicts now have targeted concurrent coverage."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-admin-duplicate-conflicts-2026-07-07.json: admin user create/update duplicate email conflicts and access-role duplicate id conflicts now have targeted concurrent coverage.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-notification-read-concurrency-2026-07-07.json: notification read duplicate/concurrent requests preserve a single readAt and read back one read notification."
       ],
-      "remainingEvidence": "Communication channel rename races, auth reset concurrent confirm/email-provider happy path, CRM/contact remaining races, notification read concurrency, access-role name DB uniqueness, and remaining write flows still need duplicate/race/idempotency evidence."
+      "remainingEvidence": "Communication channel rename races, auth reset concurrent confirm/email-provider happy path, CRM/contact remaining races, access-role name DB uniqueness, and remaining write flows still need duplicate/race/idempotency evidence."
     }
   ],
-  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, media provider checks, auth email reset happy path, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, and media participant cleanup."
+  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, media provider checks, auth email reset happy path, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, and media participant cleanup."
 }
