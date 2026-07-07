@@ -1,4 +1,4 @@
-﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabase,
@@ -431,6 +431,107 @@ describe("Phase 3.1 CRM API", () => {
     await expect(dupName.json()).resolves.toEqual({ error: "product_name_taken" });
   });
 
+  it("returns 409 when creating or updating clients with a duplicate name", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const first = await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-name-a", name: "Клиент дубль" })
+    });
+    const duplicateCreate = await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-name-b", name: "Клиент дубль" })
+    });
+    const second = await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-name-c", name: "Клиент уникальный" })
+    });
+    const duplicateUpdate = await app.request("/api/workspace/clients/client-name-c", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ name: "Клиент дубль", status: "active" })
+    });
+
+    expect(first.status).toBe(201);
+    expect(duplicateCreate.status).toBe(409);
+    await expect(duplicateCreate.json()).resolves.toEqual({ error: "client_name_taken" });
+    expect(second.status).toBe(201);
+    expect(duplicateUpdate.status).toBe(409);
+    await expect(duplicateUpdate.json()).resolves.toEqual({ error: "client_name_taken" });
+  });
+
+  it("returns 409 when updating a product to a duplicate SKU or name", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const first = await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-update-a",
+        name: "Продукт А",
+        sku: "SKU-A",
+        type: "service",
+        unit: "час",
+        price: 1000
+      })
+    });
+    const second = await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-update-b",
+        name: "Продукт Б",
+        sku: "SKU-B",
+        type: "service",
+        unit: "час",
+        price: 2000
+      })
+    });
+    const duplicateSku = await app.request("/api/workspace/products/product-update-b", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        name: "Продукт Б обновленный",
+        sku: "SKU-A",
+        type: "service",
+        unit: "час",
+        price: 2500,
+        status: "active"
+      })
+    });
+    const duplicateName = await app.request("/api/workspace/products/product-update-b", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        name: "Продукт А",
+        sku: "SKU-B-UPDATED",
+        type: "service",
+        unit: "час",
+        price: 2500,
+        status: "active"
+      })
+    });
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(duplicateSku.status).toBe(409);
+    await expect(duplicateSku.json()).resolves.toEqual({ error: "product_sku_taken" });
+    expect(duplicateName.status).toBe(409);
+    await expect(duplicateName.json()).resolves.toEqual({ error: "product_name_taken" });
+  });
   it("updates CRM foundation entities with tenant-scoped audit trail", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {

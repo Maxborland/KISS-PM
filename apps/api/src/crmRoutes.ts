@@ -389,25 +389,32 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseProductBody({ ...body.value, id: productId }, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const product = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateProduct) {
-        throw new Error("transactional_product_update_not_configured");
-      }
-      const updated = await transactionDataSource.updateProduct(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "product.updated",
-          sourceEntity: { type: "Product", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
-    });
+    let product;
+    try {
+      product = await runDataSourceTransaction(async (transactionDataSource) => {
+        if (!transactionDataSource.updateProduct) {
+          throw new Error("transactional_product_update_not_configured");
+        }
+        const updated = await transactionDataSource.updateProduct(parsed.value);
+        await appendManagementAuditEvent(
+          auditInput({
+            actor,
+            actionType: "product.updated",
+            sourceEntity: { type: "Product", id: updated.id },
+            commandInput: parsed.value,
+            beforeState,
+            afterState: updated,
+            permissionResult: decision
+          }),
+          transactionDataSource
+        );
+        return updated;
+      });
+    } catch (error) {
+      const conflict = crmUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     return context.json({ product });
   });

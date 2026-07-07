@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-07-07T20:34:24+07:00",
+  "id": "RISK-WRITE-FLOW-CRM-CONFLICT-MAPPING",
+  "status": "fixed-by-current-branch",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "scope": "CRM duplicate conflict mapping for clients and product updates",
+  "red": {
+    "command": "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts -t \\\"duplicate\\\"\"",
+    "result": "failed as expected before fix: 2 failed, 2 passed, 6 skipped",
+    "failures": [
+      "POST /api/workspace/clients duplicate name returned 500 instead of 409 client_name_taken.",
+      "PATCH /api/workspace/products/:productId duplicate SKU returned 500 instead of 409 product_sku_taken."
+    ]
+  },
+  "fix": {
+    "files": [
+      "apps/api/src/crm/clientCommandHandlers.ts",
+      "apps/api/src/crmRoutes.ts",
+      "apps/api/src/crmRoutes.db.test.ts"
+    ],
+    "behavior": [
+      "Client create/update maps Postgres clients_tenant_id_name_uidx conflicts to 409 client_name_taken.",
+      "Product update reuses crmUniqueConflict mapping so duplicate SKU/name returns 409 product_sku_taken/product_name_taken instead of internal_error."
+    ]
+  },
+  "green": {
+    "command": "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts -t \\\"duplicate\\\"\"",
+    "result": "1 file passed; 4 tests passed, 6 skipped",
+    "warning": "Existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts remains unrelated."
+  },
+  "remainingRisk": "CRM contact/opportunity true concurrent duplicate API evidence remains separate; this slice closes client duplicate-name mapping and product update duplicate conflict mapping."
+}
