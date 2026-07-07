@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 30,
+    "fixedByCurrentBranchItems": 31,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 1,
     "notABugOrSupersededOldBugIds": 4,
@@ -675,6 +675,23 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for CRM contact email and opportunity duplicate-id writes only; remaining CRM write actions and non-CRM writes still require their own duplicate/race/idempotency checks."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-JITSI-CONTRACT-JOIN-RACE",
+      "source": "current branch targeted API DB tests, video provider unit tests, and OpenAPI schema alignment",
+      "surface": "POST /api/workspace/call-rooms, POST /api/workspace/call-rooms/:roomId/sessions/start, POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/join-token, call schema primitives",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-contract-join-race-2026-07-07.json: Jitsi room create/readback/start/join URL-only contract is covered; late session-end race returns 409 without calling videoProvider.issueJoinToken; API docs provider/status/event enums align with runtime values.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+      ],
+      "tests": [
+        "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/videoProvider.test.ts\"",
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\\\.bin\\\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \\\"Jitsi|session ends\\\"\"",
+        "corepack pnpm --filter @kiss-pm/api typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-MEDIA-LIVEKIT-JITSI-CALL for API provider contracts and a join-token race only; live browser/provider traversal remains open."
     }
   ],
   "confirmedOpen": [],
@@ -723,9 +740,10 @@
       "evidence": "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:68 says video provider was disabled and real media plan was not tested.",
       "requiredEvidence": "Provider config, prejoin, join, permissions, media failure/degraded UI, leave/rejoin, participant state.",
       "partialEvidence": [
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-participant-left-on-cleanup-2026-07-07.json: participantState left on cleanup/unmount fixed and tested without real provider."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-participant-left-on-cleanup-2026-07-07.json: participantState left on cleanup/unmount fixed and tested without real provider.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-contract-join-race-2026-07-07.json: Jitsi API create/readback/start/join URL-only contract covered, schema enums aligned with runtime, and late session-end join-token race no longer calls provider issuance."
       ],
-      "remainingEvidence": "Live provider browser traversal still required: provider config, prejoin, permissions, join, media denied, leave/rejoin, remote participant, reconnect."
+      "remainingEvidence": "Live provider browser traversal still required: provider config, prejoin, permissions, join, media denied, leave/rejoin, remote participant, reconnect, and real LiveKit/Jitsi infrastructure behavior."
     },
     {
       "id": "RISK-FULL-BROWSER-TRAVERSAL",
@@ -751,5 +769,5 @@
       "remainingEvidence": "Remaining write flows outside the covered planning/admin/notification/CRM/auth/access-role/comms slices still need duplicate/race/idempotency evidence."
     }
   ],
-  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, media provider checks, live external auth email delivery, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, CRM contact/opportunity concurrency, auth reset route concurrency/happy path, access-role name uniqueness, communication channel rename version conflicts/idempotent retry, and media participant cleanup."
+  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, live media provider browser checks, live external auth email delivery, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, CRM contact/opportunity concurrency, auth reset route concurrency/happy path, access-role name uniqueness, communication channel rename version conflicts/idempotent retry, media participant cleanup, and Jitsi/API join-token contract behavior."
 }

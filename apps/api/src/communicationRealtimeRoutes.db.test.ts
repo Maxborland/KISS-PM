@@ -23,7 +23,7 @@ import {
   seedCommunicationRealtimeScenario,
   truncateCommunicationRealtimeState
 } from "./communicationRealtimeTestFixture";
-import type { VideoProvider } from "./videoProvider";
+import { createVideoProvider, type VideoProvider } from "./videoProvider";
 
 async function appendRecordingTestAuditEvent(
   input: ManagementAuditEventInput,
@@ -250,6 +250,68 @@ describe("communications realtime API", () => {
     });
   });
 
+  it("creates Jitsi rooms and issues URL-only join contracts with readback", async () => {
+    const jitsiApp = createCommunicationRealtimeTestApp(
+      client,
+      createVideoProvider({ kind: "jitsi", baseUrl: "https://meet.kiss.local/" })
+    );
+    const adminCookie = await loginCommunicationRealtimeUser(jitsiApp, "admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginCommunicationRealtimeUser(jitsiApp, "reader@kiss-pm.local", "reader12345");
+
+    const roomResponse = await jitsiApp.request("/api/workspace/call-rooms", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        entityType: "project",
+        entityId: "project-alpha",
+        title: "Jitsi проектный звонок",
+        mediaKind: "video",
+        provider: "jitsi",
+        providerRoomId: "jitsi-project-alpha"
+      })
+    });
+    expect(roomResponse.status).toBe(201);
+    const room = await roomResponse.json() as {
+      callRoom: { provider: string; roomId: string; status: string };
+    };
+    expect(room.callRoom).toMatchObject({ provider: "jitsi", status: "open" });
+
+    const started = await jitsiApp.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/start`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie)
+    });
+    expect(started.status).toBe(201);
+    const sessionBody = await started.json() as {
+      callRoom: { provider: string; status: string };
+      session: { id: string };
+    };
+    expect(sessionBody.callRoom).toMatchObject({ provider: "jitsi", status: "active" });
+
+    const detail = await jitsiApp.request(`/api/workspace/call-rooms/${room.callRoom.roomId}`, {
+      headers: jsonHeaders(readerCookie)
+    });
+    expect(detail.status).toBe(200);
+    await expect(detail.json()).resolves.toMatchObject({
+      callRoom: { provider: "jitsi", status: "active" },
+      activeSession: { id: sessionBody.session.id, status: "active" }
+    });
+
+    const join = await jitsiApp.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${sessionBody.session.id}/join-token`,
+      { method: "POST", headers: jsonHeaders(readerCookie) }
+    );
+    expect(join.status).toBe(200);
+    await expect(join.json()).resolves.toMatchObject({
+      join: {
+        provider: "jitsi",
+        joinUrl: "https://meet.kiss.local/jitsi-project-alpha",
+        token: null,
+        expiresAt: null
+      },
+      event: { eventType: "join_token_issued" }
+    });
+  });
+
   it("rejects join tokens when the session ends after the route pre-check", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
@@ -264,7 +326,7 @@ describe("communications realtime API", () => {
 
     expect(join.status).toBe(409);
     await expect(join.json()).resolves.toEqual({ error: "call_session_not_active" });
-    expect(race.joinTokenCalls()).toBe(1);
+    expect(race.joinTokenCalls()).toBe(0);
 
     const events = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/events`, {
       headers: { cookie: adminCookie }

@@ -239,13 +239,6 @@ export function createCommunicationCallWorkspace(deps: CommunicationCallWorkspac
       ) {
         return notConfigured();
       }
-      const join = await deps.videoProvider.issueJoinToken({
-        providerRoomId: input.room.providerRoomId,
-        roomId: input.room.id,
-        tenantId: input.actor.tenantId,
-        userId: input.actor.id,
-        userName: input.actor.name
-      });
       const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
         const activeSession = await requireMethod(transactionDataSource.findActiveCallSessionForUpdate).call(
           transactionDataSource,
@@ -256,6 +249,13 @@ export function createCommunicationCallWorkspace(deps: CommunicationCallWorkspac
           }
         );
         if (!activeSession) return new CallWorkspaceError(409, "call_session_not_active");
+        const join = await deps.videoProvider.issueJoinToken({
+          providerRoomId: input.room.providerRoomId,
+          roomId: input.room.id,
+          tenantId: input.actor.tenantId,
+          userId: input.actor.id,
+          userName: input.actor.name
+        });
         const event = await requireMethod(transactionDataSource.createCallEvent).call(transactionDataSource, {
           id: `call-event-${randomUUID()}`,
           tenantId: input.actor.tenantId,
@@ -276,10 +276,10 @@ export function createCommunicationCallWorkspace(deps: CommunicationCallWorkspac
           }),
           transactionDataSource
         );
-        return { event };
+        return { event, join };
       });
       if (result instanceof CallWorkspaceError) return result.toResult();
-      return { ok: true, event: result.event, join };
+      return { ok: true, event: result.event, join: result.join };
     },
 
     async updateParticipantState(input: {

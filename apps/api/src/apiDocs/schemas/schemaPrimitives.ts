@@ -95,13 +95,13 @@ export const communicationChannelTypeSchema = {
 };
 export const communicationChannelRoleSchema = { type: "string", enum: ["owner", "moderator", "member"] };
 export const stickerPackSourceSchema = { type: "string", enum: ["manual", "telegram"] };
-export const callRoomProviderSchema = { type: "string", enum: ["internal", "livekit", "jitsi", "external"] };
+export const callRoomProviderSchema = { type: "string", enum: ["manual", "jitsi", "livekit"] };
 export const callMediaKindSchema = { type: "string", enum: ["audio", "video"] };
-export const callRoomStatusSchema = { type: "string", enum: ["scheduled", "active", "ended", "cancelled"] };
+export const callRoomStatusSchema = { type: "string", enum: ["scheduled", "open", "active", "ended", "cancelled"] };
 export const callSessionStatusSchema = { type: "string", enum: ["active", "ended", "failed"] };
 export const callParticipantStateSchema = {
   type: "string",
-  enum: ["invited", "joining", "joined", "muted", "screen_sharing", "left", "declined"]
+  enum: ["invited", "joining", "joined", "left", "removed"]
 };
 export const callEventTypeSchema = {
   type: "string",
@@ -109,9 +109,16 @@ export const callEventTypeSchema = {
     "room_created",
     "session_started",
     "join_token_issued",
-    "participant_state_updated",
+    "participant_invited",
+    "participant_joining",
+    "participant_joined",
+    "participant_left",
     "session_ended",
-    "recording_attached"
+    "recording_attached",
+    "recording_started",
+    "recording_track_completed",
+    "recording_completed",
+    "recording_failed"
   ]
 };
 export const backgroundJobKindSchema = {
