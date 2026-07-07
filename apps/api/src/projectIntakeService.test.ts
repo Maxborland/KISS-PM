@@ -7,7 +7,8 @@ import type {
   ApiTenantDataSource,
   ManagementAuditEventInput,
   OpportunityInput,
-  OpportunityRecord
+  OpportunityRecord,
+  ProjectRecord
 } from "./apiTypes";
 import type { TenantUser } from "@kiss-pm/domain";
 
@@ -48,6 +49,154 @@ describe("project intake application service", () => {
     expect(
       isSingleUseActivationError(new Error("source_opportunity_not_draftable"))
     ).toBe(true);
+  });
+
+  it("keeps opportunity activation single-use when a duplicate submit repeats the write flow", async () => {
+    const audits: ManagementAuditEventInput[] = [];
+    const projects: ProjectRecord[] = [];
+    let opportunityStatus: OpportunityRecord["status"] = "ready_to_activate";
+    let createDraftCalls = 0;
+    let activateDraftCalls = 0;
+    const existingOpportunity = (): OpportunityRecord => ({
+      ...opportunityInput,
+      ownerUserId: opportunityInput.ownerUserId ?? null,
+      pipelineId: null,
+      customFieldValues: {},
+      status: opportunityStatus,
+      feasibilityStatus: "ok",
+      feasibilityResult: { rows: [] },
+      feasibilityCheckedAt: new Date("2026-05-19T00:00:00.000Z"),
+      createdAt: new Date("2026-05-18T00:00:00.000Z"),
+      updatedAt: new Date("2026-05-19T00:00:00.000Z")
+    });
+
+    const dataSource = ensureCompleteDataSource({
+      async findOpportunityById() {
+        return existingOpportunity();
+      },
+      async listPositions() {
+        return [
+          {
+            id: "position-analyst",
+            tenantId: "tenant-alpha",
+            name: "Аналитик",
+            description: null,
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-05-01T00:00:00.000Z")
+          }
+        ];
+      },
+      async listWorkspaceUsers() {
+        return [
+          {
+            id: "user-analyst",
+            tenantId: "tenant-alpha",
+            email: "analyst@example.test",
+            name: "Алексей Аналитик",
+            accessProfileId: "tenant-admin",
+            positionId: "position-analyst",
+            positionName: "Аналитик",
+            phone: null,
+            telegram: null,
+            status: "active",
+            theme: "system",
+            accentColor: "#2563eb",
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-05-01T00:00:00.000Z")
+          }
+        ];
+      },
+      async listProjects() {
+        return projects;
+      },
+      async lockTenantResourcePlanning() {
+        return undefined;
+      },
+      async createProjectDraftFromOpportunity(input) {
+        createDraftCalls += 1;
+        const project: ProjectRecord = {
+          ...input,
+          sourceType: "opportunity",
+          sourceOpportunityId: input.sourceOpportunityId,
+          createdAt: new Date("2026-05-19T00:00:00.000Z"),
+          activatedAt: null,
+          closedAt: null
+        };
+        projects.push(project);
+        return project;
+      },
+      async activateProjectDraft(input) {
+        activateDraftCalls += 1;
+        const project = projects.find((item) => item.id === input.projectId);
+        if (!project || project.status !== "draft") {
+          throw new Error("project_draft_not_activatable");
+        }
+        opportunityStatus = "won_closed";
+        const activatedProject: ProjectRecord = {
+          ...project,
+          status: "active",
+          activatedAt: new Date("2026-05-19T00:00:00.000Z")
+        };
+        projects.splice(projects.indexOf(project), 1, activatedProject);
+        return activatedProject;
+      },
+      async withTransaction(operation) {
+        return operation(dataSource as ApiTenantDataSource);
+      },
+      async appendAuditEvent() {
+        throw new Error("service test uses appendManagementAuditEvent dependency");
+      }
+    });
+    const service = createProjectIntakeService({
+      dataSource,
+      getActorProfile: async () => tenantAdminProfile,
+      runDataSourceTransaction: (operation) => dataSource.withTransaction!(operation),
+      appendManagementAuditEvent: async (input) => {
+        audits.push(input);
+        return `audit-test-${audits.length}`;
+      }
+    });
+
+    const first = await service.activateProjectFromOpportunity({
+      actor,
+      opportunityId: opportunityInput.id,
+      activation: { id: "project-from-opportunity" }
+    });
+    const duplicate = await service.activateProjectFromOpportunity({
+      actor,
+      opportunityId: opportunityInput.id,
+      activation: { id: "project-from-opportunity-duplicate" }
+    });
+
+    expect(first).toMatchObject({
+      ok: true,
+      status: 201,
+      project: {
+        id: "project-from-opportunity",
+        status: "active",
+        sourceOpportunityId: opportunityInput.id
+      }
+    });
+    expect(duplicate).toEqual({
+      ok: false,
+      status: 409,
+      error: "opportunity_not_activatable"
+    });
+    expect(projects).toHaveLength(1);
+    expect(projects[0]).toMatchObject({
+      id: "project-from-opportunity",
+      status: "active"
+    });
+    expect(createDraftCalls).toBe(1);
+    expect(activateDraftCalls).toBe(1);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      actionType: "project.activated",
+      commandInput: {
+        opportunityId: opportunityInput.id,
+        projectId: "project-from-opportunity"
+      }
+    });
   });
 
   it("creates opportunities with linked snapshot labels and management audit inside a transaction", async () => {

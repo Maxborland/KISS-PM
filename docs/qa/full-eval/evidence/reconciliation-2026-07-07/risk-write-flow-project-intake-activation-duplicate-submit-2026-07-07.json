@@ -1,0 +1,21 @@
+{
+    "id":  "CURRENT-RISK-WRITE-FLOW-PROJECT-INTAKE-ACTIVATION-DUPLICATE-SUBMIT",
+    "date":  "2026-07-07",
+    "status":  "partial-pass",
+    "riskZones":  [
+                      "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+                  ],
+    "scope":  "Project intake activation duplicate submit/single-use write-flow evidence.",
+    "evidence":  "apps/api/src/projectIntakeService.test.ts proves first activation creates exactly one active project and audit event; duplicate activation for same opportunity returns 409 opportunity_not_activatable without creating draft/project/audit duplicates.",
+    "commands":  [
+                     "node_modules/.bin/vitest.CMD run apps/api/src/projectIntakeService.test.ts",
+                     "node_modules/.bin/tsc.CMD -b --pretty false"
+                 ],
+    "result":  {
+                   "vitest":  "passed: 9 tests",
+                   "tsc":  "passed"
+               },
+    "remaining":  [
+                      "Other project intake/API/browser activation double-submit paths still require their own route-level/browser evidence if full write-flow exhaustiveness is required."
+                  ]
+}

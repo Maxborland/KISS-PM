@@ -46,4 +46,34 @@ describe("agent-client.proposeStream", () => {
     const client = createAgentClient({ apiOrigin: "", fetchImpl: fetchImpl as unknown as typeof fetch });
     await expect(client.proposeStream("g", () => {})).rejects.toMatchObject({ code: "token_budget_exceeded" });
   });
+
+  it("парсит CRLF SSE-кадры от прокси", async () => {
+    const done = { goal: "g", model: "m", reasoning: "Готово.", analyzeResults: [], proposedActions: [], iterations: 1 };
+    const fetchImpl = vi.fn().mockResolvedValue(
+      sseResponse([
+        'event: reasoning\r\ndata: {"type":"reasoning","text":"CRLF ок"}\r\n\r\n',
+        `event: done\r\ndata: ${JSON.stringify(done)}\r\n\r\n`
+      ])
+    );
+    const client = createAgentClient({ apiOrigin: "", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const events: AgentStreamEvent[] = [];
+    const result = await client.proposeStream("g", (e) => events.push(e));
+
+    expect(events).toEqual([{ type: "reasoning", text: "CRLF ок" }]);
+    expect(result).toMatchObject({ goal: "g", reasoning: "Готово.", iterations: 1 });
+  });
+
+  it("кидает stream_incomplete, если поток закрылся без done", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      sseResponse(['event: reasoning\ndata: {"type":"reasoning","text":"Начал."}\n\n'])
+    );
+    const client = createAgentClient({ apiOrigin: "", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    await expect(client.proposeStream("g", () => {})).rejects.toMatchObject({
+      status: 500,
+      code: "stream_incomplete",
+      body: { error: "stream_incomplete" }
+    });
+  });
 });

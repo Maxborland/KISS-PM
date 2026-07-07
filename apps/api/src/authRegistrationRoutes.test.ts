@@ -331,6 +331,14 @@ describe("POST /api/auth/password-reset/request", () => {
     expect(confirm.status).toBe(200);
     await expect(confirm.json()).resolves.toEqual({ status: "ok" });
 
+    const oldPasswordLogin = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({ email: "owner@example.com", password: "oldpassword" })
+    });
+    expect(oldPasswordLogin.status).toBe(401);
+    await expect(oldPasswordLogin.json()).resolves.toEqual({ error: "invalid_credentials" });
+
     const login = await app.request("/api/auth/login", {
       method: "POST",
       headers: sameOriginHeaders,

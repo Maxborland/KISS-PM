@@ -1,0 +1,85 @@
+{
+    "id":  "CURRENT-RISK-FULL-BROWSER-CORE-TRAVERSAL",
+    "date":  "2026-07-07",
+    "status":  "partial-pass",
+    "riskZones":  [
+                      "RISK-FULL-BROWSER-TRAVERSAL"
+                  ],
+    "scope":  "Core browser traversal for admin and limited profile-read user across login, shell navigation, CRM routes, admin users, CRM deal stage write/readback/reload, and API permission denial checks.",
+    "environment":  {
+                        "databaseUrl":  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm",
+                        "apiPort":  4102,
+                        "webPort":  3102,
+                        "setup":  [
+                                      "node packages/persistence/scripts/migrate.mjs -\u003e No pending migrations",
+                                      "node_modules/.bin/tsx.cmd scripts/seed-dev.ts -\u003e Seeded dev tenants, users, org structure, CRM, projects and communications data",
+                                      "manual API restart to clear in-memory auth rate limiter",
+                                      "direct POST /api/auth/login admin@kiss-pm.local/admin12345 -\u003e 200 before browser run"
+                                  ]
+                    },
+    "commands":  [
+                     "cmd /c playwright test --config playwright.config.ts e2e/smoke/deals-kanban.spec.ts e2e/smoke/single-workspace-auth-rbac.spec.ts --no-deps with DATABASE_URL=55433 E2E_API_PORT=4102 E2E_WEB_PORT=3102"
+                 ],
+    "result":  {
+                   "passed":  2,
+                   "failed":  0,
+                   "duration":  "6.8s",
+                   "tests":  [
+                                 "e2e/smoke/deals-kanban.spec.ts: deals stage move persists after reload",
+                                 "e2e/smoke/single-workspace-auth-rbac.spec.ts: single-workspace auth and RBAC scaffold works from the browser"
+                             ]
+               },
+    "covered":  [
+                    {
+                        "role":  "admin",
+                        "surfaces":  [
+                                         "/login",
+                                         "/dashboard",
+                                         "/crm/deals",
+                                         "/crm/clients",
+                                         "/crm/contacts",
+                                         "/crm/products",
+                                         "/admin/users"
+                                     ],
+                        "scenarios":  [
+                                          "login success",
+                                          "sidebar route hrefs",
+                                          "CRM route headings",
+                                          "admin users route surface",
+                                          "create limited access profile/user via API",
+                                          "CRM opportunity create via API",
+                                          "deal stage update through UI select",
+                                          "API readback",
+                                          "reload persistence",
+                                          "kanban readback"
+                                      ]
+                    },
+                    {
+                        "role":  "limited profile.read user",
+                        "surfaces":  [
+                                         "/dashboard",
+                                         "/crm/deals",
+                                         "/admin/users",
+                                         "workspace API read endpoints"
+                                     ],
+                        "scenarios":  [
+                                          "login success",
+                                          "restricted nav hides admin/deals links",
+                                          "direct forbidden routes show restricted/dashboard fallback",
+                                          "opportunities/clients/contacts/products/audit-events API return 403"
+                                      ]
+                    }
+                ],
+    "notCovered":  [
+                       "Full role x route x action traversal",
+                       "all UI buttons/modals/tables/filters",
+                       "mobile/responsive traversal",
+                       "LiveKit/Jitsi real media join",
+                       "real LLM provider browser SSE",
+                       "live email mailbox extraction"
+                   ],
+    "notes":  [
+                  "This evidence intentionally narrows RISK-FULL-BROWSER-TRAVERSAL; it does not close the full risk zone.",
+                  "Initial attempts exposed stale e2e seed/rate-limit state; final run used freshly seeded DB and restarted API process."
+              ]
+}

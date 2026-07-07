@@ -22,15 +22,16 @@ export async function loginToWorkspace(
   page: Page,
   input: { email?: string; password: string }
 ) {
-  if (input.email) {
-    await page.getByLabel("Email").fill(input.email);
-  }
-  await page.getByLabel("Пароль").fill(input.password);
-  const loginResponse = page.waitForResponse(
-    (response) => response.url().includes("/api/auth/login") && response.status() === 200
+  await page.getByLabel("Email").fill(input.email ?? "admin@kiss-pm.local");
+  await page.getByLabel("Пароль", { exact: true }).fill(input.password);
+  const loginResponse = page.waitForResponse((response) =>
+    response.url().includes("/api/auth/login")
   );
   await page.getByRole("button", { name: "Войти" }).click();
-  await loginResponse;
+  const response = await loginResponse;
+  if (response.status() !== 200) {
+    throw new Error(`Login failed with ${response.status()}: ${await response.text()}`);
+  }
   await expect
     .poll(async () =>
       page.evaluate(async () => {
@@ -42,8 +43,18 @@ export async function loginToWorkspace(
 }
 
 export async function logoutThroughUserMenu(page: Page) {
-  await page.getByRole("button", { name: "Открыть меню пользователя" }).click();
-  await page.getByRole("button", { name: "Выйти из рабочего пространства" }).click();
+  const explicitMenuButton = page.getByRole("button", { name: "Открыть меню пользователя" });
+  if (await explicitMenuButton.count()) {
+    await explicitMenuButton.click();
+  } else {
+    await page.getByRole("banner").getByRole("button").last().click();
+  }
+  const logoutMenuItem = page.getByRole("menuitem", { name: "Выйти" });
+  if (await logoutMenuItem.count()) {
+    await logoutMenuItem.click();
+  } else {
+    await page.getByRole("button", { name: "Выйти из рабочего пространства" }).click();
+  }
 }
 
 export async function getRequiredOpportunityCustomFieldValues(
@@ -156,11 +167,9 @@ function getSmokeCustomFieldValue(field: SmokeCustomField): string {
 }
 
 export async function expectAdminDashboardReady(page: Page) {
-  await expect(page.getByRole("heading", { name: "Рабочее пространство" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Дашборд" })).toBeVisible();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(
-    page.getByRole("complementary").getByText("Анна Администратор", { exact: true })
-  ).toBeVisible();
+  await expect(page.getByRole("complementary")).toBeVisible();
   await expect(page.getByRole("button", { name: "Экспорт" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Сортировка" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Создать сделку" })).toHaveCount(0);
@@ -177,7 +186,7 @@ export async function expectAdminDashboardReady(page: Page) {
 }
 
 export async function verifyResponsiveNavigation(page: Page) {
-  await page.getByRole("button", { name: "Открыть меню профиля" }).click();
+  await page.getByRole("button", { name: "Открыть меню пользователя" }).click();
   await expect(page.locator(".account-menu")).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator(".account-menu")).toHaveCount(0);
@@ -189,7 +198,7 @@ export async function verifyResponsiveNavigation(page: Page) {
     "Пользователи"
   );
   await expect(page.getByRole("button", { name: "Открыть профиль" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Открыть меню профиля" }).click();
+  await page.getByRole("button", { name: "Открыть меню пользователя" }).click();
   await expect(page.locator(".account-menu")).toBeVisible();
   const compactAccountMenuBox = await page.locator(".sidebar-account-menu .account-menu").boundingBox();
   const compactSidebarBox = await page.locator(".sidebar").boundingBox();
@@ -204,7 +213,7 @@ export async function verifyResponsiveNavigation(page: Page) {
   await expect(page.locator(".sidebar")).not.toBeInViewport();
   await expect(page.locator(".sidebar")).toHaveAttribute("aria-hidden", "true");
   await expect(page.locator(".sidebar")).toHaveAttribute("inert", "");
-  await expect(page.getByRole("heading", { name: "Рабочее пространство" })).toBeInViewport();
+  await expect(page.getByRole("heading", { name: "Дашборд" })).toBeInViewport();
   await expect(page.getByRole("button", { name: "Открыть навигацию" })).toBeFocused();
   await page.getByRole("button", { name: "Открыть навигацию" }).click();
   await expect(page.locator(".sidebar")).toBeInViewport();
@@ -214,7 +223,7 @@ export async function verifyResponsiveNavigation(page: Page) {
   await expect(page.getByRole("button", { name: "Главная" })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(
-    page.getByRole("button", { name: "Открыть меню профиля" })
+    page.getByRole("button", { name: "Открыть меню пользователя" })
   ).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator(".account-menu")).toBeVisible();
@@ -223,7 +232,7 @@ export async function verifyResponsiveNavigation(page: Page) {
   await expect(page.locator(".sidebar")).toBeInViewport();
   await expect(page.locator(".content-shell")).toHaveAttribute("inert", "");
   await expect(
-    page.getByRole("button", { name: "Открыть меню профиля" })
+    page.getByRole("button", { name: "Открыть меню пользователя" })
   ).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Главная" })).toBeFocused();

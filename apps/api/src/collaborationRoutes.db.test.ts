@@ -11,6 +11,7 @@ import {
 
 import { createApp } from "./app";
 import type { ApiTenantDataSource } from "./apiTypes";
+import { createVideoProvider } from "./videoProvider";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
@@ -1035,6 +1036,72 @@ describe("collaboration and communications API", () => {
     });
     expect(unsafeLink.status).toBe(400);
     await expect(unsafeLink.json()).resolves.toEqual({ error: "external_url_private_host" });
+  });
+
+  it("fails closed for media join tokens when the video provider is disabled", async () => {
+    const disabledVideoApp = createApp({
+      dataSource: createPostgresTenantDataSource(createDatabase(client)),
+      videoProvider: createVideoProvider({ kind: "disabled" })
+    });
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+
+    const roomResponse = await disabledVideoApp.request("/api/workspace/call-rooms", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        entityType: "project",
+        entityId: "project-alpha",
+        title: "Звонок без провайдера",
+        mediaKind: "video",
+        provider: "livekit",
+        providerRoomId: "disabled-provider-room"
+      })
+    });
+    expect(roomResponse.status).toBe(201);
+    const roomPayload = await roomResponse.json() as {
+      callRoom: { roomId: string; provider: string };
+    };
+    expect(roomPayload.callRoom.provider).toBe("livekit");
+
+    const startResponse = await disabledVideoApp.request(
+      `/api/workspace/call-rooms/${roomPayload.callRoom.roomId}/sessions/start`,
+      { method: "POST", headers: jsonHeaders(adminCookie) }
+    );
+    expect(startResponse.status).toBe(201);
+    const startPayload = await startResponse.json() as { session: { id: string } };
+
+    const joinResponse = await disabledVideoApp.request(
+      `/api/workspace/call-rooms/${roomPayload.callRoom.roomId}/sessions/${startPayload.session.id}/join-token`,
+      { method: "POST", headers: jsonHeaders(executorCookie) }
+    );
+    expect(joinResponse.status).toBe(501);
+    await expect(joinResponse.json()).resolves.toEqual({ error: "video_provider_disabled" });
+
+    const eventsResponse = await disabledVideoApp.request(
+      `/api/workspace/call-rooms/${roomPayload.callRoom.roomId}/events`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(eventsResponse.status).toBe(200);
+    const eventsPayload = await eventsResponse.json() as {
+      events: Array<{ eventType: string }>;
+    };
+    expect(eventsPayload.events).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ eventType: "join_token_issued" })])
+    );
+
+    const auditResponse = await disabledVideoApp.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    expect(auditResponse.status).toBe(200);
+    const auditPayload = await auditResponse.json() as {
+      auditEvents: Array<{ actionType: string }>;
+    };
+    expect(auditPayload.auditEvents).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ actionType: "communications.call_join_token_issued" })
+      ])
+    );
   });
 
   it("supports task and opportunity scoped discussions", async () => {
