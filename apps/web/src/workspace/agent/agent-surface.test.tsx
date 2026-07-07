@@ -132,4 +132,67 @@ describe("AgentSurface production shell contract", () => {
       root.unmount();
     });
   });
+  it("does not execute rejected actions", async () => {
+    agentMock.proposeStream.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        analyzeResults: [],
+        goal: "Проверь проект",
+        iterations: 1,
+        model: "test-model",
+        proposedActions: [
+          {
+            capability: { allowed: true, reason: "allowed" },
+            input: { taskId: "task-1", projectId: "project-1", statusId: "status-review" },
+            title: "Перевести задачу 1",
+            tool: "change_task_status"
+          },
+          {
+            capability: { allowed: true, reason: "allowed" },
+            input: { taskId: "task-2", projectId: "project-1", statusId: "status-review" },
+            title: "Перевести задачу 2",
+            tool: "change_task_status"
+          }
+        ],
+        reasoning: "Подготовил два действия."
+      }
+    });
+    agentMock.execute.mockResolvedValueOnce({
+      ok: true,
+      data: { applied: true, results: [{ ok: true, tool: "change_task_status" }] }
+    });
+    const root = await renderAgent();
+
+    const input = document.querySelector<HTMLInputElement>("input[aria-label='Сообщение Генри Гантту']");
+    expect(input).not.toBeNull();
+    await act(async () => {
+      setInputValue(input!, "Проверь проект");
+    });
+    const form = document.querySelector<HTMLFormElement>(".lad-composer");
+    await act(async () => {
+      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    const rejectButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .filter((button) => button.textContent?.trim() === "Отклонить");
+    expect(rejectButtons).toHaveLength(2);
+    await act(async () => {
+      rejectButtons[0]!.click();
+    });
+    const applyButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("Применить выбранное"));
+    expect(applyButton).toBeDefined();
+    await act(async () => {
+      applyButton!.click();
+    });
+
+    expect(agentMock.execute).toHaveBeenCalledTimes(1);
+    expect(agentMock.execute).toHaveBeenCalledWith([
+      { tool: "change_task_status", input: { taskId: "task-2", projectId: "project-1", statusId: "status-review" } }
+    ]);
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
 });

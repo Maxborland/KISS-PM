@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 31,
+    "fixedByCurrentBranchItems": 32,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 1,
     "notABugOrSupersededOldBugIds": 4,
@@ -692,6 +692,25 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows RISK-MEDIA-LIVEKIT-JITSI-CALL for API provider contracts and a join-token race only; live browser/provider traversal remains open."
+    },
+    {
+      "id": "CURRENT-RISK-AGENT-LLM-SSE-CONFIGURED-PROVIDER",
+      "source": "current branch targeted API/web tests and provider env check",
+      "surface": "GET/POST /api/workspace/agent provider/propose/stream behavior, OpenRouter adapter, agent loop events, web SSE parser, AgentSurface apply/reject UX",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-llm-sse-configured-provider-2026-07-07.json: degraded no-provider behavior, OpenRouter adapter mapping, agent loop/SSE events, web stream parsing, and rejected-action filtering are covered by targeted tests; live provider keys are absent.",
+      "linkedOldIds": [
+        "BUG-SHELL-12"
+      ],
+      "linkedRiskZones": [
+        "RISK-AGENT-REAL-LLM-SSE"
+      ],
+      "tests": [
+        "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/agent/agentProviderDegraded.test.ts apps/api/src/agent/openRouterProvider.test.ts apps/api/src/agent/agentLoop.test.ts\"",
+        "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/web/src/workspace/agent/agent-stream.test.ts apps/web/src/workspace/agent/agent-surface.test.tsx\"",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-AGENT-REAL-LLM-SSE for degraded/provider-adapter/local SSE/parser/apply UX only; real provider network smoke remains blocked by absent keys."
     }
   ],
   "confirmedOpen": [],
@@ -732,7 +751,11 @@
       "id": "RISK-AGENT-REAL-LLM-SSE",
       "status": "unverified",
       "evidence": "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:67 says real agent proposals and live SSE were not checked.",
-      "requiredEvidence": "Configured provider or explicit degraded state, streamed reasoning/proposal, apply/reject UX, no silent mock success."
+      "requiredEvidence": "Configured provider or explicit degraded state, streamed reasoning/proposal, apply/reject UX, no silent mock success.",
+      "partialEvidence": [
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-llm-sse-configured-provider-2026-07-07.json: no-provider degraded behavior, OpenRouter adapter translation, loop/SSE events, web stream parser, and apply/reject filtering covered by targeted tests."
+      ],
+      "remainingEvidence": "Live OpenRouter/Anthropic provider smoke and live browser SSE traversal remain unverified because OPENROUTER_API_KEY and ANTHROPIC_API_KEY are absent in the runtime environment."
     },
     {
       "id": "RISK-MEDIA-LIVEKIT-JITSI-CALL",
@@ -769,5 +792,5 @@
       "remainingEvidence": "Remaining write flows outside the covered planning/admin/notification/CRM/auth/access-role/comms slices still need duplicate/race/idempotency evidence."
     }
   ],
-  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, live media provider browser checks, live external auth email delivery, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, CRM contact/opportunity concurrency, auth reset route concurrency/happy path, access-role name uniqueness, communication channel rename version conflicts/idempotent retry, media participant cleanup, and Jitsi/API join-token contract behavior."
+  "nextAction": "Remaining old-bug work: BUG-SHELL-12 real provider/live SSE verification remains provider-blocked. Risk zones still require full browser traversal, live media provider browser checks, live external auth email delivery, real agent provider smoke, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, CRM contact/opportunity concurrency, auth reset route concurrency/happy path, access-role name uniqueness, communication channel rename version conflicts/idempotent retry, media participant cleanup, Jitsi/API join-token contract behavior, and agent degraded/local SSE/apply filtering."
 }
