@@ -2108,6 +2108,137 @@ describe("planning API routes", () => {
     expect(conflicting.status).toBe(409);
     await expect(conflicting.json()).resolves.toEqual({ error: "idempotency_key_conflict" });
   });
+
+  it("keeps scenario apply single-use under concurrent duplicate requests", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-scenario-race",
+      title: "Scenario race overload",
+      start: "2026-06-08",
+      finish: "2026-06-08",
+      plannedWork: 40
+    });
+
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    expect(initial.status).toBe(200);
+
+    const assignmentApplied = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command: {
+            type: "assignment.upsert",
+            payload: {
+              id: "assignment-scenario-race",
+              taskId: "task-scenario-race",
+              resourceId: "user-alpha-executor",
+              role: "executor",
+              unitsPermille: 1000,
+              workMinutes: 4_800
+            }
+          },
+          clientPlanVersion: initialBody.planVersion
+        })
+      }
+    );
+    const assignmentAppliedBody = await assignmentApplied.json();
+    expect(assignmentApplied.status).toBe(200);
+
+    const overload = assignmentAppliedBody.readModel.resourceLoad.overloads.find(
+      (candidate: { resourceId: string; taskIds: string[] }) =>
+        candidate.resourceId === "user-alpha-executor" &&
+        candidate.taskIds.includes("task-scenario-race")
+    );
+    expect(overload).toBeTruthy();
+
+    const scenarioPreview = await app.request(
+      "/api/workspace/projects/project-alpha/planning/scenario-proposals",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          clientPlanVersion: assignmentAppliedBody.newPlanVersion,
+          target: {
+            type: "resource_overload",
+            resourceId: overload.resourceId,
+            date: overload.date,
+            overloadMinutes: overload.overloadMinutes,
+            taskIds: overload.taskIds
+          }
+        })
+      }
+    );
+    const scenarioPreviewBody = await scenarioPreview.json();
+    expect(scenarioPreview.status).toBe(200);
+    const scenarioId = scenarioPreviewBody.proposals[0].id;
+    expect(scenarioId).toMatch(/^planning-scenario-/);
+
+    const applyScenario = () =>
+      app.request(
+        `/api/workspace/projects/project-alpha/planning/scenario-proposals/${scenarioId}/apply`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-kiss-pm-action": "same-origin",
+            cookie: adminCookie
+          },
+          body: JSON.stringify({
+            clientPlanVersion: assignmentAppliedBody.newPlanVersion,
+            acceptedRiskReason: "Concurrent duplicate scenario apply test"
+          })
+        }
+      );
+
+    const [first, second] = await Promise.all([applyScenario(), applyScenario()]);
+    const results = await Promise.all([
+      first.json().then((body) => ({ status: first.status, body })),
+      second.json().then((body) => ({ status: second.status, body }))
+    ]);
+    const successes = results.filter((result) => result.status === 200);
+    const conflicts = results.filter((result) => result.status === 409);
+
+    expect(successes).toHaveLength(1);
+    expect(conflicts).toHaveLength(1);
+    expect(successes[0]?.body).toMatchObject({
+      scenarioRunId: scenarioId,
+      newPlanVersion: assignmentAppliedBody.newPlanVersion + 1,
+      readModel: { planVersion: assignmentAppliedBody.newPlanVersion + 1 }
+    });
+    expect(conflicts[0]?.body).toMatchObject({
+      error: expect.stringMatching(/^(plan_version_conflict|planning_scenario_already_applied)$/)
+    });
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    expect(after.status).toBe(200);
+    expect(afterBody.planVersion).toBe(assignmentAppliedBody.newPlanVersion + 1);
+
+    const scenarioRows = await client`
+      SELECT applied_at
+      FROM planning_scenario_runs
+      WHERE tenant_id = 'tenant-alpha'
+        AND project_id = 'project-alpha'
+        AND id = ${scenarioId}
+    `;
+    expect(scenarioRows).toHaveLength(1);
+    expect(scenarioRows[0]?.applied_at).toBeTruthy();
+  });
   it("rejects batch when a middle command has blocking validation", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask(adminCookie, {

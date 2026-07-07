@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 33,
+    "fixedByCurrentBranchItems": 34,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 1,
     "notABugOrSupersededOldBugIds": 4,
@@ -727,6 +727,21 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This narrows RISK-AUTH-EMAIL-RESET-HAPPY-PATH for browser traversal and explicit no-mail degraded state only; live mailbox delivery/extraction remains blocked."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PLANNING-SCENARIO-RACE",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "POST /api/workspace/projects/:projectId/planning/scenario-proposals/:proposalId/apply, planning_scenario_runs readback",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-scenario-race-2026-07-07.json: concurrent duplicate scenario apply returns exactly one 200 and one 409; read-model planVersion increments once; DB readback shows one applied planning_scenario_runs row.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"\"deduplicates concurrent|keeps scenario apply single-use\"\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for planning scenario apply only; remaining planning preview/create and non-planning write flows still need their own race/idempotency evidence."
     }
   ],
   "confirmedOpen": [],
@@ -804,9 +819,10 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-access-role-name-unique-2026-07-07.json: access-role name DB uniqueness and concurrent create/update conflict coverage added.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: auth reset concurrent confirm consumes one token once and returns reset_token_used for the duplicate request.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-communication-channel-rename-concurrency-2026-07-07.json: communication channel rename retry is idempotent without duplicate audit and divergent concurrent renames return one 200/one 409 with winner readback.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-contact-opportunity-concurrency-2026-07-07.json: CRM contact duplicate create/update and opportunity duplicate-id concurrent writes return stable success/conflict pairs with exactly-one-row readback."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-contact-opportunity-concurrency-2026-07-07.json: CRM contact duplicate create/update and opportunity duplicate-id concurrent writes return stable success/conflict pairs with exactly-one-row readback.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-scenario-race-2026-07-07.json: planning scenario apply concurrent duplicate requests are single-use with one success, one conflict, one planVersion bump, and one applied scenario run row."
       ],
-      "remainingEvidence": "Remaining write flows outside the covered planning/admin/notification/CRM/auth/access-role/comms slices still need duplicate/race/idempotency evidence."
+      "remainingEvidence": "Remaining write flows outside the covered planning/admin/notification/CRM/auth/access-role/comms slices still need duplicate/race/idempotency evidence; planning scenario preview/create remains a separate optional atom if required."
     }
   ],
   "nextAction": "Remaining old-bug work: real provider/live SSE verification remains provider-blocked; live external auth email delivery remains mail-infra-blocked. Risk zones still require full browser traversal, live media provider browser checks, real agent provider smoke, and remaining write-flow race/idempotency slices; current branch has partial coverage for planning idempotency, admin duplicate-conflict handling, notification read concurrency, CRM conflict mapping, CRM contact/opportunity concurrency, auth reset route/browser degraded flow, access-role name uniqueness, communication channel rename version conflicts/idempotent retry, media participant cleanup, Jitsi/API join-token contract behavior, and agent degraded/local SSE/apply filtering."
