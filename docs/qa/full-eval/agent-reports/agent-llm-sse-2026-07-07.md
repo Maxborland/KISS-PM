@@ -176,4 +176,15 @@ DONE_WITH_CONCERNS: configured-provider degraded behavior, OpenRouter adapter tr
   - /api/workspace/agent/tools provider status: live/configured, model anthropic/claude-sonnet-4.6.
   - /api/workspace/agent/propose/stream: reasoning + done, no error event.
 
-Updated final status: local degraded/provider-adapter/loop/SSE/parser/apply-filter evidence is complete for this bounded slice. Real provider smoke and authenticated API SSE now pass with supplied OpenRouter env; live browser SSE proposal/apply traversal remains open and is not counted as passed.
+Updated final status: local degraded/provider-adapter/loop/SSE/parser/apply-filter evidence is complete for this bounded slice. Real provider smoke, authenticated API SSE, and Chrome browser proposal/apply/readback now pass for create_task with supplied OpenRouter env; broader role/tool/provider sweeps remain open.
+## Live browser SSE/apply follow-up
+
+Updated after the live Chrome traversal on `http://127.0.0.1:3108/agent`:
+
+- Pre-fix live traversal found a real issue: the model verbally asked to confirm two `create_task` actions, but no structured review controls were shown.
+- `runAgentLoop` now replaces unstructured action-confirmation text with a safe fallback when `proposedActions` is empty.
+- The server system prompt now explicitly forbids text-only confirmation for create/change/apply actions.
+- `create_task` execution now supplies safe defaults for title-only actions: planned start/finish today, 1 working day, 480 planned minutes, and current actor as executor.
+- Post-fix Chrome traversal passed: `/tools -> 200`, `/propose/stream -> 200 text/event-stream`, review panel showed two create_task actions, first action was rejected, second was applied through `/execute -> 200`, and `/my-work` readback contained only the applied task.
+
+Evidence: `docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-browser-sse-apply-2026-07-07.json`.

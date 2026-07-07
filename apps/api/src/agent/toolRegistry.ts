@@ -97,7 +97,7 @@ const HANDWIRED_TOOLS: AgentTool[] = [
     title: "Создать задачу",
     description: "Создать задачу (в проекте или входящую). POST /api/workspace[/projects/:id]/tasks.",
     kind: "mutation",
-    inputSchema: { type: "object", properties: { projectId: { type: "string", description: "Опционально — проект" }, title: { type: "string" }, description: { type: "string" } }, required: ["title"] },
+    inputSchema: { type: "object", properties: { projectId: { type: "string", description: "Опционально — проект" }, title: { type: "string" }, description: { type: "string" }, plannedStart: { type: "string", description: "Дата YYYY-MM-DD; если не указана, сервер возьмёт сегодня" }, plannedFinish: { type: "string", description: "Дата YYYY-MM-DD; если не указана, равна plannedStart" }, plannedWork: { type: "number", description: "Плановые минуты; по умолчанию 480" }, durationWorkingDays: { type: "number", description: "Длительность в рабочих днях; по умолчанию 1" }, participants: { type: "array", description: "Участники задачи; если пусто, сервер назначит текущего пользователя executor" } }, required: ["title"] },
     capability: tenantCapability(canCreateTasks)
   },
   {

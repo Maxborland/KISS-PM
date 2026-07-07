@@ -25,7 +25,7 @@
     "summary":  {
                     "oldBugIdsReviewed":  84,
                     "fixedByMasterOldBugIds":  64,
-                    "fixedByCurrentBranchItems":  45,
+                    "fixedByCurrentBranchItems":  46,
                     "confirmedOpen":  0,
                     "unverifiedOldBugIds":  1,
                     "notABugOrSupersededOldBugIds":  4,
@@ -767,6 +767,25 @@
                                      "note":  "This narrows RISK-AGENT-REAL-LLM-SSE for live authenticated API SSE only. Browser UI rendering/apply/reject/reload traversal under live provider remains open."
                                  },
                                  {
+                                     "id":  "CURRENT-RISK-AGENT-LIVE-BROWSER-SSE-APPLY",
+                                     "source":  "current branch live Chrome/Playwright browser traversal with OpenRouter",
+                                     "surface":  "/agent, GET /api/workspace/agent/tools, POST /api/workspace/agent/propose/stream, POST /api/workspace/agent/execute, GET /api/workspace/my-work",
+                                     "evidence":  "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-browser-sse-apply-2026-07-07.json: Chrome browser traversal covers live provider tools, SSE stream rendering, structured create_task proposal review, rejecting one action, applying one selected action, /execute 200, and readback showing only the applied task.",
+                                     "linkedOldIds":  [
+                                                          "BUG-SHELL-12"
+                                                      ],
+                                     "linkedRiskZones":  [
+                                                             "RISK-AGENT-REAL-LLM-SSE"
+                                                         ],
+                                     "tests":  [
+                                                   "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false -> pass",
+                                                   "node_modules\\.bin\\vitest.cmd run apps/api/src/agent/agentLoop.test.ts -> pass; 10 tests",
+                                                   "live Chrome/Playwright browser smoke on /agent -> pass"
+                                               ],
+                                     "coverageStatus":  "partial-risk-zone",
+                                     "note":  "This closes the core live browser SSE/apply path for OpenRouter/create_task. Full risk-zone remains open for every role, every agent tool, provider variants, and broader reload/readback combinations."
+                                 },
+                                 {
                                      "id":  "CURRENT-RISK-AUTH-RESET-BROWSER-MAIL-GAP",
                                      "source":  "current branch targeted Playwright browser test and auth reset route tests",
                                      "surface":  "/login, /password-reset, /password-reset/confirm, POST /api/auth/password-reset/request, POST /api/auth/password-reset/confirm",
@@ -989,9 +1008,10 @@
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-llm-sse-configured-provider-2026-07-07.json: no-provider degraded behavior, OpenRouter adapter translation, loop/SSE events, web stream parser, and apply/reject filtering covered by targeted tests.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-real-llm-sse-parser-tail-2026-07-07.json: CRLF SSE parser and stream_incomplete tail handling covered; live provider keys were absent at that time.",
                                                             "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-live-openrouter-smtp-imap-smoke-2026-07-07.json: supplied OpenRouter key/model passed a live provider smoke and returned the expected marker.",
-                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-openrouter-api-sse-2026-07-07.json: authenticated API /tools reports live/configured OpenRouter and /propose/stream emits reasoning plus done over text/event-stream."
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-openrouter-api-sse-2026-07-07.json: authenticated API /tools reports live/configured OpenRouter and /propose/stream emits reasoning plus done over text/event-stream.",
+                                                            "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-browser-sse-apply-2026-07-07.json: live Chrome traversal covers stream rendering, structured proposal review, reject one/apply one, /execute success, and my-work readback."
                                                         ],
-                                    "remainingEvidence":  "Live OpenRouter direct provider and authenticated API SSE smoke now pass. Live browser SSE traversal remains unverified: stream rendering, real proposal/action review, apply/reject UX, reload/readback, and no silent mock fallback still need browser evidence."
+                                    "remainingEvidence":  "Live OpenRouter direct provider, authenticated API SSE, and core Chrome browser SSE/apply/readback now pass for create_task. Remaining evidence: every role, every agent action/tool, provider variants, reload persistence, and broader no-silent-mock sweeps."
                                 },
                                 {
                                     "id":  "RISK-MEDIA-LIVEKIT-JITSI-CALL",

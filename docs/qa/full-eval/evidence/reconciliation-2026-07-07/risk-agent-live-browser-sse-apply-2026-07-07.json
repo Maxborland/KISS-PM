@@ -1,0 +1,90 @@
+{
+  "id": "RISK-AGENT-LIVE-BROWSER-SSE-APPLY-2026-07-07",
+  "generatedAt": "2026-07-07T17:53:40.616Z",
+  "purpose": "Fresh live browser traversal for RISK-AGENT-REAL-LLM-SSE using Chrome, Next web on 3108, API on 4108, and OpenRouter provider.",
+  "secretsPolicy": "OpenRouter secret was loaded from ignored env and is not written to evidence.",
+  "environment": {
+    "webOrigin": "http://127.0.0.1:3108",
+    "apiOrigin": "http://127.0.0.1:4108",
+    "browser": "Installed Google Chrome via Playwright channel=chrome",
+    "provider": {
+      "name": "openrouter",
+      "model": "anthropic/claude-sonnet-4.6",
+      "live": true,
+      "configured": true
+    }
+  },
+  "preFixFinding": {
+    "status": "confirmed-fixed-by-this-slice",
+    "screenshot": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-browser-proposal-2026-07-07.png",
+    "actualBefore": "Live model verbally asked to confirm two create_task actions, but no review controls or structured proposedActions appeared in the UI.",
+    "risk": "Fake action confirmation: user sees a confirmation request, but there is no actionable/rejectable/applicable proposal."
+  },
+  "fixes": [
+    {
+      "area": "apps/api/src/agent/agentLoop.ts",
+      "change": "Normalizes unstructured action-confirmation text to a safe fallback when proposedActions is empty."
+    },
+    {
+      "area": "apps/api/src/agent/agentRoutes.ts",
+      "change": "Strengthens the server prompt: actions must be proposed through mutation tools, not text-only confirmation."
+    },
+    {
+      "area": "apps/api/src/agent/agentRoutes.ts and toolRegistry.ts",
+      "change": "Makes title-only create_task agent actions executable by adding plannedStart/plannedFinish/plannedWork/duration/participants defaults and documenting optional schema fields."
+    }
+  ],
+  "browserEvidence": [
+    {
+      "name": "initial live stream rendering",
+      "screenshot": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-browser-after-2026-07-07.png",
+      "network": [
+        "GET /api/workspace/agent/tools -> 200 application/json",
+        "POST /api/workspace/agent/propose/stream -> 200 text/event-stream"
+      ],
+      "result": "UI rendered the live OpenRouter answer and did not show demo/mock text."
+    },
+    {
+      "name": "structured proposal after guard",
+      "screenshot": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-browser-after-guard-2026-07-07.png",
+      "network": [
+        "GET /api/workspace/agent/tools -> 200 application/json",
+        "POST /api/workspace/agent/propose/stream -> 200 text/event-stream"
+      ],
+      "result": "UI showed a review panel with two structured create_task actions and reject/apply controls."
+    },
+    {
+      "name": "reject one, apply one, readback",
+      "screenshot": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-browser-apply-2026-07-07.png",
+      "network": [
+        "GET /api/workspace/agent/tools -> 200 application/json",
+        "POST /api/workspace/agent/propose/stream -> 200 text/event-stream",
+        "POST /api/workspace/agent/execute -> 200 application/json"
+      ],
+      "execute": {
+        "status": 200,
+        "applied": true,
+        "appliedTool": "create_task",
+        "appliedTitle": "Agent live apply 1783446804314",
+        "rejectedTitle": "Agent live reject 1783446804314"
+      },
+      "readback": {
+        "endpoint": "GET /api/workspace/my-work",
+        "status": 200,
+        "appliedTitleFound": true,
+        "rejectedTitleFound": false
+      },
+      "result": "Reject/apply UX and backend readback passed: only the selected create_task action was applied."
+    }
+  ],
+  "verification": [
+    "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false -> pass",
+    "node_modules\\.bin\\vitest.cmd run apps/api/src/agent/agentLoop.test.ts -> pass; 10 tests",
+    "live Chrome/Playwright browser smoke on /agent -> pass"
+  ],
+  "knownTestHarnessIssue": "apps/api/src/agent/agentExecute.test.ts currently fails in its auth harness with 401/undefined results before the changed create_task branch; it was not used as pass evidence for this slice.",
+  "coverageImpact": {
+    "RISK-AGENT-REAL-LLM-SSE": "Covers live browser stream rendering, structured proposal rendering, reject/apply UX, /execute success, and data readback for create_task with OpenRouter. Remaining agent risk is limited to broader per-role/provider variants and other action tools, not the core live SSE/apply path."
+  },
+  "status": "pass"
+}

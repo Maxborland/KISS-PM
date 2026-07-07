@@ -25,7 +25,9 @@ const AGENT_SYSTEM_PROMPT = [
   "его уровню доступа: ты не можешь делать то, что сотруднику не разрешено.",
   "Сначала используй analyze-инструменты (только чтение), чтобы понять ситуацию.",
   "Затем ПРЕДЛОЖИ конкретные действия через mutation-инструменты — они НЕ применяются сразу,",
-  "сотрудник подтвердит каждое действие. Не выдумывай идентификаторы — бери их из результатов",
+  "сотрудник подтвердит каждое действие. Если предлагаешь создать/изменить/применить что-либо,",
+  "обязательно вызови mutation-инструмент; нельзя просить подтверждение только текстом.",
+  "Не выдумывай идентификаторы — бери их из результатов",
   "analyze. Объясняй кратко и по-русски."
 ].join(" ");
 
@@ -136,6 +138,10 @@ function agentProviderStatus(provider: { model: string }): AgentProviderStatus {
   const live = provider.model !== "mock-llm" && provider.model !== "demo-llm";
   return { model: provider.model, live, configured: provider.model !== "mock-llm" };
 }
+
+const isoDate = (date = new Date()): string => date.toISOString().slice(0, 10);
+const numberInput = (value: unknown, fallback: number): number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
 
 function createAgentProviderRuntime() {
   const provider = createAgentLlmProviderFromEnv();
@@ -525,8 +531,22 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
           continue;
         }
+        const plannedStart = typeof input.plannedStart === "string" ? input.plannedStart : isoDate();
+        const plannedFinish = typeof input.plannedFinish === "string" ? input.plannedFinish : plannedStart;
+        const participants = Array.isArray(input.participants) && input.participants.length > 0
+          ? input.participants
+          : [{ userId: actor.id, role: "executor" }];
         const path = projectId ? `/api/workspace/projects/${projectId}/tasks` : "/api/workspace/tasks";
-        const res = await dispatchInternal(app, cookie, path, { title, priority: "normal", ...(description ? { description } : {}) });
+        const res = await dispatchInternal(app, cookie, path, {
+          title,
+          priority: typeof input.priority === "string" ? input.priority : "normal",
+          plannedStart,
+          plannedFinish,
+          durationWorkingDays: numberInput(input.durationWorkingDays, 1),
+          plannedWork: numberInput(input.plannedWork, 480),
+          participants,
+          ...(description ? { description } : {})
+        });
         if (res.status === 200 || res.status === 201) results.push({ tool: tool.name, ok: true, result: res.body });
         else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "create_failed" });
         continue;

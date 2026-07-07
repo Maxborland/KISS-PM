@@ -41,6 +41,14 @@ export type AgentLoopEvent =
   | { type: "analyze"; tool: string; title: string; ok: boolean }
   | { type: "proposal"; tool: string; title: string };
 
+const UNSTRUCTURED_ACTION_RE = /(подтверд|подтверждаете|жду подтверждения|действие\s+\d|предлагаю\s+(создать|изменить|применить)|создать\s+(задач|две))/i;
+
+function normalizeReasoning(reasoning: string, proposedActions: ProposedAction[]): string {
+  if (proposedActions.length > 0) return reasoning;
+  if (!UNSTRUCTURED_ACTION_RE.test(reasoning)) return reasoning;
+  return "Я не сформировал применимых действий для подтверждения. Переформулируйте запрос или укажите конкретное действие, чтобы я подготовил структурированное предложение.";
+}
+
 // Гонка промиса с реальным дедлайном: если время вышло — возвращаем сентинел, не дожидаясь
 // зависшего вызова (SDK без AbortSignal не отменить, но ждать дальше не будем).
 const DEADLINE_HIT = Symbol("deadline");
@@ -157,8 +165,10 @@ export async function runAgentLoop(input: {
     messages.push({ role: "user", content: toolResults });
   }
 
+  const reasoning = normalizeReasoning(reasoningParts.join("\n\n"), proposedActions);
+
   return {
-    reasoning: reasoningParts.join("\n\n"),
+    reasoning,
     proposedActions,
     analyzeResults,
     iterations,
