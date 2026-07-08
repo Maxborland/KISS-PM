@@ -306,8 +306,16 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
           iceServers ? { rtcConfig: { iceServers } } : undefined
         );
         if (disposed) return;
-        await room.localParticipant.setMicrophoneEnabled(options?.micOn ?? true);
-        await room.localParticipant.setCameraEnabled(options?.cameraOn ?? true);
+        try {
+          await room.localParticipant.setMicrophoneEnabled(options?.micOn ?? true);
+        } catch {
+          // Stay in the room if the selected input device cannot start.
+        }
+        try {
+          await room.localParticipant.setCameraEnabled(options?.cameraOn ?? true);
+        } catch {
+          // Camera failures should degrade to camera-off, not fail the whole call.
+        }
         // Unblock playback of subscribed remote audio (the lobby join is the user gesture).
         void room.startAudio();
         refresh();
@@ -364,21 +372,24 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
         if (!room) return;
         void room.localParticipant
           .setMicrophoneEnabled(!room.localParticipant.isMicrophoneEnabled)
-          .then(refresh);
+          .catch(() => undefined)
+          .finally(refresh);
       },
       onToggleCamera: () => {
         const room = roomRef.current;
         if (!room) return;
         void room.localParticipant
           .setCameraEnabled(!room.localParticipant.isCameraEnabled)
-          .then(refresh);
+          .catch(() => undefined)
+          .finally(refresh);
       },
       onToggleScreenShare: () => {
         const room = roomRef.current;
         if (!room) return;
         void room.localParticipant
           .setScreenShareEnabled(!room.localParticipant.isScreenShareEnabled)
-          .then(refresh);
+          .catch(() => undefined)
+          .finally(refresh);
       },
       onLeave: () => {
         // Record that this participant left. The session is NOT ended here - others may

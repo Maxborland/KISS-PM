@@ -23,6 +23,7 @@ const defaultLobbySelection = { cameraOn: false, micOn: true };
 
 const livekitMock = vi.hoisted(() => {
   const instances: MockRoom[] = [];
+  let failNextCameraEnable = false;
 
   const ConnectionState = {
     Connecting: "connecting",
@@ -83,6 +84,10 @@ const livekitMock = vi.hoisted(() => {
       name: "Local User",
       publishData: vi.fn(),
       setCameraEnabled: vi.fn(async (enabled: boolean) => {
+        if (failNextCameraEnable) {
+          failNextCameraEnable = false;
+          throw new Error("Could not start video source");
+        }
         this.localParticipant.isCameraEnabled = enabled;
       }),
       setMicrophoneEnabled: vi.fn(async (enabled: boolean) => {
@@ -110,7 +115,10 @@ const livekitMock = vi.hoisted(() => {
     Room: MockRoom,
     RoomEvent,
     Track,
-    instances
+    instances,
+    failNextCameraEnable: () => {
+      failNextCameraEnable = true;
+    }
   };
 });
 
@@ -125,18 +133,26 @@ vi.mock("@/lib/call/call-background", () => ({
 }));
 vi.mock("livekit-client", () => livekitMock);
 
-function EngineHarness(props: { roomId: string; onState?: ((state: CallEngineState) => void) | undefined }) {
-  const state = useCallEngine(props.roomId, defaultLobbySelection);
+function EngineHarness(props: {
+  roomId: string;
+  onState?: ((state: CallEngineState) => void) | undefined;
+  selection?: typeof defaultLobbySelection | undefined;
+}) {
+  const state = useCallEngine(props.roomId, props.selection ?? defaultLobbySelection);
   props.onState?.(state);
   return null;
 }
 
-async function renderEngine(roomId = "room-1", onState?: (state: CallEngineState) => void): Promise<{ root: Root; container: HTMLElement }> {
+async function renderEngine(
+  roomId = "room-1",
+  onState?: (state: CallEngineState) => void,
+  selection?: typeof defaultLobbySelection
+): Promise<{ root: Root; container: HTMLElement }> {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
   await act(async () => {
-    root.render(<EngineHarness roomId={roomId} onState={onState} />);
+    root.render(<EngineHarness roomId={roomId} onState={onState} selection={selection} />);
   });
   return { root, container };
 }
@@ -232,6 +248,29 @@ describe("useCallEngine participant state lifecycle", () => {
 
     expect(callClientMock.postParticipantState).not.toHaveBeenCalled();
     expect(livekitMock.instances[0]?.disconnect).toHaveBeenCalledTimes(1);
+  });
+  it("keeps the participant in the room when the initial camera publish fails", async () => {
+    livekitMock.failNextCameraEnable();
+    let latestState: CallEngineState | null = null;
+    const { root } = await renderEngine(
+      "room-1",
+      (state) => {
+        latestState = state;
+      },
+      { cameraOn: true, micOn: true }
+    );
+
+    await waitForExpectation(() => {
+      expect(callClientMock.postParticipantState).toHaveBeenCalledWith("room-1", "session-1", "joined");
+    });
+
+    expect((latestState as CallEngineState | null)?.error).toBeNull();
+    expect((latestState as CallEngineState | null)?.controls).toMatchObject({ micOn: true, cameraOn: false });
+    expect(livekitMock.instances[0]?.disconnect).not.toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
   });
 
   it("exposes an external Jitsi join URL without trying to connect to LiveKit", async () => {

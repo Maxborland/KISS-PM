@@ -476,3 +476,29 @@
 **Verification:** `Resolve-DnsName` against `1.1.1.1`/`8.8.8.8` confirmed SPF/DKIM DNS; Chrome/Gmail search found the reset email; Gmail original showed pass auth results; harness endpoint `__qa/confirm-readback` confirmed token consume/login/repeat-token behavior.
 
 **Remaining:** no remaining blocker for `RISK-AUTH-EMAIL-RESET-HAPPY-PATH`. Persistence-backed full local browser reset remains dependent on a healthy Postgres environment, but the previous browser mechanics evidence plus this live delivered-token evidence closes the risk zone.
+
+## Batch 20 — Self-hosted LiveKit browser/media path
+
+**Status:** partially closed — self-hosted LiveKit browser/audio path fixed and verified; full media risk zone still has residual tails.
+
+**Risk zone:** `RISK-MEDIA-LIVEKIT-JITSI-CALL`, `RISK-FULL-BROWSER-TRAVERSAL`
+
+**Surface:** `/communications/calls`, `/calls/[roomId]`, Docker media profile, `infra/livekit/livekit.yaml`, `apps/web/src/lib/call/call-engine.ts`
+
+**Fix evidence:** `docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/risk-media-livekit-self-hosted-browser-2026-07-08.json`; screenshot: `docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/livekit-call-active-mic-on-camera-off.png`.
+
+**Expected:** with a configured LiveKit provider and browser camera/microphone permissions, a user can create/join a call, reach the active call stage, publish available local media, and see degraded UI instead of a fatal call failure when one selected device cannot start.
+
+**Actual before:** the local media stack could not complete a real browser join. Dev LiveKit config used API key `devkey`, which the API rejected as too short for configured provider mode. After aligning credentials, `livekit-client@2.20.0` failed against `livekit-server:v1.8` with `v1 RTC path not found`. After upgrading the server, OBS Virtual Camera returned `Could not start video source`, and the call engine treated initial camera publish failure as a fatal connection error.
+
+**Fix applied:** Docker LiveKit image moved to `livekit/livekit-server:v1.9`; dev LiveKit API key in `infra/livekit/livekit.yaml` now matches the API's valid-length `kisspmdevkey`; initial microphone/camera publish and later device toggles degrade per device instead of failing the whole room.
+
+**Verification:**
+
+- GREEN: `.\node_modules\.bin\vitest.CMD run apps/web/src/lib/call/call-engine.test.tsx` -> 1 file / 6 tests passed, including camera-publish failure regression.
+- GREEN: `docker compose --profile media up -d postgres redis livekit` -> LiveKit v1.9.12 running on `127.0.0.1:7880`.
+- GREEN: local Postgres migrations applied through `0051_write_flow_idempotency_keys.sql`; dev data seeded.
+- GREEN: Chrome traversal with localhost camera/microphone permissions on `http://127.0.0.1:3180/calls/call-room-77983080-b53a-40e5-9f1d-1f4b343db968` reached active call UI; controls show `micOn=true`, `cameraOn=false`; no fatal error screen.
+- GREEN: API readback shows active session and `participant_joined`; LiveKit logs show participant active and `mediaTrack published` for audio source `MICROPHONE`.
+
+**Remaining:** this does not close the entire media provider risk zone. Still required: camera video publish with a working OBS/physical camera source, actual Jitsi media beyond the meet.jit.si moderator/auth gate, remote second participant, leave/rejoin, and reconnect behavior.

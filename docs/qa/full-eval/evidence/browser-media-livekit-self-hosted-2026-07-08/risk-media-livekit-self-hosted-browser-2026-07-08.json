@@ -1,0 +1,199 @@
+{
+  "id": "RISK-MEDIA-LIVEKIT-SELF-HOSTED-BROWSER-2026-07-08",
+  "createdAt": "2026-07-08T10:44:44.9433563Z",
+  "scope": "Full browser traversal of /calls/[roomId] against self-hosted LiveKit provider on Docker media profile",
+  "environment": {
+    "web": "http://127.0.0.1:3180",
+    "api": "http://127.0.0.1:4180",
+    "livekit": "livekit/livekit-server:v1.9 on localhost:7880",
+    "database": "Postgres dev seed on localhost:55432",
+    "browser": "User Chrome via Codex extension",
+    "permissions": "Camera and microphone permissions granted by user for localhost"
+  },
+  "codeFixes": {
+    "dockerCompose": "livekit/livekit-server image bumped from v1.8 to v1.9 for livekit-client 2.20 protocol compatibility",
+    "livekitConfig": "dev API key changed from devkey to kisspmdevkey because API requires key length >= 8",
+    "callEngine": "initial mic/camera publish failures degrade to off instead of failing the entire connected room; toggle failures are caught and refreshed"
+  },
+  "browserEvidence": {
+    "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+    "route": "/calls/call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+    "lobby": "Chrome saw OBS Virtual Camera and Microphone (High Definition Audio Device); lobby showed camera unavailable, mic on, camera off",
+    "activeStage": "After join UI stayed on active call stage: phase В эфире; mic aria-label Выключить микрофон/pressed true; camera aria-label Включить камеру/pressed false; no call error screen",
+    "screenshot": "livekit-call-active-mic-on-camera-off.png"
+  },
+  "apiReadback": {
+    "detail": {
+      "callRoom": {
+        "entityId": "project-vektor-portal",
+        "entityType": "project",
+        "mediaKind": "video",
+        "provider": "livekit",
+        "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+        "status": "active",
+        "createdAt": "2026-07-08T10:42:43.245Z",
+        "createdByUserId": "user-alpha-admin",
+        "meetingId": null,
+        "title": "LiveKit QA media check kisspm-livekit-qa-20260708-174243",
+        "updatedAt": "2026-07-08T10:43:11.083Z"
+      },
+      "activeSession": {
+        "endedAt": null,
+        "endedByUserId": null,
+        "failureReason": null,
+        "id": "call-session-4959dab2-9c27-4760-9c81-0d1c09c417bf",
+        "providerSessionId": null,
+        "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+        "startedAt": "2026-07-08T10:43:11.082Z",
+        "startedByUserId": "user-alpha-admin",
+        "status": "active"
+      },
+      "events": [
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T10:43:11.439Z",
+          "eventType": "participant_joined",
+          "id": "call-event-94cba218-7ea0-4bc8-8ea2-188d6b50cdc4",
+          "payload": {
+            "state": "joined",
+            "userId": "user-alpha-admin"
+          },
+          "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+          "sessionId": "call-session-4959dab2-9c27-4760-9c81-0d1c09c417bf"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T10:43:11.163Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-c8def96d-e2fd-4291-8055-cd048f11b237",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T10:53:11Z"
+          },
+          "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+          "sessionId": "call-session-4959dab2-9c27-4760-9c81-0d1c09c417bf"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T10:43:11.113Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-57d40979-ff3e-42b7-8be9-5b28eb35b232",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T10:53:11Z"
+          },
+          "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+          "sessionId": "call-session-4959dab2-9c27-4760-9c81-0d1c09c417bf"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T10:43:11.085Z",
+          "eventType": "session_started",
+          "id": "call-event-b981a25d-c1ce-4b9e-a2d9-4d9a742d0a6e",
+          "payload": {
+            "provider": "livekit"
+          },
+          "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+          "sessionId": "call-session-4959dab2-9c27-4760-9c81-0d1c09c417bf"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T10:42:43.249Z",
+          "eventType": "room_created",
+          "id": "call-event-a1848ae4-cd73-4aef-8ae6-3d91a211464d",
+          "payload": {
+            "provider": "livekit",
+            "mediaKind": "video"
+          },
+          "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+          "sessionId": null
+        }
+      ],
+      "recordings": []
+    },
+    "events": {
+      "events": [
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T10:43:11.439Z",
+          "eventType": "participant_joined",
+          "id": "call-event-94cba218-7ea0-4bc8-8ea2-188d6b50cdc4",
+          "payload": {
+            "state": "joined",
+            "userId": "user-alpha-admin"
+          },
+          "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+          "sessionId": "call-session-4959dab2-9c27-4760-9c81-0d1c09c417bf"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T10:43:11.163Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-c8def96d-e2fd-4291-8055-cd048f11b237",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T10:53:11Z"
+          },
+          "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+          "sessionId": "call-session-4959dab2-9c27-4760-9c81-0d1c09c417bf"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T10:43:11.113Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-57d40979-ff3e-42b7-8be9-5b28eb35b232",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T10:53:11Z"
+          },
+          "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+          "sessionId": "call-session-4959dab2-9c27-4760-9c81-0d1c09c417bf"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T10:43:11.085Z",
+          "eventType": "session_started",
+          "id": "call-event-b981a25d-c1ce-4b9e-a2d9-4d9a742d0a6e",
+          "payload": {
+            "provider": "livekit"
+          },
+          "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+          "sessionId": "call-session-4959dab2-9c27-4760-9c81-0d1c09c417bf"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T10:42:43.249Z",
+          "eventType": "room_created",
+          "id": "call-event-a1848ae4-cd73-4aef-8ae6-3d91a211464d",
+          "payload": {
+            "provider": "livekit",
+            "mediaKind": "video"
+          },
+          "roomId": "call-room-77983080-b53a-40e5-9f1d-1f4b343db968",
+          "sessionId": null
+        }
+      ]
+    }
+  },
+  "livekitReadback": {
+    "marker": "kisspm-livekit-qa-20260708-174243",
+    "lines": [
+      "2026-07-08T10:39:28.582Z starting LiveKit server version=1.9.12 portHttp=7880 rtc.portTCP=7881 rtc.portICERange=[50000,50019]",
+      "2026-07-08T10:43:12.187Z participant active room=kisspm-livekit-qa-20260708-174243 participant=user-alpha-admin sdk=JS version=2.20.0 browser=Chrome connectionType=udp",
+      "2026-07-08T10:43:12.277Z mediaTrack published room=kisspm-livekit-qa-20260708-174243 participant=user-alpha-admin kind=audio source=MICROPHONE mime=audio/red",
+      "2026-07-08T10:43:12.383Z ice reconnected or switched pair room=kisspm-livekit-qa-20260708-174243 participant=user-alpha-admin transport=PUBLISHER"
+    ],
+    "redaction": "Stored excerpt omits raw SDP, ICE credentials, candidate addresses beyond high-level connection facts, and any join token material."
+  },
+  "verification": [
+    ".\\node_modules\\.bin\\vitest.CMD run apps/web/src/lib/call/call-engine.test.tsx => 1 file / 6 tests passed",
+    "GET http://127.0.0.1:7880/ => 200 OK",
+    "Browser join reached active call stage with mic on/camera off",
+    "API readback includes session_started, join_token_issued, participant_joined",
+    "LiveKit logs include participant active and audio mediaTrack published"
+  ],
+  "residualRisk": [
+    "OBS Virtual Camera itself returned camera unavailable / Could not start video source in this environment; product now degrades to camera-off and remains joined. Full camera video publish still depends on a working virtual/physical camera source."
+  ],
+  "status": "partial_pass_with_camera_source_residual"
+}
