@@ -274,8 +274,17 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
         tenantId: actor.tenantId,
         surfaceId,
         actorUserId: actor.id,
-        auditEventId
+        auditEventId,
+        expectedDraftVersion: before.draftVersion
+      }).catch((error: unknown) => {
+        if (error instanceof Error && error.message === "control_surface_version_conflict") {
+          return "control_surface_version_conflict" as const;
+        }
+        throw error;
       });
+      if (published === "control_surface_version_conflict") {
+        return { ok: false as const, status: 409, error: "control_surface_version_conflict" };
+      }
       await deps.appendManagementAuditEvent(
         {
           auditEventId,
@@ -357,8 +366,17 @@ export function registerControlSurfaceRoutes(app: ApiApp, deps: ApiRouteDeps) {
         surfaceId,
         version,
         actorUserId: actor.id,
-        auditEventId
+        auditEventId,
+        expectedCurrentVersion: before.currentVersion
+      }).catch((error: unknown) => {
+        if (error instanceof Error && error.message === "control_surface_version_conflict") {
+          return "control_surface_version_conflict" as const;
+        }
+        throw error;
       });
+      if (rollback === "control_surface_version_conflict") {
+        return { ok: false as const, status: 409, error: "control_surface_version_conflict" };
+      }
       if (!rollback) {
         await appendControlSurfaceFailureAuditIfConfigured(deps, transactionDataSource, {
           tenantId: actor.tenantId,

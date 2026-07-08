@@ -23,6 +23,7 @@ export type ControlSurfacePublishInput = {
   surfaceId: string;
   actorUserId: string;
   auditEventId?: string | null;
+  expectedDraftVersion?: number;
 };
 
 export type ControlSurfaceArchiveInput = {
@@ -37,6 +38,7 @@ export type ControlSurfaceRollbackInput = {
   version: number;
   actorUserId: string;
   auditEventId?: string | null;
+  expectedCurrentVersion?: number;
 };
 
 export type ControlSurfaceRepository = {
@@ -153,6 +155,19 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
       const existing = await this.findControlSurface(input.tenantId, input.surfaceId);
       if (!existing) throw new Error("control_surface_not_found");
       if (existing.status === "archived") throw new Error("control_surface_archived");
+      if (
+        input.expectedDraftVersion !== undefined &&
+        existing.draftVersion !== input.expectedDraftVersion
+      ) {
+        throw new Error("control_surface_version_conflict");
+      }
+      if (
+        existing.status === "published" &&
+        existing.publishedDefinition &&
+        definitionsEqual(existing.publishedDefinition, existing.draftDefinition)
+      ) {
+        throw new Error("control_surface_version_conflict");
+      }
       const now = new Date();
       const [row] = await db
         .update(controlSurfaceDefinitions)
@@ -170,11 +185,13 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
           and(
             eq(controlSurfaceDefinitions.tenantId, input.tenantId),
             eq(controlSurfaceDefinitions.id, input.surfaceId),
-            ne(controlSurfaceDefinitions.status, "archived")
+            ne(controlSurfaceDefinitions.status, "archived"),
+            eq(controlSurfaceDefinitions.currentVersion, existing.currentVersion),
+            eq(controlSurfaceDefinitions.draftVersion, existing.draftVersion)
           )
         )
         .returning();
-      if (!row) throw new Error("control_surface_archived");
+      if (!row) throw new Error("control_surface_version_conflict");
       const versionRecord = await insertSurfaceVersion(db, {
         tenantId: input.tenantId,
         surfaceId: existing.id,
@@ -223,6 +240,18 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
       const existing = await this.findControlSurface(input.tenantId, input.surfaceId);
       if (!target || !existing) return undefined;
       if (existing.status === "archived") throw new Error("control_surface_archived");
+      if (
+        input.expectedCurrentVersion !== undefined &&
+        existing.currentVersion !== input.expectedCurrentVersion
+      ) {
+        throw new Error("control_surface_version_conflict");
+      }
+      if (
+        existing.publishedDefinition &&
+        definitionsEqual(existing.publishedDefinition, target.definition)
+      ) {
+        throw new Error("control_surface_version_conflict");
+      }
       const now = new Date();
       const nextVersion = existing.currentVersion + 1;
       const [row] = await db
@@ -242,11 +271,13 @@ export function createControlSurfaceRepository(db: KissPmDatabase): ControlSurfa
           and(
             eq(controlSurfaceDefinitions.tenantId, input.tenantId),
             eq(controlSurfaceDefinitions.id, input.surfaceId),
-            ne(controlSurfaceDefinitions.status, "archived")
+            ne(controlSurfaceDefinitions.status, "archived"),
+            eq(controlSurfaceDefinitions.currentVersion, existing.currentVersion),
+            eq(controlSurfaceDefinitions.draftVersion, existing.draftVersion)
           )
         )
         .returning();
-      if (!row) throw new Error("control_surface_archived");
+      if (!row) throw new Error("control_surface_version_conflict");
       const versionRecord = await insertSurfaceVersion(db, {
         tenantId: input.tenantId,
         surfaceId: input.surfaceId,
@@ -287,6 +318,21 @@ async function insertSurfaceVersion(
     .returning();
   if (!row) throw new Error("Control surface version insert returned no row");
   return mapControlSurfaceVersionRecord(row);
+}
+
+function definitionsEqual(left: ControlSurfaceDefinition, right: ControlSurfaceDefinition): boolean {
+  return stableStringify(left) === stableStringify(right);
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function mapControlSurfaceRecord(
