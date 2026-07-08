@@ -1220,6 +1220,140 @@ describe("collaboration and communications API", () => {
     );
   });
 
+  it("treats duplicate meeting action item status updates as idempotent", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const meeting = await createMeeting(adminCookie);
+
+    const actionItem = await app.request(`/api/workspace/meetings/${meeting.meeting.id}/action-items`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        title: "Закрыть риск по повторному клику",
+        ownerUserId: "user-alpha-executor",
+        targetEntityType: "project",
+        targetEntityId: "project-alpha"
+      })
+    });
+    expect(actionItem.status).toBe(201);
+    const actionItemPayload = await actionItem.json() as {
+      actionItem: { id: string; status: string };
+    };
+
+    const firstUpdate = await app.request(
+      `/api/workspace/meetings/${meeting.meeting.id}/action-items/${actionItemPayload.actionItem.id}`,
+      {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ status: "done" })
+      }
+    );
+    expect(firstUpdate.status).toBe(200);
+    await expect(firstUpdate.json()).resolves.toMatchObject({
+      actionItem: { id: actionItemPayload.actionItem.id, status: "done" }
+    });
+
+    const duplicateUpdate = await app.request(
+      `/api/workspace/meetings/${meeting.meeting.id}/action-items/${actionItemPayload.actionItem.id}`,
+      {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ status: "done" })
+      }
+    );
+    expect(duplicateUpdate.status).toBe(200);
+    await expect(duplicateUpdate.json()).resolves.toMatchObject({
+      actionItem: { id: actionItemPayload.actionItem.id, status: "done" }
+    });
+
+    const detail = await app.request(`/api/workspace/meetings/${meeting.meeting.id}`, {
+      headers: { cookie: adminCookie }
+    });
+    expect(detail.status).toBe(200);
+    const detailPayload = await detail.json() as {
+      actionItems: Array<{ id: string; status: string }>;
+    };
+    expect(
+      detailPayload.actionItems.filter((item) => item.id === actionItemPayload.actionItem.id)
+    ).toEqual([expect.objectContaining({ status: "done" })]);
+
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    const auditPayload = await audit.json() as { auditEvents: Array<{ actionType: string }> };
+    expect(
+      auditPayload.auditEvents.filter(
+        (event) => event.actionType === "collaboration.meeting_action_item_updated"
+      )
+    ).toHaveLength(1);
+
+    const concurrentActionItem = await app.request(`/api/workspace/meetings/${meeting.meeting.id}/action-items`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        title: "Закрыть риск по гонке статуса",
+        ownerUserId: "user-alpha-executor",
+        targetEntityType: "project",
+        targetEntityId: "project-alpha"
+      })
+    });
+    expect(concurrentActionItem.status).toBe(201);
+    const concurrentActionItemPayload = await concurrentActionItem.json() as {
+      actionItem: { id: string; status: string };
+    };
+
+    const concurrentResponses = await Promise.all([
+      app.request(
+        `/api/workspace/meetings/${meeting.meeting.id}/action-items/${concurrentActionItemPayload.actionItem.id}`,
+        {
+          method: "PATCH",
+          headers: jsonHeaders(adminCookie),
+          body: JSON.stringify({ status: "done" })
+        }
+      ),
+      app.request(
+        `/api/workspace/meetings/${meeting.meeting.id}/action-items/${concurrentActionItemPayload.actionItem.id}`,
+        {
+          method: "PATCH",
+          headers: jsonHeaders(adminCookie),
+          body: JSON.stringify({ status: "done" })
+        }
+      )
+    ]);
+    expect(concurrentResponses.map((response) => response.status).sort()).toEqual([200, 200]);
+    const concurrentBodies = await Promise.all(concurrentResponses.map((response) => response.json())) as Array<{
+      actionItem: { id: string; status: string };
+    }>;
+    expect(concurrentBodies).toEqual([
+      expect.objectContaining({ actionItem: expect.objectContaining({ status: "done" }) }),
+      expect.objectContaining({ actionItem: expect.objectContaining({ status: "done" }) })
+    ]);
+
+    const concurrentDetail = await app.request(`/api/workspace/meetings/${meeting.meeting.id}`, {
+      headers: { cookie: adminCookie }
+    });
+    expect(concurrentDetail.status).toBe(200);
+    const concurrentDetailPayload = await concurrentDetail.json() as {
+      actionItems: Array<{ id: string; status: string }>;
+    };
+    expect(
+      concurrentDetailPayload.actionItems.filter(
+        (item) => item.id === concurrentActionItemPayload.actionItem.id
+      )
+    ).toEqual([expect.objectContaining({ status: "done" })]);
+
+    const concurrentAudit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    const concurrentAuditPayload = await concurrentAudit.json() as {
+      auditEvents: Array<{ actionType: string }>;
+    };
+    expect(
+      concurrentAuditPayload.auditEvents.filter(
+        (event) => event.actionType === "collaboration.meeting_action_item_updated"
+      )
+    ).toHaveLength(2);
+  });
+
   it("requires explicit action item target for non-actionable meeting scopes", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const meeting = await app.request("/api/workspace/meetings", {

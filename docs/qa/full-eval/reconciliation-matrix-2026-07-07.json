@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 66,
+    "fixedByCurrentBranchItems": 67,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 4,
@@ -1244,6 +1244,20 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This fixes and covers the media recording simultaneous first-start race. It is still DB/API/injected-egress coverage, not full real browser/provider LiveKit/Jitsi media traversal."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-MEETING-ACTION-ITEM-STATUS-IDEMPOTENCY",
+      "source": "current branch backend fix plus targeted DB/API write-flow regression coverage",
+      "surface": "PATCH /api/workspace/meetings/:meetingId/action-items/:actionItemId, GET /api/workspace/meetings/:meetingId, GET /api/tenant/current/audit-events",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-meeting-action-item-status-idempotency-2026-07-08.json: pre-fix duplicate same-status PATCH produced duplicate meeting_action_item_updated audit events; after the fix, sequential and concurrent duplicate status updates return 200 readback with one persisted final state and one audit per real transition.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"treats duplicate meeting action item status updates\" -> pass; 1 selected test passed, 18 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This fixes and covers meetings action-item status duplicate/noop and concurrent duplicate idempotency. It does not close other meeting write flows such as meeting create duplicate submit, notes, external links, or broader full browser traversal."
     }
   ],
   "confirmedOpen": [],
@@ -1337,9 +1351,10 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-profile-theme-duplicate-updates-2026-07-08.json: profile contact and theme duplicate PATCH submissions return stable 200/200 pairs with session readback of the final values.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-batch-concurrent-idempotency-2026-07-08.json: planning apply-command-batch concurrent duplicate requests with the same idempotency key return equal 200 responses, one planVersion bump, and read back the batch once.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-duplicate-start-2026-07-08.json: duplicate recording start after an active session recording returns 409 without a second egress, recording row, event, or audit side effect.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-concurrent-start-lock-2026-07-08.json: simultaneous first recording-start race now serializes with one 201/one 409 and one recording/event readback after advisory transaction lock."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-concurrent-start-lock-2026-07-08.json: simultaneous first recording-start race now serializes with one 201/one 409 and one recording/event readback after advisory transaction lock.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-meeting-action-item-status-idempotency-2026-07-08.json: meetings action-item status duplicate/noop and concurrent duplicate updates return 200 readback with one final state and one audit per real transition."
       ],
-      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work/profile/knowledge/media-recording slices still need duplicate/race/idempotency evidence. Media recording duplicate-start and simultaneous first-start race are now covered at DB/API level."
+      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work/profile/knowledge/media-recording/meeting-action-item slices still need duplicate/race/idempotency evidence. Media recording duplicate-start, simultaneous first-start race, and meeting action-item status duplicates are now covered at DB/API level."
     }
   ],
   "nextAction": "Continue remaining risk-zone atoms: real Jitsi OBS/microphone browser handoff, live provider/LLM agent browser variants, live email reset inbox readback, and any uncovered write-flow race/idempotency surfaces."

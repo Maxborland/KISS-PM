@@ -1449,6 +1449,7 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
             eq(meetingActionItems.tenantId, input.tenantId),
             eq(meetingActionItems.meetingId, input.meetingId),
             eq(meetingActionItems.id, input.actionItemId),
+            ne(meetingActionItems.status, input.status),
             isNull(meetingActionItems.archivedAt)
           )
         )

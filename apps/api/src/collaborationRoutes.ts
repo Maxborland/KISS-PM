@@ -1112,17 +1112,34 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const status = parseMeetingActionItemStatus(readRecord(body.value).status);
     if (!status.ok) return context.json({ error: status.error }, 400);
-    if (!deps.dataSource.updateMeetingActionItem) {
+    if (!deps.dataSource.updateMeetingActionItem || !deps.dataSource.listMeetingActionItems) {
       return context.json({ error: "collaboration_not_configured" }, 501);
     }
     const updated = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const currentActionItems = await requireMethod(transactionDataSource.listMeetingActionItems).call(
+        transactionDataSource,
+        actor.tenantId,
+        meeting.value.meeting.id
+      );
+      const currentActionItem = currentActionItems.find((item) => item.id === actionItemId.value);
+      if (!currentActionItem) return undefined;
+      if (currentActionItem.status === status.value) return currentActionItem;
+
       const updatedActionItem = await requireMethod(transactionDataSource.updateMeetingActionItem).call(transactionDataSource, {
         tenantId: actor.tenantId,
         meetingId: meeting.value.meeting.id,
         actionItemId: actionItemId.value,
         status: status.value
       });
-      if (!updatedActionItem) return undefined;
+      if (!updatedActionItem) {
+        const refreshedActionItems = await requireMethod(transactionDataSource.listMeetingActionItems).call(
+          transactionDataSource,
+          actor.tenantId,
+          meeting.value.meeting.id
+        );
+        const refreshedActionItem = refreshedActionItems.find((item) => item.id === actionItemId.value);
+        return refreshedActionItem?.status === status.value ? refreshedActionItem : undefined;
+      }
       await deps.appendManagementAuditEvent(collaborationAudit({
         actionType: "collaboration.meeting_action_item_updated",
         actor,
