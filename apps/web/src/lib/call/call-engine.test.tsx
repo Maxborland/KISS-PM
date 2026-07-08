@@ -248,6 +248,13 @@ describe("useCallEngine participant state lifecycle", () => {
 
     expect(callClientMock.postParticipantState).not.toHaveBeenCalled();
     expect(livekitMock.instances[0]?.disconnect).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      pendingSession.resolve({ id: "session-1" });
+    });
+
+    expect(callClientMock.fetchJoinToken).not.toHaveBeenCalled();
+    expect(callClientMock.fetchTurnCredentials).not.toHaveBeenCalled();
   });
   it("keeps the participant in the room when the initial camera publish fails", async () => {
     livekitMock.failNextCameraEnable();

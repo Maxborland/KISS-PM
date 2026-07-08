@@ -283,6 +283,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     void (async () => {
       try {
         const session = await joinOrStartCallSession(roomId);
+        if (disposed) return;
         sessionIdRef.current = session.id;
         const [join, turn] = await Promise.all([
           fetchJoinToken(roomId, session.id),

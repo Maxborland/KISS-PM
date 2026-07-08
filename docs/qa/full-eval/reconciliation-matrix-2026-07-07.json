@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 74,
+    "fixedByCurrentBranchItems": 75,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 4,
@@ -1382,6 +1382,23 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This closes the self-hosted LiveKit browser/audio path and fixes dev stack/provider compatibility plus camera-publish failure handling. It does not close Jitsi external media, video publishing with a working camera source, remote participant, leave/rejoin, or reconnect coverage."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-LIVEKIT-MULTIUSER-LIFECYCLE",
+      "source": "current branch Playwright Chromium multi-context traversal, API readback, LiveKit log readback",
+      "surface": "/calls/[roomId] self-hosted LiveKit provider with admin + engineer isolated browser contexts",
+      "evidence": "docs/qa/full-eval/evidence/browser-media-livekit-multiuser-2026-07-08/risk-media-livekit-multiuser-lifecycle-2026-07-08.json: admin@kiss-pm.local and engineer@kiss-pm.local joined the same self-hosted LiveKit room; each saw the other participant in UI; LiveKit logs show active participants plus audio/video CAMERA/MICROPHONE tracks for both; engineer leave removed the remote tile while admin stayed in active session; engineer rejoin and reload-join restored the remote tile; API events show one token per real join after the StrictMode disposed guard.",
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL",
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        ".\\node_modules\\.bin\\vitest.CMD run apps/web/src/lib/call/call-engine.test.tsx -> pass; 1 file / 6 tests passed",
+        ".\\apps\\web\\node_modules\\.bin\\tsc.CMD -p apps/web/tsconfig.json --pretty false -> pass",
+        "Playwright Chromium two isolated contexts on http://127.0.0.1:3180/calls/call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa -> UI/API/LiveKit log pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "Closes self-hosted LiveKit multi-user lifecycle with synthetic fake-media browser devices and fixes duplicate join-token side effects from disposed StrictMode effects. Does not close physical OBS/real camera source validation, actual Jitsi media, or network reconnection under transport failure."
     }
   ],
   "confirmedOpen": [],
@@ -1415,9 +1432,10 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-duplicate-start-2026-07-08.json: recording start duplicate-submit suppression is covered at DB/API level with injected LiveKit egress; not a real browser/provider media pass.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-concurrent-start-lock-2026-07-08.json: injected LiveKit egress recording-start race is backend-locked and covered; not a real browser/provider media pass.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-call-participant-state-idempotency-2026-07-08.json: duplicate same-state participant updates now return 200 with event=null, keep one participant state row, preserve one participant_joined and one participant_left event for real transitions, and avoid duplicate communications.call_participant_state_updated audit entries.",
-        "docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/risk-media-livekit-self-hosted-browser-2026-07-08.json: self-hosted LiveKit browser traversal with Chrome localhost camera/microphone permissions reached /calls active stage; API readback has active session/join token/participant_joined; LiveKit logs show participant active and audio mediaTrack published from MICROPHONE; OBS camera source was unavailable so video stayed off by degraded fallback, not a clean video publish pass."
+        "docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/risk-media-livekit-self-hosted-browser-2026-07-08.json: self-hosted LiveKit browser traversal with Chrome localhost camera/microphone permissions reached /calls active stage; API readback has active session/join token/participant_joined; LiveKit logs show participant active and audio mediaTrack published from MICROPHONE; OBS camera source was unavailable so video stayed off by degraded fallback, not a clean video publish pass.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-multiuser-2026-07-08/risk-media-livekit-multiuser-lifecycle-2026-07-08.json: self-hosted LiveKit multi-user lifecycle passed with admin and engineer isolated browser contexts; remote participant tiles appeared in both UIs; engineer leave/rejoin/reload-join preserved active session; API events show participant_joined/left without session_ended and no duplicate join_token_issued after the disposed-effect guard; LiveKit logs show audio and video CAMERA tracks for both users."
       ],
-      "remainingEvidence": "Remaining live-provider evidence: camera video publish with a working OBS/physical source, actual Jitsi external media beyond the meet.jit.si moderator/auth gate, remote second participant, leave/rejoin, and reconnect behavior. Self-hosted LiveKit browser/audio path is now covered with real Chrome permissions, API readback, and LiveKit server logs; provider-disabled, Jitsi URL handoff, device-denied lobby, recording duplicate/race, and participant-state idempotency remain narrower partial sub-surfaces."
+      "remainingEvidence": "Remaining live-provider evidence: physical OBS/real camera-source validation in user Chrome, actual Jitsi external media beyond the meet.jit.si moderator/auth gate, and network reconnect under transport failure. Self-hosted LiveKit browser/audio path plus synthetic-camera multi-user remote participant, leave/rejoin, and reload-join lifecycle are now covered with UI screenshots, API readback, and LiveKit server logs."
     },
     {
       "id": "RISK-FULL-BROWSER-TRAVERSAL",
@@ -1430,10 +1448,11 @@
         "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/admin-communications-readonly-traversal-2026-07-08.json: admin read-only communications traversal passed for channels, chat, meetings, calls, and notifications with route-specific 200 API evidence, screenshots, and network logs.",
         "docs/qa/full-eval/evidence/browser-media-provider-disabled-connect-2026-07-08/risk-media-browser-provider-disabled-connect-2026-07-08.json: admin /communications/calls browser traversal covers empty state, create room modal, session start, connect denial, stable controls, and screenshot evidence.",
         "docs/qa/full-eval/evidence/browser-crm-readonly-write-denied-2026-07-08/risk-full-browser-traversal-crm-readonly-write-denied-2026-07-08.json: CRM read-only in-app Browser traversal covers login, /crm/deals kanban/list/forecast, disabled/no-drag write controls, direct 403 create/stage writes, and unchanged readback.",
-        "docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/risk-media-livekit-self-hosted-browser-2026-07-08.json: admin Chrome traversal covers /calls/[roomId] self-hosted LiveKit lobby/join/active-call path with real localhost media permission grant, API readback, screenshot, and LiveKit audio publication logs."
+        "docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/risk-media-livekit-self-hosted-browser-2026-07-08.json: admin Chrome traversal covers /calls/[roomId] self-hosted LiveKit lobby/join/active-call path with real localhost media permission grant, API readback, screenshot, and LiveKit audio publication logs.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-multiuser-2026-07-08/risk-media-livekit-multiuser-lifecycle-2026-07-08.json: full-browser traversal partial now includes two-role /calls/[roomId] self-hosted LiveKit admin+engineer join/leave/rejoin/reload path with screenshots and backend/server readback."
       ],
-      "remainingEvidence": "Remaining full-browser traversal still required for other roles/routes/actions: Jitsi actual media beyond external moderator/auth gate, camera video publish with a working OBS/physical source, remote participant/leave/rejoin/reconnect media variants, live/browser agent provider variants, mobile/responsive passes, and any routes not yet covered by role-specific traversal evidence."
+      "remainingEvidence": "Remaining full-browser traversal still required for other roles/routes/actions: physical OBS/real camera-source media in user Chrome, Jitsi actual media beyond external moderator/auth gate, network reconnect media variant, live/browser agent provider variants, mobile/responsive passes, and routes not yet covered by role-specific traversal evidence."
     }
   ],
-  "nextAction": "Continue remaining non-write-flow risk zones: full browser traversal for every role/route/action; media tail of camera video publish with working OBS/physical source, Jitsi external media/moderator gate, remote participant, leave/rejoin, reconnect; and live OpenRouter/agent provider browser variants."
+  "nextAction": "Continue remaining non-write-flow risk zones: full browser traversal for every role/route/action; media tail of physical OBS/real camera source, Jitsi external media/moderator gate, and network reconnect; live OpenRouter/agent provider browser variants."
 }

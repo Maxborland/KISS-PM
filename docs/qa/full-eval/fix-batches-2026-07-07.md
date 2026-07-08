@@ -502,3 +502,29 @@
 - GREEN: API readback shows active session and `participant_joined`; LiveKit logs show participant active and `mediaTrack published` for audio source `MICROPHONE`.
 
 **Remaining:** this does not close the entire media provider risk zone. Still required: camera video publish with a working OBS/physical camera source, actual Jitsi media beyond the meet.jit.si moderator/auth gate, remote second participant, leave/rejoin, and reconnect behavior.
+
+## Batch 21 — Self-hosted LiveKit multi-user lifecycle
+
+**Status:** partially closed — self-hosted LiveKit multi-user lifecycle fixed and verified; physical camera/Jitsi/network-reconnect tails remain.
+
+**Risk zone:** `RISK-MEDIA-LIVEKIT-JITSI-CALL`, `RISK-FULL-BROWSER-TRAVERSAL`
+
+**Surface:** `/calls/[roomId]`, `apps/web/src/lib/call/call-engine.ts`, self-hosted LiveKit Docker profile.
+
+**Fix evidence:** `docs/qa/full-eval/evidence/browser-media-livekit-multiuser-2026-07-08/risk-media-livekit-multiuser-lifecycle-2026-07-08.json`; screenshots in the same directory.
+
+**Expected:** two different users can join the same self-hosted LiveKit room, see each other in the call UI, publish local audio/video, leave/rejoin without ending the session for the other participant, and avoid duplicate backend side effects for non-real joins.
+
+**Actual before:** the first multi-user traversal passed UI/media, but API readback showed duplicate `join_token_issued` events per real join. The root cause was `useCallEngine` continuing from `joinOrStartCallSession` into `fetchJoinToken` after the first dev/StrictMode effect had already been disposed.
+
+**Fix applied:** `useCallEngine` now returns immediately after `joinOrStartCallSession` when the effect has been disposed, before issuing join tokens or TURN credentials. The existing cleanup/left behavior remains unchanged.
+
+**Verification:**
+
+- GREEN: `.\node_modules\.bin\vitest.CMD run apps/web/src/lib/call/call-engine.test.tsx` -> 1 file / 6 tests passed, including the new no-token-after-disposed-session regression.
+- GREEN: `.\apps\web\node_modules\.bin\tsc.CMD -p apps/web/tsconfig.json --pretty false` -> passed.
+- GREEN: Playwright Chromium two isolated contexts: admin and engineer joined `call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa`; each UI showed the other participant; screenshots saved.
+- GREEN: API readback stayed `active`, had no `session_ended`, and after the fix had exactly one `join_token_issued` per real observed join: admin 1, engineer 3 (initial join, explicit rejoin, reload join).
+- GREEN: LiveKit logs show both users active and audio/video tracks published from `MICROPHONE`/`CAMERA`; engineer explicit leave closed only that participant while admin remained in the call.
+
+**Remaining:** the camera source in this run is Playwright fake media, not the user's physical/OBS source. Jitsi actual media behind meet.jit.si moderator/auth and network reconnect under transport failure remain separate tails.
