@@ -456,3 +456,23 @@
 **Verification:** `cmd /c ..\..\node_modules\.bin\vitest.cmd run --config vitest.config.ts src/lib/call/call-engine.test.tsx` → 4 tests passed; `corepack pnpm --filter @kiss-pm/web typecheck` → passed.
 
 **Remaining:** full LiveKit/Jitsi provider browser traversal remains unverified: provider config, prejoin, permissions, real join, remote participant, media-denied behavior, reconnect, leave/rejoin.
+
+## Batch 19 — Auth reset browser mechanics and live mail readback
+
+**Status:** partial / blocked by mailbox delivery, not closed
+
+**Risk zone:** `RISK-AUTH-EMAIL-RESET-HAPPY-PATH`
+
+**Surface:** `/register`, `/password-reset`, `/password-reset/confirm`, `/login`, `POST /api/auth/password-reset/*`, REG.RU SMTP/IMAP/POP3.
+
+**Fix evidence:** `docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-browser-smtp-readback-2026-07-08.json`
+
+**Expected:** browser user requests reset, reset email is delivered to mailbox, token is extracted from the received email, browser confirm accepts it, old password is rejected, new password logs in.
+
+**Actual observed:** browser register/reset-confirm/login mechanics passed on an auth-capable `createApp` harness using the same auth routes; old password was rejected and new password was accepted. Live REG.RU SMTP accepted reset email sends, but IMAP all folders and POP3 readback returned zero messages. Browser reset request degraded to the “mail is not configured / письмо не придёт” state.
+
+**Fix applied:** no production code change. This batch documents fresh browser/API/provider evidence and keeps the risk zone open instead of marking a false pass.
+
+**Verification:** in-app browser traversal on `http://127.0.0.1:3102`: register → request reset → confirm captured 64-hex token → login; API readback on the same harness: old password `401 invalid_credentials`, new password `200` with `Set-Cookie`. Provider diagnostic: REG.RU SMTP accepted send; IMAP `Trash/Junk/Sent/Drafts/INBOX` uidCount=0; POP3 recentCount=0.
+
+**Remaining:** full delivered-email happy path is still blocked until mailbox delivery/routing works or a working mailcatcher/provider is configured. Docker/WSL/Postgres was unavailable in this run, so persistence-backed local browser reset still needs a healthy DB environment.

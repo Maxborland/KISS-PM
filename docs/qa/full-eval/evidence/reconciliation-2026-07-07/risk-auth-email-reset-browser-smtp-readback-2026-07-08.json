@@ -1,0 +1,472 @@
+{
+  "id": "RISK-AUTH-EMAIL-RESET-BROWSER-SMTP-READBACK-2026-07-08",
+  "generatedAt": "2026-07-08T07:27:59.584Z",
+  "linkedRiskZones": [
+    "RISK-AUTH-EMAIL-RESET-HAPPY-PATH"
+  ],
+  "status": "partial-blocked",
+  "scope": "Browser traversal of register -> password reset request -> confirm -> login with live app routes plus REG.RU SMTP/IMAP/POP3 readback. Postgres/Docker unavailable, so auth-capable harness used createApp with the same auth routes and a test-pattern in-memory auth dataSource; SMTP provider still used real REG.RU credentials.",
+  "secretsPolicy": "Passwords, SMTP password, and raw reset token are intentionally omitted/redacted. Token was captured only in C:/tmp for the browser confirm step and not committed.",
+  "infrastructureLimitations": [
+    "Docker daemon did not start; WSL returned access denied, so local Postgres persistence could not be used for this auth block.",
+    "Default API in-memory fallback lacks auth write methods, causing live /register to show 'Аутентификация недоступна' without Postgres.",
+    "Auth harness is not product code and was not committed; it exists only to unblock route/UI mechanics verification."
+  ],
+  "browserEvidence": {
+    "startedAt": "2026-07-08T07:15:15.390Z",
+    "screenshots": [],
+    "steps": [
+      {
+        "id": "register-form-filled",
+        "url": "http://127.0.0.1:3100/register",
+        "counts": {
+          "name": 1,
+          "email": 1,
+          "password": 1,
+          "register": 1
+        },
+        "registerButtonEnabledAfterValidInput": true
+      },
+      {
+        "id": "register-submit",
+        "url": "http://127.0.0.1:3100/register",
+        "h1": "Регистрация",
+        "bodyExcerpt": "К\nKISS PM\nРабочее пространство\nРегистрация\n\nСоздайте учётную запись в рабочем пространстве\n\nНекорректный ответ сервера\nИмя\nEmail\nПароль\nНе короче 8 символов, без управляющих символов.\nСоздать аккаунт\nУже есть аккаунт? Войти"
+      },
+      {
+        "id": "register-page-after-web-restart",
+        "url": "http://127.0.0.1:3100/register",
+        "bodyExcerpt": "К\nKISS PM\nРабочее пространство\nРегистрация\n\nСоздайте учётную запись в рабочем пространстве\n\nИмя\nEmail\nПароль\nНе короче 8 символов, без управляющих символов.\nСоздать аккаунт\nУже есть аккаунт? Войти"
+      },
+      {
+        "id": "register-submit-live-api",
+        "counts": {
+          "name": 1,
+          "email": 1,
+          "password": 1,
+          "register": 1
+        },
+        "registerButtonEnabledAfterValidInput": true,
+        "url": "http://127.0.0.1:3100/register",
+        "h1": "Регистрация",
+        "bodyExcerpt": "К\nKISS PM\nРабочее пространство\nРегистрация\n\nСоздайте учётную запись в рабочем пространстве\n\nАутентификация недоступна\nИмя\nEmail\nПароль\nНе короче 8 символов, без управляющих символов.\nСоздать аккаунт\nУже есть аккаунт? Войти"
+      },
+      {
+        "id": "register-submit-harness-live-smtp-stack",
+        "controls": [
+          {
+            "aria": null,
+            "disabled": false,
+            "href": null,
+            "placeholder": "Иван Иванов",
+            "tag": "input",
+            "text": "",
+            "type": null
+          },
+          {
+            "aria": null,
+            "disabled": false,
+            "href": null,
+            "placeholder": "you@example.com",
+            "tag": "input",
+            "text": "",
+            "type": "email"
+          },
+          {
+            "aria": null,
+            "disabled": false,
+            "href": null,
+            "placeholder": "Минимум 8 символов",
+            "tag": "input",
+            "text": "",
+            "type": "password"
+          },
+          {
+            "aria": "Показать пароль",
+            "disabled": false,
+            "href": null,
+            "placeholder": null,
+            "tag": "button",
+            "text": "",
+            "type": "button"
+          },
+          {
+            "aria": null,
+            "disabled": true,
+            "href": null,
+            "placeholder": null,
+            "tag": "button",
+            "text": "Создать аккаунт",
+            "type": "submit"
+          },
+          {
+            "aria": null,
+            "disabled": false,
+            "href": "/login",
+            "placeholder": null,
+            "tag": "a",
+            "text": "Войти",
+            "type": null
+          }
+        ],
+        "counts": {
+          "name": 1,
+          "email": 1,
+          "password": 1,
+          "register": 1
+        },
+        "buttonEnabled": true,
+        "after": {
+          "url": "http://127.0.0.1:3102/dashboard",
+          "h1": "Дашборд",
+          "bodyExcerpt": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nAR\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nНе удалось собрать сводку\n\npersistence_not_configured\n\nПовторить"
+        }
+      },
+      {
+        "id": "password-reset-request-browser",
+        "before": {
+          "body": "К\nKISS PM\nРабочее пространство\nСброс пароля\n\nУкажите email рабочего пространства — мы отправим инструкции по сбросу пароля.\n\nEmail\nОтправить инструкции\nУже есть токен? Перейти к подтверждению",
+          "controls": [
+            {
+              "disabled": false,
+              "href": null,
+              "placeholder": "you@kiss-pm.local",
+              "tag": "input",
+              "text": "",
+              "type": "email"
+            },
+            {
+              "disabled": false,
+              "href": null,
+              "placeholder": null,
+              "tag": "button",
+              "text": "Отправить инструкции",
+              "type": "submit"
+            },
+            {
+              "disabled": false,
+              "href": "/password-reset/confirm",
+              "placeholder": null,
+              "tag": "a",
+              "text": "Уже есть токен? Перейти к подтверждению",
+              "type": null
+            }
+          ],
+          "h1": "Сброс пароля",
+          "title": "Сброс пароля — KISS PM",
+          "url": "http://127.0.0.1:3102/password-reset"
+        },
+        "counts": {
+          "email": 1,
+          "send": 1
+        },
+        "sendEnabled": true,
+        "requestedAt": "2026-07-08T07:20:05.598Z",
+        "after": {
+          "body": "К\nKISS PM\nРабочее пространство\nСброс пароля\n\nУкажите email рабочего пространства — мы отправим инструкции по сбросу пароля.\n\nEmail\nОтправить инструкции\nЕсли адрес зарегистрирован — мы отправили инструкции по сбросу пароля.\nУже есть токен? Перейти к подтверждению",
+          "h1": "Сброс пароля",
+          "statusTexts": [
+            "Если адрес зарегистрирован — мы отправили инструкции по сбросу пароля."
+          ],
+          "url": "http://127.0.0.1:3102/password-reset"
+        }
+      },
+      {
+        "id": "full-ui-register-and-reset-request-token-capture-stack",
+        "registerAfter": {
+          "body": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nAR\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nНе удалось собрать сводку\n\npersistence_not_configured\n\nПовторить",
+          "h1": "Дашборд",
+          "url": "http://127.0.0.1:3102/dashboard"
+        },
+        "resetRequestAfter": {
+          "body": "К\nKISS PM\nРабочее пространство\nСброс пароля\n\nУкажите email рабочего пространства — мы отправим инструкции по сбросу пароля.\n\nEmail\nОтправить инструкции\nУже есть токен? Перейти к подтверждению",
+          "h1": "Сброс пароля",
+          "statusTexts": [],
+          "url": "http://127.0.0.1:3102/password-reset"
+        },
+        "requestedAt": "2026-07-08T07:24:54.918Z"
+      },
+      {
+        "id": "reset-request-after-smtp-wait",
+        "after": {
+          "body": "К\nKISS PM\nРабочее пространство\nСброс пароля\n\nУкажите email рабочего пространства — мы отправим инструкции по сбросу пароля.\n\nEmail\nОтправить инструкции\nЗаявка принята, но отправка почты в этой инсталляции не настроена — письмо не придёт. Попросите администратора настроить SMTP или выдать токен сброса, затем введите его на странице подтверждения.\nУже есть токен? Перейти к подтверждению",
+          "buttons": [
+            {
+              "disabled": false,
+              "text": "Отправить инструкции"
+            }
+          ],
+          "h1": "Сброс пароля",
+          "statusTexts": [
+            "Заявка принята, но отправка почты в этой инсталляции не настроена — письмо не придёт. Попросите администратора настроить SMTP или выдать токен сброса, затем введите его на странице подтверждения."
+          ],
+          "url": "http://127.0.0.1:3102/password-reset"
+        }
+      },
+      {
+        "id": "password-reset-confirm-browser",
+        "tokenCapture": {
+          "generatedAt": "2026-07-08T07:24:54.970Z",
+          "resetUrlPreview": "http://127.0.0.1:4102/password-reset/confirm?token=<reset-token-redacted>"
+        },
+        "before": {
+          "body": "К\nKISS PM\nРабочее пространство\nНовый пароль\n\nВставьте токен сброса и задайте новый пароль рабочего пространства.\n\nТокен сброса\nНовый пароль\nИзменить пароль\nНет токена? Запросить сброс заново",
+          "controls": [
+            {
+              "disabled": false,
+              "placeholder": "64-символьный токен из письма",
+              "tag": "input",
+              "text": "",
+              "type": null
+            },
+            {
+              "disabled": false,
+              "placeholder": "Минимум 8 символов",
+              "tag": "input",
+              "text": "",
+              "type": "password"
+            },
+            {
+              "disabled": false,
+              "placeholder": null,
+              "tag": "button",
+              "text": "",
+              "type": "button"
+            },
+            {
+              "disabled": false,
+              "placeholder": null,
+              "tag": "button",
+              "text": "Изменить пароль",
+              "type": "submit"
+            },
+            {
+              "disabled": false,
+              "href": "/password-reset",
+              "placeholder": null,
+              "tag": "a",
+              "text": "Нет токена? Запросить сброс заново",
+              "type": null
+            }
+          ],
+          "h1": "Новый пароль",
+          "url": "http://127.0.0.1:3102/password-reset/confirm?token=<token-redacted>"
+        },
+        "confirmCounts": {
+          "token": 1,
+          "password": 1,
+          "submit": 1
+        },
+        "tokenPrepopulatedLength": 64,
+        "after": {
+          "body": "К\nKISS PM\nРабочее пространство\nНовый пароль\n\nВставьте токен сброса и задайте новый пароль рабочего пространства.\n\nПароль изменён — войдите с новым паролем.\nПерейти ко входу\nНет токена? Запросить сброс заново",
+          "h1": "Новый пароль",
+          "statusTexts": [
+            "Пароль изменён — войдите с новым паролем."
+          ],
+          "url": "http://127.0.0.1:3102/password-reset/confirm?token=<token-redacted>"
+        }
+      },
+      {
+        "id": "password-reset-login-readback-browser-and-api",
+        "currentBrowser": {
+          "body": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nAR\nДашборд\n\nПерсональная сводка: задачи, проекты и сделки рабочей области\n\nНе удалось собрать сводку\n\npersistence_not_configured\n\nПовторить",
+          "h1": "Дашборд",
+          "url": "http://127.0.0.1:3102/dashboard"
+        },
+        "apiOldPassword": {
+          "status": 401,
+          "body": {
+            "error": "invalid_credentials"
+          }
+        },
+        "apiNewPassword": {
+          "status": 200,
+          "hasSetCookie": true,
+          "userId": "user-62b5cab7-322d-4af0-b14c-b688a24d4491",
+          "workspaceId": "tenant-f5655b44-eed7-4bab-97f3-9d89adbf8a6f"
+        }
+      }
+    ],
+    "registerUrl": "http://127.0.0.1:3100/register",
+    "registerControls": [
+      {
+        "aria": null,
+        "disabled": false,
+        "href": null,
+        "name": null,
+        "placeholder": "Иван Иванов",
+        "tag": "input",
+        "text": "",
+        "type": null
+      },
+      {
+        "aria": null,
+        "disabled": false,
+        "href": null,
+        "name": null,
+        "placeholder": "you@example.com",
+        "tag": "input",
+        "text": "",
+        "type": "email"
+      },
+      {
+        "aria": null,
+        "disabled": false,
+        "href": null,
+        "name": null,
+        "placeholder": "Минимум 8 символов",
+        "tag": "input",
+        "text": "",
+        "type": "password"
+      },
+      {
+        "aria": "Показать пароль",
+        "disabled": false,
+        "href": null,
+        "name": null,
+        "placeholder": null,
+        "tag": "button",
+        "text": "",
+        "type": "button"
+      },
+      {
+        "aria": null,
+        "disabled": true,
+        "href": null,
+        "name": null,
+        "placeholder": null,
+        "tag": "button",
+        "text": "Создать аккаунт",
+        "type": "submit"
+      },
+      {
+        "aria": null,
+        "disabled": false,
+        "href": "/login",
+        "name": null,
+        "placeholder": null,
+        "tag": "a",
+        "text": "Войти",
+        "type": null
+      }
+    ],
+    "mailRequestStartedAt": "2026-07-08T07:20:05.598Z",
+    "mailRequestStartedAt2": "2026-07-08T07:24:54.918Z"
+  },
+  "providerReadback": {
+    "id": "RISK-AUTH-EMAIL-RESET-PROVIDER-READBACK-DIAGNOSTIC",
+    "generatedAt": "2026-07-08T07:21:55.846Z",
+    "linkedRiskZones": [
+      "RISK-AUTH-EMAIL-RESET-HAPPY-PATH"
+    ],
+    "scope": "Provider-level SMTP send plus IMAP/POP3 mailbox readback for password reset email marker. This does not exercise browser confirm/login.",
+    "secretsPolicy": "Loaded .env.local/user env values are not emitted. Recipient, credentials, and reset token are intentionally omitted.",
+    "status": "partial",
+    "provider": {
+      "selected": "smtp",
+      "smtp": {
+        "acceptedByProviderPath": true,
+        "host": "mail.hosting.reg.ru",
+        "port": 465,
+        "secure": true,
+        "requireTls": true
+      },
+      "recipientSource": "KISS_PM_MAIL_READBACK_TO"
+    },
+    "readback": {
+      "waitMs": 15000,
+      "imap": {
+        "status": "fail",
+        "host": "mail.hosting.reg.ru",
+        "port": 993,
+        "found": false,
+        "folders": [
+          {
+            "folder": "Trash",
+            "uidCount": 0
+          },
+          {
+            "folder": "Junk",
+            "uidCount": 0
+          },
+          {
+            "folder": "Sent",
+            "uidCount": 0
+          },
+          {
+            "folder": "Drafts",
+            "uidCount": 0
+          },
+          {
+            "folder": "INBOX",
+            "uidCount": 0
+          }
+        ]
+      },
+      "pop3": {
+        "status": "fail",
+        "host": "mail.hosting.reg.ru",
+        "port": 995,
+        "found": false,
+        "recentCount": 0
+      }
+    },
+    "coverageImpact": {
+      "RISK-AUTH-EMAIL-RESET-HAPPY-PATH": "SMTP provider accepted the reset email, but mailbox readback did not find it; full live reset via email remains open."
+    }
+  },
+  "imapRetry": {
+    "generatedAt": "2026-07-08T07:23:11.343Z",
+    "requestedAt": "2026-07-08T07:20:05.598Z",
+    "host": "mail.hosting.reg.ru",
+    "port": 993,
+    "folders": [
+      "Trash",
+      "Junk",
+      "Sent",
+      "Drafts",
+      "INBOX"
+    ],
+    "checked": [
+      {
+        "folder": "Trash",
+        "uidCount": 0
+      },
+      {
+        "folder": "Junk",
+        "uidCount": 0
+      },
+      {
+        "folder": "Sent",
+        "uidCount": 0
+      },
+      {
+        "folder": "Drafts",
+        "uidCount": 0
+      },
+      {
+        "folder": "INBOX",
+        "uidCount": 0
+      }
+    ],
+    "found": false,
+    "foundRedacted": null,
+    "token": null
+  },
+  "conclusions": {
+    "pass": [
+      "Browser registration form controls were present and enabled after valid input on the auth-capable stack.",
+      "Browser reset confirm accepted a 64-hex token and displayed 'Пароль изменён — войдите с новым паролем.'",
+      "Browser login with the new password redirected to /dashboard.",
+      "API readback on the same auth route rejected the old password with 401 invalid_credentials.",
+      "API readback accepted the new password with 200 and Set-Cookie."
+    ],
+    "failedOrBlocked": [
+      "Live web against the default no-Postgres API cannot register: it shows 'Аутентификация недоступна'.",
+      "Reset request completed as delivery='none' after SMTP wait in the browser, not as successful delivered-email state.",
+      "REG.RU SMTP accepted provider-level reset emails, but IMAP all folders and POP3 readback returned zero messages, so delivered-token mailbox extraction remains unverified/blocked."
+    ]
+  },
+  "matrixImpact": "Narrows RISK-AUTH-EMAIL-RESET-HAPPY-PATH for browser confirm/login mechanics and live SMTP acceptance, but does not close the risk zone because mailbox delivery/readback failed."
+}
