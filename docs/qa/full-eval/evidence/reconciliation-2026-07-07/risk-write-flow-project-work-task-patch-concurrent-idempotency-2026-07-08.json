@@ -1,0 +1,34 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-WORK-TASK-PATCH-CONCURRENCY",
+  "generatedAt": "2026-07-08T10:24:00+07:00",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "status": "pass",
+  "scope": "Project Work task metadata PATCH concurrent duplicate/stale-version behavior.",
+  "surfaces": [
+    "PATCH /api/workspace/tasks/:taskId",
+    "GET /api/workspace/tasks/:taskId",
+    "GET /api/workspace/projects/:projectId/planning/read-model",
+    "GET /api/tenant/current/audit-events"
+  ],
+  "expected": "Two concurrent duplicate task PATCH requests using the same clientUpdatedAt should serialize through optimistic concurrency: exactly one request succeeds, the loser receives task_version_conflict, final task/planning readback reflects the winner once, and side effects are single-use.",
+  "actual": "Pass: concurrent duplicate task PATCH returned one 200 and one 409 task_version_conflict; task detail readback showed the winner title, planning read-model planVersion incremented once, task detail showed one system activity, and audit events contained exactly one task.updated event for the target task.",
+  "preCoverageGap": "The full-evaluation write-flow matrix had project-task create/archive and task-status coverage, but no fresh duplicate/concurrent evidence for task metadata PATCH with clientUpdatedAt optimistic concurrency.",
+  "codeChanges": [
+    "apps/api/src/projectWorkRoutes.db.test.ts adds a DB/API regression covering concurrent duplicate PATCH, winner/loser responses, task readback, planning read-model version bump, system activity count, and audit count.",
+    "No production code change was needed for this atom; existing task update locking and clientUpdatedAt version checks already produced the expected 200/409 single-use behavior."
+  ],
+  "verification": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"keeps concurrent duplicate task PATCH updates\"",
+      "observed": "1 selected test passed, 23 skipped",
+      "notes": "Vitest emitted the existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts, unrelated to this slice.",
+      "result": "pass"
+    }
+  ],
+  "changedFiles": [
+    "apps/api/src/projectWorkRoutes.db.test.ts",
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-patch-concurrent-idempotency-2026-07-08.json",
+    "docs/qa/full-eval/reconciliation-matrix-2026-07-07.json"
+  ],
+  "coverageImpact": "Adds fresh DB/API evidence for Project Work task PATCH duplicate/concurrent optimistic-concurrency behavior. Broader RISK-WRITE-FLOW-RACE-IDEMPOTENCY remains open for other write surfaces such as call participant-state, meeting create duplicate submit, control-surface publish/rollback, retrospective close, and comment idempotency policy."
+}

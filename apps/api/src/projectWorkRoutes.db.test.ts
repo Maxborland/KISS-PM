@@ -1360,6 +1360,125 @@ describe("project work API routes", () => {
     await expect(staleUpdate.json()).resolves.toEqual({ error: "task_version_conflict" });
   });
 
+  it("keeps concurrent duplicate task PATCH updates single-use", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        id: "task-concurrent-patch",
+        title: "Проверить конкурентное сохранение",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-executor", role: "executor" }]
+      })
+    });
+    const detailBefore = await app.request("/api/workspace/tasks/task-concurrent-patch", {
+      headers: { cookie: adminCookie }
+    });
+    const detailBeforeBody = await detailBefore.json() as {
+      task: { updatedAt: string };
+    };
+    const planBefore = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    const planBeforeBody = await planBefore.json() as { planVersion: number };
+    const body = JSON.stringify(buildTaskPatchBody({
+      title: "Конкурентное сохранение принято",
+      clientUpdatedAt: detailBeforeBody.task.updatedAt
+    }));
+
+    const responses = await Promise.all([
+      app.request("/api/workspace/tasks/task-concurrent-patch", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body
+      }),
+      app.request("/api/workspace/tasks/task-concurrent-patch", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body
+      })
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    const responseBodies = await Promise.all(responses.map((response) => response.json())) as Array<{
+      error?: string;
+      task?: { id: string; title: string };
+    }>;
+    expect(responseBodies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task: expect.objectContaining({
+            id: "task-concurrent-patch",
+            title: "Конкурентное сохранение принято"
+          })
+        }),
+        { error: "task_version_conflict" }
+      ])
+    );
+
+    const detailAfter = await app.request("/api/workspace/tasks/task-concurrent-patch", {
+      headers: { cookie: adminCookie }
+    });
+    const detailAfterBody = await detailAfter.json() as {
+      task: { id: string; title: string };
+      activities: Array<{ type: string; title: string }>;
+    };
+    expect(detailAfterBody.task).toMatchObject({
+      id: "task-concurrent-patch",
+      title: "Конкурентное сохранение принято"
+    });
+    expect(
+      detailAfterBody.activities.filter(
+        (activity) => activity.type === "system" && activity.title === "Задача обновлена"
+      )
+    ).toHaveLength(1);
+    const planAfter = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const planAfterBody = await planAfter.json() as {
+      planVersion: number;
+      authored: { tasks: Array<{ id: string; title: string }> };
+    };
+    expect(planAfterBody.planVersion).toBe(planBeforeBody.planVersion + 1);
+    expect(planAfterBody.authored.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "task-concurrent-patch",
+          title: "Конкурентное сохранение принято"
+        })
+      ])
+    );
+
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    const auditBody = await audit.json() as {
+      auditEvents: Array<{ actionType: string; sourceEntity?: { type?: string; id?: string } }>;
+    };
+    expect(
+      auditBody.auditEvents.filter(
+        (event) =>
+          event.actionType === "task.updated" &&
+          event.sourceEntity?.type === "Task" &&
+          event.sourceEntity.id === "task-concurrent-patch"
+      )
+    ).toHaveLength(1);
+  });
   it("rejects stale task PATCH after planning assignment changes", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await app.request("/api/workspace/projects/project-alpha/tasks", {
