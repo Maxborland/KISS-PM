@@ -754,6 +754,8 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseMeetingCreateBody(readRecord(body.value));
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    const clientRequestId = parseOptionalClientRequestId(readRecord(body.value).clientRequestId);
+    if (!clientRequestId.ok) return context.json({ error: clientRequestId.error }, 400);
     const validParticipants = await validateTenantUserIds(
       deps.dataSource,
       actor.tenantId,
@@ -786,8 +788,33 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       if (!transactionDataSource.createMeeting || !transactionDataSource.replaceMeetingParticipants) {
         return { ok: false as const };
       }
+      const proposedMeetingId = `meeting-${randomUUID()}`;
+      const claim = clientRequestId.value
+        ? await transactionDataSource.claimWriteFlowIdempotencyKey({
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            surface: "collaboration.meeting.create",
+            clientRequestId: clientRequestId.value,
+            resourceId: proposedMeetingId
+          })
+        : { claimed: true, resourceId: proposedMeetingId };
+      if (!claim.claimed) {
+        const existingMeeting = await requireMethod(transactionDataSource.findMeeting).call(
+          transactionDataSource,
+          actor.tenantId,
+          claim.resourceId
+        );
+        if (!existingMeeting) throw new Error("write_flow_idempotent_resource_missing");
+        const participants = await requireMethod(transactionDataSource.listMeetingParticipants).call(
+          transactionDataSource,
+          actor.tenantId,
+          existingMeeting.id
+        );
+        return { ok: true as const, meeting: existingMeeting, participants };
+      }
+
       const meeting = await transactionDataSource.createMeeting({
-        id: `meeting-${randomUUID()}`,
+        id: claim.resourceId,
         tenantId: actor.tenantId,
         entityType: access.value.entityType,
         entityId: access.value.entityId,
@@ -822,7 +849,10 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
           actionType: "collaboration.meeting_created",
           actor,
           sourceEntity: access.value.sourceEntity,
-          commandInput: { meetingId: meeting.id },
+          commandInput: {
+            meetingId: meeting.id,
+            ...(clientRequestId.value ? { clientRequestId: clientRequestId.value } : {})
+          },
           permissionResult: access.value.manageDecision,
           afterState: { participantIds: participants.map((participant) => participant.userId) }
         }),
@@ -937,6 +967,8 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const record = readRecord(body.value);
+    const clientRequestId = parseOptionalClientRequestId(record.clientRequestId);
+    if (!clientRequestId.ok) return context.json({ error: clientRequestId.error }, 400);
     const provider = parseMeetingExternalLinkProvider(record.provider);
     if (!provider.ok) return context.json({ error: provider.error }, 400);
     const url = parseExternalReferenceUrl(record.url);
@@ -947,8 +979,29 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       return context.json({ error: "collaboration_not_configured" }, 501);
     }
     const link = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const proposedLinkId = `meeting-link-${randomUUID()}`;
+      const claim = clientRequestId.value
+        ? await transactionDataSource.claimWriteFlowIdempotencyKey({
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            surface: `collaboration.meeting.external_link.create:${meeting.value.meeting.id}`,
+            clientRequestId: clientRequestId.value,
+            resourceId: proposedLinkId
+          })
+        : { claimed: true, resourceId: proposedLinkId };
+      if (!claim.claimed) {
+        const links = await requireMethod(transactionDataSource.listMeetingExternalLinks).call(
+          transactionDataSource,
+          actor.tenantId,
+          meeting.value.meeting.id
+        );
+        const existingLink = links.find((candidate) => candidate.id === claim.resourceId);
+        if (!existingLink) throw new Error("write_flow_idempotent_resource_missing");
+        return existingLink;
+      }
+
       const createdLink = await requireMethod(transactionDataSource.createMeetingExternalLink).call(transactionDataSource, {
-        id: `meeting-link-${randomUUID()}`,
+        id: claim.resourceId,
         tenantId: actor.tenantId,
         meetingId: meeting.value.meeting.id,
         provider: provider.value,
@@ -960,7 +1013,11 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         actionType: "collaboration.external_meeting_link_added",
         actor,
         sourceEntity: meeting.value.access.sourceEntity,
-        commandInput: { meetingId: meeting.value.meeting.id, provider: provider.value },
+        commandInput: {
+          meetingId: meeting.value.meeting.id,
+          provider: provider.value,
+          ...(clientRequestId.value ? { clientRequestId: clientRequestId.value } : {})
+        },
         permissionResult: meeting.value.access.manageDecision,
         afterState: { linkId: createdLink.id, provider: createdLink.provider }
       }), transactionDataSource);
@@ -992,14 +1049,38 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     }
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsedBody = parseMeetingNoteBody(readRecord(body.value).body);
+    const record = readRecord(body.value);
+    const clientRequestId = parseOptionalClientRequestId(record.clientRequestId);
+    if (!clientRequestId.ok) return context.json({ error: clientRequestId.error }, 400);
+    const parsedBody = parseMeetingNoteBody(record.body);
     if (!parsedBody.ok) return context.json({ error: parsedBody.error }, 400);
     if (!deps.dataSource.createMeetingNote) {
       return context.json({ error: "collaboration_not_configured" }, 501);
     }
     const note = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const proposedNoteId = `meeting-note-${randomUUID()}`;
+      const claim = clientRequestId.value
+        ? await transactionDataSource.claimWriteFlowIdempotencyKey({
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            surface: `collaboration.meeting.note.create:${meeting.value.meeting.id}`,
+            clientRequestId: clientRequestId.value,
+            resourceId: proposedNoteId
+          })
+        : { claimed: true, resourceId: proposedNoteId };
+      if (!claim.claimed) {
+        const notes = await requireMethod(transactionDataSource.listMeetingNotes).call(
+          transactionDataSource,
+          actor.tenantId,
+          meeting.value.meeting.id
+        );
+        const existingNote = notes.find((candidate) => candidate.id === claim.resourceId);
+        if (!existingNote) throw new Error("write_flow_idempotent_resource_missing");
+        return existingNote;
+      }
+
       const createdNote = await requireMethod(transactionDataSource.createMeetingNote).call(transactionDataSource, {
-        id: `meeting-note-${randomUUID()}`,
+        id: claim.resourceId,
         tenantId: actor.tenantId,
         meetingId: meeting.value.meeting.id,
         authorUserId: actor.id,
@@ -1009,7 +1090,10 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         actionType: "collaboration.meeting_note_created",
         actor,
         sourceEntity: meeting.value.access.sourceEntity,
-        commandInput: { meetingId: meeting.value.meeting.id },
+        commandInput: {
+          meetingId: meeting.value.meeting.id,
+          ...(clientRequestId.value ? { clientRequestId: clientRequestId.value } : {})
+        },
         permissionResult: participant
           ? { allowed: true, reason: "same_tenant_permission_granted" }
           : meeting.value.access.manageDecision,
@@ -1397,6 +1481,19 @@ function parseOptionalCursor(value: string | undefined):
   return { ok: true as const, value: parsed.value };
 }
 
+function parseOptionalClientRequestId(value: unknown):
+  | { ok: true; value: string | undefined }
+  | { ok: false; error: string } {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true as const, value: undefined };
+  }
+  if (typeof value !== "string") return { ok: false as const, error: "client_request_id_invalid" };
+  const trimmed = value.trim();
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,119}$/.test(trimmed)) {
+    return { ok: false as const, error: "client_request_id_invalid" };
+  }
+  return { ok: true as const, value: trimmed };
+}
 function parseOptionalCollaborationId(value: unknown, error: string):
   | { ok: true; value: string | undefined }
   | { ok: false; error: string } {

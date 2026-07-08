@@ -162,3 +162,26 @@ export const passwordResetTokens = pgTable(
     index("password_reset_tokens_user_id_idx").on(table.tenantId, table.userId)
   ]
 );
+export const writeFlowIdempotencyKeys = pgTable(
+  "write_flow_idempotency_keys",
+  {
+    tenantId: text("tenant_id").notNull(),
+    surface: text("surface").notNull(),
+    actorUserId: text("actor_user_id").notNull(),
+    clientRequestId: text("client_request_id").notNull(),
+    resourceId: text("resource_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "write_flow_idempotency_keys_pkey",
+      columns: [table.tenantId, table.surface, table.actorUserId, table.clientRequestId]
+    }),
+    foreignKey({
+      name: "write_flow_idempotency_keys_actor_fk",
+      columns: [table.tenantId, table.actorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    index("write_flow_idempotency_keys_tenant_created_idx").on(table.tenantId, table.createdAt)
+  ]
+);

@@ -286,7 +286,7 @@ describe("project work parsers", () => {
     });
     expect(parseTaskCommentBody({ body: "Проверил ресурсный план." })).toEqual({
       ok: true,
-      value: { body: "Проверил ресурсный план." }
+      value: { body: "Проверил ресурсный план.", clientRequestId: null }
     });
   });
 

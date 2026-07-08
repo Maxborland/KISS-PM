@@ -1,0 +1,94 @@
+{
+  "blockId": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "status": "fixed-by-current-branch",
+  "generatedAt": "2026-07-08",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "scope": "Consolidated closure of the duplicate/race/idempotency risk zone for known write-flow surfaces in the Full Evaluation reconciliation matrix. Separate live-browser/provider zones remain tracked independently.",
+  "contract": [
+    "same clientRequestId/idempotency key or same no-op retry returns the existing resource/result without duplicate side effects",
+    "different clientRequestId/user intent creates a separate resource where the product flow allows it",
+    "concurrent duplicate requests are serialized by DB uniqueness/advisory locks/optimistic conflict contracts",
+    "readback after write confirms persisted state and bounded audit/event side effects",
+    "permission-denied paths remain explicit 403/409/404 contracts, not internal_error"
+  ],
+  "newlyClosedSurfaces": [
+    {
+      "expected": "same clientRequestId returns same meeting id, one meeting_created audit",
+      "scenario": "meeting create double-submit/concurrent duplicate",
+      "surface": "POST /api/workspace/meetings",
+      "evidence": "apps/api/src/collaborationRoutes.db.test.ts keeps duplicate meeting create, external link and note requests idempotent"
+    },
+    {
+      "expected": "same clientRequestId scoped to meeting returns same link id, one external_meeting_link_added audit",
+      "scenario": "external meeting link double-submit/concurrent duplicate",
+      "surface": "POST /api/workspace/meetings/:meetingId/external-links",
+      "evidence": "apps/api/src/collaborationRoutes.db.test.ts keeps duplicate meeting create, external link and note requests idempotent"
+    },
+    {
+      "expected": "same clientRequestId scoped to meeting returns same note id; different key creates a second note; audit count matches real intents",
+      "scenario": "meeting note double-submit/concurrent duplicate and second intent",
+      "surface": "POST /api/workspace/meetings/:meetingId/notes",
+      "evidence": "apps/api/src/collaborationRoutes.db.test.ts keeps duplicate meeting create, external link and note requests idempotent"
+    },
+    {
+      "expected": "same clientRequestId scoped to task returns same activity id; different key creates a second comment; audit count matches real intents",
+      "scenario": "task comment double-submit/concurrent duplicate and second intent",
+      "surface": "POST /api/workspace/tasks/:taskId/comments",
+      "evidence": "apps/api/src/projectWorkRoutes.db.test.ts keeps duplicate task comment requests idempotent by client request id"
+    }
+  ],
+  "previouslyClosedRepresentativeSurfaces": [
+    "planning idempotency keys and scenario/apply-command-batch concurrency",
+    "admin/user/access-role duplicate conflicts and security policy/user-status retries",
+    "notification read and notification-preference duplicate writes",
+    "CRM client/product/contact/opportunity/pipeline/stage/rule/automation duplicate/race paths",
+    "auth reset token repeat/concurrent consumption",
+    "project intake activation duplicate submit",
+    "project work task create/status/archive/PATCH optimistic-concurrency paths",
+    "knowledge version numbering conflict",
+    "profile/theme duplicate PATCH updates",
+    "media recording duplicate/concurrent start",
+    "meeting action-item status no-op/concurrent duplicates",
+    "call participant-state duplicate/no-op updates",
+    "control-surface publish/rollback duplicate conflicts",
+    "project closure retry idempotency"
+  ],
+  "verification": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules/.bin/vitest.cmd --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"keeps duplicate meeting create\"",
+      "result": "pass; 1 selected test passed, 19 skipped"
+    },
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules/.bin/vitest.cmd --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"keeps duplicate task comment\"",
+      "result": "pass; 1 selected test passed, 24 skipped"
+    },
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules/.bin/vitest.cmd --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts",
+      "result": "pass; 20 tests passed"
+    },
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules/.bin/vitest.cmd --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts",
+      "result": "pass; 25 tests passed"
+    },
+    {
+      "command": "node_modules/.bin/tsc.cmd -p packages/persistence/tsconfig.json --pretty false",
+      "result": "pass"
+    },
+    {
+      "command": "node_modules/.bin/tsc.cmd -p apps/api/tsconfig.json --pretty false",
+      "result": "pass"
+    },
+    {
+      "command": "node_modules/.bin/vitest.cmd run --root . apps/api/src/projectWorkParsers.test.ts",
+      "result": "pass; 9 tests passed; rerun outside sandbox after sandbox EPERM"
+    }
+  ],
+  "implementation": [
+    "Added write_flow_idempotency_keys table with tenant/surface/actor/clientRequestId primary key",
+    "Added PostgresTenantDataSource.claimWriteFlowIdempotencyKey",
+    "Meeting create/link/note and task comment routes claim an idempotency key before creating side effects",
+    "Subresource surfaces are scoped by parent meetingId/taskId to avoid cross-parent key collisions",
+    "Duplicate path reads and returns existing resource without appending success audit/event side effects"
+  ],
+  "remainingRisk": "No known remaining write-flow race/idempotency surfaces from the current reconciliation inventory are left in this risk zone. Remaining open work is tracked in separate risk zones for full-browser traversal, live media/provider behavior, and live email reset readback."
+}

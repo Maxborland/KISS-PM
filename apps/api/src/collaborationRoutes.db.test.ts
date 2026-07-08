@@ -1354,6 +1354,123 @@ describe("collaboration and communications API", () => {
     ).toHaveLength(2);
   });
 
+  it("keeps duplicate meeting create, external link and note requests idempotent", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+    const meetingBody = {
+      entityType: "project",
+      entityId: "project-alpha",
+      title: "Планерка без дублей",
+      agenda: "Проверяем повторный submit",
+      scheduledStart: "2026-06-02T10:00:00.000Z",
+      scheduledFinish: "2026-06-02T10:30:00.000Z",
+      participants: [{ userId: "user-alpha-executor", role: "required" }],
+      clientRequestId: "meeting-create-double-submit"
+    };
+
+    const [firstMeeting, duplicateMeeting] = await Promise.all([
+      app.request("/api/workspace/meetings", {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(meetingBody)
+      }),
+      app.request("/api/workspace/meetings", {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(meetingBody)
+      })
+    ]);
+    expect(firstMeeting.status).toBe(201);
+    expect(duplicateMeeting.status).toBe(201);
+    const firstMeetingPayload = await firstMeeting.json() as { meeting: { id: string } };
+    const duplicateMeetingPayload = await duplicateMeeting.json() as { meeting: { id: string } };
+    expect(duplicateMeetingPayload.meeting.id).toBe(firstMeetingPayload.meeting.id);
+
+    const linkBody = {
+      provider: "google_meet",
+      title: "Без дублей",
+      url: "https://meet.google.com/no-duplicate-submit",
+      clientRequestId: "meeting-link-double-submit"
+    };
+    const [firstLink, duplicateLink] = await Promise.all([
+      app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}/external-links`, {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(linkBody)
+      }),
+      app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}/external-links`, {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(linkBody)
+      })
+    ]);
+    expect(firstLink.status).toBe(201);
+    expect(duplicateLink.status).toBe(201);
+    const firstLinkPayload = await firstLink.json() as { externalLink: { id: string } };
+    const duplicateLinkPayload = await duplicateLink.json() as { externalLink: { id: string } };
+    expect(duplicateLinkPayload.externalLink.id).toBe(firstLinkPayload.externalLink.id);
+
+    const noteBody = {
+      body: "Одна заметка при двойном клике.",
+      clientRequestId: "meeting-note-double-submit"
+    };
+    const [firstNote, duplicateNote] = await Promise.all([
+      app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}/notes`, {
+        method: "POST",
+        headers: jsonHeaders(executorCookie),
+        body: JSON.stringify(noteBody)
+      }),
+      app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}/notes`, {
+        method: "POST",
+        headers: jsonHeaders(executorCookie),
+        body: JSON.stringify(noteBody)
+      })
+    ]);
+    expect(firstNote.status).toBe(201);
+    expect(duplicateNote.status).toBe(201);
+    const firstNotePayload = await firstNote.json() as { note: { id: string } };
+    const duplicateNotePayload = await duplicateNote.json() as { note: { id: string } };
+    expect(duplicateNotePayload.note.id).toBe(firstNotePayload.note.id);
+
+    const secondIntent = await app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}/notes`, {
+      method: "POST",
+      headers: jsonHeaders(executorCookie),
+      body: JSON.stringify({
+        ...noteBody,
+        clientRequestId: "meeting-note-second-intent"
+      })
+    });
+    expect(secondIntent.status).toBe(201);
+    const secondIntentPayload = await secondIntent.json() as { note: { id: string } };
+    expect(secondIntentPayload.note.id).not.toBe(firstNotePayload.note.id);
+
+    const detail = await app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}`, {
+      headers: { cookie: adminCookie }
+    });
+    expect(detail.status).toBe(200);
+    const detailPayload = await detail.json() as {
+      externalLinks: Array<{ id: string; title: string }>;
+      notes: Array<{ id: string; body: string }>;
+    };
+    expect(detailPayload.externalLinks.filter((link) => link.title === "Без дублей")).toHaveLength(1);
+    expect(detailPayload.notes.filter((note) => note.body === noteBody.body)).toHaveLength(2);
+
+    const auditRows = await client`
+      SELECT action_type, count(*)::int AS count
+      FROM audit_events
+      WHERE tenant_id = 'tenant-alpha'
+        AND action_type IN (
+          'collaboration.meeting_created',
+          'collaboration.external_meeting_link_added',
+          'collaboration.meeting_note_created'
+        )
+      GROUP BY action_type
+    `;
+    const counts = new Map(auditRows.map((row) => [String(row.action_type), Number(row.count)]));
+    expect(counts.get("collaboration.meeting_created")).toBe(1);
+    expect(counts.get("collaboration.external_meeting_link_added")).toBe(1);
+    expect(counts.get("collaboration.meeting_note_created")).toBe(2);
+  });
   it("requires explicit action item target for non-actionable meeting scopes", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const meeting = await app.request("/api/workspace/meetings", {

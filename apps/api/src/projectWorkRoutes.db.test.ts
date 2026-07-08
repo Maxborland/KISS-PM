@@ -1164,6 +1164,75 @@ describe("project work API routes", () => {
     });
   });
 
+  it("keeps duplicate task comment requests idempotent by client request id", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        id: "task-comment-idempotent",
+        title: "Не дублировать комментарии",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-admin", role: "executor" }]
+      })
+    });
+
+    const commentBody = {
+      body: "Один комментарий при двойном submit.",
+      clientRequestId: "task-comment-double-submit"
+    };
+    const [firstComment, duplicateComment] = await Promise.all([
+      app.request("/api/workspace/tasks/task-comment-idempotent/comments", {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(commentBody)
+      }),
+      app.request("/api/workspace/tasks/task-comment-idempotent/comments", {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(commentBody)
+      })
+    ]);
+    expect(firstComment.status).toBe(201);
+    expect(duplicateComment.status).toBe(201);
+    const firstPayload = await firstComment.json() as { activity: { id: string } };
+    const duplicatePayload = await duplicateComment.json() as { activity: { id: string } };
+    expect(duplicatePayload.activity.id).toBe(firstPayload.activity.id);
+
+    const secondIntent = await app.request("/api/workspace/tasks/task-comment-idempotent/comments", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        ...commentBody,
+        clientRequestId: "task-comment-second-intent"
+      })
+    });
+    expect(secondIntent.status).toBe(201);
+    const secondPayload = await secondIntent.json() as { activity: { id: string } };
+    expect(secondPayload.activity.id).not.toBe(firstPayload.activity.id);
+
+    const detail = await app.request("/api/workspace/tasks/task-comment-idempotent", {
+      headers: { cookie: adminCookie }
+    });
+    expect(detail.status).toBe(200);
+    const detailPayload = await detail.json() as {
+      activities: Array<{ id: string; type: string; body: string | null }>;
+    };
+    expect(
+      detailPayload.activities.filter((activity) => activity.type === "comment" && activity.body === commentBody.body)
+    ).toHaveLength(2);
+
+    const auditRows = await client`
+      SELECT count(*)::int AS count
+      FROM audit_events
+      WHERE tenant_id = 'tenant-alpha'
+        AND action_type = 'task.comment_created'
+        AND source_entity ->> 'id' = 'task-comment-idempotent'
+    `;
+    expect(Number(auditRows[0]?.count ?? 0)).toBe(2);
+  });
   it("blocks task field edits and archive for executors without edit/delete permission", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
@@ -1891,3 +1960,11 @@ describe("project work API routes", () => {
     await expect(deniedMyWork.json()).resolves.toEqual({ error: "permission_missing" });
   });
 });
+
+function jsonHeaders(cookie: string) {
+  return {
+    "content-type": "application/json",
+    "x-kiss-pm-action": "same-origin",
+    cookie
+  };
+}

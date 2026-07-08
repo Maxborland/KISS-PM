@@ -18,7 +18,8 @@ import {
   tenants,
   tenantUsers,
   userCredentials,
-  userSessions
+  userSessions,
+  writeFlowIdempotencyKeys
 } from "./schema";
 import { createAttachmentRepository, type AttachmentRepository } from "./attachmentRepository";
 import { createCollaborationRepository, type CollaborationRepository } from "./collaborationRepository";
@@ -137,6 +138,11 @@ export type PasswordResetTokenRecord = {
   requestedIp: string | null;
   createdAt: Date;
 };
+export type WriteFlowIdempotencyClaim = {
+  claimed: boolean;
+  resourceId: string;
+};
+
 export type PostgresTenantDataSource = CrmRepository &
   ProjectIntakeRepository &
   PlanningRepository &
@@ -229,6 +235,13 @@ export type PostgresTenantDataSource = CrmRepository &
   ): Promise<T>;
   lockTenantResourcePlanning(tenantId: TenantId): Promise<void>;
   lockCallRecordingStart(tenantId: TenantId, roomId: string, sessionId: string): Promise<void>;
+  claimWriteFlowIdempotencyKey(input: {
+    tenantId: TenantId;
+    actorUserId: UserId;
+    surface: string;
+    clientRequestId: string;
+    resourceId: string;
+  }): Promise<WriteFlowIdempotencyClaim>;
   appendAuditEvent(input: AuditEventRecordInput): Promise<void>;
   listAuditEventsByTenantId(
     tenantId: TenantId,
@@ -744,6 +757,43 @@ export function createPostgresTenantDataSource(
           hashtext(${`call_recording_start:${roomId}:${sessionId}`})
         )
       `);
+    },
+    async claimWriteFlowIdempotencyKey(input) {
+      const [inserted] = await db
+        .insert(writeFlowIdempotencyKeys)
+        .values({
+          tenantId: input.tenantId,
+          surface: input.surface,
+          actorUserId: input.actorUserId,
+          clientRequestId: input.clientRequestId,
+          resourceId: input.resourceId,
+          createdAt: new Date()
+        })
+        .onConflictDoNothing({
+          target: [
+            writeFlowIdempotencyKeys.tenantId,
+            writeFlowIdempotencyKeys.surface,
+            writeFlowIdempotencyKeys.actorUserId,
+            writeFlowIdempotencyKeys.clientRequestId
+          ]
+        })
+        .returning({ resourceId: writeFlowIdempotencyKeys.resourceId });
+      if (inserted) return { claimed: true, resourceId: inserted.resourceId };
+
+      const [existing] = await db
+        .select({ resourceId: writeFlowIdempotencyKeys.resourceId })
+        .from(writeFlowIdempotencyKeys)
+        .where(
+          and(
+            eq(writeFlowIdempotencyKeys.tenantId, input.tenantId),
+            eq(writeFlowIdempotencyKeys.surface, input.surface),
+            eq(writeFlowIdempotencyKeys.actorUserId, input.actorUserId),
+            eq(writeFlowIdempotencyKeys.clientRequestId, input.clientRequestId)
+          )
+        )
+        .limit(1);
+      if (!existing) throw new Error("write_flow_idempotency_key_missing");
+      return { claimed: false, resourceId: existing.resourceId };
     },
     async appendAuditEvent(input) {
       const event = createAuditEventRecord(input);

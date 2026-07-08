@@ -25,11 +25,11 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 71,
+    "fixedByCurrentBranchItems": 72,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 4,
-    "unverifiedRiskZones": 4
+    "unverifiedRiskZones": 3
   },
   "fixedByMaster": [
     {
@@ -1322,6 +1322,28 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This covers the retrospective project close duplicate/retry atom. It does not close unrelated meeting create/link/note or task comment atoms."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-RACE-IDEMPOTENCY-CLOSED",
+      "source": "current branch consolidated DB/API race-idempotency closure",
+      "status": "fixed-by-current-branch",
+      "surface": "All known write-flow duplicate/race/idempotency surfaces from reconciliation inventory; final new coverage for meeting create, meeting external link, meeting note, and task comment",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-race-idempotency-closed-2026-07-08.json: consolidated closure; meeting create/link/note and task comment now use clientRequestId idempotency with readback and bounded audit side effects; previously partial slices are consolidated under this fixed item.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"keeps duplicate meeting create\" -> pass; 1 selected test passed, 19 skipped",
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"keeps duplicate task comment\" -> pass; 1 selected test passed, 24 skipped",
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -> pass; 20 tests passed",
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -> pass; 25 tests passed",
+        "node_modules\\.bin\\tsc.cmd -p packages/persistence/tsconfig.json --pretty false -> pass",
+        "node_modules\\.bin\\tsc.cmd -p apps/api/tsconfig.json --pretty false -> pass",
+        "node_modules\\.bin\\vitest.cmd run --root . apps/api/src/projectWorkParsers.test.ts -> pass; 9 tests passed"
+      ],
+      "coverageStatus": "risk-zone-closed",
+      "note": "This closes RISK-WRITE-FLOW-RACE-IDEMPOTENCY as a large block in the current matrix. Remaining work is outside this risk zone: full browser traversal, live media/provider behavior, and live email reset readback."
     }
   ],
   "confirmedOpen": [],
@@ -1387,44 +1409,7 @@
         "docs/qa/full-eval/evidence/browser-crm-readonly-write-denied-2026-07-08/risk-full-browser-traversal-crm-readonly-write-denied-2026-07-08.json: CRM read-only in-app Browser traversal covers login, /crm/deals kanban/list/forecast, disabled/no-drag write controls, direct 403 create/stage writes, and unchanged readback."
       ],
       "remainingEvidence": "Remaining full-browser traversal still required for other roles/routes/actions: real Jitsi OBS/microphone media provider behavior, live/browser agent provider variants, live email reset inbox readback, mobile/responsive passes, and any routes not yet covered by role-specific traversal evidence."
-    },
-    {
-      "id": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
-      "status": "unverified",
-      "evidence": "docs/qa/full-eval/reconciliation-2026-07-07.md:56 calls for duplicate/race/idempotency checks before further fixes.",
-      "requiredEvidence": "Every write-flow checked for single submit, double submit, concurrent duplicate API calls, stale version/conflict, refresh/readback, and permission-denied role.",
-      "partialEvidence": [
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-idempotency-coverage-2026-07-07.json: planning baseline.capture and task.update_schedule concurrent idempotency coverage added.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-admin-duplicate-conflicts-2026-07-07.json: admin user create/update duplicate email conflicts and access-role duplicate id conflicts now have targeted concurrent coverage.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-notification-read-concurrency-2026-07-07.json: notification read duplicate/concurrent requests preserve a single readAt and read back one read notification.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-conflict-mapping-2026-07-07.json: CRM client duplicate-name and product update duplicate SKU/name conflicts now return stable 409 instead of 500.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-access-role-name-unique-2026-07-07.json: access-role name DB uniqueness and concurrent create/update conflict coverage added.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: auth reset concurrent confirm consumes one token once and returns reset_token_used for the duplicate request.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-communication-channel-rename-concurrency-2026-07-07.json: communication channel rename retry is idempotent without duplicate audit and divergent concurrent renames return one 200/one 409 with winner readback.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-contact-opportunity-concurrency-2026-07-07.json: CRM contact duplicate create/update and opportunity duplicate-id concurrent writes return stable success/conflict pairs with exactly-one-row readback.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-scenario-race-2026-07-07.json: planning scenario apply concurrent duplicate requests are single-use with one success, one conflict, one planVersion bump, and one applied scenario run row.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-admin-extra-race-2026-07-07.json: admin security policy duplicate saves and user deactivate/reactivate duplicate writes now have targeted DB/API readback coverage.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-communications-extra-race-2026-07-07.json: communication channel member add and notification preference duplicate writes now have targeted DB/API readback coverage.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-extra-race-2026-07-07.json: CRM client/product duplicate name/SKU create/update races now have targeted DB/API readback coverage.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-intake-activation-duplicate-submit-2026-07-07.json: project intake activation duplicate submit is single-use with one project/audit and duplicate 409.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-pipeline-stage-duplicate-submit-2026-07-08.json: first-class CRM pipeline and stage duplicate submits return stable 201/409 pairs with one-row DB readback and one success audit per operation.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-race-crm-pipeline-rules-automation-2026-07-08.json: CRM transition-rule edge and stage automation duplicate submits return stable 201/409 pairs with readback, lifecycle graph readback, and one success audit per operation.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-opportunity-stage-pipeline-idempotency-2026-07-08.json: CRM opportunity stage/pipeline duplicate submits are idempotent with readback and no duplicate audit side effects; concurrent divergent stage moves preserve final readback and bounded audit count.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-status-duplicate-archive-2026-07-08.json: Project Work task status duplicate create returns stable 201/409 with single-row/readback and single create audit; duplicate archive is idempotent with single archive audit.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-create-archive-idempotency-2026-07-08.json: Project Work project task duplicate create returns stable 201/409 with single task/readback, single create audit and created system activity; duplicate archive is idempotent with single archive audit.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-knowledge-version-conflict-2026-07-08.json: knowledge document version numbering collision returns stable 409 with no partial version row/audit side effects.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-profile-theme-duplicate-updates-2026-07-08.json: profile contact and theme duplicate PATCH submissions return stable 200/200 pairs with session readback of the final values.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-batch-concurrent-idempotency-2026-07-08.json: planning apply-command-batch concurrent duplicate requests with the same idempotency key return equal 200 responses, one planVersion bump, and read back the batch once.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-duplicate-start-2026-07-08.json: duplicate recording start after an active session recording returns 409 without a second egress, recording row, event, or audit side effect.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-concurrent-start-lock-2026-07-08.json: simultaneous first recording-start race now serializes with one 201/one 409 and one recording/event readback after advisory transaction lock.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-meeting-action-item-status-idempotency-2026-07-08.json: meetings action-item status duplicate/noop and concurrent duplicate updates return 200 readback with one final state and one audit per real transition.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-patch-concurrent-idempotency-2026-07-08.json: concurrent duplicate task PATCH calls with the same clientUpdatedAt return one 200 and one 409 task_version_conflict, read back one final title, one task.updated audit, one system activity, and one planVersion bump.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-call-participant-state-idempotency-2026-07-08.json: duplicate same-state participant updates now return 200 with event=null, keep one participant state row, preserve one participant_joined and one participant_left event for real transitions, and avoid duplicate communications.call_participant_state_updated audit entries.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-control-surface-publish-rollback-concurrency-2026-07-08.json: duplicate publish/rollback attempts now return control_surface_version_conflict without creating another immutable version row or duplicate success auditEventId; API routes map the conflict to stable 409 before success audit append.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-closure-retry-idempotency-2026-07-08.json: duplicate project close retry now returns the existing closure read model with the original auditEventId, does not create another closure side effect, and avoids project.close_conflict audit noise."
-      ],
-      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work/profile/knowledge/media-recording/meeting-action-item/call-participant-state/control-surface/project-closure slices still need duplicate/race/idempotency evidence. Media recording duplicate-start, simultaneous first-start race, meeting action-item status duplicates, Project Work task PATCH optimistic-concurrency duplicates, call participant-state duplicate/noop updates, control-surface publish/rollback duplicate conflicts, and project-closure duplicate retries are now covered at DB/API level."
     }
   ],
-  "nextAction": "Continue remaining risk-zone atoms: real Jitsi OBS/microphone browser handoff, live provider/LLM agent browser variants, live email reset inbox readback, and any uncovered write-flow race/idempotency surfaces."
+  "nextAction": "Continue remaining non-write-flow risk zones: full browser traversal for every role/route/action, live Jitsi/OBS/microphone media-provider behavior, live OpenRouter/agent provider browser variants, and live email reset inbox readback."
 }
