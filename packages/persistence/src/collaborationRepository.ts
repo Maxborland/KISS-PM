@@ -1619,7 +1619,7 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
           set: {
             state: input.state,
             joinedAt: sql`coalesce(${callParticipantStates.joinedAt}, excluded.joined_at)`,
-            leftAt,
+            leftAt: leftAt ? sql`coalesce(${callParticipantStates.leftAt}, excluded.left_at)` : null,
             lastSeenAt: now
           }
         })

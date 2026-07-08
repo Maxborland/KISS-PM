@@ -288,13 +288,14 @@ export function createCommunicationCallWorkspace(deps: CommunicationCallWorkspac
       command: UpdateParticipantStateCommand;
       room: CallRoom;
       session: CallSession;
-    }): Promise<WorkspaceResult<{ event: CallEvent; participantState: CallParticipantState }>> {
+    }): Promise<WorkspaceResult<{ event: CallEvent | null; participantState: CallParticipantState }>> {
       if (input.session.status !== "active") {
         return { ok: false, status: 409, error: "call_session_not_active" };
       }
       if (
         !deps.dataSource.withTransaction ||
         !deps.dataSource.findActiveCallSessionForUpdate ||
+        !deps.dataSource.listCallParticipantStates ||
         !deps.dataSource.upsertCallParticipantState ||
         !deps.dataSource.createCallEvent
       ) {
@@ -318,6 +319,16 @@ export function createCommunicationCallWorkspace(deps: CommunicationCallWorkspac
           }
         );
         if (!activeSession) return new CallWorkspaceError(409, "call_session_not_active");
+        const previousStates = await requireMethod(transactionDataSource.listCallParticipantStates).call(
+          transactionDataSource,
+          {
+            tenantId: input.actor.tenantId,
+            roomId: input.room.id,
+            sessionId: activeSession.id
+          }
+        );
+        const previousState = previousStates.find((state) => state.userId === input.command.userId);
+        const stateChanged = previousState?.state !== input.command.state;
         const participantState = await requireMethod(transactionDataSource.upsertCallParticipantState).call(
           transactionDataSource,
           {
@@ -328,6 +339,9 @@ export function createCommunicationCallWorkspace(deps: CommunicationCallWorkspac
             state: input.command.state
           }
         );
+        if (!stateChanged) {
+          return { event: null, participantState };
+        }
         const eventType = eventTypeForParticipantState(input.command.state);
         const event = await requireMethod(transactionDataSource.createCallEvent).call(transactionDataSource, {
           id: `call-event-${randomUUID()}`,

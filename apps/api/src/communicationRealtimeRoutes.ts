@@ -260,7 +260,7 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
     }
     return context.json({
       participantState: serializeCallParticipantState(result.participantState),
-      event: serializeCallEvent(result.event)
+      event: result.event ? serializeCallEvent(result.event) : null
     });
   });
 

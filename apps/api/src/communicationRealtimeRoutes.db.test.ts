@@ -150,6 +150,85 @@ describe("communications realtime API", () => {
     expect(JSON.stringify(auditPayload.auditEvents)).not.toContain("livekit-secret");
   });
 
+  it("keeps duplicate participant state updates event-idempotent", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+    const stateUrl = `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/participant-state`;
+
+    const joined = await app.request(stateUrl, {
+      method: "POST",
+      headers: jsonHeaders(readerCookie),
+      body: JSON.stringify({ state: "joined" })
+    });
+    expect(joined.status).toBe(200);
+    await expect(joined.json()).resolves.toMatchObject({
+      event: { eventType: "participant_joined" },
+      participantState: { state: "joined", userId: "user-alpha-reader" }
+    });
+
+    const [duplicateA, duplicateB] = await Promise.all([
+      app.request(stateUrl, {
+        method: "POST",
+        headers: jsonHeaders(readerCookie),
+        body: JSON.stringify({ state: "joined" })
+      }),
+      app.request(stateUrl, {
+        method: "POST",
+        headers: jsonHeaders(readerCookie),
+        body: JSON.stringify({ state: "joined" })
+      })
+    ]);
+    expect([duplicateA.status, duplicateB.status].sort()).toEqual([200, 200]);
+    const duplicateBodies = await Promise.all([duplicateA.json(), duplicateB.json()]) as Array<{
+      event: unknown;
+      participantState: { state: string; userId: string };
+    }>;
+    expect(duplicateBodies).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        event: null,
+        participantState: expect.objectContaining({ state: "joined", userId: "user-alpha-reader" })
+      })
+    ]));
+
+    const left = await app.request(stateUrl, {
+      method: "POST",
+      headers: jsonHeaders(readerCookie),
+      body: JSON.stringify({ state: "left" })
+    });
+    expect(left.status).toBe(200);
+    await expect(left.json()).resolves.toMatchObject({
+      event: { eventType: "participant_left" },
+      participantState: { state: "left", userId: "user-alpha-reader" }
+    });
+
+    const states = await dataSource.listCallParticipantStates({
+      tenantId: "tenant-alpha",
+      roomId: room.callRoom.roomId,
+      sessionId: started.session.id
+    });
+    expect(states.filter((state) => state.userId === "user-alpha-reader")).toHaveLength(1);
+    expect(states.find((state) => state.userId === "user-alpha-reader")?.state).toBe("left");
+
+    const events = await dataSource.listCallEvents({
+      tenantId: "tenant-alpha",
+      roomId: room.callRoom.roomId,
+      limit: 50
+    });
+    expect(events.filter((event) => event.eventType === "participant_joined")).toHaveLength(1);
+    expect(events.filter((event) => event.eventType === "participant_left")).toHaveLength(1);
+
+    const auditEvents = await dataSource.listAuditEventsByTenantId("tenant-alpha");
+    expect(
+      auditEvents.filter(
+        (event) =>
+          event.actionType === "communications.call_participant_state_updated" &&
+          event.afterState?.userId === "user-alpha-reader"
+      )
+    ).toHaveLength(2);
+  });
   it("supports call rooms scoped to the workspace general communication channel", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");

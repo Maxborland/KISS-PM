@@ -12,6 +12,7 @@ export type CommunicationCallDataSource = Pick<
   | "findAttachmentById"
   | "findCallSession"
   | "listUsersByTenantId"
+  | "listCallParticipantStates"
   | "updateCallRoomStatus"
   | "upsertCallParticipantState"
   | "withTransaction"
