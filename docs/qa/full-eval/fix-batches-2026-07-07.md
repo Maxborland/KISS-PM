@@ -457,22 +457,22 @@
 
 **Remaining:** full LiveKit/Jitsi provider browser traversal remains unverified: provider config, prejoin, permissions, real join, remote participant, media-denied behavior, reconnect, leave/rejoin.
 
-## Batch 19 — Auth reset browser mechanics and live mail readback
+## Batch 19 — Auth reset live mail readback
 
-**Status:** partial / blocked by mailbox delivery, not closed
+**Status:** closed — live delivered-email reset path passed after DNS/SPF/DKIM repair
 
 **Risk zone:** `RISK-AUTH-EMAIL-RESET-HAPPY-PATH`
 
-**Surface:** `/register`, `/password-reset`, `/password-reset/confirm`, `/login`, `POST /api/auth/password-reset/*`, REG.RU SMTP/IMAP/POP3.
+**Surface:** `/register`, `/password-reset`, `/password-reset/confirm`, `/login`, `POST /api/auth/password-reset/*`, REG.RU SMTP, Cloudflare Email Routing, Gmail original-message auth results.
 
-**Fix evidence:** `docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-browser-smtp-readback-2026-07-08.json`
+**Fix evidence:** `docs/qa/full-eval/evidence/auth-email-reset-live-delivery-2026-07-08/risk-auth-email-reset-live-delivery-2026-07-08.json`; historical partial: `docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-browser-smtp-readback-2026-07-08.json`.
 
-**Expected:** browser user requests reset, reset email is delivered to mailbox, token is extracted from the received email, browser confirm accepts it, old password is rejected, new password logs in.
+**Expected:** user requests reset, reset email is delivered to mailbox, token is extracted from the received email, confirm accepts it, old password is rejected, new password logs in, repeated token returns `reset_token_used`.
 
-**Actual observed:** browser register/reset-confirm/login mechanics passed on an auth-capable `createApp` harness using the same auth routes; old password was rejected and new password was accepted. Live REG.RU SMTP accepted reset email sends, but IMAP all folders and POP3 readback returned zero messages. Browser reset request degraded to the “mail is not configured / письмо не придёт” state.
+**Actual observed:** fresh unique `@kisspm.app` user was registered through product auth routes on an auth-capable `createApp` harness. Reset request returned `202 delivery=email`; Gmail received `KISS PM password reset`; token was extracted from the delivered body, not server memory. Confirm returned `200`; old password login returned `401 invalid_credentials`; new password login returned `200` with `Set-Cookie`; repeated confirm returned `400 reset_token_used`. Gmail original showed `SPF PASS`, `DKIM PASS`, `DMARC PASS`.
 
-**Fix applied:** no production code change. This batch documents fresh browser/API/provider evidence and keeps the risk zone open instead of marking a false pass.
+**Fix applied:** no product-code change in this batch. External DNS/mail setup was repaired: Cloudflare gained REG.RU DKIM TXT and SPF now includes `ip4:31.31.197.67`, allowing Cloudflare/Gmail to authenticate the forwarded reset mail.
 
-**Verification:** in-app browser traversal on `http://127.0.0.1:3102`: register → request reset → confirm captured 64-hex token → login; API readback on the same harness: old password `401 invalid_credentials`, new password `200` with `Set-Cookie`. Provider diagnostic: REG.RU SMTP accepted send; IMAP `Trash/Junk/Sent/Drafts/INBOX` uidCount=0; POP3 recentCount=0.
+**Verification:** `Resolve-DnsName` against `1.1.1.1`/`8.8.8.8` confirmed SPF/DKIM DNS; Chrome/Gmail search found the reset email; Gmail original showed pass auth results; harness endpoint `__qa/confirm-readback` confirmed token consume/login/repeat-token behavior.
 
-**Remaining:** full delivered-email happy path is still blocked until mailbox delivery/routing works or a working mailcatcher/provider is configured. Docker/WSL/Postgres was unavailable in this run, so persistence-backed local browser reset still needs a healthy DB environment.
+**Remaining:** no remaining blocker for `RISK-AUTH-EMAIL-RESET-HAPPY-PATH`. Persistence-backed full local browser reset remains dependent on a healthy Postgres environment, but the previous browser mechanics evidence plus this live delivered-token evidence closes the risk zone.

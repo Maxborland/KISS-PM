@@ -25,11 +25,11 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 72,
+    "fixedByCurrentBranchItems": 73,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 4,
-    "unverifiedRiskZones": 3
+    "unverifiedRiskZones": 2
   },
   "fixedByMaster": [
     {
@@ -1344,6 +1344,25 @@
       ],
       "coverageStatus": "risk-zone-closed",
       "note": "This closes RISK-WRITE-FLOW-RACE-IDEMPOTENCY as a large block in the current matrix. Remaining work is outside this risk zone: full browser traversal, live media/provider behavior, and live email reset readback."
+    },
+    {
+      "id": "CURRENT-RISK-AUTH-EMAIL-RESET-LIVE-DELIVERY",
+      "source": "current branch live SMTP/Gmail verification after DNS SPF/DKIM fix",
+      "status": "fixed-by-current-branch",
+      "surface": "/api/auth/register, /api/auth/password-reset/request, delivered Gmail reset email, /api/auth/password-reset/confirm, /api/auth/login",
+      "evidence": "docs/qa/full-eval/evidence/auth-email-reset-live-delivery-2026-07-08/risk-auth-email-reset-live-delivery-2026-07-08.json: fresh unique @kisspm.app user registered, reset request returned 202 delivery=email, Gmail delivered KISS PM password reset email, 64-char token extracted from delivered body, confirm returned 200, old password login returned 401, new password login returned 200 with Set-Cookie, repeated token returned 400 reset_token_used, reset email original showed SPF/DKIM/DMARC PASS.",
+      "linkedRiskZones": [
+        "RISK-AUTH-EMAIL-RESET-HAPPY-PATH"
+      ],
+      "tests": [
+        "Resolve-DnsName kisspm.app -Type TXT -Server 1.1.1.1 -> SPF includes ip4:31.31.197.67",
+        "Resolve-DnsName dkim._domainkey.kisspm.app -Type TXT -Server 1.1.1.1 -> REG.RU DKIM public key present",
+        "Gmail original for KISS PM password reset reset-20260708-165952@kisspm.app -> SPF PASS, DKIM PASS, DMARC PASS",
+        "POST http://127.0.0.1:4188/__qa/register-and-request -> register 201, reset 202 delivery=email",
+        "POST http://127.0.0.1:4188/__qa/confirm-readback with token extracted from Gmail -> confirm 200, old login 401, new login 200 Set-Cookie, repeat 400 reset_token_used"
+      ],
+      "coverageStatus": "risk-zone-closed",
+      "note": "Uses an isolated auth-capable createApp harness because the local no-Postgres API returns auth_not_configured for registration. The product auth routes and real SMTP provider are exercised; previous browser mechanics evidence remains valid and this run closes the external delivery/readback gap."
     }
   ],
   "confirmedOpen": [],
@@ -1361,23 +1380,6 @@
     }
   ],
   "unverifiedRiskZones": [
-    {
-      "id": "RISK-AUTH-EMAIL-RESET-HAPPY-PATH",
-      "status": "unverified",
-      "evidence": "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:66 says valid reset-token happy path through email provider was not checked.",
-      "requiredEvidence": "Real or explicitly degraded email provider status, reset request, token delivery/extraction path, confirm, login with new password, repeat-token behavior.",
-      "partialEvidence": [
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-happy-path-route-2026-07-07.json: route-level SMTP-like delivery contract and true concurrent same-token confirm behavior are covered by targeted tests.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: route-level reset request, token delivery, confirm, login with new password, SMTP-like resetUrl payload, and concurrent token consume covered.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-browser-mail-gap-2026-07-07.json: browser forgot-password/reset request/no-mail state/confirm token prefill covered; no dev token or 64-hex token leaks in DOM.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-local-provider-extraction-2026-07-07.json: local in-memory provider token extraction covers old-password rejection and new-password session login after reset.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-live-openrouter-smtp-imap-smoke-2026-07-07.json: live SMTP provider path accepted reset email sends through REG.RU SMTP, but all-folder IMAP and POP3 readback found zero delivered messages.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-provider-readback-diagnostic-2026-07-08.json: provider-level SMTP diagnostic again accepted the reset email path, but IMAP all-folder and POP3 readback still found zero messages.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-provider-readback-diagnostic-2026-07-08-live-regru.json: live REG.RU SMTP provider accepted another password-reset marker email, but after 60s IMAP all-folder readback saw Trash/Junk/Sent/Drafts/INBOX uidCount=0 and POP3 recentCount=0; not counted as pass.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-browser-smtp-readback-2026-07-08.json: browser register/reset-confirm/login mechanics passed on auth-capable createApp harness with real REG.RU SMTP provider configured; old password rejected and new password accepted, but live mailbox readback still failed and reset request degraded to delivery=none."
-      ],
-      "remainingEvidence": "Live external SMTP/email-client delivery/extraction remains blocked: repeated REG.RU SMTP accepted sends, including the fresh browser-triggered token-capture stack and provider-level diagnostic, but IMAP all folders and POP3 still returned zero delivered messages. Browser confirm/login mechanics are now covered, but full request -> delivered mailbox token -> confirm -> login cannot be passed until mailbox delivery/routing is fixed or a working mailcatcher/provider is configured."
-    },
     {
       "id": "RISK-MEDIA-LIVEKIT-JITSI-CALL",
       "status": "unverified",
@@ -1409,8 +1411,8 @@
         "docs/qa/full-eval/evidence/browser-media-provider-disabled-connect-2026-07-08/risk-media-browser-provider-disabled-connect-2026-07-08.json: admin /communications/calls browser traversal covers empty state, create room modal, session start, connect denial, stable controls, and screenshot evidence.",
         "docs/qa/full-eval/evidence/browser-crm-readonly-write-denied-2026-07-08/risk-full-browser-traversal-crm-readonly-write-denied-2026-07-08.json: CRM read-only in-app Browser traversal covers login, /crm/deals kanban/list/forecast, disabled/no-drag write controls, direct 403 create/stage writes, and unchanged readback."
       ],
-      "remainingEvidence": "Remaining full-browser traversal still required for other roles/routes/actions: real Jitsi OBS/microphone media provider behavior, live/browser agent provider variants, live email reset inbox readback, mobile/responsive passes, and any routes not yet covered by role-specific traversal evidence."
+      "remainingEvidence": "Remaining full-browser traversal still required for other roles/routes/actions: real Jitsi OBS/microphone media provider behavior, live/browser agent provider variants, mobile/responsive passes, and any routes not yet covered by role-specific traversal evidence."
     }
   ],
-  "nextAction": "Continue remaining non-write-flow risk zones: full browser traversal for every role/route/action, live Jitsi/OBS/microphone media-provider behavior, live OpenRouter/agent provider browser variants, and live email reset inbox readback."
+  "nextAction": "Continue remaining non-write-flow risk zones: full browser traversal for every role/route/action, live Jitsi/OBS/microphone media-provider behavior, and live OpenRouter/agent provider browser variants."
 }
