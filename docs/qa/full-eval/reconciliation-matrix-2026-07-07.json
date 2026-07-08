@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 70,
+    "fixedByCurrentBranchItems": 71,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 4,
@@ -1305,6 +1305,23 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "This covers the control-surface publish/rollback duplicate/stale-version atom. It does not close unrelated meeting create/link/note, task comment, or retrospective close atoms."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-CLOSURE-RETRY-IDEMPOTENCY",
+      "source": "current branch backend fix plus targeted DB/API write-flow regression coverage",
+      "surface": "POST /api/workspace/projects/:projectId/closure/close, closure readback, audit events",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-closure-retry-idempotency-2026-07-08.json: duplicate project close retry now returns the existing closure read model with the original auditEventId, does not create another closure side effect, and avoids project.close_conflict audit noise.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\\\.bin\\\\vitest.cmd run --config vitest.db.config.ts apps/api/src/backendManagementLoop.db.test.ts -t keeps duplicate project closure retry -> pass; 1 selected test passed, 2 skipped",
+        "DATABASE_URL=<local-test-db> node_modules\\\\.bin\\\\vitest.cmd run --config vitest.db.config.ts apps/api/src/backendManagementLoop.db.test.ts -> pass; 3 tests passed",
+        "node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/retrospectiveRoutes.test.ts -> pass; 13 tests passed",
+        "node_modules\\\\.bin\\\\tsc.cmd -p apps/api/tsconfig.json --pretty false -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This covers the retrospective project close duplicate/retry atom. It does not close unrelated meeting create/link/note or task comment atoms."
     }
   ],
   "confirmedOpen": [],
@@ -1403,9 +1420,10 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-meeting-action-item-status-idempotency-2026-07-08.json: meetings action-item status duplicate/noop and concurrent duplicate updates return 200 readback with one final state and one audit per real transition.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-patch-concurrent-idempotency-2026-07-08.json: concurrent duplicate task PATCH calls with the same clientUpdatedAt return one 200 and one 409 task_version_conflict, read back one final title, one task.updated audit, one system activity, and one planVersion bump.",
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-call-participant-state-idempotency-2026-07-08.json: duplicate same-state participant updates now return 200 with event=null, keep one participant state row, preserve one participant_joined and one participant_left event for real transitions, and avoid duplicate communications.call_participant_state_updated audit entries.",
-        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-control-surface-publish-rollback-concurrency-2026-07-08.json: duplicate publish/rollback attempts now return control_surface_version_conflict without creating another immutable version row or duplicate success auditEventId; API routes map the conflict to stable 409 before success audit append."
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-control-surface-publish-rollback-concurrency-2026-07-08.json: duplicate publish/rollback attempts now return control_surface_version_conflict without creating another immutable version row or duplicate success auditEventId; API routes map the conflict to stable 409 before success audit append.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-closure-retry-idempotency-2026-07-08.json: duplicate project close retry now returns the existing closure read model with the original auditEventId, does not create another closure side effect, and avoids project.close_conflict audit noise."
       ],
-      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work/profile/knowledge/media-recording/meeting-action-item/call-participant-state slices still need duplicate/race/idempotency evidence. Media recording duplicate-start, simultaneous first-start race, meeting action-item status duplicates, Project Work task PATCH optimistic-concurrency duplicates, call participant-state duplicate/noop updates, and control-surface publish/rollback duplicate conflicts are now covered at DB/API level."
+      "remainingEvidence": "Remaining write flows outside the covered planning/admin/security/user-status/notification/CRM/auth/access-role/comms/project-intake/project-work/profile/knowledge/media-recording/meeting-action-item/call-participant-state/control-surface/project-closure slices still need duplicate/race/idempotency evidence. Media recording duplicate-start, simultaneous first-start race, meeting action-item status duplicates, Project Work task PATCH optimistic-concurrency duplicates, call participant-state duplicate/noop updates, control-surface publish/rollback duplicate conflicts, and project-closure duplicate retries are now covered at DB/API level."
     }
   ],
   "nextAction": "Continue remaining risk-zone atoms: real Jitsi OBS/microphone browser handoff, live provider/LLM agent browser variants, live email reset inbox readback, and any uncovered write-flow race/idempotency surfaces."

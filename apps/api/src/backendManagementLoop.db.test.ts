@@ -420,6 +420,65 @@ describe("backend management loop DB smoke", () => {
     });
   });
 
+  it("keeps duplicate project closure retry audit-clean", async () => {
+    const cookie = await loginAsAdmin();
+    await createPlanningTasksBatch(cookie, 1);
+
+    const closeBody = {
+      closeReason: "Повторное закрытие не должно плодить side effects",
+      lessons: [
+        {
+          category: "process",
+          title: "Фиксировать повтор закрытия",
+          body: "Retry после успешного close должен вернуть существующую closure model.",
+          impact: "positive"
+        }
+      ]
+    };
+
+    const firstClose = await app.request(
+      "/api/workspace/projects/project-loop/closure/close",
+      {
+        method: "POST",
+        headers: mutationHeaders(cookie),
+        body: JSON.stringify(closeBody)
+      }
+    );
+    expect(firstClose.status).toBe(200);
+    const firstCloseBody = await firstClose.json();
+
+    const retryClose = await app.request(
+      "/api/workspace/projects/project-loop/closure/close",
+      {
+        method: "POST",
+        headers: mutationHeaders(cookie),
+        body: JSON.stringify(closeBody)
+      }
+    );
+    expect(retryClose.status).toBe(200);
+    const retryCloseBody = await retryClose.json();
+    expect(retryCloseBody).toMatchObject({
+      projectId: "project-loop",
+      auditEventId: firstCloseBody.auditEventId,
+      snapshot: {
+        id: firstCloseBody.snapshot.id,
+        projectId: "project-loop",
+        closeReason: closeBody.closeReason
+      },
+      lessons: [expect.objectContaining({ title: "Фиксировать повтор закрытия" })]
+    });
+
+    const auditResponse = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie }
+    });
+    expect(auditResponse.status).toBe(200);
+    const auditBody = await auditResponse.json();
+    const actionTypes = auditBody.auditEvents.map(
+      (event: { actionType: string }) => event.actionType
+    );
+    expect(actionTypes.filter((actionType: string) => actionType === "project.closed")).toHaveLength(1);
+    expect(actionTypes).not.toContain("project.close_conflict");
+  });
   it("keeps key backend read models inside production-readiness smoke thresholds", async () => {
     const cookie = await loginAsAdmin();
     await createPlanningTasksBatch(cookie, 25);
