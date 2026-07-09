@@ -16,7 +16,7 @@ import { useAdminRuntime } from "@/admin/lib/admin-runtime";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import type { AccessProfile, Position, WorkspaceUser } from "@/admin/lib/admin-client";
 
-const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
+const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60 [@media(pointer:coarse)]:min-h-[var(--touch-target)]";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
 export function AdminUsersSurface() {

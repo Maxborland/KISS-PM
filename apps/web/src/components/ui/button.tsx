@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 const buttonVariants = cva(
   [
     "relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none",
+    "[@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)]",
     "rounded-[var(--radius-md)] font-medium",
     "transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)]",
     "focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]",

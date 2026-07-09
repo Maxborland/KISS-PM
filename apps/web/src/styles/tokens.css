@@ -140,6 +140,7 @@
   --page-header-height: 64px;
   --row-h: 30px;
   --toolbar-h: 36px;
+  --touch-target: 44px;
   --content-max: 1480px;
   --canvas-pad: 16px;
   --canvas-radius: var(--radius-2xl);

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-07",
+  "generatedAt": "2026-07-09T19:52:19.640Z",
   "branch": "codex/pre-prod-hardening-on-master",
   "purpose": "Current-truth reconciliation after origin/master merge and the current hardening batch. Old bug docs are historical inputs, not current-open truth unless fresh evidence confirms failure.",
   "statusVocabulary": [
@@ -25,10 +25,10 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 76,
-    "confirmedOpen": 3,
+    "fixedByCurrentBranchItems": 79,
+    "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
-    "notABugOrSupersededOldBugIds": 4,
+    "notABugOrSupersededOldBugIds": 5,
     "unverifiedRiskZones": 2
   },
   "fixedByMaster": [
@@ -1418,71 +1418,55 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "Closes the self-hosted LiveKit network reconnect variant and fixes SignalReconnecting being misreported as idle/Ожидание. It does not close actual Jitsi external media or successful physical OBS CAMERA publication."
-    }
-  ],
-  "confirmedOpen": [
-    {
-      "id": "CURRENT-RESP-01-MOBILE-NAVIGATION-MISSING",
-      "status": "confirmed-open",
-      "severity": "high",
-      "affectedRoles": [
-        "admin",
-        "limited-reader"
-      ],
-      "scenario": "Authenticated mobile user navigates between product areas at 390x844.",
-      "steps": [
-        "Log in at 390x844 as admin or limited reader.",
-        "Open /dashboard and inspect visible navigation controls.",
-        "Open the only visible avatar button."
-      ],
-      "expected": "A touch-accessible application navigation opener exposes permitted work, communications, and administration routes.",
-      "actual": "No application navigation opener exists. The avatar menu contains only Profile, Settings, and Logout, so product routes require direct URL entry.",
-      "evidence": ".superloopy/evidence/lane-responsive-traversal.md and .superloopy/evidence/responsive/02-390x844-admin-avatar-menu-open.png",
-      "suspectedArea": "apps/web workspace shell responsive navigation breakpoint/rendering",
-      "fixRecommendation": "Render an explicit mobile navigation trigger and focus-managed drawer using the existing sidebar permission model.",
-      "regressionRisk": "High: shell navigation affects every authenticated mobile route and both allowed/denied role variants."
     },
     {
-      "id": "CURRENT-RESP-02-TABLET-COMMS-SIDEBAR-PAINT",
-      "status": "confirmed-open",
-      "severity": "high",
-      "affectedRoles": [
-        "admin"
+      "id": "CURRENT-RESP-01-MOBILE-NAVIGATION-MISSING",
+      "source": "current branch authenticated responsive Playwright traversal",
+      "surface": "WorkspaceShell at 390x844 for admin and plan-reader roles",
+      "evidence": ".superloopy/evidence/frontend/2026-07-10-responsive/screenshots/390x844-mobile-navigation-open.png and 390x844-plan-reader-navigation.png: focus-managed permission-aware drawer opens, closes by Escape, restores focus, and navigates the limited reader to /projects while hiding unauthorized CRM, communications, and administration links.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
       ],
-      "scenario": "Admin opens communications channels at 768x1024.",
-      "steps": [
-        "Log in at 768x1024 as admin.",
-        "Navigate to /communications/channels.",
-        "Inspect the persistent sidebar in viewport and full-page captures."
+      "tests": [
+        "responsive-shell.spec.ts admin mobile drawer open/close/Escape/focus -> pass",
+        "responsive-shell.spec.ts plan-reader permission filtering and /projects navigation -> pass"
       ],
-      "expected": "The sidebar retains the same visible logo, group labels, and navigation links as other tablet routes.",
-      "actual": "Multiple sidebar bands paint solid black and obscure the logo, group labels, and navigation links while the channel surface itself renders.",
-      "evidence": ".superloopy/evidence/lane-responsive-traversal.md, .superloopy/evidence/responsive/13b-768x1024-admin-communications-channels-viewport.png, and .superloopy/evidence/responsive/13-768x1024-admin-communications-channels.png",
-      "suspectedArea": "communications route layout/stacking context interacting with workspace sidebar at tablet width",
-      "fixRecommendation": "Isolate communications surface layers from the shell stacking context and add a 768x1024 visual regression assertion.",
-      "regressionRisk": "Medium-high: shell paint and stacking changes can affect overlays, drawers, and other communications routes."
+      "coverageStatus": "closed",
+      "note": "Adds a real mobile application navigation trigger and reuses the existing permission-filtered route model."
     },
     {
       "id": "CURRENT-RESP-03-TOUCH-TARGETS-BELOW-44",
-      "status": "confirmed-open",
-      "severity": "medium",
-      "affectedRoles": [
-        "admin",
-        "limited-reader"
+      "source": "current branch measured responsive Playwright traversal",
+      "surface": "shared Button/Input/menu/dialog primitives, avatar menu, search, sidebar links, and audited native admin selects when pointer: coarse",
+      "evidence": ".superloopy/evidence/frontend/2026-07-10-responsive/screenshots/768x1024-admin-touch-targets.png proves representative coarse-pointer controls meet 44x44. 900x800-fine-pointer-compact.png and 1280x800-desktop-compact-shell.png prove compact mouse controls are preserved at narrow and wide desktop widths.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
       ],
-      "scenario": "Touch users operate primary and repeated controls at 390x844 and 768x1024.",
-      "steps": [
-        "Open dashboard, CRM deals, admin users/modal, communications channels, and sidebar links.",
-        "Measure visible interactive control bounding boxes."
+      "tests": [
+        "responsive-shell.spec.ts coarse-pointer representative touch controls >=44x44 at 768x1024 -> pass",
+        "responsive-shell.spec.ts fine-pointer compact controls at 900x800 and 1280x800 -> pass",
+        "red-before proof: 900x800 fine-pointer avatar was 44x44 under width-only policy; green after pointer: coarse scoping"
       ],
-      "expected": "Touch controls meet the 44x44 QA threshold or provide an equivalent 44x44 interactive hit area.",
-      "actual": "Frequent controls measure 28-35px high; avatar is 32x32, modal close is 31x31, and several table actions are 32x28.",
-      "evidence": ".superloopy/evidence/lane-responsive-traversal.md with responsive/05, responsive/06, responsive/09, and responsive/13b screenshots.",
-      "suspectedArea": "shared Button/IconButton/Input sizing tokens and sidebar row sizing",
-      "fixRecommendation": "Introduce or apply touch-safe size variants at mobile/tablet breakpoints without increasing desktop density.",
-      "regressionRisk": "Medium: shared control sizing can change table density, modal height, and sidebar overflow."
+      "coverageStatus": "closed",
+      "note": "Introduces --touch-target: 44px and applies it only when the primary pointer is coarse; fine-pointer density remains unchanged across responsive widths."
+    },
+    {
+      "id": "CURRENT-RESP-04-AREA-BADGE-HEADING-OVERLAP",
+      "source": "current branch visual QA discovered during responsive closure",
+      "surface": "communications and administration area headers at 768x1024",
+      "evidence": ".superloopy/evidence/frontend/2026-07-10-responsive/screenshots/768x1024-communications-sidebar.png and 768x1024-admin-touch-targets.png: fixed-width text badges were replaced by bounded lucide icons; Playwright bounding-box assertions prove no horizontal overlap with H1.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "responsive-shell.spec.ts communications header badge/H1 geometry -> pass",
+        "responsive-shell.spec.ts admin header badge/H1 geometry -> pass"
+      ],
+      "coverageStatus": "closed",
+      "note": "Discovered and fixed within the same responsive block; no open backlog item remains."
     }
   ],
+  "confirmedOpen": [],
   "unverified": [],
   "notABugOrSuperseded": [
     {
@@ -1494,6 +1478,13 @@
       ],
       "source": "docs/qa/full-eval/bugs.md and docs/qa/full-eval/bugs/auth.md",
       "reason": "Historical environment artifacts or superseded observations. Current branch still hardens loopback dev origins for the same class of environment issue."
+    },
+    {
+      "ids": [
+        "CURRENT-RESP-02-TABLET-COMMS-SIDEBAR-PAINT"
+      ],
+      "source": ".superloopy/evidence/frontend/2026-07-10-responsive/tablet-sidebar-root-cause.md and screenshot-integrity.json",
+      "reason": "Not a product paint defect. Fresh 768x1024 browser traversal, computed styles, hit testing, screenshot hashes, and decoded PNG scans all pass; every committed source PNG has zero black pixels. The black bands reproduce only in the downstream evidence image renderer."
     }
   ],
   "unverifiedRiskZones": [
@@ -1539,5 +1530,5 @@
       "remainingEvidence": "Remaining full-browser traversal still required for other roles/routes/actions: Jitsi actual media beyond external moderator/auth gate, live/browser agent provider variants, mobile/responsive passes, and the role-specific route/action atoms not yet covered by fresh traversal evidence. Physical OBS route/action traversal is documented, but successful CAMERA publication remains blocked by Chrome/OBS NotReadableError."
     }
   ],
-  "nextAction": "Fix the confirmed responsive/browser defects and execute the atomized remaining role-specific route/action matrix; then run live/browser OpenRouter agent-provider variants. Actual Jitsi media remains blocked by the external moderator/auth gate, and physical OBS CAMERA publication remains blocked by Chrome NotReadableError until a working camera source is available."
+  "nextAction": "Execute the atomized remaining role-specific route/action matrix and live/browser OpenRouter agent-provider variants. Actual Jitsi media remains blocked by the external moderator/auth gate, and physical OBS CAMERA publication remains blocked by Chrome NotReadableError until a working camera source is available."
 }
