@@ -31,7 +31,7 @@ export function isTrustedBrowserMutationRequest(
     return (
       normalizedOrigin === requestUrl.origin ||
       trustedOrigins.includes(normalizedOrigin) ||
-      isTrustedLoopbackWildcard(originUrl, requestUrl, trustedOrigins)
+      isTrustedLoopbackWildcard(originUrl, trustedOrigins)
     );
   } catch {
     return false;
@@ -50,8 +50,14 @@ export function trustedMutationOriginsFromEnv(
   return ["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"];
 }
 
-function isTrustedLoopbackWildcard(originUrl: URL, requestUrl: URL, trustedOrigins: string[]): boolean {
-  if (!loopbackWildcardFor(requestUrl)) return false;
+// Dev-only convenience: trust a loopback browser origin (e.g. http://localhost:3000) even when the
+// API request Host is a non-loopback compose service name (http://api:4000). Previously this also
+// required the REQUEST url to be loopback, so browser POST/PATCH through the web container (which
+// rewrites /api → http://api:4000) got same_origin_action_required. The loopback wildcard entries
+// (http://localhost:*, http://127.0.0.1:*, …) exist ONLY in the non-production defaults — env-
+// configured origins are concrete and reject wildcards — so dropping the request-host check cannot
+// widen trust in production.
+function isTrustedLoopbackWildcard(originUrl: URL, trustedOrigins: string[]): boolean {
   const originWildcard = loopbackWildcardFor(originUrl);
   return originWildcard !== null && trustedOrigins.includes(originWildcard);
 }

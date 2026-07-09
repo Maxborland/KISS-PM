@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { hashJson } from "../planningProposalCodec";
 import {
   canEditTaskFields,
   canParticipateInTaskActivity,
@@ -49,9 +50,13 @@ export async function createTaskComment(
           actorUserId: input.actor.id,
           surface: `project_work.task.comment.create:${task.id}`,
           clientRequestId: input.body.clientRequestId,
-          resourceId: proposedActivityId
+          resourceId: proposedActivityId,
+          requestHash: hashJson({ body: input.body.body })
         })
-      : { claimed: true, resourceId: proposedActivityId };
+      : { claimed: true, resourceId: proposedActivityId, conflict: false };
+    // Same clientRequestId reused with a different comment body → reject instead of returning the
+    // previous comment as a success and dropping the new content.
+    if (claim.conflict) return { ok: false, status: 409, error: "idempotency_key_conflict" };
     if (!claim.claimed) {
       const activities = await transactionDataSource.listTaskActivities(input.actor.tenantId, task.id);
       const existingActivity = activities.find((activity) => activity.id === claim.resourceId);

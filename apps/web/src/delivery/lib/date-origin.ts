@@ -47,17 +47,21 @@ export function deriveScheduleTimeline(input: {
 }): { originDay: number; totalDays: number; todayDay: number; todayOffsetDays: number } {
   const todayDay = isoToDay(input.todayIso ?? currentPlanDate());
   const projectStartDay = input.projectStartIso ? isoToDay(input.projectStartIso) : null;
+  // Незапланированные строки (например, оптимистичная task.create до ответа сервера) приходят
+  // с sentinel dayStart=0/dayDur=0 → day 0 = 1970-01-01. Без фильтра Math.min выбирает 0 и origin
+  // прыгает к 1970, унося Today-маркер/подписи далеко за экран. Реальные plan-дни всегда > 0.
+  const scheduled = (days: number[]) => days.filter((d) => Number.isFinite(d) && d > 0);
   const startCandidates = [
     todayDay,
     ...(projectStartDay != null ? [projectStartDay] : []),
-    ...input.rowStartDays
+    ...scheduled(input.rowStartDays)
   ].filter(Number.isFinite);
   const originDay = startOfIsoWeekDay(startCandidates.length ? Math.min(...startCandidates) : todayDay);
   const finishCandidates = [
     todayDay,
     ...(input.projectFinishDay != null ? [input.projectFinishDay] : []),
     ...(input.deadlineDay != null ? [input.deadlineDay] : []),
-    ...input.rowFinishDays
+    ...scheduled(input.rowFinishDays)
   ].filter(Number.isFinite);
   const finishDay = finishCandidates.length ? Math.max(...finishCandidates) : originDay + 7;
   const totalDays = Math.max(7, Math.ceil((finishDay - originDay + 6) / 7) * 7);

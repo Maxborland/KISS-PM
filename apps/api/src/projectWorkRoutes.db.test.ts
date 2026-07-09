@@ -1233,6 +1233,40 @@ describe("project work API routes", () => {
     `;
     expect(Number(auditRows[0]?.count ?? 0)).toBe(2);
   });
+
+  it("rejects a reused task comment client request id with a different body (409)", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await app.request("/api/workspace/projects/project-alpha/tasks", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        id: "task-comment-conflict",
+        title: "Конфликт идемпотентности",
+        plannedStart: "2026-06-02",
+        plannedFinish: "2026-06-05",
+        plannedWork: 8,
+        participants: [{ userId: "user-alpha-admin", role: "executor" }]
+      })
+    });
+
+    const first = await app.request("/api/workspace/tasks/task-comment-conflict/comments", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({ body: "Первый текст.", clientRequestId: "reused-key" })
+    });
+    expect(first.status).toBe(201);
+
+    // Same clientRequestId reused with a DIFFERENT body must conflict — not silently return the
+    // first comment as a success (which would drop the new content).
+    const conflict = await app.request("/api/workspace/tasks/task-comment-conflict/comments", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({ body: "Совсем другой текст.", clientRequestId: "reused-key" })
+    });
+    expect(conflict.status).toBe(409);
+    expect((await conflict.json() as { error: string }).error).toBe("idempotency_key_conflict");
+  });
+
   it("blocks task field edits and archive for executors without edit/delete permission", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");

@@ -27,6 +27,22 @@ describe("delivery date-origin helpers", () => {
     expect(timeline.totalDays).toBeGreaterThanOrEqual(timeline.todayOffsetDays);
   });
 
+  it("ignores unscheduled sentinel rows (dayStart 0) when deriving the origin", () => {
+    // An optimistic task.create row carries empty calculated dates → dayStart 0 / dayFinish 0
+    // (day 0 = 1970-01-01). Including it would make Math.min pick 0 and jump the timeline to 1970.
+    const scheduled = isoToDay("2026-05-13");
+    const timeline = deriveScheduleTimeline({
+      projectStartIso: "2026-05-13",
+      projectFinishDay: isoToDay("2026-06-30"),
+      rowStartDays: [0, scheduled],
+      rowFinishDays: [0, isoToDay("2026-06-30")],
+      todayIso: "2026-05-20"
+    });
+
+    expect(timeline.originDay).toBeGreaterThan(0);
+    expect(dayToIso(timeline.originDay)).toBe("2026-05-11");
+  });
+
   it("starts calendar month choices from the calculated project range, not March 2026", () => {
     expect(buildProjectMonthKeys({
       projectStartIso: "2026-05-13",

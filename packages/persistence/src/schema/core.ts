@@ -170,6 +170,9 @@ export const writeFlowIdempotencyKeys = pgTable(
     actorUserId: text("actor_user_id").notNull(),
     clientRequestId: text("client_request_id").notNull(),
     resourceId: text("resource_id").notNull(),
+    // sha256 of the request payload. Reusing the same clientRequestId with a DIFFERENT body must
+    // conflict (not silently return the old resource). Nullable for rows written before this column.
+    requestHash: text("request_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull()
   },
   (table) => [

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { emitMessageCreated, emitNotificationCreated } from "./workspaceEventBus";
+import { hashJson } from "./planningProposalCodec";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import {
@@ -795,9 +796,13 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
             actorUserId: actor.id,
             surface: "collaboration.meeting.create",
             clientRequestId: clientRequestId.value,
-            resourceId: proposedMeetingId
+            resourceId: proposedMeetingId,
+            requestHash: hashJson(parsed.value)
           })
-        : { claimed: true, resourceId: proposedMeetingId };
+        : { claimed: true, resourceId: proposedMeetingId, conflict: false };
+      // Same clientRequestId reused with a different meeting payload → reject instead of returning
+      // the old meeting as a success and dropping the new content.
+      if (claim.conflict) return { ok: false as const, conflict: true as const };
       if (!claim.claimed) {
         const existingMeeting = await requireMethod(transactionDataSource.findMeeting).call(
           transactionDataSource,
@@ -860,7 +865,12 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
       );
       return { ok: true as const, meeting, participants };
     });
-    if (!result.ok) return context.json({ error: "collaboration_not_configured" }, 501);
+    if (!result.ok) {
+      if ("conflict" in result && result.conflict) {
+        return context.json({ error: "idempotency_key_conflict" }, 409);
+      }
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
     return context.json({
       meeting: serializeMeeting(result.meeting),
       participants: result.participants
@@ -978,7 +988,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!deps.dataSource.createMeetingExternalLink) {
       return context.json({ error: "collaboration_not_configured" }, 501);
     }
-    const link = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+    const linkResult = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       const proposedLinkId = `meeting-link-${randomUUID()}`;
       const claim = clientRequestId.value
         ? await transactionDataSource.claimWriteFlowIdempotencyKey({
@@ -986,9 +996,11 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
             actorUserId: actor.id,
             surface: `collaboration.meeting.external_link.create:${meeting.value.meeting.id}`,
             clientRequestId: clientRequestId.value,
-            resourceId: proposedLinkId
+            resourceId: proposedLinkId,
+            requestHash: hashJson({ provider: provider.value, url: url.value, title: title.value })
           })
-        : { claimed: true, resourceId: proposedLinkId };
+        : { claimed: true, resourceId: proposedLinkId, conflict: false };
+      if (claim.conflict) return { ok: false as const };
       if (!claim.claimed) {
         const links = await requireMethod(transactionDataSource.listMeetingExternalLinks).call(
           transactionDataSource,
@@ -997,7 +1009,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         );
         const existingLink = links.find((candidate) => candidate.id === claim.resourceId);
         if (!existingLink) throw new Error("write_flow_idempotent_resource_missing");
-        return existingLink;
+        return { ok: true as const, link: existingLink };
       }
 
       const createdLink = await requireMethod(transactionDataSource.createMeetingExternalLink).call(transactionDataSource, {
@@ -1021,9 +1033,10 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         permissionResult: meeting.value.access.manageDecision,
         afterState: { linkId: createdLink.id, provider: createdLink.provider }
       }), transactionDataSource);
-      return createdLink;
+      return { ok: true as const, link: createdLink };
     });
-    return context.json({ externalLink: serializeMeetingExternalLink(link) }, 201);
+    if (!linkResult.ok) return context.json({ error: "idempotency_key_conflict" }, 409);
+    return context.json({ externalLink: serializeMeetingExternalLink(linkResult.link) }, 201);
   });
 
   app.post("/api/workspace/meetings/:meetingId/notes", async (context) => {
@@ -1057,7 +1070,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     if (!deps.dataSource.createMeetingNote) {
       return context.json({ error: "collaboration_not_configured" }, 501);
     }
-    const note = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+    const noteResult = await deps.runDataSourceTransaction(async (transactionDataSource) => {
       const proposedNoteId = `meeting-note-${randomUUID()}`;
       const claim = clientRequestId.value
         ? await transactionDataSource.claimWriteFlowIdempotencyKey({
@@ -1065,9 +1078,11 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
             actorUserId: actor.id,
             surface: `collaboration.meeting.note.create:${meeting.value.meeting.id}`,
             clientRequestId: clientRequestId.value,
-            resourceId: proposedNoteId
+            resourceId: proposedNoteId,
+            requestHash: hashJson({ body: parsedBody.value })
           })
-        : { claimed: true, resourceId: proposedNoteId };
+        : { claimed: true, resourceId: proposedNoteId, conflict: false };
+      if (claim.conflict) return { ok: false as const };
       if (!claim.claimed) {
         const notes = await requireMethod(transactionDataSource.listMeetingNotes).call(
           transactionDataSource,
@@ -1076,7 +1091,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
         );
         const existingNote = notes.find((candidate) => candidate.id === claim.resourceId);
         if (!existingNote) throw new Error("write_flow_idempotent_resource_missing");
-        return existingNote;
+        return { ok: true as const, note: existingNote };
       }
 
       const createdNote = await requireMethod(transactionDataSource.createMeetingNote).call(transactionDataSource, {
@@ -1099,9 +1114,10 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
           : meeting.value.access.manageDecision,
         afterState: { noteId: createdNote.id }
       }), transactionDataSource);
-      return createdNote;
+      return { ok: true as const, note: createdNote };
     });
-    return context.json({ note: serializeMeetingNote(note) }, 201);
+    if (!noteResult.ok) return context.json({ error: "idempotency_key_conflict" }, 409);
+    return context.json({ note: serializeMeetingNote(noteResult.note) }, 201);
   });
 
   app.post("/api/workspace/meetings/:meetingId/action-items", async (context) => {

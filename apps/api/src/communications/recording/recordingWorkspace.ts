@@ -182,7 +182,9 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
 
         const recordingGroupId = `call-rec-group-${randomUUID()}`;
         const recordings: CallRecording[] = [];
-        const startedEgressIds: string[] = [];
+        // Track the started egress AND its track so a compensating row (below) can carry real
+        // participant/track/kind values if we have to persist an orphan outside the rollback.
+        const started: Array<{ egressId: string; track: (typeof tracks)[number] }> = [];
 
         try {
           for (const track of tracks) {
@@ -201,7 +203,7 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
               trackId: track.trackId,
               filepath
             });
-            startedEgressIds.push(egressId);
+            started.push({ egressId, track });
             const recording = await transactionDataSource.createCallRecording({
               id: recordingId,
               tenantId: input.actor.tenantId,
@@ -244,12 +246,45 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
         } catch (cause) {
           // Any failure after one or more egresses started (a later startTrackEgress, the DB
           // insert, or the event/audit) leaves the caller without a group id to stop. Stop every
-          // egress started in this attempt so none keep recording/billing; the janitor reaps rows.
-          for (const egressId of startedEgressIds) {
+          // egress started in this attempt so none keep recording/billing.
+          const orphaned: typeof started = [];
+          for (const item of started) {
             try {
-              await egressProvider.stopEgress(egressId);
+              await egressProvider.stopEgress(item.egressId);
             } catch {
-              // best-effort
+              // The provider stop also failed (e.g. LiveKit outage). This egress is still running.
+              orphaned.push(item);
+            }
+          }
+          // Compensating durability: if a started egress could NOT be stopped, this transaction is
+          // about to roll back and would erase every recording row — leaving that egress recording/
+          // billing with NO durable record for the reconcile/janitor path to discover and stop.
+          // Persist a "recording" row OUTSIDE the rollback boundary (via the pooled dataSource, which
+          // commits on its own connection) so reconcile can reap it. Best-effort: if this also fails
+          // there is nothing more we can do here.
+          if (orphaned.length > 0 && dataSource.createCallRecording) {
+            for (const item of orphaned) {
+              try {
+                await dataSource.createCallRecording({
+                  id: `call-recording-${randomUUID()}`,
+                  tenantId: input.actor.tenantId,
+                  roomId: input.room.id,
+                  sessionId: input.session.id,
+                  recordingGroupId,
+                  attachmentId: null,
+                  egressId: item.egressId,
+                  participantId: item.track.participantIdentity,
+                  trackId: item.track.trackId,
+                  kind: item.track.kind,
+                  status: "recording",
+                  durationSeconds: null,
+                  endedAt: null,
+                  title: `Запись · ${item.track.participantIdentity} (компенсация)`,
+                  createdByUserId: input.actor.id
+                });
+              } catch {
+                // best-effort durable compensation
+              }
             }
           }
           throw cause;

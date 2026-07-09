@@ -543,7 +543,10 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           plannedStart,
           plannedFinish,
           durationWorkingDays: numberInput(input.durationWorkingDays, 1),
-          plannedWork: numberInput(input.plannedWork, 480),
+          // plannedWork здесь В ЧАСАХ: buildCreateTaskPlanningCommand умножает его на 60
+          // (workMinutes = plannedWork * 60). Дефолт одного рабочего дня = 8 ч, а не 480
+          // (480 попадало в план как 480 ч = 28 800 мин, раздувая ресурсную загрузку).
+          plannedWork: numberInput(input.plannedWork, 8),
           participants,
           ...(description ? { description } : {})
         });

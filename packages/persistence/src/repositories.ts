@@ -141,6 +141,9 @@ export type PasswordResetTokenRecord = {
 export type WriteFlowIdempotencyClaim = {
   claimed: boolean;
   resourceId: string;
+  // true when an existing key was found but with a DIFFERENT request hash (same clientRequestId
+  // reused for a different payload). The caller must reject with 409 rather than return the old row.
+  conflict: boolean;
 };
 
 export type PostgresTenantDataSource = CrmRepository &
@@ -241,6 +244,7 @@ export type PostgresTenantDataSource = CrmRepository &
     surface: string;
     clientRequestId: string;
     resourceId: string;
+    requestHash?: string;
   }): Promise<WriteFlowIdempotencyClaim>;
   appendAuditEvent(input: AuditEventRecordInput): Promise<void>;
   listAuditEventsByTenantId(
@@ -767,6 +771,7 @@ export function createPostgresTenantDataSource(
           actorUserId: input.actorUserId,
           clientRequestId: input.clientRequestId,
           resourceId: input.resourceId,
+          requestHash: input.requestHash ?? null,
           createdAt: new Date()
         })
         .onConflictDoNothing({
@@ -778,10 +783,13 @@ export function createPostgresTenantDataSource(
           ]
         })
         .returning({ resourceId: writeFlowIdempotencyKeys.resourceId });
-      if (inserted) return { claimed: true, resourceId: inserted.resourceId };
+      if (inserted) return { claimed: true, resourceId: inserted.resourceId, conflict: false };
 
       const [existing] = await db
-        .select({ resourceId: writeFlowIdempotencyKeys.resourceId })
+        .select({
+          resourceId: writeFlowIdempotencyKeys.resourceId,
+          requestHash: writeFlowIdempotencyKeys.requestHash
+        })
         .from(writeFlowIdempotencyKeys)
         .where(
           and(
@@ -793,7 +801,14 @@ export function createPostgresTenantDataSource(
         )
         .limit(1);
       if (!existing) throw new Error("write_flow_idempotency_key_missing");
-      return { claimed: false, resourceId: existing.resourceId };
+      // Same key, different payload → conflict (otherwise the caller returns the OLD resource as a
+      // success and silently drops the new content). Legacy rows (null stored hash) are treated as
+      // non-conflicting so pre-migration keys keep replaying rather than hard-failing.
+      const conflict =
+        input.requestHash != null &&
+        existing.requestHash != null &&
+        existing.requestHash !== input.requestHash;
+      return { claimed: false, resourceId: existing.resourceId, conflict };
     },
     async appendAuditEvent(input) {
       const event = createAuditEventRecord(input);

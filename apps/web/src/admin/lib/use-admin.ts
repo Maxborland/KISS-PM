@@ -20,6 +20,10 @@ export type AdminData = {
   users: WorkspaceUser[];
   positions: Position[];
   permissions: Permission[];
+  // false when the users list is unreadable to this role (403 on the roles surface). Consumers must
+  // NOT treat users:[] as "0 assigned" — the assigned count is UNKNOWN, so destructive role actions
+  // that depend on it (delete) must be disabled rather than falsely enabled.
+  usersReadable: boolean;
 };
 export type AdminMutationResult = MutationResult;
 export type AdminLoadScope = "all" | "roles" | "users";
@@ -59,21 +63,29 @@ export function useAdmin(scope: AdminLoadScope = "all") {
         roles: roles.accessRoles,
         users: users.users,
         positions: positions.positions,
-        permissions: []
+        permissions: [],
+        usersReadable: true
       };
     }
 
     if (scope === "roles") {
+      // listUsers powers the per-role "assigned" count. If the role-manager lacks
+      // tenant.users.read it 403s: fall back to an EMPTY list but flag usersReadable=false so the
+      // surface shows the count as unknown and disables delete (a 403 must not read as "0 assigned").
       const [roles, users, catalog] = await Promise.all([
         client.listAccessRoles(),
-        optionalForbidden(client.listUsers(), { users: [] }),
+        optionalForbidden(
+          client.listUsers().then((r) => ({ users: r.users, usersReadable: true })),
+          { users: [], usersReadable: false }
+        ),
         client.listPermissionCatalog()
       ]);
       return {
         roles: roles.accessRoles,
         users: users.users,
         positions: [],
-        permissions: catalog.permissions
+        permissions: catalog.permissions,
+        usersReadable: users.usersReadable
       };
     }
 
@@ -83,7 +95,7 @@ export function useAdmin(scope: AdminLoadScope = "all") {
       client.listPositions(),
       client.listPermissionCatalog()
     ]);
-    return { roles: roles.accessRoles, users: users.users, positions: positions.positions, permissions: catalog.permissions };
+    return { roles: roles.accessRoles, users: users.users, positions: positions.positions, permissions: catalog.permissions, usersReadable: true };
   }, [client, scope]);
   const { data, status, error, setData, reload: load } = useResource(loader);
 
