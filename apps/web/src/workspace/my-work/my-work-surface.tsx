@@ -1,17 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Segmented } from "@/components/ui/segmented";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { cn } from "@/lib/cn";
-import { useMyWork, useWorkspaceTaskStatuses, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
+import { useSessionUser } from "@/shell/use-session-user";
+import { useMyWork, useProjects, useWorkspaceTaskStatuses, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
 import type { TaskPriority, TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
@@ -79,19 +82,28 @@ type Mode = "kanban" | "list";
 
 export function MyWorkSurface() {
   const { data, status, error, reload, updateTaskStatus } = useMyWork();
+  const projects = useProjects();
   const usersDir = useWorkspaceUsers();
+  const sessionUser = useSessionUser();
   const statuses = useWorkspaceTaskStatuses();
   // Фолбэк имени: под ограниченной ролью справочник людей отдаёт 403 — резолвер вернёт сырой id.
   // Показываем «Участник xxxx» вместо user-… (G8-08, G5-12).
   const userName = (id: string) => {
     const n = usersDir.name(id);
-    return n === id ? `Участник ${id.slice(-4)}` : n;
+    if (n !== id) return n;
+    return sessionUser?.id === id ? sessionUser.name : `Участник ${id.slice(-4)}`;
   };
+  const projectNames = useMemo(
+    () => new Map((projects.data?.projects ?? []).map((project) => [project.id, project.title])),
+    [projects.data]
+  );
+  const projectName = (id: string) => projectNames.get(id) ?? id;
   const userColor = (id: string): BemAvatarColor => {
     const i = usersDir.indexOf(id);
     return i < 0 ? "c5" : AV[i % AV.length]!;
   };
   const [mode, setMode] = useState<Mode>("kanban");
+  const [query, setQuery] = useState("");
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overStatusId, setOverStatusId] = useState<string | null>(null);
@@ -102,6 +114,14 @@ export function MyWorkSurface() {
   // Статус поверхности: есть данные → ready; нет данных и ошибка → error; иначе loading.
   // (Пустой набор задач показываем как empty через SurfaceState.)
   const tasks = data?.tasks ?? null;
+  const filteredTasks = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase("ru-RU");
+    if (!normalized) return tasks ?? [];
+    return (tasks ?? []).filter((task) =>
+      [task.title, task.description ?? "", projectNames.get(task.projectId) ?? task.projectId]
+        .some((value) => value.toLocaleLowerCase("ru-RU").includes(normalized))
+    );
+  }, [projectNames, query, tasks]);
   const surfaceStatus = status === "forbidden" ? "forbidden" : tasks ? (tasks.length === 0 ? "empty" : "ready") : status === "error" ? "error" : "loading";
 
   // Колонки канбана по системным статусам (TASK_STATUSES, упорядочены sortOrder).
@@ -110,9 +130,9 @@ export function MyWorkSurface() {
     const sorted = statuses.list;
     const byCategory = new Map<TaskStatusCategory, TaskRecord[]>();
     for (const s of sorted) byCategory.set(s.category, []);
-    for (const t of tasks ?? []) byCategory.get(t.statusCategory)?.push(t);
+    for (const t of filteredTasks) byCategory.get(t.statusCategory)?.push(t);
     return sorted.map((s) => ({ status: s, items: byCategory.get(s.category) ?? [] }));
-  }, [tasks, statuses.list]);
+  }, [filteredTasks, statuses.list]);
 
   // Применить смену статуса (общий путь для DnD и select). Отклонение перехода — честный toast.
   async function applyStatus(taskId: string, targetStatusId: string) {
@@ -166,6 +186,17 @@ export function MyWorkSurface() {
           />
         </div>
 
+        <div className="relative mb-2 max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--muted)]" aria-hidden />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Поиск задачи..."
+            aria-label="Поиск задачи"
+            className="pl-9"
+          />
+        </div>
+
         <div className="mb-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
           {mode === "kanban"
             ? "Перетащите карточку в колонку статуса — переход проверяется матрицей (запрет → отклонение)."
@@ -181,7 +212,11 @@ export function MyWorkSurface() {
           empty={{ title: "Задач пока нет", description: "Вам не назначено ни одной задачи в активных проектах." }}
         >
           {tasks ? (
-            mode === "kanban" ? (
+            query.trim() && filteredTasks.length === 0 ? (
+              <div role="status" className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--panel)] px-4 py-8 text-center text-[length:var(--text-sm)] text-[var(--muted)]">
+                По вашему запросу задач не найдено.
+              </div>
+            ) : mode === "kanban" ? (
               <div className="flex gap-3 overflow-x-auto pb-2">
                 {columns.map(({ status: s, items }) => (
                   <div
@@ -214,6 +249,7 @@ export function MyWorkSurface() {
                           }}
                           userName={userName}
                           userColor={userColor}
+                          projectName={projectName}
                         />
                       ))}
                       {items.length === 0 ? (
@@ -240,7 +276,7 @@ export function MyWorkSurface() {
                     </tr>
                   </thead>
                   <tbody>
-                    {tasks.map((t) => {
+                    {filteredTasks.map((t) => {
                       const due = dueLabel(t.plannedFinish);
                       return (
                         <tr key={t.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
@@ -248,7 +284,7 @@ export function MyWorkSurface() {
                             <div className="font-medium text-[var(--text-strong)]">{t.title}</div>
                             {prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{t.id}</div> : null}
                           </td>
-                          <td className="px-3 py-2 text-[var(--muted-strong)]">{t.projectId}</td>
+                          <td className="px-3 py-2 text-[var(--muted-strong)]">{projectName(t.projectId)}</td>
                           <td className="px-3 py-2">
                             <Chip variant={PRIORITY_CHIP[t.priority]}>{PRIORITY_LABEL[t.priority]}</Chip>
                           </td>
@@ -343,7 +379,8 @@ function TaskCard({
   onDragStart,
   onDragEnd,
   userName,
-  userColor
+  userColor,
+  projectName
 }: {
   task: TaskRecord;
   busy: boolean;
@@ -352,6 +389,7 @@ function TaskCard({
   onDragEnd: () => void;
   userName: (id: string) => string;
   userColor: (id: string) => BemAvatarColor;
+  projectName: (id: string) => string;
 }) {
   const due = dueLabel(task.plannedFinish);
   return (
@@ -370,7 +408,7 @@ function TaskCard({
         <BemAvatar initials={initials(userName(task.ownerUserId))} color={userColor(task.ownerUserId)} size="sm" title={userName(task.ownerUserId)} />
       </div>
       <h3 className="text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">{task.title}</h3>
-      <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{task.projectId}</p>
+      <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{projectName(task.projectId)}</p>
 
       {/* Прогресс задачи (progress 0…100). */}
       <div className="mt-2 flex items-center gap-2">

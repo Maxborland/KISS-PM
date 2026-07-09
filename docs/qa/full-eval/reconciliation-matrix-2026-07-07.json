@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-09T19:52:19.640Z",
+  "generatedAt": "2026-07-09T21:14:16.066Z",
   "branch": "codex/pre-prod-hardening-on-master",
   "purpose": "Current-truth reconciliation after origin/master merge and the current hardening batch. Old bug docs are historical inputs, not current-open truth unless fresh evidence confirms failure.",
   "statusVocabulary": [
@@ -25,7 +25,7 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 79,
+    "fixedByCurrentBranchItems": 86,
     "confirmedOpen": 0,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 5,
@@ -1464,6 +1464,105 @@
       ],
       "coverageStatus": "closed",
       "note": "Discovered and fixed within the same responsive block; no open backlog item remains."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-01-PROFILE-CANCEL",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "Profile and settings edit forms",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "profile-settings-role.spec.ts -> 11/11 passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "Added a real cancel/reset action that restores persisted values."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-02-SAVE-FEEDBACK",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "Profile/settings save and auth refresh",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "profile-settings-role.spec.ts -> 11/11 passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "Quiet auth refresh preserves the mounted form and visible saved confirmation."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-03-LOGOUT-BACK-CACHE",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "Workspace shell logout for AADM/EADM/PLAN/RES/BADM",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "shell-role-nav.spec.ts -> 5/5 roles passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "Hard location replacement prevents browser Back from restoring a cached protected profile."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-04-MYWORK-PROJECT-LABELS",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "My Work Kanban and List",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "mywork-role-actions.spec.ts -> 11/11 passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "Project ids resolve to project titles from the project read model."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-05-MYWORK-CURRENT-USER",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "My Work PLAN identity fallback",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "mywork-role-actions.spec.ts PLAN rows/readback -> passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "The authenticated user name is used when the users directory is forbidden."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-06-MYWORK-SEARCH",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "My Work Kanban/List filter",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "mywork-role-actions.spec.ts filter parity -> passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "Added one real task search shared by both views with a no-results state."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-07-RESET-PUBLIC-ORIGIN",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "SMTP password-reset link behind the Next.js API rewrite",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; code-level origin regression and browser route pass, post-fix delivered-message content rereadback pending.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "authRegistrationRoutes.test.ts -> 17/17 passed",
+        "live reset browser/mailbox traversal -> passed"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "Implementation is fixed and normalized; do not count live provider-content closure until a fresh Gmail message is reread after the fix."
     }
   ],
   "confirmedOpen": [],
@@ -1525,10 +1624,11 @@
         "docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/risk-media-livekit-self-hosted-browser-2026-07-08.json: admin Chrome traversal covers /calls/[roomId] self-hosted LiveKit lobby/join/active-call path with real localhost media permission grant, API readback, screenshot, and LiveKit audio publication logs.",
         "docs/qa/full-eval/evidence/browser-media-livekit-multiuser-2026-07-08/risk-media-livekit-multiuser-lifecycle-2026-07-08.json: full-browser traversal partial now includes two-role /calls/[roomId] self-hosted LiveKit admin+engineer join/leave/rejoin/reload path with screenshots and backend/server readback.",
         "docs/qa/full-eval/evidence/browser-media-livekit-physical-camera-2026-07-09/risk-media-livekit-physical-camera-obs-2026-07-09.json: admin user Chrome route/action traversal covers /communications/calls create LiveKit room/start session/connect token modal and /calls/[roomId] lobby/join active stage with real localhost permissions, OBS device enumeration, degraded camera state, API readback, screenshot, and LiveKit server logs.",
-        "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/risk-media-livekit-reconnect-2026-07-10.json: admin + engineer browser traversal covers connected synthetic audio/video, visible client and server reconnecting states, recovery without reload, remote participant readback, active-session invariants, and sanitized LiveKit server evidence."
+        "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/risk-media-livekit-reconnect-2026-07-10.json: admin + engineer browser traversal covers connected synthetic audio/video, visible client and server reconnecting states, recovery without reload, remote participant readback, active-session invariants, and sanitized LiveKit server evidence.",
+        ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md: Auth + Shell has 154 passed atoms; the reset-origin implementation passes split code/browser proof but remains partial until a post-fix Gmail content rereadback."
       ],
-      "remainingEvidence": "Remaining full-browser traversal still required for other roles/routes/actions: Jitsi actual media beyond external moderator/auth gate, live/browser agent provider variants, mobile/responsive passes, and the role-specific route/action atoms not yet covered by fresh traversal evidence. Physical OBS route/action traversal is documented, but successful CAMERA publication remains blocked by Chrome/OBS NotReadableError."
+      "remainingEvidence": "Remaining full-browser traversal is limited to the large domains not closed by the Auth + Shell and responsive batches: Projects, CRM write breadth, Communications/Admin write breadth, live/browser OpenRouter variants, actual Jitsi media beyond the external moderator/auth gate, and successful physical/OBS CAMERA publication after the OS/Chrome source works."
     }
   ],
-  "nextAction": "Execute the atomized remaining role-specific route/action matrix and live/browser OpenRouter agent-provider variants. Actual Jitsi media remains blocked by the external moderator/auth gate, and physical OBS CAMERA publication remains blocked by Chrome NotReadableError until a working camera source is available."
+  "nextAction": "First reread one fresh post-fix Gmail reset message and verify its link targets the web origin. Then execute the Projects domain as the next complete role × route × action × state batch, followed by CRM and Communications/Admin."
 }

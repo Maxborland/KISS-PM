@@ -89,6 +89,105 @@
       "artifact": ".superloopy/evidence/frontend/2026-07-10-responsive/responsive-final-correction-audit.md",
       "recordedAt": "2026-07-09T20:01:50.256Z",
       "updatedAt": "2026-07-09T20:01:50.256Z"
+    },
+    {
+      "id": "H009",
+      "agent": "dashboard-role-states",
+      "assignment": "Auth Shell dashboard role and failure states",
+      "status": "dispatched",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/auth-shell-2026-07-10/dashboard-role-states.md",
+      "recordedAt": "2026-07-09T21:18:28.002Z",
+      "updatedAt": "2026-07-09T21:18:28.002Z"
+    },
+    {
+      "id": "H010",
+      "agent": "auth-route-guards",
+      "assignment": "Anonymous and five-role route guards",
+      "status": "dispatched",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+      "recordedAt": "2026-07-09T21:18:28.172Z",
+      "updatedAt": "2026-07-09T21:18:28.172Z"
+    },
+    {
+      "id": "H011",
+      "agent": "auth-public",
+      "assignment": "Public auth and live SMTP reset remediation",
+      "status": "dispatched",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md",
+      "recordedAt": "2026-07-09T21:18:28.301Z",
+      "updatedAt": "2026-07-09T21:18:28.301Z"
+    },
+    {
+      "id": "H012",
+      "agent": "shell-role-nav",
+      "assignment": "Five-role shell navigation logout back relogin",
+      "status": "dispatched",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md",
+      "recordedAt": "2026-07-09T21:18:28.429Z",
+      "updatedAt": "2026-07-09T21:18:28.429Z"
+    },
+    {
+      "id": "H013",
+      "agent": "profile-settings",
+      "assignment": "Profile settings mutations reload and failure states",
+      "status": "dispatched",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md",
+      "recordedAt": "2026-07-09T21:18:28.569Z",
+      "updatedAt": "2026-07-09T21:18:28.569Z"
+    },
+    {
+      "id": "H014",
+      "agent": "mywork-role-actions",
+      "assignment": "Five-role My Work reads writes denials isolation and retry",
+      "status": "dispatched",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md",
+      "recordedAt": "2026-07-09T21:18:28.718Z",
+      "updatedAt": "2026-07-09T21:18:28.718Z"
+    },
+    {
+      "id": "H015",
+      "agent": "coverage-matrix",
+      "assignment": "Machine-readable Auth Shell coverage reconciliation",
+      "status": "dispatched",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/auth-shell-2026-07-10/auth-shell-coverage.json",
+      "recordedAt": "2026-07-09T21:18:28.866Z",
+      "updatedAt": "2026-07-09T21:18:28.866Z"
+    },
+    {
+      "id": "H016",
+      "agent": "final-auth-shell-auditor",
+      "assignment": "Independent Auth Shell closure integrity audit",
+      "status": "dispatched",
+      "verdict": "REJECT",
+      "normalizedVerdict": "reject",
+      "artifact": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md",
+      "recordedAt": "2026-07-09T21:29:19.950Z",
+      "updatedAt": "2026-07-09T21:29:19.950Z"
+    },
+    {
+      "id": "H017",
+      "agent": "superseding-auth-shell-auditor",
+      "assignment": "Superseding audit after closure-integrity corrections",
+      "status": "dispatched",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_SUPERSEDING_AUDIT.md",
+      "recordedAt": "2026-07-09T21:32:37.039Z",
+      "updatedAt": "2026-07-09T21:32:37.039Z"
     }
   ]
 }

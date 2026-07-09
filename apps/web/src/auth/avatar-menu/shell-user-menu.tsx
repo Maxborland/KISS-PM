@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { LogOut, Settings, User } from "lucide-react";
 
 import { AuthRuntimeProvider } from "@/auth/lib/auth-runtime";
@@ -29,7 +28,6 @@ export function ShellUserMenu() {
 
 function ShellUserMenuInner() {
   const { user, logout } = useAuth();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -40,7 +38,7 @@ function ShellUserMenuInner() {
     await logout();
     setBusy(false);
     setOpen(false);
-    router.replace("/login");
+    window.location.replace("/login");
   }
 
   return (

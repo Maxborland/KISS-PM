@@ -365,6 +365,16 @@ function ProfileForm({
   const themeEditDisabled = busy || !editCapabilities.canManageTheme;
   const canSave = dirty && !busy && name.trim().length > 0 && accentValid && canSubmitProfileDiff && canSubmitThemeDiff;
 
+  function reset() {
+    setName(user.name);
+    setPhone(user.phone ?? "");
+    setTelegram(user.telegram ?? "");
+    setTheme(user.theme);
+    setAccentColor(user.accentColor);
+    setErrorCode(null);
+    setSaved(false);
+  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSave) return;
@@ -479,6 +489,9 @@ function ProfileForm({
               Сохранено
             </span>
           ) : null}
+          <Button type="button" variant="ghost" size="sm" disabled={!dirty || busy} onClick={reset}>
+            Отменить
+          </Button>
           <Button type="submit" variant="default" size="sm" disabled={!canSave}>
             {busy ? "Сохранение…" : "Сохранить"}
           </Button>

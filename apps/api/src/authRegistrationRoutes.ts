@@ -431,11 +431,14 @@ function deriveTenantName(ownerName: string, email: string): string {
   return domain && domain.length > 0 ? domain : email;
 }
 
-// Ссылка на форму подтверждения сброса на фронте, относительно текущего origin запроса.
-// Реальный роут — /password-reset/confirm (группа (auth) в URL не участвует), токен читается
-// из ?token= на confirm-странице. Прежний /auth/reset-password 404-ил каждое письмо сброса.
+// Ссылка на форму подтверждения сброса на фронте. При web -> API rewrite URL запроса
+// содержит внутренний origin API, поэтому используем browser Origin, уже проверенный
+// same-origin middleware. Для server-to-server вызовов без Origin оставляем request origin.
 function buildResetUrl(context: Context, rawToken: string): string {
-  const origin = new URL(context.req.url).origin;
+  const originHeader = context.req.header("origin");
+  const origin = originHeader
+    ? new URL(originHeader).origin
+    : new URL(context.req.url).origin;
   return `${origin}/password-reset/confirm?token=${encodeURIComponent(rawToken)}`;
 }
 

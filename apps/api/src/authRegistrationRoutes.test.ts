@@ -357,13 +357,21 @@ describe("POST /api/auth/password-reset/request", () => {
     });
     const sendPasswordReset = vi.fn(async (_input: PasswordResetEmailInput) => undefined);
     const emailProvider: SmtpEmailProvider = { provider: "smtp", sendPasswordReset };
-    const app = createApp({ dataSource, emailProvider });
-
-    const response = await app.request("/api/auth/password-reset/request", {
-      method: "POST",
-      headers: sameOriginHeaders,
-      body: JSON.stringify({ email: "owner@example.com" })
+    const publicAppOrigin = "https://app.kiss-pm.test";
+    const app = createApp({
+      dataSource,
+      emailProvider,
+      trustedMutationOrigins: [publicAppOrigin]
     });
+
+    const response = await app.request(
+      "https://api.kiss-pm.test/api/auth/password-reset/request",
+      {
+        method: "POST",
+        headers: { ...sameOriginHeaders, origin: `${publicAppOrigin}/ignored/path` },
+        body: JSON.stringify({ email: "owner@example.com" })
+      }
+    );
 
     expect(response.status).toBe(202);
     await expect(response.json()).resolves.toEqual({ status: "ok", delivery: "email" });
@@ -374,6 +382,7 @@ describe("POST /api/auth/password-reset/request", () => {
     expect(payload!.rawToken).toMatch(/^[a-f0-9]{64}$/);
     expect(payload!.resetUrl).toContain("/password-reset/confirm?token=");
     const resetUrl = new URL(payload!.resetUrl);
+    expect(resetUrl.origin).toBe(publicAppOrigin);
     expect(resetUrl.pathname).toBe("/password-reset/confirm");
     expect(resetUrl.searchParams.get("token")).toBe(payload!.rawToken);
     expect(state.resetTokens.size).toBe(1);
