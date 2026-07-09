@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "sessionId": null,
+  "handoffs": [
+    {
+      "id": "H001",
+      "agent": "Euclid",
+      "assignment": "Atomize remaining role x route x action browser coverage",
+      "status": "dispatched",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/lane-role-route-action-gap-map.md",
+      "recordedAt": "2026-07-09T18:54:48.773Z",
+      "updatedAt": "2026-07-09T18:54:48.773Z"
+    },
+    {
+      "id": "H002",
+      "agent": "Lovelace",
+      "assignment": "Classify Jitsi and physical OBS external media blockers",
+      "status": "dispatched",
+      "verdict": "BLOCKED",
+      "normalizedVerdict": "needs-context",
+      "artifact": ".superloopy/evidence/lane-external-media-blockers.md",
+      "recordedAt": "2026-07-09T18:54:52.635Z",
+      "updatedAt": "2026-07-09T18:54:52.635Z"
+    },
+    {
+      "id": "H003",
+      "agent": "Euler",
+      "assignment": "Audit prior LiveKit reconnect evidence and define pass gate",
+      "status": "dispatched",
+      "verdict": "REJECT",
+      "normalizedVerdict": "reject",
+      "artifact": ".superloopy/evidence/lane-livekit-reconnect-audit.md",
+      "recordedAt": "2026-07-09T18:54:57.463Z",
+      "updatedAt": "2026-07-09T18:54:57.463Z"
+    },
+    {
+      "id": "H004",
+      "agent": "Dewey",
+      "assignment": "Execute live/browser OpenRouter and agent-provider variants",
+      "status": "dispatched",
+      "verdict": "BLOCKED",
+      "normalizedVerdict": "needs-context",
+      "artifact": ".superloopy/evidence/lane-openrouter-agent-provider.md",
+      "recordedAt": "2026-07-09T18:55:01.860Z",
+      "updatedAt": "2026-07-09T18:55:01.860Z"
+    },
+    {
+      "id": "H005",
+      "agent": "Volta",
+      "assignment": "Execute mobile and tablet responsive traversal",
+      "status": "dispatched",
+      "verdict": "FAIL",
+      "normalizedVerdict": "reject",
+      "artifact": ".superloopy/evidence/lane-responsive-traversal.md",
+      "recordedAt": "2026-07-09T18:55:06.093Z",
+      "updatedAt": "2026-07-09T18:55:06.093Z"
+    },
+    {
+      "id": "H006",
+      "agent": "Laplace",
+      "assignment": "Audit final LiveKit transport reconnect implementation and evidence",
+      "status": "dispatched",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/lane-livekit-reconnect-final-audit.md",
+      "recordedAt": "2026-07-09T19:07:55.272Z",
+      "updatedAt": "2026-07-09T19:07:55.272Z"
+    }
+  ]
+}

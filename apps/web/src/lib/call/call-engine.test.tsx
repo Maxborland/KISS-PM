@@ -29,6 +29,7 @@ const livekitMock = vi.hoisted(() => {
     Connecting: "connecting",
     Connected: "connected",
     Reconnecting: "reconnecting",
+    SignalReconnecting: "signalReconnecting",
     Disconnected: "disconnected"
   } as const;
 
@@ -97,7 +98,13 @@ const livekitMock = vi.hoisted(() => {
         this.localParticipant.isScreenShareEnabled = enabled;
       })
     };
-    on = vi.fn(() => this);
+    listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+    on = vi.fn((event: string, listener: (...args: unknown[]) => void) => {
+      const listeners = this.listeners.get(event) ?? new Set();
+      listeners.add(listener);
+      this.listeners.set(event, listeners);
+      return this;
+    });
     removeAllListeners = vi.fn();
     remoteParticipants = new Map();
     startAudio = vi.fn();
@@ -105,6 +112,10 @@ const livekitMock = vi.hoisted(() => {
 
     constructor() {
       instances.push(this);
+    }
+
+    emit(event: string, ...args: unknown[]) {
+      for (const listener of this.listeners.get(event) ?? []) listener(...args);
     }
   }
 
@@ -274,6 +285,29 @@ describe("useCallEngine participant state lifecycle", () => {
     expect((latestState as CallEngineState | null)?.error).toBeNull();
     expect((latestState as CallEngineState | null)?.controls).toMatchObject({ micOn: true, cameraOn: false });
     expect(livekitMock.instances[0]?.disconnect).not.toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it("shows reconnecting while the LiveKit signal connection is recovering", async () => {
+    let latestState: CallEngineState | null = null;
+    const { root } = await renderEngine("room-1", (state) => {
+      latestState = state;
+    });
+    await waitForExpectation(() => {
+      expect(callClientMock.postParticipantState).toHaveBeenCalledWith("room-1", "session-1", "joined");
+    });
+
+    await act(async () => {
+      const room = livekitMock.instances[0];
+      if (!room) throw new Error("mock_room_missing");
+      room.state = livekitMock.ConnectionState.SignalReconnecting;
+      room.emit(livekitMock.RoomEvent.ConnectionStateChanged, room.state);
+    });
+
+    expect((latestState as CallEngineState | null)?.stage.phase).toBe("reconnecting");
 
     await act(async () => {
       root.unmount();

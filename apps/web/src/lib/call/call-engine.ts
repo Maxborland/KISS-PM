@@ -63,6 +63,7 @@ function phaseFromConnectionState(state: ConnectionState): CallPhase {
     case ConnectionState.Connected:
       return "connected";
     case ConnectionState.Reconnecting:
+    case ConnectionState.SignalReconnecting:
       return "reconnecting";
     case ConnectionState.Disconnected:
       return "disconnected";

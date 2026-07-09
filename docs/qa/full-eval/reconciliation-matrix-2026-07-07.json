@@ -25,8 +25,8 @@
   "summary": {
     "oldBugIdsReviewed": 84,
     "fixedByMasterOldBugIds": 64,
-    "fixedByCurrentBranchItems": 75,
-    "confirmedOpen": 0,
+    "fixedByCurrentBranchItems": 76,
+    "confirmedOpen": 3,
     "unverifiedOldBugIds": 0,
     "notABugOrSupersededOldBugIds": 4,
     "unverifiedRiskZones": 2
@@ -1399,9 +1399,90 @@
       ],
       "coverageStatus": "partial-risk-zone",
       "note": "Closes self-hosted LiveKit multi-user lifecycle with synthetic fake-media browser devices and fixes duplicate join-token side effects from disposed StrictMode effects. Does not close physical OBS/real camera source validation, actual Jitsi media, or network reconnection under transport failure."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-LIVEKIT-TRANSPORT-RECONNECT",
+      "source": "current branch Playwright Chromium transport-failure traversal, API readback, and sanitized LiveKit server logs",
+      "surface": "/calls/[roomId] self-hosted LiveKit provider with admin + engineer isolated browser contexts under client offline/online and LiveKit container pause/unpause",
+      "evidence": "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/risk-media-livekit-reconnect-2026-07-10.json: admin and engineer joined the same room with synthetic CAMERA/MICROPHONE tracks; engineer context offline visibly entered reconnecting and recovered; pausing LiveKit made both clients visibly reconnect and unpausing restored both remote participant tiles; API readback preserved the active session with exactly one join token and one participant_joined event per actor, no participant_left, and no session_ended; 8 screenshots and allowlisted LiveKit server entries are stored without SDP/ICE/tokens.",
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL",
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "pnpm vitest run apps/web/src/lib/call/call-engine.test.tsx -> pass; 1 file / 7 tests passed",
+        ".\\apps\\web\\node_modules\\.bin\\tsc.CMD -p apps/web/tsconfig.json --pretty false -> pass",
+        "node docs/qa/full-eval/tools/livekit-reconnect-e2e.mjs -> repeated full browser pass; latest run covers client offline/online and docker compose pause/unpause livekit",
+        "sensitive scan for SDP, ICE credentials/candidates, join tokens, and JWTs -> clean",
+        "docker compose ps livekit after traversal -> Up"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "Closes the self-hosted LiveKit network reconnect variant and fixes SignalReconnecting being misreported as idle/Ожидание. It does not close actual Jitsi external media or successful physical OBS CAMERA publication."
     }
   ],
-  "confirmedOpen": [],
+  "confirmedOpen": [
+    {
+      "id": "CURRENT-RESP-01-MOBILE-NAVIGATION-MISSING",
+      "status": "confirmed-open",
+      "severity": "high",
+      "affectedRoles": [
+        "admin",
+        "limited-reader"
+      ],
+      "scenario": "Authenticated mobile user navigates between product areas at 390x844.",
+      "steps": [
+        "Log in at 390x844 as admin or limited reader.",
+        "Open /dashboard and inspect visible navigation controls.",
+        "Open the only visible avatar button."
+      ],
+      "expected": "A touch-accessible application navigation opener exposes permitted work, communications, and administration routes.",
+      "actual": "No application navigation opener exists. The avatar menu contains only Profile, Settings, and Logout, so product routes require direct URL entry.",
+      "evidence": ".superloopy/evidence/lane-responsive-traversal.md and .superloopy/evidence/responsive/02-390x844-admin-avatar-menu-open.png",
+      "suspectedArea": "apps/web workspace shell responsive navigation breakpoint/rendering",
+      "fixRecommendation": "Render an explicit mobile navigation trigger and focus-managed drawer using the existing sidebar permission model.",
+      "regressionRisk": "High: shell navigation affects every authenticated mobile route and both allowed/denied role variants."
+    },
+    {
+      "id": "CURRENT-RESP-02-TABLET-COMMS-SIDEBAR-PAINT",
+      "status": "confirmed-open",
+      "severity": "high",
+      "affectedRoles": [
+        "admin"
+      ],
+      "scenario": "Admin opens communications channels at 768x1024.",
+      "steps": [
+        "Log in at 768x1024 as admin.",
+        "Navigate to /communications/channels.",
+        "Inspect the persistent sidebar in viewport and full-page captures."
+      ],
+      "expected": "The sidebar retains the same visible logo, group labels, and navigation links as other tablet routes.",
+      "actual": "Multiple sidebar bands paint solid black and obscure the logo, group labels, and navigation links while the channel surface itself renders.",
+      "evidence": ".superloopy/evidence/lane-responsive-traversal.md, .superloopy/evidence/responsive/13b-768x1024-admin-communications-channels-viewport.png, and .superloopy/evidence/responsive/13-768x1024-admin-communications-channels.png",
+      "suspectedArea": "communications route layout/stacking context interacting with workspace sidebar at tablet width",
+      "fixRecommendation": "Isolate communications surface layers from the shell stacking context and add a 768x1024 visual regression assertion.",
+      "regressionRisk": "Medium-high: shell paint and stacking changes can affect overlays, drawers, and other communications routes."
+    },
+    {
+      "id": "CURRENT-RESP-03-TOUCH-TARGETS-BELOW-44",
+      "status": "confirmed-open",
+      "severity": "medium",
+      "affectedRoles": [
+        "admin",
+        "limited-reader"
+      ],
+      "scenario": "Touch users operate primary and repeated controls at 390x844 and 768x1024.",
+      "steps": [
+        "Open dashboard, CRM deals, admin users/modal, communications channels, and sidebar links.",
+        "Measure visible interactive control bounding boxes."
+      ],
+      "expected": "Touch controls meet the 44x44 QA threshold or provide an equivalent 44x44 interactive hit area.",
+      "actual": "Frequent controls measure 28-35px high; avatar is 32x32, modal close is 31x31, and several table actions are 32x28.",
+      "evidence": ".superloopy/evidence/lane-responsive-traversal.md with responsive/05, responsive/06, responsive/09, and responsive/13b screenshots.",
+      "suspectedArea": "shared Button/IconButton/Input sizing tokens and sidebar row sizing",
+      "fixRecommendation": "Introduce or apply touch-safe size variants at mobile/tablet breakpoints without increasing desktop density.",
+      "regressionRisk": "Medium: shared control sizing can change table density, modal height, and sidebar overflow."
+    }
+  ],
   "unverified": [],
   "notABugOrSuperseded": [
     {
@@ -1434,9 +1515,10 @@
         "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-call-participant-state-idempotency-2026-07-08.json: duplicate same-state participant updates now return 200 with event=null, keep one participant state row, preserve one participant_joined and one participant_left event for real transitions, and avoid duplicate communications.call_participant_state_updated audit entries.",
         "docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/risk-media-livekit-self-hosted-browser-2026-07-08.json: self-hosted LiveKit browser traversal with Chrome localhost camera/microphone permissions reached /calls active stage; API readback has active session/join token/participant_joined; LiveKit logs show participant active and audio mediaTrack published from MICROPHONE; OBS camera source was unavailable so video stayed off by degraded fallback, not a clean video publish pass.",
         "docs/qa/full-eval/evidence/browser-media-livekit-multiuser-2026-07-08/risk-media-livekit-multiuser-lifecycle-2026-07-08.json: self-hosted LiveKit multi-user lifecycle passed with admin and engineer isolated browser contexts; remote participant tiles appeared in both UIs; engineer leave/rejoin/reload-join preserved active session; API events show participant_joined/left without session_ended and no duplicate join_token_issued after the disposed-effect guard; LiveKit logs show audio and video CAMERA tracks for both users.",
-        "docs/qa/full-eval/evidence/browser-media-livekit-physical-camera-2026-07-09/risk-media-livekit-physical-camera-obs-2026-07-09.json: user Chrome physical/OBS camera-source traversal completed with granted camera/microphone permissions and OBS Virtual Camera enumerated; direct getUserMedia({video:true}) failed NotReadableError Could not start video source, so KISS PM correctly degraded to camera-off while LiveKit joined active with microphone audio track; video CAMERA publication remains externally blocked, not counted as pass."
+        "docs/qa/full-eval/evidence/browser-media-livekit-physical-camera-2026-07-09/risk-media-livekit-physical-camera-obs-2026-07-09.json: user Chrome physical/OBS camera-source traversal completed with granted camera/microphone permissions and OBS Virtual Camera enumerated; direct getUserMedia({video:true}) failed NotReadableError Could not start video source, so KISS PM correctly degraded to camera-off while LiveKit joined active with microphone audio track; video CAMERA publication remains externally blocked, not counted as pass.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/risk-media-livekit-reconnect-2026-07-10.json: two-role self-hosted LiveKit transport traversal passed for engineer client offline/online and LiveKit container pause/unpause; reconnecting UI and recovered remote participants were verified with screenshots, API invariants, and sanitized server logs."
       ],
-      "remainingEvidence": "Remaining live-provider evidence: actual Jitsi external media beyond the meet.jit.si moderator/auth gate, network reconnect under transport failure, and successful physical/OBS CAMERA track publication after OS/Chrome camera source is working. Physical OBS source has now been traversed in user Chrome and is blocked by Chrome NotReadableError rather than a KISS PM product failure; self-hosted LiveKit audio/degraded-camera and synthetic-camera multi-user lifecycle are covered."
+      "remainingEvidence": "Remaining live-provider evidence: actual Jitsi external media beyond the meet.jit.si moderator/auth gate and successful physical/OBS CAMERA track publication after OS/Chrome camera source is working. Physical OBS source has been traversed in user Chrome and is blocked by Chrome NotReadableError rather than a KISS PM product failure; self-hosted LiveKit audio/degraded-camera, synthetic-camera multi-user lifecycle, and network reconnect under client/server transport interruption are covered."
     },
     {
       "id": "RISK-FULL-BROWSER-TRAVERSAL",
@@ -1451,10 +1533,11 @@
         "docs/qa/full-eval/evidence/browser-crm-readonly-write-denied-2026-07-08/risk-full-browser-traversal-crm-readonly-write-denied-2026-07-08.json: CRM read-only in-app Browser traversal covers login, /crm/deals kanban/list/forecast, disabled/no-drag write controls, direct 403 create/stage writes, and unchanged readback.",
         "docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/risk-media-livekit-self-hosted-browser-2026-07-08.json: admin Chrome traversal covers /calls/[roomId] self-hosted LiveKit lobby/join/active-call path with real localhost media permission grant, API readback, screenshot, and LiveKit audio publication logs.",
         "docs/qa/full-eval/evidence/browser-media-livekit-multiuser-2026-07-08/risk-media-livekit-multiuser-lifecycle-2026-07-08.json: full-browser traversal partial now includes two-role /calls/[roomId] self-hosted LiveKit admin+engineer join/leave/rejoin/reload path with screenshots and backend/server readback.",
-        "docs/qa/full-eval/evidence/browser-media-livekit-physical-camera-2026-07-09/risk-media-livekit-physical-camera-obs-2026-07-09.json: admin user Chrome route/action traversal covers /communications/calls create LiveKit room/start session/connect token modal and /calls/[roomId] lobby/join active stage with real localhost permissions, OBS device enumeration, degraded camera state, API readback, screenshot, and LiveKit server logs."
+        "docs/qa/full-eval/evidence/browser-media-livekit-physical-camera-2026-07-09/risk-media-livekit-physical-camera-obs-2026-07-09.json: admin user Chrome route/action traversal covers /communications/calls create LiveKit room/start session/connect token modal and /calls/[roomId] lobby/join active stage with real localhost permissions, OBS device enumeration, degraded camera state, API readback, screenshot, and LiveKit server logs.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/risk-media-livekit-reconnect-2026-07-10.json: admin + engineer browser traversal covers connected synthetic audio/video, visible client and server reconnecting states, recovery without reload, remote participant readback, active-session invariants, and sanitized LiveKit server evidence."
       ],
-      "remainingEvidence": "Remaining full-browser traversal still required for other roles/routes/actions: Jitsi actual media beyond external moderator/auth gate, network reconnect media variant, live/browser agent provider variants, mobile/responsive passes, and routes not yet covered by role-specific traversal evidence. Physical OBS route/action traversal is now documented, but successful CAMERA publication remains blocked by Chrome/OBS NotReadableError."
+      "remainingEvidence": "Remaining full-browser traversal still required for other roles/routes/actions: Jitsi actual media beyond external moderator/auth gate, live/browser agent provider variants, mobile/responsive passes, and the role-specific route/action atoms not yet covered by fresh traversal evidence. Physical OBS route/action traversal is documented, but successful CAMERA publication remains blocked by Chrome/OBS NotReadableError."
     }
   ],
-  "nextAction": "Continue remaining non-write-flow risk zones: actual Jitsi external media beyond the meet.jit.si moderator/auth gate; network reconnect media variant; live/browser OpenRouter/agent provider variants; mobile/responsive passes and remaining role-specific route/action traversal. Physical OBS user-Chrome traversal is documented as externally blocked by Chrome NotReadableError until a working camera source is available."
+  "nextAction": "Fix the confirmed responsive/browser defects and execute the atomized remaining role-specific route/action matrix; then run live/browser OpenRouter agent-provider variants. Actual Jitsi media remains blocked by the external moderator/auth gate, and physical OBS CAMERA publication remains blocked by Chrome NotReadableError until a working camera source is available."
 }

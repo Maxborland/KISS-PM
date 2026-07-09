@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "mode": "light",
+  "createdAt": "2026-07-09T18:27:31.613Z",
+  "updatedAt": "2026-07-09T18:27:31.628Z",
+  "briefPath": ".superloopy/brief.md",
+  "evidencePath": ".superloopy/evidence",
+  "goalsPath": ".superloopy/goals.json",
+  "ledgerPath": ".superloopy/ledger.jsonl",
+  "goals": [
+    {
+      "id": "G001",
+      "title": "Закрыть оставшиеся risk-зоны Full Product Evaluation: LiveKit transpo...",
+      "objective": "Закрыть оставшиеся risk-зоны Full Product Evaluation: LiveKit transport reconnect с двухпользовательским browser evidence; атомарная role x route x action матрица без сэмплинга; mobile responsive traversal; live browser OpenRouter agent variants; Jitsi и physical OBS media blockers с честным pass или blocker evidence. После каждого крупного блока обновлять reconciliation matrix, коммитить и пушить.",
+      "status": "in_progress",
+      "attempt": 1,
+      "createdAt": "2026-07-09T18:27:31.613Z",
+      "updatedAt": "2026-07-09T18:27:31.628Z",
+      "criteria": [
+        {
+          "id": "C001",
+          "kind": "happy",
+          "scenario": "Happy path works from the real user-facing surface.",
+          "essential": true,
+          "status": "pending",
+          "artifact": null,
+          "capturedAt": null
+        },
+        {
+          "id": "C002",
+          "kind": "risk",
+          "scenario": "Riskiest edge or failure path is handled.",
+          "essential": true,
+          "status": "pending",
+          "artifact": null,
+          "capturedAt": null
+        }
+      ],
+      "startedAt": "2026-07-09T18:27:31.628Z"
+    }
+  ],
+  "aggregateCompletion": null
+}
