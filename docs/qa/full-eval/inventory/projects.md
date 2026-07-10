@@ -40,7 +40,7 @@
 | PROJ-002 | все | Глобальный поиск «Найти задачу или ресурс» | A/PR/RR | — | **Фейковый контрол**: input `disabled` с demo-title. На проде — рабочий поиск или скрыт | фокус/ввод невозможны; a11y: disabled input в label | ❌ BUG-PROJ-08 |
 | PROJ-003 | все | Аватар пользователя в топбаре | A/PR/RR | — | Хардкод «КБ» без меню — на проде должен показывать текущего пользователя и меню сессии | под PR/RR отображается тот же «КБ»; выхода из сессии нет | ❌ BUG-PROJ-08 |
 | PROJ-004 | `/projects/[id]/*` | Таб-бар поверхностей («Обзор» … «Настройки», DELIVERY_TABS) | A/PR/RR | — | Все 9 табов — нативные project-specific ссылки с единственным `aria-current`; staged Schedule batch требует подтверждения ухода | clean без prompt; Cancel сохраняет staged; Leave сбрасывает optimistic batch без API write; reload/close защищён | ✅ live 9/9 tabs + staged Cancel/Leave/no-write · focused A/PR/RR |
-| PROJ-005 | `/projects/[id]/*` | Шапка проекта (код, имя, статус, план vN, дедлайн, финиш, variance) | A/PR/RR | read-model | Версия/дедлайн/финиш/variance — из read-model (`deriveProjectMeta`); **имя/код/статус — хардкод** «Производственный портал · Релиз 2» для ЛЮБОГО проекта | чужой проект показывает чужое имя; дедлайн null → «—» и без variance; finish < deadline → «резерв N дн.» | ❌ BUG-PROJ-04 |
+| `PROJ-005` | `/projects/[id]/*` | Шапка проекта (код, имя, статус, план vN, дедлайн, финиш, variance) | A/PR/RR | detail API + read-model | Live title/status и code из title запрошенного проекта; плановые поля из read-model; loading/forbidden не показывают чужую identity | смена projectId без flash старого имени; same-id remount после denied response; active-only detail contract; 9/9 routes | ✅ live 9/9 headers + tenant-safe focused identity |
 | PROJ-006 | `/projects/[id]/*` | Индикатор «Сохранено» (зелёная точка в таб-баре) | A/PR/RR | — | **Фейковый контрол**: хардкод, не отражает реальное состояние сохранения/ошибок apply | показывает «Сохранено» во время busy/после reject команды | ❌ BUG-PROJ-08 |
 | PROJ-007 | все | Баннеры «Прототип …» на прод-роутах | A/PR/RR | — | Каждая поверхность несёт баннер «Прототип · данные in-memory» — на live-транспорте текст ложный (данные реальные, сохраняются). Тексты обязаны соответствовать среде | пользователь читает «не сохраняется» и делает правки в проде | ❌ BUG-PROJ-12 |
 
@@ -60,13 +60,13 @@
 
 | ID | Роут | Позиция | Роли | API-эндпоинт | Критерии приёмки | Edge-кейсы | Статус |
 |---|---|---|---|---|---|---|---|
-| PROJ-015 | `/projects/[id]` | Селектор «Проект:» (select активных) | A/PR | GET `/api/workspace/projects` + `/:id` | Смена значения выполняет реальный `getProjectDetail(:id)`; URL при этом **не меняется** (гэп: state ≠ URL) | список ещё грузится → опция-заглушка с raw id; refresh теряет выбранный selectedId | ❌ BUG-PROJ-10 |
-| PROJ-016 | `/projects/[id]` | Обработка несуществующего id в URL | A/PR | GET `/api/workspace/projects/:id` | Сейчас: `useEffect` **тихо подменяет** отсутствующий в списке id первым проектом. Ожидание: явное «Проект не найден» (`project_not_found`) без подмены | `/projects/абракадабра`; `/projects/{id архивного}`; id из чужого тенанта; пока список не загружен — мигает 404→подмена | ❌ BUG-PROJ-10 |
+| `PROJ-015` | `/projects/[id]` | Селектор «Проект:» (select активных) | A/PR | GET `/api/workspace/projects` + `/:id` | Смена значения обновляет detail request и canonical URL `/projects/:id` | reload, Back и Forward сохраняют URL/readback выбранного проекта | ✅ live admin/PR canonical sequence |
+| `PROJ-016` | `/projects/[id]` | Обработка несуществующего id в URL | A/PR | GET `/api/workspace/projects/:id` | 404 `project_not_found` показывает «Проект не найден» и сохраняет исходный URL без подмены | invalid id под admin/PR/beta; reload; RR не получает identity leak | ✅ live 404 без подмены |
 | PROJ-017 | `/projects/[id]` | Шапка карточки (статус-chip, id, клиент, старт/срок/сумма/план.часы/задач) | A/PR | GET `/api/workspace/projects/:id` | Все поля из `{project}`; даты ДД.ММ.ГГГГ; деньги ru-RU | plannedFinish null; contractValue 0; длинное имя клиента | ✅ |
 | PROJ-018 | `/projects/[id]` | Таблица задач проекта (Задача, Статус, Исполнитель, Срок, Прогресс) | A/PR | GET `/api/workspace/projects/:id`, `/api/workspace/users` | Сортировка фиксированная: незакрытые вперёд, затем по plannedFinish; статус-chip по category; «требует приёмки» в подписи | ownerUserId null → «—»; неизвестный statusCategory; прогресс >100 обрезается | ✅ |
 | PROJ-019 | `/projects/[id]` | Пустой список задач | A/PR | — | Плашка «У проекта пока нет задач» | новый проект без задач | 🚧 заблокировано: на стенде нет проекта без задач, создать проект из UI нельзя (PROJ-116) |
 | PROJ-020 | `/projects/[id]` | Сводка: Segmented «Объём / Демэнд» + StatTile/прогресс-бары | A/PR | — (агрегаты клиента) | «Объём»: прогресс взвешен по plannedWork, открыто/план/факт часы; «Демэнд»: доли по позициям из project.demand | plannedWork=0 → прогресс 0; demand пуст → «не задан»; сумма долей ≈100% | ✅ |
-| PROJ-021 | `/projects/[id]` | Состояния loading/error + retry | A/PR/RR | GET `/api/workspace/projects/:id` | RU-маппинг `invalid_project_id`/`project_not_found`/`load_failed`; retry работает | 404 против 403 (комментарий в коде: forbidden зарезервирован, мок не моделирует) | ❌ BUG-PROJ-10 (404 никогда не показывается — подмена id) |
+| `PROJ-021` | `/projects/[id]` | Состояния loading/error/forbidden/empty + retry | A/PR/RR | GET `/api/workspace/projects/:id` | RU-маппинг; Retry повторяет тот же projectId; 403 и 404 не маскируются | focused `load_failed`+retry/forbidden; live 404/403 | ✅ focused + live state matrix |
 | PROJ-022 | `/projects/[id]` | Доступ по ролям | RR | GET `/api/workspace/projects/:id` | RR без `projects.read` → отказ; PR видит карточку (read) | смешанный случай: список доступен, детали 403 | ✅ (RR: detail → 403 permission_missing; PR: read ок) |
 
 ## 3. `/projects/[id]/overview` — обзор
@@ -237,7 +237,7 @@
 
 **Семантика и поведение:**
 
-7. `/projects/[id]`: несуществующий id тихо подменяется первым проектом (`useEffect` в `project-detail-surface.tsx`) — вместо 404-состояния (PROJ-016). При этом переключение проекта в селекторе не меняет URL.
+7. **Исправлено 2026-07-10:** `/projects/[id]` сохраняет invalid id и показывает честный 404/not-found; селектор меняет canonical URL, reload/Back/Forward согласованы с выбранной карточкой (PROJ-015/016/021).
 8. **Исправлено 2026-07-10:** контрол называется «Принять перегруз как риск», сохраняет accepted-state и подтверждён после reload (PROJ-068).
 9. Баннеры «Прототип · данные in-memory, не сохраняются» отображаются на live-роутах, где данные реально пишутся в БД через apply-command — текст вводит в заблуждение об уровне ответственности действий (PROJ-007).
 10. `/commits`: на live «Откатить» работает только для последнего apply текущей сессии (before-снимок в памяти клиента) — задокументировано в коде, но UI-подпись «обратимый» у прочих коммитов может путать (PROJ-107).

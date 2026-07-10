@@ -72,6 +72,8 @@
 
 **Доказательства:** bug-proj-03-overview-header-today.png (vektor), прогон demo-crm-intake (та же шапка), RR-прогон («план v17» без прав на read-model).
 
+**Исправление 2026-07-10:** `useProjectBase` получает live title/status по запрошенному projectId, немедленно сбрасывает прежнюю identity при смене id и используется всеми 9 delivery surfaces. Свежий browser-run: 9/9 headers; focused: mock/live active-only, отсутствие flash старого проекта и отсутствие same-id reuse после denied response.
+
 ---
 
 ## BUG-PROJ-05 · MAJOR · Мок-эпоха времени: «Сегодня»=28.04.2026, таймлайн от 02.03.2026, просрочки от 23.06.2026 (реальная дата 04.07.2026)
@@ -170,6 +172,8 @@
 **Факт:** (1) URL остаётся `/projects/project-does-not-exist-xyz`, но показана карточка **project-vektor-portal** — fetch 404 проглатывается, id подменяется первым в списке; RU-состояние `project_not_found` не показывается никогда. (2) Селектор реально грузит `getProjectDetail('project-demo-crm-intake')`, URL не меняется — refresh/шаринг ссылки теряют выбор.
 
 **Доказательства:** bug-proj-02-fake-id-substitution.png; network: `GET /api/workspace/projects/project-does-not-exist-xyz → 404 {"error":"project_not_found"}` + рендер карточки Вектор.
+
+**Исправление 2026-07-10:** selector меняет canonical URL; admin и planReader проходят select → readback → reload → Back → Forward. Invalid id под admin/planReader/beta остаётся в URL, API возвращает 404 и UI показывает «Проект не найден» без подмены; RR получает 403 forbidden.
 
 ---
 

@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-07-10T08:38:19.977Z",
+  "scope": [
+    "PROJ-005",
+    "PROJ-015",
+    "PROJ-016",
+    "PROJ-021"
+  ],
+  "verdict": "pass",
+  "matrixDelta": {
+    "rowsPromoted": 10,
+    "from": {
+      "fail": 56,
+      "pass": 70
+    },
+    "to": {
+      "fail": 46,
+      "pass": 80
+    }
+  },
+  "verification": [
+    {
+      "command": "focused identity/detail Vitest",
+      "result": "2 files, 8/8 passed"
+    },
+    {
+      "command": "web typecheck",
+      "result": "passed"
+    },
+    {
+      "command": "projects-detail-identity.spec.ts",
+      "result": "16/16 live browser checks; 9/9 headers; canonical URL/reload/back/forward; 404/403/empty; 0 fail",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json"
+    }
+  ],
+  "independentReview": [
+    ".superloopy/evidence/projects-2026-07-10/qa-project-identity-code-review.md",
+    ".superloopy/evidence/projects-2026-07-10/qa-project-identity-browser-audit.md",
+    ".superloopy/evidence/projects-2026-07-10/qa-project-identity-matrix-audit.md"
+  ],
+  "orchestratorEvidence": [
+    ".superloopy/evidence/projects-2026-07-10/orchestrator-project-identity.md"
+  ],
+  "independentReviewVerdicts": {
+    "code": "APPROVE",
+    "browserEvidence": "APPROVE (independent live traversal) + fresh post-fix 16/16 E2E",
+    "matrix": "APPROVE",
+    "supersedingBrowserFreshnessLane": "INCONCLUSIVE (agent timeout, not counted as approval)"
+  }
+}

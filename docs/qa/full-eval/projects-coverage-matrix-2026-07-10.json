@@ -12,7 +12,7 @@
     },
     {
       "status": "fail",
-      "count": 56
+      "count": 46
     },
     {
       "status": "historical_evidence_only",
@@ -24,7 +24,7 @@
     },
     {
       "status": "pass",
-      "count": 70
+      "count": 80
     },
     {
       "status": "unverified",
@@ -182,11 +182,11 @@
       "scenario": "Шапка проекта (код, имя, статус, план vN, дедлайн, финиш, variance)",
       "surface": "`/projects/[id]/*`",
       "apiOrDataSurface": "read-model",
-      "expectedBehavior": "Версия/дедлайн/финиш/variance — из read-model (`deriveProjectMeta`); **имя/код/статус — хардкод** «Производственный портал · Релиз 2» для ЛЮБОГО проекта",
-      "dataStateAndEdges": "чужой проект показывает чужое имя; дедлайн null → «—» и без variance; finish < deadline → «резерв N дн.»",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-04"
+      "expectedBehavior": "Live-шапка получает title/status из GET /api/workspace/projects/:id, code выводит из title; версия/дедлайн/финиш/variance — из read-model. Loading/403/404 не показывают identity другого проекта.",
+      "dataStateAndEdges": "9/9 delivery routes показывают active-project identity; смена projectId немедленно даёт нейтральную мету; same-id remount после denied response не переиспользует прежнюю tenant identity.",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "status": "pass",
+      "inventoryStatus": "✅ 9/9 live headers + tenant-safe active-only identity tests"
     },
     {
       "role": "PR",
@@ -194,11 +194,11 @@
       "scenario": "Шапка проекта (код, имя, статус, план vN, дедлайн, финиш, variance)",
       "surface": "`/projects/[id]/*`",
       "apiOrDataSurface": "read-model",
-      "expectedBehavior": "Версия/дедлайн/финиш/variance — из read-model (`deriveProjectMeta`); **имя/код/статус — хардкод** «Производственный портал · Релиз 2» для ЛЮБОГО проекта",
-      "dataStateAndEdges": "чужой проект показывает чужое имя; дедлайн null → «—» и без variance; finish < deadline → «резерв N дн.»",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-04"
+      "expectedBehavior": "Live-шапка получает title/status из GET /api/workspace/projects/:id, code выводит из title; версия/дедлайн/финиш/variance — из read-model. Loading/403/404 не показывают identity другого проекта.",
+      "dataStateAndEdges": "9/9 delivery routes показывают active-project identity; смена projectId немедленно даёт нейтральную мету; same-id remount после denied response не переиспользует прежнюю tenant identity.",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "status": "pass",
+      "inventoryStatus": "✅ 9/9 live headers + tenant-safe active-only identity tests"
     },
     {
       "role": "RR",
@@ -206,11 +206,11 @@
       "scenario": "Шапка проекта (код, имя, статус, план vN, дедлайн, финиш, variance)",
       "surface": "`/projects/[id]/*`",
       "apiOrDataSurface": "read-model",
-      "expectedBehavior": "Версия/дедлайн/финиш/variance — из read-model (`deriveProjectMeta`); **имя/код/статус — хардкод** «Производственный портал · Релиз 2» для ЛЮБОГО проекта",
-      "dataStateAndEdges": "чужой проект показывает чужое имя; дедлайн null → «—» и без variance; finish < deadline → «резерв N дн.»",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-04"
+      "expectedBehavior": "Live-шапка получает title/status из GET /api/workspace/projects/:id, code выводит из title; версия/дедлайн/финиш/variance — из read-model. Loading/403/404 не показывают identity другого проекта.",
+      "dataStateAndEdges": "9/9 delivery routes показывают active-project identity; смена projectId немедленно даёт нейтральную мету; same-id remount после denied response не переиспользует прежнюю tenant identity.",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "status": "pass",
+      "inventoryStatus": "✅ 9/9 live headers + tenant-safe active-only identity tests"
     },
     {
       "role": "A",
@@ -458,11 +458,11 @@
       "scenario": "Селектор «Проект:» (select активных)",
       "surface": "`/projects/[id]`",
       "apiOrDataSurface": "GET `/api/workspace/projects` + `/:id`",
-      "expectedBehavior": "Смена значения выполняет реальный `getProjectDetail(:id)`; URL при этом **не меняется** (гэп: state ≠ URL)",
-      "dataStateAndEdges": "список ещё грузится → опция-заглушка с raw id; refresh теряет выбранный selectedId",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-10"
+      "expectedBehavior": "Смена select выполняет getProjectDetail(:id) и router.push на canonical /projects/:id; reload/back/forward сохраняют согласованность URL и карточки.",
+      "dataStateAndEdges": "admin + planReader: select второго проекта → URL/readback → reload → Back/Forward без потери выбора.",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "status": "pass",
+      "inventoryStatus": "✅ live admin/PR canonical URL + reload/back/forward"
     },
     {
       "role": "PR",
@@ -470,11 +470,11 @@
       "scenario": "Селектор «Проект:» (select активных)",
       "surface": "`/projects/[id]`",
       "apiOrDataSurface": "GET `/api/workspace/projects` + `/:id`",
-      "expectedBehavior": "Смена значения выполняет реальный `getProjectDetail(:id)`; URL при этом **не меняется** (гэп: state ≠ URL)",
-      "dataStateAndEdges": "список ещё грузится → опция-заглушка с raw id; refresh теряет выбранный selectedId",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-10"
+      "expectedBehavior": "Смена select выполняет getProjectDetail(:id) и router.push на canonical /projects/:id; reload/back/forward сохраняют согласованность URL и карточки.",
+      "dataStateAndEdges": "admin + planReader: select второго проекта → URL/readback → reload → Back/Forward без потери выбора.",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "status": "pass",
+      "inventoryStatus": "✅ live admin/PR canonical URL + reload/back/forward"
     },
     {
       "role": "A",
@@ -482,11 +482,11 @@
       "scenario": "Обработка несуществующего id в URL",
       "surface": "`/projects/[id]`",
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
-      "expectedBehavior": "Сейчас: `useEffect` **тихо подменяет** отсутствующий в списке id первым проектом. Ожидание: явное «Проект не найден» (`project_not_found`) без подмены",
-      "dataStateAndEdges": "`/projects/абракадабра`; `/projects/{id архивного}`; id из чужого тенанта; пока список не загружен — мигает 404→подмена",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-10"
+      "expectedBehavior": "Несуществующий id остаётся в URL и показывает явное «Проект не найден» после честного 404 project_not_found; никакой подмены первым проектом.",
+      "dataStateAndEdges": "admin/planReader/beta invalid id → API 404, exact URL после reload, visible not-found; resourceReader не получает утечку identity.",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "status": "pass",
+      "inventoryStatus": "✅ live 404 admin/PR/beta без подмены"
     },
     {
       "role": "PR",
@@ -494,11 +494,11 @@
       "scenario": "Обработка несуществующего id в URL",
       "surface": "`/projects/[id]`",
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
-      "expectedBehavior": "Сейчас: `useEffect` **тихо подменяет** отсутствующий в списке id первым проектом. Ожидание: явное «Проект не найден» (`project_not_found`) без подмены",
-      "dataStateAndEdges": "`/projects/абракадабра`; `/projects/{id архивного}`; id из чужого тенанта; пока список не загружен — мигает 404→подмена",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-10"
+      "expectedBehavior": "Несуществующий id остаётся в URL и показывает явное «Проект не найден» после честного 404 project_not_found; никакой подмены первым проектом.",
+      "dataStateAndEdges": "admin/planReader/beta invalid id → API 404, exact URL после reload, visible not-found; resourceReader не получает утечку identity.",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "status": "pass",
+      "inventoryStatus": "✅ live 404 admin/PR/beta без подмены"
     },
     {
       "role": "A",
@@ -602,11 +602,11 @@
       "scenario": "Состояния loading/error + retry",
       "surface": "`/projects/[id]`",
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
-      "expectedBehavior": "RU-маппинг `invalid_project_id`/`project_not_found`/`load_failed`; retry работает",
-      "dataStateAndEdges": "404 против 403 (комментарий в коде: forbidden зарезервирован, мок не моделирует)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-10 (404 никогда не показывается — подмена id)"
+      "expectedBehavior": "Loading/error/forbidden/empty различаются; RU-маппинг кодов работает; Retry повторяет тот же projectId.",
+      "dataStateAndEdges": "focused load_failed+retry/forbidden; live 404 empty и 403 forbidden; screenshot/evidence failures fail closed.",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "status": "pass",
+      "inventoryStatus": "✅ focused error+retry + live 404/403 states"
     },
     {
       "role": "PR",
@@ -614,11 +614,11 @@
       "scenario": "Состояния loading/error + retry",
       "surface": "`/projects/[id]`",
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
-      "expectedBehavior": "RU-маппинг `invalid_project_id`/`project_not_found`/`load_failed`; retry работает",
-      "dataStateAndEdges": "404 против 403 (комментарий в коде: forbidden зарезервирован, мок не моделирует)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-10 (404 никогда не показывается — подмена id)"
+      "expectedBehavior": "Loading/error/forbidden/empty различаются; RU-маппинг кодов работает; Retry повторяет тот же projectId.",
+      "dataStateAndEdges": "focused load_failed+retry/forbidden; live 404 empty и 403 forbidden; screenshot/evidence failures fail closed.",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "status": "pass",
+      "inventoryStatus": "✅ focused error+retry + live 404/403 states"
     },
     {
       "role": "RR",
@@ -626,11 +626,11 @@
       "scenario": "Состояния loading/error + retry",
       "surface": "`/projects/[id]`",
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
-      "expectedBehavior": "RU-маппинг `invalid_project_id`/`project_not_found`/`load_failed`; retry работает",
-      "dataStateAndEdges": "404 против 403 (комментарий в коде: forbidden зарезервирован, мок не моделирует)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-10 (404 никогда не показывается — подмена id)"
+      "expectedBehavior": "Loading/error/forbidden/empty различаются; RU-маппинг кодов работает; Retry повторяет тот же projectId.",
+      "dataStateAndEdges": "focused load_failed+retry/forbidden; live 404 empty и 403 forbidden; screenshot/evidence failures fail closed.",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "status": "pass",
+      "inventoryStatus": "✅ focused error+retry + live 404/403 states"
     },
     {
       "role": "RR",

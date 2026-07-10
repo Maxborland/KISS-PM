@@ -13,7 +13,7 @@ import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
 export const PROJECT_FALLBACK: ProjectMeta = {
   name: "Проект",
   code: "…",
-  status: "В работе",
+  status: "—",
   statusTone: "info",
   planVersion: "",
   deadline: "—",
@@ -22,11 +22,14 @@ export const PROJECT_FALLBACK: ProjectMeta = {
 
 /* ============================================================
    Реальное название проекта в шапке (G3-01): read-model плана не несёт title,
-   поэтому в live тянем GET /api/workspace/projects/:id и подменяем name/code
-   базовой меты. В mock (stories, live=false) возвращаем mockBase без запросов.
-   Кэш на модуль — шапка не мигает при переключении вкладок проекта.
+   поэтому в live тянем active-only GET /api/workspace/projects/:id. Identity
+   хранится только в состоянии экземпляра hook: module-cache здесь опасен,
+   потому что projectId уникален лишь внутри tenant.
    ============================================================ */
-const projectTitleCache = new Map<string, string>();
+type ProjectIdentity = {
+  title: string;
+  status: "active";
+};
 
 const codeInitials = (title: string): string => {
   const words = title.replace(/[«»"']/g, "").split(/[\s·]+/).filter(Boolean);
@@ -35,18 +38,23 @@ const codeInitials = (title: string): string => {
 
 export function useProjectBase(projectId: string, mockBase: ProjectMeta): ProjectMeta {
   const { live } = usePlanningRuntime();
-  const [title, setTitle] = useState<string | null>(() => projectTitleCache.get(projectId) ?? null);
+  const [loaded, setLoaded] = useState<{ projectId: string; identity: ProjectIdentity } | null>(null);
+  const identity = loaded?.projectId === projectId ? loaded.identity : null;
 
   useEffect(() => {
-    if (!live || projectTitleCache.has(projectId)) return;
+    if (!live) return;
     let active = true;
-    void fetch(`/api/workspace/projects/${encodeURIComponent(projectId)}`, { credentials: "include" })
-      .then((r) => (r.ok ? (r.json() as Promise<{ project?: { title?: unknown } }>) : null))
-      .then((d) => {
-        const t = d?.project?.title;
-        if (active && typeof t === "string" && t.length > 0) {
-          projectTitleCache.set(projectId, t);
-          setTitle(t);
+    void fetch("/api/workspace/projects/" + encodeURIComponent(projectId), { credentials: "include" })
+      .then((response) => (
+        response.ok
+          ? (response.json() as Promise<{ project?: { title?: unknown; status?: unknown } }>)
+          : null
+      ))
+      .then((data) => {
+        const title = data?.project?.title;
+        const status = data?.project?.status;
+        if (active && typeof title === "string" && title.length > 0 && status === "active") {
+          setLoaded({ projectId, identity: { title, status } });
         }
       })
       .catch(() => {});
@@ -54,11 +62,18 @@ export function useProjectBase(projectId: string, mockBase: ProjectMeta): Projec
   }, [live, projectId]);
 
   if (!live) return mockBase;
-  if (title) return { ...mockBase, name: title, code: codeInitials(title) };
-  // Название ещё не загрузилось — нейтральная шапка вместо чужого мок-имени.
-  return { ...mockBase, name: "Проект", code: "…" };
+  if (identity) {
+    return {
+      ...mockBase,
+      name: identity.title,
+      code: codeInitials(identity.title),
+      status: "В работе",
+      statusTone: "info"
+    };
+  }
+  // Identity ещё не загружена или detail недоступен — только нейтральная мета.
+  return { ...mockBase, name: "Проект", code: "…", status: "—", statusTone: "info" };
 }
-
 /**
  * RU-маппер кодов ошибок загрузки плана для <SurfaceState errorFormat>. Коды приходят
  * из usePlanning (load_failed) и из PlanningApiError.code/сетевых сообщений транспорта.

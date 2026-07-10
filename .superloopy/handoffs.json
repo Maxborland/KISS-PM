@@ -254,6 +254,83 @@
       "artifact": ".superloopy/evidence/projects-2026-07-10/qa-navigation-matrix-audit.md",
       "recordedAt": "2026-07-10T05:39:08.817Z",
       "updatedAt": "2026-07-10T05:39:08.817Z"
+    },
+    {
+      "id": "H024",
+      "agent": "Poincare",
+      "assignment": "Implement real identity in all 9 delivery headers",
+      "status": "completed",
+      "verdict": "BLOCKED",
+      "normalizedVerdict": "needs-context",
+      "artifact": null,
+      "recordedAt": "2026-07-10T05:54:01.469Z",
+      "updatedAt": "2026-07-10T08:38:32.909Z"
+    },
+    {
+      "id": "H025",
+      "agent": "Epicurus",
+      "assignment": "Close project detail canonical URL not-found and retry tests",
+      "status": "completed",
+      "verdict": "BLOCKED",
+      "normalizedVerdict": "needs-context",
+      "artifact": null,
+      "recordedAt": "2026-07-10T05:54:01.906Z",
+      "updatedAt": "2026-07-10T08:38:32.909Z"
+    },
+    {
+      "id": "H026",
+      "agent": "orchestrator-project-identity",
+      "assignment": "Implement tenant-safe header identity and project detail evidence",
+      "status": "completed",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/orchestrator-project-identity.md",
+      "recordedAt": "2026-07-10T08:38:52.286Z",
+      "updatedAt": "2026-07-10T08:38:52.286Z"
+    },
+    {
+      "id": "H027",
+      "agent": "project-identity-code-review",
+      "assignment": "Final tenant-safe identity code audit",
+      "status": "completed",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/qa-project-identity-code-review.md",
+      "recordedAt": "2026-07-10T08:38:52.904Z",
+      "updatedAt": "2026-07-10T08:38:52.904Z"
+    },
+    {
+      "id": "H028",
+      "agent": "project-identity-browser-audit",
+      "assignment": "Independent in-app browser identity detail audit",
+      "status": "completed",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/qa-project-identity-browser-audit.md",
+      "recordedAt": "2026-07-10T08:38:53.534Z",
+      "updatedAt": "2026-07-10T08:38:53.534Z"
+    },
+    {
+      "id": "H029",
+      "agent": "project-identity-matrix-audit",
+      "assignment": "Final identity matrix and docs audit",
+      "status": "completed",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/qa-project-identity-matrix-audit.md",
+      "recordedAt": "2026-07-10T08:38:54.156Z",
+      "updatedAt": "2026-07-10T08:38:54.156Z"
+    },
+    {
+      "id": "H030",
+      "agent": "project-identity-superseding-browser",
+      "assignment": "Post-fix browser freshness recheck",
+      "status": "completed",
+      "verdict": "inconclusive",
+      "normalizedVerdict": "needs-context",
+      "artifact": null,
+      "recordedAt": "2026-07-10T08:38:54.799Z",
+      "updatedAt": "2026-07-10T08:38:54.799Z"
     }
   ]
 }
