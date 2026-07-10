@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ProjectRecord } from "@/workspace/lib/workspace-client";
-import { getVisibleProjects, PROJECTS_LIST_AVAILABLE_FILTERS } from "./projects-list-surface";
+import { getVisibleProjects, projectsErrorMessage, PROJECTS_LIST_AVAILABLE_FILTERS } from "./projects-list-surface";
 
 const project = (overrides: Partial<ProjectRecord>): ProjectRecord => {
   const base: ProjectRecord = {
@@ -30,6 +30,12 @@ const project = (overrides: Partial<ProjectRecord>): ProjectRecord => {
 describe("projects list honest scope", () => {
   it("only exposes filters backed by the active-projects API contract", () => {
     expect(PROJECTS_LIST_AVAILABLE_FILTERS).toEqual([{ value: "active", label: "Активные" }]);
+  });
+
+  it("does not expose raw network errors", () => {
+    expect(projectsErrorMessage("load_failed")).toBe("Не удалось загрузить проекты");
+    expect(projectsErrorMessage("invalid_json_response")).toBe("Некорректный ответ сервера");
+    expect(projectsErrorMessage("Failed to fetch internal.example")).toBe("Запрос не выполнен");
   });
 
   it("shows active projects only", () => {

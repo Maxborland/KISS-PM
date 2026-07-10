@@ -70,6 +70,9 @@ export function createRequestJson(options: DomainClientOptions) {
         body
       );
     }
+    if (body.error === "invalid_json_response") {
+      throw new DomainApiError(response.status, "invalid_json_response", body);
+    }
     return body as T;
   };
 }

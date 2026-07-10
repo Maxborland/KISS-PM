@@ -6,7 +6,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ProjectDetailSurface } from "./project-detail-surface";
+import { ProjectDetailSurface, projectDetailErrorMessage } from "./project-detail-surface";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -99,6 +99,13 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.replaceChildren();
+});
+
+describe("project detail error copy", () => {
+  it("localizes known errors and hides raw network messages", () => {
+    expect(projectDetailErrorMessage("invalid_json_response")).toBe("Некорректный ответ сервера");
+    expect(projectDetailErrorMessage("Failed to fetch internal.example")).toBe("Запрос не выполнен");
+  });
 });
 
 describe("ProjectDetailSurface identity and states", () => {

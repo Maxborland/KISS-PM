@@ -59,7 +59,7 @@ const ERR_RU: Record<string, string> = {
   request_failed: "Запрос не выполнен",
   invalid_json_response: "Некорректный ответ сервера"
 };
-const projectsErr = (code?: string) => (code && ERR_RU[code]) || code || "Не удалось загрузить";
+export const projectsErrorMessage = (code?: string) => (code && ERR_RU[code]) || (code ? "Запрос не выполнен" : "Не удалось загрузить");
 
 // Человекочитаемый статус проекта (боевой status — свободная строка; известные — переводим).
 const STATUS_LABEL: Record<string, string> = {
@@ -112,7 +112,7 @@ export function ProjectsListSurface() {
           status={surfaceStatus}
           error={error}
           onRetry={() => void reload()}
-          errorFormat={projectsErr}
+          errorFormat={projectsErrorMessage}
           loadingLabel="Загрузка проектов…"
           empty={{
             title: "Нет проектов",

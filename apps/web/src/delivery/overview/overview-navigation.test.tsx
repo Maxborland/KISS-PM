@@ -13,7 +13,7 @@ import { ProjectOverview } from "./overview-surface";
 let loadCommitsImpl: () => Promise<unknown>;
 const loadCommits = vi.fn(() => loadCommitsImpl());
 
-const readModel = {
+const populatedReadModel = {
   project: { deadline: "2026-07-10" },
   authored: {
     tasks: [{
@@ -52,6 +52,8 @@ const readModel = {
   validationIssues: [],
   planVersion: 9
 };
+
+let activeReadModel: Record<string, unknown> = populatedReadModel;
 
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>
@@ -102,7 +104,7 @@ vi.mock("@/delivery/lib/project-chrome", () => ({
 
 vi.mock("@/delivery/lib/use-planning", () => ({
   usePlanning: () => ({
-    readModel,
+    readModel: activeReadModel,
     status: "ready",
     error: null,
     reload: vi.fn(),
@@ -124,6 +126,7 @@ vi.mock("@/views/lib/prototype-gate", () => ({
 }));
 
 beforeEach(() => {
+  activeReadModel = populatedReadModel;
   loadCommitsImpl = async () => ({ commits: [], latestRevert: null });
   loadCommits.mockClear();
 });
@@ -164,6 +167,24 @@ describe("overview navigation and audit states", () => {
     expect(view.host.textContent).toContain("История пуста.");
     expect(view.host.textContent).not.toContain("Не удалось загрузить историю изменений.");
     expect(view.host.textContent).not.toContain("недостаточно прав");
+
+    await unmount(view.root);
+  });
+
+  it("renders honest empty states for milestones and key tasks", async () => {
+    activeReadModel = {
+      ...populatedReadModel,
+      project: { deadline: null },
+      authored: { tasks: [] },
+      calculatedPlan: { tasks: [], projectFinish: null, criticalPathTaskIds: [] },
+      resourceLoad: { overloads: [] },
+      baselineComparison: { tasks: [] }
+    };
+    const view = await renderOverview();
+
+    expect(view.host.textContent).toContain("Контрольных точек пока нет.");
+    expect(view.host.textContent).toContain("Открытых ключевых задач нет.");
+    expect(view.host.textContent).not.toContain("NaN");
 
     await unmount(view.root);
   });

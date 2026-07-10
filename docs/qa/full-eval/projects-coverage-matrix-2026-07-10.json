@@ -8,15 +8,15 @@
   "summary": [
     {
       "status": "blocked",
-      "count": 4
+      "count": 2
     },
     {
       "status": "fail",
-      "count": 41
+      "count": 10
     },
     {
       "status": "historical_evidence_only",
-      "count": 56
+      "count": 40
     },
     {
       "status": "partial",
@@ -24,7 +24,7 @@
     },
     {
       "status": "pass",
-      "count": 120
+      "count": 169
     },
     {
       "status": "unverified",
@@ -40,8 +40,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Фейковый контрол**: пункты — `<span cursor-default>` c title «Демо-прототип», бейджи хардкод (12/8/37/42). На прод-роуте навигация обязана вести на реальные роуты и скрывать разделы без прав",
       "dataStateAndEdges": "клик по пункту ничего не делает; бейджи врут против реальных данных; RR видит «Проекты» без права",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-001:admin; assertions: Compared the exact visible sidebar href set with the authenticated role | Clicked every visible sidebar link and verified destination plus browser Back | Confirmed resourceReader has no inaccessible project navigation; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-001-admin-role-aware-links.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -52,8 +52,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Фейковый контрол**: пункты — `<span cursor-default>` c title «Демо-прототип», бейджи хардкод (12/8/37/42). На прод-роуте навигация обязана вести на реальные роуты и скрывать разделы без прав",
       "dataStateAndEdges": "клик по пункту ничего не делает; бейджи врут против реальных данных; RR видит «Проекты» без права",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-001:planReader; assertions: Compared the exact visible sidebar href set with the authenticated role | Clicked every visible sidebar link and verified destination plus browser Back | Confirmed resourceReader has no inaccessible project navigation; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-001-planReader-role-aware-links.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -64,8 +64,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Фейковый контрол**: пункты — `<span cursor-default>` c title «Демо-прототип», бейджи хардкод (12/8/37/42). На прод-роуте навигация обязана вести на реальные роуты и скрывать разделы без прав",
       "dataStateAndEdges": "клик по пункту ничего не делает; бейджи врут против реальных данных; RR видит «Проекты» без права",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-001:resourceReader; assertions: Compared the exact visible sidebar href set with the authenticated role | Clicked every visible sidebar link and verified destination plus browser Back | Confirmed resourceReader has no inaccessible project navigation; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-001-resourceReader-role-aware-links.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -76,8 +76,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Фейковый контрол**: input `disabled` с demo-title. На проде — рабочий поиск или скрыт",
       "dataStateAndEdges": "фокус/ввод невозможны; a11y: disabled input в label",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-002:admin; assertions: Search returned the live project and Enter navigated to the API-provided route | The global search combobox was enabled and keyboard-operable; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-002-admin-live-result.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-002-admin-keyboard-navigation.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -88,8 +88,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Фейковый контрол**: input `disabled` с demo-title. На проде — рабочий поиск или скрыт",
       "dataStateAndEdges": "фокус/ввод невозможны; a11y: disabled input в label",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-002:planReader; assertions: Search returned the live project and Enter navigated to the API-provided route | The global search combobox was enabled and keyboard-operable; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-002-planReader-live-result.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-002-planReader-keyboard-navigation.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -100,8 +100,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Фейковый контрол**: input `disabled` с demo-title. На проде — рабочий поиск или скрыт",
       "dataStateAndEdges": "фокус/ввод невозможны; a11y: disabled input в label",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-002:resourceReader; assertions: Search returned 200 with ACL-filtered empty results, an explicit no-matches state, and no project route leak | The global search combobox was enabled and keyboard-operable; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-002-resourceReader-acl-filtered-no-leak.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -112,8 +112,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Хардкод «КБ» без меню — на проде должен показывать текущего пользователя и меню сессии",
       "dataStateAndEdges": "под PR/RR отображается тот же «КБ»; выхода из сессии нет",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-003:admin; assertions: User-menu title and body matched GET /api/auth/me | Profile and Settings were canonical menu links | Logout ended the session and redirected to /login; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-003-admin-live-user-menu.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-003-admin-logout-redirect.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -124,8 +124,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Хардкод «КБ» без меню — на проде должен показывать текущего пользователя и меню сессии",
       "dataStateAndEdges": "под PR/RR отображается тот же «КБ»; выхода из сессии нет",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-003:planReader; assertions: User-menu title and body matched GET /api/auth/me | Profile and Settings were canonical menu links | Logout ended the session and redirected to /login; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-003-planReader-live-user-menu.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-003-planReader-logout-redirect.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -136,8 +136,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Хардкод «КБ» без меню — на проде должен показывать текущего пользователя и меню сессии",
       "dataStateAndEdges": "под PR/RR отображается тот же «КБ»; выхода из сессии нет",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-003:resourceReader; assertions: User-menu title and body matched GET /api/auth/me | Profile and Settings were canonical menu links | Logout ended the session and redirected to /login; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-003-resourceReader-live-user-menu.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-003-resourceReader-logout-redirect.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -148,7 +148,7 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Все 9 delivery tabs — нативные project-specific ссылки с единственным aria-current; staged Schedule batch требует явного подтверждения ухода",
       "dataStateAndEdges": "clean navigation без prompt; Cancel сохраняет staged state; Leave сбрасывает optimistic batch без API write; reload/close защищён beforeunload",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-004:admin; assertions: Visited all nine project-specific routes and compared the complete tab href set | Verified exactly one aria-current tab on every route | Dismissed staged-leave confirmation, then accepted it and proved no planning version write; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-route-overview.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-route-schedule.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-route-resources.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-route-assignments.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-route-calendars.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-route-scenarios.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-route-baseline.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-route-commits.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-route-settings.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-staged-before-leave.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-cancel-keeps-staged.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-admin-leave-discards-without-write.png",
       "status": "pass",
       "inventoryStatus": "✅ live 9/9 tabs A/PR/RR + staged Cancel/Leave/no-write; beforeunload unit"
     },
@@ -160,7 +160,7 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Все 9 delivery tabs — нативные project-specific ссылки с единственным aria-current; staged Schedule batch требует явного подтверждения ухода",
       "dataStateAndEdges": "clean navigation без prompt; Cancel сохраняет staged state; Leave сбрасывает optimistic batch без API write; reload/close защищён beforeunload",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-004:planReader; assertions: Visited all nine project-specific routes and compared the complete tab href set | Verified exactly one aria-current tab on every route | Verified the read-only role exposes no batch staging control; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-planReader-route-overview.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-planReader-route-schedule.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-planReader-route-resources.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-planReader-route-assignments.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-planReader-route-calendars.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-planReader-route-scenarios.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-planReader-route-baseline.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-planReader-route-commits.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-planReader-route-settings.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-planReader-read-only-no-staging.png",
       "status": "pass",
       "inventoryStatus": "✅ live 9/9 tabs A/PR/RR + staged Cancel/Leave/no-write; beforeunload unit"
     },
@@ -172,7 +172,7 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Все 9 delivery tabs — нативные project-specific ссылки с единственным aria-current; staged Schedule batch требует явного подтверждения ухода",
       "dataStateAndEdges": "clean navigation без prompt; Cancel сохраняет staged state; Leave сбрасывает optimistic batch без API write; reload/close защищён beforeunload",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-004:resourceReader; assertions: Visited all nine project-specific routes and compared the complete tab href set | Verified exactly one aria-current tab on every route | Verified the read-only role exposes no batch staging control; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-resourceReader-route-overview.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-resourceReader-route-schedule.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-resourceReader-route-resources.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-resourceReader-route-assignments.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-resourceReader-route-calendars.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-resourceReader-route-scenarios.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-resourceReader-route-baseline.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-resourceReader-route-commits.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-resourceReader-route-settings.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-004-resourceReader-read-only-no-staging.png",
       "status": "pass",
       "inventoryStatus": "✅ live 9/9 tabs A/PR/RR + staged Cancel/Leave/no-write; beforeunload unit"
     },
@@ -184,7 +184,7 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Live-шапка получает title/status из GET /api/workspace/projects/:id, code выводит из title; версия/дедлайн/финиш/variance — из read-model. Loading/403/404 не показывают identity другого проекта.",
       "dataStateAndEdges": "9/9 delivery routes показывают active-project identity; смена projectId немедленно даёт нейтральную мету; same-id remount после denied response не переиспользует прежнюю tenant identity.",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-005:admin; assertions: Visited all nine routes and verified live title, status, and plan version | Captured route-specific header evidence for every delivery surface; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-admin-route-overview.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-admin-route-schedule.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-admin-route-resources.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-admin-route-assignments.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-admin-route-calendars.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-admin-route-scenarios.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-admin-route-baseline.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-admin-route-commits.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-admin-route-settings.png",
       "status": "pass",
       "inventoryStatus": "✅ 9/9 live headers + tenant-safe active-only identity tests"
     },
@@ -196,7 +196,7 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Live-шапка получает title/status из GET /api/workspace/projects/:id, code выводит из title; версия/дедлайн/финиш/variance — из read-model. Loading/403/404 не показывают identity другого проекта.",
       "dataStateAndEdges": "9/9 delivery routes показывают active-project identity; смена projectId немедленно даёт нейтральную мету; same-id remount после denied response не переиспользует прежнюю tenant identity.",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-005:planReader; assertions: Visited all nine routes and verified live title, status, and plan version | Captured route-specific header evidence for every delivery surface; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-planReader-route-overview.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-planReader-route-schedule.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-planReader-route-resources.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-planReader-route-assignments.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-planReader-route-calendars.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-planReader-route-scenarios.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-planReader-route-baseline.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-planReader-route-commits.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-planReader-route-settings.png",
       "status": "pass",
       "inventoryStatus": "✅ 9/9 live headers + tenant-safe active-only identity tests"
     },
@@ -208,7 +208,7 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Live-шапка получает title/status из GET /api/workspace/projects/:id, code выводит из title; версия/дедлайн/финиш/variance — из read-model. Loading/403/404 не показывают identity другого проекта.",
       "dataStateAndEdges": "9/9 delivery routes показывают active-project identity; смена projectId немедленно даёт нейтральную мету; same-id remount после denied response не переиспользует прежнюю tenant identity.",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-005:resourceReader; assertions: Visited all nine routes and verified no requested project identity leaked through forbidden states | Captured route-specific header evidence for every delivery surface; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-resourceReader-route-overview.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-resourceReader-route-schedule.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-resourceReader-route-resources.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-resourceReader-route-assignments.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-resourceReader-route-calendars.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-resourceReader-route-scenarios.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-resourceReader-route-baseline.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-resourceReader-route-commits.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-005-resourceReader-route-settings.png",
       "status": "pass",
       "inventoryStatus": "✅ 9/9 live headers + tenant-safe active-only identity tests"
     },
@@ -220,8 +220,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Фейковый контрол**: хардкод, не отражает реальное состояние сохранения/ошибок apply",
       "dataStateAndEdges": "показывает «Сохранено» во время busy/после reject команды",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-006:admin; assertions: The live project chrome contained no hard-coded saved indicator; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-006-admin-fake-saved-absent.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -232,8 +232,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Фейковый контрол**: хардкод, не отражает реальное состояние сохранения/ошибок apply",
       "dataStateAndEdges": "показывает «Сохранено» во время busy/после reject команды",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-006:planReader; assertions: The live project chrome contained no hard-coded saved indicator; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-006-planReader-fake-saved-absent.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -244,8 +244,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Фейковый контрол**: хардкод, не отражает реальное состояние сохранения/ошибок apply",
       "dataStateAndEdges": "показывает «Сохранено» во время busy/после reject команды",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-006:resourceReader; assertions: The live project chrome contained no hard-coded saved indicator; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-006-resourceReader-fake-saved-absent.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-08"
     },
     {
@@ -256,8 +256,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Каждая поверхность несёт баннер «Прототип · данные in-memory» — на live-транспорте текст ложный (данные реальные, сохраняются). Тексты обязаны соответствовать среде",
       "dataStateAndEdges": "пользователь читает «не сохраняется» и делает правки в проде",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-007:admin; assertions: Prototype and in-memory disclaimers were absent from the live route after all route traversal; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-007-admin-live-copy.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-12"
     },
     {
@@ -268,8 +268,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Каждая поверхность несёт баннер «Прототип · данные in-memory» — на live-транспорте текст ложный (данные реальные, сохраняются). Тексты обязаны соответствовать среде",
       "dataStateAndEdges": "пользователь читает «не сохраняется» и делает правки в проде",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-007:planReader; assertions: Prototype and in-memory disclaimers were absent from the live route after all route traversal; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-007-planReader-live-copy.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-12"
     },
     {
@@ -280,8 +280,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Каждая поверхность несёт баннер «Прототип · данные in-memory» — на live-транспорте текст ложный (данные реальные, сохраняются). Тексты обязаны соответствовать среде",
       "dataStateAndEdges": "пользователь читает «не сохраняется» и делает правки в проде",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-007:resourceReader; assertions: Prototype and in-memory disclaimers were absent from the live route after all route traversal; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-007-resourceReader-live-copy.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-12"
     },
     {
@@ -292,8 +292,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects`",
       "expectedBehavior": "`SurfaceState loading` «Загрузка проектов…» до ответа",
       "dataStateAndEdges": "медленная сеть; повторное монтирование",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-008:admin; assertions: Captured the loading surface while the real projects fetch was deliberately delayed | The loading label disappeared only after the live response resolved; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-008-admin-delayed-live-request.png",
+      "status": "pass",
       "inventoryStatus": "✅"
     },
     {
@@ -304,8 +304,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects`",
       "expectedBehavior": "`SurfaceState loading` «Загрузка проектов…» до ответа",
       "dataStateAndEdges": "медленная сеть; повторное монтирование",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-008:planReader; assertions: Captured the loading surface while the real projects fetch was deliberately delayed | The loading label disappeared only after the live response resolved; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-008-planReader-delayed-live-request.png",
+      "status": "pass",
       "inventoryStatus": "✅"
     },
     {
@@ -316,8 +316,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects`, GET `/api/workspace/users`",
       "expectedBehavior": "Все колонки из ProjectRecord; деньги ru-RU (млн/тыс ₽); даты ДД.ММ.ГГГГ; демэнд-чипы positionId·часы",
       "dataStateAndEdges": "contractValue=0; невалидная дата (выводится как есть); demand пуст → «—»; users не загрузились → цвет c5",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-009:admin; assertions: Compared every live row field and format with GET /api/workspace/projects | Verified zero money/hours, invalid-date passthrough, empty demand, and unknown-directory fallback state; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-009-admin-live-api-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-009-admin-zero-invalid-date-empty-demand.png",
+      "status": "pass",
       "inventoryStatus": "✅"
     },
     {
@@ -328,8 +328,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects`, GET `/api/workspace/users`",
       "expectedBehavior": "Все колонки из ProjectRecord; деньги ru-RU (млн/тыс ₽); даты ДД.ММ.ГГГГ; демэнд-чипы positionId·часы",
       "dataStateAndEdges": "contractValue=0; невалидная дата (выводится как есть); demand пуст → «—»; users не загрузились → цвет c5",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-009:planReader; assertions: Compared every live row field and format with GET /api/workspace/projects | Verified zero money/hours, invalid-date passthrough, empty demand, and unknown-directory fallback state; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-009-planReader-live-api-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-009-planReader-zero-invalid-date-empty-demand.png",
+      "status": "pass",
       "inventoryStatus": "✅"
     },
     {
@@ -340,8 +340,8 @@
       "apiOrDataSurface": "— (клиентский)",
       "expectedBehavior": "«Активные» фильтрует по `status===\"active\"`; «Все» — **демо-переключатель** (API отдаёт только активные) с честной подписью",
       "dataStateAndEdges": "оба таба показывают одинаковый список; сортировки/поиска в таблице нет вообще (гэп)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-010:admin; assertions: The live API returned only active projects | The unsupported All filter was absent and the surface explicitly stated active-project scope; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-010-admin-active-only-honest-scope.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-16"
     },
     {
@@ -352,8 +352,8 @@
       "apiOrDataSurface": "— (клиентский)",
       "expectedBehavior": "«Активные» фильтрует по `status===\"active\"`; «Все» — **демо-переключатель** (API отдаёт только активные) с честной подписью",
       "dataStateAndEdges": "оба таба показывают одинаковый список; сортировки/поиска в таблице нет вообще (гэп)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-010:planReader; assertions: The live API returned only active projects | The unsupported All filter was absent and the surface explicitly stated active-project scope; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-010-planReader-active-only-honest-scope.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-16"
     },
     {
@@ -364,7 +364,7 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Название каждого доступного проекта — нативная ссылка на /projects/[id] с keyboard и browser link affordances",
       "dataStateAndEdges": "click/final URL/back; loading/error/empty не содержат ложных detail links",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-011:admin; assertions: Every live project title was an A element with its canonical detail href | Clicked a project title, verified the final URL, and restored the list with browser Back; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-011-admin-native-link-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-011-admin-browser-back-readback.png",
       "status": "pass",
       "inventoryStatus": "✅ native detail links + live click/final URL/back"
     },
@@ -376,7 +376,7 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Название каждого доступного проекта — нативная ссылка на /projects/[id] с keyboard и browser link affordances",
       "dataStateAndEdges": "click/final URL/back; loading/error/empty не содержат ложных detail links",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-011:planReader; assertions: Every live project title was an A element with its canonical detail href | Clicked a project title, verified the final URL, and restored the list with browser Back; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-011-planReader-native-link-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-011-planReader-browser-back-readback.png",
       "status": "pass",
       "inventoryStatus": "✅ native detail links + live click/final URL/back"
     },
@@ -388,8 +388,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects`",
       "expectedBehavior": "`SurfaceState empty` «Нет проектов» при пустом списке активных",
       "dataStateAndEdges": "тенант без проектов; фильтр «Активные» при только-архивных",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-012:admin; assertions: A true empty active-project response rendered the explicit empty state | The empty state exposed a real CRM link and no false project-detail links; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-012-admin-true-empty-response.png",
+      "status": "pass",
       "inventoryStatus": "✅ (пустое состояние подтверждено под beta/tenant-beta)"
     },
     {
@@ -400,8 +400,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects`",
       "expectedBehavior": "`SurfaceState empty` «Нет проектов» при пустом списке активных",
       "dataStateAndEdges": "тенант без проектов; фильтр «Активные» при только-архивных",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-012:planReader; assertions: A true empty active-project response rendered the explicit empty state | The empty state exposed a real CRM link and no false project-detail links; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-012-planReader-true-empty-response.png",
+      "status": "pass",
       "inventoryStatus": "✅ (пустое состояние подтверждено под beta/tenant-beta)"
     },
     {
@@ -412,8 +412,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects`",
       "expectedBehavior": "`SurfaceState error` с RU-текстом (`load_failed`/`request_failed`/`invalid_json_response`), retry перезапрашивает",
       "dataStateAndEdges": "500; обрыв сети; невалидный JSON; повтор после восстановления",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-013:admin; assertions: Forced and observed HTTP 500, network failure, and malformed successful JSON as distinct RU error states | Each Retry reached the live backend and restored project rows | Captured every error and post-Retry state separately; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-admin-http-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-admin-http-retry-live.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-admin-network-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-admin-network-retry-live.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-admin-json-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-admin-json-retry-live.png",
+      "status": "pass",
       "inventoryStatus": "🚧 заблокировано: 500/обрыв сети/битый JSON не смоделировать на боевом стенде; error-state+retry виден на 403 (RR), но текст — raw-код (см. BUG-PROJ-15)"
     },
     {
@@ -424,8 +424,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects`",
       "expectedBehavior": "`SurfaceState error` с RU-текстом (`load_failed`/`request_failed`/`invalid_json_response`), retry перезапрашивает",
       "dataStateAndEdges": "500; обрыв сети; невалидный JSON; повтор после восстановления",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-013:planReader; assertions: Forced and observed HTTP 500, network failure, and malformed successful JSON as distinct RU error states | Each Retry reached the live backend and restored project rows | Captured every error and post-Retry state separately; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-planReader-http-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-planReader-http-retry-live.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-planReader-network-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-planReader-network-retry-live.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-planReader-json-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-planReader-json-retry-live.png",
+      "status": "pass",
       "inventoryStatus": "🚧 заблокировано: 500/обрыв сети/битый JSON не смоделировать на боевом стенде; error-state+retry виден на 403 (RR), но текст — raw-код (см. BUG-PROJ-15)"
     },
     {
@@ -436,8 +436,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects`",
       "expectedBehavior": "`SurfaceState error` с RU-текстом (`load_failed`/`request_failed`/`invalid_json_response`), retry перезапрашивает",
       "dataStateAndEdges": "500; обрыв сети; невалидный JSON; повтор после восстановления",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-013:resourceReader; assertions: Forced and observed HTTP 500, network failure, and malformed successful JSON as distinct RU error states | Each Retry reached the live backend and settled into the role-correct forbidden state | Captured every error and post-Retry state separately; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-resourceReader-http-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-resourceReader-http-retry-forbidden.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-resourceReader-network-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-resourceReader-network-retry-forbidden.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-resourceReader-json-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-013-resourceReader-json-retry-forbidden.png",
+      "status": "pass",
       "inventoryStatus": "🚧 заблокировано: 500/обрыв сети/битый JSON не смоделировать на боевом стенде; error-state+retry виден на 403 (RR), но текст — raw-код (см. BUG-PROJ-15)"
     },
     {
@@ -448,8 +448,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects`",
       "expectedBehavior": "RR (без `projects.read`) должен получить 403 и человекочитаемый отказ, не «вечную загрузку»",
       "dataStateAndEdges": "неавторизованный (401 → redirect/логин); истёкшая cookie-сессия",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-014:resourceReader; assertions: Direct projects API returned 403 for resourceReader | The UI rendered a human-readable forbidden state, stopped loading, and leaked no project identity; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-014-resourceReader-live-403-no-leak.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-15"
     },
     {
@@ -460,7 +460,7 @@
       "apiOrDataSurface": "GET `/api/workspace/projects` + `/:id`",
       "expectedBehavior": "Смена select выполняет getProjectDetail(:id) и router.push на canonical /projects/:id; reload/back/forward сохраняют согласованность URL и карточки.",
       "dataStateAndEdges": "admin + planReader: select второго проекта → URL/readback → reload → Back/Forward без потери выбора.",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-015:admin; assertions: Select changed both canonical URL and visible project identity | Reload, browser Back, and browser Forward preserved URL-to-card agreement; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-015-admin-second-project-url-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-015-admin-reload-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-015-admin-back-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-015-admin-forward-readback.png",
       "status": "pass",
       "inventoryStatus": "✅ live admin/PR canonical URL + reload/back/forward"
     },
@@ -472,7 +472,7 @@
       "apiOrDataSurface": "GET `/api/workspace/projects` + `/:id`",
       "expectedBehavior": "Смена select выполняет getProjectDetail(:id) и router.push на canonical /projects/:id; reload/back/forward сохраняют согласованность URL и карточки.",
       "dataStateAndEdges": "admin + planReader: select второго проекта → URL/readback → reload → Back/Forward без потери выбора.",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-015:planReader; assertions: Select changed both canonical URL and visible project identity | Reload, browser Back, and browser Forward preserved URL-to-card agreement; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-015-planReader-second-project-url-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-015-planReader-reload-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-015-planReader-back-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-015-planReader-forward-readback.png",
       "status": "pass",
       "inventoryStatus": "✅ live admin/PR canonical URL + reload/back/forward"
     },
@@ -484,7 +484,7 @@
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
       "expectedBehavior": "Несуществующий id остаётся в URL и показывает явное «Проект не найден» после честного 404 project_not_found; никакой подмены первым проектом.",
       "dataStateAndEdges": "admin/planReader/beta invalid id → API 404, exact URL после reload, visible not-found; resourceReader не получает утечку identity.",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-016:admin; assertions: Direct API returned project_not_found and the UI preserved the unknown ID | Reload kept the exact URL and explicit not-found state without substituting another project; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-016-admin-live-404.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-016-admin-reload-stays-404.png",
       "status": "pass",
       "inventoryStatus": "✅ live 404 admin/PR/beta без подмены"
     },
@@ -496,7 +496,7 @@
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
       "expectedBehavior": "Несуществующий id остаётся в URL и показывает явное «Проект не найден» после честного 404 project_not_found; никакой подмены первым проектом.",
       "dataStateAndEdges": "admin/planReader/beta invalid id → API 404, exact URL после reload, visible not-found; resourceReader не получает утечку identity.",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-016:planReader; assertions: Direct API returned project_not_found and the UI preserved the unknown ID | Reload kept the exact URL and explicit not-found state without substituting another project; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-016-planReader-live-404.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-016-planReader-reload-stays-404.png",
       "status": "pass",
       "inventoryStatus": "✅ live 404 admin/PR/beta без подмены"
     },
@@ -508,8 +508,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
       "expectedBehavior": "Все поля из `{project}`; даты ДД.ММ.ГГГГ; деньги ru-RU",
       "dataStateAndEdges": "plannedFinish null; contractValue 0; длинное имя клиента",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-017:admin; assertions: Compared title, client, status, dates, money, planned hours, and task count with the live detail response | Verified long title/client, absent finish, zero contract value, and zero planned hours; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-017-admin-live-header-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-017-admin-zero-null-long-values.png",
+      "status": "pass",
       "inventoryStatus": "✅"
     },
     {
@@ -520,8 +520,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
       "expectedBehavior": "Все поля из `{project}`; даты ДД.ММ.ГГГГ; деньги ru-RU",
       "dataStateAndEdges": "plannedFinish null; contractValue 0; длинное имя клиента",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-017:planReader; assertions: Compared title, client, status, dates, money, planned hours, and task count with the live detail response | Verified long title/client, absent finish, zero contract value, and zero planned hours; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-017-planReader-live-header-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-017-planReader-zero-null-long-values.png",
+      "status": "pass",
       "inventoryStatus": "✅"
     },
     {
@@ -532,8 +532,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`, `/api/workspace/users`",
       "expectedBehavior": "Сортировка фиксированная: незакрытые вперёд, затем по plannedFinish; статус-chip по category; «требует приёмки» в подписи",
       "dataStateAndEdges": "ownerUserId null → «—»; неизвестный statusCategory; прогресс >100 обрезается",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-018:admin; assertions: Compared exact UI task order with unfinished-first then planned-finish sorting | Compared status, finish, progress, and acceptance copy for every live task | Verified nullable owner, unknown status, acceptance marker, and progress clamping to 0..100; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-018-admin-live-sorted-task-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-018-admin-nullable-unknown-clamped.png",
+      "status": "pass",
       "inventoryStatus": "✅"
     },
     {
@@ -544,8 +544,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`, `/api/workspace/users`",
       "expectedBehavior": "Сортировка фиксированная: незакрытые вперёд, затем по plannedFinish; статус-chip по category; «требует приёмки» в подписи",
       "dataStateAndEdges": "ownerUserId null → «—»; неизвестный statusCategory; прогресс >100 обрезается",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-018:planReader; assertions: Compared exact UI task order with unfinished-first then planned-finish sorting | Compared status, finish, progress, and acceptance copy for every live task | Verified nullable owner, unknown status, acceptance marker, and progress clamping to 0..100; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-018-planReader-live-sorted-task-readback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-018-planReader-nullable-unknown-clamped.png",
+      "status": "pass",
       "inventoryStatus": "✅"
     },
     {
@@ -556,8 +556,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Плашка «У проекта пока нет задач»",
       "dataStateAndEdges": "новый проект без задач",
-      "evidence": "",
-      "status": "blocked",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-019:admin; assertions: Created a project through opportunity feasibility and activation | Read back zero tasks from the live detail API and observed the explicit no-tasks state; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-019-admin-real-zero-task-project.png",
+      "status": "pass",
       "inventoryStatus": "🚧 заблокировано: на стенде нет проекта без задач, создать проект из UI нельзя (PROJ-116)"
     },
     {
@@ -568,32 +568,32 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Плашка «У проекта пока нет задач»",
       "dataStateAndEdges": "новый проект без задач",
-      "evidence": "",
-      "status": "blocked",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-019:planReader; assertions: Read the zero-task project created by the preceding admin write flow without claiming a planReader write | Read back zero tasks from the live detail API and observed the explicit no-tasks state; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-019-planReader-real-zero-task-project.png",
+      "status": "pass",
       "inventoryStatus": "🚧 заблокировано: на стенде нет проекта без задач, создать проект из UI нельзя (PROJ-116)"
     },
     {
       "role": "A",
       "scenarioId": "PROJ-020",
-      "scenario": "Сводка: Segmented «Объём / Демэнд» + StatTile/прогресс-бары",
+      "scenario": "Сводка: Segmented «Объём / Спрос» + StatTile/прогресс-бары",
       "surface": "`/projects/[id]`",
       "apiOrDataSurface": "— (агрегаты клиента)",
-      "expectedBehavior": "«Объём»: прогресс взвешен по plannedWork, открыто/план/факт часы; «Демэнд»: доли по позициям из project.demand",
+      "expectedBehavior": "«Объём»: прогресс взвешен по plannedWork, открыто/план/факт часы; «Спрос»: доли по позициям из project.demand",
       "dataStateAndEdges": "plannedWork=0 → прогресс 0; demand пуст → «не задан»; сумма долей ≈100%",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-020:admin; assertions: Compared weighted progress, open/done/in-progress counts, planned work, and actual work with live tasks | Compared every demand position hour/share and total with the live project | Verified zero planned work produces 0 without NaN and empty demand has explicit copy; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-020-admin-live-weighted-volume-demand.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-020-admin-zero-work-no-nan.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-020-admin-empty-demand.png",
+      "status": "pass",
       "inventoryStatus": "✅"
     },
     {
       "role": "PR",
       "scenarioId": "PROJ-020",
-      "scenario": "Сводка: Segmented «Объём / Демэнд» + StatTile/прогресс-бары",
+      "scenario": "Сводка: Segmented «Объём / Спрос» + StatTile/прогресс-бары",
       "surface": "`/projects/[id]`",
       "apiOrDataSurface": "— (агрегаты клиента)",
-      "expectedBehavior": "«Объём»: прогресс взвешен по plannedWork, открыто/план/факт часы; «Демэнд»: доли по позициям из project.demand",
+      "expectedBehavior": "«Объём»: прогресс взвешен по plannedWork, открыто/план/факт часы; «Спрос»: доли по позициям из project.demand",
       "dataStateAndEdges": "plannedWork=0 → прогресс 0; demand пуст → «не задан»; сумма долей ≈100%",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-020:planReader; assertions: Compared weighted progress, open/done/in-progress counts, planned work, and actual work with live tasks | Compared every demand position hour/share and total with the live project | Verified zero planned work produces 0 without NaN and empty demand has explicit copy; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-020-planReader-live-weighted-volume-demand.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-020-planReader-zero-work-no-nan.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-020-planReader-empty-demand.png",
+      "status": "pass",
       "inventoryStatus": "✅"
     },
     {
@@ -604,7 +604,7 @@
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
       "expectedBehavior": "Loading/error/forbidden/empty различаются; RU-маппинг кодов работает; Retry повторяет тот же projectId.",
       "dataStateAndEdges": "focused load_failed+retry/forbidden; live 404 empty и 403 forbidden; screenshot/evidence failures fail closed.",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-021:admin; assertions: Captured loading before each delayed detail response | Distinguished HTTP, network, malformed JSON, synthetic forbidden, and role-correct Retry outcomes | Verified a live unknown project remains a canonical 404 state; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-http-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-http-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-http-retry-live.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-network-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-network-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-network-retry-live.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-json-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-json-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-json-retry-live.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-forbidden-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-forbidden-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-admin-live-404.png",
       "status": "pass",
       "inventoryStatus": "✅ focused error+retry + live 404/403 states"
     },
@@ -616,7 +616,7 @@
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
       "expectedBehavior": "Loading/error/forbidden/empty различаются; RU-маппинг кодов работает; Retry повторяет тот же projectId.",
       "dataStateAndEdges": "focused load_failed+retry/forbidden; live 404 empty и 403 forbidden; screenshot/evidence failures fail closed.",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-021:planReader; assertions: Captured loading before each delayed detail response | Distinguished HTTP, network, malformed JSON, synthetic forbidden, and role-correct Retry outcomes | Verified a live unknown project remains a canonical 404 state; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-http-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-http-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-http-retry-live.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-network-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-network-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-network-retry-live.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-json-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-json-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-json-retry-live.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-forbidden-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-forbidden-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-planReader-live-404.png",
       "status": "pass",
       "inventoryStatus": "✅ focused error+retry + live 404/403 states"
     },
@@ -628,7 +628,7 @@
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
       "expectedBehavior": "Loading/error/forbidden/empty различаются; RU-маппинг кодов работает; Retry повторяет тот же projectId.",
       "dataStateAndEdges": "focused load_failed+retry/forbidden; live 404 empty и 403 forbidden; screenshot/evidence failures fail closed.",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-detail-identity.json + focused identity/state tests + independent final audits",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-021:resourceReader; assertions: Captured loading before each delayed detail response | Distinguished HTTP, network, malformed JSON, synthetic forbidden, and role-correct Retry outcomes | Verified the live detail API and UI remain forbidden without identity leakage; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-http-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-http-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-http-retry-forbidden.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-network-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-network-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-network-retry-forbidden.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-json-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-json-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-json-retry-forbidden.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-forbidden-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-forbidden-state.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-021-resourceReader-live-403.png",
       "status": "pass",
       "inventoryStatus": "✅ focused error+retry + live 404/403 states"
     },
@@ -640,8 +640,8 @@
       "apiOrDataSurface": "GET `/api/workspace/projects/:id`",
       "expectedBehavior": "RR без `projects.read` → отказ; PR видит карточку (read)",
       "dataStateAndEdges": "смешанный случай: список доступен, детали 403",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-022:resourceReader; assertions: Direct project detail API returned 403 for resourceReader | The detail UI rendered forbidden and exposed no project identity; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-022-resourceReader-direct-api-and-ui-403.png",
+      "status": "pass",
       "inventoryStatus": "✅ (RR: detail → 403 permission_missing; PR: read ок)"
     },
     {
@@ -652,8 +652,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Все 5 плиток из read-model (взвешенный прогресс, резерв к дедлайну, Δ к baseline, ресурсы с перегрузом, validationIssues)",
       "dataStateAndEdges": "дедлайн null → «дедлайн не задан»; baseline нет → «0 дн»; пустой план (0 задач) → прогресс 0 без NaN",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-023:admin; assertions: KPI values matched deterministic read-model calculations: 63%, 15.07 and 3 days late, +3 baseline days, 2 unique day-overload resources, 3 risks | Zero/null model rendered 0%, no finish, no deadline, zero baseline delta, zero overloads and zero risks without NaN; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-023-admin-five-exact-kpis.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-023-admin-zero-nullable.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-11 (подпись «0 закрыто · 0 в работе» врёт)"
     },
     {
@@ -664,8 +664,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Все 5 плиток из read-model (взвешенный прогресс, резерв к дедлайну, Δ к baseline, ресурсы с перегрузом, validationIssues)",
       "dataStateAndEdges": "дедлайн null → «дедлайн не задан»; baseline нет → «0 дн»; пустой план (0 задач) → прогресс 0 без NaN",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-023:planReader; assertions: KPI values matched deterministic read-model calculations: 63%, 15.07 and 3 days late, +3 baseline days, 2 unique day-overload resources, 3 risks | Zero/null model rendered 0%, no finish, no deadline, zero baseline delta, zero overloads and zero risks without NaN; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-023-planReader-five-exact-kpis.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-023-planReader-zero-nullable.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-11 (подпись «0 закрыто · 0 в работе» врёт)"
     },
     {
@@ -676,8 +676,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Порядок: срыв дедлайна → перегрузы → сдвиг от baseline → просрочки → критпуть; пусто → «Критичных сигналов нет»",
       "dataStateAndEdges": "все сигналы одновременно; перегрузы у PR (resourceLoad в read-model приходит?)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-024:admin; assertions: Signal titles matched the exact five derived conditions in deadline, overload, baseline, overdue, critical order | Signal details matched boundary dates, overload-day count, and zero-slack semantics | An all-done critical task produced the honest no-signal state; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-024-admin-all-five-ordered.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-024-admin-all-done-empty.png",
+      "status": "pass",
       "inventoryStatus": "✅ (порядок/пусто ок; resourceLoad PR-у ПРИХОДИТ — policy-замечание в BUG-PROJ-14; дата просрочек мок — BUG-PROJ-05)"
     },
     {
@@ -688,8 +688,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Порядок: срыв дедлайна → перегрузы → сдвиг от baseline → просрочки → критпуть; пусто → «Критичных сигналов нет»",
       "dataStateAndEdges": "все сигналы одновременно; перегрузы у PR (resourceLoad в read-model приходит?)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-024:planReader; assertions: Signal titles matched the exact five derived conditions in deadline, overload, baseline, overdue, critical order | Signal details matched boundary dates, overload-day count, and zero-slack semantics | An all-done critical task produced the honest no-signal state; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-024-planReader-all-five-ordered.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-024-planReader-all-done-empty.png",
+      "status": "pass",
       "inventoryStatus": "✅ (порядок/пусто ок; resourceLoad PR-у ПРИХОДИТ — policy-замечание в BUG-PROJ-14; дата просрочек мок — BUG-PROJ-05)"
     },
     {
@@ -700,7 +700,7 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Каждый видимый planning signal ведёт в project-specific Schedule, Scenarios или Baseline",
       "dataStateAndEdges": "проверены все 5 live signal CTA, точные href, final URL и browser back",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-025:admin; assertions: Открыть График -> /projects/project-vektor-portal/schedule -> Back restored Финиш за дедлайном: +3 дн. | Открыть Сценарии -> /projects/project-vektor-portal/scenarios -> Back restored Перегруз ресурсов: 2 | Открыть Baseline -> /projects/project-vektor-portal/baseline -> Back restored Финиш сдвинут +5 дн от базового плана | Открыть График -> /projects/project-vektor-portal/schedule -> Back restored Просрочено задач: 1 | Показать путь -> /projects/project-vektor-portal/schedule -> Back restored На критическом пути: 1 задача; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-admin-cta-1-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-admin-cta-1-back.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-admin-cta-2-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-admin-cta-2-back.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-admin-cta-3-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-admin-cta-3-back.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-admin-cta-4-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-admin-cta-4-back.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-admin-cta-5-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-admin-cta-5-back.png",
       "status": "pass",
       "inventoryStatus": "✅ live 5/5 signal CTA navigation"
     },
@@ -712,7 +712,7 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Каждый видимый planning signal ведёт в project-specific Schedule, Scenarios или Baseline",
       "dataStateAndEdges": "проверены все 5 live signal CTA, точные href, final URL и browser back",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-025:planReader; assertions: Открыть График -> /projects/project-vektor-portal/schedule -> Back restored Финиш за дедлайном: +3 дн. | Открыть Сценарии -> /projects/project-vektor-portal/scenarios -> Back restored Перегруз ресурсов: 2 | Открыть Baseline -> /projects/project-vektor-portal/baseline -> Back restored Финиш сдвинут +5 дн от базового плана | Открыть График -> /projects/project-vektor-portal/schedule -> Back restored Просрочено задач: 1 | Показать путь -> /projects/project-vektor-portal/schedule -> Back restored На критическом пути: 1 задача; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-planReader-cta-1-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-planReader-cta-1-back.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-planReader-cta-2-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-planReader-cta-2-back.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-planReader-cta-3-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-planReader-cta-3-back.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-planReader-cta-4-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-planReader-cta-4-back.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-planReader-cta-5-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-025-planReader-cta-5-back.png",
       "status": "pass",
       "inventoryStatus": "✅ live 5/5 signal CTA navigation"
     },
@@ -724,8 +724,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Отсортированы по дате; веха done при pct≥100; дедлайн добавлен отдельной строкой",
       "dataStateAndEdges": "вех нет и дедлайна нет → пустой список без плашки (гэп); веха без calc-дат",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-026:admin; assertions: Milestones, deadline, planned-date fallback, no-date row, and done semantics matched exact chronological order | No milestones and no deadline rendered the explicit empty copy; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-026-admin-ordered-done-fallback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-026-admin-explicit-empty.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-11 (веха live-плана не показана)"
     },
     {
@@ -736,8 +736,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Отсортированы по дате; веха done при pct≥100; дедлайн добавлен отдельной строкой",
       "dataStateAndEdges": "вех нет и дедлайна нет → пустой список без плашки (гэп); веха без calc-дат",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-026:planReader; assertions: Milestones, deadline, planned-date fallback, no-date row, and done semantics matched exact chronological order | No milestones and no deadline rendered the explicit empty copy; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-026-planReader-ordered-done-fallback.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-026-planReader-explicit-empty.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-11 (веха live-плана не показана)"
     },
     {
@@ -748,8 +748,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Закрытые исключены; аватар из customFields.resLabel",
       "dataStateAndEdges": "resLabel нет на live (аватар «—»); меньше 5 задач; все задачи done",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-027:admin; assertions: Verified exact critical-first then finish-date order, top-five cap, done exclusion, avatar fallback, and planned-finish display fallback | All-done model rendered one explicit empty row and no task rows; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-027-admin-ordered-cap-done-excluded.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-027-admin-all-done-empty.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-11 (закрытая задача 100% в топе, аватары «—»)"
     },
     {
@@ -760,8 +760,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Закрытые исключены; аватар из customFields.resLabel",
       "dataStateAndEdges": "resLabel нет на live (аватар «—»); меньше 5 задач; все задачи done",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-027:planReader; assertions: Verified exact critical-first then finish-date order, top-five cap, done exclusion, avatar fallback, and planned-finish display fallback | All-done model rendered one explicit empty row and no task rows; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-027-planReader-ordered-cap-done-excluded.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-027-planReader-all-done-empty.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-11 (закрытая задача 100% в топе, аватары «—»)"
     },
     {
@@ -772,7 +772,7 @@
       "apiOrDataSurface": "GET `/api/tenant/current/audit-events?projectId`",
       "expectedBehavior": "Planning commits загружаются из audit-events; Все ведёт в Commits; loading, true empty, forbidden и error различимы",
       "dataStateAndEdges": "ADMIN true empty подтверждён API+UI; PR audit-events 403 показывает явный forbidden state, не пустую историю",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-028:admin; assertions: Captured distinct loading, four-item ready, true-empty, forbidden, and error commit states | Filtered out non-planning and fifth planning events while preserving descending versions | The All link navigated to canonical Commits and browser Back restored ready Overview; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-admin-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-admin-ready-four.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-admin-true-empty.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-admin-forbidden.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-admin-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-admin-commits-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-admin-back-ready.png",
       "status": "pass",
       "inventoryStatus": "✅ live All→Commits + true empty + PR 403 distinct from empty"
     },
@@ -784,7 +784,7 @@
       "apiOrDataSurface": "GET `/api/tenant/current/audit-events?projectId`",
       "expectedBehavior": "Planning commits загружаются из audit-events; Все ведёт в Commits; loading, true empty, forbidden и error различимы",
       "dataStateAndEdges": "ADMIN true empty подтверждён API+UI; PR audit-events 403 показывает явный forbidden state, не пустую историю",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-028:planReader; assertions: Captured distinct loading, four-item ready, true-empty, forbidden, and error commit states | Filtered out non-planning and fifth planning events while preserving descending versions | The All link navigated to canonical Commits and browser Back restored ready Overview; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-planReader-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-planReader-ready-four.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-planReader-true-empty.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-planReader-forbidden.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-planReader-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-planReader-commits-destination.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-028-planReader-back-ready.png",
       "status": "pass",
       "inventoryStatus": "✅ live All→Commits + true empty + PR 403 distinct from empty"
     },
@@ -796,8 +796,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Хардкод «сегодня» = 2026-06-23** (`TODAY`) — на live просрочки считаются от вшитой даты, не от реальной",
       "dataStateAndEdges": "реальная дата ≠ 2026-06-23 → ложные/пропущенные просрочки",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-029:admin; assertions: At 2026-07-11 exactly two open effective finishes were overdue; boundary-today, future, done, and null were excluded | Moving current time to 2026-07-13 changed the same model to four overdue tasks and updated the visible boundary date | The removed fixed 23.06.2026 date was absent; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-029-admin-current-date-2026-07-11.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-029-admin-current-date-2026-07-13.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-05"
     },
     {
@@ -808,8 +808,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Хардкод «сегодня» = 2026-06-23** (`TODAY`) — на live просрочки считаются от вшитой даты, не от реальной",
       "dataStateAndEdges": "реальная дата ≠ 2026-06-23 → ложные/пропущенные просрочки",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-029:planReader; assertions: At 2026-07-11 exactly two open effective finishes were overdue; boundary-today, future, done, and null were excluded | Moving current time to 2026-07-13 changed the same model to four overdue tasks and updated the visible boundary date | The removed fixed 23.06.2026 date was absent; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-029-planReader-current-date-2026-07-11.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-029-planReader-current-date-2026-07-13.png",
+      "status": "pass",
       "inventoryStatus": "❌ BUG-PROJ-05"
     },
     {
@@ -820,8 +820,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "`SurfaceState`: RR → «Нет прав на просмотр плана проекта» (403→forbidden), error → RU-код + retry",
       "dataStateAndEdges": "несуществующий project id (404 → error, не forbidden); обрыв сети",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-030:admin; assertions: Held an intercepted read-model request and captured loading before any KPI content | Observed distinct server and network errors with Retry controls | Retry issued exactly two requests for the same project and reached ready KPI content | Synthetic 404 preserved the missing project URL without identity leakage | Synthetic 403 mapped to the dedicated forbidden surface without Retry; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-admin-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-admin-500-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-admin-network-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-admin-retry-ready.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-admin-404-no-leak.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-admin-403-forbidden.png",
+      "status": "pass",
       "inventoryStatus": "✅ (RR → RU-текст «У вас нет прав…»; 404 → error+Повторить)"
     },
     {
@@ -832,8 +832,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "`SurfaceState`: RR → «Нет прав на просмотр плана проекта» (403→forbidden), error → RU-код + retry",
       "dataStateAndEdges": "несуществующий project id (404 → error, не forbidden); обрыв сети",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-030:planReader; assertions: Held an intercepted read-model request and captured loading before any KPI content | Observed distinct server and network errors with Retry controls | Retry issued exactly two requests for the same project and reached ready KPI content | Synthetic 404 preserved the missing project URL without identity leakage | Synthetic 403 mapped to the dedicated forbidden surface without Retry; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-planReader-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-planReader-500-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-planReader-network-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-planReader-retry-ready.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-planReader-404-no-leak.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-planReader-403-forbidden.png",
+      "status": "pass",
       "inventoryStatus": "✅ (RR → RU-текст «У вас нет прав…»; 404 → error+Повторить)"
     },
     {
@@ -844,8 +844,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "`SurfaceState`: RR → «Нет прав на просмотр плана проекта» (403→forbidden), error → RU-код + retry",
       "dataStateAndEdges": "несуществующий project id (404 → error, не forbidden); обрыв сети",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-shell-overview-2026-07-11/project-shell-overview-machine.json#PROJ-030:resourceReader; assertions: Held an intercepted read-model request and captured loading before any KPI content | Observed distinct server and network errors with Retry controls | Retry issued exactly two requests for the same project and reached ready KPI content | Synthetic 404 preserved the missing project URL without identity leakage | Direct live API and synthetic state both proved 403 without project identity leakage; screenshots: .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-resourceReader-loading.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-resourceReader-500-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-resourceReader-network-error.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-resourceReader-retry-ready.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-resourceReader-404-no-leak.png, .superloopy/evidence/project-shell-overview-2026-07-11/proj-030-resourceReader-403-forbidden.png",
+      "status": "pass",
       "inventoryStatus": "✅ (RR → RU-текст «У вас нет прав…»; 404 → error+Повторить)"
     },
     {

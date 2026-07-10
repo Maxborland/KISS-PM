@@ -1,0 +1,1342 @@
+{
+  "schemaVersion": 1,
+  "runId": "project-shell-overview-20260711-literal-final3",
+  "generatedAt": "2026-07-10T20:24:17.819Z",
+  "targetRowCount": 68,
+  "bundleCount": 7,
+  "statusCounts": {
+    "pass": 68,
+    "pending": 0
+  },
+  "sourceStateAtStart": {
+    "e2e/full-eval/projects-shell-overview-closeout.spec.ts": "d0f6a2c853416dc7754406cd81ad01636831d4685f92596f929eb08cb4a01780",
+    "apps/web/src/delivery/ui/workspace-shell.tsx": "694ae555ca374d7377b9a167a240c3b17e6d8d273a4a4f5575601e94d83676c8",
+    "apps/web/src/delivery/ui/global-search.tsx": "97d350cfc883681be6a6037cb4271eba9ac8c5485ed7f6c7f912d07784755b22",
+    "apps/web/src/delivery/ui/delivery-frame.tsx": "8881b62bb6c01edb0877c1b910cb21a9d8b2a74b02257e8321e41b73b5b307fa",
+    "apps/web/src/workspace/projects/projects-list-surface.tsx": "738c983a58ffdbca459e92c390d41b0347418d6af6ef610944f52299ed76afc3",
+    "apps/web/src/workspace/project-detail/project-detail-surface.tsx": "9472b7aa67624002d080975adad6135c1ba546b345fbb8c95183a31a407adec2",
+    "apps/web/src/delivery/overview/overview-surface.tsx": "9c9648fefb7bbcce39964f10569bebd63411f50fbb814863227c2b22fabddad5",
+    "apps/web/src/delivery/overview/overview-status.ts": "e18e69953edce9dfc684b4b95a4d3efcec3705772b95df930677cf03b06a1d9c",
+    "apps/web/src/delivery/lib/project-chrome.ts": "a1d6abd72d8bcffc42c834f53b06a28db69562d9f10e8b5f501986814672404b",
+    "apps/web/src/delivery/lib/use-planning.ts": "0c0d136c1c3a33af6c332a933dda14dccd420718b294262f7ca809fa35fb8830",
+    "apps/web/src/lib/domain-client.ts": "dfbb6b2d95e53bdc03b00eab184a58d1e9c50f5292a160878297f5afe4864254"
+  },
+  "sourceStateAtEnd": {
+    "e2e/full-eval/projects-shell-overview-closeout.spec.ts": "d0f6a2c853416dc7754406cd81ad01636831d4685f92596f929eb08cb4a01780",
+    "apps/web/src/delivery/ui/workspace-shell.tsx": "694ae555ca374d7377b9a167a240c3b17e6d8d273a4a4f5575601e94d83676c8",
+    "apps/web/src/delivery/ui/global-search.tsx": "97d350cfc883681be6a6037cb4271eba9ac8c5485ed7f6c7f912d07784755b22",
+    "apps/web/src/delivery/ui/delivery-frame.tsx": "8881b62bb6c01edb0877c1b910cb21a9d8b2a74b02257e8321e41b73b5b307fa",
+    "apps/web/src/workspace/projects/projects-list-surface.tsx": "738c983a58ffdbca459e92c390d41b0347418d6af6ef610944f52299ed76afc3",
+    "apps/web/src/workspace/project-detail/project-detail-surface.tsx": "9472b7aa67624002d080975adad6135c1ba546b345fbb8c95183a31a407adec2",
+    "apps/web/src/delivery/overview/overview-surface.tsx": "9c9648fefb7bbcce39964f10569bebd63411f50fbb814863227c2b22fabddad5",
+    "apps/web/src/delivery/overview/overview-status.ts": "e18e69953edce9dfc684b4b95a4d3efcec3705772b95df930677cf03b06a1d9c",
+    "apps/web/src/delivery/lib/project-chrome.ts": "a1d6abd72d8bcffc42c834f53b06a28db69562d9f10e8b5f501986814672404b",
+    "apps/web/src/delivery/lib/use-planning.ts": "0c0d136c1c3a33af6c332a933dda14dccd420718b294262f7ca809fa35fb8830",
+    "apps/web/src/lib/domain-client.ts": "dfbb6b2d95e53bdc03b00eab184a58d1e9c50f5292a160878297f5afe4864254"
+  },
+  "rows": [
+    {
+      "scenarioId": "PROJ-001",
+      "role": "admin",
+      "bundle": "P01",
+      "key": "PROJ-001:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:22:46.694Z",
+      "assertions": [
+        "Compared the exact visible sidebar href set with the authenticated role",
+        "Clicked every visible sidebar link and verified destination plus browser Back",
+        "Confirmed resourceReader has no inaccessible project navigation"
+      ],
+      "screenshots": [
+        "proj-001-admin-role-aware-links.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-001",
+      "role": "planReader",
+      "bundle": "P01",
+      "key": "PROJ-001:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:22:56.766Z",
+      "assertions": [
+        "Compared the exact visible sidebar href set with the authenticated role",
+        "Clicked every visible sidebar link and verified destination plus browser Back",
+        "Confirmed resourceReader has no inaccessible project navigation"
+      ],
+      "screenshots": [
+        "proj-001-planReader-role-aware-links.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-001",
+      "role": "resourceReader",
+      "bundle": "P01",
+      "key": "PROJ-001:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:04.843Z",
+      "assertions": [
+        "Compared the exact visible sidebar href set with the authenticated role",
+        "Clicked every visible sidebar link and verified destination plus browser Back",
+        "Confirmed resourceReader has no inaccessible project navigation"
+      ],
+      "screenshots": [
+        "proj-001-resourceReader-role-aware-links.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-002",
+      "role": "admin",
+      "bundle": "P01",
+      "key": "PROJ-002:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:22:47.622Z",
+      "assertions": [
+        "Search returned the live project and Enter navigated to the API-provided route",
+        "The global search combobox was enabled and keyboard-operable"
+      ],
+      "screenshots": [
+        "proj-002-admin-live-result.png",
+        "proj-002-admin-keyboard-navigation.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-002",
+      "role": "planReader",
+      "bundle": "P01",
+      "key": "PROJ-002:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:22:57.689Z",
+      "assertions": [
+        "Search returned the live project and Enter navigated to the API-provided route",
+        "The global search combobox was enabled and keyboard-operable"
+      ],
+      "screenshots": [
+        "proj-002-planReader-live-result.png",
+        "proj-002-planReader-keyboard-navigation.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-002",
+      "role": "resourceReader",
+      "bundle": "P01",
+      "key": "PROJ-002:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:05.246Z",
+      "assertions": [
+        "Search returned 200 with ACL-filtered empty results, an explicit no-matches state, and no project route leak",
+        "The global search combobox was enabled and keyboard-operable"
+      ],
+      "screenshots": [
+        "proj-002-resourceReader-acl-filtered-no-leak.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-003",
+      "role": "admin",
+      "bundle": "P01",
+      "key": "PROJ-003:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:22:54.316Z",
+      "assertions": [
+        "User-menu title and body matched GET /api/auth/me",
+        "Profile and Settings were canonical menu links",
+        "Logout ended the session and redirected to /login"
+      ],
+      "screenshots": [
+        "proj-003-admin-live-user-menu.png",
+        "proj-003-admin-logout-redirect.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-003",
+      "role": "planReader",
+      "bundle": "P01",
+      "key": "PROJ-003:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:03.347Z",
+      "assertions": [
+        "User-menu title and body matched GET /api/auth/me",
+        "Profile and Settings were canonical menu links",
+        "Logout ended the session and redirected to /login"
+      ],
+      "screenshots": [
+        "proj-003-planReader-live-user-menu.png",
+        "proj-003-planReader-logout-redirect.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-003",
+      "role": "resourceReader",
+      "bundle": "P01",
+      "key": "PROJ-003:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:09.312Z",
+      "assertions": [
+        "User-menu title and body matched GET /api/auth/me",
+        "Profile and Settings were canonical menu links",
+        "Logout ended the session and redirected to /login"
+      ],
+      "screenshots": [
+        "proj-003-resourceReader-live-user-menu.png",
+        "proj-003-resourceReader-logout-redirect.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-004",
+      "role": "admin",
+      "bundle": "P01",
+      "key": "PROJ-004:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:22:53.585Z",
+      "assertions": [
+        "Visited all nine project-specific routes and compared the complete tab href set",
+        "Verified exactly one aria-current tab on every route",
+        "Dismissed staged-leave confirmation, then accepted it and proved no planning version write"
+      ],
+      "screenshots": [
+        "proj-004-admin-route-overview.png",
+        "proj-004-admin-route-schedule.png",
+        "proj-004-admin-route-resources.png",
+        "proj-004-admin-route-assignments.png",
+        "proj-004-admin-route-calendars.png",
+        "proj-004-admin-route-scenarios.png",
+        "proj-004-admin-route-baseline.png",
+        "proj-004-admin-route-commits.png",
+        "proj-004-admin-route-settings.png",
+        "proj-004-admin-staged-before-leave.png",
+        "proj-004-admin-cancel-keeps-staged.png",
+        "proj-004-admin-leave-discards-without-write.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-004",
+      "role": "planReader",
+      "bundle": "P01",
+      "key": "PROJ-004:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:02.578Z",
+      "assertions": [
+        "Visited all nine project-specific routes and compared the complete tab href set",
+        "Verified exactly one aria-current tab on every route",
+        "Verified the read-only role exposes no batch staging control"
+      ],
+      "screenshots": [
+        "proj-004-planReader-route-overview.png",
+        "proj-004-planReader-route-schedule.png",
+        "proj-004-planReader-route-resources.png",
+        "proj-004-planReader-route-assignments.png",
+        "proj-004-planReader-route-calendars.png",
+        "proj-004-planReader-route-scenarios.png",
+        "proj-004-planReader-route-baseline.png",
+        "proj-004-planReader-route-commits.png",
+        "proj-004-planReader-route-settings.png",
+        "proj-004-planReader-read-only-no-staging.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-004",
+      "role": "resourceReader",
+      "bundle": "P01",
+      "key": "PROJ-004:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:08.765Z",
+      "assertions": [
+        "Visited all nine project-specific routes and compared the complete tab href set",
+        "Verified exactly one aria-current tab on every route",
+        "Verified the read-only role exposes no batch staging control"
+      ],
+      "screenshots": [
+        "proj-004-resourceReader-route-overview.png",
+        "proj-004-resourceReader-route-schedule.png",
+        "proj-004-resourceReader-route-resources.png",
+        "proj-004-resourceReader-route-assignments.png",
+        "proj-004-resourceReader-route-calendars.png",
+        "proj-004-resourceReader-route-scenarios.png",
+        "proj-004-resourceReader-route-baseline.png",
+        "proj-004-resourceReader-route-commits.png",
+        "proj-004-resourceReader-route-settings.png",
+        "proj-004-resourceReader-read-only-no-staging.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-005",
+      "role": "admin",
+      "bundle": "P01",
+      "key": "PROJ-005:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:22:53.588Z",
+      "assertions": [
+        "Visited all nine routes and verified live title, status, and plan version",
+        "Captured route-specific header evidence for every delivery surface"
+      ],
+      "screenshots": [
+        "proj-005-admin-route-overview.png",
+        "proj-005-admin-route-schedule.png",
+        "proj-005-admin-route-resources.png",
+        "proj-005-admin-route-assignments.png",
+        "proj-005-admin-route-calendars.png",
+        "proj-005-admin-route-scenarios.png",
+        "proj-005-admin-route-baseline.png",
+        "proj-005-admin-route-commits.png",
+        "proj-005-admin-route-settings.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-005",
+      "role": "planReader",
+      "bundle": "P01",
+      "key": "PROJ-005:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:02.584Z",
+      "assertions": [
+        "Visited all nine routes and verified live title, status, and plan version",
+        "Captured route-specific header evidence for every delivery surface"
+      ],
+      "screenshots": [
+        "proj-005-planReader-route-overview.png",
+        "proj-005-planReader-route-schedule.png",
+        "proj-005-planReader-route-resources.png",
+        "proj-005-planReader-route-assignments.png",
+        "proj-005-planReader-route-calendars.png",
+        "proj-005-planReader-route-scenarios.png",
+        "proj-005-planReader-route-baseline.png",
+        "proj-005-planReader-route-commits.png",
+        "proj-005-planReader-route-settings.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-005",
+      "role": "resourceReader",
+      "bundle": "P01",
+      "key": "PROJ-005:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:08.770Z",
+      "assertions": [
+        "Visited all nine routes and verified no requested project identity leaked through forbidden states",
+        "Captured route-specific header evidence for every delivery surface"
+      ],
+      "screenshots": [
+        "proj-005-resourceReader-route-overview.png",
+        "proj-005-resourceReader-route-schedule.png",
+        "proj-005-resourceReader-route-resources.png",
+        "proj-005-resourceReader-route-assignments.png",
+        "proj-005-resourceReader-route-calendars.png",
+        "proj-005-resourceReader-route-scenarios.png",
+        "proj-005-resourceReader-route-baseline.png",
+        "proj-005-resourceReader-route-commits.png",
+        "proj-005-resourceReader-route-settings.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-006",
+      "role": "admin",
+      "bundle": "P01",
+      "key": "PROJ-006:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:22:53.893Z",
+      "assertions": [
+        "The live project chrome contained no hard-coded saved indicator"
+      ],
+      "screenshots": [
+        "proj-006-admin-fake-saved-absent.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-006",
+      "role": "planReader",
+      "bundle": "P01",
+      "key": "PROJ-006:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:02.981Z",
+      "assertions": [
+        "The live project chrome contained no hard-coded saved indicator"
+      ],
+      "screenshots": [
+        "proj-006-planReader-fake-saved-absent.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-006",
+      "role": "resourceReader",
+      "bundle": "P01",
+      "key": "PROJ-006:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:08.978Z",
+      "assertions": [
+        "The live project chrome contained no hard-coded saved indicator"
+      ],
+      "screenshots": [
+        "proj-006-resourceReader-fake-saved-absent.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-007",
+      "role": "admin",
+      "bundle": "P01",
+      "key": "PROJ-007:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:22:54.024Z",
+      "assertions": [
+        "Prototype and in-memory disclaimers were absent from the live route after all route traversal"
+      ],
+      "screenshots": [
+        "proj-007-admin-live-copy.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-007",
+      "role": "planReader",
+      "bundle": "P01",
+      "key": "PROJ-007:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:03.078Z",
+      "assertions": [
+        "Prototype and in-memory disclaimers were absent from the live route after all route traversal"
+      ],
+      "screenshots": [
+        "proj-007-planReader-live-copy.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-007",
+      "role": "resourceReader",
+      "bundle": "P01",
+      "key": "PROJ-007:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:09.032Z",
+      "assertions": [
+        "Prototype and in-memory disclaimers were absent from the live route after all route traversal"
+      ],
+      "screenshots": [
+        "proj-007-resourceReader-live-copy.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-008",
+      "role": "admin",
+      "bundle": "P02",
+      "key": "PROJ-008:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:10.787Z",
+      "assertions": [
+        "Captured the loading surface while the real projects fetch was deliberately delayed",
+        "The loading label disappeared only after the live response resolved"
+      ],
+      "screenshots": [
+        "proj-008-admin-delayed-live-request.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-008",
+      "role": "planReader",
+      "bundle": "P02",
+      "key": "PROJ-008:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:14.899Z",
+      "assertions": [
+        "Captured the loading surface while the real projects fetch was deliberately delayed",
+        "The loading label disappeared only after the live response resolved"
+      ],
+      "screenshots": [
+        "proj-008-planReader-delayed-live-request.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-009",
+      "role": "admin",
+      "bundle": "P02",
+      "key": "PROJ-009:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:12.705Z",
+      "assertions": [
+        "Compared every live row field and format with GET /api/workspace/projects",
+        "Verified zero money/hours, invalid-date passthrough, empty demand, and unknown-directory fallback state"
+      ],
+      "screenshots": [
+        "proj-009-admin-live-api-readback.png",
+        "proj-009-admin-zero-invalid-date-empty-demand.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-009",
+      "role": "planReader",
+      "bundle": "P02",
+      "key": "PROJ-009:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:16.759Z",
+      "assertions": [
+        "Compared every live row field and format with GET /api/workspace/projects",
+        "Verified zero money/hours, invalid-date passthrough, empty demand, and unknown-directory fallback state"
+      ],
+      "screenshots": [
+        "proj-009-planReader-live-api-readback.png",
+        "proj-009-planReader-zero-invalid-date-empty-demand.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-010",
+      "role": "admin",
+      "bundle": "P02",
+      "key": "PROJ-010:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:11.058Z",
+      "assertions": [
+        "The live API returned only active projects",
+        "The unsupported All filter was absent and the surface explicitly stated active-project scope"
+      ],
+      "screenshots": [
+        "proj-010-admin-active-only-honest-scope.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-010",
+      "role": "planReader",
+      "bundle": "P02",
+      "key": "PROJ-010:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:15.158Z",
+      "assertions": [
+        "The live API returned only active projects",
+        "The unsupported All filter was absent and the surface explicitly stated active-project scope"
+      ],
+      "screenshots": [
+        "proj-010-planReader-active-only-honest-scope.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-011",
+      "role": "admin",
+      "bundle": "P02",
+      "key": "PROJ-011:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:11.901Z",
+      "assertions": [
+        "Every live project title was an A element with its canonical detail href",
+        "Clicked a project title, verified the final URL, and restored the list with browser Back"
+      ],
+      "screenshots": [
+        "proj-011-admin-native-link-destination.png",
+        "proj-011-admin-browser-back-readback.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-011",
+      "role": "planReader",
+      "bundle": "P02",
+      "key": "PROJ-011:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:15.978Z",
+      "assertions": [
+        "Every live project title was an A element with its canonical detail href",
+        "Clicked a project title, verified the final URL, and restored the list with browser Back"
+      ],
+      "screenshots": [
+        "proj-011-planReader-native-link-destination.png",
+        "proj-011-planReader-browser-back-readback.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-012",
+      "role": "admin",
+      "bundle": "P02",
+      "key": "PROJ-012:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:13.472Z",
+      "assertions": [
+        "A true empty active-project response rendered the explicit empty state",
+        "The empty state exposed a real CRM link and no false project-detail links"
+      ],
+      "screenshots": [
+        "proj-012-admin-true-empty-response.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-012",
+      "role": "planReader",
+      "bundle": "P02",
+      "key": "PROJ-012:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:17.522Z",
+      "assertions": [
+        "A true empty active-project response rendered the explicit empty state",
+        "The empty state exposed a real CRM link and no false project-detail links"
+      ],
+      "screenshots": [
+        "proj-012-planReader-true-empty-response.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-013",
+      "role": "admin",
+      "bundle": "P03",
+      "key": "PROJ-013:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:19.211Z",
+      "assertions": [
+        "Forced and observed HTTP 500, network failure, and malformed successful JSON as distinct RU error states",
+        "Each Retry reached the live backend and restored project rows",
+        "Captured every error and post-Retry state separately"
+      ],
+      "screenshots": [
+        "proj-013-admin-http-error.png",
+        "proj-013-admin-http-retry-live.png",
+        "proj-013-admin-network-error.png",
+        "proj-013-admin-network-retry-live.png",
+        "proj-013-admin-json-error.png",
+        "proj-013-admin-json-retry-live.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-013",
+      "role": "planReader",
+      "bundle": "P03",
+      "key": "PROJ-013:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:20.819Z",
+      "assertions": [
+        "Forced and observed HTTP 500, network failure, and malformed successful JSON as distinct RU error states",
+        "Each Retry reached the live backend and restored project rows",
+        "Captured every error and post-Retry state separately"
+      ],
+      "screenshots": [
+        "proj-013-planReader-http-error.png",
+        "proj-013-planReader-http-retry-live.png",
+        "proj-013-planReader-network-error.png",
+        "proj-013-planReader-network-retry-live.png",
+        "proj-013-planReader-json-error.png",
+        "proj-013-planReader-json-retry-live.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-013",
+      "role": "resourceReader",
+      "bundle": "P03",
+      "key": "PROJ-013:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:22.474Z",
+      "assertions": [
+        "Forced and observed HTTP 500, network failure, and malformed successful JSON as distinct RU error states",
+        "Each Retry reached the live backend and settled into the role-correct forbidden state",
+        "Captured every error and post-Retry state separately"
+      ],
+      "screenshots": [
+        "proj-013-resourceReader-http-error.png",
+        "proj-013-resourceReader-http-retry-forbidden.png",
+        "proj-013-resourceReader-network-error.png",
+        "proj-013-resourceReader-network-retry-forbidden.png",
+        "proj-013-resourceReader-json-error.png",
+        "proj-013-resourceReader-json-retry-forbidden.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-014",
+      "role": "resourceReader",
+      "bundle": "P03",
+      "key": "PROJ-014:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:22.654Z",
+      "assertions": [
+        "Direct projects API returned 403 for resourceReader",
+        "The UI rendered a human-readable forbidden state, stopped loading, and leaked no project identity"
+      ],
+      "screenshots": [
+        "proj-014-resourceReader-live-403-no-leak.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-015",
+      "role": "admin",
+      "bundle": "P04",
+      "key": "PROJ-015:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:26.093Z",
+      "assertions": [
+        "Select changed both canonical URL and visible project identity",
+        "Reload, browser Back, and browser Forward preserved URL-to-card agreement"
+      ],
+      "screenshots": [
+        "proj-015-admin-second-project-url-readback.png",
+        "proj-015-admin-reload-readback.png",
+        "proj-015-admin-back-readback.png",
+        "proj-015-admin-forward-readback.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-015",
+      "role": "planReader",
+      "bundle": "P04",
+      "key": "PROJ-015:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:31.262Z",
+      "assertions": [
+        "Select changed both canonical URL and visible project identity",
+        "Reload, browser Back, and browser Forward preserved URL-to-card agreement"
+      ],
+      "screenshots": [
+        "proj-015-planReader-second-project-url-readback.png",
+        "proj-015-planReader-reload-readback.png",
+        "proj-015-planReader-back-readback.png",
+        "proj-015-planReader-forward-readback.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-016",
+      "role": "admin",
+      "bundle": "P04",
+      "key": "PROJ-016:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:26.596Z",
+      "assertions": [
+        "Direct API returned project_not_found and the UI preserved the unknown ID",
+        "Reload kept the exact URL and explicit not-found state without substituting another project"
+      ],
+      "screenshots": [
+        "proj-016-admin-live-404.png",
+        "proj-016-admin-reload-stays-404.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-016",
+      "role": "planReader",
+      "bundle": "P04",
+      "key": "PROJ-016:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:31.778Z",
+      "assertions": [
+        "Direct API returned project_not_found and the UI preserved the unknown ID",
+        "Reload kept the exact URL and explicit not-found state without substituting another project"
+      ],
+      "screenshots": [
+        "proj-016-planReader-live-404.png",
+        "proj-016-planReader-reload-stays-404.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-017",
+      "role": "admin",
+      "bundle": "P04",
+      "key": "PROJ-017:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:24.174Z",
+      "assertions": [
+        "Compared title, client, status, dates, money, planned hours, and task count with the live detail response",
+        "Verified long title/client, absent finish, zero contract value, and zero planned hours"
+      ],
+      "screenshots": [
+        "proj-017-admin-live-header-readback.png",
+        "proj-017-admin-zero-null-long-values.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-017",
+      "role": "planReader",
+      "bundle": "P04",
+      "key": "PROJ-017:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:29.179Z",
+      "assertions": [
+        "Compared title, client, status, dates, money, planned hours, and task count with the live detail response",
+        "Verified long title/client, absent finish, zero contract value, and zero planned hours"
+      ],
+      "screenshots": [
+        "proj-017-planReader-live-header-readback.png",
+        "proj-017-planReader-zero-null-long-values.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-018",
+      "role": "admin",
+      "bundle": "P04",
+      "key": "PROJ-018:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:24.967Z",
+      "assertions": [
+        "Compared exact UI task order with unfinished-first then planned-finish sorting",
+        "Compared status, finish, progress, and acceptance copy for every live task",
+        "Verified nullable owner, unknown status, acceptance marker, and progress clamping to 0..100"
+      ],
+      "screenshots": [
+        "proj-018-admin-live-sorted-task-readback.png",
+        "proj-018-admin-nullable-unknown-clamped.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-018",
+      "role": "planReader",
+      "bundle": "P04",
+      "key": "PROJ-018:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:30.040Z",
+      "assertions": [
+        "Compared exact UI task order with unfinished-first then planned-finish sorting",
+        "Compared status, finish, progress, and acceptance copy for every live task",
+        "Verified nullable owner, unknown status, acceptance marker, and progress clamping to 0..100"
+      ],
+      "screenshots": [
+        "proj-018-planReader-live-sorted-task-readback.png",
+        "proj-018-planReader-nullable-unknown-clamped.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-019",
+      "role": "admin",
+      "bundle": "P04",
+      "key": "PROJ-019:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:26.966Z",
+      "assertions": [
+        "Created a project through opportunity feasibility and activation",
+        "Read back zero tasks from the live detail API and observed the explicit no-tasks state"
+      ],
+      "screenshots": [
+        "proj-019-admin-real-zero-task-project.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-019",
+      "role": "planReader",
+      "bundle": "P04",
+      "key": "PROJ-019:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:32.064Z",
+      "assertions": [
+        "Read the zero-task project created by the preceding admin write flow without claiming a planReader write",
+        "Read back zero tasks from the live detail API and observed the explicit no-tasks state"
+      ],
+      "screenshots": [
+        "proj-019-planReader-real-zero-task-project.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-020",
+      "role": "admin",
+      "bundle": "P04",
+      "key": "PROJ-020:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:27.432Z",
+      "assertions": [
+        "Compared weighted progress, open/done/in-progress counts, planned work, and actual work with live tasks",
+        "Compared every demand position hour/share and total with the live project",
+        "Verified zero planned work produces 0 without NaN and empty demand has explicit copy"
+      ],
+      "screenshots": [
+        "proj-020-admin-live-weighted-volume-demand.png",
+        "proj-020-admin-zero-work-no-nan.png",
+        "proj-020-admin-empty-demand.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-020",
+      "role": "planReader",
+      "bundle": "P04",
+      "key": "PROJ-020:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:32.493Z",
+      "assertions": [
+        "Compared weighted progress, open/done/in-progress counts, planned work, and actual work with live tasks",
+        "Compared every demand position hour/share and total with the live project",
+        "Verified zero planned work produces 0 without NaN and empty demand has explicit copy"
+      ],
+      "screenshots": [
+        "proj-020-planReader-live-weighted-volume-demand.png",
+        "proj-020-planReader-zero-work-no-nan.png",
+        "proj-020-planReader-empty-demand.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-021",
+      "role": "admin",
+      "bundle": "P05",
+      "key": "PROJ-021:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:36.600Z",
+      "assertions": [
+        "Captured loading before each delayed detail response",
+        "Distinguished HTTP, network, malformed JSON, synthetic forbidden, and role-correct Retry outcomes",
+        "Verified a live unknown project remains a canonical 404 state"
+      ],
+      "screenshots": [
+        "proj-021-admin-http-loading.png",
+        "proj-021-admin-http-state.png",
+        "proj-021-admin-http-retry-live.png",
+        "proj-021-admin-network-loading.png",
+        "proj-021-admin-network-state.png",
+        "proj-021-admin-network-retry-live.png",
+        "proj-021-admin-json-loading.png",
+        "proj-021-admin-json-state.png",
+        "proj-021-admin-json-retry-live.png",
+        "proj-021-admin-forbidden-loading.png",
+        "proj-021-admin-forbidden-state.png",
+        "proj-021-admin-live-404.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-021",
+      "role": "planReader",
+      "bundle": "P05",
+      "key": "PROJ-021:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:40.804Z",
+      "assertions": [
+        "Captured loading before each delayed detail response",
+        "Distinguished HTTP, network, malformed JSON, synthetic forbidden, and role-correct Retry outcomes",
+        "Verified a live unknown project remains a canonical 404 state"
+      ],
+      "screenshots": [
+        "proj-021-planReader-http-loading.png",
+        "proj-021-planReader-http-state.png",
+        "proj-021-planReader-http-retry-live.png",
+        "proj-021-planReader-network-loading.png",
+        "proj-021-planReader-network-state.png",
+        "proj-021-planReader-network-retry-live.png",
+        "proj-021-planReader-json-loading.png",
+        "proj-021-planReader-json-state.png",
+        "proj-021-planReader-json-retry-live.png",
+        "proj-021-planReader-forbidden-loading.png",
+        "proj-021-planReader-forbidden-state.png",
+        "proj-021-planReader-live-404.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-021",
+      "role": "resourceReader",
+      "bundle": "P05",
+      "key": "PROJ-021:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:44.762Z",
+      "assertions": [
+        "Captured loading before each delayed detail response",
+        "Distinguished HTTP, network, malformed JSON, synthetic forbidden, and role-correct Retry outcomes",
+        "Verified the live detail API and UI remain forbidden without identity leakage"
+      ],
+      "screenshots": [
+        "proj-021-resourceReader-http-loading.png",
+        "proj-021-resourceReader-http-state.png",
+        "proj-021-resourceReader-http-retry-forbidden.png",
+        "proj-021-resourceReader-network-loading.png",
+        "proj-021-resourceReader-network-state.png",
+        "proj-021-resourceReader-network-retry-forbidden.png",
+        "proj-021-resourceReader-json-loading.png",
+        "proj-021-resourceReader-json-state.png",
+        "proj-021-resourceReader-json-retry-forbidden.png",
+        "proj-021-resourceReader-forbidden-loading.png",
+        "proj-021-resourceReader-forbidden-state.png",
+        "proj-021-resourceReader-live-403.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-022",
+      "role": "resourceReader",
+      "bundle": "P05",
+      "key": "PROJ-022:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:44.955Z",
+      "assertions": [
+        "Direct project detail API returned 403 for resourceReader",
+        "The detail UI rendered forbidden and exposed no project identity"
+      ],
+      "screenshots": [
+        "proj-022-resourceReader-direct-api-and-ui-403.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-023",
+      "role": "admin",
+      "bundle": "P06",
+      "key": "PROJ-023:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:46.753Z",
+      "assertions": [
+        "KPI values matched deterministic read-model calculations: 63%, 15.07 and 3 days late, +3 baseline days, 2 unique day-overload resources, 3 risks",
+        "Zero/null model rendered 0%, no finish, no deadline, zero baseline delta, zero overloads and zero risks without NaN"
+      ],
+      "screenshots": [
+        "proj-023-admin-five-exact-kpis.png",
+        "proj-023-admin-zero-nullable.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-023",
+      "role": "planReader",
+      "bundle": "P06",
+      "key": "PROJ-023:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:58.768Z",
+      "assertions": [
+        "KPI values matched deterministic read-model calculations: 63%, 15.07 and 3 days late, +3 baseline days, 2 unique day-overload resources, 3 risks",
+        "Zero/null model rendered 0%, no finish, no deadline, zero baseline delta, zero overloads and zero risks without NaN"
+      ],
+      "screenshots": [
+        "proj-023-planReader-five-exact-kpis.png",
+        "proj-023-planReader-zero-nullable.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-024",
+      "role": "admin",
+      "bundle": "P06",
+      "key": "PROJ-024:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:47.638Z",
+      "assertions": [
+        "Signal titles matched the exact five derived conditions in deadline, overload, baseline, overdue, critical order",
+        "Signal details matched boundary dates, overload-day count, and zero-slack semantics",
+        "An all-done critical task produced the honest no-signal state"
+      ],
+      "screenshots": [
+        "proj-024-admin-all-five-ordered.png",
+        "proj-024-admin-all-done-empty.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-024",
+      "role": "planReader",
+      "bundle": "P06",
+      "key": "PROJ-024:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:59.629Z",
+      "assertions": [
+        "Signal titles matched the exact five derived conditions in deadline, overload, baseline, overdue, critical order",
+        "Signal details matched boundary dates, overload-day count, and zero-slack semantics",
+        "An all-done critical task produced the honest no-signal state"
+      ],
+      "screenshots": [
+        "proj-024-planReader-all-five-ordered.png",
+        "proj-024-planReader-all-done-empty.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-025",
+      "role": "admin",
+      "bundle": "P06",
+      "key": "PROJ-025:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:50.807Z",
+      "assertions": [
+        "Открыть График -> /projects/project-vektor-portal/schedule -> Back restored Финиш за дедлайном: +3 дн.",
+        "Открыть Сценарии -> /projects/project-vektor-portal/scenarios -> Back restored Перегруз ресурсов: 2",
+        "Открыть Baseline -> /projects/project-vektor-portal/baseline -> Back restored Финиш сдвинут +5 дн от базового плана",
+        "Открыть График -> /projects/project-vektor-portal/schedule -> Back restored Просрочено задач: 1",
+        "Показать путь -> /projects/project-vektor-portal/schedule -> Back restored На критическом пути: 1 задача"
+      ],
+      "screenshots": [
+        "proj-025-admin-cta-1-destination.png",
+        "proj-025-admin-cta-1-back.png",
+        "proj-025-admin-cta-2-destination.png",
+        "proj-025-admin-cta-2-back.png",
+        "proj-025-admin-cta-3-destination.png",
+        "proj-025-admin-cta-3-back.png",
+        "proj-025-admin-cta-4-destination.png",
+        "proj-025-admin-cta-4-back.png",
+        "proj-025-admin-cta-5-destination.png",
+        "proj-025-admin-cta-5-back.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-025",
+      "role": "planReader",
+      "bundle": "P06",
+      "key": "PROJ-025:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:24:02.525Z",
+      "assertions": [
+        "Открыть График -> /projects/project-vektor-portal/schedule -> Back restored Финиш за дедлайном: +3 дн.",
+        "Открыть Сценарии -> /projects/project-vektor-portal/scenarios -> Back restored Перегруз ресурсов: 2",
+        "Открыть Baseline -> /projects/project-vektor-portal/baseline -> Back restored Финиш сдвинут +5 дн от базового плана",
+        "Открыть График -> /projects/project-vektor-portal/schedule -> Back restored Просрочено задач: 1",
+        "Показать путь -> /projects/project-vektor-portal/schedule -> Back restored На критическом пути: 1 задача"
+      ],
+      "screenshots": [
+        "proj-025-planReader-cta-1-destination.png",
+        "proj-025-planReader-cta-1-back.png",
+        "proj-025-planReader-cta-2-destination.png",
+        "proj-025-planReader-cta-2-back.png",
+        "proj-025-planReader-cta-3-destination.png",
+        "proj-025-planReader-cta-3-back.png",
+        "proj-025-planReader-cta-4-destination.png",
+        "proj-025-planReader-cta-4-back.png",
+        "proj-025-planReader-cta-5-destination.png",
+        "proj-025-planReader-cta-5-back.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-026",
+      "role": "admin",
+      "bundle": "P06",
+      "key": "PROJ-026:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:51.618Z",
+      "assertions": [
+        "Milestones, deadline, planned-date fallback, no-date row, and done semantics matched exact chronological order",
+        "No milestones and no deadline rendered the explicit empty copy"
+      ],
+      "screenshots": [
+        "proj-026-admin-ordered-done-fallback.png",
+        "proj-026-admin-explicit-empty.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-026",
+      "role": "planReader",
+      "bundle": "P06",
+      "key": "PROJ-026:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:24:03.312Z",
+      "assertions": [
+        "Milestones, deadline, planned-date fallback, no-date row, and done semantics matched exact chronological order",
+        "No milestones and no deadline rendered the explicit empty copy"
+      ],
+      "screenshots": [
+        "proj-026-planReader-ordered-done-fallback.png",
+        "proj-026-planReader-explicit-empty.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-027",
+      "role": "admin",
+      "bundle": "P06",
+      "key": "PROJ-027:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:52.538Z",
+      "assertions": [
+        "Verified exact critical-first then finish-date order, top-five cap, done exclusion, avatar fallback, and planned-finish display fallback",
+        "All-done model rendered one explicit empty row and no task rows"
+      ],
+      "screenshots": [
+        "proj-027-admin-ordered-cap-done-excluded.png",
+        "proj-027-admin-all-done-empty.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-027",
+      "role": "planReader",
+      "bundle": "P06",
+      "key": "PROJ-027:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:24:04.191Z",
+      "assertions": [
+        "Verified exact critical-first then finish-date order, top-five cap, done exclusion, avatar fallback, and planned-finish display fallback",
+        "All-done model rendered one explicit empty row and no task rows"
+      ],
+      "screenshots": [
+        "proj-027-planReader-ordered-cap-done-excluded.png",
+        "proj-027-planReader-all-done-empty.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-028",
+      "role": "admin",
+      "bundle": "P06",
+      "key": "PROJ-028:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:55.538Z",
+      "assertions": [
+        "Captured distinct loading, four-item ready, true-empty, forbidden, and error commit states",
+        "Filtered out non-planning and fifth planning events while preserving descending versions",
+        "The All link navigated to canonical Commits and browser Back restored ready Overview"
+      ],
+      "screenshots": [
+        "proj-028-admin-loading.png",
+        "proj-028-admin-ready-four.png",
+        "proj-028-admin-true-empty.png",
+        "proj-028-admin-forbidden.png",
+        "proj-028-admin-error.png",
+        "proj-028-admin-commits-destination.png",
+        "proj-028-admin-back-ready.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-028",
+      "role": "planReader",
+      "bundle": "P06",
+      "key": "PROJ-028:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:24:07.248Z",
+      "assertions": [
+        "Captured distinct loading, four-item ready, true-empty, forbidden, and error commit states",
+        "Filtered out non-planning and fifth planning events while preserving descending versions",
+        "The All link navigated to canonical Commits and browser Back restored ready Overview"
+      ],
+      "screenshots": [
+        "proj-028-planReader-loading.png",
+        "proj-028-planReader-ready-four.png",
+        "proj-028-planReader-true-empty.png",
+        "proj-028-planReader-forbidden.png",
+        "proj-028-planReader-error.png",
+        "proj-028-planReader-commits-destination.png",
+        "proj-028-planReader-back-ready.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-029",
+      "role": "admin",
+      "bundle": "P06",
+      "key": "PROJ-029:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:23:56.421Z",
+      "assertions": [
+        "At 2026-07-11 exactly two open effective finishes were overdue; boundary-today, future, done, and null were excluded",
+        "Moving current time to 2026-07-13 changed the same model to four overdue tasks and updated the visible boundary date",
+        "The removed fixed 23.06.2026 date was absent"
+      ],
+      "screenshots": [
+        "proj-029-admin-current-date-2026-07-11.png",
+        "proj-029-admin-current-date-2026-07-13.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-029",
+      "role": "planReader",
+      "bundle": "P06",
+      "key": "PROJ-029:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:24:08.120Z",
+      "assertions": [
+        "At 2026-07-11 exactly two open effective finishes were overdue; boundary-today, future, done, and null were excluded",
+        "Moving current time to 2026-07-13 changed the same model to four overdue tasks and updated the visible boundary date",
+        "The removed fixed 23.06.2026 date was absent"
+      ],
+      "screenshots": [
+        "proj-029-planReader-current-date-2026-07-11.png",
+        "proj-029-planReader-current-date-2026-07-13.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-030",
+      "role": "admin",
+      "bundle": "P07",
+      "key": "PROJ-030:admin",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:24:11.620Z",
+      "assertions": [
+        "Held an intercepted read-model request and captured loading before any KPI content",
+        "Observed distinct server and network errors with Retry controls",
+        "Retry issued exactly two requests for the same project and reached ready KPI content",
+        "Synthetic 404 preserved the missing project URL without identity leakage",
+        "Synthetic 403 mapped to the dedicated forbidden surface without Retry"
+      ],
+      "screenshots": [
+        "proj-030-admin-loading.png",
+        "proj-030-admin-500-error.png",
+        "proj-030-admin-network-error.png",
+        "proj-030-admin-retry-ready.png",
+        "proj-030-admin-404-no-leak.png",
+        "proj-030-admin-403-forbidden.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-030",
+      "role": "planReader",
+      "bundle": "P07",
+      "key": "PROJ-030:planReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:24:14.691Z",
+      "assertions": [
+        "Held an intercepted read-model request and captured loading before any KPI content",
+        "Observed distinct server and network errors with Retry controls",
+        "Retry issued exactly two requests for the same project and reached ready KPI content",
+        "Synthetic 404 preserved the missing project URL without identity leakage",
+        "Synthetic 403 mapped to the dedicated forbidden surface without Retry"
+      ],
+      "screenshots": [
+        "proj-030-planReader-loading.png",
+        "proj-030-planReader-500-error.png",
+        "proj-030-planReader-network-error.png",
+        "proj-030-planReader-retry-ready.png",
+        "proj-030-planReader-404-no-leak.png",
+        "proj-030-planReader-403-forbidden.png"
+      ]
+    },
+    {
+      "scenarioId": "PROJ-030",
+      "role": "resourceReader",
+      "bundle": "P07",
+      "key": "PROJ-030:resourceReader",
+      "status": "pass",
+      "runId": "project-shell-overview-20260711-literal-final3",
+      "generatedAt": "2026-07-10T20:24:17.673Z",
+      "assertions": [
+        "Held an intercepted read-model request and captured loading before any KPI content",
+        "Observed distinct server and network errors with Retry controls",
+        "Retry issued exactly two requests for the same project and reached ready KPI content",
+        "Synthetic 404 preserved the missing project URL without identity leakage",
+        "Direct live API and synthetic state both proved 403 without project identity leakage"
+      ],
+      "screenshots": [
+        "proj-030-resourceReader-loading.png",
+        "proj-030-resourceReader-500-error.png",
+        "proj-030-resourceReader-network-error.png",
+        "proj-030-resourceReader-retry-ready.png",
+        "proj-030-resourceReader-404-no-leak.png",
+        "proj-030-resourceReader-403-forbidden.png"
+      ]
+    }
+  ]
+}

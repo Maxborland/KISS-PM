@@ -50,13 +50,14 @@ const ddmmyyyy = (iso: string | null) => {
 
 // RU-маппер кодов проекта/задач (боевые коды projectWorkRoutes) — для SurfaceState.errorFormat.
 const ERR_RU: Record<string, string> = {
+  invalid_json_response: "Некорректный ответ сервера",
   permission_missing: "Недостаточно прав для просмотра этого раздела",
   invalid_project_id: "Некорректный идентификатор проекта",
   project_not_found: "Проект не найден или неактивен",
   load_failed: "Не удалось загрузить данные",
   request_failed: "Запрос не выполнен"
 };
-const wsErr = (code?: string) => (code && ERR_RU[code]) || code || "Неизвестная ошибка";
+export const projectDetailErrorMessage = (code?: string) => (code && ERR_RU[code]) || (code ? "Запрос не выполнен" : "Неизвестная ошибка");
 
 // Статус проекта → tone чипа (проект «active» — основной кейс мока).
 const PROJECT_STATUS_LABEL: Record<string, string> = { active: "В работе", closed: "Закрыт", draft: "Черновик" };
@@ -133,7 +134,7 @@ export function ProjectDetailSurface({ initialProjectId }: { initialProjectId?: 
           status={surfaceStatus}
           error={error}
           onRetry={() => void reload()}
-          errorFormat={wsErr}
+          errorFormat={projectDetailErrorMessage}
           loadingLabel="Загружаем карточку проекта…"
           empty={{
             title: "Проект не найден",
@@ -321,7 +322,7 @@ function ProjectTasks({ tasks }: { tasks: TaskRecord[] }) {
               <td className="px-3 py-2">
                 <div className="flex items-center gap-2">
                   <ProgressBar value={t.progress} />
-                  <span className="v4-num w-9 shrink-0 text-right text-[length:var(--text-xs)] text-[var(--muted)]">{t.progress}%</span>
+                  <span className="v4-num w-9 shrink-0 text-right text-[length:var(--text-xs)] text-[var(--muted)]">{Math.min(100, Math.max(0, t.progress))}%</span>
                 </div>
               </td>
             </tr>

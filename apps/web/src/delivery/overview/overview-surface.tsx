@@ -30,6 +30,8 @@ const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Dat
 const ddmmyyyy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
 
+const taskNoun = (count: number) => count % 10 === 1 && count % 100 !== 11 ? "задача" : count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14) ? "задачи" : "задач";
+
 type CommitsState =
   | { status: "loading"; commits: CommitMetaView[] }
   | { status: "ready"; commits: CommitMetaView[] }
@@ -130,7 +132,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     const fin = model.calcById.get(t.id)?.calculatedFinish ?? t.plannedFinish;
     return isPlanItemOverdue(fin, todayIso);
   });
-  const critNoSlack = model.leaves.filter((t) => { const c = model.calcById.get(t.id); return c?.isCritical && (c.totalSlackMinutes ?? 0) <= 0; });
+  const critNoSlack = model.leaves.filter((t) => { const c = model.calcById.get(t.id); return !isOverviewDoneStatus(t.statusId) && c?.isCritical && (c.totalSlackMinutes ?? 0) <= 0; });
 
   const signals: Array<{ tone: "danger" | "warning" | "info"; icon: typeof Zap; title: string; detail: string; action: string; href: string }> = [];
   // срыв дедлайна — самый критичный выводимый из плана факт, ведёт список
@@ -138,7 +140,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   if (overloadResources.length > 0) signals.push({ tone: "danger", icon: Zap, title: `Перегруз ресурсов: ${overloadResources.length}`, detail: `${overloadResources.map(resName).join(", ")} · ${model.overloads.length} дн с превышением`, action: "Открыть Сценарии", href: `/projects/${projectId}/scenarios` });
   if (projDelta > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Финиш сдвинут +${projDelta} дн от базового плана`, detail: `текущий ${ddmm(model.projectFinish)} · базовый ${ddmm(baseFinishDay ? model.bc.find((t) => t.baselineFinish && isoToDay(t.baselineFinish) === baseFinishDay)?.baselineFinish ?? null : null)}`, action: "Открыть Baseline", href: `/projects/${projectId}/baseline` });
   if (overdue.length > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Просрочено задач: ${overdue.length}`, detail: `срок раньше ${ddmmyyyy(todayIso)}, не закрыты`, action: "Открыть График", href: `/projects/${projectId}/schedule` });
-  if (critNoSlack.length > 0) signals.push({ tone: "info", icon: TrendingUp, title: `На критическом пути: ${critNoSlack.length} задач`, detail: "резерв 0 дн — сдвиг тянет дедлайн", action: "Показать путь", href: `/projects/${projectId}/schedule` });
+  if (critNoSlack.length > 0) signals.push({ tone: "info", icon: TrendingUp, title: `На критическом пути: ${critNoSlack.length} ${taskNoun(critNoSlack.length)}`, detail: "резерв 0 дн — сдвиг тянет дедлайн", action: "Показать путь", href: `/projects/${projectId}/schedule` });
 
   // вехи: milestone-задачи + внешний дедлайн, по дате
   const milestoneRows = [
@@ -204,6 +206,11 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         {/* Контрольные точки */}
         <BentoCard span={4} title="Контрольные точки" subtitle="Вехи и дедлайн проекта" flush>
           <ul className="py-1">
+            {milestoneRows.length === 0 ? (
+              <li className="px-4 py-8 text-center text-[length:var(--text-sm)] text-[var(--muted)]">
+                Контрольных точек пока нет.
+              </li>
+            ) : null}
             {milestoneRows.map((m) => (
               <li key={m.key} className="v4-row flex items-center gap-3 px-4 py-2.5">
                 <Flag className={cn("size-4 shrink-0", m.done ? "text-[var(--success)]" : "text-[var(--muted-soft)]")} aria-hidden />
@@ -221,6 +228,13 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         <BentoCard span={7} title="Ключевые задачи" subtitle="Критический путь и ближайшие сроки" flush>
           <table className="w-full border-collapse text-[length:var(--text-sm)]">
             <tbody>
+              {keyTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-[length:var(--text-sm)] text-[var(--muted)]">
+                    Открытых ключевых задач нет.
+                  </td>
+                </tr>
+              ) : null}
               {keyTasks.map((row, i) => (
                 <tr key={row.t.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
                   <td className="v4-mono py-2.5 pl-4 pr-2 align-middle text-[length:var(--text-xs)] text-[var(--muted)]">{row.t.wbsCode}</td>
@@ -234,7 +248,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                     <div className="flex items-center gap-2"><ProgressBar value={row.t.percentComplete} critical={row.crit} /><span className="v4-num w-8 shrink-0 text-right text-[length:var(--text-xs)] text-[var(--muted)]">{row.t.percentComplete}%</span></div>
                   </td>
                   <td className="py-2.5 pr-2 align-middle"><BemAvatar initials={initials(cfOf(row.t).resLabel ?? "—")} color={AV[i % AV.length]!} size="sm" /></td>
-                  <td className="v4-num py-2.5 pr-4 align-middle text-right text-[length:var(--text-sm)] text-[var(--muted-strong)]">{ddmm(row.c?.calculatedFinish ?? null)}</td>
+                  <td className="v4-num py-2.5 pr-4 align-middle text-right text-[length:var(--text-sm)] text-[var(--muted-strong)]">{ddmm(row.c?.calculatedFinish ?? row.t.plannedFinish)}</td>
                 </tr>
               ))}
             </tbody>
