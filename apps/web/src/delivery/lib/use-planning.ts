@@ -9,6 +9,7 @@ import {
 } from "@kiss-pm/planning-client";
 
 import { createDeliveryPlanningClient, type CommitMetaView, type CommitsView } from "./planning-client";
+import { usePlanningPreviewGate } from "./planning-preview-gate";
 import { usePlanningRuntime } from "./planning-runtime";
 
 export type { CommitMetaView, CommitsView };
@@ -37,6 +38,7 @@ export type ScenarioApplyResult =
  */
 export function usePlanning(projectId: string) {
   const { live } = usePlanningRuntime();
+  const { requestConfirmation } = usePlanningPreviewGate();
   // Единый шов: решение mock/live принимается ОДИН раз при конструировании клиента (createDeliveryPlanningClient),
   // а не переветвляется в каждом read-пути. Команды, журнал коммитов и справочник ресурсов идут через него.
   const clientRef = useRef<ReturnType<typeof createDeliveryPlanningClient> | null>(null);
@@ -85,6 +87,17 @@ export function usePlanning(projectId: string) {
     async (command: PlanningCommand): Promise<ApplyResult> => {
       if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
       try {
+        const previewResult = await client.previewCommand(projectId, {
+          command,
+          clientPlanVersion: readModel.planVersion
+        });
+        const confirmed = await requestConfirmation({
+          commands: [command],
+          preview: previewResult
+        });
+        if (!confirmed) {
+          return { ok: false, conflict: false, message: "preview_cancelled" };
+        }
         const res = await client.applyCommand(projectId, { command, clientPlanVersion: readModel.planVersion });
         lastApplyRef.current = { afterVersion: res.newPlanVersion, commands: [command], before: readModel };
         setReadModel(res.readModel);
@@ -104,13 +117,21 @@ export function usePlanning(projectId: string) {
         return { ok: false, conflict: false, message: e instanceof Error ? e.message : "apply_failed", ...(issues ? { issues } : {}) };
       }
     },
-    [client, projectId, readModel, load]
+    [client, projectId, readModel, load, requestConfirmation]
   );
 
   const applyBatch = useCallback(
     async (commands: PlanningCommand[]): Promise<ApplyResult> => {
       if (!readModel || commands.length === 0) return { ok: false, conflict: false, message: "empty_batch" };
       try {
+        const previewResult = await client.previewCommandBatch(projectId, {
+          commands,
+          clientPlanVersion: readModel.planVersion
+        });
+        const confirmed = await requestConfirmation({ commands, preview: previewResult });
+        if (!confirmed) {
+          return { ok: false, conflict: false, message: "preview_cancelled" };
+        }
         const res = await client.applyCommandBatch(projectId, { commands, clientPlanVersion: readModel.planVersion });
         lastApplyRef.current = { afterVersion: res.newPlanVersion, commands, before: readModel };
         setReadModel(res.readModel);
@@ -130,7 +151,7 @@ export function usePlanning(projectId: string) {
         return { ok: false, conflict: false, message: e instanceof Error ? e.message : "apply_failed", ...(issues ? { issues } : {}) };
       }
     },
-    [client, projectId, readModel, load]
+    [client, projectId, readModel, load, requestConfirmation]
   );
 
   // BUG-PROJ-24: откат последнего обратимого коммита через серверный revert-last
@@ -167,7 +188,7 @@ export function usePlanning(projectId: string) {
         return { ok: false, conflict: false, message: e instanceof Error ? e.message : "preview_failed" };
       }
     },
-    [client, projectId, readModel, load]
+    [client, projectId, readModel, load, requestConfirmation]
   );
 
   const applyScenario = useCallback(
@@ -186,7 +207,7 @@ export function usePlanning(projectId: string) {
         return { ok: false, conflict: false, ...(code ? { code } : {}), message: e instanceof Error ? e.message : "apply_scenario_failed" };
       }
     },
-    [client, projectId, readModel, load]
+    [client, projectId, readModel, load, requestConfirmation]
   );
 
   // журнал коммитов сессии — через единый шов клиента (mock /planning/commits vs live audit-events).

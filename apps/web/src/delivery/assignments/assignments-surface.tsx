@@ -8,12 +8,15 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
+import { hasPermission } from "@/lib/permissions";
+import { useSessionUser } from "@/shell/use-session-user";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AddAssigneeDialog, distribute, presetWeights, ROLES, roleLabel } from "@/delivery/assignments/assignments-editors";
+import { createClientId } from "@/delivery/lib/client-id";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
@@ -30,6 +33,7 @@ const COL_W: Record<Gran, number> = { day: 30, week: 44 };
 const ROW_H = 34;
 const HEADER_H = 40;
 const LEFT_W = 360;
+const ASSIGNMENTS_MANAGE_PERMISSION = "tenant.project_resources.manage";
 const WORKING = new Set(["executor", "co_executor"]); // только эти роли создают нагрузку и учитываются в труде
 // «прицел» (как в матрице ресурсов): тонирующий inset-shadow строки/столбца под курсором
 const CROSS = "shadow-[inset_0_0_0_9999px_color-mix(in_oklab,var(--accent)_14%,transparent)]";
@@ -46,8 +50,7 @@ const dayToIsoAt = (baseMs: number, day: number) => new Date(baseMs + day * 86_4
 const isoToDayAt = (baseMs: number, iso: string) => Math.round((Date.parse(iso + "T00:00:00Z") - baseMs) / 86_400_000);
 const isWeekdayAt = (baseMs: number, day: number) => { const d = new Date(baseMs + day * 86_400_000).getUTCDay(); return d >= 1 && d <= 5; };
 
-let NID = 0;
-const nid = (p: string) => `${p}-n${(NID += 1)}`;
+const nid = createClientId;
 
 type AsgMeta = { asg: AsgRaw; days: number[]; scheduledSet: Set<number>; flatPer: number; explicit: Map<number, number>; hasExplicit: boolean };
 
@@ -55,6 +58,8 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   const { readModel, status, error, reload, apply } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
+  const sessionUser = useSessionUser();
+  const canManageAssignments = hasPermission(sessionUser?.permissions ?? [], ASSIGNMENTS_MANAGE_PERMISSION);
   // Фолбэк имени: под ограниченной ролью справочник людей может отдать 403 — резолвер вернёт сырой id.
   // Показываем «Участник xxxx» вместо user-/r-идентификатора (G8-08).
   const resName = (id: string) => { const n = resDir.name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
@@ -127,7 +132,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Назначения">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} projectId={projectId} activeTab="Назначения">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка назначений…">
           <span />
         </SurfaceState>
@@ -212,9 +217,9 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   const sumAsgWork = (taskId: string) => (model.asgByTask.get(taskId) ?? []).filter((a) => WORKING.has(a.role)).reduce((s, a) => s + a.workMinutes, 0);
 
   return (
-    <DeliveryFrame project={projectMeta} activeTab="Назначения">
+    <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Назначения">
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
-        <div className="text-[length:var(--text-sm)] text-[var(--muted)]">Задача → исполнители с дневной кривой распределения. Клик по исполнителю — инспектор и редактор кривой.</div>
+        <div className="text-[length:var(--text-sm)] text-[var(--muted)]">Задача → исполнители с дневной кривой распределения. Клик по исполнителю — {canManageAssignments ? "инспектор и редактор кривой" : "инспектор назначения"}.</div>
         <div className="ml-auto flex items-center gap-2">
           <div className="flex items-center gap-0.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-0.5 py-0.5">
             <button type="button" onClick={() => setMonthOffset((o) => Math.max(0, o - 1))} disabled={monthOffset <= 0} className="grid size-6 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)] disabled:opacity-40" aria-label="Предыдущий месяц"><ChevronLeft className="size-4" aria-hidden /></button>
@@ -229,7 +234,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
         </div>
       </div>
 
-      {prototypeNotesEnabled ? (
+      {prototypeNotesEnabled && canManageAssignments ? (
         <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
           Реальный контракт: assignment.upsert / assignment.allocations.replace (сумма кривой = трудоёмкости) / assignment.delete. Кривая по дням редактируема; пресеты дают сбалансированную раскладку. Данные in-memory.
@@ -252,9 +257,11 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                       <span className="mono shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{t.wbsCode}</span>
                       <span className="min-w-0 flex-1 truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{t.title}</span>
                       <span className="shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]" title={`Труд задачи ${h1(t.workMinutes)} ч · сумма назначений ${h1(sumAsgWork(t.id))} ч`}>{h1(sumAsgWork(t.id))}/{h1(t.workMinutes)} ч</span>
-                      <AddAssigneeDialog taskTitle={t.title} excludeIds={asgs.map((a) => a.resourceId)} onSubmit={(rid, role) => addAssignee(t.id, rid, role)}>
-                        <button type="button" className="grid size-5 shrink-0 place-items-center rounded text-[var(--muted)] hover:bg-[var(--panel-strong)] hover:text-[var(--accent)]" title="Добавить исполнителя" disabled={busy}><Plus className="size-3.5" aria-hidden /></button>
-                      </AddAssigneeDialog>
+                      {canManageAssignments ? (
+                        <AddAssigneeDialog taskTitle={t.title} excludeIds={asgs.map((a) => a.resourceId)} resources={resDir.list} onSubmit={(rid, role) => addAssignee(t.id, rid, role)}>
+                          <button type="button" className="grid size-5 shrink-0 place-items-center rounded text-[var(--muted)] hover:bg-[var(--panel-strong)] hover:text-[var(--accent)]" title="Добавить исполнителя" disabled={busy}><Plus className="size-3.5" aria-hidden /></button>
+                        </AddAssigneeDialog>
+                      ) : null}
                     </div>
                     {asgs.length === 0 ? (
                       <div className="flex items-center border-b border-[var(--border-subtle)] px-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]" style={{ height: ROW_H, width: LEFT_W, paddingLeft: 28 }}>нет исполнителей</div>
@@ -319,6 +326,8 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
               <button type="button" onClick={() => { setSel(null); setDraft(null); }} className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)]" aria-label="Закрыть"><X className="size-4" aria-hidden /></button>
             </div>
             <div className="flex-1 overflow-auto px-4 py-3 text-[length:var(--text-sm)]">
+              {canManageAssignments ? (
+                <>
               {/* атрибуты назначения */}
               <div className="grid grid-cols-2 gap-2">
                 <label className="col-span-2 block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Ресурс</span>
@@ -381,13 +390,54 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                   <Button variant="ghost" size="sm" disabled={busy} className="text-[var(--danger-text)] hover:bg-[var(--danger-soft)]"><Trash2 className="size-3.5" aria-hidden />Снять исполнителя</Button>
                 </ConfirmDialog>
               </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Ресурс</span>
+                      <div className="text-[var(--text)]">{resName(selMeta.asg.resourceId)}</div>
+                    </div>
+                    <div>
+                      <span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Роль</span>
+                      <div className="text-[var(--text)]">{roleLabel(selMeta.asg.role)}</div>
+                    </div>
+                    <div>
+                      <span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Единицы</span>
+                      <div className="tabular-nums text-[var(--text)]">{Math.round(selMeta.asg.unitsPermille / 10)}%</div>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Трудозатраты</span>
+                      <div className="tabular-nums text-[var(--text)]">{h1(selMeta.asg.workMinutes)} ч</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 mb-1.5 flex items-center justify-between">
+                    <span className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Кривая распределения</span>
+                    <span className="text-[length:var(--text-xs)] tabular-nums text-[var(--muted-strong)]">{h1(draftSum)} / {h1(selMeta.asg.workMinutes)} ч</span>
+                  </div>
+                  <div className="max-h-[240px] overflow-auto rounded-[var(--radius-md)] border border-[var(--border)]">
+                    {editDaysOf(selMeta).length === 0 ? <div className="px-2 py-3 text-center text-[length:var(--text-xs)] text-[var(--muted)]">Нет рабочих дней в расписании задачи.</div> : editDaysOf(selMeta).map((d) => {
+                      const dt = new Date(baseMs + d * 86_400_000);
+                      const cur = curDraft(selMeta).get(d) ?? 0;
+                      return (
+                        <div key={d} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-1 last:border-b-0">
+                          <span className="mono w-[78px] shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{String(dt.getUTCDate()).padStart(2, "0")}.{String(dt.getUTCMonth() + 1).padStart(2, "0")} {DOW[dt.getUTCDay()]}</span>
+                          <span className="flex-1 text-right tabular-nums text-[var(--text)]">{Math.round((cur / 60) * 10) / 10}</span>
+                          <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">ч</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </aside>
         ) : null}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
-        <span className="inline-flex items-center gap-1"><UserPlus className="size-3.5" aria-hidden />+ на строке задачи — добавить исполнителя</span>
+        {canManageAssignments ? <span className="inline-flex items-center gap-1"><UserPlus className="size-3.5" aria-hidden />+ на строке задачи — добавить исполнителя</span> : null}
         <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: WEEKEND_BG }} /> выходной</span>
         <span>Число в ячейке — часы за период · «кривая» у имени — задана явная дневная раскладка · наведение — прицел</span>
       </div>

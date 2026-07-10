@@ -31,11 +31,9 @@ export function useResourceDirectory(): {
 
   // синхронный старт (mock → RESOURCES сразу; live → пусто до ответа), затем обновление из шва (live).
   const [list, setList] = useState<Resource[]>(() => (client ? client.resourceDirectorySeed() : RESOURCES));
-  const requested = useRef(false);
 
   useEffect(() => {
-    if (!client || requested.current) return;
-    requested.current = true;
+    if (!client) return;
     let active = true;
     void client.getResourceDirectory().then((rs) => {
       if (active) setList(rs);

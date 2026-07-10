@@ -5,6 +5,7 @@ import { ArrowDownWideNarrow, ArrowUpRight, ChevronDown, ChevronLeft, ChevronRig
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { hasPermission } from "@/lib/permissions";
 import { dayToIso, isoToDay, type Resource } from "@/delivery/lib/planning-demo-data";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
@@ -75,6 +76,12 @@ export type MatrixCallbacks = {
   onEditAssignmentHours?: (asg: MatrixAssignment, hours: number) => void;
   onAbsence?: (resourceId: string, typeLabel: string, startIso: string, finishIso: string) => void;
 };
+
+const RESOURCE_MANAGE_PERMISSION = "tenant.project_resources.manage";
+
+export function canManageResourceControls({ live, permissions }: { live: boolean; permissions: readonly string[] }): boolean {
+  return !live || hasPermission(permissions, RESOURCE_MANAGE_PERMISSION);
+}
 
 const ROW_H = 34;
 const HEADER_H = 40;
@@ -481,7 +488,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
               {selOverloaded ? (
                 <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft)] px-2.5 py-2 text-[length:var(--text-xs)] text-[var(--danger-text)]">
                   <span className="flex-1">Перегруз {selBucket ? `+${h1(selCommitted - selCap)} ч` : ""}{scope.level !== "project" ? (projectFilter === "all" ? " (по всем проектам)" : " (в проекте)") : ""}</span>
-                  {onAcceptOverload && gran === "day" ? <Button variant="secondary" size="sm" onClick={() => onAcceptOverload(sel.resourceId, sel.date)} disabled={busy}>Снять перегруз</Button> : gran !== "day" ? <span className="text-[var(--muted)]">снятие — на дне</span> : null}
+                  {onAcceptOverload && gran === "day" ? <Button variant="secondary" size="sm" onClick={() => onAcceptOverload(sel.resourceId, sel.date)} disabled={busy}>Принять перегруз как риск</Button> : gran !== "day" ? <span className="text-[var(--muted)]">принятие риска — на дне</span> : null}
                 </div>
               ) : null}
               <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Из чего сложилась загрузка</div>

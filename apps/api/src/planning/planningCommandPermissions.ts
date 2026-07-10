@@ -14,6 +14,11 @@ export function permissionForCommand(
 ): PolicyDecision {
   const input = { actor, profile, targetTenantId: actor.tenantId };
   if (command.type === "baseline.capture") return canManageProjectBaselines(input);
+  if (command.type === "calendar.exception.upsert") {
+    return command.payload.resourceId === null
+      ? canManageProjectPlan(input)
+      : canManageProjectResources(input);
+  }
   if (command.type === "task.create" && command.payload.assignments.length > 0) {
     const planDecision = canManageProjectPlan(input);
     if (!planDecision.allowed) return planDecision;

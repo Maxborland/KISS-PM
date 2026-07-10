@@ -1,0 +1,114 @@
+{
+  "generatedAt": "2026-07-09T23:09:05.831Z",
+  "baseURL": "http://127.0.0.1:3180",
+  "projects": [
+    {
+      "id": "project-vektor-portal",
+      "title": "Портал подрядчиков Вектор"
+    },
+    {
+      "id": "project-gorset-migration",
+      "title": "Миграция данных Горсеть"
+    },
+    {
+      "id": "project-demo-crm-intake",
+      "title": "CRM intake"
+    }
+  ],
+  "routes": [
+    {
+      "route": "/projects/project-vektor-portal/overview",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "activeTab": "Обзор",
+      "tabLinks": 9,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/overview.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "route": "/projects/project-vektor-portal/schedule",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "activeTab": "График",
+      "tabLinks": 9,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/schedule.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "route": "/projects/project-vektor-portal/resources",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
+      "activeTab": "Ресурсы",
+      "tabLinks": 9,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/resources.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "route": "/projects/project-vektor-portal/assignments",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
+      "activeTab": "Назначения",
+      "tabLinks": 9,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/assignments.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "route": "/projects/project-vektor-portal/calendars",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
+      "activeTab": "Календари",
+      "tabLinks": 9,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/calendars.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "route": "/projects/project-vektor-portal/scenarios",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
+      "activeTab": "Сценарии",
+      "tabLinks": 9,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/scenarios.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "route": "/projects/project-vektor-portal/baseline",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
+      "activeTab": "Baseline",
+      "tabLinks": 9,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/baseline.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "route": "/projects/project-vektor-portal/commits",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
+      "activeTab": "Коммиты",
+      "tabLinks": 9,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/commits.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "route": "/projects/project-vektor-portal/settings",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
+      "activeTab": "Настройки",
+      "tabLinks": 9,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/settings.png",
+      "status": "PASS",
+      "error": ""
+    }
+  ],
+  "selector": {
+    "from": "project-vektor-portal",
+    "to": "project-gorset-migration",
+    "reloadPersisted": true,
+    "backRestored": true,
+    "status": "PASS"
+  },
+  "summary": {
+    "total": 10,
+    "pass": 10,
+    "fail": 0
+  },
+  "failures": []
+}

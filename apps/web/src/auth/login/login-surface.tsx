@@ -115,9 +115,10 @@ export function LoginSurface({ prefill = false }: LoginSurfaceProps) {
                 required
               />
             </label>
-            <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">
-              Пароль
+            <div className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">
+              <label htmlFor="login-password">Пароль</label>
               <PasswordField
+                id="login-password"
                 name="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -127,7 +128,7 @@ export function LoginSurface({ prefill = false }: LoginSurfaceProps) {
                 aria-invalid={Boolean(errCode)}
                 required
               />
-            </label>
+            </div>
 
             {/* Ошибка входа → FormError(code): RU-текст через authErr. */}
             <FormError code={errCode} />

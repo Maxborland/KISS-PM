@@ -161,57 +161,66 @@ async function updateTaskStatus(
   });
   if (!decision.allowed) return { ok: false, status: 403, error: decision.reason };
 
-  return deps.runDataSourceTransaction(async (transactionDataSource) => {
-    if (
-      !transactionDataSource.updateTaskStatusDefinition ||
-      !transactionDataSource.listTaskStatuses ||
-      !transactionDataSource.appendAuditEvent
-    ) {
-      return { ok: false, status: 501, error: "persistence_not_configured" };
-    }
-    const before = (await transactionDataSource.listTaskStatuses(input.actor.tenantId)).find(
-      (status) => status.id === input.statusId
-    );
-    if (!before) return { ok: false, status: 404, error: "task_status_not_found" };
-    if (before.isSystem && input.value.status === "archived") {
-      return { ok: false, status: 409, error: "system_task_status_required" };
-    }
-    if (before.isSystem && before.category !== input.value.category) {
-      return { ok: false, status: 409, error: "system_task_status_category_locked" };
-    }
+  const value = { ...input.value, id: input.statusId };
+  try {
+    return await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.updateTaskStatusDefinition ||
+        !transactionDataSource.listTaskStatuses ||
+        !transactionDataSource.appendAuditEvent
+      ) {
+        return { ok: false, status: 501, error: "persistence_not_configured" };
+      }
+      const before = (await transactionDataSource.listTaskStatuses(input.actor.tenantId)).find(
+        (status) => status.id === input.statusId
+      );
+      if (!before) return { ok: false, status: 404, error: "task_status_not_found" };
+      if (before.isSystem && value.status === "archived") {
+        return { ok: false, status: 409, error: "system_task_status_required" };
+      }
+      if (before.isSystem && before.category !== value.category) {
+        return { ok: false, status: 409, error: "system_task_status_category_locked" };
+      }
 
-    const taskStatus = await transactionDataSource.updateTaskStatusDefinition({
-      ...input.value,
-      tenantId: input.actor.tenantId
+      const taskStatus = await transactionDataSource.updateTaskStatusDefinition({
+        ...value,
+        tenantId: input.actor.tenantId
+      });
+      await appendTaskStatusAudit(
+        deps,
+        {
+          actor: input.actor,
+          actionType: "task_status.updated",
+          taskStatusId: taskStatus.id,
+          commandInput: value,
+          beforeState: {
+            id: before.id,
+            name: before.name,
+            category: before.category,
+            sortOrder: before.sortOrder,
+            status: before.status
+          },
+          afterState: {
+            id: taskStatus.id,
+            name: taskStatus.name,
+            category: taskStatus.category,
+            sortOrder: taskStatus.sortOrder,
+            status: taskStatus.status
+          },
+          permissionReason: decision.reason
+        },
+        transactionDataSource
+      );
+
+      return { ok: true, taskStatus };
     });
-    await appendTaskStatusAudit(
-      deps,
-      {
-        actor: input.actor,
-        actionType: "task_status.updated",
-        taskStatusId: taskStatus.id,
-        commandInput: input.value,
-        beforeState: {
-          id: before.id,
-          name: before.name,
-          category: before.category,
-          sortOrder: before.sortOrder,
-          status: before.status
-        },
-        afterState: {
-          id: taskStatus.id,
-          name: taskStatus.name,
-          category: taskStatus.category,
-          sortOrder: taskStatus.sortOrder,
-          status: taskStatus.status
-        },
-        permissionReason: decision.reason
-      },
-      transactionDataSource
-    );
-
-    return { ok: true, taskStatus };
-  });
+  } catch (error) {
+    const conflict = taskStatusUniqueConflict(error);
+    if (conflict) {
+      return { ok: false, status: 409, error: conflict };
+    }
+    throw error;
+  }
 }
 
 async function archiveTaskStatus(

@@ -14,8 +14,12 @@ import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { buildProjectMonthKeys, currentPlanDate, monthGridDays, planDateFromDay, utcDayOfWeek } from "@/delivery/lib/date-origin";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
+import { hasPermission } from "@/lib/permissions";
+import { useSessionUser } from "@/shell/use-session-user";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
+import { createClientId } from "@/delivery/lib/client-id";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { PlanningCommand, PlanCalendar, PlanCalendarException, PlanTask } from "@kiss-pm/domain";
@@ -25,10 +29,19 @@ const MONTHS_CAP = ["Январь", "Февраль", "Март", "Апрель"
 const DOW_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const ddmm = (iso: string) => { const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 
-let NID = 0;
-const nid = (p: string) => `${p}-n${(NID += 1)}`;
+const nid = createClientId;
+const PLAN_MANAGE_PERMISSION = "tenant.project_plan.manage";
+const RESOURCE_MANAGE_PERMISSION = "tenant.project_resources.manage";
+
+export function canManageCalendarControls({ live, permissions, scope = "project" }: { live: boolean; permissions: readonly string[]; scope?: "project" | "resource" }): boolean {
+  return !live || hasPermission(permissions, scope === "resource" ? RESOURCE_MANAGE_PERMISSION : PLAN_MANAGE_PERMISSION);
+}
 
 export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { live } = usePlanningRuntime();
+  const sessionUser = useSessionUser();
+  const canManagePlan = canManageCalendarControls({ live, permissions: sessionUser?.permissions ?? [] });
+  const canManageResources = canManageCalendarControls({ live, permissions: sessionUser?.permissions ?? [], scope: "resource" });
   const { readModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
@@ -92,7 +105,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Календари">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} projectId={projectId} activeTab="Календари">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка календарей…">
           <span />
         </SurfaceState>
@@ -118,6 +131,10 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   };
 
   async function applyCmd(command: PlanningCommand, okMsg: string) {
+    const allowed = command.type === "calendar.exception.upsert" && command.payload.resourceId !== null
+      ? canManageResources
+      : canManagePlan;
+    if (!allowed) return;
     setBusy(true);
     const res = await apply(command);
     setBusy(false);
@@ -127,6 +144,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
 
   // клик по дню: тогл праздника (вид проекта) или отсутствия (вид ресурса). Восстановление = рабочие минуты.
   const toggleDay = (day: number) => {
+    if (isResourceView ? !canManageResources : !canManagePlan) return;
     const st = dayState(day);
     if (st.weekend) return; // выходные задаются календарём (read-only)
     if (!isResourceView) {
@@ -142,6 +160,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const removeExc = (x: PlanCalendarException) => void applyCmd(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: x.id, calendarId: x.calendarId, resourceId: x.resourceId, date: x.date, workingMinutes: model.full, reason: "" } }), "Исключение снято");
 
   const doAbsence = async (resourceId: string, typeLabel: string, start: string, finish: string) => {
+    if (!canManageResources) return;
     const cmds: PlanningCommand[] = [];
     const end = isoToDay(finish);
     for (let d = isoToDay(start); d <= end; d += 1) {
@@ -164,16 +183,16 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   ].sort((a, b) => isoToDay(a.date) - isoToDay(b.date));
 
   return (
-    <DeliveryFrame project={projectMeta} activeTab="Календари">
+    <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Календари">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Календари проекта и ресурсов</h2>
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Производственный календарь проекта, праздники и персональные отсутствия ресурсов.</p>
         </div>
         <div className="ml-auto">
-          {isResourceView && selRes ? (
+          {(isResourceView ? canManageResources : canManagePlan) ? (isResourceView && selRes ? (
             <AbsenceDialog onSubmit={doAbsence}><Button variant="default" size="sm" disabled={busy}><UserPlus className="size-3.5" aria-hidden />Исключение</Button></AbsenceDialog>
-          ) : <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Клик по дню сетки — добавить/снять праздник</span>}
+          ) : <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Клик по дню сетки — добавить/снять праздник</span>) : null}
         </div>
       </div>
 
@@ -228,10 +247,11 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
             {grid.map((day) => {
               const st = dayState(day);
               const dt = planDateFromDay(day);
-              const clickable = st.inMonth && !st.weekend && !(isResourceView && st.holiday);
+              const canManageView = isResourceView ? canManageResources : canManagePlan;
+              const clickable = canManageView && st.inMonth && !st.weekend && !(isResourceView && st.holiday);
               const dayTone = st.holiday ? NON_WORKING_TONE.holiday : st.absence ? NON_WORKING_TONE.absence : st.weekend ? NON_WORKING_TONE.weekend : { bg: "var(--panel-subtle)", fg: "var(--text)", border: "var(--border-subtle)" };
               return (
-                <button key={day} type="button" disabled={!clickable || busy} onClick={() => toggleDay(day)} title={st.holiday ? `${ddmm(dayToIso(day))} · ${st.holiday.reason || "Праздник"}` : st.absence ? `${ddmm(dayToIso(day))} · ${st.absence.reason || "Отсутствие"}` : st.weekend ? "Выходной" : "Рабочий день — клик: нерабочий"} style={{ background: dayTone.bg, color: dayTone.fg, borderColor: dayTone.border }} className={cn("relative flex h-[58px] flex-col rounded-[var(--radius-sm)] border p-1 text-left outline-none transition-colors", !st.inMonth && "opacity-35", clickable && "hover:ring-1 hover:ring-[var(--accent)]")}>
+                <button key={day} type="button" disabled={!clickable || busy} onClick={() => toggleDay(day)} title={st.holiday ? `${ddmm(dayToIso(day))} · ${st.holiday.reason || "Праздник"}` : st.absence ? `${ddmm(dayToIso(day))} · ${st.absence.reason || "Отсутствие"}` : st.weekend ? "Выходной" : canManageView ? "Рабочий день — клик: нерабочий" : "Рабочий день"} style={{ background: dayTone.bg, color: dayTone.fg, borderColor: dayTone.border }} className={cn("relative flex h-[58px] flex-col rounded-[var(--radius-sm)] border p-1 text-left outline-none transition-colors", !st.inMonth && "opacity-35", clickable && "hover:ring-1 hover:ring-[var(--accent)]")}>
                   <span className="text-[length:var(--text-xs)] font-semibold tabular-nums">{dt.getUTCDate()}</span>
                   <span className="mt-auto self-end text-[length:var(--text-2xs)] font-medium">{st.holiday ? "праздник" : st.absence ? (st.absence.reason || "отсутствие").toLowerCase() : st.weekend ? "" : "8 ч"}</span>
                 </button>
@@ -255,7 +275,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                 <div key={x.id} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-1.5 last:border-b-0">
                   <span className={cn("inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", x.resourceId === null ? "bg-[var(--warning-soft)] text-[var(--warning-text)]" : "bg-[color-mix(in_oklab,var(--violet)_16%,var(--panel))] text-[var(--violet)]")}>{x.resourceId === null ? "праздник" : (x.reason || "отсутствие")}</span>
                   <span className="mono min-w-0 flex-1 truncate text-[length:var(--text-xs)] text-[var(--muted-strong)]">{ddmm(x.date)}{x.resourceId && x.resourceId !== selCal ? ` · ${resDir.of(x.resourceId)?.name ?? ""}` : ""}</span>
-                  <button type="button" onClick={() => removeExc(x)} disabled={busy} className="grid size-5 shrink-0 place-items-center rounded text-[var(--muted)] hover:bg-[var(--panel-strong)] hover:text-[var(--danger)]" title="Снять исключение"><X className="size-3.5" aria-hidden /></button>
+                  {(x.resourceId === null ? canManagePlan : canManageResources) ? <button type="button" onClick={() => removeExc(x)} disabled={busy} className="grid size-5 shrink-0 place-items-center rounded text-[var(--muted)] hover:bg-[var(--panel-strong)] hover:text-[var(--danger)]" title="Снять исключение"><X className="size-3.5" aria-hidden /></button> : null}
                 </div>
               ))}
             </div>

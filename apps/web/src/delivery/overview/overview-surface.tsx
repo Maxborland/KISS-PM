@@ -73,7 +73,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Обзор">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} projectId={projectId} activeTab="Обзор">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
           <span />
         </SurfaceState>
@@ -134,7 +134,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   };
 
   return (
-    <DeliveryFrame project={projectMeta} activeTab="Обзор">
+    <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Обзор">
       <div className="mb-3 flex items-baseline justify-between gap-2">
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Обзор проекта</h2>

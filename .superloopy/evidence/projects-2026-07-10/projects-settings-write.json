@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-07-10T00:05:03.177Z",
+  "baseURL": "http://127.0.0.1:3180",
+  "admin": {
+    "projectId": "project-vektor-portal",
+    "originalDeadline": "2026-07-08",
+    "movedDeadline": "2026-07-09",
+    "movePreviewStatus": 200,
+    "moveApplyStatus": 200,
+    "restorePreviewStatus": 200,
+    "restoreApplyStatus": 200,
+    "planVersionBefore": 81,
+    "planVersionMoved": 82,
+    "planVersionRestored": 83,
+    "reloadMoveReadback": true,
+    "reloadRestoreReadback": true,
+    "cleanup": "restored_via_ui",
+    "status": "PASS"
+  },
+  "planReader": {
+    "projectId": "project-vektor-portal",
+    "uiWriteControlCount": 0,
+    "previewStatus": 403,
+    "applyRequestCount": 0,
+    "deadlineBefore": "2026-07-08",
+    "deadlineAfter": "2026-07-08",
+    "deadlineReloaded": "2026-07-08",
+    "planVersionBefore": 83,
+    "planVersionAfter": 83,
+    "planVersionReloaded": 83,
+    "status": "PASS"
+  },
+  "status": "PASS"
+}

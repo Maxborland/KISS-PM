@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Chip } from "@/components/ui/chip";
@@ -79,6 +80,7 @@ const STATUS_TONE: Record<TaskStatusCategory, "info" | "success" | "warning" | "
 };
 
 export function ProjectDetailSurface({ initialProjectId }: { initialProjectId?: string } = {}) {
+  const router = useRouter();
   // Выбор проекта — реальный список активных (GET /api/workspace/projects), старт = MOCK_PROJECT_ID.
   const projectsList = useProjects();
   const [selectedId, setSelectedId] = useState<string>(initialProjectId ?? MOCK_PROJECT_ID);
@@ -98,6 +100,12 @@ export function ProjectDetailSurface({ initialProjectId }: { initialProjectId?: 
   }, [initialProjectId, projectsList.data, selectedId]);
   // Карточка проекта + его задачи (GET /api/workspace/projects/:id) — реальный запрос на смену selectedId.
   const { data, status, error, reload } = useProjectDetail(selectedId);
+  const selectProject = (projectId: string) => {
+    setSelectedId(projectId);
+    if (initialProjectId && projectId !== selectedId) {
+      router.push(`/projects/${encodeURIComponent(projectId)}`);
+    }
+  };
 
   // Статус поверхности: data → ready; иначе loading; error-код project_not_found → можно трактовать как «нет доступа»,
   // но контракт отдаёт 404 (а не 403) — показываем как error с человекочитаемым текстом. forbidden зарезервирован
@@ -117,7 +125,7 @@ export function ProjectDetailSurface({ initialProjectId }: { initialProjectId?: 
           <ProjectSwitcher
             projects={projectsList.data?.projects ?? []}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={selectProject}
           />
         </div>
 

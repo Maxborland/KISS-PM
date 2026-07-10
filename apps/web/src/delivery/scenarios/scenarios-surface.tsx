@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
+import { hasPermission } from "@/lib/permissions";
+import { useSessionUser } from "@/shell/use-session-user";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
@@ -27,6 +29,8 @@ type Proposal = {
 type Overload = { resourceId: string; date: string; overloadMinutes: number; taskIds: string[] };
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
+const SCENARIO_PREVIEW_PERMISSION = "tenant.planning_scenarios.preview";
+const SCENARIO_APPLY_PERMISSION = "tenant.planning_scenarios.apply";
 const PROFILE_META: Record<Profile, { label: string; desc: string }> = {
   aggressive: { label: "Агрессивный", desc: "Принять перегруз, сохранить дату финиша" },
   balanced: { label: "Балансированный", desc: "Снять половину перегруза на альт-исполнителя, минимальный сдвиг" },
@@ -39,6 +43,10 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const { readModel, status, error, reload, previewScenarios, applyScenario } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
+  const sessionUser = useSessionUser();
+  const permissions = sessionUser?.permissions ?? [];
+  const canPreviewScenarios = hasPermission(permissions, SCENARIO_PREVIEW_PERMISSION);
+  const canApplyScenarios = hasPermission(permissions, SCENARIO_APPLY_PERMISSION);
   // Фолбэк имени: под ограниченной ролью справочник людей может отдать 403 — резолвер вернёт сырой id.
   // Показываем «Участник xxxx» вместо user-/r-идентификатора (G8-08).
   const resName = (id: string) => { const n = resDir.name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
@@ -78,6 +86,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const target: Overload | null = model ? (model.overloads.find((o) => `${o.resourceId}|${o.date}` === targetKey) ?? model.overloads[0] ?? null) : null;
 
   async function runPreview(t: Overload) {
+    if (!canPreviewScenarios) return;
     setPreviewBusy(true); setScenarioErr(null); setCompareId(null);
     const res = await previewScenarios({ type: "resource_overload", resourceId: t.resourceId, date: t.date, overloadMinutes: t.overloadMinutes, taskIds: t.taskIds });
     setPreviewBusy(false);
@@ -87,10 +96,10 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
 
   // авто-превью для худшего перегруза при загрузке и после применения (planVersion сменился → proposals=null)
   useEffect(() => {
-    if (!readModel || !target || proposals !== null || previewBusy) return;
+    if (!canPreviewScenarios || !readModel || !target || proposals !== null || previewBusy) return;
     void runPreview(target);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readModel?.planVersion, targetKey, proposals, target?.resourceId, target?.date]);
+  }, [canPreviewScenarios, readModel?.planVersion, targetKey, proposals, target?.resourceId, target?.date]);
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
   // готовый контент — только при наличии model+readModel. Frame-обёртку сохраняем.
@@ -128,6 +137,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   });
 
   const onApply = async (p: Proposal) => {
+    if (!canApplyScenarios) return;
     const requiresReason = p.conflictEffect === "accepted";
     if (requiresReason && !riskReason.trim()) { setReasonError("Укажите причину принятия риска (требуется для агрессивного сценария)"); return; }
     setApplyBusy(true); setScenarioErr(null); setReasonError(null);
@@ -152,7 +162,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Сценарии планирования</h2>
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Бэкенд предлагает три профиля разрешения перегруза ресурса; выбранный применяется как пакет команд (коммит плана).</p>
         </div>
-        <Button variant="ghost" size="sm" className="ml-auto" disabled={previewBusy || !target} onClick={() => { if (target) { setProposals(null); void runPreview(target); } }}><RefreshCw className={cn("size-3.5", previewBusy && "animate-spin")} aria-hidden />Запросить заново</Button>
+        {canPreviewScenarios ? <Button variant="ghost" size="sm" className="ml-auto" disabled={previewBusy || !target} onClick={() => { if (target) { setProposals(null); void runPreview(target); } }}><RefreshCw className={cn("size-3.5", previewBusy && "animate-spin")} aria-hidden />Запросить заново</Button> : null}
       </div>
 
       {prototypeNotesEnabled && (
@@ -176,7 +186,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
             </div>
             <div className="flex flex-wrap items-center gap-1.5 text-[length:var(--text-xs)]">
               <span className="inline-flex items-center rounded-full bg-[var(--info-soft)] px-2 py-0.5 font-medium text-[var(--info)]">Цель: снять перегруз</span>
-              {model.overloads.length > 1 ? (
+              {canPreviewScenarios && model.overloads.length > 1 ? (
                 <select value={target ? `${target.resourceId}|${target.date}` : ""} onChange={(e) => { setTargetKey(e.target.value); setProposals(null); setCompareId(null); setScenarioErr(null); }} className="h-7 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]" aria-label="Перегруз">
                   {model.overloads.map((o) => <option key={`${o.resourceId}|${o.date}`} value={`${o.resourceId}|${o.date}`}>{resName(o.resourceId)} · {ddmm(o.date)} · {h(o.overloadMinutes)} ч</option>)}
                 </select>
@@ -187,7 +197,9 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           </div>
 
           {/* список профилей */}
-          {previewBusy && list.length === 0 ? (
+          {!canPreviewScenarios ? (
+            <div className="flex h-[120px] items-center justify-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[length:var(--text-sm)] text-[var(--muted)]">Недостаточно прав для расчёта сценариев.</div>
+          ) : previewBusy && list.length === 0 ? (
             <div className="flex h-[200px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Расчёт сценариев…</div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -219,12 +231,12 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
                         <Button variant="secondary" size="sm" onClick={() => setCompareId(compareId === p.id ? null : p.id)}>{compareId === p.id ? "Скрыть" : "Сравнить"}</Button>
-                        <Button variant="default" size="sm" disabled={applyBusy} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button>
+                        {canApplyScenarios ? <Button variant="default" size="sm" disabled={applyBusy} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button> : null}
                       </div>
                     </div>
 
                     {/* поле причины риска для агрессивного */}
-                    {p.conflictEffect === "accepted" ? (
+                    {canApplyScenarios && p.conflictEffect === "accepted" ? (
                       <div className="mt-2 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-2.5 py-1.5">
                         <span className="text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Причина принятия риска (обязательна):</span>
                         <input value={riskReason} aria-invalid={reasonError ? true : undefined} onChange={(e) => { setReasonError(null); setRiskReason(e.target.value); }} placeholder="напр. согласовано с РП, срок критичнее" className="h-7 min-w-[240px] flex-1 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)] aria-[invalid]:border-[var(--danger)]" />

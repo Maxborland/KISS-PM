@@ -1,0 +1,1520 @@
+{
+  "config": {
+    "configFile": "E:\\KISS-PM\\playwright.config.ts",
+    "rootDir": "E:/KISS-PM/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "E:/KISS-PM/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "E:/KISS-PM/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "planning\\assignments.spec.ts",
+      "file": "planning/assignments.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "assignments matrix inline edit triggers preview bar",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 588,
+                  "error": {
+                    "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                    "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\assignments.spec.ts:6:3",
+                    "location": {
+                      "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                      "column": 35,
+                      "line": 6
+                    },
+                    "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      },
+                      "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\assignments.spec.ts:6:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-09T21:40:59.916Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "E:\\KISS-PM\\test-results\\planning-assignments-assig-26d9e-e-edit-triggers-preview-bar-chromium\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "E:\\KISS-PM\\test-results\\planning-assignments-assig-26d9e-e-edit-triggers-preview-bar-chromium\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                    "column": 35,
+                    "line": 6
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "e71e0d242a11b340217b-9c5c623db5e9ad2d1f78",
+          "file": "planning/assignments.spec.ts",
+          "line": 5,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "planning\\calendars.spec.ts",
+      "file": "planning/calendars.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "calendar exception dialog opens preview",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 568,
+                  "error": {
+                    "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                    "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\calendars.spec.ts:6:3",
+                    "location": {
+                      "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                      "column": 35,
+                      "line": 6
+                    },
+                    "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      },
+                      "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\calendars.spec.ts:6:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-09T21:41:01.294Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "E:\\KISS-PM\\test-results\\planning-calendars-calendar-exception-dialog-opens-preview-chromium\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "E:\\KISS-PM\\test-results\\planning-calendars-calendar-exception-dialog-opens-preview-chromium\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                    "column": 35,
+                    "line": 6
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "68df19b9b88ab7da10e7-38401a00d6319bb4b2d0",
+          "file": "planning/calendars.spec.ts",
+          "line": 5,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "planning\\compensating-undo.spec.ts",
+      "file": "planning/compensating-undo.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Planning compensating undo",
+          "file": "planning/compensating-undo.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "undoes applied edit with Ctrl+Shift+Z",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 567,
+                      "error": {
+                        "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                        "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\compensating-undo.spec.ts:7:5",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                          "column": 35,
+                          "line": 6
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                            "column": 35,
+                            "line": 6
+                          },
+                          "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\compensating-undo.spec.ts:7:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:02.623Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-compensating-undo-841ba-lied-edit-with-Ctrl-Shift-Z-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-compensating-undo-841ba-lied-edit-with-Ctrl-Shift-Z-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "849688255b1e3bbbda9b-a654552970de7a80d3a8",
+              "file": "planning/compensating-undo.spec.ts",
+              "line": 11,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "planning\\cross-project-drilldown.spec.ts",
+      "file": "planning/cross-project-drilldown.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "cross-project drilldown",
+          "file": "planning/cross-project-drilldown.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "resource matrix cell opens day drawer",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 17600,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-testid^=\\'resource-matrix-cell-\\']').first()\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\\'resource-matrix-cell-\\']').first()\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-testid^=\\'resource-matrix-cell-\\']').first()\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\\'resource-matrix-cell-\\']').first()\u001b[22m\n\n    at E:\\KISS-PM\\e2e\\planning\\cross-project-drilldown.spec.ts:15:24",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\cross-project-drilldown.spec.ts",
+                          "column": 24,
+                          "line": 15
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 13 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/projects/project-alpha/resources\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 14 |\u001b[39m     \u001b[36mconst\u001b[39m cell \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39mlocator(\u001b[32m\"[data-testid^='resource-matrix-cell-']\"\u001b[39m)\u001b[33m.\u001b[39mfirst()\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 15 |\u001b[39m     \u001b[36mawait\u001b[39m expect(cell)\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m15\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                        \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 16 |\u001b[39m     \u001b[36mawait\u001b[39m cell\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 17 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByTestId(\u001b[32m\"resource-day-drawer\"\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 18 |\u001b[39m   })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\cross-project-drilldown.spec.ts",
+                            "column": 24,
+                            "line": 15
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-testid^=\\'resource-matrix-cell-\\']').first()\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\\'resource-matrix-cell-\\']').first()\u001b[22m\n\n\n  13 |     await page.goto(\"/projects/project-alpha/resources\");\n  14 |     const cell = page.locator(\"[data-testid^='resource-matrix-cell-']\").first();\n> 15 |     await expect(cell).toBeVisible({ timeout: 15_000 });\n     |                        ^\n  16 |     await cell.click();\n  17 |     await expect(page.getByTestId(\"resource-day-drawer\")).toBeVisible();\n  18 |   });\n    at E:\\KISS-PM\\e2e\\planning\\cross-project-drilldown.spec.ts:15:24"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:03.881Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-cross-project-dri-1337f-atrix-cell-opens-day-drawer-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-cross-project-dri-1337f-atrix-cell-opens-day-drawer-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\cross-project-drilldown.spec.ts",
+                        "column": 24,
+                        "line": 15
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "b3c2dbbda33c0916e162-fe65f925c4ae0b4afde6",
+              "file": "planning/cross-project-drilldown.spec.ts",
+              "line": 6,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "planning\\custom-fields.spec.ts",
+      "file": "planning/custom-fields.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "custom wbs fields",
+          "file": "planning/custom-fields.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "project settings shows custom field definitions",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 12348,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('custom-field-definitions').or(getByTestId('custom-fields-empty'))\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('custom-field-definitions').or(getByTestId('custom-fields-empty'))\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('custom-field-definitions').or(getByTestId('custom-fields-empty'))\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('custom-field-definitions').or(getByTestId('custom-fields-empty'))\u001b[22m\n\n    at E:\\KISS-PM\\e2e\\planning\\custom-fields.spec.ts:16:7",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\custom-fields.spec.ts",
+                          "column": 7,
+                          "line": 16
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 14 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\n \u001b[90m 15 |\u001b[39m       page\u001b[33m.\u001b[39mgetByTestId(\u001b[32m\"custom-field-definitions\"\u001b[39m)\u001b[33m.\u001b[39mor(page\u001b[33m.\u001b[39mgetByTestId(\u001b[32m\"custom-fields-empty\"\u001b[39m))\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 16 |\u001b[39m     )\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 17 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 18 |\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m 19 |\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\custom-fields.spec.ts",
+                            "column": 7,
+                            "line": 16
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('custom-field-definitions').or(getByTestId('custom-fields-empty'))\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('custom-field-definitions').or(getByTestId('custom-fields-empty'))\u001b[22m\n\n\n  14 |     await expect(\n  15 |       page.getByTestId(\"custom-field-definitions\").or(page.getByTestId(\"custom-fields-empty\"))\n> 16 |     ).toBeVisible();\n     |       ^\n  17 |   });\n  18 | });\n  19 |\n    at E:\\KISS-PM\\e2e\\planning\\custom-fields.spec.ts:16:7"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:22.221Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-custom-fields-cus-8b010-ws-custom-field-definitions-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-custom-fields-cus-8b010-ws-custom-field-definitions-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\custom-fields.spec.ts",
+                        "column": 7,
+                        "line": 16
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "4d5a62138f7086363c7a-b526d24ceed8aef577cf",
+              "file": "planning/custom-fields.spec.ts",
+              "line": 6,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "planning\\drag-fill-dates.spec.ts",
+      "file": "planning/drag-fill-dates.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Planning drag-fill",
+          "file": "planning/drag-fill-dates.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "fills finish dates downward",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 559,
+                      "error": {
+                        "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                        "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\drag-fill-dates.spec.ts:7:5",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                          "column": 35,
+                          "line": 6
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                            "column": 35,
+                            "line": 6
+                          },
+                          "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\drag-fill-dates.spec.ts:7:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:35.379Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-drag-fill-dates-P-c4c53-fills-finish-dates-downward-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-drag-fill-dates-P-c4c53-fills-finish-dates-downward-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "f3137cc03da83167d3f8-1d63e8c0bdf2fbc4a6e2",
+              "file": "planning/drag-fill-dates.spec.ts",
+              "line": 11,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "planning\\excel-paste-10x6.spec.ts",
+      "file": "planning/excel-paste-10x6.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Planning excel paste",
+          "file": "planning/excel-paste-10x6.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "pastes 10x6 TSV block",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 562,
+                      "error": {
+                        "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                        "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\excel-paste-10x6.spec.ts:7:5",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                          "column": 35,
+                          "line": 6
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                            "column": 35,
+                            "line": 6
+                          },
+                          "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\excel-paste-10x6.spec.ts:7:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:36.741Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-excel-paste-10x6--982f9-paste-pastes-10x6-TSV-block-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-excel-paste-10x6--982f9-paste-pastes-10x6-TSV-block-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "b08ef950fb986a580001-1366b426e4cafbea3058",
+              "file": "planning/excel-paste-10x6.spec.ts",
+              "line": 11,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "planning\\keyboard-only-10-tasks.spec.ts",
+      "file": "planning/keyboard-only-10-tasks.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Planning keyboard-only task creation",
+          "file": "planning/keyboard-only-10-tasks.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "creates 10 tasks using keyboard only",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 586,
+                      "error": {
+                        "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                        "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\keyboard-only-10-tasks.spec.ts:7:5",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                          "column": 35,
+                          "line": 6
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                            "column": 35,
+                            "line": 6
+                          },
+                          "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\keyboard-only-10-tasks.spec.ts:7:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:38.078Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-keyboard-only-10--dfd81-0-tasks-using-keyboard-only-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-keyboard-only-10--dfd81-0-tasks-using-keyboard-only-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "4ddd92c1eec4a5043da5-620888f78c6fcbb9bb29",
+              "file": "planning/keyboard-only-10-tasks.spec.ts",
+              "line": 11,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "planning\\planning-a11y.spec.ts",
+      "file": "planning/planning-a11y.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Planning accessibility",
+          "file": "planning/planning-a11y.spec.ts",
+          "line": 6,
+          "column": 6,
+          "specs": [
+            {
+              "title": "schedule workspace has no critical axe violations",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 8,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 569,
+                      "error": {
+                        "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                        "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-a11y.spec.ts:8:5",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                          "column": 35,
+                          "line": 6
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                            "column": 35,
+                            "line": 6
+                          },
+                          "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-a11y.spec.ts:8:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:39.494Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-a11y-Pla-e4c36--no-critical-axe-violations-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-a11y-Pla-e4c36--no-critical-axe-violations-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "5e1950cb74a2fa752b16-9192d684967caa3daa6c",
+              "file": "planning/planning-a11y.spec.ts",
+              "line": 12,
+              "column": 3
+            },
+            {
+              "title": "gantt pane has no critical axe violations",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 521,
+                      "error": {
+                        "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                        "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-a11y.spec.ts:8:5",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                          "column": 35,
+                          "line": 6
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                            "column": 35,
+                            "line": 6
+                          },
+                          "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-a11y.spec.ts:8:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:40.939Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-a11y-Pla-afb79--no-critical-axe-violations-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-a11y-Pla-afb79--no-critical-axe-violations-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "5e1950cb74a2fa752b16-be4174f7429d83ed1833",
+              "file": "planning/planning-a11y.spec.ts",
+              "line": 20,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "planning\\planning-grid.spec.ts",
+      "file": "planning/planning-grid.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Planning grid Phase B",
+          "file": "planning/planning-grid.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "opens schedule workspace with WBS and Gantt panes",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 10,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 531,
+                      "error": {
+                        "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                        "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-grid.spec.ts:7:5",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                          "column": 35,
+                          "line": 6
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                            "column": 35,
+                            "line": 6
+                          },
+                          "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-grid.spec.ts:7:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:42.230Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-grid-Pla-9f888-ce-with-WBS-and-Gantt-panes-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-grid-Pla-9f888-ce-with-WBS-and-Gantt-panes-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bde7132752df0ae71679-948f04fb2d81e1d8531f",
+              "file": "planning/planning-grid.spec.ts",
+              "line": 10,
+              "column": 3
+            },
+            {
+              "title": "gantt bar position responds to zoom scale",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 11,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 566,
+                      "error": {
+                        "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                        "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-grid.spec.ts:7:5",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                          "column": 35,
+                          "line": 6
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                            "column": 35,
+                            "line": 6
+                          },
+                          "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-grid.spec.ts:7:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:43.566Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-grid-Pla-07824-tion-responds-to-zoom-scale-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-grid-Pla-07824-tion-responds-to-zoom-scale-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bde7132752df0ae71679-d36ed916d73186484c3c",
+              "file": "planning/planning-grid.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "renders dependency connectors when plan has links",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 12,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 599,
+                      "error": {
+                        "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                        "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-grid.spec.ts:7:5",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                          "column": 35,
+                          "line": 6
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                            "column": 35,
+                            "line": 6
+                          },
+                          "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-grid.spec.ts:7:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:44.823Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-grid-Pla-9a596-nectors-when-plan-has-links-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-grid-Pla-9a596-nectors-when-plan-has-links-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bde7132752df0ae71679-b14539a51671ac3a4a37",
+              "file": "planning/planning-grid.spec.ts",
+              "line": 31,
+              "column": 3
+            },
+            {
+              "title": "shows conflict banner after remote plan version bump",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 13,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 642,
+                      "error": {
+                        "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                        "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-grid.spec.ts:7:5",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                          "column": 35,
+                          "line": 6
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                            "column": 35,
+                            "line": 6
+                          },
+                          "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\planning-grid.spec.ts:7:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:46.153Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-grid-Pla-61e80-er-remote-plan-version-bump-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-planning-grid-Pla-61e80-er-remote-plan-version-bump-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bde7132752df0ae71679-648ed5d94aad3b1b4e84",
+              "file": "planning/planning-grid.spec.ts",
+              "line": 43,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "planning\\resource-matrix.spec.ts",
+      "file": "planning/resource-matrix.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "resource matrix",
+          "file": "planning/resource-matrix.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "planning resources tab shows monthly matrix",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 14,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 10943,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('planning-resource-matrix')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('planning-resource-matrix')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('planning-resource-matrix')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('planning-resource-matrix')\u001b[22m\n\n    at E:\\KISS-PM\\e2e\\planning\\resource-matrix.spec.ts:14:64",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\resource-matrix.spec.ts",
+                          "column": 64,
+                          "line": 14
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 12 |\u001b[39m\n \u001b[90m 13 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/projects/project-alpha/resources\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 14 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByTestId(\u001b[32m\"planning-resource-matrix\"\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 15 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByTestId(\u001b[32m\"planning-resource-matrix-nav\"\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 16 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 17 |\u001b[39m })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\resource-matrix.spec.ts",
+                            "column": 64,
+                            "line": 14
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('planning-resource-matrix')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('planning-resource-matrix')\u001b[22m\n\n\n  12 |\n  13 |     await page.goto(\"/projects/project-alpha/resources\");\n> 14 |     await expect(page.getByTestId(\"planning-resource-matrix\")).toBeVisible();\n     |                                                                ^\n  15 |     await expect(page.getByTestId(\"planning-resource-matrix-nav\")).toBeVisible();\n  16 |   });\n  17 | });\n    at E:\\KISS-PM\\e2e\\planning\\resource-matrix.spec.ts:14:64"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:41:47.614Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-resource-matrix-r-52695-es-tab-shows-monthly-matrix-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-resource-matrix-r-52695-es-tab-shows-monthly-matrix-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\resource-matrix.spec.ts",
+                        "column": 64,
+                        "line": 14
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "24806ffba772800811b0-64883179b41213c43c6e",
+              "file": "planning/resource-matrix.spec.ts",
+              "line": 6,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "planning\\resources.spec.ts",
+      "file": "planning/resources.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "resources pane opens from project tab",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 15,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 570,
+                  "error": {
+                    "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n",
+                    "stack": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\resources.spec.ts:6:3",
+                    "location": {
+                      "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                      "column": 35,
+                      "line": 6
+                    },
+                    "snippet": "\u001b[90m   at \u001b[39mplanning\\planningHelpers.ts:6\n\n\u001b[0m \u001b[90m 4 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 5 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Email\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin@kiss-pm.local\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 6 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Пароль\"\u001b[39m)\u001b[33m.\u001b[39mfill(\u001b[32m\"admin12345\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m   |\u001b[39m                                   \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 7 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"button\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Войти\"\u001b[39m })\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 8 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m\"**/dashboard\"\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 9 |\u001b[39m }\u001b[0m"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                        "column": 35,
+                        "line": 6
+                      },
+                      "message": "Error: locator.fill: Error: strict mode violation: getByLabel('Пароль') resolved to 2 elements:\n    1) <input value=\"\" required=\"\" type=\"password\" name=\"password\" data-slot=\"input\" placeholder=\"Пароль\" aria-invalid=\"false\" autocomplete=\"current-password\" class=\"flex h-[var(--row-h)] w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] [@media(pointer:coarse)]:min-h-[var(--touch-target)] bg-[var(--panel)] px-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)] placeholder:text-[var(--muted)] transition-colors duration-[var(--duration-fast)] focus-vis…/> aka getByRole('textbox', { name: 'Пароль Показать пароль' })\n    2) <button type=\"button\" data-size=\"icon\" data-slot=\"button\" data-variant=\"ghost\" aria-pressed=\"false\" aria-label=\"Показать пароль\" class=\"inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap cursor-pointer select-none [@media(pointer:coarse)]:min-h-[var(--touch-target)] [@media(pointer:coarse)]:min-w-[var(--touch-target)] rounded-[var(--radius-md)] font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] focus-visible:outline-n…>…</button> aka getByRole('button', { name: 'Показать пароль' })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Пароль')\u001b[22m\n\n\n   at planning\\planningHelpers.ts:6\n\n  4 |   await page.goto(\"/\");\n  5 |   await page.getByLabel(\"Email\").fill(\"admin@kiss-pm.local\");\n> 6 |   await page.getByLabel(\"Пароль\").fill(\"admin12345\");\n    |                                   ^\n  7 |   await page.getByRole(\"button\", { name: \"Войти\" }).click();\n  8 |   await page.waitForURL(\"**/dashboard\");\n  9 | }\n    at loginAsAdmin (E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts:6:35)\n    at E:\\KISS-PM\\e2e\\planning\\resources.spec.ts:6:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-09T21:41:59.344Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "E:\\KISS-PM\\test-results\\planning-resources-resources-pane-opens-from-project-tab-chromium\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "E:\\KISS-PM\\test-results\\planning-resources-resources-pane-opens-from-project-tab-chromium\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "E:\\KISS-PM\\e2e\\planning\\planningHelpers.ts",
+                    "column": 35,
+                    "line": 6
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "eae75f5e0b3a06b78952-4b54999df7806c505e0d",
+          "file": "planning/resources.spec.ts",
+          "line": 5,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "planning\\saved-views.spec.ts",
+      "file": "planning/saved-views.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "saved views",
+          "file": "planning/saved-views.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "wbs grid exposes saved views dropdown",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 16,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 12402,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('saved-views-dropdown')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('saved-views-dropdown')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('saved-views-dropdown')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('saved-views-dropdown')\u001b[22m\n\n    at E:\\KISS-PM\\e2e\\planning\\saved-views.spec.ts:14:60",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\saved-views.spec.ts",
+                          "column": 60,
+                          "line": 14
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 12 |\u001b[39m\n \u001b[90m 13 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/projects/project-alpha/schedule\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 14 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByTestId(\u001b[32m\"saved-views-dropdown\"\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 15 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 16 |\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m 17 |\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\saved-views.spec.ts",
+                            "column": 60,
+                            "line": 14
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('saved-views-dropdown')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('saved-views-dropdown')\u001b[22m\n\n\n  12 |\n  13 |     await page.goto(\"/projects/project-alpha/schedule\");\n> 14 |     await expect(page.getByTestId(\"saved-views-dropdown\")).toBeVisible();\n     |                                                            ^\n  15 |   });\n  16 | });\n  17 |\n    at E:\\KISS-PM\\e2e\\planning\\saved-views.spec.ts:14:60"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:42:00.657Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-saved-views-saved-b0210-xposes-saved-views-dropdown-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-saved-views-saved-b0210-xposes-saved-views-dropdown-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\saved-views.spec.ts",
+                        "column": 60,
+                        "line": 14
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "cff62aac601f0c40418a-ee31e758282b30754b29",
+              "file": "planning/saved-views.spec.ts",
+              "line": 6,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "planning\\settings.spec.ts",
+      "file": "planning/settings.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "project planning settings",
+          "file": "planning/settings.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "pm previews calendar change",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 17,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 11139,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('planning-settings-pane')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('planning-settings-pane')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('planning-settings-pane')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('planning-settings-pane')\u001b[22m\n\n    at E:\\KISS-PM\\e2e\\planning\\settings.spec.ts:14:62",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\planning\\settings.spec.ts",
+                          "column": 62,
+                          "line": 14
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 12 |\u001b[39m\n \u001b[90m 13 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m\"/projects/project-alpha/settings\"\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 14 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByTestId(\u001b[32m\"planning-settings-pane\"\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 15 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m\"Календарь проекта\"\u001b[39m)\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 16 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"option\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[35m/tenant-default|производственный/i\u001b[39m })\u001b[33m.\u001b[39mfirst()\u001b[33m.\u001b[39mclick()\u001b[33m;\u001b[39m\n \u001b[90m 17 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByTestId(\u001b[32m\"calendar-preview-summary\"\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\planning\\settings.spec.ts",
+                            "column": 62,
+                            "line": 14
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('planning-settings-pane')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('planning-settings-pane')\u001b[22m\n\n\n  12 |\n  13 |     await page.goto(\"/projects/project-alpha/settings\");\n> 14 |     await expect(page.getByTestId(\"planning-settings-pane\")).toBeVisible();\n     |                                                              ^\n  15 |     await page.getByLabel(\"Календарь проекта\").click();\n  16 |     await page.getByRole(\"option\", { name: /tenant-default|производственный/i }).first().click();\n  17 |     await expect(page.getByTestId(\"calendar-preview-summary\")).toBeVisible();\n    at E:\\KISS-PM\\e2e\\planning\\settings.spec.ts:14:62"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T21:42:13.872Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\planning-settings-project--5777b-pm-previews-calendar-change-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\planning-settings-project--5777b-pm-previews-calendar-change-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\planning\\settings.spec.ts",
+                        "column": 62,
+                        "line": 14
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "498cc0604317dc606ae2-567b414d6b0a5edb14d6",
+              "file": "planning/settings.spec.ts",
+              "line": 6,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-09T21:40:58.638Z",
+    "duration": 86643.317,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 18,
+    "flaky": 0
+  }
+}

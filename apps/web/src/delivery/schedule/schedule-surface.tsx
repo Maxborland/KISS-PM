@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, GitBranch, IndentDecrease, IndentIncrease, Plus, TriangleAlert, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -11,12 +11,16 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
+import { createClientId } from "@/delivery/lib/client-id";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/planning-demo-data";
 import { currentPlanDate, deriveScheduleTimeline, formatWeekLabel } from "@/delivery/lib/date-origin";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
 import { usePointerDrag } from "@/delivery/lib/use-pointer-drag";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
+import { hasPermission } from "@/lib/permissions";
+import { useSessionUser } from "@/shell/use-session-user";
 import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu, TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { DependencyType, PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
@@ -24,8 +28,16 @@ import { buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/plan
 import { mapRows, type Kind, type Mode, type Pred, type Row } from "@/delivery/schedule/schedule-rows";
 
 const HPD = 8; // часов в рабочем дне
-let SEQ = 0;
-const genId = (p: string) => `${p}-new-${++SEQ}`;
+const genId = createClientId;
+const PLAN_MANAGE_PERMISSION = "tenant.project_plan.manage";
+
+export function canManageScheduleControls({ live, permissions }: { live: boolean; permissions: readonly string[] }): boolean {
+  return !live || hasPermission(permissions, PLAN_MANAGE_PERMISSION);
+}
+
+function ScheduleRowMenu({ canManagePlan, children, ...props }: ComponentProps<typeof RowMenu> & { canManagePlan: boolean }) {
+  return canManagePlan ? <RowMenu {...props}>{children}</RowMenu> : <>{children}</>;
+}
 
 type EditField = "name" | "dur" | "work" | "pct"; // редактируемые ячейки сетки (для Tab-навигации)
 
@@ -157,6 +169,9 @@ const numInput = "w-full rounded-[var(--radius-xs)] border border-[var(--accent)
 const cellBtn = "block w-full cursor-pointer truncate rounded-[var(--radius-xs)] px-1 text-left hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]";
 
 export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { live } = usePlanningRuntime();
+  const sessionUser = useSessionUser();
+  const canManagePlan = canManageScheduleControls({ live, permissions: sessionUser?.permissions ?? [] });
   const { readModel, setReadModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
@@ -318,6 +333,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }, [inlineNew?.afterId, inlineNew?.parentId]);
 
   async function applyStaged() {
+    if (!canManagePlan) return;
     if (staged.length === 0) return;
     const cmds = staged;
     const base = batchBaseRef.current;
@@ -327,7 +343,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     setStaged([]);
     if (res.ok) {
       lastCommitRef.current = base ? { commands: cmds, before: base } : null;
-      setCanUndo(base != null);
+      setCanUndo(base != null && cmds.some((command) => buildCompensatingCommands(command, base).length > 0));
       setErrors(new Map());
       setFlash(new Set(res.changed));
       toast.success(`Пакет применён: коммит v${res.planVersion} · затронуто задач: ${res.changed.length}`);
@@ -349,6 +365,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     void reload();
   }
   async function undo() {
+    if (!canManagePlan) return;
     const lc = lastCommitRef.current;
     if (!lc) return;
     const inverses = lc.commands.slice().reverse().flatMap((c) => buildCompensatingCommands(c, lc.before));
@@ -369,6 +386,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }
 
   async function applyCmd(command: PlanningCommand) {
+    if (!canManagePlan) return;
     // режим пакета: копим правки + оптимистично показываем, применяем одним коммитом
     if (batchMode) {
       if (staged.length === 0) batchBaseRef.current = readModel;
@@ -385,7 +403,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     setBusy(false);
     if (res.ok) {
       lastCommitRef.current = prev ? { commands: [command], before: prev } : null;
-      setCanUndo(prev != null);
+      setCanUndo(prev != null && buildCompensatingCommands(command, prev).length > 0);
       setErrors(new Map());
       setFlash(new Set(res.changed));
       toast.success(`Коммит v${res.planVersion} применён · затронуто задач: ${res.changed.length}`);
@@ -409,7 +427,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   if (status !== "ready" || !mapped || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="График">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} projectId={projectId} activeTab="График">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка плана…">
           <span />
         </SurfaceState>
@@ -568,6 +586,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   };
 
   async function runBatch(cmds: PlanningCommand[]) {
+    if (!canManagePlan) return;
     if (!cmds.length) return;
     const base = readModel;
     setBusy(true);
@@ -575,7 +594,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     setBusy(false);
     if (res.ok) {
       lastCommitRef.current = base ? { commands: cmds, before: base } : null;
-      setCanUndo(base != null);
+      setCanUndo(base != null && cmds.some((command) => buildCompensatingCommands(command, base).length > 0));
       setErrors(new Map());
       setFlash(new Set(res.changed));
       toast.success(`Коммит v${res.planVersion} применён · затронуто задач: ${res.changed.length}`);
@@ -746,17 +765,21 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   };
 
   return (
-    <DeliveryFrame project={projectMeta} activeTab="График">
+    <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="График">
       {/* Toolbar */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
-        <Button variant="default" size="sm" onClick={() => openCreate(null)} disabled={busy}><Plus className="size-3.5" aria-hidden />Задача</Button>
-        <Button variant="secondary" size="sm" onClick={() => selected && openCreate(selected.id)} disabled={busy || !selected}><Plus className="size-3.5" aria-hidden />Подзадача</Button>
-        <span className="mx-1 h-5 w-px bg-[var(--border)]" />
-        <Button variant="ghost" size="sm" onClick={() => selected && outdent(selected)} disabled={busy || !selected || (selected ? !canOutdent(selected) : true)} title="На уровень выше"><IndentDecrease className="size-3.5" aria-hidden /></Button>
-        <Button variant="ghost" size="sm" onClick={() => selected && indent(selected)} disabled={busy || !selected || (selected ? !canIndent(selected) : true)} title="На уровень глубже"><IndentIncrease className="size-3.5" aria-hidden /></Button>
-        <span className="mx-1 h-5 w-px bg-[var(--border)]" />
-        <Button variant={batchMode ? "default" : "ghost"} size="sm" onClick={() => setBatchMode((v) => !v)} title="Режим пакета: копить правки и применить одним коммитом"><GitBranch className="size-3.5" aria-hidden />Пакет{staged.length ? ` · ${staged.length}` : ""}</Button>
-        <Button variant="ghost" size="sm" onClick={() => void undo()} disabled={busy || !canUndo} title="Откатить последний коммит (компенсирующий коммит)"><Undo2 className="size-3.5" aria-hidden />Откат</Button>
+        {canManagePlan ? (
+          <>
+            <Button variant="default" size="sm" onClick={() => openCreate(null)} disabled={busy}><Plus className="size-3.5" aria-hidden />Задача</Button>
+            <Button variant="secondary" size="sm" onClick={() => selected && openCreate(selected.id)} disabled={busy || !selected}><Plus className="size-3.5" aria-hidden />Подзадача</Button>
+            <span className="mx-1 h-5 w-px bg-[var(--border)]" />
+            <Button variant="ghost" size="sm" onClick={() => selected && outdent(selected)} disabled={busy || !selected || (selected ? !canOutdent(selected) : true)} title="На уровень выше"><IndentDecrease className="size-3.5" aria-hidden /></Button>
+            <Button variant="ghost" size="sm" onClick={() => selected && indent(selected)} disabled={busy || !selected || (selected ? !canIndent(selected) : true)} title="На уровень глубже"><IndentIncrease className="size-3.5" aria-hidden /></Button>
+            <span className="mx-1 h-5 w-px bg-[var(--border)]" />
+            <Button variant={batchMode ? "default" : "ghost"} size="sm" onClick={() => setBatchMode((v) => !v)} title="Режим пакета: копить правки и применить одним коммитом"><GitBranch className="size-3.5" aria-hidden />Пакет{staged.length ? ` · ${staged.length}` : ""}</Button>
+            <Button variant="ghost" size="sm" onClick={() => void undo()} disabled={busy || !canUndo} title="Откатить последний коммит (компенсирующий коммит)"><Undo2 className="size-3.5" aria-hidden />Откат</Button>
+          </>
+        ) : null}
         <Button asChild variant="ghost" size="sm"><Link href={`/projects/${projectId}/baseline`}>Baseline</Link></Button>
         <div className="ml-auto flex items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-0.5">
           {(["day", "week", "month"] as Zoom[]).map((z) => (
@@ -767,7 +790,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         </div>
       </div>
 
-      {prototypeNotesEnabled ? (
+      {prototypeNotesEnabled && canManagePlan ? (
         <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
           Реальный контракт planning · каждая правка = коммит preview→apply через @kiss-pm/planning-client. Данные in-memory, не сохраняются. Нижняя строка — создать задачу (Enter) · 2× клик — правка ячейки · ПКМ — меню · границы колонок — ширина · бар: тяни тело (сдвиг), края (длительность), точку справа — связь.
@@ -815,7 +838,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 <tbody>
                   {visibleRows.map((r, i) => (
                     <Fragment key={r.id}>
-                    <RowMenu
+                    <ScheduleRowMenu
+                      canManagePlan={canManagePlan}
                       isLeaf={r.kind !== "summary"}
                       canIndent={canIndent(r)}
                       canOutdent={canOutdent(r)}
@@ -832,7 +856,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                         <td className="num muted text-[length:var(--text-xs)]">{i + 1}</td>
                         <td>{r.kind === "milestone" ? <span className="text-[var(--muted-soft)]">—</span> : <ModeChip mode={r.mode} />}</td>
                         <td className="mono muted text-[length:var(--text-xs)]">{r.wbs}</td>
-                        <td title={r.name} onDoubleClick={(e) => { stop(e); beginEdit(r, "name", r.name); }}>
+                        <td title={r.name} onDoubleClick={canManagePlan ? (e) => { stop(e); beginEdit(r, "name", r.name); } : undefined}>
                           <span className="name-cell" style={{ paddingLeft: r.level * 14 }}>
                             {r.kind === "summary" && hasChildren(r) ? (
                               <button type="button" onClick={(e) => { stop(e); toggle(r.id); }} className="grid size-3.5 shrink-0 place-items-center rounded-[var(--radius-xs)] text-[var(--muted)] transition-colors hover:bg-[var(--panel-strong)] hover:text-[var(--text)]" aria-label={collapsed.has(r.id) ? "Развернуть группу" : "Свернуть группу"}>
@@ -841,35 +865,35 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                             ) : <span className="w-3.5 shrink-0" />}
                             {r.critical ? <span className="size-1.5 shrink-0 rounded-full bg-[var(--critical-stripe)]" title="На критическом пути" /> : null}
                             {r.warning ? <span className="inline-flex shrink-0" title={r.warnMsg ?? "Предупреждение планировщика"}><TriangleAlert className="size-3 text-[var(--warning)]" aria-hidden /></span> : null}
-                            {edit?.id === r.id && edit.field === "name" ? (
+                            {canManagePlan && edit?.id === r.id && edit.field === "name" ? (
                               <input autoFocus value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "name")} className="w-full rounded-[var(--radius-xs)] border border-[var(--accent)] bg-[var(--panel)] px-1 text-[length:var(--text-sm)] outline-none" />
                             ) : <span className={cn("truncate", r.kind === "summary" ? "font-bold text-[var(--text-strong)]" : "font-medium text-[var(--text)]")}>{r.name}</span>}
                           </span>
                         </td>
-                        <td className="num muted" onDoubleClick={(e) => { if (r.kind === "task") { stop(e); beginEdit(r, "dur", r.durDays); } }}>
-                          {edit?.id === r.id && edit.field === "dur" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "dur")} className={numInput} /> : r.kind === "milestone" ? "0 дн" : `${r.durDays} дн`}
+                        <td className="num muted" onDoubleClick={canManagePlan ? (e) => { if (r.kind === "task") { stop(e); beginEdit(r, "dur", r.durDays); } } : undefined}>
+                          {canManagePlan && edit?.id === r.id && edit.field === "dur" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "dur")} className={numInput} /> : r.kind === "milestone" ? "0 дн" : `${r.durDays} дн`}
                         </td>
-                        <td className="num muted" onDoubleClick={(e) => { if (r.kind === "task") { stop(e); beginEdit(r, "work", r.workH); } }}>
-                          {edit?.id === r.id && edit.field === "work" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "work")} className={numInput} /> : r.kind === "milestone" ? "—" : `${r.workH} ч`}
+                        <td className="num muted" onDoubleClick={canManagePlan ? (e) => { if (r.kind === "task") { stop(e); beginEdit(r, "work", r.workH); } } : undefined}>
+                          {canManagePlan && edit?.id === r.id && edit.field === "work" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "work")} className={numInput} /> : r.kind === "milestone" ? "—" : `${r.workH} ч`}
                         </td>
-                        <td className="num" onDoubleClick={(e) => { if (r.kind === "task") { stop(e); beginEdit(r, "pct", r.pct); } }}>
-                          {edit?.id === r.id && edit.field === "pct" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "pct")} className={numInput} /> : `${r.pct}%`}
-                        </td>
-                        <td className="mono muted">
-                          {r.kind === "milestone" || r.kind === "task" ? <DateEditor valueIso={r.startIso} onPick={(iso) => editDate(r, iso)}><button type="button" onClick={stop} className={cellBtn}>{fmtDate(r.startIso)}</button></DateEditor> : fmtDate(r.startIso)}
+                        <td className="num" onDoubleClick={canManagePlan ? (e) => { if (r.kind === "task") { stop(e); beginEdit(r, "pct", r.pct); } } : undefined}>
+                          {canManagePlan && edit?.id === r.id && edit.field === "pct" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "pct")} className={numInput} /> : `${r.pct}%`}
                         </td>
                         <td className="mono muted">
-                          {r.kind === "task" ? <DateEditor title="Окончание задачи" valueIso={r.finishIso} onPick={(iso) => editFinish(r, iso)}><button type="button" onClick={stop} className={cellBtn}>{fmtDate(r.finishIso)}</button></DateEditor> : fmtDate(r.finishIso)}
+                          {canManagePlan && (r.kind === "milestone" || r.kind === "task") ? <DateEditor valueIso={r.startIso} onPick={(iso) => editDate(r, iso)}><button type="button" onClick={stop} className={cellBtn}>{fmtDate(r.startIso)}</button></DateEditor> : fmtDate(r.startIso)}
+                        </td>
+                        <td className="mono muted">
+                          {canManagePlan && r.kind === "task" ? <DateEditor title="Окончание задачи" valueIso={r.finishIso} onPick={(iso) => editFinish(r, iso)}><button type="button" onClick={stop} className={cellBtn}>{fmtDate(r.finishIso)}</button></DateEditor> : fmtDate(r.finishIso)}
                         </td>
                         <td className="text-[var(--muted-strong)]">
-                          {r.kind === "task" ? <ResourceEditor onPick={(rid) => assignRes(r.id, rid)}><button type="button" onClick={stop} className={cellBtn}>{r.res}</button></ResourceEditor> : <span className="text-[var(--muted-soft)]">{r.res}</span>}
+                          {canManagePlan && r.kind === "task" ? <ResourceEditor onPick={(rid) => assignRes(r.id, rid)}><button type="button" onClick={stop} className={cellBtn}>{r.res}</button></ResourceEditor> : <span className="text-[var(--muted-soft)]">{r.res}</span>}
                         </td>
                         <td className="mono text-[length:var(--text-xs)] text-[var(--muted)]">
-                          {r.kind !== "summary" ? <DependencyEditor preds={predRows(r)} options={depOptions(r)} onAdd={(p, t, l) => depAdd(r.id, p, t, l)} onRemove={depRemove}><button type="button" onClick={stop} className={cellBtn}>{r.predDisplay}</button></DependencyEditor> : "—"}
+                          {canManagePlan && r.kind !== "summary" ? <DependencyEditor preds={predRows(r)} options={depOptions(r)} onAdd={(p, t, l) => depAdd(r.id, p, t, l)} onRemove={depRemove}><button type="button" onClick={stop} className={cellBtn}>{r.predDisplay}</button></DependencyEditor> : r.predDisplay || "—"}
                         </td>
                       </tr>
-                    </RowMenu>
-                    {inlineNew && inlineNew.afterId === r.id ? (
+                    </ScheduleRowMenu>
+                    {canManagePlan && inlineNew && inlineNew.afterId === r.id ? (
                       <tr className="msgrid-newrow">
                         <td className="num muted text-[length:var(--text-xs)]" aria-hidden>+</td>
                         <td />
@@ -893,23 +917,25 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                     </Fragment>
                   ))}
                   {/* Excel-подобная строка создания: имя → Enter создаёт задачу и очищает для следующей. */}
-                  <tr className="msgrid-newrow">
-                    <td className="num muted text-[length:var(--text-xs)]" aria-hidden>+</td>
-                    <td />
-                    <td />
-                    <td colSpan={COLS.length - 3}>
-                      {newTaskCell({
-                        value: newTask,
-                        onChange: (v) => { setCreateError(null); setNewTask(v); },
-                        onEnter: () => { if (createInline(newTask)) setNewTask(""); },
-                        onTab: () => { const last = visibleRows[visibleRows.length - 1]; if (createInline(newTask, last ? last.id : null)) setNewTask(""); },
-                        onEsc: () => { setCreateError(null); setNewTask(""); },
-                        level: 0,
-                        placeholder: "Новая задача — Enter (Tab — подзадачей)",
-                        error: createError?.scope === "bottom" ? createError.msg : null
-                      })}
-                    </td>
-                  </tr>
+                  {canManagePlan ? (
+                    <tr className="msgrid-newrow">
+                      <td className="num muted text-[length:var(--text-xs)]" aria-hidden>+</td>
+                      <td />
+                      <td />
+                      <td colSpan={COLS.length - 3}>
+                        {newTaskCell({
+                          value: newTask,
+                          onChange: (v) => { setCreateError(null); setNewTask(v); },
+                          onEnter: () => { if (createInline(newTask)) setNewTask(""); },
+                          onTab: () => { const last = visibleRows[visibleRows.length - 1]; if (createInline(newTask, last ? last.id : null)) setNewTask(""); },
+                          onEsc: () => { setCreateError(null); setNewTask(""); },
+                          level: 0,
+                          placeholder: "Новая задача — Enter (Tab — подзадачей)",
+                          error: createError?.scope === "bottom" ? createError.msg : null
+                        })}
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -940,18 +966,22 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       <>
                         {r.baseDay != null && r.baseDur != null ? <span className="absolute rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" style={{ left: toTimelineX(r.baseDay), width: Math.max(r.baseDur * dayW, 6), height: 6, bottom: 5 }} title="Baseline B2" /> : null}
                         <span
-                          className={cn("gantt-bar absolute top-1/2 flex -translate-y-1/2 cursor-grab items-center overflow-hidden rounded-[5px] shadow-[var(--shadow-card)] active:cursor-grabbing", r.critical && "gantt-bar--crit", dragging && "opacity-90 outline-dashed outline-2 outline-offset-1 outline-[var(--accent)]", flash.has(r.id) && "ring-2 ring-[var(--success)]")}
+                          className={cn("gantt-bar absolute top-1/2 flex -translate-y-1/2 items-center overflow-hidden rounded-[5px] shadow-[var(--shadow-card)]", canManagePlan ? "cursor-grab active:cursor-grabbing" : "cursor-default", r.critical && "gantt-bar--crit", dragging && "opacity-90 outline-dashed outline-2 outline-offset-1 outline-[var(--accent)]", flash.has(r.id) && "ring-2 ring-[var(--success)]")}
                           style={{ left, width, height: 18 }}
-                          title={`${r.name} · ${fillPct}% · тело — сдвиг, края — длительность`}
-                          onPointerDown={(e) => startDrag(e, r, "move")}
+                          title={canManagePlan ? `${r.name} · ${fillPct}% · тело — сдвиг, края — длительность` : `${r.name} · ${fillPct}%`}
+                          onPointerDown={canManagePlan ? (e) => startDrag(e, r, "move") : undefined}
                         >
                           <span className={cn("gantt-bar-fill h-full", r.critical && "gantt-bar-fill--crit")} style={{ width: `${fillPct}%` }} />
-                          <span className="absolute top-0 h-full w-1 -translate-x-1/2 cursor-ew-resize bg-[var(--accent)] opacity-0 group-hover:opacity-100" style={{ left: `${fillPct}%` }} onPointerDown={(e) => startDrag(e, r, "progress")} title="Тяните — % выполнения" />
-                          <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resizeLeft")} title="Потяните — сдвинуть начало" />
-                          <span className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resize")} title="Потяните — изменить длительность" />
+                          {canManagePlan ? <>
+                            <span className="absolute top-0 h-full w-1 -translate-x-1/2 cursor-ew-resize bg-[var(--accent)] opacity-0 group-hover:opacity-100" style={{ left: `${fillPct}%` }} onPointerDown={(e) => startDrag(e, r, "progress")} title="Тяните — % выполнения" />
+                            <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resizeLeft")} title="Потяните — сдвинуть начало" />
+                            <span className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resize")} title="Потяните — изменить длительность" />
+                          </> : null}
                         </span>
-                        <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--muted-soft)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: left - 3 }} onPointerDown={(e) => startLink(e, r, "start")} title="Тяните от начала → связь НН/НО" />
-                        <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--accent)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: barRight + 3 }} onPointerDown={(e) => startLink(e, r, "finish")} title="Тяните от конца → связь ОН/ОО" />
+                        {canManagePlan ? <>
+                          <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--muted-soft)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: left - 3 }} onPointerDown={(e) => startLink(e, r, "start")} title="Тяните от начала → связь НН/НО" />
+                          <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--accent)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: barRight + 3 }} onPointerDown={(e) => startLink(e, r, "finish")} title="Тяните от конца → связь ОН/ОО" />
+                        </> : null}
                       </>
                     )}
                   </div>
@@ -974,13 +1004,13 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 </svg>
               ) : null}
               {/* бейджи лага на связях выбранной задачи — клик редактирует тип/лаг/удаляет */}
-              {links.filter((l) => l.accent).map((l) => (
+              {canManagePlan ? links.filter((l) => l.accent).map((l) => (
                 <LinkLagEditor key={`badge-${l.key}`} type={l.type} lagDays={l.lagDays} onSave={(t, lag) => depUpsert(l.depId, l.predId, l.succId, t, lag)} onDelete={() => depRemove(l.depId)}>
                   <button type="button" onClick={stop} className="absolute z-[4] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--accent)] bg-[var(--panel)] px-1 text-[length:var(--text-2xs)] font-semibold leading-tight text-[var(--accent)] shadow-[var(--shadow-card)] hover:bg-[var(--accent-soft)]" style={{ left: l.mx, top: HEADER_H + l.my }} title="Изменить связь (тип/лаг)">
                     {DEP_RU[l.type]}{l.lagDays ? `+${l.lagDays}` : ""}
                   </button>
                 </LinkLagEditor>
-              ))}
+              )) : null}
             </div>
           </div>
         </div>
@@ -1004,7 +1034,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 <Fact label="Режим" value={selected.mode === "auto" ? "Авто" : "Ручной"} />
                 <Fact label="Длительность" value={`${selected.durDays} дн`} />
                 <Fact label="Трудозатраты" value={`${selected.workH} ч`} />
-                <FactNum label="Единицы" value={unitsPct(selected.durDays, selected.workH)} suffix="%" disabled={selected.kind !== "task"} onCommit={(n) => editUnits(selected, n)} />
+                {canManagePlan ? <FactNum label="Единицы" value={unitsPct(selected.durDays, selected.workH)} suffix="%" disabled={selected.kind !== "task"} onCommit={(n) => editUnits(selected, n)} /> : <Fact label="Единицы" value={`${unitsPct(selected.durDays, selected.workH)}%`} />}
                 <Fact label="Начало" value={fmtDate(selected.startIso)} mono />
                 <Fact label="Окончание" value={fmtDate(selected.finishIso)} mono />
                 <Fact label="Слак" value={selected.slackDays != null ? `${selected.slackDays} дн` : "—"} />
@@ -1024,7 +1054,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         ) : null}
       </div>
 
-      {staged.length > 0 ? (
+      {canManagePlan && staged.length > 0 ? (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-2.5 shadow-[var(--shadow-raise)]">
           <span className="inline-flex items-center gap-1.5 text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]"><GitBranch className="size-4 text-[var(--accent)]" aria-hidden />Пакет правок</span>
           <span className="text-[length:var(--text-sm)] text-[var(--muted-strong)]">накоплено: <span className="font-semibold">{staged.length}</span> · применятся одним коммитом</span>
@@ -1043,20 +1073,20 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         <span className="flex items-center gap-1.5"><span className="size-2.5 rotate-45 rounded-[2px] bg-[var(--text-strong)]" /> Веха</span>
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-5 rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" /> Baseline B2</span>
         <span className="flex items-center gap-1.5"><svg width="22" height="8" aria-hidden><polyline points="1,4 14,4" fill="none" stroke="var(--muted-soft)" strokeWidth="1.25" /><polygon points="21,4 15,1.5 15,6.5" fill="var(--muted-soft)" /></svg> Связь</span>
-        <span className="ml-auto text-[length:var(--text-xs)] text-[var(--muted-soft)]">2× клик — правка · ПКМ — меню · тяни бар — сдвиг/длительность · движок считает даты/критпуть</span>
+        {canManagePlan ? <span className="ml-auto text-[length:var(--text-xs)] text-[var(--muted-soft)]">2× клик — правка · ПКМ — меню · тяни бар — сдвиг/длительность · движок считает даты/критпуть</span> : null}
       </div>
 
-      {taskModal ? <TaskModal open mode={taskModal.mode} initial={taskModal.initial} onOpenChange={(o) => { if (!o) setTaskModal(null); }} onSubmit={submitTaskModal} /> : null}
+      {canManagePlan && taskModal ? <TaskModal open mode={taskModal.mode} initial={taskModal.initial} onOpenChange={(o) => { if (!o) setTaskModal(null); }} onSubmit={submitTaskModal} /> : null}
 
       {/* Подтверждение необратимого удаления (G3-06): вызов из ПКМ-меню, поэтому контролируемый диалог, а не asChild-триггер */}
-      {confirmDelete ? (
+      {canManagePlan && confirmDelete ? (
         <Dialog open onOpenChange={(o) => { if (!o) setConfirmDelete(null); }}>
           <DialogContent className="max-w-[440px]">
             <DialogHeader>
               <DialogTitle>{`Удалить задачу «${confirmDelete.name}»?`}</DialogTitle>
               <DialogDescription>
-                Задача будет архивирована; откатить это действие из интерфейса нельзя.
-                {confirmDelete.kind === "summary" ? " Вместе с суммарной задачей будут архивированы все её подзадачи." : ""}
+                Задача будет безвозвратно удалена из плана.
+                {confirmDelete.kind === "summary" ? " Вместе с суммарной задачей будут также удалены все её подзадачи." : ""}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

@@ -14,6 +14,7 @@ import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRo
 import { notifyPlanVersionChanged } from "../planningEventBus";
 import { registerPlanningEventsRoute } from "../planningEventsRoute";
 import { registerPlanningAutoSolverRoutes } from "./planningAutoSolverRoutes";
+import { registerPlanningBatchPreviewRoute } from "./planningBatchPreviewRoute";
 import { registerPlanningRevertRoute } from "./planningRevertRoute";
 import { registerPlanningSavedViewRoutes } from "./planningSavedViewRoutes";
 import {
@@ -64,6 +65,7 @@ function emitPlanVersionFromBody(
 
 export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
   registerPlanningRevertRoute(app, deps);
+  registerPlanningBatchPreviewRoute(app, deps);
   registerPlanningEventsRoute(app, {
     getSessionActorFromHeaders: deps.getSessionActorFromHeaders,
     getActorProfile: deps.getActorProfile,

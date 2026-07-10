@@ -6,26 +6,35 @@ import { toast } from "sonner";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
+import { createClientId } from "@/delivery/lib/client-id";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
+import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import {
+  canManageResourceControls,
   ResourceLoadMatrix,
   type MatrixAssignment,
   type MatrixData,
   type MatrixScope
 } from "@/delivery/resources/resource-load-matrix";
 import { TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
+import { useSessionUser } from "@/shell/use-session-user";
+import { hasPermission } from "@/lib/permissions";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const SCOPE: MatrixScope = { level: "project", groupLevels: ["team", "role", "person"], windowNoun: "проект" };
 
-let NID = 0;
-const nid = (p: string) => `${p}-n${(NID += 1)}`;
+const nid = createClientId;
 
 export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { live } = usePlanningRuntime();
+  const sessionUser = useSessionUser();
+  const canManageResources = canManageResourceControls({ live, permissions: sessionUser?.permissions ?? [] });
+  const canManagePlan = !live || hasPermission(sessionUser?.permissions ?? [], "tenant.project_plan.manage");
+  const canManageResourceTasks = canManagePlan && canManageResources;
   const { readModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
@@ -74,6 +83,8 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const projectMeta = deriveProjectMeta(readModel, projectBase);
 
   async function applyCmd(command: PlanningCommand) {
+    const allowed = command.type === "risk.accept_overload" ? canManagePlan : canManageResources;
+    if (!allowed) return;
     setBusy(true);
     const res = await apply(command);
     setBusy(false);
@@ -81,8 +92,12 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
   }
 
-  const openCreateTask = (presetResourceId?: string) => setTaskModal({ mode: "create", initial: { title: "", assigneeId: presetResourceId ?? "", startIso: "", durDays: 5, workH: 40, pct: 0 } });
+  const openCreateTask = (presetResourceId?: string) => {
+    if (!canManageResourceTasks) return;
+    setTaskModal({ mode: "create", initial: { title: "", assigneeId: presetResourceId ?? "", startIso: "", durDays: 5, workH: 40, pct: 0 } });
+  };
   const openEditTask = (taskId: string) => {
+    if (!canManageResourceTasks) return;
     const t = model.rawById.get(taskId);
     if (!t) return;
     const asg = [...model.data.asgById.values()].find((x) => x.taskId === taskId);
@@ -103,6 +118,10 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   };
 
   async function submitTaskModal(v: TaskModalValues) {
+    if (!canManageResourceTasks) {
+      setTaskModal(null);
+      return;
+    }
     const m = taskModal;
     setTaskModal(null);
     if (!m) return;
@@ -132,6 +151,7 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   }
 
   async function doAbsence(resourceId: string, typeLabel: string, start: string, finish: string) {
+    if (!canManageResources) return;
     if (!model) return;
     const cmds: PlanningCommand[] = [];
     const end = isoToDay(finish);
@@ -153,9 +173,14 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       <ResourceLoadMatrix
         scope={SCOPE}
         data={model.data}
-        callbacks={{ busy, onCreateTask: openCreateTask, onEditTask: openEditTask, onAcceptOverload: acceptOverload, onEditAssignmentHours: editUnits, onAbsence: doAbsence }}
+        callbacks={{
+          busy,
+          ...(canManageResourceTasks ? { onCreateTask: openCreateTask, onEditTask: openEditTask } : {}),
+          ...(canManagePlan ? { onAcceptOverload: acceptOverload } : {}),
+          ...(canManageResources ? { onEditAssignmentHours: editUnits, onAbsence: doAbsence } : {})
+        }}
       />
-      {taskModal ? <TaskModal open mode={taskModal.mode} initial={taskModal.initial} onOpenChange={(o) => { if (!o) setTaskModal(null); }} onSubmit={submitTaskModal} /> : null}
+      {canManageResourceTasks && taskModal ? <TaskModal open mode={taskModal.mode} initial={taskModal.initial} onOpenChange={(o) => { if (!o) setTaskModal(null); }} onSubmit={submitTaskModal} /> : null}
     </DeliveryFrame>
   );
 }

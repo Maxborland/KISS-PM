@@ -78,6 +78,12 @@ export function createPlanningApiClient(options: PlanningApiClientOptions) {
         }
       );
     },
+    previewCommandBatch(projectId: string, input: PlanningCommandBatchRequest) {
+      return requestJson<PlanningPreviewResponse>(
+        `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/preview-command-batch`,
+        { method: "POST", body: JSON.stringify(input) }
+      );
+    },
     applyCommand(projectId: string, input: PlanningCommandRequest) {
       return requestJson<PlanningApplyResponse>(
         `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/apply-command`,

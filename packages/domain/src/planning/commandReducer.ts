@@ -579,11 +579,7 @@ function validateCommandPreconditions(
       }
       return [];
     }
-    case "assignment.delete":
-      if (!assignmentIds.has(command.payload.assignmentId)) {
-        return [invalid("planning_command_invalid", "Команда ссылается на неизвестное назначение")];
-      }
-      return [];
+
     case "baseline.capture":
       if (command.payload.baselineId.trim().length === 0) {
         return [invalid("planning_command_invalid", "Baseline должен иметь идентификатор")];

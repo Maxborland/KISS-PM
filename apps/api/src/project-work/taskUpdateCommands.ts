@@ -30,6 +30,9 @@ export async function updateTask(
   if (!task) return { ok: false, status: 404, error: "task_not_found" };
   const editDecision = canEditTaskFields(input.actor, input.profile, task);
   if (!editDecision.allowed) return { ok: false, status: 403, error: editDecision.reason };
+  if (input.body.statusId !== task.statusId) {
+    return { ok: false, status: 409, error: "task_status_transition_not_allowed" };
+  }
 
   const participants = normalizeTaskParticipants(input.actor.id, input.body.participants);
   const ownerUserId = getParticipantUserId(participants, "executor");
@@ -63,6 +66,13 @@ export async function updateTask(
     const currentEditDecision = canEditTaskFields(input.actor, input.profile, currentTask);
     if (!currentEditDecision.allowed) {
       return { ok: false as const, status: 403, error: currentEditDecision.reason };
+    }
+    if (input.body.statusId !== currentTask.statusId) {
+      return {
+        ok: false as const,
+        status: 409,
+        error: "task_status_transition_not_allowed"
+      };
     }
 
     const currentActiveUserIds = new Set(

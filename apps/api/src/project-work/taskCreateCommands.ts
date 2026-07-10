@@ -64,7 +64,7 @@ export async function createWorkspaceInboxTask(
   const { participants, ownerUserId, requesterUserId } = participantResult;
   const taskId = input.body.id ?? `task-${randomUUID()}`;
 
-  return deps.runDataSourceTransaction(async (transactionDataSource) => {
+  return deps.runDataSourceTransaction<TaskResult>(async (transactionDataSource) => {
     if (
       !transactionDataSource.ensureWorkspaceInboxProject ||
       !transactionDataSource.listWorkspaceUsers ||
@@ -171,6 +171,12 @@ export async function createWorkspaceInboxTask(
       project: inboxProject,
       planVersion
     };
+  }).catch((error: unknown) => {
+    const conflict = input.body.id !== undefined ? taskCreateConflict(error) : null;
+    if (conflict) {
+      return { ok: false as const, status: 409 as const, error: conflict };
+    }
+    throw error;
   });
 }
 
