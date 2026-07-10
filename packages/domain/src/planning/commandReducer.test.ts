@@ -129,6 +129,36 @@ describe("planning command reducer", () => {
     }
   });
 
+  it("accepts a zero-duration zero-work milestone model", () => {
+    const result = reducePlanningCommand(createSnapshot(), {
+      type: "task.update_work_model",
+      payload: {
+        taskId: "task-a",
+        taskType: "fixed_duration",
+        effortDriven: false,
+        durationMinutes: 0,
+        workMinutes: 0
+      }
+    });
+
+    expect(result.validationIssues).toEqual([]);
+    expect(result.nextSnapshot.tasks[0]).toMatchObject({
+      durationMinutes: 0,
+      workMinutes: 0
+    });
+  });
+
+  it("removes a custom field when compensation writes null", () => {
+    const snapshot = createSnapshot();
+    snapshot.tasks[0]!.customFields = { kind: "milestone", keep: true };
+    const result = reducePlanningCommand(snapshot, {
+      type: "task.update_custom_field",
+      payload: { taskId: "task-a", fieldKey: "kind", value: null }
+    });
+
+    expect(result.validationIssues).toEqual([]);
+    expect(result.nextSnapshot.tasks[0]!.customFields).toEqual({ keep: true });
+  });
   it("rejects task.create for another project without mutating the snapshot", () => {
     const snapshot = createSnapshot();
     const result = reducePlanningCommand(snapshot, {

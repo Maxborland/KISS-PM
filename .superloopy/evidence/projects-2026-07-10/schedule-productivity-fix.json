@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-07-10T03:35:38.2686408Z",
+  "scope": "PROJ-123, PROJ-124, PROJ-125, PROJ-126; milestone hardening",
+  "verdict": "pass",
+  "scenarios": [
+    {
+      "id": "PROJ-123",
+      "status": "pass",
+      "behavior": "10x6 TSV paste -> preview -> atomic batch apply -> readback; duplicate blocked; stale-version preview 409 with zero apply/zero rows"
+    },
+    {
+      "id": "PROJ-124",
+      "status": "pass",
+      "behavior": "literal pointer drag from finish-date handle downward -> sequential preview -> atomic batch -> readback"
+    },
+    {
+      "id": "PROJ-125",
+      "status": "pass",
+      "behavior": "10 tasks created keyboard-only with Insert/Enter; Home/End/Arrows and F2 edit verified"
+    },
+    {
+      "id": "PROJ-126",
+      "status": "pass",
+      "behavior": "Ctrl+Shift+Z compensating batch; busy/editable/version/capability guards; stale version emits no write"
+    },
+    {
+      "id": "PROJ-046",
+      "status": "pass",
+      "behavior": "live assigned task loses assignment and resource-load contribution, becomes duration/work=0 milestone, and survives reload"
+    }
+  ],
+  "verification": [
+    {
+      "command": "Playwright projects-schedule-productivity.spec.ts",
+      "result": "4/4 passed",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/schedule-productivity-playwright.json"
+    },
+    {
+      "command": "focused schedule/domain tests",
+      "result": "197/197 passed across domain, planning-client, and schedule suites"
+    },
+    {
+      "command": "planningRoutes DB batch audit",
+      "result": "1/1 passed (23 skipped)"
+    },
+    {
+      "command": "domain, planning-client, api, web typecheck",
+      "result": "passed"
+    },
+    {
+      "command": "responsive traversal",
+      "result": "390/768/1280, no document overflow"
+    }
+  ],
+  "independentReview": [
+    ".superloopy/evidence/projects-2026-07-10/qa-schedule-productivity-independent.md",
+    ".superloopy/evidence/projects-2026-07-10/qa-schedule-productivity-final.md",
+    ".superloopy/evidence/projects-2026-07-10/qa-schedule-productivity-qa-gate.md",
+    ".superloopy/evidence/projects-2026-07-10/qa-schedule-productivity-recheck.md",
+    ".superloopy/evidence/projects-2026-07-10/qa-schedule-productivity-recheck-final-a.md"
+  ]
+}

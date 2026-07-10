@@ -176,6 +176,7 @@ export function RowMenu({
   isLeaf,
   canIndent,
   canOutdent,
+  canMakeMilestone,
   onOpen,
   onEdit,
   onAddSub,
@@ -189,6 +190,7 @@ export function RowMenu({
   isLeaf: boolean;
   canIndent: boolean;
   canOutdent: boolean;
+  canMakeMilestone: boolean;
   onOpen: () => void;
   onEdit: () => void;
   onAddSub: () => void;
@@ -215,7 +217,7 @@ export function RowMenu({
           <ContextMenu.Separator className="my-1 h-px bg-[var(--border)]" />
           <ContextMenu.Item className={canIndent ? ITEM : itemDisabled} disabled={!canIndent} onSelect={onIndent}><IndentIncrease className="size-3.5" aria-hidden />На уровень глубже</ContextMenu.Item>
           <ContextMenu.Item className={canOutdent ? ITEM : itemDisabled} disabled={!canOutdent} onSelect={onOutdent}><IndentDecrease className="size-3.5" aria-hidden />На уровень выше</ContextMenu.Item>
-          {isLeaf ? <ContextMenu.Item className={ITEM} onSelect={onMakeMilestone}><Diamond className="size-3.5" aria-hidden />Сделать вехой</ContextMenu.Item> : null}
+          {isLeaf ? <ContextMenu.Item className={canMakeMilestone ? ITEM : itemDisabled} disabled={!canMakeMilestone} onSelect={onMakeMilestone}><Diamond className="size-3.5" aria-hidden />Сделать вехой</ContextMenu.Item> : null}
           <ContextMenu.Separator className="my-1 h-px bg-[var(--border)]" />
           <ContextMenu.Item className={ITEM_DANGER} onSelect={onDelete}><Trash2 className="size-3.5" aria-hidden />Удалить</ContextMenu.Item>
         </ContextMenu.Content>

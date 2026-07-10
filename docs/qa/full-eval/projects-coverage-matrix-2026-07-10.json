@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-10T03:15:44.339Z",
+  "generatedAt": "2026-07-10T03:47:54.289Z",
   "source": "docs/qa/full-eval/inventory/projects.md",
   "evidenceRule": "Only rows linked to fresh 2026-07-10 artifacts may be pass; historical checks remain historical_evidence_only.",
   "schema": "role x scenario x surface x expectedBehavior x evidence x status",
@@ -12,7 +12,7 @@
     },
     {
       "status": "fail",
-      "count": 73
+      "count": 71
     },
     {
       "status": "historical_evidence_only",
@@ -20,15 +20,15 @@
     },
     {
       "status": "partial",
-      "count": 5
+      "count": 3
     },
     {
       "status": "pass",
-      "count": 50
+      "count": 55
     },
     {
       "status": "unverified",
-      "count": 32
+      "count": 31
     }
   ],
   "rows": [
@@ -1081,12 +1081,12 @@
       "scenarioId": "PROJ-046",
       "scenario": "«Сделать вехой»",
       "surface": "`/schedule`",
-      "apiOrDataSurface": "apply-command (task.update_custom_field kind=milestone)",
-      "expectedBehavior": "Веха = customFields.kind, НЕ durationMinutes=0 (домен отклоняет 0)",
-      "dataStateAndEdges": "веха с назначением; веха обратно в задачу (нет обратного пункта — гэп)",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "apiOrDataSurface": "apply-command-batch (assignment.delete + task.update_duration/work/custom_field)",
+      "expectedBehavior": "Атомарно снять назначения, обнулить duration/work и установить customFields.kind=milestone",
+      "dataStateAndEdges": "назначенная задача теряет assignment и resource-load contribution; компенсация восстанавливает исходное состояние; обратный UI-пункт остаётся гэпом",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/schedule-productivity-playwright.json; .superloopy/evidence/projects-2026-07-10/schedule-productivity-fix.json; .superloopy/evidence/projects-2026-07-10/qa-schedule-productivity-recheck-final-a.md",
+      "status": "pass",
+      "inventoryStatus": "✅ live assigned milestone removes assignment/resource load; compensation covered"
     },
     {
       "role": "A",
@@ -2582,11 +2582,11 @@
       "scenario": "Paste 10x6 TSV from clipboard",
       "surface": "/schedule",
       "apiOrDataSurface": "UI + planning batch",
-      "expectedBehavior": "Rectangular TSV paste is parsed, previewed and applied atomically.",
-      "dataStateAndEdges": "10x6 data, invalid cells, duplicate paste and version race",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
-      "status": "fail",
-      "inventoryStatus": "FAIL incomplete"
+      "expectedBehavior": "Paste открывает построчный preview и атомарно создаёт 10 задач",
+      "dataStateAndEdges": "duplicate blocked; dedicated stale-version preview 409 with zero apply and zero rows; malformed TSV rejected",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/schedule-productivity-playwright.json; .superloopy/evidence/projects-2026-07-10/schedule-productivity-fix.json; .superloopy/evidence/projects-2026-07-10/qa-schedule-productivity-recheck-final-a.md",
+      "status": "pass",
+      "inventoryStatus": "✅ live 10x6 apply/readback + duplicate + dedicated race"
     },
     {
       "role": "A",
@@ -2594,11 +2594,11 @@
       "scenario": "Drag-fill finish dates downward",
       "surface": "/schedule",
       "apiOrDataSurface": "UI + planning batch",
-      "expectedBehavior": "Drag-fill propagates sequential finish dates in one reviewed batch.",
-      "dataStateAndEdges": "weekends, holidays, invalid destination and version race",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
-      "status": "fail",
-      "inventoryStatus": "FAIL incomplete"
+      "expectedBehavior": "Literal pointer drag за finish-date handle создаёт последовательный preview и один atomic batch",
+      "dataStateAndEdges": "downward range only; same/upward drag no write; stale version preserves rows",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/schedule-productivity-playwright.json; .superloopy/evidence/projects-2026-07-10/schedule-productivity-fix.json; .superloopy/evidence/projects-2026-07-10/qa-schedule-productivity-recheck-final-a.md",
+      "status": "pass",
+      "inventoryStatus": "✅ literal pointer drag + sequential readback"
     },
     {
       "role": "A",
@@ -2606,11 +2606,11 @@
       "scenario": "Create 10 tasks keyboard-only",
       "surface": "/schedule",
       "apiOrDataSurface": "UI + API",
-      "expectedBehavior": "Keyboard-only workflow creates and navigates tasks without pointer.",
-      "dataStateAndEdges": "rapid repeated creation, focus order and duplicate submits",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
-      "status": "partial",
-      "inventoryStatus": "PARTIAL quick-create exists"
+      "expectedBehavior": "Insert/Enter creates tasks; Home/End/Arrows navigate; F2 edits without pointer",
+      "dataStateAndEdges": "10 sequential creates; reload persistence; PLAN controls absent",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/schedule-productivity-playwright.json; .superloopy/evidence/projects-2026-07-10/schedule-productivity-fix.json; .superloopy/evidence/projects-2026-07-10/qa-schedule-productivity-recheck-final-a.md",
+      "status": "pass",
+      "inventoryStatus": "✅ 10 keyboard creates + navigation/F2/reload"
     },
     {
       "role": "A",
@@ -2618,11 +2618,11 @@
       "scenario": "Undo with Ctrl+Shift+Z",
       "surface": "/schedule",
       "apiOrDataSurface": "UI + compensating commit",
-      "expectedBehavior": "Shortcut invokes the guarded compensating undo.",
-      "dataStateAndEdges": "no undo available, busy state and conflicting version",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
-      "status": "partial",
-      "inventoryStatus": "PARTIAL button exists"
+      "expectedBehavior": "Shortcut invokes reviewed compensating batch for the latest commit",
+      "dataStateAndEdges": "busy/editable/capability/inverse/version guards; stale version sends zero write",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/schedule-productivity-playwright.json; .superloopy/evidence/projects-2026-07-10/schedule-productivity-fix.json; .superloopy/evidence/projects-2026-07-10/qa-schedule-productivity-recheck-final-a.md",
+      "status": "pass",
+      "inventoryStatus": "✅ live undo + stale guard + domain/API compensation"
     },
     {
       "role": "A",

@@ -4,7 +4,7 @@ import {
   canPreviewPlanningScenarios,
   canReadProjectResources
 } from "@kiss-pm/access-control";
-import { buildCompensatingCommands, isBlockingValidationIssue, proposePlanningScenarios, type PlanningCommand } from "@kiss-pm/domain";
+import { buildCompensatingCommandBatch, buildCompensatingCommands, isBlockingValidationIssue, proposePlanningScenarios, type PlanningCommand } from "@kiss-pm/domain";
 import type { Handler, Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
@@ -522,7 +522,8 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
           planVersion: newPlanVersion,
           changedTaskIds: batchPreview.planDelta.changedTaskIds,
           changedAssignmentIds: batchPreview.planDelta.changedAssignmentIds,
-          changedDependencyIds: batchPreview.planDelta.changedDependencyIds
+          changedDependencyIds: batchPreview.planDelta.changedDependencyIds,
+          compensatingCommands: buildCompensatingCommandBatch(commands, snapshot)
         },
         permissionResult: { allowed: true, reason: "same_tenant_permission_granted" },
         executionResult: { status: "succeeded", validationIssues: batchPreview.validationIssues }

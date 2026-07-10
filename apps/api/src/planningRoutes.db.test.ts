@@ -1906,6 +1906,24 @@ describe("planning API routes", () => {
         expect.objectContaining({ id: "task-plan-b", title: "Batch rename B" })
       ])
     );
+    const auditResponse = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    expect(auditResponse.status).toBe(200);
+    const auditBody = await auditResponse.json();
+    const batchAudit = auditBody.auditEvents.find(
+      (event: { id: string }) => event.id === appliedBody.auditEventId
+    );
+    expect(batchAudit?.afterState?.compensatingCommands).toEqual([
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-plan-b", title: "Согласовать план" }
+      },
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-plan-a", title: "Подготовить план" }
+      }
+    ]);
 
     const retried = await app.request(
       "/api/workspace/projects/project-alpha/planning/apply-command-batch",

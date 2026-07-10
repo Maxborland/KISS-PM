@@ -13,6 +13,7 @@ type AuthoredTask = {
   durationMinutes?: number | null;
   workMinutes?: number;
   statusId?: string;
+  customFields?: Record<string, unknown>;
 };
 
 function taskById(readModel: PlanningReadModel, taskId: string): AuthoredTask | undefined {
@@ -87,6 +88,24 @@ export function buildCompensatingCommands(
         }
       ];
     }
+    case "task.update_custom_field": {
+      const task = taskById(before, command.payload.taskId);
+      if (!task) return [];
+      const customFields = task.customFields ?? {};
+      const value = Object.prototype.hasOwnProperty.call(customFields, command.payload.fieldKey)
+        ? customFields[command.payload.fieldKey]
+        : null;
+      return [
+        {
+          type: "task.update_custom_field",
+          payload: {
+            taskId: command.payload.taskId,
+            fieldKey: command.payload.fieldKey,
+            value
+          }
+        }
+      ];
+    }
     case "assignment.upsert": {
       // Правки труда/длительности шлют [task.update_work_model, assignment.upsert] пакетом,
       // поэтому откат task-модели без отката назначения возвращал бы тот самый рассинхрон
@@ -111,6 +130,25 @@ export function buildCompensatingCommands(
         ];
       }
       return [{ type: "assignment.delete", payload: { assignmentId: command.payload.id } }];
+    }
+    case "assignment.delete": {
+      const existing = before.authored.assignments.find(
+        (assignment) => String((assignment as { id?: unknown }).id) === command.payload.assignmentId
+      ) as Record<string, unknown> | undefined;
+      if (!existing) return [];
+      return [
+        {
+          type: "assignment.upsert",
+          payload: {
+            id: command.payload.assignmentId,
+            taskId: String(existing.taskId),
+            resourceId: String(existing.resourceId),
+            role: (existing.role as string | undefined) ?? "executor",
+            unitsPermille: Number(existing.unitsPermille ?? 1000),
+            workMinutes: existing.workMinutes == null ? null : Number(existing.workMinutes)
+          }
+        } as PlanningCommand
+      ];
     }
     case "dependency.upsert": {
       const existing = before.authored.dependencies.find((dep) => String(dep.id) === command.payload.id);
@@ -151,4 +189,13 @@ export function buildCompensatingCommands(
     default:
       return [];
   }
+}
+
+export function buildCompensatingCommandBatch(
+  commands: readonly PlanningCommand[],
+  before: PlanningReadModel
+): PlanningCommand[] {
+  const groups = commands.map((command) => buildCompensatingCommands(command, before));
+  if (groups.some((group) => group.length === 0)) return [];
+  return groups.reverse().flat();
 }

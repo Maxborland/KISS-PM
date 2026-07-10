@@ -160,10 +160,11 @@ export function reducePlanningCommand(
           task.id === command.payload.taskId
             ? {
                 ...task,
-                customFields: {
-                  ...(task.customFields ?? {}),
-                  [command.payload.fieldKey]: command.payload.value
-                }
+                customFields: updateCustomFields(
+                  task.customFields,
+                  command.payload.fieldKey,
+                  command.payload.value
+                )
               }
             : task
         )
@@ -429,9 +430,10 @@ function validateCommandPreconditions(
       if (
         command.payload.durationMinutes !== undefined &&
         command.payload.durationMinutes !== null &&
-        command.payload.durationMinutes <= 0
+        (command.payload.durationMinutes < 0 ||
+          (command.payload.durationMinutes === 0 && command.payload.workMinutes > 0))
       ) {
-        return [invalid("planning_command_invalid", "Длительность задачи должна быть больше нуля")];
+        return [invalid("planning_command_invalid", "Нулевая длительность допустима только для вехи без трудоемкости")];
       }
       {
         const plannedStart = command.payload.plannedStart ?? snapshot.project.plannedStart;
@@ -652,10 +654,24 @@ function validateWorkModelPayload(
   if (workMinutes < 0) {
     return [invalid("planning_command_invalid", "Трудоемкость задачи не может быть отрицательной")];
   }
-  if (durationMinutes !== null && durationMinutes <= 0) {
-    return [invalid("planning_command_invalid", "Длительность задачи должна быть больше нуля")];
+  if (
+    durationMinutes !== null &&
+    (durationMinutes < 0 || (durationMinutes === 0 && workMinutes > 0))
+  ) {
+    return [invalid("planning_command_invalid", "Нулевая длительность допустима только для вехи без трудоемкости")];
   }
   return [];
+}
+
+function updateCustomFields(
+  current: Record<string, unknown> | undefined,
+  fieldKey: string,
+  value: unknown
+): Record<string, unknown> {
+  const next = { ...(current ?? {}) };
+  if (value === null) delete next[fieldKey];
+  else next[fieldKey] = value;
+  return next;
 }
 
 function validateTaskScheduleUpdate(

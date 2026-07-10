@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, GitBranch, IndentDecrease, IndentIncrease, Plus, TriangleAlert, Undo2, X } from "lucide-react";
+import { Fragment, type ClipboardEvent as ReactClipboardEvent, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Plus, TriangleAlert, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { createClientId } from "@/delivery/lib/client-id";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/planning-demo-data";
 import { currentPlanDate, deriveScheduleTimeline, formatWeekLabel } from "@/delivery/lib/date-origin";
-import { usePlanning } from "@/delivery/lib/use-planning";
+import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
 import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
 import { usePointerDrag } from "@/delivery/lib/use-pointer-drag";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
@@ -24,8 +24,10 @@ import { useSessionUser } from "@/shell/use-session-user";
 import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu, TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { DependencyType, PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
-import { buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/planning-client";
+import { buildCompensatingCommandBatch, buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/planning-client";
 import { mapRows, type Kind, type Mode, type Pred, type Row } from "@/delivery/schedule/schedule-rows";
+import { buildFinishDateFillCommands, buildPasteCommands, createTaskTsvId, getScheduleNavigationTarget, parseTaskTsv, resolveFinishFillDrag, shouldRunScheduleUndo } from "@/delivery/schedule/schedule-productivity";
+import { buildMilestoneCommands } from "@/delivery/schedule/schedule-milestone";
 
 const HPD = 8; // часов в рабочем дне
 const genId = createClientId;
@@ -142,7 +144,7 @@ type ColDrag = { index: number; startX: number; origW: number };
 type LinkDrag = { fromId: string; fromEdge: "start" | "finish"; fromX: number; fromY: number; curX: number; curY: number };
 
 const COLS: Array<{ key: string; label: string; align?: string; w: number }> = [
-  { key: "id", label: "#", align: "num", w: 32 },
+  { key: "id", label: "#", align: "num", w: 52 },
   { key: "mode", label: "Реж", w: 64 },
   { key: "wbs", label: "WBS", w: 44 },
   { key: "name", label: "Название", w: 196 },
@@ -205,15 +207,29 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const [batchMode, setBatchMode] = useState(false);
   const [staged, setStaged] = useState<PlanningCommand[]>([]);
   const [canUndo, setCanUndo] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(() => new Set());
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteDraft, setPasteDraft] = useState("");
+  const [pasteIssue, setPasteIssue] = useState<string | null>(null);
+  const [fillOpen, setFillOpen] = useState(false);
+  const [fillDate, setFillDate] = useState("");
+  const [fillMode, setFillMode] = useState<"same" | "series">("series");
+  const [fillDragRange, setFillDragRange] = useState<Set<string>>(() => new Set());
   // asgId — id текущего назначения редактируемой задачи: reuse в submitTaskModal, чтобы upsert
   // обновлял его (а не плодил второе назначение, удваивая нагрузку — реальный редьюсер upsert-ит по id).
   const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; parentId: string | null; taskId?: string; asgId?: string; initial: TaskModalValues } | null>(null);
   const [colW, setColW] = useState<number[]>(() => [...DEFAULT_COLW]);
 
   const mapped = useMemo(() => (readModel ? mapRows(readModel, resName) : null), [readModel, resName]);
+  const parsedPaste = useMemo(() => parseTaskTsv(pasteDraft), [pasteDraft]);
   const dayW = ZOOM_DAY_W[zoom];
-  const lastCommitRef = useRef<{ commands: PlanningCommand[]; before: PlanningReadModel } | null>(null);
+  const lastCommitRef = useRef<{ commands: PlanningCommand[]; before: PlanningReadModel; afterVersion: number } | null>(null);
   const batchBaseRef = useRef<PlanningReadModel | null>(null);
+  const operationRef = useRef(false);
+  const lastAppliedPasteRef = useRef<string | null>(null);
+  const quickCreateRef = useRef<HTMLInputElement | null>(null);
+  const rowElementsRef = useRef<Map<string, HTMLTableRowElement>>(new Map()).current;
+  const fillDragTargetRef = useRef<string | null>(null);
   const ganttRef = useRef<HTMLDivElement>(null);
   // Актуальный read-model для window-обработчиков drag/resize (без устаревшего замыкания эффекта):
   // нужен, чтобы в момент отпускания резолвить текущее назначение задачи и синхронить его труд.
@@ -332,25 +348,36 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inlineNew?.afterId, inlineNew?.parentId]);
 
+  function beginOperation(): boolean {
+    if (operationRef.current) return false;
+    operationRef.current = true;
+    setBusy(true);
+    return true;
+  }
+  function endOperation() {
+    operationRef.current = false;
+    setBusy(false);
+  }
+
   async function applyStaged() {
     if (!canManagePlan) return;
     if (staged.length === 0) return;
+    if (!beginOperation()) return;
     const cmds = staged;
     const base = batchBaseRef.current;
-    setBusy(true);
-    const res = await applyBatch(cmds);
-    setBusy(false);
+    let res: ApplyResult;
+    try { res = await applyBatch(cmds); } finally { endOperation(); }
     setStaged([]);
     if (res.ok) {
-      lastCommitRef.current = base ? { commands: cmds, before: base } : null;
-      setCanUndo(base != null && cmds.some((command) => buildCompensatingCommands(command, base).length > 0));
+      lastCommitRef.current = base ? { commands: cmds, before: base, afterVersion: res.planVersion } : null;
+      setCanUndo(base != null && buildCompensatingCommandBatch(cmds, base).length > 0);
       setErrors(new Map());
       setFlash(new Set(res.changed));
       toast.success(`Пакет применён: коммит v${res.planVersion} · затронуто задач: ${res.changed.length}`);
       window.setTimeout(() => setFlash(new Set()), 1700);
     } else if (res.conflict) {
       toast.error("Конфликт версий плана — перезагружено");
-    } else {
+    } else if (res.message !== "preview_cancelled") {
       const m = new Map<string, string>();
       (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); });
       setErrors(m);
@@ -367,12 +394,19 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   async function undo() {
     if (!canManagePlan) return;
     const lc = lastCommitRef.current;
-    if (!lc) return;
-    const inverses = lc.commands.slice().reverse().flatMap((c) => buildCompensatingCommands(c, lc.before));
+    if (!lc || !canUndo) { toast.error("Нет применённого действия для отката"); return; }
+    if (readModel?.planVersion !== lc.afterVersion) {
+      lastCommitRef.current = null;
+      setCanUndo(false);
+      toast.error("План уже изменён. Откат отменён, данные перезагружены");
+      await reload();
+      return;
+    }
+    const inverses = buildCompensatingCommandBatch(lc.commands, lc.before);
     if (inverses.length === 0) { toast.error("Откат недоступен для этой операции (создание/перенос/назначение)"); return; }
-    setBusy(true);
-    const res = await applyBatch(inverses);
-    setBusy(false);
+    if (!beginOperation()) return;
+    let res: ApplyResult;
+    try { res = await applyBatch(inverses); } finally { endOperation(); }
     lastCommitRef.current = null;
     setCanUndo(false);
     if (res.ok) {
@@ -385,24 +419,24 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     }
   }
 
-  async function applyCmd(command: PlanningCommand) {
-    if (!canManagePlan) return;
+  async function applyCmd(command: PlanningCommand): Promise<ApplyResult | null> {
+    if (!canManagePlan) return null;
     // режим пакета: копим правки + оптимистично показываем, применяем одним коммитом
     if (batchMode) {
       if (staged.length === 0) batchBaseRef.current = readModel;
       setStaged((s) => [...s, command]);
       if (readModel) { const opt = optimisticPatch(readModel, command); if (opt !== readModel) setReadModel(opt); }
-      return;
+      return null;
     }
+    if (!beginOperation()) return null;
     const prev = readModel;
     // 1) оптимистично применяем на фронте — мгновенный отклик
     if (prev) { const opt = optimisticPatch(prev, command); if (opt !== prev) setReadModel(opt); }
-    setBusy(true);
     // 2) бэк валидирует и пересчитывает авторитетно
-    const res = await apply(command);
-    setBusy(false);
+    let res: ApplyResult;
+    try { res = await apply(command); } finally { endOperation(); }
     if (res.ok) {
-      lastCommitRef.current = prev ? { commands: [command], before: prev } : null;
+      lastCommitRef.current = prev ? { commands: [command], before: prev, afterVersion: res.planVersion } : null;
       setCanUndo(prev != null && buildCompensatingCommands(command, prev).length > 0);
       setErrors(new Map());
       setFlash(new Set(res.changed));
@@ -413,11 +447,13 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     } else {
       // 3) бэк отклонил → откат оптимистики + подсветка где/как
       if (prev) setReadModel(prev);
+      if (res.message === "preview_cancelled") return res;
       const m = new Map<string, string>();
       (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); });
       setErrors(m);
       toast.error(`Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
     }
+    return res;
   }
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
@@ -542,10 +578,12 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const depAdd = (succId: string, predId: string, type: string, lagDays: number) => void applyCmd(createPlanningCommand({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: predId, successorTaskId: succId, dependencyType: type as DependencyType, lagMinutes: lagDays * MIN_PER_DAY } }));
   const depRemove = (depId: string) => void applyCmd(createPlanningCommand({ type: "dependency.delete", payload: { dependencyId: depId } }));
   const depUpsert = (depId: string, predId: string, succId: string, type: string, lagDays: number) => void applyCmd(createPlanningCommand({ type: "dependency.upsert", payload: { id: depId, predecessorTaskId: predId, successorTaskId: succId, dependencyType: type as DependencyType, lagMinutes: lagDays * MIN_PER_DAY } }));
-  // Веха = пользовательское поле kind=milestone (как читают overview/inspector/settings),
-  // а НЕ durationMinutes:0 — домен отклоняет нулевую длительность (validateWorkModelPayload).
-  const makeMilestone = (r: Row) => void applyCmd(createPlanningCommand({ type: "task.update_custom_field", payload: { taskId: r.id, fieldKey: "kind", value: "milestone" } }));
-  const deleteTask = (r: Row) => {
+  const makeMilestone = (r: Row) => {
+    const assignments = authoredAsgs
+      .filter((assignment) => assignment.taskId === r.id)
+      .map((assignment) => ({ id: assignment.id }));
+    void runBatch(buildMilestoneCommands({ taskId: r.id, assignments }));
+  };  const deleteTask = (r: Row) => {
     // Удаление summary: реальный редьюсер сносит только саму задачу и оставляет детей сиротами.
     // Шлём явный пакет удаления всего поддерева (summary + потомки по wbs), а не один delete.
     if (r.kind === "summary") {
@@ -585,22 +623,21 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     void applyCmd(moveCmd(r.id, grandId, Math.max(0, at)));
   };
 
-  async function runBatch(cmds: PlanningCommand[]) {
-    if (!canManagePlan) return;
-    if (!cmds.length) return;
+  async function runBatch(cmds: PlanningCommand[], idempotencyKey?: string): Promise<ApplyResult | null> {
+    if (!canManagePlan || !cmds.length || !beginOperation()) return null;
     const base = readModel;
-    setBusy(true);
-    const res = await applyBatch(cmds);
-    setBusy(false);
+    let res: ApplyResult;
+    try { res = await applyBatch(cmds, idempotencyKey ? { idempotencyKey } : undefined); } finally { endOperation(); }
     if (res.ok) {
-      lastCommitRef.current = base ? { commands: cmds, before: base } : null;
-      setCanUndo(base != null && cmds.some((command) => buildCompensatingCommands(command, base).length > 0));
+      lastCommitRef.current = base ? { commands: cmds, before: base, afterVersion: res.planVersion } : null;
+      setCanUndo(base != null && buildCompensatingCommandBatch(cmds, base).length > 0);
       setErrors(new Map());
       setFlash(new Set(res.changed));
       toast.success(`Коммит v${res.planVersion} применён · затронуто задач: ${res.changed.length}`);
       window.setTimeout(() => setFlash(new Set()), 1700);
     } else if (res.conflict) toast.error("Конфликт версий плана — перезагружено");
-    else { const m = new Map<string, string>(); (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); }); setErrors(m); toast.error(`Отклонено: ${res.issues?.[0]?.message ?? res.message}`); }
+    else if (res.message !== "preview_cancelled") { const m = new Map<string, string>(); (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); }); setErrors(m); toast.error(`Отклонено: ${res.issues?.[0]?.message ?? res.message}`); }
+    return res;
   }
   const addFinish = (iso: string, dur: number) => dayToIso(isoToDay(iso) + dur);
   const openCreate = (parentId: string | null) => setTaskModal({ mode: "create", parentId, initial: { title: "", assigneeId: "", startIso: "", durDays: 5, workH: 40, pct: 0 } });
@@ -639,6 +676,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // task.create-команда (оптимистично + откат при reject), контракт уже боевой.
   // Возвращает true, если задача отправлена на создание (для очистки/закрытия строки).
   function createInline(title: string, parentId: string | null = null, scope: "bottom" | "inline" = "bottom"): boolean {
+    if (operationRef.current) return false;
     const t = title.trim();
     if (t.length < 3) { setCreateError({ scope, msg: "Название задачи: минимум 3 символа" }); return false; } // домен: title 3–160
     setCreateError(null);
@@ -732,6 +770,192 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // Коммит по потере фокуса (клик мимо), но НЕ при Tab-навигации (там коммит уже сделан).
   const cellBlur = (r: Row) => { if (skipBlurRef.current) { skipBlurRef.current = false; return; } commitInline(r); };
 
+  const fillTaskRows = visibleRows.filter((row) => row.kind === "task");
+  const selectedFillRows = fillTaskRows.filter((row) => selectedTaskIds.has(row.id));
+  const fillPreview = fillDate
+    ? buildFinishDateFillCommands({
+        firstFinishIso: fillDate,
+        mode: fillMode,
+        rows: selectedFillRows.map((row) => ({ id: row.id, startIso: row.startIso, durationDays: row.durDays, workHours: row.workH })),
+        assignments: authoredAsgs
+      })
+    : null;
+
+  const isEditableTarget = (target: EventTarget | null) => {
+    const element = target instanceof HTMLElement ? target : null;
+    return element?.matches("input, textarea, select, [contenteditable='true']") ?? false;
+  };
+  const focusScheduleRow = (id: string) => {
+    setSel(id);
+    window.requestAnimationFrame(() => rowElementsRef.get(id)?.focus());
+  };
+  const toggleTaskSelection = (id: string) => {
+    setSelectedTaskIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleAllTaskSelection = () => {
+    setSelectedTaskIds((current) => current.size === fillTaskRows.length
+      ? new Set()
+      : new Set(fillTaskRows.map((row) => row.id)));
+  };  const startFinishFillDrag = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    source: Row
+  ) => {
+    if (!canManagePlan || source.kind !== "task" || !source.finishIso) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const rowIds = fillTaskRows.map((row) => row.id);
+    fillDragTargetRef.current = source.id;
+
+    const updateTarget = (clientX: number, clientY: number) => {
+      const targetId = document
+        .elementFromPoint(clientX, clientY)
+        ?.closest<HTMLElement>("[data-schedule-row-id]")
+        ?.dataset.scheduleRowId;
+      if (!targetId) return;
+      fillDragTargetRef.current = targetId;
+      const resolved = resolveFinishFillDrag({
+        rowIds,
+        sourceId: source.id,
+        targetId,
+        sourceFinishIso: source.finishIso
+      });
+      setFillDragRange(new Set(resolved?.targetIds ?? []));
+    };
+    const moveDrag = (pointerEvent: PointerEvent) => {
+      updateTarget(pointerEvent.clientX, pointerEvent.clientY);
+    };
+    const cancelDrag = () => {
+      window.removeEventListener("pointermove", moveDrag);
+      window.removeEventListener("pointerup", stopDrag);
+      window.removeEventListener("pointercancel", cancelDrag);
+      setFillDragRange(new Set());
+      fillDragTargetRef.current = null;
+    };
+    const stopDrag = (pointerEvent: PointerEvent) => {
+      window.removeEventListener("pointermove", moveDrag);
+      window.removeEventListener("pointerup", stopDrag);
+      window.removeEventListener("pointercancel", cancelDrag);
+      updateTarget(pointerEvent.clientX, pointerEvent.clientY);
+      const targetId = fillDragTargetRef.current;
+      const resolved = targetId
+        ? resolveFinishFillDrag({
+            rowIds,
+            sourceId: source.id,
+            targetId,
+            sourceFinishIso: source.finishIso
+          })
+        : null;
+      setFillDragRange(new Set());
+      fillDragTargetRef.current = null;
+      if (!resolved) return;
+      setSelectedTaskIds(new Set(resolved.targetIds));
+      setFillMode("series");
+      setFillDate(resolved.firstFinishIso);
+      setFillOpen(true);
+    };
+
+    window.addEventListener("pointermove", moveDrag);
+    window.addEventListener("pointerup", stopDrag);
+    window.addEventListener("pointercancel", cancelDrag);
+  };
+
+  const updatePasteDraft = (value: string) => {
+    setPasteDraft(value);
+    const parsed = parseTaskTsv(value);
+    setPasteIssue(parsed.ok && parsed.fingerprint === lastAppliedPasteRef.current ? "Этот TSV уже применён в текущей сессии" : null);
+  };
+  const openPastePreview = (value = "") => {
+    updatePasteDraft(value);
+    setPasteOpen(true);
+  };
+  const handleWorkspacePaste = (event: ReactClipboardEvent<HTMLElement>) => {
+    if (!canManagePlan || isEditableTarget(event.target)) return;
+    const text = event.clipboardData.getData("text/plain");
+    if (!text || (!text.includes("\t") && !text.includes("\n"))) return;
+    event.preventDefault();
+    openPastePreview(text);
+  };
+  const applyPastedTasks = async () => {
+    if (!parsedPaste.ok || pasteIssue) return;
+    if (parsedPaste.fingerprint === lastAppliedPasteRef.current) {
+      setPasteIssue("Этот TSV уже применён в текущей сессии");
+      return;
+    }
+    const commands = buildPasteCommands({
+      projectId,
+      rows: parsedPaste.rows,
+      createId: (index) => createTaskTsvId(projectId, parsedPaste.fingerprint, index)
+    });
+    const fingerprint = parsedPaste.fingerprint;
+    setPasteOpen(false);
+    const result = await runBatch(commands, "schedule-tsv-" + fingerprint);
+    if (result?.ok) {
+      lastAppliedPasteRef.current = fingerprint;
+      setPasteDraft("");
+      setPasteIssue(null);
+      return;
+    }
+    setPasteOpen(true);
+    if (result?.conflict) setPasteIssue("Версия плана изменилась. Данные перезагружены, проверьте импорт ещё раз");
+  };
+  const applyDateFill = async () => {
+    if (!fillPreview?.ok) return;
+    setFillOpen(false);
+    const result = await runBatch(fillPreview.commands);
+    if (result?.ok) {
+      setSelectedTaskIds(new Set());
+      return;
+    }
+    setFillOpen(true);
+  };
+  const handleWorkspaceKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    const editableTarget = isEditableTarget(event.target);
+    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "z") {
+      if (!canManagePlan || editableTarget) return;
+      event.preventDefault();
+      const lastCommit = lastCommitRef.current;
+      const allowed = shouldRunScheduleUndo({
+        canManage: canManagePlan,
+        busy: busy || operationRef.current,
+        canUndo,
+        currentVersion: readModel.planVersion,
+        afterVersion: lastCommit?.afterVersion ?? null,
+        editableTarget
+      });
+      if (allowed || (lastCommit && readModel.planVersion !== lastCommit.afterVersion)) void undo();
+      else if (busy || operationRef.current) toast.error("Дождитесь завершения текущей операции");
+      else toast.error("Нет применённого действия для отката");
+      return;
+    }
+    if (editableTarget) return;
+    if (event.key === "Insert" && canManagePlan) {
+      event.preventDefault();
+      quickCreateRef.current?.focus();
+      return;
+    }
+    const focusedRowId = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>("[data-schedule-row-id]")?.dataset.scheduleRowId ?? null : null;
+    const currentRowId = focusedRowId ?? sel;
+    if (["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+      event.preventDefault();
+      const targetId = getScheduleNavigationTarget(visibleRows.map((row) => row.id), currentRowId, event.key as "ArrowUp" | "ArrowDown" | "Home" | "End");
+      if (targetId) focusScheduleRow(targetId);
+      return;
+    }
+    const current = visibleRows.find((row) => row.id === currentRowId);
+    if ((event.key === "F2" || event.key === "Enter") && canManagePlan && current) {
+      event.preventDefault();
+      beginEdit(current, "name", current.name);
+    } else if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && current?.kind === "summary" && hasChildren(current)) {
+      event.preventDefault();
+      const shouldCollapse = event.key === "ArrowLeft";
+      if (collapsed.has(current.id) !== shouldCollapse) toggle(current.id);
+    }
+  };
+
   const isDescendantOf = (row: Row, parentId: string) => {
     let current = row.parentId;
     while (current) {
@@ -766,6 +990,14 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
   return (
     <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="График">
+      <div
+        data-testid="schedule-productivity-workspace"
+        tabIndex={0}
+        onKeyDown={handleWorkspaceKeyDown}
+        onPaste={handleWorkspacePaste}
+        aria-label="График проекта. Insert создаёт задачу, стрелки перемещают по строкам"
+        className="outline-none"
+      >
       {/* Toolbar */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         {canManagePlan ? (
@@ -778,6 +1010,9 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
             <span className="mx-1 h-5 w-px bg-[var(--border)]" />
             <Button variant={batchMode ? "default" : "ghost"} size="sm" onClick={() => setBatchMode((v) => !v)} title="Режим пакета: копить правки и применить одним коммитом"><GitBranch className="size-3.5" aria-hidden />Пакет{staged.length ? ` · ${staged.length}` : ""}</Button>
             <Button variant="ghost" size="sm" onClick={() => void undo()} disabled={busy || !canUndo} title="Откатить последний коммит (компенсирующий коммит)"><Undo2 className="size-3.5" aria-hidden />Откат</Button>
+            <span className="mx-1 h-5 w-px bg-[var(--border)]" />
+            <Button variant="ghost" size="sm" onClick={() => openPastePreview()} disabled={busy} title="Вставить задачи из TSV через предпросмотр"><ClipboardPaste className="size-3.5" aria-hidden />Вставить TSV</Button>
+            <Button variant="ghost" size="sm" onClick={() => setFillOpen(true)} disabled={busy || selectedFillRows.length === 0} title="Заполнить даты окончания выбранных задач"><CalendarRange className="size-3.5" aria-hidden />Заполнить даты{selectedFillRows.length ? ` · ${selectedFillRows.length}` : ""}</Button>
           </>
         ) : null}
         <Button asChild variant="ghost" size="sm"><Link href={`/projects/${projectId}/baseline`}>Baseline</Link></Button>
@@ -823,7 +1058,11 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                   <tr>
                     {COLS.map((c, i) => (
                       <th key={c.key} className={cn(c.align, "relative")}>
-                        {c.label}
+                        {c.key === "id" && canManagePlan ? (
+                          <input type="checkbox" aria-label="Выбрать все задачи для заполнения дат" checked={fillTaskRows.length > 0 && selectedFillRows.length === fillTaskRows.length} onChange={toggleAllTaskSelection} />
+                        ) : (
+                          c.label
+                        )}
                         {i < COLS.length - 1 ? (
                           <span
                             className="absolute -right-[3px] top-0 z-10 h-full w-[6px] cursor-col-resize hover:bg-[var(--accent)]"
@@ -843,6 +1082,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       isLeaf={r.kind !== "summary"}
                       canIndent={canIndent(r)}
                       canOutdent={canOutdent(r)}
+                      canMakeMilestone={r.kind === "task"}
                       onOpen={() => openRow(r.id)}
                       onEdit={() => openEdit(r)}
                       onAddSub={() => setInlineNew({ parentId: r.id, afterId: r.id, draft: "" })}
@@ -852,8 +1092,21 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       onMakeMilestone={() => makeMilestone(r)}
                       onDelete={() => setConfirmDelete(r)}
                     >
-                      <tr onClick={() => openRow(r.id)} className={cn(r.kind === "summary" && "is-summary", sel === r.id && "is-selected", flash.has(r.id) && "bg-[var(--success-soft)]", errors.has(r.id) && "bg-[var(--danger-soft)]")}>
-                        <td className="num muted text-[length:var(--text-xs)]">{i + 1}</td>
+                      <tr
+                        ref={(node) => { if (node) rowElementsRef.set(r.id, node); else rowElementsRef.delete(r.id); }}
+                        data-schedule-row-id={r.id}
+                        tabIndex={sel === r.id ? 0 : -1}
+                        aria-selected={sel === r.id}
+                        onFocus={() => setSel(r.id)}
+                        onClick={(event) => { event.currentTarget.focus(); openRow(r.id); }}
+                        className={cn(r.kind === "summary" && "is-summary", sel === r.id && "is-selected", flash.has(r.id) && "bg-[var(--success-soft)]", errors.has(r.id) && "bg-[var(--danger-soft)]", fillDragRange.has(r.id) && "bg-[var(--accent-soft)]")}
+                      >
+                        <td className="num muted text-[length:var(--text-xs)]">
+                          <span className="flex items-center justify-center gap-1">
+                            {canManagePlan && r.kind === "task" ? <input type="checkbox" aria-label={`Выбрать ${r.name} для заполнения дат`} checked={selectedTaskIds.has(r.id)} onClick={stop} onChange={() => toggleTaskSelection(r.id)} /> : null}
+                            <span>{i + 1}</span>
+                          </span>
+                        </td>
                         <td>{r.kind === "milestone" ? <span className="text-[var(--muted-soft)]">—</span> : <ModeChip mode={r.mode} />}</td>
                         <td className="mono muted text-[length:var(--text-xs)]">{r.wbs}</td>
                         <td title={r.name} onDoubleClick={canManagePlan ? (e) => { stop(e); beginEdit(r, "name", r.name); } : undefined}>
@@ -883,7 +1136,25 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                           {canManagePlan && (r.kind === "milestone" || r.kind === "task") ? <DateEditor valueIso={r.startIso} onPick={(iso) => editDate(r, iso)}><button type="button" onClick={stop} className={cellBtn}>{fmtDate(r.startIso)}</button></DateEditor> : fmtDate(r.startIso)}
                         </td>
                         <td className="mono muted">
-                          {canManagePlan && r.kind === "task" ? <DateEditor title="Окончание задачи" valueIso={r.finishIso} onPick={(iso) => editFinish(r, iso)}><button type="button" onClick={stop} className={cellBtn}>{fmtDate(r.finishIso)}</button></DateEditor> : fmtDate(r.finishIso)}
+                          <span className="flex items-center gap-0.5">
+                            {canManagePlan && r.kind === "task" ? (
+                              <>
+                                <DateEditor title="Окончание задачи" valueIso={r.finishIso} onPick={(iso) => editFinish(r, iso)}>
+                                  <button type="button" onClick={stop} className={cellBtn}>{fmtDate(r.finishIso)}</button>
+                                </DateEditor>
+                                <button
+                                  type="button"
+                                  aria-label={"Протянуть дату окончания от " + r.name}
+                                  title="Потяните вниз — последовательное заполнение дат"
+                                  className="grid size-5 shrink-0 cursor-ns-resize place-items-center rounded-[var(--radius-xs)] text-[var(--muted-soft)] hover:bg-[var(--panel-strong)] hover:text-[var(--accent)]"
+                                  onClick={stop}
+                                  onPointerDown={(event) => startFinishFillDrag(event, r)}
+                                >
+                                  <GripVertical className="size-3" aria-hidden />
+                                </button>
+                              </>
+                            ) : fmtDate(r.finishIso)}
+                          </span>
                         </td>
                         <td className="text-[var(--muted-strong)]">
                           {canManagePlan && r.kind === "task" ? <ResourceEditor onPick={(rid) => assignRes(r.id, rid)}><button type="button" onClick={stop} className={cellBtn}>{r.res}</button></ResourceEditor> : <span className="text-[var(--muted-soft)]">{r.res}</span>}
@@ -925,6 +1196,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       <td colSpan={COLS.length - 3}>
                         {newTaskCell({
                           value: newTask,
+                          inputRef: quickCreateRef,
                           onChange: (v) => { setCreateError(null); setNewTask(v); },
                           onEnter: () => { if (createInline(newTask)) setNewTask(""); },
                           onTab: () => { const last = visibleRows[visibleRows.length - 1]; if (createInline(newTask, last ? last.id : null)) setNewTask(""); },
@@ -1096,6 +1368,80 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           </DialogContent>
         </Dialog>
       ) : null}
+
+      {canManagePlan ? (
+        <Dialog open={pasteOpen} onOpenChange={(open) => { setPasteOpen(open); if (!open) setPasteIssue(null); }}>
+          <DialogContent className="max-w-[720px]">
+            <DialogHeader>
+              <DialogTitle>Импорт задач из TSV</DialogTitle>
+              <DialogDescription>Колонки: название, начало, окончание, длительность в днях, труд в часах, прогресс. Пустые последние колонки допустимы.</DialogDescription>
+            </DialogHeader>
+            <label className="grid gap-1 text-[length:var(--text-sm)] text-[var(--muted-strong)]">
+              TSV
+              <textarea
+                autoFocus
+                rows={7}
+                value={pasteDraft}
+                onChange={(event) => updatePasteDraft(event.target.value)}
+                aria-invalid={!parsedPaste.ok || pasteIssue ? true : undefined}
+                className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 font-mono text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              />
+            </label>
+            {pasteIssue ? <p role="alert" className="text-[length:var(--text-sm)] text-[var(--danger-text)]">{pasteIssue}</p> : null}
+            {parsedPaste.ok ? (
+              <div className="min-h-0">
+                <p className="mb-1 text-[length:var(--text-sm)] text-[var(--muted-strong)]">Будет создано задач: <strong>{parsedPaste.rows.length}</strong>. Все команды применятся атомарно.</p>
+                <div className="max-h-52 overflow-auto border-y border-[var(--border)]">
+                  <table className="w-full text-left text-[length:var(--text-xs)]">
+                    <thead className="text-[var(--muted)]"><tr><th className="px-2 py-1">Название</th><th className="px-2 py-1">Начало</th><th className="px-2 py-1">Окончание</th><th className="px-2 py-1 text-right">Дни</th><th className="px-2 py-1 text-right">Часы</th><th className="px-2 py-1 text-right">%</th></tr></thead>
+                    <tbody>{parsedPaste.rows.slice(0, 20).map((row, index) => <tr key={`${row.title}-${index}`} className="border-t border-[var(--border-subtle)]"><td className="px-2 py-1">{row.title}</td><td className="px-2 py-1 font-mono">{row.startIso ?? ""}</td><td className="px-2 py-1 font-mono">{row.finishIso ?? ""}</td><td className="px-2 py-1 text-right">{row.durationDays}</td><td className="px-2 py-1 text-right">{row.workHours}</td><td className="px-2 py-1 text-right">{row.percentComplete}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <ul role="alert" className="max-h-36 overflow-auto text-[length:var(--text-sm)] text-[var(--danger-text)]">
+                {parsedPaste.errors.slice(0, 8).map((error, index) => <li key={`${error.row}-${error.column}-${index}`}>Строка {error.row}, {error.message}</li>)}
+              </ul>
+            )}
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setPasteOpen(false)}>Отмена</Button>
+              <Button variant="default" disabled={busy || !parsedPaste.ok || Boolean(pasteIssue)} onClick={() => void applyPastedTasks()}>Проверить и применить</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {canManagePlan ? (
+        <Dialog open={fillOpen} onOpenChange={setFillOpen}>
+          <DialogContent className="max-w-[560px]">
+            <DialogHeader>
+              <DialogTitle>Заполнение дат окончания</DialogTitle>
+              <DialogDescription>Выбрано задач: {selectedFillRows.length}. Изменения уйдут одним атомарным пакетом.</DialogDescription>
+            </DialogHeader>
+            <label className="grid gap-1 text-[length:var(--text-sm)] text-[var(--muted-strong)]">
+              Первая дата окончания
+              <input type="date" value={fillDate} onChange={(event) => setFillDate(event.target.value)} className="h-9 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[var(--text)] outline-none focus:border-[var(--accent)]" />
+            </label>
+            <fieldset className="flex gap-3 text-[length:var(--text-sm)] text-[var(--text)]">
+              <legend className="sr-only">Режим заполнения</legend>
+              <label className="flex items-center gap-1.5"><input type="radio" name="fill-mode" checked={fillMode === "series"} onChange={() => setFillMode("series")} />Последовательно, шаг 1 день</label>
+              <label className="flex items-center gap-1.5"><input type="radio" name="fill-mode" checked={fillMode === "same"} onChange={() => setFillMode("same")} />Одинаковая дата</label>
+            </fieldset>
+            {fillPreview?.ok ? (
+              <div className="max-h-56 overflow-auto border-y border-[var(--border)] text-[length:var(--text-sm)]">
+                {fillPreview.preview.map((item) => { const row = rows.find((candidate) => candidate.id === item.taskId); return <div key={item.taskId} className="flex items-center gap-3 border-t border-[var(--border-subtle)] px-2 py-1 first:border-0"><span className="min-w-0 flex-1 truncate">{row?.wbs} {row?.name}</span><span className="font-mono text-[var(--muted-strong)]">{item.finishIso}</span><span className="w-14 text-right text-[var(--muted)]">{item.durationDays} дн</span></div>; })}
+              </div>
+            ) : fillPreview ? (
+              <ul role="alert" className="text-[length:var(--text-sm)] text-[var(--danger-text)]">{fillPreview.errors.map((error) => { const row = rows.find((candidate) => candidate.id === error.taskId); return <li key={error.taskId}>{row?.name ?? error.taskId}: {error.message}</li>; })}</ul>
+            ) : null}
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setFillOpen(false)}>Отмена</Button>
+              <Button variant="default" disabled={busy || !fillPreview?.ok} onClick={() => void applyDateFill()}>Проверить и применить</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+      </div>
     </DeliveryFrame>
   );
 }

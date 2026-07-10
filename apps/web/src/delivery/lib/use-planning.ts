@@ -20,6 +20,8 @@ export type { CommitMetaView, CommitsView };
 export type PlanningStatus = "loading" | "ready" | "error" | "forbidden";
 
 export type ValidationHit = { message: string; entityId?: string };
+export type ApplyBatchOptions = { idempotencyKey?: string };
+
 export type ApplyResult =
   | { ok: true; changed: string[]; planVersion: number }
   | { ok: false; conflict: boolean; message: string; issues?: ValidationHit[] };
@@ -121,7 +123,7 @@ export function usePlanning(projectId: string) {
   );
 
   const applyBatch = useCallback(
-    async (commands: PlanningCommand[]): Promise<ApplyResult> => {
+    async (commands: PlanningCommand[], options?: ApplyBatchOptions): Promise<ApplyResult> => {
       if (!readModel || commands.length === 0) return { ok: false, conflict: false, message: "empty_batch" };
       try {
         const previewResult = await client.previewCommandBatch(projectId, {
@@ -132,7 +134,11 @@ export function usePlanning(projectId: string) {
         if (!confirmed) {
           return { ok: false, conflict: false, message: "preview_cancelled" };
         }
-        const res = await client.applyCommandBatch(projectId, { commands, clientPlanVersion: readModel.planVersion });
+        const res = await client.applyCommandBatch(projectId, {
+          commands,
+          clientPlanVersion: readModel.planVersion,
+          ...(options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {})
+        });
         lastApplyRef.current = { afterVersion: res.newPlanVersion, commands, before: readModel };
         setReadModel(res.readModel);
         return { ok: true, changed: res.applied.changedTaskIds, planVersion: res.newPlanVersion };
