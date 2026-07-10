@@ -14,6 +14,7 @@ import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
+import { isCalendarWorkingWeekday, resolveProjectCalendar } from "@/delivery/lib/project-calendar";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AddAssigneeDialog, distribute, presetWeights, ROLES, roleLabel } from "@/delivery/assignments/assignments-editors";
 import { createClientId } from "@/delivery/lib/client-id";
@@ -48,7 +49,6 @@ const h1 = (min: number) => (Math.round((min / 60) * 10) / 10).toLocaleString("r
 // Чистые помощники относительно произвольного начала (baseMs); внутри компонента биндятся на origin плана.
 const dayToIsoAt = (baseMs: number, day: number) => new Date(baseMs + day * 86_400_000).toISOString().slice(0, 10);
 const isoToDayAt = (baseMs: number, iso: string) => Math.round((Date.parse(iso + "T00:00:00Z") - baseMs) / 86_400_000);
-const isWeekdayAt = (baseMs: number, day: number) => { const d = new Date(baseMs + day * 86_400_000).getUTCDay(); return d >= 1 && d <= 5; };
 
 const nid = createClientId;
 
@@ -94,9 +94,11 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
 
     // нерабочие дни календаря: праздники (resourceId=null) и отсутствия по ресурсу (workingMinutes < полного дня) —
     // тот же фильтр, что на вкладке «Календари». Пресеты не должны раскладывать труд на праздник/отсутствие (нулевая ёмкость).
-    const cal = (readModel.calendars ?? [])[0];
+    const cal = resolveProjectCalendar({ project: readModel.project, calendars: readModel.calendars });
     const full = cal?.workingMinutesPerDay ?? MIN_PER_DAY;
-    const exns = (readModel.calendarExceptions ?? []).filter((x) => x.workingMinutes < full);
+    const exns = (readModel.calendarExceptions ?? []).filter(
+      (x) => cal !== null && x.calendarId === cal.id && x.workingMinutes < full
+    );
     const holidayDays = new Set<number>();
     const absenceByRes = new Map<string, Set<number>>();
     for (const x of exns) {
@@ -104,7 +106,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
       if (x.resourceId === null) holidayDays.add(day);
       else { let s = absenceByRes.get(x.resourceId); if (!s) { s = new Set(); absenceByRes.set(x.resourceId, s); } s.add(day); }
     }
-    const isWorkingFor = (resourceId: string, day: number) => isWeekdayAt(baseMs, day) && !holidayDays.has(day) && !(absenceByRes.get(resourceId)?.has(day) ?? false);
+    const isWorkingFor = (resourceId: string, day: number) => cal !== null && isCalendarWorkingWeekday(cal, new Date(baseMs + day * 86_400_000).getUTCDay()) && !holidayDays.has(day) && !(absenceByRes.get(resourceId)?.has(day) ?? false);
 
     const metaByAsg = new Map<string, AsgMeta>();
     for (const a of assignments) {
@@ -124,7 +126,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
     let minDay = 9999, maxDay = 0;
     for (const m of metaByAsg.values()) for (const d of m.days) { minDay = Math.min(minDay, d); maxDay = Math.max(maxDay, d); }
     if (minDay > maxDay) { minDay = 0; maxDay = 34; }
-    return { leafTasks, asgByTask, metaByAsg, calcById, minDay, maxDay };
+    return { leafTasks, asgByTask, metaByAsg, calcById, minDay, maxDay, hasProjectCalendar: cal !== null };
   }, [readModel, baseMs]);
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
@@ -238,6 +240,11 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
         <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
           Реальный контракт: assignment.upsert / assignment.allocations.replace (сумма кривой = трудоёмкости) / assignment.delete. Кривая по дням редактируема; пресеты дают сбалансированную раскладку. Данные in-memory.
+        </div>
+      ) : null}
+      {!model.hasProjectCalendar ? (
+        <div role="status" className="mb-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--warning-text)]">
+          Календарь проекта не настроен. Дневное распределение трудозатрат недоступно.
         </div>
       ) : null}
 

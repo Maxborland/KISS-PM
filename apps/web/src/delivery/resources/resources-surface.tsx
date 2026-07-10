@@ -9,6 +9,7 @@ import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from
 import { createClientId } from "@/delivery/lib/client-id";
 import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
+import { isProjectWorkingDate, resolveProjectCalendar } from "@/delivery/lib/project-calendar";
 import { usePlanning } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import {
@@ -48,9 +49,21 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     const rawById = new Map(authored.tasks.map((t) => [t.id, t]));
     // id календаря для команд отсутствия = реальный календарь плана (project.calendarId / первый из read-model),
     // а не литерал "cal-5x8": на live чужой calendarId не пройдёт precondition команды. Инвариант «live = смена apiOrigin».
-    const calendars = readModel.calendars ?? [];
-    const projCalId = readModel.project.calendarId;
-    const calendarId = (typeof projCalId === "string" ? calendars.find((c) => c.id === projCalId)?.id : undefined) ?? calendars[0]?.id ?? "cal-5x8";
+    const calendar = resolveProjectCalendar({
+      project: readModel.project,
+      calendars: readModel.calendars
+    });
+    const projectHolidayDates = new Set(
+      (readModel.calendarExceptions ?? [])
+        .filter(
+          (exception) =>
+            calendar !== null &&
+            exception.calendarId === calendar.id &&
+            exception.resourceId === null &&
+            exception.workingMinutes < calendar.workingMinutesPerDay
+        )
+        .map((exception) => exception.date)
+    );
     const data: MatrixData = {
       buckets: readModel.resourceLoad.buckets ?? [],
       resources: resDir.list,
@@ -64,7 +77,7 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       // в mock/Storybook (KPI не падают, ✓ не рендерится).
       accepted: new Set((readModel.resourceLoad as { acceptedOverloads?: string[] }).acceptedOverloads ?? [])
     };
-    return { data, rawById, calendarId };
+    return { data, rawById, calendar, projectHolidayDates };
   }, [readModel, resDir.list]);
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
@@ -151,14 +164,13 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   }
 
   async function doAbsence(resourceId: string, typeLabel: string, start: string, finish: string) {
-    if (!canManageResources) return;
-    if (!model) return;
+    if (!canManageResources || !model?.calendar) return;
     const cmds: PlanningCommand[] = [];
     const end = isoToDay(finish);
     for (let d = isoToDay(start); d <= end; d += 1) {
-      const dow = new Date(Date.UTC(2026, 2, 2) + d * 86_400_000).getUTCDay();
-      if (dow === 0 || dow === 6) continue; // только рабочие дни диапазона (пропускаем выходные)
-      cmds.push(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: model.calendarId, resourceId, date: dayToIso(d), workingMinutes: 0, reason: typeLabel } }));
+      const date = dayToIso(d);
+      if (!isProjectWorkingDate(model.calendar, date, model.projectHolidayDates)) continue;
+      cmds.push(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: model.calendar.id, resourceId, date, workingMinutes: 0, reason: typeLabel } }));
     }
     if (cmds.length === 0) return;
     setBusy(true);
@@ -170,6 +182,11 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
 
   return (
     <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Ресурсы">
+      {!model.calendar ? (
+        <div role="status" className="mb-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--warning-text)]">
+          Календарь проекта не настроен. Создание отсутствий недоступно.
+        </div>
+      ) : null}
       <ResourceLoadMatrix
         scope={SCOPE}
         data={model.data}
@@ -177,7 +194,8 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           busy,
           ...(canManageResourceTasks ? { onCreateTask: openCreateTask, onEditTask: openEditTask } : {}),
           ...(canManagePlan ? { onAcceptOverload: acceptOverload } : {}),
-          ...(canManageResources ? { onEditAssignmentHours: editUnits, onAbsence: doAbsence } : {})
+          ...(canManageResources ? { onEditAssignmentHours: editUnits } : {}),
+          ...(canManageResources && model.calendar ? { onAbsence: doAbsence } : {})
         }}
       />
       {canManageResourceTasks && taskModal ? <TaskModal open mode={taskModal.mode} initial={taskModal.initial} onOpenChange={(o) => { if (!o) setTaskModal(null); }} onSubmit={submitTaskModal} /> : null}

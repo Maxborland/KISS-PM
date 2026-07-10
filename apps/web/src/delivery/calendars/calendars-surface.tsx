@@ -11,9 +11,10 @@ import { cn } from "@/lib/cn";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
-import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
+import { dayToIso, isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { buildProjectMonthKeys, currentPlanDate, monthGridDays, planDateFromDay, utcDayOfWeek } from "@/delivery/lib/date-origin";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { resolveProjectCalendar } from "@/delivery/lib/project-calendar";
 import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { hasPermission } from "@/lib/permissions";
@@ -27,6 +28,7 @@ import type { PlanningCommand, PlanCalendar, PlanCalendarException, PlanTask } f
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const MONTHS_CAP = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 const DOW_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const DOW_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const ddmm = (iso: string) => { const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 
 const nid = createClientId;
@@ -48,14 +50,15 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const [selCal, setSelCal] = useState<string>("project"); // "project" | resourceId
   const [monthOffset, setMonthOffset] = useState(0);
   const [busy, setBusy] = useState(false);
+  const projectCalendar = useMemo(
+    () => readModel ? resolveProjectCalendar({ project: readModel.project, calendars: readModel.calendars }) : null,
+    [readModel]
+  );
 
   const model = useMemo(() => {
-    if (!readModel) return null;
-    const calendars = readModel.calendars ?? [];
-    // календарь, по которому реально считается расписание = project.calendarId (а не просто первый из списка);
-    // на live это может быть НЕ дефолтный тенантный календарь, поэтому праздники должны писаться именно сюда.
-    const projCalId = readModel.project.calendarId;
-    const cal: PlanCalendar = (typeof projCalId === "string" ? calendars.find((c) => c.id === projCalId) : undefined) ?? calendars[0] ?? { id: "cal-5x8", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: MIN_PER_DAY };
+    if (!readModel || !projectCalendar) return null;
+    // Календарь, по которому реально считается расписание, выбирается только через project.calendarId.
+    const cal = projectCalendar;
     const exns = readModel.calendarExceptions ?? [];
     const full = cal.workingMinutesPerDay;
     // нерабочие исключения (workingMinutes < полного дня): праздники (resourceId=null) и отсутствия
@@ -98,11 +101,11 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       fallbackIso: currentPlanDate()
     });
     return { cal, full, holidayByDay, absByResDay, anyHolidayByDay, anyAbsByResDay, leafTasks, conflicts, monthsList };
-  }, [readModel]);
+  }, [readModel, projectCalendar]);
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
   // готовый контент — только при наличии model+readModel. Frame-обёртку сохраняем.
-  if (status !== "ready" || !model || !readModel) {
+  if (status !== "ready" || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
       <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} projectId={projectId} activeTab="Календари">
@@ -114,6 +117,20 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   }
 
   const projectMeta = deriveProjectMeta(readModel, projectBase);
+  if (!projectCalendar || !model) {
+    return (
+      <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Календари">
+        <div>
+          <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Календари проекта и ресурсов</h2>
+          <div role="status" className="mt-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-8 text-center text-[length:var(--text-sm)] text-[var(--muted)] shadow-[var(--shadow-card)]">
+            Календарь проекта не настроен. Исключения и отсутствия недоступны до выбора календаря.
+          </div>
+        </div>
+      </DeliveryFrame>
+    );
+  }
+  const workweekLabel = model.cal.workingWeekdays.map((day) => DOW_RU[day] ?? "?").join(", ");
+  const workdayHours = (model.full / 60).toLocaleString("ru-RU", { maximumFractionDigits: 1 });
   const focusMonth = model.monthsList[Math.max(0, Math.min(monthOffset, model.monthsList.length - 1))] ?? "";
   const monthLabel = focusMonth ? `${MONTHS_CAP[Number(focusMonth.slice(5, 7)) - 1]} ${focusMonth.slice(0, 4)}` : "";
   const isResourceView = selCal !== "project";
@@ -199,7 +216,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       {prototypeNotesEnabled ? (
         <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-          Реальный контракт: PlanCalendar (5×8, рабочая неделя read-only) + calendar.exception.upsert (праздник для всех — resourceId=null, отсутствие — по ресурсу). Ёмкость пересчитывается. Данные in-memory.
+          Реальный контракт: PlanCalendar (рабочая неделя и длительность дня read-only) + calendar.exception.upsert (праздник для всех, отсутствие по ресурсу). Ёмкость пересчитывается. Данные in-memory.
         </div>
       ) : null}
 
@@ -238,8 +255,8 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
             </div>
             <span className="text-[length:var(--text-sm)] text-[var(--muted)]">{isResourceView && selRes ? `${selRes.name} · наследует календарь проекта` : "Календарь проекта · базовый"}</span>
             <span className="ml-auto flex items-center gap-1">
-              <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-strong)]">Пн–Пт</span>
-              <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-strong)]">8 ч/день</span>
+              <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-strong)]">{workweekLabel}</span>
+              <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-strong)]">{workdayHours} ч/день</span>
             </span>
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -253,13 +270,13 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
               return (
                 <button key={day} type="button" disabled={!clickable || busy} onClick={() => toggleDay(day)} title={st.holiday ? `${ddmm(dayToIso(day))} · ${st.holiday.reason || "Праздник"}` : st.absence ? `${ddmm(dayToIso(day))} · ${st.absence.reason || "Отсутствие"}` : st.weekend ? "Выходной" : canManageView ? "Рабочий день — клик: нерабочий" : "Рабочий день"} style={{ background: dayTone.bg, color: dayTone.fg, borderColor: dayTone.border }} className={cn("relative flex h-[58px] flex-col rounded-[var(--radius-sm)] border p-1 text-left outline-none transition-colors", !st.inMonth && "opacity-35", clickable && "hover:ring-1 hover:ring-[var(--accent)]")}>
                   <span className="text-[length:var(--text-xs)] font-semibold tabular-nums">{dt.getUTCDate()}</span>
-                  <span className="mt-auto self-end text-[length:var(--text-2xs)] font-medium">{st.holiday ? "праздник" : st.absence ? (st.absence.reason || "отсутствие").toLowerCase() : st.weekend ? "" : "8 ч"}</span>
+                  <span className="mt-auto self-end text-[length:var(--text-2xs)] font-medium">{st.holiday ? "праздник" : st.absence ? (st.absence.reason || "отсутствие").toLowerCase() : st.weekend ? "" : `${workdayHours} ч`}</span>
                 </button>
               );
             })}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
-            <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-[var(--panel-subtle)] ring-1 ring-[var(--border-subtle)]" /> рабочий 8 ч</span>
+            <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-[var(--panel-subtle)] ring-1 ring-[var(--border-subtle)]" /> рабочий {workdayHours} ч</span>
             <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: NON_WORKING_TONE.weekend.bg }} /> выходной</span>
             <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: NON_WORKING_TONE.holiday.bg, boxShadow: `inset 0 0 0 1px ${NON_WORKING_TONE.holiday.border}` }} /> праздник</span>
             <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: NON_WORKING_TONE.absence.bg, boxShadow: `inset 0 0 0 1px ${NON_WORKING_TONE.absence.border}` }} /> отсутствие</span>

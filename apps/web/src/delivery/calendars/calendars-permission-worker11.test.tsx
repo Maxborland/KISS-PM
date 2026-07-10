@@ -30,15 +30,15 @@ vi.mock("@/delivery/lib/use-planning", () => ({
       },
       calendars: [{
         id: "calendar",
-        workingWeekdays: [1, 2, 3, 4, 5],
-        workingMinutesPerDay: 480
+        workingWeekdays: [2, 3, 4, 5, 6],
+        workingMinutesPerDay: 360
       }],
       calendarExceptions: [
         {
           id: "holiday",
           calendarId: "calendar",
           resourceId: null,
-          date: "2026-07-06",
+          date: "2026-07-07",
           workingMinutes: 0,
           reason: "Праздник"
         },
@@ -46,7 +46,7 @@ vi.mock("@/delivery/lib/use-planning", () => ({
           id: "absence",
           calendarId: "calendar",
           resourceId: "resource",
-          date: "2026-07-07",
+          date: "2026-07-08",
           workingMinutes: 0,
           reason: "Отпуск"
         }
@@ -131,6 +131,14 @@ describe("calendar planning permissions worker 11", () => {
 
     permissions = ["tenant.project_plan.read", "tenant.project_plan.manage"];
     const planManagerRoot = await renderCalendars();
+    expect(document.body.textContent).toContain("Вт, Ср, Чт, Пт, Сб");
+    expect(document.body.textContent).toContain("6 ч/день");
+    const julyFourth = [...document.querySelectorAll<HTMLButtonElement>('button[title="Рабочий день — клик: нерабочий"]')]
+      .find((button) => button.textContent?.trim().startsWith("4"));
+    expect(julyFourth?.disabled).toBe(false);
+    const julySixth = [...document.querySelectorAll<HTMLButtonElement>('button[title="Выходной"]')]
+      .find((button) => button.textContent?.trim().startsWith("6"));
+    expect(julySixth?.disabled).toBe(true);
     expect([...document.querySelectorAll<HTMLButtonElement>('button[title="Рабочий день — клик: нерабочий"]')].some((button) => !button.disabled)).toBe(true);
     expect(document.querySelector('button[title="Снять исключение"]')).not.toBeNull();
     await act(async () => buttonWithText("Test Resource")?.click());
