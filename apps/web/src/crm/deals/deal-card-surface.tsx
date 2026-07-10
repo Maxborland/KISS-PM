@@ -14,10 +14,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { money } from "@/crm/ui/crm-bits";
+import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { makeRuError } from "@/lib/error-messages";
 import { useCrm, useCrmUsers, type CrmUsersIndex } from "@/crm/lib/use-crm";
+import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import type { CrmActivity, DealStage, FeasibilityAssessment, Opportunity } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
+import { useSessionUser } from "@/shell/use-session-user";
 
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
 const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean); return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—"; };
@@ -149,6 +152,41 @@ export function DealCard({ initialId }: { initialId?: string } = {}) {
 }
 
 function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm>; data: NonNullable<ReturnType<typeof useCrm>["data"]>; opp: Opportunity; users: CrmUsersIndex }) {
+  const { live } = useCrmRuntime();
+  const sessionUser = useSessionUser();
+  const permissions = sessionUser?.permissions ?? [];
+  const manageCapability = getCrmWriteCapability({
+    live,
+    permissions,
+    permission: "tenant.opportunities.manage"
+  });
+  const feasibilityCapability = getCrmWriteCapability({
+    live,
+    permissions,
+    permission: "tenant.resource_feasibility.read"
+  });
+  const activationCapability = getCrmWriteCapability({
+    live,
+    permissions,
+    permission: "tenant.project_activation.manage"
+  });
+  const projectCapability = getCrmWriteCapability({
+    live,
+    permissions,
+    permission: "tenant.projects.manage"
+  });
+  const canManage = manageCapability.allowed;
+  const canCheckFeasibility = canManage && feasibilityCapability.allowed;
+  const canActivate = activationCapability.allowed && projectCapability.allowed;
+  const readOnlyReason = manageCapability.disabledReason ?? "Недостаточно прав для изменения сделки";
+  const feasibilityDisabledReason =
+    manageCapability.disabledReason ??
+    feasibilityCapability.disabledReason ??
+    "Недостаточно прав для проверки осуществимости";
+  const activationDisabledReason =
+    activationCapability.disabledReason ??
+    projectCapability.disabledReason ??
+    "Недостаточно прав для активации проекта";
   const [form, setForm] = useState<FormState>(() => formOf(opp));
   const [feasibility, setFeasibility] = useState<FeasibilityAssessment | null>(() => (opp.feasibilityResult as FeasibilityAssessment | null) ?? null);
   const [activities, setActivities] = useState<CrmActivity[] | null>(null);
@@ -159,6 +197,11 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   const locked = isFinal(opp);
   const effectivePipelineId = useMemo(() => resolveOpportunityPipelineId(opp, data.dealStages), [data.dealStages, opp]);
   const stages = useMemo(() => stagesForOpportunity(opp, data.dealStages), [data.dealStages, opp]);
+  const requiresStageAssignment = !opp.stageId || !effectivePipelineId;
+  const canEditParameters = canManage && !requiresStageAssignment;
+  const editDisabledReason = requiresStageAssignment
+    ? "Сначала назначьте сделке стадию в списке"
+    : readOnlyReason;
   const pipelineName = data.pipelines.find((p) => p.id === effectivePipelineId)?.name ?? "—";
   const stageName = (id: string | null) => data.dealStages.find((s) => s.id === id)?.name ?? "— без стадии —";
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -257,27 +300,33 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
           <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Параметры сделки</h3>
-              <Button variant="default" size="sm" disabled={busy || locked || !dirty} onClick={() => void save()}><Save className="size-3.5" aria-hidden />Сохранить</Button>
+              <Button variant="default" size="sm" disabled={busy || locked || !canEditParameters || !dirty} onClick={() => void save()} title={canEditParameters ? undefined : editDisabledReason}><Save className="size-3.5" aria-hidden />Сохранить</Button>
             </div>
+            {requiresStageAssignment ? (
+              <p className="mb-3 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--warning-text)]">
+                Сначала назначьте сделке стадию.{" "}
+                <Link href="/crm/deals" className="font-semibold underline underline-offset-2">Назначить стадию в списке</Link>
+              </p>
+            ) : null}
             <div className="grid grid-cols-2 gap-3">
-              <label className={`col-span-2 ${labelCls}`}>Название<Input value={form.title} onChange={(e) => set("title", e.target.value)} disabled={locked} /></label>
-              <label className={`col-span-2 ${labelCls}`}>Описание<Textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} disabled={locked} placeholder="Контекст для команды…" /></label>
+              <label className={`col-span-2 ${labelCls}`}>Название<Input value={form.title} onChange={(e) => set("title", e.target.value)} disabled={locked || !canEditParameters} /></label>
+              <label className={`col-span-2 ${labelCls}`}>Описание<Textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} disabled={locked || !canEditParameters} placeholder="Контекст для команды…" /></label>
               <label className={labelCls}>Стадия
-                <select value={form.stageId} onChange={(e) => set("stageId", e.target.value)} disabled={locked} className={selCls}>
+                <select value={form.stageId} onChange={(e) => set("stageId", e.target.value)} disabled={locked || !canEditParameters} className={selCls}>
                   {stages.some((s) => s.id === form.stageId) ? null : <option value={form.stageId}>— без стадии —</option>}
                   {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </label>
               <label className={labelCls}>Владелец
-                <select value={form.ownerUserId} onChange={(e) => set("ownerUserId", e.target.value)} disabled={locked} className={selCls}>
+                <select value={form.ownerUserId} onChange={(e) => set("ownerUserId", e.target.value)} disabled={locked || !canEditParameters} className={selCls}>
                   {users.list.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </label>
-              <label className={labelCls}>Старт<Input type="date" value={form.plannedStart} onChange={(e) => set("plannedStart", e.target.value)} disabled={locked} /></label>
-              <label className={labelCls}>Финиш<Input type="date" value={form.plannedFinish} onChange={(e) => set("plannedFinish", e.target.value)} disabled={locked} aria-invalid={form.plannedFinish < form.plannedStart} /></label>
-              <label className={labelCls}>Сумма, ₽<Input type="number" min={1} value={form.contractValue} onChange={(e) => set("contractValue", e.target.value)} disabled={locked} className="text-right" /></label>
-              <label className={labelCls}>Ставка, ₽/ч<Input type="number" min={1} value={form.plannedHourlyRate} onChange={(e) => set("plannedHourlyRate", e.target.value)} disabled={locked} className="text-right" /></label>
-              <label className={labelCls}>Вероятность, %<Input type="number" min={0} max={100} value={form.probability} onChange={(e) => set("probability", e.target.value)} disabled={locked} className="text-right" /></label>
+              <label className={labelCls}>Старт<Input type="date" value={form.plannedStart} onChange={(e) => set("plannedStart", e.target.value)} disabled={locked || !canEditParameters} /></label>
+              <label className={labelCls}>Финиш<Input type="date" value={form.plannedFinish} onChange={(e) => set("plannedFinish", e.target.value)} disabled={locked || !canEditParameters} aria-invalid={form.plannedFinish < form.plannedStart} /></label>
+              <label className={labelCls}>Сумма, ₽<Input type="number" min={1} value={form.contractValue} onChange={(e) => set("contractValue", e.target.value)} disabled={locked || !canEditParameters} className="text-right" /></label>
+              <label className={labelCls}>Ставка, ₽/ч<Input type="number" min={1} value={form.plannedHourlyRate} onChange={(e) => set("plannedHourlyRate", e.target.value)} disabled={locked || !canEditParameters} className="text-right" /></label>
+              <label className={labelCls}>Вероятность, %<Input type="number" min={0} max={100} value={form.probability} onChange={(e) => set("probability", e.target.value)} disabled={locked || !canEditParameters} className="text-right" /></label>
               <div className={labelCls}>Плановые часы<div className="flex h-9 items-center rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--panel-subtle)] px-2.5 v4-num text-[var(--muted-strong)]" title="Считается сервером: сумма / ставка">{plannedHours.toLocaleString("ru-RU")} ч</div></div>
             </div>
             <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] p-2.5">
@@ -290,19 +339,19 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
 
           <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
             <h3 className="mb-3 text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Лента активности</h3>
-            {!locked ? (
+            {!locked && canManage ? (
               <div className="mb-3 flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] p-2.5">
                 <Textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Написать комментарий…" />
                 <div className="flex justify-end"><Button variant="default" size="sm" disabled={busy || !comment.trim()} onClick={() => void sendComment()}><Send className="size-3.5" aria-hidden />Отправить</Button></div>
               </div>
-            ) : <p className="mb-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Сделка завершена — новые записи в ленту недоступны.</p>}
+            ) : <p className="mb-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">{locked ? "Сделка завершена — новые записи в ленту недоступны." : "Лента доступна только для чтения."}</p>}
             {activities === null ? (
               <div className="flex items-center gap-2 py-4 text-[length:var(--text-xs)] text-[var(--muted)]"><Loader2 className="size-3.5 animate-spin" aria-hidden /> Загрузка ленты…</div>
             ) : activities.length === 0 ? (
               <p className="py-4 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Пока нет активностей.</p>
             ) : (
               <ul className="flex flex-col gap-2.5">
-                {activities.map((a) => <ActivityItem key={a.id} a={a} users={users} busy={busy} onToggle={() => void toggleTask(a)} />)}
+                {activities.map((a) => <ActivityItem key={a.id} a={a} users={users} busy={busy} canToggle={canManage && !locked} onToggle={() => void toggleTask(a)} />)}
               </ul>
             )}
           </section>
@@ -313,7 +362,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
           <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Осуществимость</h3>
-              <Button variant="secondary" size="sm" disabled={busy || locked} onClick={() => void check()}><FlaskConical className="size-3.5" aria-hidden />Проверить</Button>
+              <Button variant="secondary" size="sm" disabled={busy || locked || !canCheckFeasibility} onClick={() => void check()} title={canCheckFeasibility ? undefined : feasibilityDisabledReason}><FlaskConical className="size-3.5" aria-hidden />Проверить</Button>
             </div>
             {feasibility ? <FeasibilityWidget a={feasibility} checkedAt={opp.feasibilityCheckedAt} /> : (
               <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Проверка осуществимости ещё не запускалась. Нажмите «Проверить» — сервер оценит ресурсы по плановым часам, спросу и активным проектам.</p>
@@ -330,9 +379,9 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
             ) : (
               <div className="flex flex-col gap-2.5">
                 {feasibility?.status === "conflict" ? (
-                  <label className={labelCls}>Обоснование риска (для активации при конфликте)<Input value={riskReason} onChange={(e) => setRiskReason(e.target.value)} placeholder="Почему запускаем несмотря на конфликт…" /></label>
+                  <label className={labelCls}>Обоснование риска (для активации при конфликте)<Input value={riskReason} onChange={(e) => setRiskReason(e.target.value)} disabled={!canActivate} placeholder="Почему запускаем несмотря на конфликт…" /></label>
                 ) : null}
-                <Button variant="default" disabled={busy || opp.feasibilityStatus == null} onClick={() => void activate()} title={opp.feasibilityStatus == null ? "Сначала проверьте осуществимость" : undefined}><Rocket className="size-3.5" aria-hidden />Активировать в проект</Button>
+                <Button variant="default" disabled={busy || !canActivate || opp.feasibilityStatus == null} onClick={() => void activate()} title={!canActivate ? activationDisabledReason : opp.feasibilityStatus == null ? "Сначала проверьте осуществимость" : undefined}><Rocket className="size-3.5" aria-hidden />Активировать в проект</Button>
                 <div className="flex gap-2">
                   {/* Необратимое закрытие сделки — только через подтверждение (G4-06). */}
                   <ConfirmDialog
@@ -341,7 +390,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
                     confirmLabel="Выиграна"
                     onConfirm={() => finalize("won_closed")}
                   >
-                    <Button variant="secondary" size="sm" className="flex-1" disabled={busy}><Trophy className="size-3.5" aria-hidden />Выиграна</Button>
+                    <Button variant="secondary" size="sm" className="flex-1" disabled={busy || !canManage} title={canManage ? undefined : readOnlyReason}><Trophy className="size-3.5" aria-hidden />Выиграна</Button>
                   </ConfirmDialog>
                   <ConfirmDialog
                     title="Закрыть сделку как проигранную?"
@@ -349,7 +398,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
                     confirmLabel="Проиграна"
                     onConfirm={() => finalize("lost_rejected")}
                   >
-                    <Button variant="ghost" size="sm" className="flex-1" disabled={busy}><XCircle className="size-3.5" aria-hidden />Проиграна</Button>
+                    <Button variant="ghost" size="sm" className="flex-1" disabled={busy || !canManage} title={canManage ? undefined : readOnlyReason}><XCircle className="size-3.5" aria-hidden />Проиграна</Button>
                   </ConfirmDialog>
                 </div>
                 {opp.feasibilityStatus == null ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Активация станет доступна после проверки осуществимости.</p> : null}
@@ -399,7 +448,7 @@ function FeasibilityWidget({ a, checkedAt }: { a: FeasibilityAssessment; checked
   );
 }
 
-function ActivityItem({ a, users, busy, onToggle }: { a: CrmActivity; users: CrmUsersIndex; busy: boolean; onToggle: () => void }) {
+function ActivityItem({ a, users, busy, canToggle, onToggle }: { a: CrmActivity; users: CrmUsersIndex; busy: boolean; canToggle: boolean; onToggle: () => void }) {
   const author = ownerName(users, a.authorUserId);
   const when = new Date(a.createdAt).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   return (
@@ -414,7 +463,7 @@ function ActivityItem({ a, users, busy, onToggle }: { a: CrmActivity; users: Crm
         </div>
         {a.type === "task" ? (
           <div className="mt-0.5 flex items-start gap-1.5">
-            <button type="button" disabled={busy} onClick={onToggle} title={a.status === "done" ? "Вернуть в работу" : "Отметить выполненной"} className="mt-0.5 shrink-0 text-[var(--muted)] hover:text-[var(--accent)] disabled:opacity-50">
+            <button type="button" disabled={busy || !canToggle} onClick={onToggle} title={canToggle ? a.status === "done" ? "Вернуть в работу" : "Отметить выполненной" : "Недостаточно прав для изменения"} className="mt-0.5 shrink-0 text-[var(--muted)] hover:text-[var(--accent)] disabled:opacity-50">
               {a.status === "done" ? <CheckCircle2 className="size-4 text-[var(--success-text)]" aria-hidden /> : <Square className="size-4" aria-hidden />}
             </button>
             <div className="min-w-0">
