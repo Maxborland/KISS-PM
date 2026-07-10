@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, type ClipboardEvent as ReactClipboardEvent, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type ClipboardEvent as ReactClipboardEvent, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Plus, TriangleAlert, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -13,7 +13,7 @@ import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { createClientId } from "@/delivery/lib/client-id";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
-import { dayToIso, isoToDay, MIN_PER_DAY, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/planning-demo-data";
+import { dayToIso, isoToDay, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/planning-demo-data";
 import { currentPlanDate, deriveScheduleTimeline, formatWeekLabel } from "@/delivery/lib/date-origin";
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
 import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
@@ -21,21 +21,33 @@ import { usePointerDrag } from "@/delivery/lib/use-pointer-drag";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { hasPermission } from "@/lib/permissions";
 import { useSessionUser } from "@/shell/use-session-user";
-import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu, TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
+import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu, TaskModal, type TaskModalSubmitResult, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { DependencyType, PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
-import { buildCompensatingCommandBatch, buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/planning-client";
+import { buildCompensatingCommandBatch, type PlanningReadModel } from "@kiss-pm/planning-client";
 import { mapRows, type Kind, type Mode, type Pred, type Row } from "@/delivery/schedule/schedule-rows";
 import { buildFinishDateFillCommands, buildPasteCommands, createTaskTsvId, getScheduleNavigationTarget, parseTaskTsv, resolveFinishFillDrag, shouldRunScheduleUndo } from "@/delivery/schedule/schedule-productivity";
 import { buildMilestoneCommands } from "@/delivery/schedule/schedule-milestone";
+import { ScheduleSavedViews, type ScheduleSavedViewPayload, type ScheduleZoom } from "@/delivery/schedule/schedule-saved-views";
+import {
+  resolveScheduleWorkingTime,
+  scheduleFinishDateForDuration,
+  scheduleWorkingDateOnOrAfter,
+  scheduleWorkingMinutesThroughDate,
+  type ScheduleCalendarSource
+} from "@/delivery/schedule/schedule-working-time";
 
-const HPD = 8; // часов в рабочем дне
 const genId = createClientId;
 const PLAN_MANAGE_PERMISSION = "tenant.project_plan.manage";
+const RESOURCE_MANAGE_PERMISSION = "tenant.project_resources.manage";
 const SCHEDULE_NAVIGATION_GUARD_STATE_KEY = "__kissPmScheduleNavigationGuard";
 
 export function canManageScheduleControls({ live, permissions }: { live: boolean; permissions: readonly string[] }): boolean {
   return !live || hasPermission(permissions, PLAN_MANAGE_PERMISSION);
+}
+
+export function canManageScheduleResourceControls({ live, permissions }: { live: boolean; permissions: readonly string[] }): boolean {
+  return !live || hasPermission(permissions, RESOURCE_MANAGE_PERMISSION);
 }
 
 function ScheduleRowMenu({ canManagePlan, children, ...props }: ComponentProps<typeof RowMenu> & { canManagePlan: boolean }) {
@@ -43,14 +55,167 @@ function ScheduleRowMenu({ canManagePlan, children, ...props }: ComponentProps<t
 }
 
 type EditField = "name" | "dur" | "work" | "pct"; // редактируемые ячейки сетки (для Tab-навигации)
+type ScheduleAssignmentRef = {
+  id: string;
+  taskId: string;
+  resourceId: string;
+  role?: PlanAssignmentRole;
+  unitsPermille?: number;
+};
+
+function rowDurationMinutes(row: Row): number {
+  return row.durationMinutes ??
+    Math.round(row.durDays * row.workingMinutesPerDay);
+}
+
+function scaledWorkMinutes(row: Row, durationMinutes: number): number {
+  const previousDurationMinutes = rowDurationMinutes(row);
+  return previousDurationMinutes > 0
+    ? Math.max(0, Math.round(durationMinutes * row.workH * 60 / previousDurationMinutes))
+    : Math.max(0, durationMinutes);
+}
+
+export function resolveScheduleTiming(
+  source: ScheduleCalendarSource,
+  calendarId: string | null | undefined,
+  startIso: string | null,
+  durationDays: number
+): { durationMinutes: number; finishIso: string | null; workingMinutesPerDay: number } {
+  const workingTime = resolveScheduleWorkingTime(source, calendarId);
+  const durationMinutes = Math.max(
+    0,
+    Math.round(durationDays * workingTime.workingMinutesPerDay)
+  );
+  return {
+    durationMinutes,
+    finishIso: startIso
+      ? scheduleFinishDateForDuration(startIso, durationMinutes, workingTime)
+      : null,
+    workingMinutesPerDay: workingTime.workingMinutesPerDay
+  };
+}
+
+export function buildScheduleWorkCommand(
+  row: Row,
+  durationDays: number,
+  workHours: number
+): PlanningCommand {
+  return createPlanningCommand({
+    type: "task.update_work_model",
+    payload: {
+      taskId: row.id,
+      taskType: "fixed_duration",
+      effortDriven: false,
+      durationMinutes: Math.max(0, Math.round(durationDays * row.workingMinutesPerDay)),
+      workMinutes: Math.max(0, Math.round(workHours * 60))
+    }
+  });
+}
+
+export function buildScheduleDependencyCommand(input: {
+  id: string;
+  predecessorTaskId: string;
+  successor: Row;
+  type: DependencyType;
+  lagDays: number;
+}): PlanningCommand {
+  return createPlanningCommand({
+    type: "dependency.upsert",
+    payload: {
+      id: input.id,
+      predecessorTaskId: input.predecessorTaskId,
+      successorTaskId: input.successor.id,
+      dependencyType: input.type,
+      lagMinutes: Math.round(input.lagDays * input.successor.workingMinutesPerDay)
+    }
+  });
+}
+
+export function buildScheduleRangeCommands(input: {
+  source: ScheduleCalendarSource;
+  row: Row;
+  startIso: string;
+  finishIso: string;
+  assignment?: ScheduleAssignmentRef;
+}): PlanningCommand[] | null {
+  const workingTime = resolveScheduleWorkingTime(
+    input.source,
+    input.row.effectiveCalendarId
+  );
+  const startIso = scheduleWorkingDateOnOrAfter(input.startIso, workingTime);
+  const finishIso = scheduleWorkingDateOnOrAfter(input.finishIso, workingTime);
+  const durationMinutes = scheduleWorkingMinutesThroughDate(
+    startIso,
+    finishIso,
+    workingTime
+  );
+  if (durationMinutes <= 0) return null;
+
+  const workMinutes = scaledWorkMinutes(input.row, durationMinutes);
+  const commands: PlanningCommand[] = [
+    createPlanningCommand({
+      type: "task.update_schedule",
+      payload: { taskId: input.row.id, plannedStart: startIso, plannedFinish: finishIso }
+    }),
+    createPlanningCommand({
+      type: "task.update_work_model",
+      payload: {
+        taskId: input.row.id,
+        taskType: "fixed_duration",
+        effortDriven: false,
+        durationMinutes,
+        workMinutes
+      }
+    })
+  ];
+  if (input.assignment) {
+    commands.push(createPlanningCommand({
+      type: "assignment.upsert",
+      payload: {
+        id: input.assignment.id,
+        taskId: input.row.id,
+        resourceId: input.assignment.resourceId,
+        role: input.assignment.role ?? "executor",
+        unitsPermille: input.assignment.unitsPermille ?? 1000,
+        workMinutes
+      }
+    }));
+  }
+  return commands;
+}
+
+export function buildScheduleMoveCommand(
+  source: ScheduleCalendarSource,
+  row: Row,
+  requestedStartIso: string
+): PlanningCommand {
+  const workingTime = resolveScheduleWorkingTime(source, row.effectiveCalendarId);
+  const plannedStart = scheduleWorkingDateOnOrAfter(requestedStartIso, workingTime);
+  const plannedFinish = scheduleFinishDateForDuration(
+    plannedStart,
+    rowDurationMinutes(row),
+    workingTime
+  );
+  return createPlanningCommand({
+    type: "task.update_schedule",
+    payload: { taskId: row.id, plannedStart, plannedFinish }
+  });
+}
+
+export function scheduleUnitsPercent(row: Row): number {
+  const durationMinutes = rowDurationMinutes(row);
+  return durationMinutes > 0
+    ? Math.round(row.workH * 60 / durationMinutes * 100)
+    : 100;
+}
 
 // Оптимистичный патч read-model: применяем правку локально мгновенно (до ответа бэка).
 // summary-rollup пересчитает mapRows; полный каскад/критпуть вернёт бэк.
-function optimisticPatch(rm: PlanningReadModel, command: PlanningCommand): PlanningReadModel {
+export function optimisticPatch(rm: PlanningReadModel, command: PlanningCommand): PlanningReadModel {
   const cmd = command as { type: string; payload: Record<string, unknown> };
   // optimisticPatch мутирует ЧАСТИЧНУЮ копию (только трогаемые поля) — авторитетную полную форму
   // вернёт бэк, поэтому здесь узкие локальные типы, а не полный PlanTask/CalculatedTask.
-  type PatchTask = { id: string; parentTaskId: string | null; wbsCode: string; title: string; schedulingMode: Mode; durationMinutes: number | null; workMinutes: number; percentComplete: number; customFields?: Record<string, unknown> };
+  type PatchTask = { id: string; parentTaskId: string | null; wbsCode: string; title: string; schedulingMode: Mode; durationMinutes: number | null; workMinutes: number; percentComplete: number; calendarId?: string | null; customFields?: Record<string, unknown> };
   type PatchCalc = { id: string; calculatedStart: string; calculatedFinish: string; totalSlackMinutes: number | null; isCritical: boolean };
   const authored = rm.authored as unknown as { tasks: PatchTask[] };
   const calcPlan = rm.calculatedPlan as unknown as { tasks: PatchCalc[] };
@@ -62,7 +227,14 @@ function optimisticPatch(rm: PlanningReadModel, command: PlanningCommand): Plann
   switch (cmd.type) {
     case "task.update_work_model":
       if (T) { if (cmd.payload.durationMinutes != null) T.durationMinutes = cmd.payload.durationMinutes as number; if (typeof cmd.payload.workMinutes === "number") T.workMinutes = cmd.payload.workMinutes; }
-      if (T && C && T.durationMinutes != null) C.calculatedFinish = dayToIso(isoToDay(C.calculatedStart) + T.durationMinutes / MIN_PER_DAY);
+      if (T && C?.calculatedStart && T.durationMinutes != null) {
+        const workingTime = resolveScheduleWorkingTime(rm, T.calendarId);
+        C.calculatedFinish = scheduleFinishDateForDuration(
+          C.calculatedStart,
+          T.durationMinutes,
+          workingTime
+        );
+      }
       break;
     case "task.update_progress":
       if (T) T.percentComplete = cmd.payload.percentComplete as number;
@@ -75,18 +247,11 @@ function optimisticPatch(rm: PlanningReadModel, command: PlanningCommand): Plann
       const pf = cmd.payload.plannedFinish as string | null;
       if (C && ps) C.calculatedStart = ps;
       if (C && pf) C.calculatedFinish = pf;
-      if (T && ps && pf) {
-        const oldDurDays = T.durationMinutes != null ? T.durationMinutes / MIN_PER_DAY : 0;
-        const wpd = oldDurDays > 0 ? T.workMinutes / oldDurDays : MIN_PER_DAY;
-        const newDurDays = isoToDay(pf) - isoToDay(ps);
-        T.workMinutes = Math.round(newDurDays * wpd);
-        T.durationMinutes = newDurDays * MIN_PER_DAY;
-      }
       break;
     }
     case "assignment.upsert": {
       const rid = String(cmd.payload.resourceId);
-      const name = RESOURCES.find((r) => r.id === rid)?.name ?? rid;
+      const name = RESOURCES.find((resource) => resource.id === rid)?.name ?? rid;
       if (T) T.customFields = { ...(T.customFields ?? {}), resLabel: name };
       break;
     }
@@ -95,15 +260,21 @@ function optimisticPatch(rm: PlanningReadModel, command: PlanningCommand): Plann
       // wbsCode — плейсхолдер «…»; авторитетную нумерацию вернёт бэк (mock task.create).
       const p = cmd.payload;
       const newId = String(p.id);
+      const workingTime = resolveScheduleWorkingTime(rm, null);
       tasks.push({
         id: newId,
         parentTaskId: (p.parentTaskId as string | null) ?? null,
         wbsCode: "…",
         title: String(p.title ?? "Новая задача"),
         schedulingMode: "auto",
-        durationMinutes: typeof p.durationMinutes === "number" ? p.durationMinutes : 5 * MIN_PER_DAY,
-        workMinutes: typeof p.workMinutes === "number" ? p.workMinutes : 40 * 60,
+        durationMinutes: typeof p.durationMinutes === "number"
+          ? p.durationMinutes
+          : 5 * workingTime.workingMinutesPerDay,
+        workMinutes: typeof p.workMinutes === "number"
+          ? p.workMinutes
+          : 5 * workingTime.workingMinutesPerDay,
         percentComplete: 0,
+        calendarId: rm.project.calendarId,
         customFields: {}
       });
       calc.push({ id: newId, calculatedStart: "", calculatedFinish: "", totalSlackMinutes: null, isCritical: false });
@@ -134,11 +305,8 @@ function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}.${m}.${y}`;
 }
-function unitsPct(durDays: number, workH: number): number {
-  return durDays > 0 ? Math.round((workH / (durDays * HPD)) * 100) : 100;
-}
 const ZOOM_DAY_W = { day: 36, week: 20, month: 8 } as const;
-type Zoom = keyof typeof ZOOM_DAY_W;
+type Zoom = ScheduleZoom;
 type DragMode = "move" | "resize" | "resizeLeft" | "progress";
 type DragState = { id: string; mode: DragMode; startX: number; origStart: number; origDur: number; origWorkH: number; origPct: number; deltaDays: number; curPct: number };
 type ColDrag = { index: number; startX: number; origW: number };
@@ -174,16 +342,23 @@ const cellBtn = "block w-full cursor-pointer truncate rounded-[var(--radius-xs)]
 export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { live } = usePlanningRuntime();
   const sessionUser = useSessionUser();
-  const canManagePlan = canManageScheduleControls({ live, permissions: sessionUser?.permissions ?? [] });
+  const permissions = sessionUser?.permissions ?? [];
+  const canManagePlan = canManageScheduleControls({ live, permissions });
+  const canManageResources = canManageScheduleResourceControls({ live, permissions });
   const { readModel, setReadModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
-  const resDir = useResourceDirectory();
-  // Фолбэк имени ресурса: под ограниченной ролью справочник людей может отдать 403 —
-  // резолвер вернёт сырой id; показываем «Участник xxxx» вместо user-/r-идентификатора (G8-08).
+  const resourceDirectory = useResourceDirectory();
+  const planningResources = resourceDirectory.list;
+  const resourceOverride = live && planningResources.length === 0
+    ? undefined
+    : planningResources;
+  const resourceOverrideProps = resourceOverride
+    ? { resources: resourceOverride }
+    : {};
   const resName = useMemo(() => {
-    const name = resDir.name;
-    return (id: string) => { const n = name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
-  }, [resDir.name]);
+    const names = new Map(planningResources.map((resource) => [resource.id, resource.name]));
+    return (id: string) => names.get(id) ?? `Участник ${id.slice(-4)}`;
+  }, [planningResources]);
   const [zoom, setZoom] = useState<Zoom>("week");
   const [sel, setSel] = useState<string | null>("t-3.2.1");
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -198,13 +373,17 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const inlineRef = useRef<HTMLInputElement | null>(null);
   // При Tab-навигации moveEdit уже коммитит текущую ячейку; подавляем повторный коммит из onBlur.
   const skipBlurRef = useRef(false);
+  const editableClickTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (editableClickTimerRef.current !== null) window.clearTimeout(editableClickTimerRef.current);
+  }, []);
   const [flash, setFlash] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   // инлайн-валидация строк создания задачи (мин. 3 символа) — у поля, не в toast
   const [createError, setCreateError] = useState<{ scope: "bottom" | "inline"; msg: string } | null>(null);
   // подтверждение архивации задачи (необратимое действие) — из ПКМ-меню строки
   const [confirmDelete, setConfirmDelete] = useState<Row | null>(null);
-  const [errors, setErrors] = useState<Map<string, string>>(() => new Map());
+  const [errors, setErrors] = useState<Map<string, string[]>>(() => new Map());
   const [batchMode, setBatchMode] = useState(false);
   const [staged, setStaged] = useState<PlanningCommand[]>([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -220,9 +399,21 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // обновлял его (а не плодил второе назначение, удваивая нагрузку — реальный редьюсер upsert-ит по id).
   const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; parentId: string | null; taskId?: string; asgId?: string; initial: TaskModalValues } | null>(null);
   const [colW, setColW] = useState<number[]>(() => [...DEFAULT_COLW]);
+  const savedViewPayload = useMemo<ScheduleSavedViewPayload>(() => ({
+    version: 1,
+    zoom,
+    columnWidths: [...colW],
+    collapsedTaskIds: [...collapsed]
+  }), [collapsed, colW, zoom]);
+
+  function applySavedView(payload: ScheduleSavedViewPayload) {
+    setZoom(payload.zoom);
+    setColW([...payload.columnWidths]);
+    setCollapsed(new Set(payload.collapsedTaskIds));
+  }
 
   const mapped = useMemo(() => (readModel ? mapRows(readModel, resName) : null), [readModel, resName]);
-  const parsedPaste = useMemo(() => parseTaskTsv(pasteDraft), [pasteDraft]);
+  const parsedPaste = useMemo(() => parseTaskTsv(pasteDraft, readModel ?? {}), [pasteDraft, readModel]);
   const dayW = ZOOM_DAY_W[zoom];
   const lastCommitRef = useRef<{ commands: PlanningCommand[]; before: PlanningReadModel; afterVersion: number } | null>(null);
   const batchBaseRef = useRef<PlanningReadModel | null>(null);
@@ -272,40 +463,46 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         return;
       }
       if (cur.deltaDays === 0) return;
+      const source = readModelRef.current;
+      const row = mappedRef.current?.rows.find((candidate) => candidate.id === cur.id);
+      if (!source || !row) return;
+      const assignment = source.authored.assignments.find(
+        (candidate) => candidate.taskId === cur.id
+      );
+      const projectStartDay = isoToDay(source.project.plannedStart);
       if (cur.mode === "move") {
-        const ns = Math.max(0, cur.origStart + cur.deltaDays);
-        void applyCmd(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: cur.id, plannedStart: dayToIso(ns), plannedFinish: dayToIso(ns + cur.origDur) } }));
+        const ns = Math.max(projectStartDay, cur.origStart + cur.deltaDays);
+        if (ns === cur.origStart) return;
+        void applyCmd(buildScheduleMoveCommand(source, row, dayToIso(ns)));
       } else if (cur.mode === "resizeLeft") {
         // Тяга левого края меняет старт И длительность → шлём update_schedule + update_work_model
         // + синк назначения (как editFinish). Иначе WBS покажет новые часы, а Ресурсы/Сценарии —
         // старую нагрузку (она считается из assignment.workMinutes).
-        const ns = Math.max(0, cur.origStart + cur.deltaDays);
+        const ns = Math.max(projectStartDay, cur.origStart + cur.deltaDays);
         const nf = cur.origStart + cur.origDur;
         const nd = nf - ns;
+        if (ns === cur.origStart) return;
         if (nd >= 1) {
-          const u = cur.origDur > 0 ? cur.origWorkH / (cur.origDur * HPD) : 1;
-          const wm = Math.max(0, Math.round(nd * HPD * u * 60));
-          const cmds: PlanningCommand[] = [
-            createPlanningCommand({ type: "task.update_schedule", payload: { taskId: cur.id, plannedStart: dayToIso(ns), plannedFinish: dayToIso(nf) } }),
-            createPlanningCommand({ type: "task.update_work_model", payload: { taskId: cur.id, taskType: "fixed_duration", effortDriven: false, durationMinutes: nd * MIN_PER_DAY, workMinutes: wm } })
-          ];
-          const asgs = readModelRef.current?.authored.assignments;
-          const asg = asgs?.find((x) => x.taskId === cur.id);
-          if (asg) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: cur.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } }));
-          void runBatch(cmds);
+          const commands = buildScheduleRangeCommands({
+            source,
+            row,
+            startIso: dayToIso(ns),
+            finishIso: dayToIso(nf),
+            ...(assignment ? { assignment } : {})
+          });
+          if (commands) void runBatch(commands);
         }
       } else {
         const nd = Math.max(1, cur.origDur + cur.deltaDays);
-        const u = cur.origDur > 0 ? cur.origWorkH / (cur.origDur * HPD) : 1;
-        const wm = Math.max(0, Math.round(nd * HPD * u * 60));
-        const cmds: PlanningCommand[] = [
-          createPlanningCommand({ type: "task.update_work_model", payload: { taskId: cur.id, taskType: "fixed_duration", effortDriven: false, durationMinutes: nd * MIN_PER_DAY, workMinutes: wm } })
-        ];
-        // синхронизируем труд назначения (загрузка ресурса считается из assignment.workMinutes)
-        const asgs = readModelRef.current?.authored.assignments;
-        const asg = asgs?.find((x) => x.taskId === cur.id);
-        if (asg) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: cur.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } }));
-        if (cmds.length > 1) void runBatch(cmds); else void applyCmd(cmds[0]!);
+        if (nd === cur.origDur) return;
+        const commands = buildScheduleRangeCommands({
+          source,
+          row,
+          startIso: row.startIso,
+          finishIso: dayToIso(cur.origStart + nd),
+          ...(assignment ? { assignment } : {})
+        });
+        if (commands) void runBatch(commands);
       }
     }
   });
@@ -334,10 +531,12 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       if (!targetId || targetId === cur.fromId) return;
       // тип связи = из какого края тянули → в какой край цели (по позиции курсора)
       const tr = mappedRef.current?.rows.find((x) => x.id === targetId);
+      if (!tr || tr.kind === "summary") return;
       const rect = ganttRef.current?.getBoundingClientRect();
       let toEdge: "start" | "finish" = "start";
       if (tr && rect) { const x = e.clientX - rect.left; const mid = toTimelineX(tr.dayStart) + (tr.dayDur / 2) * dayWRef.current; toEdge = x < mid ? "start" : "finish"; }
       const type = cur.fromEdge === "finish" ? (toEdge === "start" ? "FS" : "FF") : toEdge === "start" ? "SS" : "SF";
+      if (tr.predList.some((pred) => pred.predId === cur.fromId && pred.type === type)) return;
       void applyCmd(createPlanningCommand({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: cur.fromId, successorTaskId: targetId, dependencyType: type, lagMinutes: 0 } }));
     }
   });
@@ -353,7 +552,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }, [inlineNew?.afterId, inlineNew?.parentId]);
 
   function beginOperation(): boolean {
-    if (operationRef.current) return false;
+    if (operationRef.current) {
+      toast.error("Дождитесь завершения текущей операции");
+      return false;
+    }
     operationRef.current = true;
     setBusy(true);
     return true;
@@ -378,33 +580,39 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }
 
   async function applyStaged() {
-    if (!canManagePlan) return;
-    if (staged.length === 0) return;
-    if (!beginOperation()) return;
-    const cmds = staged;
-    const base = batchBaseRef.current;
-    let res: ApplyResult;
-    try { res = await applyBatch(cmds); } finally { endOperation(); }
+    if (!canManagePlan || staged.length === 0 || !beginOperation()) return;
+    const commands = staged;
+    const beforeApply = batchBaseRef.current;
+    let result: ApplyResult;
+    try { result = await applyBatch(commands); } finally { endOperation(); }
+
+    if (!result.ok && result.message === "preview_cancelled") return;
+
     consumeNavigationSentinel();
     setStaged([]);
     batchBaseRef.current = null;
-    if (res.ok) {
-      lastCommitRef.current = base ? { commands: cmds, before: base, afterVersion: res.planVersion } : null;
-      setCanUndo(base != null && buildCompensatingCommandBatch(cmds, base).length > 0);
+    if (result.ok) {
+      lastCommitRef.current = beforeApply ? { commands, before: beforeApply, afterVersion: result.planVersion } : null;
+      setCanUndo(beforeApply != null && buildCompensatingCommandBatch(commands, beforeApply).length > 0);
       setErrors(new Map());
-      setFlash(new Set(res.changed));
-      toast.success(`Пакет применён: коммит v${res.planVersion} · затронуто задач: ${res.changed.length}`);
+      setFlash(new Set(result.changed));
+      toast.success(`Пакет применён: коммит v${result.planVersion} · затронуто задач: ${result.changed.length}`);
       window.setTimeout(() => setFlash(new Set()), 1700);
-    } else if (res.conflict) {
-      toast.error("Конфликт версий плана — перезагружено");
-    } else if (res.message !== "preview_cancelled") {
-      const m = new Map<string, string>();
-      (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); });
-      setErrors(m);
-      toast.error(`Пакет отклонён: ${res.issues?.[0]?.message ?? res.message}`);
-      await reload();
+      return;
     }
+
+    const nextErrors = new Map<string, string[]>();
+    (result.issues ?? []).forEach((issue) => {
+      const key = issue.entityId ?? "__plan__";
+      nextErrors.set(key, [...(nextErrors.get(key) ?? []), issue.message]);
+    });
+    setErrors(nextErrors);
+    toast.error(result.conflict
+      ? "Конфликт версий плана — пакет сброшен, данные перезагружены"
+      : `Пакет отклонён и сброшен: ${result.issues?.[0]?.message ?? result.message}`);
+    await reload();
   }
+
   function resetStagedReadModel() {
     const base = batchBaseRef.current;
     batchBaseRef.current = null;
@@ -417,6 +625,13 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     resetStagedReadModel();
     toast.success("Пакет сброшен");
     void reload();
+  }
+  function toggleBatchMode() {
+    if (batchMode && staged.length > 0) {
+      toast.error("Сначала примените или сбросьте накопленный пакет");
+      return;
+    }
+    setBatchMode((current) => !current);
   }
   useEffect(() => {
     if (staged.length === 0) return;
@@ -483,69 +698,115 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       window.removeEventListener("popstate", guardHistoryTraversal);
     };
   }, [projectId, staged.length]);
+  const containsResourceMutation = (commands: PlanningCommand[]) => commands.some((command) =>
+    command.type === "assignment.upsert"
+    || command.type === "assignment.delete"
+    || command.type === "assignment.allocations.replace"
+    || command.type === "resource.reserve"
+  );
+
   async function undo() {
     if (!canManagePlan) return;
-    const lc = lastCommitRef.current;
-    if (!lc || !canUndo) { toast.error("Нет применённого действия для отката"); return; }
-    if (readModel?.planVersion !== lc.afterVersion) {
+    const lastCommit = lastCommitRef.current;
+    if (!lastCommit || !canUndo) { toast.error("Нет применённого действия для отката"); return; }
+    if (readModel?.planVersion !== lastCommit.afterVersion) {
       lastCommitRef.current = null;
       setCanUndo(false);
       toast.error("План уже изменён. Откат отменён, данные перезагружены");
       await reload();
       return;
     }
-    const inverses = buildCompensatingCommandBatch(lc.commands, lc.before);
+    const inverses = buildCompensatingCommandBatch(lastCommit.commands, lastCommit.before);
     if (inverses.length === 0) { toast.error("Откат недоступен для этой операции (создание/перенос/назначение)"); return; }
-    if (!beginOperation()) return;
-    let res: ApplyResult;
-    try { res = await applyBatch(inverses); } finally { endOperation(); }
-    lastCommitRef.current = null;
-    setCanUndo(false);
-    if (res.ok) {
-      setErrors(new Map());
-      setFlash(new Set(res.changed));
-      toast.success(`Откат применён — компенсирующий коммит v${res.planVersion}`);
-      window.setTimeout(() => setFlash(new Set()), 1700);
-    } else {
-      toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Откат отклонён: ${res.issues?.[0]?.message ?? res.message}`);
+    if (containsResourceMutation(inverses) && !canManageResources) {
+      toast.error("Для отката назначения нужно право управления ресурсами");
+      return;
     }
+    if (!beginOperation()) return;
+    let result: ApplyResult;
+    try { result = await applyBatch(inverses); } finally { endOperation(); }
+
+    if (!result.ok && result.message === "preview_cancelled") return;
+
+    if (result.ok) {
+      lastCommitRef.current = null;
+      setCanUndo(false);
+      setErrors(new Map());
+      setFlash(new Set(result.changed));
+      toast.success(`Откат применён — компенсирующий коммит v${result.planVersion}`);
+      window.setTimeout(() => setFlash(new Set()), 1700);
+      return;
+    }
+
+    if (result.conflict) {
+      lastCommitRef.current = null;
+      setCanUndo(false);
+      await reload();
+    }
+    toast.error(result.conflict
+      ? "Конфликт версий — откат недоступен, данные перезагружены"
+      : `Откат отклонён: ${result.issues?.[0]?.message ?? result.message}`);
   }
 
-  async function applyCmd(command: PlanningCommand): Promise<ApplyResult | null> {
-    if (!canManagePlan) return null;
-    // режим пакета: копим правки + оптимистично показываем, применяем одним коммитом
-    if (batchMode) {
-      if (staged.length === 0) batchBaseRef.current = readModel;
-      setStaged((s) => [...s, command]);
-      if (readModel) { const opt = optimisticPatch(readModel, command); if (opt !== readModel) setReadModel(opt); }
+  async function mutateCommands(commands: PlanningCommand[], options?: { idempotencyKey?: string }): Promise<ApplyResult | null> {
+    if (!canManagePlan || commands.length === 0) return null;
+    if (containsResourceMutation(commands) && !canManageResources) {
+      toast.error("Для изменения назначения нужно право управления ресурсами");
       return null;
     }
+
+    if (batchMode) {
+      if (!batchBaseRef.current) batchBaseRef.current = readModel;
+      setStaged((current) => [...current, ...commands]);
+      if (readModel) {
+        const optimistic = commands.reduce(optimisticPatch, readModel);
+        if (optimistic !== readModel) setReadModel(optimistic);
+      }
+      return null;
+    }
+
     if (!beginOperation()) return null;
-    const prev = readModel;
-    // 1) оптимистично применяем на фронте — мгновенный отклик
-    if (prev) { const opt = optimisticPatch(prev, command); if (opt !== prev) setReadModel(opt); }
-    // 2) бэк валидирует и пересчитывает авторитетно
-    let res: ApplyResult;
-    try { res = await apply(command); } finally { endOperation(); }
-    if (res.ok) {
-      lastCommitRef.current = prev ? { commands: [command], before: prev, afterVersion: res.planVersion } : null;
-      setCanUndo(prev != null && buildCompensatingCommands(command, prev).length > 0);
+    const before = readModel;
+    if (before) {
+      const optimistic = commands.reduce(optimisticPatch, before);
+      if (optimistic !== before) setReadModel(optimistic);
+    }
+
+    let result: ApplyResult;
+    try {
+      result = commands.length === 1 && !options?.idempotencyKey
+        ? await apply(commands[0]!)
+        : await applyBatch(commands, options);
+    } finally {
+      endOperation();
+    }
+
+    if (result.ok) {
+      lastCommitRef.current = before ? { commands, before, afterVersion: result.planVersion } : null;
+      setCanUndo(before != null && buildCompensatingCommandBatch(commands, before).length > 0);
       setErrors(new Map());
-      setFlash(new Set(res.changed));
-      toast.success(`Коммит v${res.planVersion} применён · затронуто задач: ${res.changed.length}`);
+      setFlash(new Set(result.changed));
+      toast.success(`Коммит v${result.planVersion} применён · затронуто задач: ${result.changed.length}`);
       window.setTimeout(() => setFlash(new Set()), 1700);
-    } else if (res.conflict) {
+    } else if (result.conflict) {
       toast.error("Конфликт версий плана — перезагружено");
     } else {
-      // 3) бэк отклонил → откат оптимистики + подсветка где/как
-      if (prev) setReadModel(prev);
-      if (res.message === "preview_cancelled") return res;
-      const m = new Map<string, string>();
-      (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); });
-      setErrors(m);
-      toast.error(`Отклонено: ${res.issues?.[0]?.message ?? res.message}`);
+      if (before) setReadModel(before);
+      if (result.message !== "preview_cancelled") {
+        const nextErrors = new Map<string, string[]>();
+        (result.issues ?? []).forEach((issue) => {
+          const key = issue.entityId ?? "__plan__";
+          nextErrors.set(key, [...(nextErrors.get(key) ?? []), issue.message]);
+        });
+        setErrors(nextErrors);
+        toast.error(`Отклонено: ${result.issues?.[0]?.message ?? result.message}`);
+      }
     }
-    return res;
+    return result;
+  }
+
+  function applyCmd(command: PlanningCommand): Promise<ApplyResult | null> {
+    return mutateCommands([command]);
   }
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
@@ -563,6 +824,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     );
   }
 
+  const scheduleReadModel = readModel;
   const projectMeta = deriveProjectMeta(readModel, projectBase);
   const { rows, deadlineDay, projectFinishDay } = mapped;
   const timeline = deriveScheduleTimeline({
@@ -622,6 +884,19 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const selected = rows.find((r) => r.id === sel) ?? null;
 
   const openRow = (id: string) => { setSel(id); setInspectorOpen(true); };
+  const cancelEditableClick = () => {
+    if (editableClickTimerRef.current !== null) window.clearTimeout(editableClickTimerRef.current);
+    editableClickTimerRef.current = null;
+  };
+  const selectEditableCell = (event: ReactMouseEvent, row: Row) => {
+    stop(event);
+    cancelEditableClick();
+    if (event.detail > 1) return;
+    editableClickTimerRef.current = window.setTimeout(() => {
+      openRow(row.id);
+      editableClickTimerRef.current = null;
+    }, 180);
+  };
 
   // --- команды ---
   // Текущее назначение задачи из read-model (по taskId): нужен его id, чтобы upsert
@@ -629,53 +904,79 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   type AsgRM = { id: string; taskId: string; resourceId: string; role?: PlanAssignmentRole; unitsPermille?: number; workMinutes?: number | null };
   const authoredAsgs = readModel.authored.assignments;
   const currentAsg = (taskId: string): AsgRM | undefined => authoredAsgs.find((x) => x.taskId === taskId);
-  const workCmd = (taskId: string, durDays: number, workH: number): PlanningCommand =>
-    createPlanningCommand({ type: "task.update_work_model", payload: { taskId, taskType: "fixed_duration", effortDriven: false, durationMinutes: durDays * MIN_PER_DAY, workMinutes: Math.max(0, Math.round(workH * 60)) } });
+  const workCmd = (row: Row, durationDays: number, workHours: number): PlanningCommand =>
+    buildScheduleWorkCommand(row, durationDays, workHours);
   // Правка труда/длительности должна синхронизировать ТРУД назначения: загрузка ресурса
   // считается из assignment.workMinutes, иначе WBS покажет новые часы, а Ресурсы/Сценарии —
   // старую нагрузку. Шлём task.update_work_model + assignment.upsert (по id текущего назначения).
   const workEdit = (r: Row, durDays: number, workH: number) => {
     const wm = Math.max(0, Math.round(workH * 60));
-    const cmds: PlanningCommand[] = [workCmd(r.id, durDays, workH)];
+    const cmds: PlanningCommand[] = [workCmd(r, durDays, workH)];
     const asg = currentAsg(r.id);
     if (asg) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: r.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: wm } }));
     void runBatch(cmds);
   };
-  const editDuration = (r: Row, days: number) => { const u = r.durDays > 0 ? r.workH / (r.durDays * HPD) : 1; workEdit(r, days, Math.round(days * HPD * u)); };
+  const editDuration = (r: Row, days: number) => {
+    const durationMinutes = Math.max(0, Math.round(days * r.workingMinutesPerDay));
+    workEdit(r, days, scaledWorkMinutes(r, durationMinutes) / 60);
+  };
   const editWork = (r: Row, workH: number) => workEdit(r, r.durDays, workH);
-  const editUnits = (r: Row, pct: number) => workEdit(r, r.durDays, Math.round(r.durDays * HPD * (pct / 100)));
+  const editUnits = (r: Row, pct: number) => workEdit(
+    r,
+    r.durDays,
+    Math.max(0, Math.round(rowDurationMinutes(r) * pct / 100)) / 60
+  );
   const editName = (r: Row, title: string) => void applyCmd(createPlanningCommand({ type: "task.update_identity", payload: { taskId: r.id, title } }));
   const editPct = (r: Row, pct: number) => void applyCmd(createPlanningCommand({ type: "task.update_progress", payload: { taskId: r.id, percentComplete: Math.max(0, Math.min(100, pct)) } }));
-  const editDate = (r: Row, iso: string) => void applyCmd(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: r.id, plannedStart: iso, plannedFinish: dayToIso(isoToDay(iso) + r.dayDur) } }));
+  const editDate = (r: Row, iso: string) =>
+    void applyCmd(buildScheduleMoveCommand(readModel, r, iso));
   // Перенос окончания = изменение длительности: помимо update_schedule (авторские даты)
   // шлём update_work_model с новой длительностью + синхроним труд назначения, иначе на живом
   // read-model длина бара (она идёт от durationMinutes движка) осталась бы прежней.
   const editFinish = (r: Row, iso: string) => {
     const startIso = r.startIso || dayToIso(r.dayStart);
-    const newDur = isoToDay(iso) - isoToDay(startIso);
-    if (newDur < 1) return;
-    const u = r.durDays > 0 ? r.workH / (r.durDays * HPD) : 1;
-    const workH = Math.round(newDur * HPD * u);
-    const cmds: PlanningCommand[] = [
-      createPlanningCommand({ type: "task.update_schedule", payload: { taskId: r.id, plannedStart: startIso, plannedFinish: iso } }),
-      workCmd(r.id, newDur, workH)
-    ];
     const asg = currentAsg(r.id);
-    if (asg) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg.id, taskId: r.id, resourceId: asg.resourceId, role: asg.role ?? "executor", unitsPermille: asg.unitsPermille ?? 1000, workMinutes: Math.max(0, Math.round(workH * 60)) } }));
-    void runBatch(cmds);
+    const commands = buildScheduleRangeCommands({
+      source: readModel,
+      row: r,
+      startIso,
+      finishIso: iso,
+      ...(asg ? { assignment: asg } : {})
+    });
+    if (commands) void runBatch(commands);
   };
   // Переназначение ресурса: переиспользуем id текущего назначения (если есть), иначе genId —
   // реальный редьюсер upsert-ит строго по payload.id, новый id добавил бы второе назначение.
   const assignRes = (taskId: string, resourceId: string) => { const asg = currentAsg(taskId); void applyCmd(createPlanningCommand({ type: "assignment.upsert", payload: { id: asg?.id ?? genId("a"), taskId, resourceId, role: asg?.role ?? "executor", unitsPermille: asg?.unitsPermille ?? 1000, workMinutes: null } })); };
-  const depAdd = (succId: string, predId: string, type: string, lagDays: number) => void applyCmd(createPlanningCommand({ type: "dependency.upsert", payload: { id: genId("dep"), predecessorTaskId: predId, successorTaskId: succId, dependencyType: type as DependencyType, lagMinutes: lagDays * MIN_PER_DAY } }));
+  const depAdd = (succId: string, predId: string, type: string, lagDays: number) => {
+    const successor = rows.find((row) => row.id === succId);
+    if (successor) void applyCmd(buildScheduleDependencyCommand({
+      id: genId("dep"),
+      predecessorTaskId: predId,
+      successor,
+      type: type as DependencyType,
+      lagDays
+    }));
+  };
   const depRemove = (depId: string) => void applyCmd(createPlanningCommand({ type: "dependency.delete", payload: { dependencyId: depId } }));
-  const depUpsert = (depId: string, predId: string, succId: string, type: string, lagDays: number) => void applyCmd(createPlanningCommand({ type: "dependency.upsert", payload: { id: depId, predecessorTaskId: predId, successorTaskId: succId, dependencyType: type as DependencyType, lagMinutes: lagDays * MIN_PER_DAY } }));
+  const depUpsert = (depId: string, predId: string, succId: string, type: string, lagDays: number) => {
+    const successor = rows.find((row) => row.id === succId);
+    if (successor) void applyCmd(buildScheduleDependencyCommand({
+      id: depId,
+      predecessorTaskId: predId,
+      successor,
+      type: type as DependencyType,
+      lagDays
+    }));
+  };
   const makeMilestone = (r: Row) => {
     const assignments = authoredAsgs
       .filter((assignment) => assignment.taskId === r.id)
       .map((assignment) => ({ id: assignment.id }));
     void runBatch(buildMilestoneCommands({ taskId: r.id, assignments }));
-  };  const deleteTask = (r: Row) => {
+  };
+
+  const deleteTask = (r: Row) => {
     // Удаление summary: реальный редьюсер сносит только саму задачу и оставляет детей сиротами.
     // Шлём явный пакет удаления всего поддерева (summary + потомки по wbs), а не один delete.
     if (r.kind === "summary") {
@@ -715,52 +1016,73 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     void applyCmd(moveCmd(r.id, grandId, Math.max(0, at)));
   };
 
-  async function runBatch(cmds: PlanningCommand[], idempotencyKey?: string): Promise<ApplyResult | null> {
-    if (!canManagePlan || !cmds.length || !beginOperation()) return null;
-    const base = readModel;
-    let res: ApplyResult;
-    try { res = await applyBatch(cmds, idempotencyKey ? { idempotencyKey } : undefined); } finally { endOperation(); }
-    if (res.ok) {
-      lastCommitRef.current = base ? { commands: cmds, before: base, afterVersion: res.planVersion } : null;
-      setCanUndo(base != null && buildCompensatingCommandBatch(cmds, base).length > 0);
-      setErrors(new Map());
-      setFlash(new Set(res.changed));
-      toast.success(`Коммит v${res.planVersion} применён · затронуто задач: ${res.changed.length}`);
-      window.setTimeout(() => setFlash(new Set()), 1700);
-    } else if (res.conflict) toast.error("Конфликт версий плана — перезагружено");
-    else if (res.message !== "preview_cancelled") { const m = new Map<string, string>(); (res.issues ?? []).forEach((i) => { if (i.entityId) m.set(i.entityId, i.message); }); setErrors(m); toast.error(`Отклонено: ${res.issues?.[0]?.message ?? res.message}`); }
-    return res;
+  function runBatch(commands: PlanningCommand[], idempotencyKey?: string): Promise<ApplyResult | null> {
+    return mutateCommands(commands, idempotencyKey ? { idempotencyKey } : undefined);
   }
-  const addFinish = (iso: string, dur: number) => dayToIso(isoToDay(iso) + dur);
-  const openCreate = (parentId: string | null) => setTaskModal({ mode: "create", parentId, initial: { title: "", assigneeId: "", startIso: "", durDays: 5, workH: 40, pct: 0 } });
+
+  const projectWorkingTime = resolveScheduleWorkingTime(scheduleReadModel, null);
+  const defaultDurationDays = 5;
+  const defaultWorkHours = defaultDurationDays *
+    projectWorkingTime.workingMinutesPerDay / 60;
+  const openCreate = (parentId: string | null) => setTaskModal({
+    mode: "create",
+    parentId,
+    initial: {
+      title: "",
+      assigneeId: "",
+      startIso: "",
+      durDays: defaultDurationDays,
+      workH: defaultWorkHours,
+      pct: 0
+    }
+  });
   const openEdit = (r: Row) => {
     if (r.kind === "summary") { openRow(r.id); return; }
     const asg = currentAsg(r.id);
     setTaskModal({ mode: "edit", parentId: r.parentId, taskId: r.id, ...(asg ? { asgId: asg.id } : {}), initial: { title: r.name, assigneeId: asg?.resourceId ?? "", startIso: r.startIso, durDays: r.durDays, workH: r.workH, pct: r.pct } });
   };
-  function submitTaskModal(v: TaskModalValues) {
-    const m = taskModal;
-    setTaskModal(null);
-    if (!m) return;
-    const cmds: PlanningCommand[] = [];
-    if (m.mode === "create") {
-      const id = genId("t");
-      cmds.push(createPlanningCommand({ type: "task.create", payload: { id, projectId, parentTaskId: m.parentId, title: v.title, statusId: "todo", plannedStart: v.startIso || null, plannedFinish: v.startIso ? addFinish(v.startIso, v.durDays) : null, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60, assignments: [] } }));
-      if (v.startIso) cmds.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: addFinish(v.startIso, v.durDays) } }));
-      if (v.assigneeId) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: genId("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } }));
-      if (v.pct > 0) cmds.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } }));
-    } else if (m.taskId) {
-      const id = m.taskId;
-      cmds.push(createPlanningCommand({ type: "task.update_identity", payload: { taskId: id, title: v.title } }));
-      cmds.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId: id, taskType: "fixed_duration", effortDriven: false, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60 } }));
-      if (v.startIso) cmds.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: addFinish(v.startIso, v.durDays) } }));
-      cmds.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } }));
-      // переиспользуем id текущего назначения (если было) — иначе upsert добавит второе и удвоит нагрузку
-      if (v.assigneeId) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: m.asgId ?? genId("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } }));
+  async function submitTaskModal(values: TaskModalValues): Promise<TaskModalSubmitResult> {
+    const modal = taskModal;
+    if (!modal) return { accepted: false };
+    const changesAssignedWork = modal.mode === "edit"
+      && modal.asgId
+      && !canManageResources
+      && (values.durDays !== modal.initial.durDays || values.workH !== modal.initial.workH);
+    if (changesAssignedWork) {
+      toast.error("Труд назначенной задачи меняет загрузку ресурса. Нужно право управления ресурсами");
+      return { accepted: false };
     }
-    void runBatch(cmds);
-  }
 
+    const commands: PlanningCommand[] = [];
+    const editedRow = modal.taskId
+      ? rows.find((row) => row.id === modal.taskId)
+      : undefined;
+    const timing = resolveScheduleTiming(
+      scheduleReadModel,
+      editedRow?.effectiveCalendarId,
+      values.startIso || null,
+      values.durDays
+    );
+    if (modal.mode === "create") {
+      const taskId = genId("t");
+      commands.push(createPlanningCommand({ type: "task.create", payload: { id: taskId, projectId, parentTaskId: modal.parentId, title: values.title, statusId: "todo", plannedStart: values.startIso || null, plannedFinish: timing.finishIso, durationMinutes: timing.durationMinutes, workMinutes: Math.round(values.workH * 60), assignments: [] } }));
+      if (canManageResources && values.assigneeId) commands.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: genId("a"), taskId, resourceId: values.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: values.workH * 60 } }));
+      if (values.pct > 0) commands.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId, percentComplete: values.pct } }));
+    } else if (modal.taskId) {
+      const taskId = modal.taskId;
+      commands.push(createPlanningCommand({ type: "task.update_identity", payload: { taskId, title: values.title } }));
+      commands.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId, taskType: "fixed_duration", effortDriven: false, durationMinutes: timing.durationMinutes, workMinutes: Math.round(values.workH * 60) } }));
+      if (values.startIso) commands.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId, plannedStart: values.startIso, plannedFinish: timing.finishIso } }));
+      commands.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId, percentComplete: values.pct } }));
+      if (canManageResources && values.assigneeId) {
+        commands.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: modal.asgId ?? genId("a"), taskId, resourceId: values.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: values.workH * 60 } }));
+      } else if (canManageResources && modal.asgId) {
+        commands.push(createPlanningCommand({ type: "assignment.delete", payload: { assignmentId: modal.asgId } }));
+      }
+    }
+    const result = await runBatch(commands);
+    return { accepted: batchMode || result?.ok === true };
+  }
   // Инлайн-создание задачи (Excel-подобный быстрый ввод): из нижней строки WBS,
   // из ПКМ-меню (задача рядом / подзадача), либо по Tab (подзадача предыдущей).
   // Только название; даты/ресурс/связи/длительность правятся в ячейках после создания.
@@ -772,6 +1094,12 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     const t = title.trim();
     if (t.length < 3) { setCreateError({ scope, msg: "Название задачи: минимум 3 символа" }); return false; } // домен: title 3–160
     setCreateError(null);
+    const timing = resolveScheduleTiming(
+      scheduleReadModel,
+      null,
+      null,
+      defaultDurationDays
+    );
     void applyCmd(createPlanningCommand({
       type: "task.create",
       payload: {
@@ -782,8 +1110,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         statusId: "todo",
         plannedStart: null,
         plannedFinish: null,
-        durationMinutes: 5 * MIN_PER_DAY,
-        workMinutes: 40 * 60,
+        durationMinutes: timing.durationMinutes,
+        workMinutes: timing.durationMinutes,
         assignments: []
       }
     }));
@@ -826,7 +1154,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     const n = Number(draft);
     if (f === "name") { if (draft.trim() && draft !== r.name) editName(r, draft.trim()); return; }
     if (Number.isNaN(n)) return;
-    if (f === "dur") { if (n > 0 && n !== r.durDays) editDuration(r, n); else if (n <= 0) setErrors((prev) => new Map(prev).set(r.id, "Длительность задачи должна быть больше 0 (для вехи — пункт меню «Сделать вехой»)")); }
+    if (f === "dur") { if (n > 0 && n !== r.durDays) editDuration(r, n); else if (n <= 0) setErrors((prev) => new Map(prev).set(r.id, ["Длительность задачи должна быть больше 0 (для вехи — пункт меню «Сделать вехой»)"])); }
     else if (f === "work" && n >= 0 && n !== r.workH) editWork(r, n);
     else if (f === "pct" && n !== r.pct) editPct(r, n);
     else if (f === "units" && n > 0) editUnits(r, n);
@@ -865,17 +1193,27 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const fillTaskRows = visibleRows.filter((row) => row.kind === "task");
   const selectedFillRows = fillTaskRows.filter((row) => selectedTaskIds.has(row.id));
   const fillPreview = fillDate
-    ? buildFinishDateFillCommands({
+      ? buildFinishDateFillCommands({
         firstFinishIso: fillDate,
         mode: fillMode,
-        rows: selectedFillRows.map((row) => ({ id: row.id, startIso: row.startIso, durationDays: row.durDays, workHours: row.workH })),
-        assignments: authoredAsgs
+        rows: selectedFillRows.map((row) => ({
+          id: row.id,
+          startIso: row.startIso,
+          durationDays: row.durDays,
+          ...(row.durationMinutes != null
+            ? { durationMinutes: row.durationMinutes }
+            : {}),
+          workHours: row.workH,
+          calendarId: row.effectiveCalendarId
+        })),
+        assignments: authoredAsgs,
+        calendarSource: scheduleReadModel
       })
     : null;
 
   const isEditableTarget = (target: EventTarget | null) => {
     const element = target instanceof HTMLElement ? target : null;
-    return element?.matches("input, textarea, select, [contenteditable='true']") ?? false;
+    return Boolean(element?.closest("input, textarea, select, button, a, [contenteditable='true'], [role='button'], [role='dialog'], [role='menu'], [role='listbox']"));
   };
   const focusScheduleRow = (id: string) => {
     setSel(id);
@@ -957,7 +1295,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
   const updatePasteDraft = (value: string) => {
     setPasteDraft(value);
-    const parsed = parseTaskTsv(value);
+    const parsed = parseTaskTsv(value, readModel ?? {});
     setPasteIssue(parsed.ok && parsed.fingerprint === lastAppliedPasteRef.current ? "Этот TSV уже применён в текущей сессии" : null);
   };
   const openPastePreview = (value = "") => {
@@ -1065,6 +1403,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // --- drag/resize/link ---
   const startDrag = (e: ReactPointerEvent, r: Row, mode: DragMode) => {
     e.stopPropagation();
+    e.preventDefault();
     if (r.kind !== "task") return;
     barDrag.begin({ id: r.id, mode, startX: e.clientX, origStart: r.dayStart, origDur: r.dayDur, origWorkH: r.workH, origPct: r.pct, deltaDays: 0, curPct: r.pct });
   };
@@ -1075,6 +1414,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   };
   const startLink = (e: ReactPointerEvent, r: Row, edge: "start" | "finish") => {
     e.stopPropagation();
+    e.preventDefault();
     const fromX = toTimelineX(edge === "finish" ? r.dayStart + r.dayDur : r.dayStart);
     const fromY = (indexById.get(r.id) ?? 0) * ROW_H + ROW_H / 2;
     linkDrag.begin({ fromId: r.id, fromEdge: edge, fromX, fromY, curX: fromX, curY: fromY });
@@ -1100,7 +1440,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
             <Button variant="ghost" size="sm" onClick={() => selected && outdent(selected)} disabled={busy || !selected || (selected ? !canOutdent(selected) : true)} title="На уровень выше"><IndentDecrease className="size-3.5" aria-hidden /></Button>
             <Button variant="ghost" size="sm" onClick={() => selected && indent(selected)} disabled={busy || !selected || (selected ? !canIndent(selected) : true)} title="На уровень глубже"><IndentIncrease className="size-3.5" aria-hidden /></Button>
             <span className="mx-1 h-5 w-px bg-[var(--border)]" />
-            <Button variant={batchMode ? "default" : "ghost"} size="sm" onClick={() => setBatchMode((v) => !v)} title="Режим пакета: копить правки и применить одним коммитом"><GitBranch className="size-3.5" aria-hidden />Пакет{staged.length ? ` · ${staged.length}` : ""}</Button>
+            <Button variant={batchMode ? "default" : "ghost"} size="sm" onClick={toggleBatchMode} aria-pressed={batchMode} title="Режим пакета: копить правки и применить одним коммитом"><GitBranch className="size-3.5" aria-hidden />Пакет{staged.length ? ` · ${staged.length}` : ""}</Button>
             <Button variant="ghost" size="sm" onClick={() => void undo()} disabled={busy || !canUndo} title="Откатить последний коммит (компенсирующий коммит)"><Undo2 className="size-3.5" aria-hidden />Откат</Button>
             <span className="mx-1 h-5 w-px bg-[var(--border)]" />
             <Button variant="ghost" size="sm" onClick={() => openPastePreview()} disabled={busy} title="Вставить задачи из TSV через предпросмотр"><ClipboardPaste className="size-3.5" aria-hidden />Вставить TSV</Button>
@@ -1108,9 +1448,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           </>
         ) : null}
         <Button asChild variant="ghost" size="sm"><Link href={`/projects/${projectId}/baseline`}>Baseline</Link></Button>
+        <ScheduleSavedViews projectId={projectId} canManage={canManagePlan} current={savedViewPayload} onApply={applySavedView} />
         <div className="ml-auto flex items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-0.5">
           {(["day", "week", "month"] as Zoom[]).map((z) => (
-            <button key={z} type="button" onClick={() => setZoom(z)} className={cn("rounded-[var(--radius-sm)] px-2.5 py-1 text-[length:var(--text-sm)] font-medium transition-colors", zoom === z ? "bg-[var(--panel-strong)] text-[var(--text-strong)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>
+            <button key={z} type="button" aria-pressed={zoom === z} onClick={() => setZoom(z)} className={cn("rounded-[var(--radius-sm)] px-2.5 py-1 text-[length:var(--text-sm)] font-medium transition-colors", zoom === z ? "bg-[var(--panel-strong)] text-[var(--text-strong)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>
               {z === "day" ? "День" : z === "week" ? "Неделя" : "Месяц"}
             </button>
           ))}
@@ -1125,15 +1466,15 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       ) : null}
 
       {errors.size > 0 ? (
-        <div className="mb-2 flex flex-col gap-1 rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--danger-text)]">
-          {[...errors].map(([tid, msg]) => {
+        <div data-testid="schedule-validation-errors" className="mb-2 flex flex-col gap-1 rounded-[var(--radius-md)] border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--danger-text)]">
+          {[...errors].flatMap(([tid, messages]) => {
             const er = rows.find((x) => x.id === tid);
-            return (
-              <div key={tid} className="flex items-start gap-1.5">
+            return messages.map((msg, index) => (
+              <div key={`${tid}:${index}`} className="flex items-start gap-1.5">
                 <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                <span><span className="font-semibold">{er ? `${er.wbs} ${er.name}` : tid}</span> — {msg}</span>
+                <span><span className="font-semibold">{er ? `${er.wbs} ${er.name}` : "План"}</span> — {msg}</span>
               </div>
-            );
+            ));
           })}
         </div>
       ) : null}
@@ -1167,6 +1508,13 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                   </tr>
                 </thead>
                 <tbody>
+                  {visibleRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={COLS.length} className="h-[var(--row-h)] px-4 text-center text-[length:var(--text-sm)] text-[var(--muted)]">
+                        В плане пока нет задач
+                      </td>
+                    </tr>
+                  ) : null}
                   {visibleRows.map((r, i) => (
                     <Fragment key={r.id}>
                     <ScheduleRowMenu
@@ -1201,7 +1549,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                         </td>
                         <td>{r.kind === "milestone" ? <span className="text-[var(--muted-soft)]">—</span> : <ModeChip mode={r.mode} />}</td>
                         <td className="mono muted text-[length:var(--text-xs)]">{r.wbs}</td>
-                        <td title={r.name} onDoubleClick={canManagePlan ? (e) => { stop(e); beginEdit(r, "name", r.name); } : undefined}>
+                        <td title={r.name} onClick={canManagePlan ? (e) => selectEditableCell(e, r) : undefined} onDoubleClick={canManagePlan ? (e) => { stop(e); cancelEditableClick(); beginEdit(r, "name", r.name); } : undefined}>
                           <span className="name-cell" style={{ paddingLeft: r.level * 14 }}>
                             {r.kind === "summary" && hasChildren(r) ? (
                               <button type="button" onClick={(e) => { stop(e); toggle(r.id); }} className="grid size-3.5 shrink-0 place-items-center rounded-[var(--radius-xs)] text-[var(--muted)] transition-colors hover:bg-[var(--panel-strong)] hover:text-[var(--text)]" aria-label={collapsed.has(r.id) ? "Развернуть группу" : "Свернуть группу"}>
@@ -1215,13 +1563,13 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                             ) : <span className={cn("truncate", r.kind === "summary" ? "font-bold text-[var(--text-strong)]" : "font-medium text-[var(--text)]")}>{r.name}</span>}
                           </span>
                         </td>
-                        <td className="num muted" onDoubleClick={canManagePlan ? (e) => { if (r.kind === "task") { stop(e); beginEdit(r, "dur", r.durDays); } } : undefined}>
+                        <td className="num muted" onClick={canManagePlan ? (e) => selectEditableCell(e, r) : undefined} onDoubleClick={canManagePlan ? (e) => { if (r.kind === "task") { stop(e); cancelEditableClick(); beginEdit(r, "dur", r.durDays); } } : undefined}>
                           {canManagePlan && edit?.id === r.id && edit.field === "dur" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "dur")} className={numInput} /> : r.kind === "milestone" ? "0 дн" : `${r.durDays} дн`}
                         </td>
-                        <td className="num muted" onDoubleClick={canManagePlan ? (e) => { if (r.kind === "task") { stop(e); beginEdit(r, "work", r.workH); } } : undefined}>
+                        <td className="num muted" onClick={canManagePlan ? (e) => selectEditableCell(e, r) : undefined} onDoubleClick={canManagePlan ? (e) => { if (r.kind === "task") { stop(e); cancelEditableClick(); beginEdit(r, "work", r.workH); } } : undefined}>
                           {canManagePlan && edit?.id === r.id && edit.field === "work" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "work")} className={numInput} /> : r.kind === "milestone" ? "—" : `${r.workH} ч`}
                         </td>
-                        <td className="num" onDoubleClick={canManagePlan ? (e) => { if (r.kind === "task") { stop(e); beginEdit(r, "pct", r.pct); } } : undefined}>
+                        <td className="num" onClick={canManagePlan ? (e) => selectEditableCell(e, r) : undefined} onDoubleClick={canManagePlan ? (e) => { if (r.kind === "task") { stop(e); cancelEditableClick(); beginEdit(r, "pct", r.pct); } } : undefined}>
                           {canManagePlan && edit?.id === r.id && edit.field === "pct" ? <input autoFocus type="number" value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "pct")} className={numInput} /> : `${r.pct}%`}
                         </td>
                         <td className="mono muted">
@@ -1249,7 +1597,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                           </span>
                         </td>
                         <td className="text-[var(--muted-strong)]">
-                          {canManagePlan && r.kind === "task" ? <ResourceEditor onPick={(rid) => assignRes(r.id, rid)}><button type="button" onClick={stop} className={cellBtn}>{r.res}</button></ResourceEditor> : <span className="text-[var(--muted-soft)]">{r.res}</span>}
+                          {canManagePlan && canManageResources && r.kind === "task" ? <ResourceEditor {...resourceOverrideProps} onPick={(rid) => assignRes(r.id, rid)}><button type="button" onClick={stop} className={cellBtn}>{r.res}</button></ResourceEditor> : <span className="text-[var(--muted-soft)]">{r.res}</span>}
                         </td>
                         <td className="mono text-[length:var(--text-xs)] text-[var(--muted)]">
                           {canManagePlan && r.kind !== "summary" ? <DependencyEditor preds={predRows(r)} options={depOptions(r)} onAdd={(p, t, l) => depAdd(r.id, p, t, l)} onRemove={depRemove}><button type="button" onClick={stop} className={cellBtn}>{r.predDisplay}</button></DependencyEditor> : r.predDisplay || "—"}
@@ -1323,12 +1671,15 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 return (
                   <div key={r.id} data-task-id={r.id} onClick={() => openRow(r.id)} className={cn("group relative h-[var(--row-h)] cursor-pointer border-b border-[var(--border-subtle)] last:border-0", errors.has(r.id) ? "bg-[var(--danger-soft)]" : sel === r.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--panel-subtle)]")} style={{ backgroundImage: sel === r.id || errors.has(r.id) ? undefined : `repeating-linear-gradient(to right, transparent, transparent ${weekW - 1}px, var(--border-subtle) ${weekW - 1}px, var(--border-subtle) ${weekW}px)` }}>
                     {r.kind === "milestone" ? (
-                      <span className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] bg-[var(--text-strong)]" style={{ left }} title={`Веха · ${fmtDate(r.finishIso)}`} />
+                      <>
+                        {r.baseDay != null ? <span className="gantt-baseline-milestone absolute bottom-1 size-2.5 -translate-x-1/2 rotate-45 rounded-[2px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" style={{ left: toTimelineX(r.baseDay) }} title={readModel.baselineComparison?.label ?? "Базовый план"} /> : null}
+                        <span className="gantt-milestone absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] bg-[var(--text-strong)]" style={{ left }} title={`Веха · ${fmtDate(r.finishIso)}`} />
+                      </>
                     ) : r.kind === "summary" ? (
                       <span className="absolute top-1/2 -translate-y-1/2 rounded-[3px] bg-[var(--text-strong)]" style={{ left, width, height: 8 }} title={`${r.name} · ${r.pct}%`} />
                     ) : (
                       <>
-                        {r.baseDay != null && r.baseDur != null ? <span className="absolute rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" style={{ left: toTimelineX(r.baseDay), width: Math.max(r.baseDur * dayW, 6), height: 6, bottom: 5 }} title="Baseline B2" /> : null}
+                        {r.baseDay != null && r.baseDur != null ? <span className="absolute rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" style={{ left: toTimelineX(r.baseDay), width: Math.max(r.baseDur * dayW, 6), height: 6, bottom: 5 }} title={readModel.baselineComparison?.label ?? "Базовый план"} /> : null}
                         <span
                           className={cn("gantt-bar absolute top-1/2 flex -translate-y-1/2 items-center overflow-hidden rounded-[5px] shadow-[var(--shadow-card)]", canManagePlan ? "cursor-grab active:cursor-grabbing" : "cursor-default", r.critical && "gantt-bar--crit", dragging && "opacity-90 outline-dashed outline-2 outline-offset-1 outline-[var(--accent)]", flash.has(r.id) && "ring-2 ring-[var(--success)]")}
                           style={{ left, width, height: 18 }}
@@ -1337,14 +1688,14 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                         >
                           <span className={cn("gantt-bar-fill h-full", r.critical && "gantt-bar-fill--crit")} style={{ width: `${fillPct}%` }} />
                           {canManagePlan ? <>
-                            <span className="absolute top-0 h-full w-1 -translate-x-1/2 cursor-ew-resize bg-[var(--accent)] opacity-0 group-hover:opacity-100" style={{ left: `${fillPct}%` }} onPointerDown={(e) => startDrag(e, r, "progress")} title="Тяните — % выполнения" />
+                            <span className="absolute top-0 z-[3] h-full w-1 -translate-x-1/2 cursor-ew-resize bg-[var(--accent)] opacity-0 group-hover:opacity-100" style={{ left: `clamp(2px, ${fillPct}%, calc(100% - 2px))` }} onPointerDown={(e) => startDrag(e, r, "progress")} title="Тяните — % выполнения" />
                             <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resizeLeft")} title="Потяните — сдвинуть начало" />
                             <span className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resize")} title="Потяните — изменить длительность" />
                           </> : null}
                         </span>
                         {canManagePlan ? <>
-                          <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--muted-soft)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: left - 3 }} onPointerDown={(e) => startLink(e, r, "start")} title="Тяните от начала → связь НН/НО" />
-                          <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--accent)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: barRight + 3 }} onPointerDown={(e) => startLink(e, r, "finish")} title="Тяните от конца → связь ОН/ОО" />
+                          <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--muted-soft)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: left - 12 }} onPointerDown={(e) => startLink(e, r, "start")} title="Тяните от начала → связь НН/НО" />
+                          <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--accent)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: barRight + 8 }} onPointerDown={(e) => startLink(e, r, "finish")} title="Тяните от конца → связь ОН/ОО" />
                         </> : null}
                       </>
                     )}
@@ -1370,8 +1721,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
               {/* бейджи лага на связях выбранной задачи — клик редактирует тип/лаг/удаляет */}
               {canManagePlan ? links.filter((l) => l.accent).map((l) => (
                 <LinkLagEditor key={`badge-${l.key}`} type={l.type} lagDays={l.lagDays} onSave={(t, lag) => depUpsert(l.depId, l.predId, l.succId, t, lag)} onDelete={() => depRemove(l.depId)}>
-                  <button type="button" onClick={stop} className="absolute z-[4] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--accent)] bg-[var(--panel)] px-1 text-[length:var(--text-2xs)] font-semibold leading-tight text-[var(--accent)] shadow-[var(--shadow-card)] hover:bg-[var(--accent-soft)]" style={{ left: l.mx, top: HEADER_H + l.my }} title="Изменить связь (тип/лаг)">
-                    {DEP_RU[l.type]}{l.lagDays ? `+${l.lagDays}` : ""}
+                  <button type="button" onClick={stop} className="pointer-events-auto absolute z-[30] inline-flex min-h-5 min-w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--accent)] bg-[var(--panel)] px-1 text-[length:var(--text-2xs)] font-semibold leading-tight text-[var(--accent)] shadow-[var(--shadow-card)] hover:bg-[var(--accent-soft)]" style={{ left: l.mx, top: HEADER_H + l.my }} title="Изменить связь (тип/лаг)">
+                    {DEP_RU[l.type]}{l.lagDays ? `${l.lagDays > 0 ? "+" : ""}${l.lagDays}` : ""}
                   </button>
                 </LinkLagEditor>
               )) : null}
@@ -1398,18 +1749,18 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 <Fact label="Режим" value={selected.mode === "auto" ? "Авто" : "Ручной"} />
                 <Fact label="Длительность" value={`${selected.durDays} дн`} />
                 <Fact label="Трудозатраты" value={`${selected.workH} ч`} />
-                {canManagePlan ? <FactNum label="Единицы" value={unitsPct(selected.durDays, selected.workH)} suffix="%" disabled={selected.kind !== "task"} onCommit={(n) => editUnits(selected, n)} /> : <Fact label="Единицы" value={`${unitsPct(selected.durDays, selected.workH)}%`} />}
+                {canManagePlan ? <FactNum label="Единицы" value={scheduleUnitsPercent(selected)} suffix="%" disabled={selected.kind !== "task"} onCommit={(n) => editUnits(selected, n)} /> : <Fact label="Единицы" value={`${scheduleUnitsPercent(selected)}%`} />}
                 <Fact label="Начало" value={fmtDate(selected.startIso)} mono />
                 <Fact label="Окончание" value={fmtDate(selected.finishIso)} mono />
                 <Fact label="Слак" value={selected.slackDays != null ? `${selected.slackDays} дн` : "—"} />
                 <Fact label="Ресурсы" value={selected.res} span />
               </dl>
-              <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">Треугольник планирования: Труд = Длительность × {HPD} ч × Единицы. Изменишь длительность — пересчитается труд; изменишь труд — изменятся единицы.</p>
+              <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">Треугольник планирования: Труд = Длительность × {selected.workingMinutesPerDay / 60} ч × Единицы. Изменишь длительность — пересчитается труд; изменишь труд — изменятся единицы.</p>
               <div className="mt-3 border-t border-[var(--border)] pt-3">
                 <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Зависимости</div>
                 {selected.predList.length ? (
                   <ul className="space-y-1">
-                    {selected.predList.map((p) => { const pr = rows.find((x) => x.id === p.predId); return <li key={p.depId} className="flex items-center gap-2 text-[var(--text)]"><span className="mono text-[var(--muted)]">{pr?.wbs}</span><span className="truncate">{pr?.name}</span><span className="ml-auto rounded bg-[var(--panel-strong)] px-1 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{DEP_RU[p.type]}{p.lagDays ? ` +${p.lagDays}д` : ""}</span></li>; })}
+                    {selected.predList.map((p) => { const pr = rows.find((x) => x.id === p.predId); return <li key={p.depId} className="flex items-center gap-2 text-[var(--text)]"><span className="mono text-[var(--muted)]">{pr?.wbs}</span><span className="truncate">{pr?.name}</span><span className="ml-auto rounded bg-[var(--panel-strong)] px-1 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{DEP_RU[p.type]}{p.lagDays ? ` ${p.lagDays > 0 ? "+" : ""}${p.lagDays}д` : ""}</span></li>; })}
                   </ul>
                 ) : <span className="text-[var(--muted)]">нет</span>}
               </div>
@@ -1435,12 +1786,12 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-5 rounded-[3px] bg-[var(--critical-stripe)]" /> Критический путь</span>
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-5 rounded-[3px] bg-[var(--text-strong)]" /> Суммарная задача</span>
         <span className="flex items-center gap-1.5"><span className="size-2.5 rotate-45 rounded-[2px] bg-[var(--text-strong)]" /> Веха</span>
-        <span className="flex items-center gap-1.5"><span className="h-1.5 w-5 rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" /> Baseline B2</span>
+        <span className="flex items-center gap-1.5"><span className="h-1.5 w-5 rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" /> {readModel.baselineComparison?.label ?? "Базовый план"}</span>
         <span className="flex items-center gap-1.5"><svg width="22" height="8" aria-hidden><polyline points="1,4 14,4" fill="none" stroke="var(--muted-soft)" strokeWidth="1.25" /><polygon points="21,4 15,1.5 15,6.5" fill="var(--muted-soft)" /></svg> Связь</span>
         {canManagePlan ? <span className="ml-auto text-[length:var(--text-xs)] text-[var(--muted-soft)]">2× клик — правка · ПКМ — меню · тяни бар — сдвиг/длительность · движок считает даты/критпуть</span> : null}
       </div>
 
-      {canManagePlan && taskModal ? <TaskModal open mode={taskModal.mode} initial={taskModal.initial} onOpenChange={(o) => { if (!o) setTaskModal(null); }} onSubmit={submitTaskModal} /> : null}
+      {canManagePlan && taskModal ? <TaskModal open mode={taskModal.mode} initial={taskModal.initial} {...resourceOverrideProps} canAssign={canManageResources} workingMinutesPerDay={projectWorkingTime.workingMinutesPerDay} onOpenChange={(o) => { if (!o) setTaskModal(null); }} onSubmit={submitTaskModal} /> : null}
 
       {/* Подтверждение необратимого удаления (G3-06): вызов из ПКМ-меню, поэтому контролируемый диалог, а не asChild-триггер */}
       {canManagePlan && confirmDelete ? (

@@ -515,6 +515,20 @@ function validateCommandPreconditions(
       if (command.payload.predecessorTaskId === command.payload.successorTaskId) {
         return [invalid("planning_command_invalid", "Задача не может зависеть сама от себя")];
       }
+      if (snapshot.tasks.some((task) =>
+        task.parentTaskId === command.payload.predecessorTaskId ||
+        task.parentTaskId === command.payload.successorTaskId
+      )) {
+        return [invalid("planning_command_invalid", "Зависимость можно создавать только между конечными задачами")];
+      }
+      if (snapshot.dependencies.some((dependency) =>
+        dependency.id !== command.payload.id &&
+        dependency.predecessorTaskId === command.payload.predecessorTaskId &&
+        dependency.successorTaskId === command.payload.successorTaskId &&
+        dependency.type === command.payload.dependencyType
+      )) {
+        return [invalid("planning_command_invalid", "Такая зависимость уже существует")];
+      }
       if (!Number.isFinite(command.payload.lagMinutes)) {
         return [invalid("planning_command_invalid", "Lag/lead должен быть числом рабочих минут")];
       }

@@ -197,7 +197,13 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
       const [project] = await db
         .select()
         .from(projects)
-        .where(and(eq(projects.tenantId, tenantId), eq(projects.id, projectId)))
+        .where(
+          and(
+            eq(projects.tenantId, tenantId),
+            eq(projects.id, projectId),
+            eq(projects.status, "active")
+          )
+        )
         .limit(1);
       if (!project) return undefined;
       const rangeStart = toPlanDate(project.plannedStart);

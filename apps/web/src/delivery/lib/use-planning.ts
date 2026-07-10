@@ -9,6 +9,8 @@ import {
 } from "@kiss-pm/planning-client";
 
 import { createDeliveryPlanningClient, type CommitMetaView, type CommitsView } from "./planning-client";
+import { createClientId } from "./client-id";
+import { mapPlanningError } from "./project-chrome";
 import { usePlanningPreviewGate } from "./planning-preview-gate";
 import { usePlanningRuntime } from "./planning-runtime";
 
@@ -21,14 +23,15 @@ export type PlanningStatus = "loading" | "ready" | "error" | "forbidden";
 
 export type ValidationHit = { message: string; entityId?: string };
 export type ApplyBatchOptions = { idempotencyKey?: string };
+type PendingPlanningWrite = { signature: string; idempotencyKey: string };
 
 export type ApplyResult =
   | { ok: true; changed: string[]; planVersion: number }
-  | { ok: false; conflict: boolean; message: string; issues?: ValidationHit[] };
+  | { ok: false; conflict: boolean; code?: string; message: string; issues?: ValidationHit[] };
 
 export type ScenarioPreviewResult =
   | { ok: true; proposals: Array<Record<string, unknown>>; expiresAt: string }
-  | { ok: false; conflict: boolean; message: string };
+  | { ok: false; conflict: boolean; code?: string; message: string };
 export type ScenarioApplyResult =
   | { ok: true; planVersion: number; scenarioRunId: string }
   | { ok: false; conflict: boolean; code?: string; message: string };
@@ -53,6 +56,9 @@ export function usePlanning(projectId: string) {
   // Последний применённый этой сессией apply: команды + read-model ДО него + версия ПОСЛЕ.
   // Держим before в памяти клиента, т.к. audit.beforeState (только счётчики) недостаточен для отката.
   const lastApplyRef = useRef<{ afterVersion: number; commands: PlanningCommand[]; before: PlanningReadModel } | null>(null);
+  const applyRequestRef = useRef<PendingPlanningWrite | null>(null);
+  const applyBatchRequestRef = useRef<PendingPlanningWrite | null>(null);
+  const revertRequestRef = useRef<{ targetCommitId: string; clientPlanVersion: number; idempotencyKey: string } | null>(null);
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -62,14 +68,15 @@ export function usePlanning(projectId: string) {
       setStatus("ready");
       setError(null);
     } catch (e) {
+      const mappedError = mapPlanningError(e, "load_failed");
       // 403 → forbidden (нет права на проект): отдельный статус, не «ошибка загрузки».
       if (e instanceof PlanningApiError && e.status === 403) {
         setStatus("forbidden");
-        setError(e.code || "forbidden");
+        setError(mappedError.code);
         return;
       }
       setStatus("error");
-      setError(e instanceof Error ? e.message : "load_failed");
+      setError(mappedError.code);
     }
   }, [client, projectId]);
 
@@ -100,15 +107,31 @@ export function usePlanning(projectId: string) {
         if (!confirmed) {
           return { ok: false, conflict: false, message: "preview_cancelled" };
         }
-        const res = await client.applyCommand(projectId, { command, clientPlanVersion: readModel.planVersion });
+        const signature = planningWriteSignature(readModel.planVersion, [command]);
+        const request = resolvePlanningWriteRequest(
+          applyRequestRef.current,
+          signature,
+          "planning-apply"
+        );
+        applyRequestRef.current = request;
+        const res = await client.applyCommand(projectId, {
+          command,
+          clientPlanVersion: readModel.planVersion,
+          idempotencyKey: request.idempotencyKey
+        });
+        if (applyRequestRef.current?.idempotencyKey === request.idempotencyKey) {
+          applyRequestRef.current = null;
+        }
         lastApplyRef.current = { afterVersion: res.newPlanVersion, commands: [command], before: readModel };
         setReadModel(res.readModel);
         return { ok: true, changed: res.applied.changedTaskIds, planVersion: res.newPlanVersion };
       } catch (e) {
         if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
           await load();
-          return { ok: false, conflict: true, message: "plan_version_conflict" };
+          const mappedError = mapPlanningError(e);
+          return { ok: false, conflict: true, code: mappedError.code, message: mappedError.message };
         }
+        const mappedError = mapPlanningError(e, "apply_failed");
         let issues: ValidationHit[] | undefined;
         if (e instanceof PlanningApiError && Array.isArray(e.body.validationIssues)) {
           issues = (e.body.validationIssues as Array<{ message?: string; entity?: { id?: string } | null }>).map((v) => ({
@@ -116,7 +139,7 @@ export function usePlanning(projectId: string) {
             ...(v.entity?.id ? { entityId: v.entity.id } : {})
           }));
         }
-        return { ok: false, conflict: false, message: e instanceof Error ? e.message : "apply_failed", ...(issues ? { issues } : {}) };
+        return { ok: false, conflict: false, code: mappedError.code, message: mappedError.message, ...(issues ? { issues } : {}) };
       }
     },
     [client, projectId, readModel, load, requestConfirmation]
@@ -134,19 +157,33 @@ export function usePlanning(projectId: string) {
         if (!confirmed) {
           return { ok: false, conflict: false, message: "preview_cancelled" };
         }
+        const signature = planningWriteSignature(readModel.planVersion, commands);
+        const request = options?.idempotencyKey
+          ? { signature, idempotencyKey: options.idempotencyKey }
+          : resolvePlanningWriteRequest(
+              applyBatchRequestRef.current,
+              signature,
+              "planning-batch"
+            );
+        applyBatchRequestRef.current = request;
         const res = await client.applyCommandBatch(projectId, {
           commands,
           clientPlanVersion: readModel.planVersion,
-          ...(options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {})
+          idempotencyKey: request.idempotencyKey
         });
+        if (applyBatchRequestRef.current?.idempotencyKey === request.idempotencyKey) {
+          applyBatchRequestRef.current = null;
+        }
         lastApplyRef.current = { afterVersion: res.newPlanVersion, commands, before: readModel };
         setReadModel(res.readModel);
         return { ok: true, changed: res.applied.changedTaskIds, planVersion: res.newPlanVersion };
       } catch (e) {
         if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
           await load();
-          return { ok: false, conflict: true, message: "plan_version_conflict" };
+          const mappedError = mapPlanningError(e);
+          return { ok: false, conflict: true, code: mappedError.code, message: mappedError.message };
         }
+        const mappedError = mapPlanningError(e, "apply_failed");
         let issues: ValidationHit[] | undefined;
         if (e instanceof PlanningApiError && Array.isArray(e.body.validationIssues)) {
           issues = (e.body.validationIssues as Array<{ message?: string; entity?: { id?: string } | null }>).map((v) => ({
@@ -154,7 +191,7 @@ export function usePlanning(projectId: string) {
             ...(v.entity?.id ? { entityId: v.entity.id } : {})
           }));
         }
-        return { ok: false, conflict: false, message: e instanceof Error ? e.message : "apply_failed", ...(issues ? { issues } : {}) };
+        return { ok: false, conflict: false, code: mappedError.code, message: mappedError.message, ...(issues ? { issues } : {}) };
       }
     },
     [client, projectId, readModel, load, requestConfirmation]
@@ -162,24 +199,33 @@ export function usePlanning(projectId: string) {
 
   // BUG-PROJ-24: откат последнего обратимого коммита через серверный revert-last
   // (работает из истории /commits, не зависит от in-session lastApplyRef).
-  const revertLast = useCallback(async (): Promise<ApplyResult> => {
+  const revertLast = useCallback(async (targetCommitId: string): Promise<ApplyResult> => {
     if (!client) return { ok: false, conflict: false, message: "no_client" };
+    if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
+    const current = revertRequestRef.current;
+    const request = current?.targetCommitId === targetCommitId && current.clientPlanVersion === readModel.planVersion
+      ? current
+      : {
+          targetCommitId,
+          clientPlanVersion: readModel.planVersion,
+          idempotencyKey: createClientId("planning-revert")
+        };
+    revertRequestRef.current = request;
     try {
-      const res = await client.revertLast(projectId);
+      const res = await client.revertLast(projectId, request);
+      revertRequestRef.current = null;
       setReadModel(res.readModel);
       return { ok: true, changed: res.applied.changedTaskIds, planVersion: res.newPlanVersion };
     } catch (e) {
-      if (e instanceof PlanningApiError && e.code === "nothing_to_revert") {
-        return { ok: false, conflict: false, message: "nothing_to_revert" };
-      }
       if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
         await load();
-        return { ok: false, conflict: true, message: "plan_version_conflict" };
+        const mappedError = mapPlanningError(e);
+        return { ok: false, conflict: true, code: mappedError.code, message: mappedError.message };
       }
-      return { ok: false, conflict: false, message: e instanceof Error ? e.message : "revert_failed" };
+      const mappedError = mapPlanningError(e, "revert_failed");
+      return { ok: false, conflict: false, code: mappedError.code, message: mappedError.message };
     }
-  }, [client, projectId, load]);
-
+  }, [client, projectId, readModel, load]);
   const previewScenarios = useCallback(
     async (target: Record<string, unknown>): Promise<ScenarioPreviewResult> => {
       if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
@@ -189,9 +235,11 @@ export function usePlanning(projectId: string) {
       } catch (e) {
         if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
           await load();
-          return { ok: false, conflict: true, message: "plan_version_conflict" };
+          const mappedError = mapPlanningError(e);
+          return { ok: false, conflict: true, code: mappedError.code, message: mappedError.message };
         }
-        return { ok: false, conflict: false, message: e instanceof Error ? e.message : "preview_failed" };
+        const mappedError = mapPlanningError(e, "preview_failed");
+        return { ok: false, conflict: false, code: mappedError.code, message: mappedError.message };
       }
     },
     [client, projectId, readModel, load, requestConfirmation]
@@ -207,10 +255,11 @@ export function usePlanning(projectId: string) {
       } catch (e) {
         if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
           await load();
-          return { ok: false, conflict: true, message: "plan_version_conflict" };
+          const mappedError = mapPlanningError(e);
+          return { ok: false, conflict: true, code: mappedError.code, message: mappedError.message };
         }
-        const code = e instanceof PlanningApiError ? e.code : undefined;
-        return { ok: false, conflict: false, ...(code ? { code } : {}), message: e instanceof Error ? e.message : "apply_scenario_failed" };
+        const mappedError = mapPlanningError(e, "apply_scenario_failed");
+        return { ok: false, conflict: false, code: mappedError.code, message: mappedError.message };
       }
     },
     [client, projectId, readModel, load, requestConfirmation]
@@ -223,4 +272,17 @@ export function usePlanning(projectId: string) {
   }, [client, projectId]);
 
   return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch, revertLast, previewScenarios, applyScenario, loadCommits };
+}
+function planningWriteSignature(planVersion: number, commands: readonly PlanningCommand[]): string {
+  return JSON.stringify({ planVersion, commands });
+}
+
+function resolvePlanningWriteRequest(
+  pending: PendingPlanningWrite | null,
+  signature: string,
+  prefix: string
+): PendingPlanningWrite {
+  return pending?.signature === signature
+    ? pending
+    : { signature, idempotencyKey: createClientId(prefix) };
 }

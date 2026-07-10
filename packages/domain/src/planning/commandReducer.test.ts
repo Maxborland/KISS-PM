@@ -534,6 +534,36 @@ describe("planning command reducer", () => {
       ]);
     }
   });
+
+  it("rejects summary dependency endpoints and exact duplicate triples", () => {
+    const summarySnapshot = createSnapshot();
+    summarySnapshot.tasks.push({ ...createTask("task-child", "1.1"), parentTaskId: "task-a" });
+    const summary = reducePlanningCommand(summarySnapshot, {
+      type: "dependency.upsert",
+      payload: { id: "dep-summary", predecessorTaskId: "task-a", successorTaskId: "task-b", dependencyType: "SS", lagMinutes: 0 }
+    });
+    expect(summary.nextSnapshot).toBe(summarySnapshot);
+    expect(summary.validationIssues).toEqual([
+      expect.objectContaining({ code: "planning_command_invalid", message: "Зависимость можно создавать только между конечными задачами" })
+    ]);
+
+    const duplicateSnapshot = createSnapshot();
+    const duplicate = reducePlanningCommand(duplicateSnapshot, {
+      type: "dependency.upsert",
+      payload: { id: "dep-duplicate", predecessorTaskId: "task-a", successorTaskId: "task-b", dependencyType: "FS", lagMinutes: 0 }
+    });
+    expect(duplicate.nextSnapshot).toBe(duplicateSnapshot);
+    expect(duplicate.validationIssues).toEqual([
+      expect.objectContaining({ code: "planning_command_invalid", message: "Такая зависимость уже существует" })
+    ]);
+
+    const parallelType = reducePlanningCommand(duplicateSnapshot, {
+      type: "dependency.upsert",
+      payload: { id: "dep-parallel", predecessorTaskId: "task-a", successorTaskId: "task-b", dependencyType: "SS", lagMinutes: 0 }
+    });
+    expect(parallelType.validationIssues).toEqual([]);
+    expect(parallelType.nextSnapshot.dependencies.map((dependency) => dependency.type)).toEqual(["FS", "SS"]);
+  });
 });
 
 function createSnapshot(): PlanSnapshot {

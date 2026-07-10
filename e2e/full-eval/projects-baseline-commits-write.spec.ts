@@ -168,7 +168,7 @@ test.describe("Projects baseline and commits write flows", () => {
       await page.reload();
       await expect(page.getByRole("heading", { name: "Коммиты плана" })).toBeVisible();
       await expect(
-        commitButton(page, reverted.newPlanVersion, "Изменено название задачи")
+        commitButton(page, reverted.newPlanVersion, "Откат коммита")
       ).toBeVisible();
 
       await page.goto(`/projects/${projectId}/schedule`);
@@ -204,8 +204,7 @@ test.describe("Projects baseline and commits write flows", () => {
       page.getByRole("button", { name: "Зафиксировать базовый план", exact: true })
     ).toHaveCount(0);
 
-    const deniedResponse = await page.request.post(
-      `/api/workspace/projects/${projectId}/planning/preview-command`,
+    const deniedResponse = await page.request.post(apiUrl(`/api/workspace/projects/${projectId}/planning/preview-command`),
       {
         headers: sameOriginMutationHeaders(page),
         data: {
@@ -263,10 +262,14 @@ test.describe("Projects baseline and commits write flows", () => {
     await expect(page.getByText("Откатить", { exact: true })).toHaveCount(0);
 
     const deniedResponse = await page.request.post(
-      `/api/workspace/projects/${projectId}/planning/revert-last`,
+      apiUrl(`/api/workspace/projects/${projectId}/planning/revert-last`),
       {
         headers: sameOriginMutationHeaders(page),
-        data: {}
+        data: {
+          targetCommitId: "audit-reader-denied",
+          clientPlanVersion: before.planVersion,
+          idempotencyKey: `reader-revert-denied-${Date.now()}`
+        }
       }
     );
     expect(deniedResponse.status()).toBe(403);
@@ -291,13 +294,14 @@ async function loginAndGetProject(
   page: Page,
   credentials: { email: string; password: string } = ADMIN
 ) {
+  await routeApiToConfiguredPort(page);
   await page.goto("/");
   await page.getByLabel("Email", { exact: true }).fill(credentials.email);
   await page.getByLabel("Пароль", { exact: true }).fill(credentials.password);
   await page.getByRole("button", { name: "Войти", exact: true }).click();
   await page.waitForURL("**/dashboard");
 
-  const response = await page.request.get("/api/workspace/projects");
+  const response = await page.request.get(apiUrl("/api/workspace/projects"));
   expect(response.status()).toBe(200);
   const body = (await response.json()) as { projects: Array<{ id: string }> };
   expect(body.projects.length).toBeGreaterThan(0);
@@ -305,9 +309,7 @@ async function loginAndGetProject(
 }
 
 async function getReadModel(page: Page, projectId: string): Promise<ReadModel> {
-  const response = await page.request.get(
-    `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/read-model`
-  );
+  const response = await page.request.get(apiUrl(`/api/workspace/projects/${encodeURIComponent(projectId)}/planning/read-model`));
   expect(response.status()).toBe(200);
   return (await response.json()) as ReadModel;
 }
@@ -320,7 +322,7 @@ async function applyTaskTitle(
 ): Promise<ApplyResponse> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const current = await getReadModel(page, projectId);
-    const response = await page.request.post(applyCommandPath(projectId), {
+    const response = await page.request.post(apiUrl(applyCommandPath(projectId)), {
       headers: sameOriginMutationHeaders(page),
       data: {
         command: {
@@ -359,9 +361,7 @@ async function restoreTaskTitle(
 }
 
 async function getLatestRevertibleAuditEvent(page: Page, projectId: string) {
-  const response = await page.request.get(
-    `/api/tenant/current/audit-events?projectId=${encodeURIComponent(projectId)}`
-  );
+  const response = await page.request.get(apiUrl(`/api/tenant/current/audit-events?projectId=${encodeURIComponent(projectId)}`));
   expect(response.status()).toBe(200);
   const body = (await response.json()) as { auditEvents: AuditEvent[] };
   return body.auditEvents.find((event) => {
@@ -421,4 +421,22 @@ function sameOriginMutationHeaders(page: Page) {
     Origin: new URL(page.url()).origin,
     "x-kiss-pm-action": "same-origin"
   };
+}
+
+function apiUrl(path: string) {
+  const port = process.env.E2E_API_PORT;
+  return port ? `http://127.0.0.1:${port}${path}` : path;
+}
+
+async function routeApiToConfiguredPort(page: Page) {
+  const port = process.env.E2E_API_PORT;
+  if (!port) return;
+  await page.context().route("**/api/**", async (route) => {
+    const target = new URL(route.request().url());
+    target.protocol = "http:";
+    target.hostname = "127.0.0.1";
+    target.port = port;
+    const response = await route.fetch({ url: target.toString() });
+    await route.fulfill({ response });
+  });
 }

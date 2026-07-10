@@ -44,3 +44,9 @@ export type PlanningCommandBatchRequest = {
   clientPlanVersion: number;
   idempotencyKey?: string;
 };
+
+export type PlanningRevertRequest = {
+  targetCommitId: string;
+  clientPlanVersion: number;
+  idempotencyKey: string;
+};

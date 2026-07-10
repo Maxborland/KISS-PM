@@ -32,12 +32,12 @@ vi.mock("./planning-client", () => ({
   })
 }));
 
-function Harness() {
-  const directory = useResourceDirectory();
+function Harness({ override }: { override?: readonly [] }) {
+  const directory = useResourceDirectory(override);
   return <div data-testid="resources">{directory.list.map((item) => item.name).join(",")}</div>;
 }
 
-async function renderStrictDirectory(): Promise<Root> {
+async function renderStrictDirectory(override?: readonly []): Promise<Root> {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -45,7 +45,7 @@ async function renderStrictDirectory(): Promise<Root> {
     root.render(
       <StrictMode>
         <PlanningRuntimeProvider live>
-          <Harness />
+          <Harness {...(override ? { override } : {})} />
         </PlanningRuntimeProvider>
       </StrictMode>
     );
@@ -64,6 +64,17 @@ describe("useResourceDirectory live lifecycle", () => {
   it("loads resources after the StrictMode effect cleanup and remount", async () => {
     const root = await renderStrictDirectory();
 
+    expect(document.querySelector("[data-testid='resources']")?.textContent).toBe(
+      "Ресурс из API"
+    );
+
+    await act(async () => root.unmount());
+  });
+
+  it("treats an empty live override as absent and loads the tenant directory", async () => {
+    const root = await renderStrictDirectory([]);
+
+    expect(directoryMock.getResourceDirectory).toHaveBeenCalled();
     expect(document.querySelector("[data-testid='resources']")?.textContent).toBe(
       "Ресурс из API"
     );

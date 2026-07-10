@@ -4,6 +4,7 @@ import type {
   PlanningCommandBatchRequest,
   PlanningCommandRequest,
   PlanningPreviewResponse,
+  PlanningRevertRequest,
   PlanningReadModel
 } from "./types";
 
@@ -97,10 +98,10 @@ export function createPlanningApiClient(options: PlanningApiClientOptions) {
       );
     },
     // BUG-PROJ-24: откат последнего обратимого коммита плана (серверные компенсирующие команды).
-    revertLast(projectId: string) {
+    revertLast(projectId: string, input: PlanningRevertRequest) {
       return requestJson<PlanningApplyResponse & { reverted: string }>(
         `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/revert-last`,
-        { method: "POST", body: JSON.stringify({}) }
+        { method: "POST", body: JSON.stringify(input) }
       );
     },
     bumpPlanVersionForTests(projectId: string) {

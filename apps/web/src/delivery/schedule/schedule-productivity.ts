@@ -1,6 +1,15 @@
 import { createPlanningCommand, type PlanAssignmentRole, type PlanningCommand } from "@kiss-pm/domain";
 
-const MINUTES_PER_DAY = 8 * 60;
+import {
+  nextScheduleWorkingDate,
+  resolveScheduleWorkingTime,
+  scheduleFinishDateForDuration,
+  scheduleWorkingDateOnOrAfter,
+  scheduleWorkingDays,
+  scheduleWorkingMinutesThroughDate,
+  type ScheduleCalendarSource
+} from "./schedule-working-time";
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type TaskTsvRow = {
@@ -8,6 +17,7 @@ export type TaskTsvRow = {
   startIso: string | null;
   finishIso: string | null;
   durationDays: number;
+  durationMinutes: number;
   workHours: number;
   percentComplete: number;
 };
@@ -27,6 +37,8 @@ export type FinishFillRow = {
   startIso: string;
   durationDays: number;
   workHours: number;
+  calendarId?: string | null;
+  durationMinutes?: number;
 };
 
 export type FinishFillAssignment = {
@@ -49,9 +61,13 @@ export function normalizeTaskTsv(value: string): string {
   return value.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").replace(/\n+$/, "");
 }
 
-export function parseTaskTsv(value: string): TaskTsvResult {
+export function parseTaskTsv(
+  value: string,
+  calendarSource: ScheduleCalendarSource = {}
+): TaskTsvResult {
   const normalized = normalizeTaskTsv(value);
   if (!normalized.trim()) return { ok: false, errors: [{ row: 1, column: "row", message: "Вставьте хотя бы одну строку" }] };
+  const workingTime = resolveScheduleWorkingTime(calendarSource, null);
 
   const lines = normalized.split("\n");
   if (lines.length > 200) return { ok: false, errors: [{ row: 201, column: "row", message: "За один раз можно импортировать не более 200 задач" }] };
@@ -87,22 +103,52 @@ export function parseTaskTsv(value: string): TaskTsvResult {
     if (explicitDuration !== null && (!Number.isInteger(explicitDuration) || explicitDuration <= 0)) {
       errors.push({ row: rowNumber, column: "duration", message: "Длительность должна быть целым числом больше 0" });
     }
-    const dateDuration = startIso && finishIsoInput ? daysBetween(startIso, finishIsoInput) : null;
-    if (dateDuration !== null && dateDuration <= 0) errors.push({ row: rowNumber, column: "finish", message: "Окончание должно быть позже начала" });
-    if (dateDuration !== null && dateDuration > 0 && explicitDuration !== null && explicitDuration !== dateDuration) {
+    const finishIso = startIso && finishIsoInput
+      ? scheduleWorkingDateOnOrAfter(finishIsoInput, workingTime)
+      : null;
+    const dateDurationMinutes = startIso && finishIso
+      ? scheduleWorkingMinutesThroughDate(startIso, finishIso, workingTime)
+      : null;
+    if (dateDurationMinutes !== null && dateDurationMinutes <= 0) {
+      errors.push({ row: rowNumber, column: "finish", message: "Окончание должно быть позже начала" });
+    }
+    const explicitDurationMinutes = explicitDuration !== null
+      ? explicitDuration * workingTime.workingMinutesPerDay
+      : null;
+    if (
+      dateDurationMinutes !== null &&
+      dateDurationMinutes > 0 &&
+      explicitDurationMinutes !== null &&
+      explicitDurationMinutes !== dateDurationMinutes
+    ) {
       errors.push({ row: rowNumber, column: "duration", message: "Длительность не совпадает с диапазоном дат" });
     }
-    const durationDays = dateDuration && dateDuration > 0 ? dateDuration : explicitDuration && explicitDuration > 0 ? explicitDuration : 5;
-    const finishIso = startIso ? finishIsoInput ?? addIsoDays(startIso, durationDays) : null;
+    const durationMinutes = dateDurationMinutes && dateDurationMinutes > 0
+      ? dateDurationMinutes
+      : explicitDurationMinutes && explicitDurationMinutes > 0
+        ? explicitDurationMinutes
+        : 5 * workingTime.workingMinutesPerDay;
+    const durationDays = scheduleWorkingDays(durationMinutes, workingTime);
+    const resolvedFinishIso = startIso
+      ? finishIso ?? scheduleFinishDateForDuration(startIso, durationMinutes, workingTime)
+      : null;
 
-    const workHours = workValue ? Number(workValue) : durationDays * 8;
+    const workHours = workValue ? Number(workValue) : durationMinutes / 60;
     if (!Number.isFinite(workHours) || workHours < 0) errors.push({ row: rowNumber, column: "work", message: "Трудозатраты должны быть числом не меньше 0" });
     const percentComplete = progressValue ? Number(progressValue) : 0;
     if (!Number.isFinite(percentComplete) || percentComplete < 0 || percentComplete > 100) {
       errors.push({ row: rowNumber, column: "progress", message: "Прогресс должен быть от 0 до 100" });
     }
 
-    rows.push({ title, startIso, finishIso, durationDays, workHours, percentComplete });
+    rows.push({
+      title,
+      startIso,
+      finishIso: resolvedFinishIso,
+      durationDays,
+      durationMinutes,
+      workHours,
+      percentComplete
+    });
   });
 
   if (errors.length) return { ok: false, errors };
@@ -138,7 +184,7 @@ export function buildPasteCommands({
           statusId: "todo",
           plannedStart: row.startIso,
           plannedFinish: row.finishIso,
-          durationMinutes: row.durationDays * MINUTES_PER_DAY,
+          durationMinutes: row.durationMinutes,
           workMinutes: Math.round(row.workHours * 60),
           assignments: []
         }
@@ -155,23 +201,53 @@ export function buildFinishDateFillCommands({
   firstFinishIso,
   mode,
   rows,
-  assignments
+  assignments,
+  calendarSource
 }: {
   firstFinishIso: string;
   mode: "same" | "series";
   rows: readonly FinishFillRow[];
   assignments: readonly FinishFillAssignment[];
+  calendarSource?: ScheduleCalendarSource;
 }): FinishFillResult {
   if (!isIsoDate(firstFinishIso)) return { ok: false, errors: rows.map((row) => ({ taskId: row.id, message: "Укажите корректную дату окончания" })) };
+  if (!calendarSource) {
+    return {
+      ok: false,
+      errors: rows.map((row) => ({
+        taskId: row.id,
+        message: "Для расчета окончания нужен календарь задачи"
+      }))
+    };
+  }
 
+  let previousFinishIso: string | null = null;
   const preview = rows.map((row, index) => {
-    const finishIso = mode === "series" ? addIsoDays(firstFinishIso, index) : firstFinishIso;
-    const durationDays = isIsoDate(row.startIso) ? daysBetween(row.startIso, finishIso) : 0;
-    const unitHours = row.durationDays > 0 ? row.workHours / row.durationDays : 8;
-    return { taskId: row.id, finishIso, durationDays, workHours: Math.max(0, Math.round(durationDays * unitHours)) };
+    const workingTime = resolveScheduleWorkingTime(calendarSource, row.calendarId);
+    const finishIso = mode === "series" && index > 0 && previousFinishIso
+      ? nextScheduleWorkingDate(previousFinishIso, workingTime)
+      : scheduleWorkingDateOnOrAfter(firstFinishIso, workingTime);
+    previousFinishIso = finishIso;
+    const durationMinutes = isIsoDate(row.startIso)
+      ? scheduleWorkingMinutesThroughDate(row.startIso, finishIso, workingTime)
+      : 0;
+    const durationDays = durationMinutes / workingTime.workingMinutesPerDay;
+    const previousDurationMinutes = row.durationMinutes ??
+      row.durationDays * workingTime.workingMinutesPerDay;
+    const workMinutesPerDurationMinute = previousDurationMinutes > 0
+      ? row.workHours * 60 / previousDurationMinutes
+      : 1;
+    const workHours = Math.max(
+      0,
+      Math.round(durationMinutes * workMinutesPerDurationMinute) / 60
+    );
+    return { taskId: row.id, finishIso, durationDays, workHours, durationMinutes };
   });
   const errors = preview
-    .filter((item) => item.durationDays <= 0)
+    .filter((item) => {
+      const row = rows.find((candidate) => candidate.id === item.taskId);
+      return !row || item.finishIso <= row.startIso || item.durationMinutes <= 0;
+    })
     .map((item) => ({ taskId: item.taskId, message: "Окончание должно быть позже начала" }));
   if (errors.length) return { ok: false, errors };
 
@@ -185,8 +261,8 @@ export function buildFinishDateFillCommands({
           taskId: item.taskId,
           taskType: "fixed_duration",
           effortDriven: false,
-          durationMinutes: item.durationDays * MINUTES_PER_DAY,
-          workMinutes: item.workHours * 60
+          durationMinutes: item.durationMinutes,
+          workMinutes: Math.round(item.workHours * 60)
         }
       })
     ];
@@ -200,14 +276,23 @@ export function buildFinishDateFillCommands({
           resourceId: assignment.resourceId,
           role: assignment.role ?? "executor",
           unitsPermille: assignment.unitsPermille ?? 1000,
-          workMinutes: item.workHours * 60
+          workMinutes: Math.round(item.workHours * 60)
         }
       }));
     }
     return result;
   });
 
-  return { ok: true, preview, commands };
+  return {
+    ok: true,
+    preview: preview.map((item) => ({
+      taskId: item.taskId,
+      finishIso: item.finishIso,
+      durationDays: item.durationDays,
+      workHours: item.workHours
+    })),
+    commands
+  };
 }
 
 export function resolveFinishFillDrag(input: {
@@ -265,10 +350,6 @@ function addIsoDays(value: string, days: number): string {
   const date = new Date(`${value}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
-}
-
-function daysBetween(startIso: string, finishIso: string): number {
-  return Math.round((Date.parse(`${finishIso}T00:00:00.000Z`) - Date.parse(`${startIso}T00:00:00.000Z`)) / 86_400_000);
 }
 
 function fingerprint(value: string): string {

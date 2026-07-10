@@ -74,22 +74,80 @@ export function useProjectBase(projectId: string, mockBase: ProjectMeta): Projec
   // Identity ещё не загружена или detail недоступен — только нейтральная мета.
   return { ...mockBase, name: "Проект", code: "…", status: "—", statusTone: "info" };
 }
-/**
- * RU-маппер кодов ошибок загрузки плана для <SurfaceState errorFormat>. Коды приходят
- * из usePlanning (load_failed) и из PlanningApiError.code/сетевых сообщений транспорта.
- * Неизвестный код отдаём как есть (или общий fallback).
- */
-const PLANNING_ERR_RU: Record<string, string> = {
-  permission_missing: "Недостаточно прав для просмотра плана проекта",
-  project_not_found: "Проект не найден: возможно, он удалён или ссылка устарела",
-  load_failed: "Не удалось загрузить план проекта",
-  request_failed: "Запрос к планировщику не выполнен",
-  invalid_json_response: "Некорректный ответ планировщика",
-  plan_version_conflict: "Конфликт версий плана — обновите страницу",
-  forbidden: "Нет прав на просмотр плана проекта"
+export type PlanningUiError = {
+  code: string;
+  message: string;
+  status?: number;
 };
+
+const SESSION_REQUIRED_MESSAGE = "Сессия истекла. Войдите снова, чтобы продолжить";
+const PERMISSION_MISSING_MESSAGE = "Недостаточно прав для работы с планом проекта";
+const PROJECT_NOT_FOUND_MESSAGE = "Проект не найден: возможно, он удалён или ссылка устарела";
+const PERSISTENCE_UNAVAILABLE_MESSAGE = "Сервис планирования временно недоступен";
+const TRANSPORT_FAILURE_MESSAGE = "Не удалось связаться с сервисом планирования. Проверьте подключение и повторите";
+
+const PLANNING_ERROR_MESSAGES: Record<string, string> = {
+  session_required: SESSION_REQUIRED_MESSAGE,
+  unauthorized: SESSION_REQUIRED_MESSAGE,
+  permission_missing: PERMISSION_MISSING_MESSAGE,
+  forbidden: PERMISSION_MISSING_MESSAGE,
+  project_not_found: PROJECT_NOT_FOUND_MESSAGE,
+  plan_version_conflict: "План уже изменился. Данные обновлены, повторите действие",
+  planning_precondition_failed: "Изменение нельзя применить к текущему состоянию плана",
+  idempotency_key_conflict: "Операция конфликтует с уже отправленным запросом. Повторите действие",
+  persistence_not_configured: PERSISTENCE_UNAVAILABLE_MESSAGE,
+  transport_failure: TRANSPORT_FAILURE_MESSAGE,
+  network_error: TRANSPORT_FAILURE_MESSAGE,
+  invalid_json_response: "Сервис планирования вернул некорректный ответ",
+  nothing_to_revert: "Нет изменений, которые можно отменить"
+};
+
+const STATUS_ERROR_MESSAGES: Record<number, string> = {
+  401: SESSION_REQUIRED_MESSAGE,
+  403: PERMISSION_MISSING_MESSAGE,
+  404: PROJECT_NOT_FOUND_MESSAGE,
+  409: "План или операция уже изменились. Обновите данные и повторите действие",
+  501: PERSISTENCE_UNAVAILABLE_MESSAGE
+};
+
+const STATUS_ERROR_CODES: Record<number, string> = {
+  401: "session_required",
+  403: "permission_missing",
+  404: "project_not_found",
+  409: "conflict",
+  501: "persistence_not_configured"
+};
+
+const FALLBACK_ERROR_MESSAGES: Record<string, string> = {
+  load_failed: "Не удалось загрузить план проекта",
+  request_failed: "Не удалось выполнить запрос к планировщику",
+  apply_failed: "Не удалось применить изменение плана",
+  revert_failed: "Не удалось отменить изменение плана",
+  preview_failed: "Не удалось рассчитать изменение плана",
+  apply_scenario_failed: "Не удалось применить сценарий"
+};
+
+export function mapPlanningError(error: unknown, fallbackCode = "request_failed"): PlanningUiError {
+  const value = error && typeof error === "object" ? error as { code?: unknown; status?: unknown } : null;
+  const status = typeof value?.status === "number" ? value.status : undefined;
+  const explicitCode = typeof error === "string"
+    ? error
+    : typeof value?.code === "string"
+      ? value.code
+      : undefined;
+  const code = explicitCode
+    ?? (error instanceof TypeError ? "transport_failure" : undefined)
+    ?? (status === undefined ? undefined : STATUS_ERROR_CODES[status])
+    ?? fallbackCode;
+  const message = PLANNING_ERROR_MESSAGES[code]
+    ?? (status === undefined ? undefined : STATUS_ERROR_MESSAGES[status])
+    ?? FALLBACK_ERROR_MESSAGES[code]
+    ?? "Не удалось выполнить операцию планирования";
+  return { code, message, ...(status === undefined ? {} : { status }) };
+}
+
 export const planningErr = (code?: string): string =>
-  (code && PLANNING_ERR_RU[code]) || code || "Не удалось загрузить план";
+  mapPlanningError(code ?? "load_failed", "load_failed").message;
 
 const ddmmyyyy = (iso: string | null): string => {
   if (!iso) return "—";

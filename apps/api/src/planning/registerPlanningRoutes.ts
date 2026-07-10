@@ -13,6 +13,7 @@ import { persistPlanningNotifications } from "../collaborationNotificationServic
 import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRoutes";
 import { notifyPlanVersionChanged } from "../planningEventBus";
 import { registerPlanningEventsRoute } from "../planningEventsRoute";
+import { PlanningPostWriteReadbackError } from "../governedPlanningApply";
 import { registerPlanningAutoSolverRoutes } from "./planningAutoSolverRoutes";
 import { registerPlanningBatchPreviewRoute } from "./planningBatchPreviewRoute";
 import { registerPlanningRevertRoute } from "./planningRevertRoute";
@@ -60,6 +61,20 @@ function emitPlanVersionFromBody(
   if (typeof body.newPlanVersion === "number") {
     invalidateCapacityCacheForTenant(tenantId);
     notifyPlanVersionChanged(tenantId, projectId, body.newPlanVersion);
+  }
+}
+
+async function runPlanningWriteTransaction<T extends { ok: boolean }>(
+  deps: PlanningRouteDeps,
+  operation: (transactionDataSource: PlanningRouteDeps["dataSource"]) => Promise<T>
+): Promise<T | { ok: false; status: 404; error: "project_not_found" }> {
+  try {
+    return await deps.runDataSourceTransaction(operation) as T;
+  } catch (error) {
+    if (error instanceof PlanningPostWriteReadbackError) {
+      return { ok: false, status: 404, error: "project_not_found" };
+    }
+    throw error;
   }
 }
 
@@ -209,7 +224,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       });
     }
 
-    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+    const result = await runPlanningWriteTransaction(deps, async (rawStore) => {
       // Один вызов вместо цепочки `!ds.a || !ds.b`; возвращает store с этими методами как обязательными,
       // downstream больше не нуждается в non-null-ассершенах.
       const transactionDataSource = requireCapabilities(rawStore, [
@@ -325,7 +340,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         executionResult: { status: "succeeded", validationIssues }
       }, transactionDataSource);
       const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
-      if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      if (!appliedSnapshot) throw new PlanningPostWriteReadbackError();
       await persistPlanningNotifications({
         dataSource: transactionDataSource,
         tenantId: actor.tenantId,
@@ -407,7 +422,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       });
     }
 
-    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+    const result = await runPlanningWriteTransaction(deps, async (rawStore) => {
       const transactionDataSource = requireCapabilities(rawStore, [
         "getPlanSnapshot",
         "applyPlanningCommand",
@@ -529,7 +544,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         executionResult: { status: "succeeded", validationIssues: batchPreview.validationIssues }
       }, transactionDataSource);
       const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
-      if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      if (!appliedSnapshot) throw new PlanningPostWriteReadbackError();
       await persistPlanningNotifications({
         dataSource: transactionDataSource,
         tenantId: actor.tenantId,

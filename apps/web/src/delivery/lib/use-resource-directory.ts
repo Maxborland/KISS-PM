@@ -16,23 +16,26 @@ import { RESOURCES, type Resource } from "./mock-planning-backend";
  * не ломаются. team/capacity на проде — из позиции/дефолта: полная оргструктура (tenant_org_nodes)
  * появится с дополнением сидов (SEED-AUGMENTATION-TASK.md).
  */
-export function useResourceDirectory(): {
+export function useResourceDirectory(override?: readonly Resource[]): {
   list: Resource[];
   byId: Map<string, Resource>;
   name: (id: string) => string;
   of: (id: string) => Resource | undefined;
 } {
   const { live } = usePlanningRuntime();
+  const effectiveOverride = override?.length ? override : undefined;
   const clientRef = useRef<ReturnType<typeof createDeliveryPlanningClient> | null>(null);
   // Клиент нужен ТОЛЬКО для live-фетча справочника (/api/workspace/users). В mock директория статична
   // (RESOURCES), поэтому НЕ конструируем весь мок-бэкенд (createMockPlanningFetch) ради константы.
-  if (live && clientRef.current === null) clientRef.current = createDeliveryPlanningClient(live);
+  if (live && !effectiveOverride && clientRef.current === null) clientRef.current = createDeliveryPlanningClient(live);
   const client = clientRef.current;
 
   // синхронный старт (mock → RESOURCES сразу; live → пусто до ответа), затем обновление из шва (live).
-  const [list, setList] = useState<Resource[]>(() => (client ? client.resourceDirectorySeed() : RESOURCES));
+  const [list, setList] = useState<Resource[]>(() => client ? client.resourceDirectorySeed() : RESOURCES);
+  const effectiveList = effectiveOverride ?? list;
 
   useEffect(() => {
+    if (effectiveOverride) return;
     if (!client) return;
     let active = true;
     void client.getResourceDirectory().then((rs) => {
@@ -41,10 +44,11 @@ export function useResourceDirectory(): {
     return () => {
       active = false;
     };
-  }, [client]);
+  }, [client, effectiveOverride]);
 
   return useMemo(() => {
-    const byId = new Map(list.map((r) => [r.id, r]));
-    return { list, byId, name: (id: string) => byId.get(id)?.name ?? id, of: (id: string) => byId.get(id) };
-  }, [list]);
+    const resolved = [...effectiveList];
+    const byId = new Map(resolved.map((r) => [r.id, r]));
+    return { list: resolved, byId, name: (id: string) => byId.get(id)?.name ?? id, of: (id: string) => byId.get(id) };
+  }, [effectiveList]);
 }

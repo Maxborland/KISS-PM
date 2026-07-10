@@ -11,6 +11,7 @@ type RouteDoc = {
   response?: "json" | "file" | "event-stream";
   requestSchema?: string;
   successSchema?: string;
+  errorSchema?: string;
   successStatus?: 200 | 201 | 202;
   queryParameters?: Array<Record<string, unknown>>;
   availability?: "always" | "test-hooks";
@@ -135,9 +136,10 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/search", tag: "Storage and search", summary: "Unified metadata search", successSchema: "WorkspaceSearchResponse", queryParameters: [{ name: "q", in: "query", required: true, schema: { type: "string", minLength: 2, maxLength: 120 } }, { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 20, default: 20 } }, { name: "types", in: "query", required: false, schema: { type: "string", description: "Comma-separated SearchResultType values." } }] },
   { method: "get", path: "/api/workspace/projects/:projectId/planning/read-model", tag: "Planning", summary: "Read planning model", successSchema: "PlanningReadModelResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/preview-command", tag: "Planning", summary: "Preview planning command", requestSchema: "PlanningCommandEnvelope", successSchema: "PlanningCommandPreviewResponse" },
+  { method: "post", path: "/api/workspace/projects/:projectId/planning/preview-command-batch", tag: "Planning", summary: "Preview planning command batch", requestSchema: "PlanningCommandBatchEnvelope", successSchema: "PlanningCommandPreviewResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/apply-command", tag: "Planning", summary: "Apply planning command", requestSchema: "PlanningCommandEnvelope", successSchema: "PlanningApplyResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/apply-command-batch", tag: "Planning", summary: "Apply planning command batch", requestSchema: "PlanningCommandBatchEnvelope", successSchema: "PlanningApplyResponse" },
-  { method: "post", path: "/api/workspace/projects/:projectId/planning/revert-last", tag: "Planning", summary: "Revert last revertible planning commit", successSchema: "PlanningApplyResponse" },
+  { method: "post", path: "/api/workspace/projects/:projectId/planning/revert-last", tag: "Planning", summary: "Revert a specific planning commit", requestSchema: "PlanningRevertRequest", successSchema: "PlanningRevertResponse", errorSchema: "PlanningRevertErrorResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/test/bump-plan-version", tag: "Planning", summary: "Test-only plan version bump", auth: "dev", successSchema: "PlanningPlanVersionBumpResponse", availability: "test-hooks" },
   { method: "get", path: "/api/workspace/projects/:projectId/planning/baselines", tag: "Planning", summary: "List planning baselines", successSchema: "PlanningBaselinesResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/scenarios/preview", tag: "Planning", summary: "Preview planning scenario", requestSchema: "PlanningScenarioPreviewRequest", successSchema: "PlanningScenarioPreviewResponse" },
@@ -147,7 +149,8 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/projects/:projectId/planning/events", tag: "Planning", summary: "Planning realtime event stream", response: "event-stream" },
   { method: "get", path: "/api/workspace/projects/:projectId/planning/saved-views", tag: "Planning", summary: "List planning saved views", successSchema: "PlanningSavedViewsResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/saved-views", tag: "Planning", summary: "Create planning saved view", requestSchema: "PlanningSavedViewCreateRequest", successSchema: "PlanningSavedViewResponse", successStatus: 201 },
-  { method: "delete", path: "/api/workspace/projects/:projectId/planning/saved-views/:viewId", tag: "Planning", summary: "Delete planning saved view", body: "none", successSchema: "OkResponse" },
+  { method: "patch", path: "/api/workspace/projects/:projectId/planning/saved-views/:viewId", tag: "Planning", summary: "Rename planning saved view", requestSchema: "PlanningSavedViewRenameRequest", successSchema: "PlanningSavedViewResponse" },
+  { method: "delete", path: "/api/workspace/projects/:projectId/planning/saved-views/:viewId", tag: "Planning", summary: "Delete planning saved view", requestSchema: "PlanningSavedViewDeleteRequest", successSchema: "OkResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/auto-solver-runs", tag: "Planning", summary: "Create auto-solver run", requestSchema: "PlanningAutoSolverRunCreateRequest", successSchema: "PlanningAutoSolverRunResponse" },
   { method: "get", path: "/api/workspace/projects/:projectId/planning/auto-solver-runs/:runId", tag: "Planning", summary: "Read auto-solver run", successSchema: "PlanningAutoSolverRunDetailResponse" },
   { method: "post", path: "/api/workspace/projects/:projectId/planning/auto-solver-runs/:runId/proposals/:proposalId/apply", tag: "Planning", summary: "Apply persisted auto-solver proposal", requestSchema: "PlanningScenarioApplyRequest", successSchema: "PlanningApplyResponse" },
@@ -366,6 +369,7 @@ function requestBodyFor(route: RouteDoc) {
 }
 
 function responsesFor(route: RouteDoc) {
+  const errorSchema = route.errorSchema ?? "ApiError";
   const successContent =
     route.response === "file"
       ? {
@@ -395,13 +399,14 @@ function responsesFor(route: RouteDoc) {
             : "Successful response.",
       content: successContent
     },
-    "400": errorResponse("Invalid input or malformed route/query parameter."),
-    "401": errorResponse("Session is required or invalid."),
-    "403": errorResponse("Permission or same-origin mutation guard denied the request."),
-    "404": errorResponse("Entity or route was not found."),
-    "409": errorResponse("Optimistic concurrency, lifecycle, or uniqueness conflict."),
-    "413": errorResponse("Request body exceeds route limits."),
-    "501": errorResponse("Persistence/provider capability is not configured.")
+    "400": errorResponse("Invalid input or malformed route/query parameter.", errorSchema),
+    "401": errorResponse("Session is required or invalid.", errorSchema),
+    "403": errorResponse("Permission or same-origin mutation guard denied the request.", errorSchema),
+    "404": errorResponse("Entity or route was not found.", errorSchema),
+    "409": errorResponse("Optimistic concurrency, lifecycle, or uniqueness conflict.", errorSchema),
+    "413": errorResponse("Request body exceeds route limits.", errorSchema),
+    "415": errorResponse("Request media type is not supported.", errorSchema),
+    "501": errorResponse("Persistence/provider capability is not configured.", errorSchema)
   };
 }
 
@@ -409,12 +414,12 @@ function schemaRef(name: string) {
   return { $ref: `#/components/schemas/${name}` };
 }
 
-function errorResponse(description: string) {
+function errorResponse(description: string, schemaName: string) {
   return {
     description,
     content: {
       "application/json": {
-        schema: { $ref: "#/components/schemas/ApiError" }
+        schema: schemaRef(schemaName)
       }
     }
   };

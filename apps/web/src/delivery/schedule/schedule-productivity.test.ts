@@ -10,6 +10,26 @@ import {
   shouldRunScheduleUndo
 } from "./schedule-productivity";
 
+const calendarSource = {
+  project: { calendarId: "calendar-default" },
+  calendars: [{
+    id: "calendar-default",
+    workingWeekdays: [1, 2, 3, 4, 5],
+    workingMinutesPerDay: 480
+  }],
+  calendarExceptions: []
+};
+
+const sixHourCalendarSource = {
+  project: { calendarId: "calendar-six-hour" },
+  calendars: [{
+    id: "calendar-six-hour",
+    workingWeekdays: [1, 2, 3, 4, 5],
+    workingMinutesPerDay: 360
+  }],
+  calendarExceptions: []
+};
+
 describe("schedule productivity commands", () => {
   it("normalizes and parses a rectangular 10x6 TSV import", () => {
     const tsv = `\uFEFF${Array.from({ length: 10 }, (_, index) => {
@@ -17,7 +37,7 @@ describe("schedule productivity commands", () => {
       return `Imported task ${index + 1}\t2026-07-${day}\t\t5\t40\t${index}`;
     }).join("\r\n")}\r\n`;
 
-    const parsed = parseTaskTsv(tsv);
+    const parsed = parseTaskTsv(tsv, calendarSource);
 
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
@@ -25,13 +45,14 @@ describe("schedule productivity commands", () => {
     expect(parsed.rows[0]).toEqual({
       title: "Imported task 1",
       startIso: "2026-07-01",
-      finishIso: "2026-07-06",
+      finishIso: "2026-07-07",
       durationDays: 5,
+      durationMinutes: 2400,
       workHours: 40,
       percentComplete: 0
     });
-    expect(parsed.fingerprint).toBe(parseTaskTsv(tsv.replace("\r\n", "\n")).ok
-      ? (parseTaskTsv(tsv.replace("\r\n", "\n")) as { fingerprint: string }).fingerprint
+    expect(parsed.fingerprint).toBe(parseTaskTsv(tsv.replace("\r\n", "\n"), calendarSource).ok
+      ? (parseTaskTsv(tsv.replace("\r\n", "\n"), calendarSource) as { fingerprint: string }).fingerprint
       : "");
   });
 
@@ -62,7 +83,7 @@ describe("schedule productivity commands", () => {
     );
   });
   it("builds one stable atomic create/progress command list", () => {
-    const parsed = parseTaskTsv("Imported task\t2026-07-01\t\t5\t40\t25");
+    const parsed = parseTaskTsv("Imported task\t2026-07-01\t\t5\t40\t25", calendarSource);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
 
@@ -82,7 +103,7 @@ describe("schedule productivity commands", () => {
           title: "Imported task",
           statusId: "todo",
           plannedStart: "2026-07-01",
-          plannedFinish: "2026-07-06",
+          plannedFinish: "2026-07-07",
           durationMinutes: 2400,
           workMinutes: 2400,
           assignments: []
@@ -95,6 +116,73 @@ describe("schedule productivity commands", () => {
     ]);
   });
 
+  it("uses the effective six-hour project calendar for TSV duration and default work", () => {
+    const parsed = parseTaskTsv(
+      "Six hour task\t2026-07-06\t\t2\t\t0",
+      sixHourCalendarSource
+    );
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.rows[0]).toMatchObject({
+      finishIso: "2026-07-07",
+      durationDays: 2,
+      durationMinutes: 720,
+      workHours: 12
+    });
+
+    const [createCommand] = buildPasteCommands({
+      projectId: "project-1",
+      rows: parsed.rows,
+      createId: () => "task-six-hour"
+    });
+    expect(createCommand).toMatchObject({
+      type: "task.create",
+      payload: {
+        durationMinutes: 720,
+        workMinutes: 720
+      }
+    });
+  });
+
+  it("skips weekend days when deriving a TSV finish date", () => {
+    const parsed = parseTaskTsv(
+      "Weekend task\t2026-07-10\t\t2\t12\t0",
+      sixHourCalendarSource
+    );
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.rows[0]).toMatchObject({
+      finishIso: "2026-07-13",
+      durationMinutes: 720
+    });
+  });
+
+  it("skips project calendar exceptions when deriving a TSV finish date", () => {
+    const parsed = parseTaskTsv(
+      "Holiday task\t2026-07-10\t\t2\t12\t0",
+      {
+        ...sixHourCalendarSource,
+        calendarExceptions: [{
+          id: "holiday",
+          calendarId: "calendar-six-hour",
+          resourceId: null,
+          date: "2026-07-13",
+          workingMinutes: 0,
+          reason: "holiday"
+        }]
+      }
+    );
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.rows[0]).toMatchObject({
+      finishIso: "2026-07-14",
+      durationMinutes: 720
+    });
+  });
+
   it("previews sequential finish dates across a weekend as one batch", () => {
     const result = buildFinishDateFillCommands({
       firstFinishIso: "2026-07-10",
@@ -104,15 +192,16 @@ describe("schedule productivity commands", () => {
         { id: "task-2", startIso: "2026-07-02", durationDays: 5, workHours: 20 },
         { id: "task-3", startIso: "2026-07-03", durationDays: 5, workHours: 40 }
       ],
-      assignments: []
+      assignments: [],
+      calendarSource
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.preview.map((item) => item.finishIso)).toEqual([
       "2026-07-10",
-      "2026-07-11",
-      "2026-07-12"
+      "2026-07-13",
+      "2026-07-14"
     ]);
     expect(result.commands.filter((command) => command.type === "task.update_schedule")).toHaveLength(3);
     expect(result.commands.filter((command) => command.type === "task.update_work_model")).toHaveLength(3);
@@ -126,7 +215,8 @@ describe("schedule productivity commands", () => {
         { id: "task-1", startIso: "2026-07-01", durationDays: 5, workHours: 40 },
         { id: "task-2", startIso: "2026-06-20", durationDays: 5, workHours: 40 }
       ],
-      assignments: []
+      assignments: [],
+      calendarSource
     });
 
     expect(result).toEqual({

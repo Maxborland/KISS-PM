@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-10T04:47:08.267Z",
+  "generatedAt": "2026-07-10T16:57:46.899Z",
   "source": "docs/qa/full-eval/inventory/projects.md",
   "evidenceRule": "Only rows linked to fresh 2026-07-10 artifacts may be pass; historical checks remain historical_evidence_only.",
   "schema": "role x scenario x surface x expectedBehavior x evidence x status",
@@ -12,23 +12,23 @@
     },
     {
       "status": "fail",
-      "count": 46
+      "count": 41
     },
     {
       "status": "historical_evidence_only",
-      "count": 59
+      "count": 56
     },
     {
       "status": "partial",
-      "count": 3
+      "count": 1
     },
     {
       "status": "pass",
-      "count": 80
+      "count": 120
     },
     {
       "status": "unverified",
-      "count": 31
+      "count": 1
     }
   ],
   "rows": [
@@ -904,9 +904,9 @@
       "apiOrDataSurface": "POST `…/apply-command-batch`",
       "expectedBehavior": "Disabled без выделения; создаёт с parentTaskId=selected",
       "dataStateAndEdges": "выделение сброшено после удаления строки; родитель — веха",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-01 (disabled-логика кнопки корректна, но создание падает)"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-033:admin; screenshots=c01-admin-authoring.png; assertions=Subtask disabled without selection; selected row becomes persisted parentTaskId",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C01"
     },
     {
       "role": "A",
@@ -916,9 +916,9 @@
       "apiOrDataSurface": "apply-command-batch",
       "expectedBehavior": "Edit переиспользует id существующего назначения (`asgId`) — без дублирования нагрузки; длительность ≥1 принудительно",
       "dataStateAndEdges": "**исполнитель — select из МОК `RESOURCES`, а не реальных users** (см. PROJ-060); невалидные даты; Enter в поле названия = submit",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-02 (+BUG-PROJ-01)"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-034:admin; screenshots=c01-admin-authoring.png; assertions=Create/edit modal persists all fields, clamps values, and reuses stable assignment id",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C01"
     },
     {
       "role": "A",
@@ -928,9 +928,9 @@
       "apiOrDataSurface": "POST `…/apply-command` (task.move_wbs c sortOrder)",
       "expectedBehavior": "Disabled когда нет prev-sibling / родителя; outdent встаёт сразу после бывшего родителя",
       "dataStateAndEdges": "indent под веху; циклическое перемещение summary в собственного потомка (домен должен отклонить)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (indent v7 / outdent v8, disabled-состояния корректны)"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-035:admin; screenshots=proj-035-indent.png,proj-035-outdent.png; assertions=Indent/outdent boundaries and resulting WBS order persist after reload",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C02"
     },
     {
       "role": "A",
@@ -940,9 +940,9 @@
       "apiOrDataSurface": "POST `…/apply-command-batch`",
       "expectedBehavior": "Правки копятся (счётчик), применяются одним коммитом; reject → подсветка ошибок + reload; сброс → reload",
       "dataStateAndEdges": "конфликт версий при применении пакета; закрытие вкладки с несохранённым пакетом (нет предупреждения); пакет из конфликтующих правок одной задачи",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (счётчик «Пакет · N», 2 правки → один коммит v15)"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-036:admin; screenshots=proj-036-batch-staged.png,proj-036-batch-applied.png,proj-036-batch-reset.png; assertions=Two edits stage with zero writes, apply atomically, and reset with zero writes",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C02"
     },
     {
       "role": "A",
@@ -952,9 +952,9 @@
       "apiOrDataSurface": "apply-command-batch (компенсирующие команды)",
       "expectedBehavior": "`buildCompensatingCommands` из before-снимка; недоступен для create/move/assignment (notice)",
       "dataStateAndEdges": "undo после конфликта версий; двойной undo; undo чужого коммита (недоступен — только свой последний)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (компенсирующий коммит v10, дата вернулась)"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-037:admin; screenshots=proj-037-before-undo.png,proj-037-after-undo.png; assertions=Compensating undo works once and rejects unsupported, stale, duplicate, and foreign targets",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C02"
     },
     {
       "role": "A",
@@ -964,9 +964,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Фейковые контролы**: `demoAction` disabled на прод-роуте; baseline-снимок при этом реально доступен на вкладке Baseline",
       "dataStateAndEdges": "пользователь ищет фильтры и не находит",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-038:admin; screenshots=c03-admin.png; assertions=Admin Baseline route is real and undeclared Filters/Columns controls are absent",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C03"
     },
     {
       "role": "PR",
@@ -976,9 +976,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Фейковые контролы**: `demoAction` disabled на прод-роуте; baseline-снимок при этом реально доступен на вкладке Baseline",
       "dataStateAndEdges": "пользователь ищет фильтры и не находит",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-038:planReader; screenshots=c03-planReader.png; assertions=Reader Baseline route is readable and undeclared Filters/Columns controls are absent",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C03"
     },
     {
       "role": "A",
@@ -988,9 +988,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Меняет ширину дня (36/20/8 px); бары/связи/маркеры пересчитываются",
       "dataStateAndEdges": "drag бара при зуме «Месяц» (шаг 8px → грубые дельты)",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-039:admin; screenshots=c03-admin.png; assertions=Admin Day/Week/Month reflows bars, links, and markers at 36/20/8 px",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C03"
     },
     {
       "role": "PR",
@@ -1000,9 +1000,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Меняет ширину дня (36/20/8 px); бары/связи/маркеры пересчитываются",
       "dataStateAndEdges": "drag бара при зуме «Месяц» (шаг 8px → грубые дельты)",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-039:planReader; screenshots=c03-planReader.png; assertions=Reader Day/Week/Month reflows read-only bars, links, and markers at 36/20/8 px",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C03"
     },
     {
       "role": "A",
@@ -1012,9 +1012,9 @@
       "apiOrDataSurface": "apply-command / apply-command-batch (update_identity / update_work_model+assignment.upsert / update_progress)",
       "expectedBehavior": "Excel-навигация Tab/Shift+Tab с переносом строк; правка длительности синхронизирует труд назначения; dur/work/pct недоступны у summary/вех",
       "dataStateAndEdges": "dur ≤ 0 → notice про веху; NaN-ввод игнорируется; blur после Tab не даёт двойного коммита; pct вне 0..100 клампится",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-040:admin; screenshots=c01-admin-authoring.png; assertions=Inline Enter/Escape/Tab/Shift+Tab navigation persists only committed editable task fields",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C01"
     },
     {
       "role": "A",
@@ -1024,9 +1024,9 @@
       "apiOrDataSurface": "apply-command (task.update_schedule)",
       "expectedBehavior": "Сдвигает старт+финиш на ту же длительность; PR → 403",
       "dataStateAndEdges": "невалидная/пустая дата; старт на выходной (движок сдвинет); manual-режим",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-041:admin; screenshots=c01-admin-authoring.png; assertions=Live start-date editor shifts schedule and persists through reload",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C01"
     },
     {
       "role": "A",
@@ -1036,9 +1036,9 @@
       "apiOrDataSurface": "apply-command-batch (update_schedule + update_work_model + assignment.upsert)",
       "expectedBehavior": "Новая длительность ≥1, труд пересчитан по units, труд назначения синхронизирован",
       "dataStateAndEdges": "финиш раньше старта (молча игнорируется — newDur<1, гэп: нет сообщения); задача без назначения",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-042:admin; screenshots=c01-admin-authoring.png; assertions=Finish-date editor recalculates duration/work and keeps assignment id stable",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C01"
     },
     {
       "role": "A",
@@ -1048,9 +1048,9 @@
       "apiOrDataSurface": "apply-command (assignment.upsert, reuse id)",
       "expectedBehavior": "Переиспользует id текущего назначения — не плодит второе",
       "dataStateAndEdges": "**Баг-кандидат: список — статический МОК `RESOURCES` (`planning-demo-data`), а не `/api/workspace/users`** → на live отправляется мок-resourceId; конфликт назначений (двое на одну задачу)",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-043:admin; screenshots=c01-admin-authoring.png; assertions=Live resource editor persists real user id without duplicate assignment",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C01"
     },
     {
       "role": "A",
@@ -1060,9 +1060,9 @@
       "apiOrDataSurface": "apply-command (dependency.upsert / dependency.delete)",
       "expectedBehavior": "Опции исключают себя, потомков и уже-предшественников; лаг в днях → минуты",
       "dataStateAndEdges": "**циклическая зависимость** через промежуточную задачу (фильтр UI не ловит транзитивный цикл — должен отклонить бэк); лаг отрицательный; связь на summary исключена",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-044:admin; screenshots=c05-dependencies.png; assertions=Dependency editor excludes invalid options and persists add/update/delete with signed lag",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C05"
     },
     {
       "role": "A",
@@ -1072,9 +1072,9 @@
       "apiOrDataSurface": "соответствующие команды",
       "expectedBehavior": "Все 9 пунктов работают; disabled-состояния indent/outdent соблюдены",
       "dataStateAndEdges": "ПКМ на summary (нет «Сделать вехой»); фокус после закрытия меню не крадёт инлайн-строку",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-045:admin; screenshots=c01-admin-authoring.png; assertions=All row-menu actions and disabled hierarchy states are traversed",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C01"
     },
     {
       "role": "A",
@@ -1096,9 +1096,9 @@
       "apiOrDataSurface": "apply-command(-batch) (task.delete_or_archive mode=delete)",
       "expectedBehavior": "Summary удаляется пакетом снизу-вверх (листья первыми) — без сирот",
       "dataStateAndEdges": "удаление задачи со связями/назначениями; удаление последней задачи плана (пустой план); undo после удаления недоступен (create необратим)",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-047:admin; screenshots=c06-honest-empty-plan.png; assertions=Leaf and leaves-first summary deletion remove real assignments/dependencies and expose an honest empty plan",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C06"
     },
     {
       "role": "A",
@@ -1108,9 +1108,9 @@
       "apiOrDataSurface": "apply-command (task.create, оптимистично)",
       "expectedBehavior": "Мин. 3 символа (notice); wbs-плейсхолдер «…» до ответа бэка; строка очищается для следующей",
       "dataStateAndEdges": "Enter на пустом; Tab в нижней строке → подзадача последней видимой; reject бэка → откат оптимистичной строки",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-048:admin; screenshots=c01-admin-authoring.png; assertions=Bottom and positioned quick-create cover Enter, Tab, Escape, validation, and readback",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C01"
     },
     {
       "role": "A",
@@ -1120,9 +1120,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Скрывает поддерево по wbs-префиксу; связи к скрытым строкам не рисуются",
       "dataStateAndEdges": "вложенные summary; выделенная задача внутри свёрнутой группы (инспектор)",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-049:admin; screenshots=c03-admin.png; assertions=Admin nested collapse hides descendants and connectors, then restores them",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C03"
     },
     {
       "role": "PR",
@@ -1132,9 +1132,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Скрывает поддерево по wbs-префиксу; связи к скрытым строкам не рисуются",
       "dataStateAndEdges": "вложенные summary; выделенная задача внутри свёрнутой группы (инспектор)",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-049:planReader; screenshots=c03-planReader.png; assertions=Reader nested collapse hides descendants and connectors without a write",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C03"
     },
     {
       "role": "A",
@@ -1144,9 +1144,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Мин. ширина 36px; сохраняется в state (не персистится — гэп)",
       "dataStateAndEdges": "двойной drag; сброс при remount",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-050:admin; screenshots=c03-admin.png; assertions=Admin column resize clamps at 36 px and resets on remount",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C03"
     },
     {
       "role": "PR",
@@ -1156,9 +1156,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Мин. ширина 36px; сохраняется в state (не персистится — гэп)",
       "dataStateAndEdges": "двойной drag; сброс при remount",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-050:planReader; screenshots=c03-planReader.png; assertions=Reader column resize clamps at 36 px and resets on remount",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C03"
     },
     {
       "role": "A",
@@ -1168,9 +1168,9 @@
       "apiOrDataSurface": "apply-command (task.update_schedule)",
       "expectedBehavior": "Оптимистично + авторитетный пересчёт бэком; deltaDays=0 → без команды",
       "dataStateAndEdges": "drag за левую границу таймлайна (кламп 0); drag summary/вехи (недоступен); отпускание вне ганта",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-051:admin; screenshots=c04-gantt-gestures.png; assertions=Gantt body move covers positive, negative, zero, clamp, and release outside",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C04"
     },
     {
       "role": "A",
@@ -1180,9 +1180,9 @@
       "apiOrDataSurface": "update_schedule / batch (update_work_model + assignment.upsert)",
       "expectedBehavior": "Правый край: труд пересчитан по units + синхронизация назначения; мин. длительность 1 дн",
       "dataStateAndEdges": "схлопывание до <1 дн (игнор); resize при активном pct-drag",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-052:admin; screenshots=c04-gantt-gestures.png; assertions=Gantt left/right resize clamps duration and synchronizes assignment work",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C04"
     },
     {
       "role": "A",
@@ -1192,9 +1192,9 @@
       "apiOrDataSurface": "apply-command (task.update_progress)",
       "expectedBehavior": "Кламп 0..100; коммит только при изменении",
       "dataStateAndEdges": "0%→100% одним жестом; drag на критической задаче",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-053:admin; screenshots=c04-gantt-gestures.png; assertions=Gantt progress drag clamps 0..100 and zero delta emits no write",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C04"
     },
     {
       "role": "A",
@@ -1204,9 +1204,9 @@
       "apiOrDataSurface": "apply-command (dependency.upsert)",
       "expectedBehavior": "Тип связи выводится из краёв; на себя — игнор",
       "dataStateAndEdges": "drop мимо задачи; drop на summary; создание дубля связи; **циклическая связь → отклонение бэком с внятной ошибкой**",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-054:admin; screenshots=c04-gantt-gestures.png; assertions=Gantt link drag covers four edge types plus self, miss, duplicate, summary, and cycle rejection",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C04"
     },
     {
       "role": "A",
@@ -1216,9 +1216,9 @@
       "apiOrDataSurface": "dependency.upsert / dependency.delete",
       "expectedBehavior": "Бейджи только на связях выделенной задачи; сохранение по id связи",
       "dataStateAndEdges": "лаг отрицательный; смена типа создающая цикл",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-055:admin; screenshots=c05-dependencies.png; assertions=Selected-task link badge edits type/lag by stable dependency id and deletes it",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C05"
     },
     {
       "role": "A",
@@ -1228,9 +1228,9 @@
       "apiOrDataSurface": "apply-command-batch (через editUnits)",
       "expectedBehavior": "«Единицы» редактируются кликом (только task); закрытие крестиком",
       "dataStateAndEdges": "дефолтное выделение `sel=\"t-3.2.1\"` — мок-id, на live не существует (инспектор по клику всё равно работает); слак null → «—»",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-056:admin; screenshots=c03-admin.png; assertions=Admin inspector facts, close action, and units write persist",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C03"
     },
     {
       "role": "PR",
@@ -1240,9 +1240,9 @@
       "apiOrDataSurface": "apply-command-batch (через editUnits)",
       "expectedBehavior": "«Единицы» редактируются кликом (только task); закрытие крестиком",
       "dataStateAndEdges": "дефолтное выделение `sel=\"t-3.2.1\"` — мок-id, на live не существует (инспектор по клику всё равно работает); слак null → «—»",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-056:planReader; screenshots=c03-planReader.png; assertions=Reader inspector exposes facts but no units write control",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C03"
     },
     {
       "role": "A",
@@ -1252,9 +1252,9 @@
       "apiOrDataSurface": "ответ apply (validationIssues)",
       "expectedBehavior": "Reject → откат оптимистики, красный блок «WBS имя — сообщение», строки подсвечены",
       "dataStateAndEdges": "ошибка без entityId; несколько ошибок пакета; исчезновение после успешного коммита",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-057:admin; screenshots=c06-validation-rollback.png; assertions=Local and server rejection roll back data, show multiple row/global issues, highlight rows, and clear after success",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C06"
     },
     {
       "role": "A",
@@ -1264,9 +1264,9 @@
       "apiOrDataSurface": "apply-command",
       "expectedBehavior": "Мгновенный локальный патч → авторитетный read-model бэка; notice «Коммит vN · затронуто задач: K»; flash изменённых строк",
       "dataStateAndEdges": "reject → полный откат к prev; двойной быстрый ввод (busy-блокировка)",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-058:admin; screenshots=c06-optimistic-commit.png; assertions=Optimistic patch is visible before preview resolves; authoritative commit notice/flash replace it; busy second input emits zero writes",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C06"
     },
     {
       "role": "A",
@@ -1276,9 +1276,9 @@
       "apiOrDataSurface": "apply → 409 `plan_version_conflict`",
       "expectedBehavior": "Авто-reload read-model + notice «Конфликт версий — перезагружено»; несохранённый пакет при этом теряется? (проверить)",
       "dataStateAndEdges": "два окна редактируют один план; конфликт в середине пакета",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-059:admin; screenshots=c07-workflow-conflict.png; assertions=Single and batch stale writes return visible 409 outcomes and reload authoritative state without automatic retry",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C07"
     },
     {
       "role": "A",
@@ -1288,9 +1288,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Баг-кандидаты**: `BASE_MS=2026-03-02` (isoToDay/dayToIso из planning-demo-data), «Сегодня»=2026-04-28, недельные подписи от 2026-03-02, PROJECT-заглушка, RESOURCES в optimisticPatch",
       "dataStateAndEdges": "проект со стартом в 2027 → маркер «Сегодня» и подписи недель мимо; отрицательные day-индексы для задач до 2026-03-02",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-060:admin; screenshots=c08-admin-live-data.png; assertions=Admin timeline origin, week label, today marker, identity, baseline label, and assignment request derive from live data",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C08"
     },
     {
       "role": "PR",
@@ -1300,9 +1300,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Баг-кандидаты**: `BASE_MS=2026-03-02` (isoToDay/dayToIso из planning-demo-data), «Сегодня»=2026-04-28, недельные подписи от 2026-03-02, PROJECT-заглушка, RESOURCES в optimisticPatch",
       "dataStateAndEdges": "проект со стартом в 2027 → маркер «Сегодня» и подписи недель мимо; отрицательные day-индексы для задач до 2026-03-02",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-060:planReader; screenshots=c08-planReader-live-data.png; assertions=Reader timeline geometry derives from live data and every UI/API write path is absent or 403 with unchanged readback",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C08"
     },
     {
       "role": "A",
@@ -2488,9 +2488,9 @@
       "apiOrDataSurface": "preview→apply контур",
       "expectedBehavior": "Версия растёт монотонно; каждый шаг виден на `/commits`; отказ валидации не ломает состояние",
       "dataStateAndEdges": "цепочка из 10+ правок; параллельная сессия (конфликты)",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-permissions-integrated-playwright.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
-      "status": "partial",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-117:admin; screenshots=c07-workflow-conflict.png; assertions=10+ create/edit/dependency/milestone/delete steps increment versions monotonically with readback after every commit; reject adds zero versions",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C07"
     },
     {
       "role": "A",
@@ -2512,9 +2512,9 @@
       "apiOrDataSurface": "baseline.capture",
       "expectedBehavior": "Δ согласована во всех трёх местах",
       "dataStateAndEdges": "повторный снимок обнуляет дельты",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-21/BUG-PROJ-22 (уже задокументированы частью B ранее): фиксация работает и коммитится, но введённое имя снимка теряется, а дельты сразу после фиксации — ненулевые (authored↔calculated рассинхрон) — согласованность между таблицей/шапкой/Gantt подорвана искажёнными дельтами"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-119:admin; screenshots=c09-baseline-cross-surface.png; assertions=Baseline capture, finish-controlling shift, API/table/header/Gantt deltas, reload, and recapture-to-zero agree",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C09"
     },
     {
       "role": "A",
@@ -2632,9 +2632,9 @@
       "apiOrDataSurface": "UI + persistence",
       "expectedBehavior": "Manage and select persisted WBS views.",
       "dataStateAndEdges": "empty views, duplicate names and reload",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
-      "status": "fail",
-      "inventoryStatus": "FAIL incomplete"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-127:admin; screenshots=c10-admin-saved-views.png; assertions=Admin saved views cover full payload, create/rename/delete, privacy, corrupt/empty states, duplicate races, replay, and divergent conflicts",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C10"
     },
     {
       "role": "PR",
@@ -2644,9 +2644,9 @@
       "apiOrDataSurface": "UI + persistence",
       "expectedBehavior": "Select saved views without unauthorized shared-view writes.",
       "dataStateAndEdges": "no views and direct mutation denial",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
-      "status": "fail",
-      "inventoryStatus": "FAIL incomplete"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-127:planReader; screenshots=c10-plan-reader-saved-view.png; assertions=Reader selects shared view, cannot see private views, has no mutation controls, and direct create/rename/delete are 403",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C10"
     },
     {
       "role": "A",
@@ -2680,9 +2680,9 @@
       "apiOrDataSurface": "WBS + Gantt",
       "expectedBehavior": "No critical axe violations on current WBS and Gantt.",
       "dataStateAndEdges": "dialogs, selected row, preview and mobile",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
-      "status": "unverified",
-      "inventoryStatus": "UNVERIFIED migration required"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-129:admin; screenshots=c11-admin-default.png,c11-admin-inspector.png,c11-admin-dialog.png,c11-admin-preview.png,c11-admin-validation.png,c11-admin-mobile.png; assertions=Admin default, inspector, dialog, preview, validation, and mobile states have zero critical axe violations",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C11"
     },
     {
       "role": "PR",
@@ -2692,9 +2692,9 @@
       "apiOrDataSurface": "WBS + Gantt",
       "expectedBehavior": "No critical axe violations in read-only current WBS and Gantt.",
       "dataStateAndEdges": "forbidden controls and keyboard navigation",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
-      "status": "unverified",
-      "inventoryStatus": "UNVERIFIED migration required"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-129:planReader; screenshots=c11-planReader-default.png,c11-planReader-inspector.png,c11-planReader-mobile.png,c11-planReader-forbidden.png; assertions=Reader default, inspector, forbidden, keyboard, and mobile states have zero critical axe violations and zero writes",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C11"
     },
     {
       "role": "A",
@@ -2704,9 +2704,9 @@
       "apiOrDataSurface": "UI + API 409",
       "expectedBehavior": "Remote plan-version bump shows explicit conflict and reloads authoritative state.",
       "dataStateAndEdges": "dirty draft, batch conflict and repeated retry",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
-      "status": "partial",
-      "inventoryStatus": "PARTIAL backend covered"
+      "evidence": ".superloopy/evidence/schedule-closeout-2026-07-10/schedule-closeout-machine.json#PROJ-130:admin; screenshots=c07-workflow-conflict.png; assertions=Dirty single draft and staged batch conflict in two windows; staged retry succeeds only after explicit restage",
+      "status": "pass",
+      "inventoryStatus": "PASS fresh schedule-closeout-20260710-final4 / C07"
     }
   ]
 }

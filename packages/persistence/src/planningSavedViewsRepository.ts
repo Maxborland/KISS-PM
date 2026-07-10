@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, or } from "drizzle-orm";
 
 import type { TenantId, UserId } from "@kiss-pm/domain";
 
@@ -27,6 +27,13 @@ export type PlanningSavedViewsRepository = {
     actorUserId: UserId
   ): Promise<PlanningSavedViewRecord[]>;
   createSavedView(input: PlanningSavedViewInput): Promise<PlanningSavedViewRecord>;
+  updateSavedViewName(
+    tenantId: TenantId,
+    projectId: string,
+    viewId: string,
+    actorUserId: UserId,
+    name: string
+  ): Promise<PlanningSavedViewRecord | null>;
   deleteSavedView(
     tenantId: TenantId,
     projectId: string,
@@ -72,38 +79,50 @@ export function createPlanningSavedViewsRepository(
           payload: input.payload,
           createdAt: now
         })
-        .returning();
+        .returning()
+        .catch(rethrowSavedViewNameConflict);
 
       if (!row) throw new Error("planning_saved_view_insert_failed");
       return mapSavedView(row);
     },
 
-    async deleteSavedView(tenantId, projectId, viewId, actorUserId) {
+    async updateSavedViewName(tenantId, projectId, viewId, actorUserId, name) {
       const [row] = await db
-        .select()
-        .from(planningSavedViews)
+        .update(planningSavedViews)
+        .set({ name })
         .where(
           and(
             eq(planningSavedViews.tenantId, tenantId),
             eq(planningSavedViews.projectId, projectId),
-            eq(planningSavedViews.id, viewId)
+            eq(planningSavedViews.id, viewId),
+            or(
+              eq(planningSavedViews.scope, "project"),
+              eq(planningSavedViews.ownerUserId, actorUserId)
+            )
           )
         )
-        .limit(1);
+        .returning()
+        .catch(rethrowSavedViewNameConflict);
 
-      if (!row) return false;
-      if (row.scope === "user" && row.ownerUserId !== actorUserId) return false;
+      return row ? mapSavedView(row) : null;
+    },
 
-      await db
+    async deleteSavedView(tenantId, projectId, viewId, actorUserId) {
+      const [row] = await db
         .delete(planningSavedViews)
         .where(
           and(
             eq(planningSavedViews.tenantId, tenantId),
             eq(planningSavedViews.projectId, projectId),
-            eq(planningSavedViews.id, viewId)
+            eq(planningSavedViews.id, viewId),
+            or(
+              eq(planningSavedViews.scope, "project"),
+              eq(planningSavedViews.ownerUserId, actorUserId)
+            )
           )
-        );
-      return true;
+        )
+        .returning({ id: planningSavedViews.id });
+      return Boolean(row);
     }
   };
 }
@@ -119,4 +138,18 @@ function mapSavedView(row: typeof planningSavedViews.$inferSelect): PlanningSave
     payload: row.payload,
     createdAt: row.createdAt
   };
+}
+function rethrowSavedViewNameConflict(error: unknown): never {
+  const wrapped = error as { code?: string; constraint?: string; cause?: unknown; message?: string };
+  const value = (wrapped.cause ?? wrapped) as { code?: string; constraint?: string; message?: string };
+  const constraint = value.constraint ?? "";
+  const message = `${wrapped.message ?? ""} ${value.message ?? ""}`;
+  if (value.code === "23505" && (
+    (constraint.startsWith("planning_saved_views_") && constraint.endsWith("_name_uidx")) ||
+    message.includes("planning_saved_views_project_name_uidx") ||
+    message.includes("planning_saved_views_user_name_uidx")
+  )) {
+    throw new Error("planning_saved_view_name_conflict");
+  }
+  throw error;
 }

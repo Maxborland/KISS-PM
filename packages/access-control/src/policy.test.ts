@@ -665,7 +665,11 @@ describe("access-control tenant policy", () => {
     });
     const planReader = createAccessProfile({
       id: "plan-reader",
-      permissions: ["tenant.project_plan.read", "tenant.project_resources.read"]
+      permissions: [
+        "tenant.project_plan.read",
+        "tenant.project_resources.read",
+        "tenant.audit_events.read"
+      ]
     });
 
     expect(
@@ -676,6 +680,12 @@ describe("access-control tenant policy", () => {
     });
     expect(
       canReadProjectResources({ actor, profile: planReader, targetTenantId: "tenant-alpha" })
+    ).toEqual({
+      allowed: true,
+      reason: "same_tenant_permission_granted"
+    });
+    expect(
+      canReadAuditEvents({ actor, profile: planReader, targetTenantId: "tenant-alpha" })
     ).toEqual({
       allowed: true,
       reason: "same_tenant_permission_granted"

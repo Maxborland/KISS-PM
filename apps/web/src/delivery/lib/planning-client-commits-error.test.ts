@@ -56,7 +56,13 @@ describe("createDeliveryPlanningClient live getCommits", () => {
                 actionType: "planning.custom.applied",
                 sourceWorkflow: "planning",
                 input: { command: { type: "custom.command" } },
-                afterState: { planVersion: 4 },
+                afterState: {
+                  planVersion: 4,
+                  compensatingCommands: [
+                    { type: "task.update_identity", payload: { taskId: "task-4", title: "Before" } }
+                  ]
+                },
+                executionResult: { status: "succeeded" },
                 createdAt: "2026-07-10T11:00:00.000Z"
               },
               {
@@ -73,11 +79,7 @@ describe("createDeliveryPlanningClient live getCommits", () => {
       )
     );
 
-    const result = await createDeliveryPlanningClient(true).getCommits("project-1", {
-      afterVersion: 4,
-      commands: [],
-      before: {} as never
-    });
+    const result = await createDeliveryPlanningClient(true).getCommits("project-1", null);
 
     expect(result).toEqual({
       commits: [
@@ -101,9 +103,7 @@ describe("createDeliveryPlanningClient live getCommits", () => {
         }
       ],
       latestRevert: {
-        auditEventId: "audit-4",
-        commands: [],
-        before: {}
+        auditEventId: "audit-4"
       }
     });
   });

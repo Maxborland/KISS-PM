@@ -1,5 +1,10 @@
-import { dayToIso, isoToDay, MIN_PER_DAY } from "@/delivery/lib/mock-planning-backend";
+import { dayToIso, isoToDay } from "@/delivery/lib/mock-planning-backend";
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
+
+import {
+  resolveScheduleWorkingTime,
+  scheduleWorkingDays
+} from "./schedule-working-time";
 
 // Чистое отображение канонического read-model в строки Гантта (WBS + summary-rollup + предшественники).
 // Вынесено из schedule-surface (god-компонент) в самостоятельный модуль без React — тестируемо и локально.
@@ -17,6 +22,7 @@ export type Row = {
   mode: Mode;
   parentId: string | null;
   durDays: number;
+  durationMinutes: number | null;
   pct: number;
   startIso: string;
   finishIso: string;
@@ -32,6 +38,8 @@ export type Row = {
   warnMsg?: string;
   baseDay?: number;
   baseDur?: number;
+  effectiveCalendarId: string;
+  workingMinutesPerDay: number;
 };
 
 export function mapRows(
@@ -77,7 +85,14 @@ export function mapRows(
   const predsBySucc = new Map<string, Pred[]>();
   for (const d of authored.dependencies) {
     const arr = predsBySucc.get(d.successorTaskId) ?? [];
-    arr.push({ depId: d.id, predId: d.predecessorTaskId, type: d.type, lagDays: Math.round(d.lagMinutes / MIN_PER_DAY) });
+    const successor = taskById.get(d.successorTaskId);
+    const workingTime = resolveScheduleWorkingTime(rm, successor?.calendarId);
+    arr.push({
+      depId: d.id,
+      predId: d.predecessorTaskId,
+      type: d.type,
+      lagDays: Math.round(scheduleWorkingDays(d.lagMinutes, workingTime))
+    });
     predsBySucc.set(d.successorTaskId, arr);
   }
   // Имена ресурсов для колонки «Ресурсы»: read-model не отдаёт customFields.resLabel,
@@ -91,6 +106,7 @@ export function mapRows(
   const assigneeLabel = (taskId: string) => (assigneesByTask.get(taskId) ?? []).join(", ");
 
   const rows: Row[] = authored.tasks.map((t) => {
+    const workingTime = resolveScheduleWorkingTime(rm, t.calendarId);
     const c = calcById.get(t.id);
     const start = c?.calculatedStart ?? "";
     const finish = c?.calculatedFinish ?? "";
@@ -104,7 +120,7 @@ export function mapRows(
     const kind: Kind = hasChildren || cf.kind === "summary" ? "summary" : cf.kind === "milestone" || t.durationMinutes === 0 ? "milestone" : "task";
     const predList = predsBySucc.get(t.id) ?? [];
     const predDisplay = predList.length
-      ? predList.map((p) => `${wbsById.get(p.predId) ?? "?"} ${DEP_RU[p.type] ?? p.type}${p.lagDays ? ` +${p.lagDays}д` : ""}`).join(", ")
+      ? predList.map((p) => `${wbsById.get(p.predId) ?? "?"} ${DEP_RU[p.type] ?? p.type}${p.lagDays ? ` ${p.lagDays > 0 ? "+" : ""}${p.lagDays}д` : ""}`).join(", ")
       : "—";
     const base = baseById.get(t.id);
     const baseDay = base?.baselineStart ? isoToDay(base.baselineStart) : undefined;
@@ -119,7 +135,10 @@ export function mapRows(
       hasChildren,
       mode: t.schedulingMode,
       parentId: t.parentTaskId,
-      durDays: t.durationMinutes != null ? Math.round(t.durationMinutes / MIN_PER_DAY) : dayDur,
+      durDays: t.durationMinutes != null
+        ? Math.round(scheduleWorkingDays(t.durationMinutes, workingTime))
+        : dayDur,
+      durationMinutes: t.durationMinutes,
       pct: t.percentComplete,
       startIso: start,
       finishIso: finish,
@@ -127,11 +146,15 @@ export function mapRows(
       predList,
       res: cf.resLabel ?? (assigneeLabel(t.id) || "—"),
       workH: Math.round(t.workMinutes / 60),
-      slackDays: c?.totalSlackMinutes != null ? Math.round(c.totalSlackMinutes / MIN_PER_DAY) : null,
+      slackDays: c?.totalSlackMinutes != null
+        ? Math.round(scheduleWorkingDays(c.totalSlackMinutes, workingTime))
+        : null,
       dayStart,
       dayDur,
       critical: c?.isCritical ?? false,
       warning: warnSet.has(t.id),
+      effectiveCalendarId: workingTime.calendar.id,
+      workingMinutesPerDay: workingTime.workingMinutesPerDay,
       ...(wm ? { warnMsg: wm } : {}),
       ...(baseDay != null ? { baseDay } : {}),
       ...(baseDur != null ? { baseDur } : {})

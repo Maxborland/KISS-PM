@@ -883,6 +883,66 @@ export const planningSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  PlanningRevertRequest: {
+    type: "object",
+    required: ["targetCommitId", "clientPlanVersion", "idempotencyKey"],
+    properties: {
+      targetCommitId: { type: "string", minLength: 1, maxLength: 500 },
+      clientPlanVersion: { type: "integer", minimum: 1 },
+      idempotencyKey: {
+        type: "string",
+        minLength: 1,
+        maxLength: 120,
+        pattern: "^[A-Za-z0-9._:-]+$"
+      }
+    },
+    additionalProperties: false
+  },
+  PlanningRevertResponse: {
+    type: "object",
+    required: ["reverted", "applied", "newPlanVersion", "auditEventId", "readModel"],
+    properties: {
+      reverted: stringIdSchema,
+      applied: schemaRef("PlanningPlanDelta"),
+      newPlanVersion: { type: "integer", minimum: 1 },
+      auditEventId: stringIdSchema,
+      readModel: schemaRef("PlanningReadModelResponse")
+    },
+    additionalProperties: false
+  },
+  PlanningRevertErrorResponse: {
+    type: "object",
+    required: ["error"],
+    properties: {
+      error: {
+        type: "string",
+        enum: [
+          "invalid_project_id",
+          "session_required",
+          "same_origin_action_required",
+          "persistence_not_configured",
+          "cross_tenant_denied",
+          "permission_missing",
+          "invalid_json",
+          "invalid_content_length",
+          "payload_too_large",
+          "unsupported_media_type",
+          "planning_revert_invalid",
+          "idempotency_key_conflict",
+          "project_not_found",
+          "planning_commit_not_found",
+          "planning_commit_already_reverted",
+          "planning_commit_not_revertible",
+          "planning_commit_not_current",
+          "planning_precondition_failed",
+          "plan_version_conflict"
+        ]
+      },
+      currentPlanVersion: { type: "integer", minimum: 1 },
+      validationIssues: { type: "array", items: schemaRef("PlanningValidationIssue") }
+    },
+    additionalProperties: false
+  },
   PlanningPlanVersionBumpResponse: {
     type: "object",
     required: ["newPlanVersion"],
@@ -1008,7 +1068,7 @@ export const planningSchemas = openApiSchemaFragment({
       projectId: stringIdSchema,
       ownerUserId: stringIdSchema,
       scope: { type: "string", enum: ["user", "project"] },
-      name: { type: "string", minLength: 1 },
+      name: { type: "string", minLength: 1, maxLength: 80 },
       payload: schemaRef("AnyJsonObject"),
       createdAt: dateTimeSchema
     },
@@ -1016,11 +1076,39 @@ export const planningSchemas = openApiSchemaFragment({
   },
   PlanningSavedViewCreateRequest: {
     type: "object",
-    required: ["name", "payload"],
+    required: ["name", "payload", "clientRequestId"],
     properties: {
-      name: { type: "string", minLength: 1 },
+      name: { type: "string", minLength: 1, maxLength: 80 },
       scope: { type: "string", enum: ["user", "project"], default: "user" },
-      payload: schemaRef("AnyJsonObject")
+      payload: schemaRef("AnyJsonObject"),
+      clientRequestId: { type: "string", minLength: 8, maxLength: 128 }
+    },
+    additionalProperties: false
+  },
+  PlanningSavedViewRenameRequest: {
+    type: "object",
+    required: ["name", "clientRequestId"],
+    properties: {
+      name: { type: "string", minLength: 1, maxLength: 80 },
+      clientRequestId: {
+        type: "string",
+        minLength: 8,
+        maxLength: 128,
+        pattern: "^[A-Za-z0-9._:-]+$"
+      }
+    },
+    additionalProperties: false
+  },
+  PlanningSavedViewDeleteRequest: {
+    type: "object",
+    required: ["clientRequestId"],
+    properties: {
+      clientRequestId: {
+        type: "string",
+        minLength: 8,
+        maxLength: 128,
+        pattern: "^[A-Za-z0-9._:-]+$"
+      }
     },
     additionalProperties: false
   },

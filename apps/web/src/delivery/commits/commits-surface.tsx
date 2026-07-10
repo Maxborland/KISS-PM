@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GitCommitVertical, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { buildCompensatingCommands, type PlanningReadModel } from "@kiss-pm/planning-client";
 
 import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
@@ -40,16 +39,49 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   const { live } = usePlanningRuntime();
   const sessionUser = useSessionUser();
   const canManagePlan = canManageCommitControls({ live, permissions: sessionUser?.permissions ?? [] });
-  const { readModel, status, error, reload, applyBatch, revertLast, loadCommits } = usePlanning(projectId);
+  const { readModel, status, error, reload, revertLast, loadCommits } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const [data, setData] = useState<CommitsView | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [commitsStatus, setCommitsStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [commitsError, setCommitsError] = useState<string | null>(null);
+  const commitsRequestId = useRef(0);
 
+  const loadHistory = useCallback(async () => {
+    const requestId = ++commitsRequestId.current;
+    setCommitsStatus("loading");
+    setCommitsError(null);
+    try {
+      const commits = await loadCommits();
+      if (requestId !== commitsRequestId.current) return;
+      setData(commits);
+      setSel((current) =>
+        current && commits.commits.some((commit) => commit.auditEventId === current)
+          ? current
+          : commits.commits[0]?.auditEventId ?? null
+      );
+      setCommitsStatus("ready");
+    } catch (loadError: unknown) {
+      if (requestId !== commitsRequestId.current) return;
+      setCommitsError(
+        loadError instanceof Error && loadError.message ? loadError.message : "request_failed"
+      );
+      setCommitsStatus("error");
+    }
+  }, [loadCommits]);
+
+  const planVersion = readModel?.planVersion;
   useEffect(() => {
-    if (!readModel) return;
-    void loadCommits().then((c) => { setData(c); setSel((s) => s ?? c.commits[0]?.auditEventId ?? null); });
-  }, [readModel?.planVersion, loadCommits, readModel]);
+    if (planVersion === undefined) {
+      commitsRequestId.current += 1;
+      return;
+    }
+    void loadHistory();
+    return () => {
+      commitsRequestId.current += 1;
+    };
+  }, [loadHistory, planVersion, projectId]);
 
   const taskTitle = useMemo(() => {
     const m = new Map((readModel?.authored.tasks ?? []).map((t) => [t.id, t]));
@@ -70,35 +102,51 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   }
 
   const projectMeta = deriveProjectMeta(readModel, projectBase);
-  const commits = data?.commits ?? [];
+  if (commitsStatus !== "ready" || !data) {
+    return (
+      <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Коммиты">
+        <SurfaceState
+          status={commitsStatus}
+          error={commitsError}
+          onRetry={() => void loadHistory()}
+          errorFormat={planningErr}
+          loadingLabel="Загрузка истории…"
+        >
+          <span />
+        </SurfaceState>
+      </DeliveryFrame>
+    );
+  }
+
+  const commits = data.commits;
   const latestRevert = data?.latestRevert ?? null;
   const selected = commits.find((c) => c.auditEventId === sel) ?? commits[0] ?? null;
 
-  const onRevert = async (c: CommitMetaView) => {
-    if (!canManagePlan) return;
-    if (!latestRevert || c.auditEventId !== latestRevert.auditEventId) return;
-    const before = latestRevert.before as PlanningReadModel;
-    const inverses = latestRevert.commands.slice().reverse().flatMap((cmd) => buildCompensatingCommands(cmd, before));
-    if (inverses.length === 0) { toast.error("Откат недоступен для этой операции (создание/перенос/назначение)"); return; }
+  const runRevert = async (targetCommitId: string) => {
     setBusy(true);
-    const res = await applyBatch(inverses);
+    const res = await revertLast(targetCommitId);
     setBusy(false);
-    if (res.ok) { toast.success(`Откат применён компенсирующим коммитом v${res.planVersion}`); const fresh = await loadCommits(); setData(fresh); setSel(fresh.commits[0]?.auditEventId ?? null); }
-    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
+    if (res.ok) {
+      toast.success(`Откат применён компенсирующим коммитом v${res.planVersion}`);
+      await loadHistory();
+      return;
+    }
+    toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
   };
 
-  // BUG-PROJ-24: откат последнего обратимого коммита через серверный revert-last —
-  // работает из истории (не зависит от in-session state).
+  const onRevert = async (commit: CommitMetaView) => {
+    if (!canManagePlan || !latestRevert || commit.auditEventId !== latestRevert.auditEventId) return;
+    await runRevert(commit.auditEventId);
+  };
+
   const onRevertLast = async () => {
     if (!canManagePlan) return;
-    setBusy(true);
-    const res = await revertLast();
-    setBusy(false);
-    if (res.ok) { toast.success(`Откат применён компенсирующим коммитом v${res.planVersion}`); const fresh = await loadCommits(); setData(fresh); setSel(fresh.commits[0]?.auditEventId ?? null); }
-    else if (res.message === "nothing_to_revert") toast.error("Нет обратимого коммита для отката");
-    else toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
+    if (!latestRevert) {
+      toast.error("Нет обратимого коммита для отката");
+      return;
+    }
+    await runRevert(latestRevert.auditEventId);
   };
-
   return (
     <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Коммиты">
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
@@ -112,7 +160,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
       {prototypeNotesEnabled && (
         <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-          История версий текущей сессии (auditEventId / planVersion реальны). Откат — через buildCompensatingCommands + apply-command-batch (обратимы правки задач/связей). Данные in-memory.
+          История версий текущей сессии (auditEventId / planVersion реальны). Откат — атомарный, привязан к выбранному аудиту и безопасен при повторе. Данные in-memory.
         </div>
       )}
 

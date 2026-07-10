@@ -107,6 +107,14 @@ describe("scenario permission controls", () => {
     expect(button(denied.host, "Применить")).toBeUndefined();
     await denied.unmount();
 
+    const applyOnly = await renderSurface(["tenant.planning_scenarios.apply"]);
+    expect(previewScenarios).not.toHaveBeenCalled();
+    expect(applyOnly.host.textContent).toContain("Недостаточно прав для расчёта сценариев.");
+    expect(button(applyOnly.host, "Запросить заново")).toBeUndefined();
+    expect(button(applyOnly.host, "Сравнить")).toBeUndefined();
+    expect(button(applyOnly.host, "Применить")).toBeUndefined();
+    await applyOnly.unmount();
+
     previewScenarios.mockClear();
     const previewOnly = await renderSurface(["tenant.planning_scenarios.preview"]);
     expect(previewScenarios).toHaveBeenCalledTimes(1);
@@ -114,6 +122,11 @@ describe("scenario permission controls", () => {
     expect(button(previewOnly.host, "Сравнить")).toBeDefined();
     expect(button(previewOnly.host, "Применить")).toBeUndefined();
     expect(previewOnly.host.querySelector('input[placeholder*="согласовано"]')).toBeNull();
+    await act(async () => {
+      button(previewOnly.host, "Сравнить")?.click();
+    });
+    expect(previewOnly.host.textContent).toContain("Сравнение · предпросмотр (ничего не сохранено)");
+    expect(applyScenario).not.toHaveBeenCalled();
     await previewOnly.unmount();
 
     previewScenarios.mockClear();
@@ -125,6 +138,11 @@ describe("scenario permission controls", () => {
     expect(button(full.host, "Сравнить")).toBeDefined();
     expect(button(full.host, "Применить")).toBeDefined();
     expect(full.host.querySelector('input[placeholder*="согласовано"]')).not.toBeNull();
+    await act(async () => {
+      button(full.host, "Применить")?.click();
+    });
+    expect(applyScenario).not.toHaveBeenCalled();
+    expect(full.host.textContent).toContain("Укажите причину принятия риска");
     await full.unmount();
   });
 });
