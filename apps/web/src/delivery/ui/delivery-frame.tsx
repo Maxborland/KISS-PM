@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 
 import { cn } from "@/lib/cn";
@@ -74,11 +74,17 @@ export function DeliveryFrame({
   children
 }: {
   project: ProjectMeta;
-  /** Реальный id проекта — база для ссылок табов. Без него табы неактивны. */
-  projectId?: string;
+  /** Реальный id проекта — база для ссылок табов. */
+  projectId: string;
   activeTab: DeliveryTab;
   children: ReactNode;
 }) {
+  const activeTabRef = useRef<HTMLAnchorElement | null>(null);
+
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeTab, projectId]);
+
   return (
     <WorkspaceShell activeNav="Проекты">
         {/* Project header */}
@@ -101,7 +107,7 @@ export function DeliveryFrame({
         </div>
 
         {/* Tabs — реальные ссылки на /projects/[id]/<slug> */}
-        <nav className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 md:px-4">
+        <nav aria-label="Разделы проекта" className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 md:px-4">
           {DELIVERY_TABS.map((tab) => {
             const active = tab === activeTab;
             const tabClass = cn(
@@ -111,17 +117,11 @@ export function DeliveryFrame({
             const underline = active ? (
               <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[var(--accent)]" />
             ) : null;
-            // projectId известен → ссылка; иначе (Storybook/без id) — статичный текст.
-            return projectId ? (
-              <Link key={tab} href={`/projects/${projectId}/${DELIVERY_TAB_SLUGS[tab]}`} aria-current={active ? "page" : undefined} className={tabClass}>
+            return (
+              <Link ref={active ? activeTabRef : undefined} key={tab} href={`/projects/${projectId}/${DELIVERY_TAB_SLUGS[tab]}`} aria-current={active ? "page" : undefined} className={tabClass}>
                 {tab}
                 {underline}
               </Link>
-            ) : (
-              <span key={tab} aria-current={active ? "page" : undefined} className={tabClass}>
-                {tab}
-                {underline}
-              </span>
             );
           })}
           {prototypeNotesEnabled ? (

@@ -17,7 +17,8 @@ const allowedResponseFailures: ResponseAllowlistEntry[] = [
     method: "POST",
     status: 403,
     url: /\/api\/workspace\/agent-thread\/proposals\/[^/]+\/confirm$/
-  }
+  },
+  { method: "GET", status: 401, url: /\/api\/auth\/me$/ }
 ];
 
 export const test = base.extend<{ page: Page }>({
@@ -90,6 +91,10 @@ function isAllowedConsoleError(text: string, url: string): boolean {
     (
       /\/api\/workspace\/agent-thread\/proposals\/[^/]+\/confirm$/.test(url) &&
       /Failed to load resource: the server responded with a status of 403/.test(text)
+    ) ||
+    (
+      /\/api\/auth\/me$/.test(url) &&
+      /Failed to load resource: the server responded with a status of 401/.test(text)
     )
   );
 }

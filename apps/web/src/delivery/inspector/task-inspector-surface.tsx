@@ -115,7 +115,7 @@ export function TaskInspector() {
     const surfaceStatus =
       status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "ready" ? "empty" : "error";
     return (
-      <DeliveryFrame project={PROJECT_FALLBACK} activeTab="График">
+      <DeliveryFrame project={PROJECT_FALLBACK} projectId={MOCK_PROJECT_ID} activeTab="График">
         <SurfaceState
           status={surfaceStatus}
           error={error}
@@ -148,7 +148,7 @@ export function TaskInspector() {
   ];
 
   return (
-    <DeliveryFrame project={project} activeTab="График">
+    <DeliveryFrame project={project} projectId={MOCK_PROJECT_ID} activeTab="График">
       {/* Sub-header: реальные wbs/title/план-версия + флаг критпути из read-model */}
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         <button

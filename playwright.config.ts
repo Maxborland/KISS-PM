@@ -31,7 +31,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `powershell -NoProfile -Command "$env:DATABASE_URL='${databaseUrl}'; $env:PORT='${apiPort}'; $env:KISS_PM_E2E_TEST_HOOKS='1'; pnpm --dir '${configDir}' --filter @kiss-pm/api dev"`,
+      command: `powershell -NoProfile -Command "$env:DATABASE_URL='${databaseUrl}'; $env:PORT='${apiPort}'; $env:KISS_PM_E2E_TEST_HOOKS='1'; $env:KISS_PM_TRUSTED_MUTATION_ORIGINS='${webOrigin}'; pnpm --dir '${configDir}' --filter @kiss-pm/api dev"`,
       cwd: configDir,
       url: `${apiOrigin}/health`,
       reuseExistingServer: !process.env.CI,
