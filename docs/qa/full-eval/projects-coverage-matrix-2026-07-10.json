@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-07-10T00:03:44.0642123Z",
+  "generatedAt": "2026-07-10T01:07:09.4050529Z",
   "source": "docs/qa/full-eval/inventory/projects.md",
   "evidenceRule": "Only rows linked to fresh 2026-07-10 artifacts may be pass; historical checks remain historical_evidence_only.",
   "schema": "role x scenario x surface x expectedBehavior x evidence x status",
-  "sourceScenarioCount": 122,
-  "expandedMatrixRowCount": 212,
+  "sourceScenarioCount": 130,
+  "expandedMatrixRowCount": 223,
   "summary": [
     {
       "status": "blocked",
@@ -12,7 +12,7 @@
     },
     {
       "status": "fail",
-      "count": 72
+      "count": 78
     },
     {
       "status": "historical_evidence_only",
@@ -20,15 +20,15 @@
     },
     {
       "status": "partial",
-      "count": 3
+      "count": 5
     },
     {
       "status": "pass",
-      "count": 44
+      "count": 45
     },
     {
       "status": "unverified",
-      "count": 30
+      "count": 32
     }
   ],
   "rows": [
@@ -1527,10 +1527,10 @@
       "surface": "`/resources`",
       "apiOrDataSurface": "apply-command-batch",
       "expectedBehavior": "Пропускает выходные; calendarId — реальный календарь плана (project.calendarId)",
-      "dataStateAndEdges": "**селект сотрудника в диалоге — мок RESOURCES**; дефолтные даты хардкод 2026-04-…; диапазон целиком из выходных → 0 команд (молча)",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-permissions-integrated-playwright.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "dataStateAndEdges": "live-users; актуальные даты; полностью нерабочий диапазон даёт явное сообщение и не отправляет batch",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/calendar-live-resource-fix.json; .superloopy/evidence/projects-2026-07-10/calendar-live-resource-dialog.png; .superloopy/evidence/projects-2026-07-10/calendar-live-resource-playwright.json; .superloopy/evidence/projects-2026-07-10/qa-calendar-live-resource-independent.md; .superloopy/evidence/projects-2026-07-10/lane-03-race-idempotency.md",
       "status": "pass",
-      "inventoryStatus": "❌ BUG-PROJ-20"
+      "inventoryStatus": "✅ 2026-07-10 BUG-PROJ-20 fixed"
     },
     {
       "role": "A",
@@ -1947,10 +1947,10 @@
       "surface": "`/calendars`",
       "apiOrDataSurface": "apply-command-batch",
       "expectedBehavior": "Пропускает выходные И праздники; notice с типом",
-      "dataStateAndEdges": "**селект сотрудника в диалоге — мок RESOURCES**; диапазон полностью нерабочий → 0 команд молча",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-permissions-integrated-playwright.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
-      "status": "partial",
-      "inventoryStatus": "❌ BUG-PROJ-20 (диалог дефолтит на «Петров А.» даже в виде ресурса Игоря)"
+      "dataStateAndEdges": "выбранный live-resource; даты видимого месяца в границах проекта; 0 рабочих дней → явный отказ без preview/apply",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/calendar-live-resource-fix.json; .superloopy/evidence/projects-2026-07-10/calendar-live-resource-dialog.png; .superloopy/evidence/projects-2026-07-10/calendar-live-resource-playwright.json; .superloopy/evidence/projects-2026-07-10/qa-calendar-live-resource-independent.md; .superloopy/evidence/projects-2026-07-10/lane-03-race-idempotency.md",
+      "status": "pass",
+      "inventoryStatus": "✅ 2026-07-10 BUG-PROJ-20 fixed"
     },
     {
       "role": "A",
@@ -2575,6 +2575,138 @@
       "evidence": ".superloopy/evidence/projects-2026-07-10/projects-permissions-integrated-playwright.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
       "status": "pass",
       "inventoryStatus": "✅ для 3 вкладок части B (scenarios/commits/settings): RR → «Доступ ограничен» на всех трёх; PR → read-model открывается, все мутации (project.deadline.move, scenario apply) реально уходят на бэк и получают 403 permission_missing (defense in depth подтверждён; текст raw-код — класс BUG-PROJ-15); полная матрица по всем 11 роутам закрыта совместно с частью A (см. её RBAC-строки)"
+    },
+    {
+      "role": "A",
+      "scenarioId": "PROJ-123",
+      "scenario": "Paste 10x6 TSV from clipboard",
+      "surface": "/schedule",
+      "apiOrDataSurface": "UI + planning batch",
+      "expectedBehavior": "Rectangular TSV paste is parsed, previewed and applied atomically.",
+      "dataStateAndEdges": "10x6 data, invalid cells, duplicate paste and version race",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+      "status": "fail",
+      "inventoryStatus": "FAIL incomplete"
+    },
+    {
+      "role": "A",
+      "scenarioId": "PROJ-124",
+      "scenario": "Drag-fill finish dates downward",
+      "surface": "/schedule",
+      "apiOrDataSurface": "UI + planning batch",
+      "expectedBehavior": "Drag-fill propagates sequential finish dates in one reviewed batch.",
+      "dataStateAndEdges": "weekends, holidays, invalid destination and version race",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+      "status": "fail",
+      "inventoryStatus": "FAIL incomplete"
+    },
+    {
+      "role": "A",
+      "scenarioId": "PROJ-125",
+      "scenario": "Create 10 tasks keyboard-only",
+      "surface": "/schedule",
+      "apiOrDataSurface": "UI + API",
+      "expectedBehavior": "Keyboard-only workflow creates and navigates tasks without pointer.",
+      "dataStateAndEdges": "rapid repeated creation, focus order and duplicate submits",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+      "status": "partial",
+      "inventoryStatus": "PARTIAL quick-create exists"
+    },
+    {
+      "role": "A",
+      "scenarioId": "PROJ-126",
+      "scenario": "Undo with Ctrl+Shift+Z",
+      "surface": "/schedule",
+      "apiOrDataSurface": "UI + compensating commit",
+      "expectedBehavior": "Shortcut invokes the guarded compensating undo.",
+      "dataStateAndEdges": "no undo available, busy state and conflicting version",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+      "status": "partial",
+      "inventoryStatus": "PARTIAL button exists"
+    },
+    {
+      "role": "A",
+      "scenarioId": "PROJ-127",
+      "scenario": "Saved WBS views",
+      "surface": "/schedule",
+      "apiOrDataSurface": "UI + persistence",
+      "expectedBehavior": "Manage and select persisted WBS views.",
+      "dataStateAndEdges": "empty views, duplicate names and reload",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+      "status": "fail",
+      "inventoryStatus": "FAIL incomplete"
+    },
+    {
+      "role": "PR",
+      "scenarioId": "PROJ-127",
+      "scenario": "Saved WBS views",
+      "surface": "/schedule",
+      "apiOrDataSurface": "UI + persistence",
+      "expectedBehavior": "Select saved views without unauthorized shared-view writes.",
+      "dataStateAndEdges": "no views and direct mutation denial",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+      "status": "fail",
+      "inventoryStatus": "FAIL incomplete"
+    },
+    {
+      "role": "A",
+      "scenarioId": "PROJ-128",
+      "scenario": "Custom WBS field definitions",
+      "surface": "/settings",
+      "apiOrDataSurface": "UI + data readback",
+      "expectedBehavior": "Show real custom-field definitions or explicit empty state.",
+      "dataStateAndEdges": "empty definitions and unknown field type",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+      "status": "fail",
+      "inventoryStatus": "FAIL incomplete"
+    },
+    {
+      "role": "PR",
+      "scenarioId": "PROJ-128",
+      "scenario": "Custom WBS field definitions",
+      "surface": "/settings",
+      "apiOrDataSurface": "UI + data readback",
+      "expectedBehavior": "Read real custom-field definitions or explicit empty state.",
+      "dataStateAndEdges": "empty definitions and permission-limited data",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+      "status": "fail",
+      "inventoryStatus": "FAIL incomplete"
+    },
+    {
+      "role": "A",
+      "scenarioId": "PROJ-129",
+      "scenario": "Current-surface axe audit",
+      "surface": "/schedule",
+      "apiOrDataSurface": "WBS + Gantt",
+      "expectedBehavior": "No critical axe violations on current WBS and Gantt.",
+      "dataStateAndEdges": "dialogs, selected row, preview and mobile",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+      "status": "unverified",
+      "inventoryStatus": "UNVERIFIED migration required"
+    },
+    {
+      "role": "PR",
+      "scenarioId": "PROJ-129",
+      "scenario": "Current-surface axe audit",
+      "surface": "/schedule",
+      "apiOrDataSurface": "WBS + Gantt",
+      "expectedBehavior": "No critical axe violations in read-only current WBS and Gantt.",
+      "dataStateAndEdges": "forbidden controls and keyboard navigation",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+      "status": "unverified",
+      "inventoryStatus": "UNVERIFIED migration required"
+    },
+    {
+      "role": "A",
+      "scenarioId": "PROJ-130",
+      "scenario": "Visible concurrent-version conflict",
+      "surface": "/schedule",
+      "apiOrDataSurface": "UI + API 409",
+      "expectedBehavior": "Remote plan-version bump shows explicit conflict and reloads authoritative state.",
+      "dataStateAndEdges": "dirty draft, batch conflict and repeated retry",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+      "status": "partial",
+      "inventoryStatus": "PARTIAL backend covered"
     }
   ]
 }

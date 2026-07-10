@@ -309,7 +309,7 @@
 
 ---
 
-## BUG-PROJ-20 · MAJOR · Resources+Calendars: диалог «Отсутствие»/«Исключение» — МОК RESOURCES + хардкод-даты 04–08.05.2026; отсутствие невозможно добавить
+## BUG-PROJ-20 · MAJOR · FIXED 2026-07-10 · Resources+Calendars: диалог «Отсутствие»/«Исключение» использовал mock resources и даты вне проекта
 
 **Где:** `/projects/[id]/resources` кнопка «Отсутствие» и `/projects/[id]/calendars` кнопка «Исключение» — общий AbsenceDialog (`resources-editors.tsx`, импорт `RESOURCES`).
 
@@ -326,6 +326,11 @@
 - сабмит → **409 planning_precondition_failed**: `«Исключение ссылается на неизвестный ресурс»` ×2 + `«Команда ссылается на неизвестный или неактивный ресурс»` ×2; UI-нотис — raw-код «Отклонено: planning_precondition_failed» (класс BUG-PROJ-15). Добавить отсутствие/исключение из UI невозможно.
 
 **Доказательства:** опции диалога (мок) на обеих вкладках; network `apply-command-batch → 409` + response body с validationIssues; нотис «Отклонено: planning_precondition_failed».
+
+
+**Исправление 2026-07-10:** AbsenceDialog получает live /api/workspace/users, при каждом открытии синхронизирует выбранного ресурса и диапазон видимого месяца в границах проекта. Диапазон без рабочих дней показывает явный отказ и не открывает preview/не отправляет batch. Свежий ADMIN E2E проходит полный цикл Calendar: selected live resource → one-command batch preview → apply → API readback → reload → remove → reload/cleanup; reader/direct 403 сохранён.
+
+**Fresh evidence:** .superloopy/evidence/projects-2026-07-10/calendar-live-resource-fix.json, .superloopy/evidence/projects-2026-07-10/calendar-live-resource-dialog.png, focused Vitest 5/5, Calendar Playwright 3/3, planning batch race/idempotency matrix.
 
 ---
 
@@ -450,3 +455,20 @@
 - защита бэка: неизвестный ресурс/статус → 409 precondition_failed (порчи данных нет), циклическая зависимость (3→1 при существующей 1→3) → 400, план не изменён;
 - indent/outdent (task.move_wbs), DateEditor «Начало», «Сделать вехой» (update_custom_field kind), удаление задачи, режим «Пакет» (2 правки → один коммит), «Откат» (компенсирующий коммит), инспектор side-peek, DependencyEditor (исключение себя/предшественников), зум День/Неделя/Месяц (36/8/20px);
 - RBAC-ядро: PR читает план, мутации → 403; RR → forbidden на planning-вкладках и отказ на /projects; beta (tenant-beta) не видит проекты alpha (пустой список, 404 на чужой id).
+## BUG-PROJ-27 · MAJOR · Schedule lost spreadsheet productivity contracts
+
+Fresh rerun of the repository-owned planning suite confirms that TSV paste, date drag-fill and the Insert/F2 keyboard grid workflow have no current equivalent contract. The current quick-create textbox covers simple Enter/Tab creation but not rectangular paste, multi-row fill or the original keyboard navigation flow.
+
+Evidence: projects-old-planning-suite-batch2.json, projects-legacy-contract-reconciliation.json, PROJ-123..125.
+
+## BUG-PROJ-28 · MAJOR · Saved views and custom-field definitions disappeared from current surfaces
+
+The current Schedule has no saved-view selector or persistence. Project Settings shows neither custom WBS field definitions nor an explicit empty state, despite repository-owned E2E contracts for both.
+
+Evidence: saved-views.spec.ts, custom-fields.spec.ts, PROJ-127..128.
+
+## BUG-PROJ-29 · MINOR · Legacy planning E2E is not migrated to the current UI contract
+
+Eleven of eighteen tests assert removed planning testids, stale labels, hardcoded project-alpha, or derive /projects/undefined. Equivalent current flows are covered elsewhere, but the old suite remains red and its a11y and conflict assertions no longer protect the current WBS/Gantt.
+
+Evidence: full disposable rerun 17 failed / 1 skipped and diagnostic batch2 12 failed / 0 flaky.
