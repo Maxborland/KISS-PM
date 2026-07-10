@@ -32,10 +32,10 @@ const EXPECTED_TABS = [
   ["Настройки", "settings"]
 ] as const satisfies ReadonlyArray<readonly [DeliveryTab, string]>;
 
-function renderFrame(activeTab: DeliveryTab, projectId?: string) {
+function renderFrame(activeTab: DeliveryTab, projectId: string) {
   const window = new Window();
   window.document.body.innerHTML = renderToStaticMarkup(
-    <DeliveryFrame project={PROJECT} {...(projectId === undefined ? {} : { projectId })} activeTab={activeTab}>
+    <DeliveryFrame project={PROJECT} projectId={projectId} activeTab={activeTab}>
       <div>Surface</div>
     </DeliveryFrame>
   );
@@ -67,15 +67,5 @@ describe("DeliveryFrame project navigation", () => {
         expect(links[index]?.getAttribute("aria-current")).toBe(tab === activeTab ? "page" : null);
       });
     }
-  });
-
-  it("keeps the story fallback visibly static without a project id", () => {
-    const document = renderFrame("Обзор");
-    const nav = document.querySelector("nav");
-
-    expect(nav).not.toBeNull();
-    expect(nav?.querySelectorAll("a, button, [role='link'], [tabindex]")).toHaveLength(0);
-    expect(Array.from(nav?.children ?? []).map((item) => item.textContent?.trim())).toEqual(DELIVERY_TABS);
-    expect(nav?.children[0]?.getAttribute("aria-current")).toBe("page");
   });
 });

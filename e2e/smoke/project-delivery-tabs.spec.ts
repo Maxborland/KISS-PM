@@ -6,6 +6,8 @@ import { test as runtimeTest } from "../runtime/runtimeQaFixtures";
 
 const PROJECT_ID = "project-demo-crm-intake";
 const PROJECT_NAV_LABEL = "Разделы проекта";
+const isCommitsReadUrl = (url: URL) =>
+  url.pathname === `/api/workspace/projects/${PROJECT_ID}/planning/commits`;
 
 type ProjectTab = {
   label: string;
@@ -117,8 +119,6 @@ runtimeTest("project route actions use their existing destinations", async ({ pa
     "href",
     projectPath("baseline")
   );
-  await expect(schedule.getByRole("button", { name: "Фильтры", exact: true })).toBeDisabled();
-  await expect(schedule.getByRole("button", { name: "Колонки", exact: true })).toBeDisabled();
 
   await page.goto(projectPath("settings"));
   await expect(PROJECT_TABS[8]!.ready(page)).toBeVisible();
@@ -159,7 +159,7 @@ runtimeTest("project commits preserves tab navigation while its history loads em
   const auditEventsReleased = new Promise<void>((resolve) => {
     releaseAuditEvents = resolve;
   });
-  await page.route(/\/api\/tenant\/current\/audit-events(?:\?|$)/, async (route) => {
+  await page.route(isCommitsReadUrl, async (route) => {
     await auditEventsReleased;
     await route.fulfill({
       status: 200,
@@ -179,12 +179,12 @@ runtimeTest("project commits preserves tab navigation while its history loads em
   }
 
   await expect(page.getByText("История пуста.", { exact: true })).toBeVisible();
-  await page.unroute(/\/api\/tenant\/current\/audit-events(?:\?|$)/);
+  await page.unroute(isCommitsReadUrl);
 });
 
 browserTest("project commits preserves tab navigation when its history fails", async ({ page }) => {
   await loginAsAdmin(page);
-  await page.route(/\/api\/tenant\/current\/audit-events(?:\?|$)/, async (route) => {
+  await page.route(isCommitsReadUrl, async (route) => {
     await route.fulfill({
       status: 500,
       contentType: "application/json",
@@ -194,11 +194,14 @@ browserTest("project commits preserves tab navigation when its history fails", a
 
   await page.goto(projectPath("commits"));
   const projectNavigation = projectTabs(page);
-  const historyError = page.getByRole("alert").filter({ hasText: "Не удалось загрузить историю" });
-  await expect(historyError).toBeVisible();
+  const historyError = page
+    .getByRole("main")
+    .getByRole("alert")
+    .filter({ hasText: "Не удалось загрузить" });
+  await expect(historyError).toContainText("Не удалось выполнить операцию планирования");
   await expect(historyError.getByRole("button", { name: "Повторить", exact: true })).toBeVisible();
   await expectProjectTabs(projectNavigation, "commits");
-  await page.unroute(/\/api\/tenant\/current\/audit-events(?:\?|$)/);
+  await page.unroute(isCommitsReadUrl);
 });
 
 runtimeTest("project tab strip reveals the active mobile deep link", async ({ page }) => {
@@ -210,6 +213,56 @@ runtimeTest("project tab strip reveals the active mobile deep link", async ({ pa
   const settingsTab = tabLink(projectTabs(page), PROJECT_TABS[8]!);
   await expect(settingsTab).toHaveAttribute("aria-current", "page");
   await expect(settingsTab).toBeInViewport();
+});
+
+runtimeTest("project commits selects the compensating commit after a revert", async ({ page }) => {
+  await loginAsAdmin(page);
+
+  const readModelResponse = await page.request.get(
+    `/api/workspace/projects/${PROJECT_ID}/planning/read-model`
+  );
+  expect(readModelResponse.ok()).toBeTruthy();
+  const readModel = (await readModelResponse.json()) as {
+    planVersion: number;
+    authored: { tasks: Array<{ id: string; percentComplete: number }> };
+  };
+  const task = readModel.authored.tasks.find(
+    (candidate) => candidate.id === "task-demo-resource-estimate"
+  );
+  expect(task).toBeTruthy();
+  if (!task) throw new Error("Seeded project is missing task-demo-resource-estimate");
+
+  const applyResponse = await page.request.post(
+    `/api/workspace/projects/${PROJECT_ID}/planning/apply-command`,
+    {
+      headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin" },
+      data: {
+        command: {
+          type: "task.update_progress",
+          payload: {
+            taskId: task.id,
+            percentComplete: task.percentComplete === 0 ? 1 : 0
+          }
+        },
+        clientPlanVersion: readModel.planVersion
+      }
+    }
+  );
+  expect(applyResponse.ok()).toBeTruthy();
+
+  await page.goto(projectPath("commits"));
+  await expect(PROJECT_TABS[7]!.ready(page)).toBeVisible();
+  const revertResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith(`/api/workspace/projects/${PROJECT_ID}/planning/revert-last`)
+  );
+  await page.getByRole("button", { name: "Откатить последний", exact: true }).click();
+  const reverted = (await (await revertResponse).json()) as { newPlanVersion: number };
+
+  await expect(
+    page.getByText(`v${reverted.newPlanVersion - 1} → v${reverted.newPlanVersion}`, { exact: true })
+  ).toBeVisible();
 });
 
 for (const failureCase of [

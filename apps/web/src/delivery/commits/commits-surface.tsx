@@ -47,8 +47,9 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   const [commitsStatus, setCommitsStatus] = useState<"loading" | "ready" | "error">("loading");
   const [commitsError, setCommitsError] = useState<string | null>(null);
   const commitsRequestId = useRef(0);
+  const preferredHistoryVersion = useRef<number | undefined>(undefined);
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (preferredVersion?: number) => {
     const requestId = ++commitsRequestId.current;
     setCommitsStatus("loading");
     setCommitsError(null);
@@ -56,11 +57,14 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
       const commits = await loadCommits();
       if (requestId !== commitsRequestId.current) return;
       setData(commits);
-      setSel((current) =>
-        current && commits.commits.some((commit) => commit.auditEventId === current)
+      setSel((current) => {
+        const selectedId = preferredVersion === undefined
           ? current
-          : commits.commits[0]?.auditEventId ?? null
-      );
+          : commits.commits.find((commit) => commit.version === preferredVersion)?.auditEventId;
+        return selectedId && commits.commits.some((commit) => commit.auditEventId === selectedId)
+          ? selectedId
+          : commits.commits[0]?.auditEventId ?? null;
+      });
       setCommitsStatus("ready");
     } catch (loadError: unknown) {
       if (requestId !== commitsRequestId.current) return;
@@ -77,7 +81,9 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
       commitsRequestId.current += 1;
       return;
     }
-    void loadHistory();
+    const preferredVersion = preferredHistoryVersion.current;
+    preferredHistoryVersion.current = undefined;
+    void loadHistory(preferredVersion);
     return () => {
       commitsRequestId.current += 1;
     };
@@ -127,8 +133,8 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
     const res = await revertLast(targetCommitId);
     setBusy(false);
     if (res.ok) {
+      preferredHistoryVersion.current = res.planVersion;
       toast.success(`Откат применён компенсирующим коммитом v${res.planVersion}`);
-      await loadHistory();
       return;
     }
     toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
