@@ -289,7 +289,7 @@
 
 ---
 
-## BUG-PROJ-19 · MAJOR · Resources: «Снять перегруз» (risk.accept_overload) — пустышка на DB-бэкенде; перегруз не снимается и не принимается
+## BUG-PROJ-19 · MAJOR · FIXED 2026-07-10 · Resources: принятие перегруза не сохранялось на DB-бэкенде
 
 **Где:** `/projects/[id]/resources` — drilldown ячейки → «Снять перегруз» (`resource-load-matrix.tsx` → `risk.accept_overload`).
 
@@ -307,6 +307,9 @@
 
 **Доказательства:** код `planningRepository.ts:1117`; runtime: apply 200 / newVersion 23 / acceptedOverloads absent / overloadStillPresent true; матрица после — перегруз на месте.
 
+**Исправление 2026-07-10:** risk.accept_overload сохраняет первую запись принятия по ключу resourceId:YYYY-MM-DD; повторные и конкурентные команды не меняют reason/actor/timestamp. Некорректный ID блокируется API-precondition и дополнительно отклоняется persistence. Auto-solver исправлен с resourceId:taskId на дату фактической перегруженной allocation. Подпись UI теперь честная: «Принять перегруз как риск».
+
+**Fresh evidence:** .superloopy/evidence/projects-2026-07-10/persistence-overload-playwright.json, planningRepository.db.test.ts 29/29 (включая conflicting initial writers), focused API/OpenAPI/domain 70/70, .superloopy/evidence/projects-2026-07-10/persistence-data-integrity-fix.json.
 ---
 
 ## BUG-PROJ-20 · MAJOR · FIXED 2026-07-10 · Resources+Calendars: диалог «Отсутствие»/«Исключение» использовал mock resources и даты вне проекта
@@ -334,7 +337,7 @@
 
 ---
 
-## BUG-PROJ-21 · MINOR · Baseline: имя снимка, введённое пользователем, нигде не отображается — все снимки называются «Снимок плана»
+## BUG-PROJ-21 · MINOR · FIXED 2026-07-10 · Baseline: имя снимка не возвращалось в read-model
 
 **Где:** `/projects/[id]/baseline` — форма «Зафиксировать базовый план» (поле «Название снимка») + история снимков.
 
@@ -348,9 +351,12 @@
 
 **Доказательства:** read-model baselines: keys `[id, capturedAt, tasks]` (нет name/label); UI-история показывает «Снимок плана · активный» и «Снимок плана · архив».
 
+**Исправление 2026-07-10:** label включён в PlanBaseline, baseline comparison и OpenAPI; введённое имя отображается в истории и сохраняется после reload. ID снимка immutable: conflicting replay не переписывает label/capturedAt/content.
+
+**Fresh evidence:** .superloopy/evidence/projects-2026-07-10/persistence-baseline-playwright-final.json, planningRepository.db.test.ts 29/29, planningRoutes.db.test.ts 24/24.
 ---
 
-## BUG-PROJ-22 · MAJOR · Baseline: свежезафиксированный снимок сразу показывает ложные отклонения сроков (Δ дн. ≠ 0 при Δ работы 0) — capture морозит authored-даты, сравнение идёт против calculated-плана
+## BUG-PROJ-22 · MAJOR · FIXED 2026-07-10 · Baseline: свежий снимок показывал ложные отклонения authored-vs-calculated
 
 **Где:** `/projects/[id]/baseline` — плитки + таблица «Отклонения от базового плана» (`baselineComparison`).
 
@@ -364,6 +370,9 @@
 
 **Доказательства:** bug-proj-22-baseline-spurious-deltas.png; read-model: baseline-n1 task-demo-description plannedFinish 2026-05-23 vs calculatedFinish 2026-05-27; comparison.baselineId=baseline-n1 (активный свежий).
 
+**Исправление 2026-07-10:** capture замораживает calculated start/finish внутри одной транзакции; свежий baseline сразу даёт нулевые start/finish/work deltas. Заголовок и дочерние строки пишутся атомарно; принудительный сбой child insert подтверждает rollback без orphan header.
+
+**Fresh evidence:** .superloopy/evidence/projects-2026-07-10/persistence-baseline-playwright-final.json, forced-failure rollback + conflicting initial-writer DB tests в planningRepository.db.test.ts (29/29), полный planningRoutes.db.test.ts (24/24).
 ---
 
 ## BUG-PROJ-23 · КРИТИЧЕСКИЙ · Одна невалидная задача (веха с invalid_work_model) навсегда блокирует ВСЕ planning-команды проекта — /schedule, /scenarios, /baseline, /assignments, /calendars, /settings

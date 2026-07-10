@@ -5,6 +5,7 @@ const PLAN_READER_NO_RESOURCES = {
   email: "plan-reader-no-resources@kiss-pm.local",
   password: "reader12345"
 };
+const DISPOSABLE_DATABASE_ENV = "KISS_PM_E2E_DISPOSABLE_DATABASE";
 const APPLY_COMMAND_PATH = (projectId: string) =>
   `/api/workspace/projects/${projectId}/planning/apply-command`;
 const APPLY_COMMAND_BATCH_PATH = (projectId: string) =>
@@ -40,6 +41,15 @@ type ReadModel = {
     workingMinutesPerDay: number;
   }>;
   calendarExceptions: CalendarException[];
+  resourceLoad: {
+    overloads: Array<{
+      resourceId: string;
+      date: string;
+      granularity: string;
+      overloadMinutes: number;
+    }>;
+    acceptedOverloads?: string[];
+  };
   planVersion: number;
 };
 
@@ -181,6 +191,82 @@ test.describe("Projects resources absence write flows", () => {
     }
   });
 
+  test("ADMIN accepts a day overload with readback and persisted reload state", async ({
+    page
+  }) => {
+    test.skip(
+      process.env[DISPOSABLE_DATABASE_ENV] !== "1",
+      "risk.accept_overload is immutable; set " + DISPOSABLE_DATABASE_ENV + "=1 only for a disposable database"
+    );
+    test.setTimeout(90_000);
+    await loginAndGetProject(page, ADMIN);
+
+    const projectsResponse = await page.request.get("/api/workspace/projects");
+    expect(projectsResponse.status()).toBe(200);
+    const projects = (await projectsResponse.json()) as {
+      projects: Array<{ id: string }>;
+    };
+    let projectId: string | undefined;
+    let before: ReadModel | undefined;
+    for (const project of projects.projects) {
+      const candidate = await getReadModel(page, project.id);
+      const accepted = new Set(candidate.resourceLoad.acceptedOverloads ?? []);
+      if (
+        candidate.resourceLoad.overloads.some(
+          (overload) =>
+            overload.granularity === "day" &&
+            !accepted.has(overload.resourceId + ":" + overload.date)
+        )
+      ) {
+        projectId = project.id;
+        before = candidate;
+        break;
+      }
+    }
+    expect(projectId, "requires a project with an unaccepted day overload").toBeTruthy();
+    expect(before).toBeDefined();
+    if (!projectId || !before) return;
+
+    await openProjectResources(page, projectId);
+    const overloadCell = page.locator('button[title*="ПЕРЕГРУЗ"]').first();
+    await expect(overloadCell).toBeVisible();
+    await overloadCell.click();
+
+    const acceptButton = page.getByRole("button", {
+      name: "Принять перегруз как риск",
+      exact: true
+    });
+    await expect(acceptButton).toBeVisible();
+
+    const previewPromise = waitForPlanningResponse(page, projectId, "preview-command");
+    await acceptButton.click();
+    const previewResponse = await previewPromise;
+    expect(previewResponse.status()).toBe(200);
+    const previewEnvelope = previewResponse.request().postDataJSON() as {
+      command: {
+        type: "risk.accept_overload";
+        payload: { overloadId: string };
+      };
+    };
+    expect(previewEnvelope.command.type).toBe("risk.accept_overload");
+    const acceptedId = previewEnvelope.command.payload.overloadId;
+    expect(acceptedId).toMatch(/^[^:]+:\d{4}-\d{2}-\d{2}$/);
+
+    const applyPromise = waitForPlanningResponse(page, projectId, "apply-command");
+    await confirmPlanningPreview(page);
+    expect((await applyPromise).status()).toBe(200);
+
+    const after = await getReadModel(page, projectId);
+    expect(after.resourceLoad.acceptedOverloads).toContain(acceptedId);
+    await page.reload();
+    await waitForResources(page);
+    await expect(
+      page.locator('button[title*="перегруз принят"]').filter({ hasText: "✓" }).first()
+    ).toBeVisible();
+    expect((await getReadModel(page, projectId)).resourceLoad.acceptedOverloads).toContain(
+      acceptedId
+    );
+  });
   test("PLAN reader without resource permission sees no absence write control and gets 403", async ({
     page
   }) => {

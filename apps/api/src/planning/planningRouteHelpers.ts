@@ -160,6 +160,18 @@ export async function validateCommandDataSourcePreconditions(
   command: PlanningCommand
 ): Promise<ValidationIssue[]> {
   const issues: ValidationIssue[] = [];
+  if (
+    command.type === "risk.accept_overload" &&
+    parseAcceptedOverloadId(command.payload.overloadId) === null
+  ) {
+    issues.push({
+      code: "planning_command_invalid",
+      severity: "error",
+      message: "Идентификатор перегруза должен иметь формат resourceId:YYYY-MM-DD",
+      entity: null
+    });
+  }
+
   const statusId =
     command.type === "task.create"
       ? command.payload.statusId
@@ -209,6 +221,31 @@ function resourceIdsForCommand(command: PlanningCommand): string[] {
         ? [command.payload.resourceId]
         : command.type === "calendar.exception.upsert" && command.payload.resourceId
           ? [command.payload.resourceId]
-          : [];
+          : command.type === "risk.accept_overload"
+            ? [parseAcceptedOverloadId(command.payload.overloadId)?.resourceId].filter(
+                (resourceId): resourceId is string => resourceId !== undefined
+              )
+            : [];
   return [...new Set(resourceIds)];
+}
+
+function parseAcceptedOverloadId(
+  overloadId: string
+): { resourceId: string; date: string } | null {
+  const separator = overloadId.lastIndexOf(":");
+  const resourceId = overloadId.slice(0, separator);
+  const date = overloadId.slice(separator + 1);
+  const parsedDate = new Date(date + "T00:00:00.000Z");
+
+  if (
+    separator <= 0 ||
+    resourceId.length === 0 ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    Number.isNaN(parsedDate.getTime()) ||
+    parsedDate.toISOString().slice(0, 10) !== date
+  ) {
+    return null;
+  }
+
+  return { resourceId, date };
 }

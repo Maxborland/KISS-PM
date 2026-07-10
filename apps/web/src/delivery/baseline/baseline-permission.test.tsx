@@ -18,7 +18,7 @@ vi.mock("@/delivery/lib/use-planning", () => ({
     readModel: {
       project: { deadline: null },
       authored: { baselines: [], tasks: [] },
-      baselineComparison: { baselineId: null, tasks: [] },
+      baselineComparison: { baselineId: null, label: null, capturedAt: null, tasks: [] },
       calculatedPlan: { criticalPathTaskIds: [], projectFinish: null },
       planVersion: 1
     },

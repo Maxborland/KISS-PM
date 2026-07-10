@@ -475,10 +475,14 @@ function commandsForAssignmentPlans(
     }
 
     if (plan.acceptedOverloadMinutes > 0) {
+      const overloadAllocation = originalAllocations[originalAllocations.length - 1];
+      if (!overloadAllocation) {
+        throw new Error("planning_auto_solver_overload_allocation_missing");
+      }
       riskCommands.push({
         type: "risk.accept_overload",
         payload: {
-          overloadId: `${plan.assignment.resourceId}:${plan.assignment.taskId}`,
+          overloadId: overloadAllocation.resourceId + ":" + overloadAllocation.date,
           acceptedRiskReason: "Auto-solver could not find a no-overlap allocation before the deadline"
         }
       });

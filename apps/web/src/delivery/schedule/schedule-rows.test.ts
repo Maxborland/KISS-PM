@@ -110,7 +110,7 @@ describe("schedule row mapping", () => {
         scheduleTrace: [],
         validationIssues: []
       },
-      baselineComparison: { baselineId: null, capturedAt: null, tasks: [] },
+      baselineComparison: { baselineId: null, label: null, capturedAt: null, tasks: [] },
       resourceLoad: { buckets: [], overloads: [], acceptedOverloads: [], freeCapacityBuckets: [] },
       calendars: [],
       calendarExceptions: [],

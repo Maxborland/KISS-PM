@@ -24,7 +24,15 @@ type ReadModel = {
     tasks: PlanTask[];
     baselines: PlanBaseline[];
   };
-  baselineComparison: { baselineId: string | null };
+  baselineComparison: {
+    baselineId: string | null;
+    label: string | null;
+    tasks: Array<{
+      startDeltaDays: number | null;
+      finishDeltaDays: number | null;
+      workDeltaMinutes: number | null;
+    }>;
+  };
   planVersion: number;
 };
 
@@ -83,6 +91,13 @@ test.describe("Projects baseline and commits write flows", () => {
       before.authored.baselines.length + 1
     );
     expect(capturedModel.baselineComparison.baselineId).toBe(captured!.id);
+    expect(capturedModel.baselineComparison.label).toBe(marker);
+    expect(capturedModel.baselineComparison.tasks.length).toBeGreaterThan(0);
+    for (const task of capturedModel.baselineComparison.tasks) {
+      expect(task.startDeltaDays).toBe(0);
+      expect(task.finishDeltaDays).toBe(0);
+      expect(task.workDeltaMinutes).toBe(0);
+    }
     expect(capturedModel.planVersion).toBe(applied.newPlanVersion);
     expect(capturedModel.planVersion).toBeGreaterThan(before.planVersion);
 

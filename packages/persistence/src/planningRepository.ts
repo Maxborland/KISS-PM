@@ -1083,23 +1083,11 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           }
           return;
         case "baseline.capture": {
-          // BUG-PROJ-22: морозим CALCULATED-даты расписания на момент захвата, чтобы
-          // сравнение шло schedule-vs-schedule (свежий baseline → Δ=0), а не authored-vs-calculated.
-          const snapshotForBaseline = await this.getPlanSnapshot(input.tenantId, input.projectId);
-          const calculatedById = snapshotForBaseline
-            ? new Map(
-                calculatePlan(snapshotForBaseline, {
-                  calculatedAt: snapshotForBaseline.capturedAt,
-                  engineVersion: "planning-core-v1"
-                }).tasks.map((task) => [task.id, task])
-              )
-            : new Map();
           await captureBaseline(
             input.tenantId,
             input.projectId,
             input.command.payload.baselineId,
-            input.command.payload.label,
-            calculatedById
+            input.command.payload.label
           );
           return;
         }
@@ -1161,12 +1149,9 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             });
           return;
         case "risk.accept_overload": {
-          // BUG-PROJ-19: overloadId = "resourceId:date" (см. resources-surface). Пишем
-          // принятие в plan_accepted_overloads (раньше был no-op → перегруз не снимался).
-          const sep = input.command.payload.overloadId.lastIndexOf(":");
-          if (sep <= 0) return;
-          const resourceId = input.command.payload.overloadId.slice(0, sep);
-          const date = input.command.payload.overloadId.slice(sep + 1);
+          const { resourceId, date } = parseAcceptedOverloadId(
+            input.command.payload.overloadId
+          );
           await db
             .insert(planAcceptedOverloads)
             .values({
@@ -1178,14 +1163,13 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
               acceptedByUserId: input.actorUserId,
               acceptedAt: new Date()
             })
-            .onConflictDoUpdate({
+            .onConflictDoNothing({
               target: [
                 planAcceptedOverloads.tenantId,
                 planAcceptedOverloads.projectId,
                 planAcceptedOverloads.resourceId,
                 planAcceptedOverloads.date
-              ],
-              set: { reason: input.command.payload.acceptedRiskReason, acceptedByUserId: input.actorUserId }
+              ]
             });
           return;
         }
@@ -1442,77 +1426,77 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
     tenantId: string,
     projectId: string,
     baselineId: string,
-    label: string,
-    // BUG-PROJ-22: calculated-даты расписания на момент захвата (taskId → engine task).
-    calculatedById: Map<string, { calculatedStart: PlanDate | null; calculatedFinish: PlanDate | null }>
+    label: string
   ): Promise<void> {
-    const now = new Date();
-    const taskRows = await db
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId), isNull(tasks.archivedAt)));
-    const assignmentRows = await db
-      .select()
-      .from(taskAssignments)
-      .where(and(eq(taskAssignments.tenantId, tenantId), eq(taskAssignments.projectId, projectId)));
-    const activeTaskIds = new Set(taskRows.map((task) => task.id));
-    const activeAssignmentRows = assignmentRows.filter((assignment) => activeTaskIds.has(assignment.taskId));
-    await db
-      .insert(projectBaselines)
-      .values({ id: baselineId, tenantId, projectId, label, capturedAt: now })
-      .onConflictDoUpdate({
-        target: [projectBaselines.tenantId, projectBaselines.projectId, projectBaselines.id],
-        set: { label, capturedAt: now }
-      });
-    await db
-      .delete(projectBaselineTasks)
-      .where(
-        and(
-          eq(projectBaselineTasks.tenantId, tenantId),
-          eq(projectBaselineTasks.projectId, projectId),
-          eq(projectBaselineTasks.baselineId, baselineId)
-        )
+    await db.transaction(async (transaction) => {
+      const tx = transaction as unknown as KissPmDatabase;
+      const now = new Date();
+      const inserted = await tx
+        .insert(projectBaselines)
+        .values({ id: baselineId, tenantId, projectId, label, capturedAt: now })
+        .onConflictDoNothing({
+          target: [projectBaselines.tenantId, projectBaselines.projectId, projectBaselines.id]
+        })
+        .returning({ id: projectBaselines.id });
+
+      // Baseline IDs are immutable. A replay with the same ID must not alter the
+      // original label, timestamp, or snapshot rows.
+      if (inserted.length === 0) return;
+
+      const snapshot = await createPlanningRepository(tx).getPlanSnapshot(tenantId, projectId);
+      if (!snapshot) throw new Error("planning_project_not_found");
+
+      const calculatedById = new Map(
+        calculatePlan(snapshot, {
+          calculatedAt: snapshot.capturedAt,
+          engineVersion: "planning-core-v1"
+        }).tasks.map((task) => [task.id, task])
       );
-    await db
-      .delete(projectBaselineAssignments)
-      .where(
-        and(
-          eq(projectBaselineAssignments.tenantId, tenantId),
-          eq(projectBaselineAssignments.projectId, projectId),
-          eq(projectBaselineAssignments.baselineId, baselineId)
-        )
+      const [taskRows, assignmentRows] = await Promise.all([
+        tx
+          .select()
+          .from(tasks)
+          .where(and(eq(tasks.tenantId, tenantId), eq(tasks.projectId, projectId), isNull(tasks.archivedAt))),
+        tx
+          .select()
+          .from(taskAssignments)
+          .where(and(eq(taskAssignments.tenantId, tenantId), eq(taskAssignments.projectId, projectId)))
+      ]);
+      const activeTaskIds = new Set(taskRows.map((task) => task.id));
+      const activeAssignmentRows = assignmentRows.filter((assignment) =>
+        activeTaskIds.has(assignment.taskId)
       );
-    if (taskRows.length > 0) {
-      await db.insert(projectBaselineTasks).values(
-        taskRows.map((task) => {
-          // Морозим calculated-даты (расписание); fallback на authored, если движок
-          // не дал результата для задачи (напр. отфильтрована).
-          const calc = calculatedById.get(task.id);
-          return {
+
+      if (taskRows.length > 0) {
+        await tx.insert(projectBaselineTasks).values(
+          taskRows.map((task) => {
+            const calculated = calculatedById.get(task.id);
+            return {
+              tenantId,
+              projectId,
+              baselineId,
+              taskId: task.id,
+              plannedStart: calculated?.calculatedStart ?? toPlanDate(task.plannedStart),
+              plannedFinish: calculated?.calculatedFinish ?? toPlanDate(task.plannedFinish),
+              workMinutes: task.workMinutes ?? task.plannedWork * 60
+            };
+          })
+        );
+      }
+      if (activeAssignmentRows.length > 0) {
+        await tx.insert(projectBaselineAssignments).values(
+          activeAssignmentRows.map((assignment) => ({
             tenantId,
             projectId,
             baselineId,
-            taskId: task.id,
-            plannedStart: calc?.calculatedStart ?? toPlanDate(task.plannedStart),
-            plannedFinish: calc?.calculatedFinish ?? toPlanDate(task.plannedFinish),
-            workMinutes: task.workMinutes ?? task.plannedWork * 60
-          };
-        })
-      );
-    }
-    if (activeAssignmentRows.length > 0) {
-      await db.insert(projectBaselineAssignments).values(
-        activeAssignmentRows.map((assignment) => ({
-          tenantId,
-          projectId,
-          baselineId,
-          assignmentId: assignment.id,
-          taskId: assignment.taskId,
-          resourceId: assignment.resourceId,
-          workMinutes: assignment.workMinutes
-        }))
-      );
-    }
+            assignmentId: assignment.id,
+            taskId: assignment.taskId,
+            resourceId: assignment.resourceId,
+            workMinutes: assignment.workMinutes
+          }))
+        );
+      }
+    });
   }
 }
 
@@ -1805,6 +1789,28 @@ function deriveProgressExpression(statusCategory: string | undefined) {
 
 function defaultProjectCalendarId(projectId: string): string {
   return `${projectId}-default-calendar`;
+}
+
+function parseAcceptedOverloadId(overloadId: string): {
+  resourceId: string;
+  date: PlanDate;
+} {
+  const separator = overloadId.lastIndexOf(":");
+  const resourceId = overloadId.slice(0, separator);
+  const date = overloadId.slice(separator + 1);
+  const parsedDate = new Date(date + "T00:00:00.000Z");
+
+  if (
+    separator <= 0 ||
+    resourceId.length === 0 ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    Number.isNaN(parsedDate.getTime()) ||
+    parsedDate.toISOString().slice(0, 10) !== date
+  ) {
+    throw new Error("planning_overload_id_invalid");
+  }
+
+  return { resourceId, date };
 }
 
 function toPlanDate(date: Date): PlanDate {

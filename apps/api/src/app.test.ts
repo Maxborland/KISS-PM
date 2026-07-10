@@ -118,6 +118,33 @@ describe("KISS PM API Phase 1 shell", () => {
       document.paths["/api/workspace/projects/{projectId}/planning/baselines"].get.responses["200"]
         .content["application/json"].schema
     ).toEqual({ $ref: "#/components/schemas/PlanningBaselinesResponse" });
+    expect(document.components.schemas.PlanningBaseline.required).toContain("label");
+    expect(document.components.schemas.PlanningBaseline.properties.label).toEqual({
+      type: "string",
+      minLength: 1
+    });
+    expect(document.components.schemas.PlanningResourceLoadMatrix.required).toContain(
+      "acceptedOverloads"
+    );
+    expect(
+      document.components.schemas.PlanningResourceLoadMatrix.properties.acceptedOverloads
+    ).toEqual({
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+        pattern: "^[^:]+:\\d{4}-\\d{2}-\\d{2}$"
+      }
+    });
+    expect(document.components.schemas.PlanningResourceOverload.required).toContain(
+      "accepted"
+    );
+    expect(document.components.schemas.PlanningResourceOverload.properties.accepted).toEqual({
+      type: "boolean"
+    });
+    expect(document.components.schemas.PlanningResourceOverload.additionalProperties).toBe(
+      false
+    );
     expect(
       document.paths["/api/workspace/projects/{projectId}/planning/auto-solver-runs"].post
         .requestBody.content["application/json"].schema

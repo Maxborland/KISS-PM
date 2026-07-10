@@ -1,0 +1,55 @@
+{
+  "generatedAt": "2026-07-10T03:14:12.0367443Z",
+  "scope": "BUG-PROJ-19, BUG-PROJ-21, BUG-PROJ-22",
+  "verdict": "pass",
+  "fixes": [
+    "baseline.capture uses an atomic transaction and immutable baseline IDs",
+    "baseline captures calculated schedule dates and returns user labels",
+    "risk.accept_overload persists the first acceptance immutably and rejects malformed IDs",
+    "auto-solver emits resourceId:YYYY-MM-DD overload IDs",
+    "OpenAPI matches PlanningBaseline, PlanningResourceLoadMatrix, and PlanningResourceOverload"
+  ],
+  "verification": [
+    {
+      "command": "planningRepository.db.test.ts",
+      "result": "29/29 passed",
+      "coverage": "conflicting initial writers, replay immutability, forced child failure rollback"
+    },
+    {
+      "command": "planningRoutes.db.test.ts",
+      "result": "24/24 passed",
+      "coverage": "nested API transactions, baseline comparison, idempotency"
+    },
+    {
+      "command": "domain + persistence unit suites",
+      "result": "241/241 passed"
+    },
+    {
+      "command": "focused API/domain/OpenAPI",
+      "result": "70/70 passed"
+    },
+    {
+      "command": "domain, persistence, api, web typecheck",
+      "result": "passed"
+    },
+    {
+      "command": "Playwright baseline capture",
+      "result": "1/1 passed",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/persistence-baseline-playwright-final.json"
+    },
+    {
+      "command": "Playwright overload acceptance",
+      "result": "1/1 passed",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/persistence-overload-playwright.json"
+    }
+  ],
+  "liveBehavior": [
+    "ADMIN baseline preview -> apply -> label/readback -> zero deltas -> reload -> commit history",
+    "ADMIN overload drilldown -> preview -> apply -> acceptedOverloads readback -> reload -> persisted accepted marker"
+  ],
+  "evidence": [
+    ".superloopy/evidence/projects-2026-07-10/persistence-baseline-playwright-final.json",
+    ".superloopy/evidence/projects-2026-07-10/persistence-overload-playwright.json",
+    ".superloopy/evidence/projects-2026-07-10/qa-persistence-data-integrity-independent.md"
+  ]
+}

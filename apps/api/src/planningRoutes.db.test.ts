@@ -1253,6 +1253,7 @@ describe("planning API routes", () => {
     expect(initialReadModel.status).toBe(200);
     expect(initialBody.baselineComparison).toEqual({
       baselineId: null,
+      label: null,
       capturedAt: null,
       tasks: []
     });
@@ -1318,6 +1319,7 @@ describe("planning API routes", () => {
     expect(finalBody.planVersion).toBe(workUpdateBody.newPlanVersion);
     expect(finalBody.baselineComparison).toMatchObject({
       baselineId: "baseline-api-a",
+      label: "Стартовый baseline",
       tasks: [
         expect.objectContaining({
           taskId: "task-baseline-a",

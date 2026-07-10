@@ -344,7 +344,12 @@ describe("auto planning solver", () => {
     });
     expect(result.proposals[0]?.planDelta.commands).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: "risk.accept_overload" })
+        expect.objectContaining({
+          type: "risk.accept_overload",
+          payload: expect.objectContaining({
+            overloadId: "resource-alpha:2026-06-01"
+          })
+        })
       ])
     );
   });
