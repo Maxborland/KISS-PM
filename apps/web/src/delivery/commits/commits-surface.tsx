@@ -12,11 +12,19 @@ import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type CommitMetaView, type CommitsView } from "@/delivery/lib/use-planning";
+import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
+import { hasPermission } from "@/lib/permissions";
+import { useSessionUser } from "@/shell/use-session-user";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const dt = (iso: string) => { const d = new Date(iso); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}, ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
 const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
+const PLAN_MANAGE_PERMISSION = "tenant.project_plan.manage";
+
+export function canManageCommitControls({ live, permissions }: { live: boolean; permissions: readonly string[] }): boolean {
+  return !live || hasPermission(permissions, PLAN_MANAGE_PERMISSION);
+}
 
 // тип-чип по actionType (как в макете 09-audit)
 const typeOf = (actionType: string): { label: string; cls: string } => {
@@ -29,6 +37,9 @@ const typeOf = (actionType: string): { label: string; cls: string } => {
 };
 
 export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { live } = usePlanningRuntime();
+  const sessionUser = useSessionUser();
+  const canManagePlan = canManageCommitControls({ live, permissions: sessionUser?.permissions ?? [] });
   const { readModel, status, error, reload, applyBatch, revertLast, loadCommits } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const [data, setData] = useState<CommitsView | null>(null);
@@ -64,6 +75,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   const selected = commits.find((c) => c.auditEventId === sel) ?? commits[0] ?? null;
 
   const onRevert = async (c: CommitMetaView) => {
+    if (!canManagePlan) return;
     if (!latestRevert || c.auditEventId !== latestRevert.auditEventId) return;
     const before = latestRevert.before as PlanningReadModel;
     const inverses = latestRevert.commands.slice().reverse().flatMap((cmd) => buildCompensatingCommands(cmd, before));
@@ -78,6 +90,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   // BUG-PROJ-24: откат последнего обратимого коммита через серверный revert-last —
   // работает из истории (не зависит от in-session state).
   const onRevertLast = async () => {
+    if (!canManagePlan) return;
     setBusy(true);
     const res = await revertLast();
     setBusy(false);
@@ -93,7 +106,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Коммиты плана</h2>
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">PM-as-code: каждая правка плана — версия с аудит-событием. Откат последнего обратимого коммита — компенсирующими командами.</p>
         </div>
-        <Button variant="secondary" size="sm" disabled={busy} onClick={() => void onRevertLast()}><RotateCcw className="size-3.5" aria-hidden />Откатить последний</Button>
+        {canManagePlan ? <Button variant="secondary" size="sm" disabled={busy} onClick={() => void onRevertLast()}><RotateCcw className="size-3.5" aria-hidden />Откатить последний</Button> : null}
       </div>
 
       {prototypeNotesEnabled && (
@@ -110,7 +123,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
           {commits.map((c) => {
             const type = typeOf(c.actionType);
             const active = c.auditEventId === sel;
-            const canRevert = latestRevert?.auditEventId === c.auditEventId;
+            const canRevert = canManagePlan && latestRevert?.auditEventId === c.auditEventId;
             return (
               <button key={c.auditEventId} type="button" onClick={() => setSel(c.auditEventId)} className={cn("flex w-full items-start gap-2 border-b border-[var(--border-subtle)] px-3 py-2 text-left last:border-b-0 hover:bg-[var(--panel-subtle)]", active && "bg-[var(--accent-soft)]")}>
                 <span className="mono mt-0.5 w-[78px] shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{hhmm(c.at)}</span>
@@ -156,9 +169,9 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
                 </div>
               ) : null}
 
-              {latestRevert?.auditEventId === selected.auditEventId ? (
+              {canManagePlan ? latestRevert?.auditEventId === selected.auditEventId ? (
                 <Button variant="secondary" size="sm" className="mt-3" disabled={busy} onClick={() => void onRevert(selected)}><RotateCcw className="size-3.5" aria-hidden />Откатить коммит</Button>
-              ) : selected.revertible ? <p className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Откат доступен только для последнего обратимого коммита.</p> : <p className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Откат недоступен (необратимая операция или системная запись).</p>}
+              ) : selected.revertible ? <p className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Откат доступен только для последнего обратимого коммита.</p> : <p className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Откат недоступен (необратимая операция или системная запись).</p> : null}
 
               {prototypeNotesEnabled ? (
               <details className="mt-3 rounded-[var(--radius-md)] border border-[var(--border)]">
