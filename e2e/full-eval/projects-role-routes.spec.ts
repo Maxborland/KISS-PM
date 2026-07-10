@@ -45,6 +45,7 @@ type EvidenceRow = {
   route: string;
   projectsApiStatus: number;
   projectsCount: number;
+  expectedUiState: UiState;
   uiState: UiState;
   finalUrl: string;
   apiResponses: Array<{ status: number; path: string }>;
@@ -111,6 +112,11 @@ test("Projects role x every route state matrix", async ({ browser }, testInfo) =
           route,
           projectsApiStatus,
           projectsCount: projects.length,
+          expectedUiState: getExpectedUiState(
+            projectsApiStatus,
+            projects.length,
+            route
+          ),
           uiState: "error",
           finalUrl: "",
           apiResponses: [],
@@ -132,13 +138,9 @@ test("Projects role x every route state matrix", async ({ browser }, testInfo) =
             projects.length === 0 &&
             [...alphaTitles].some((title) => bodyText.includes(title));
 
-          if (projectsApiStatus === 403) {
-            expect(row.uiState).toBe("forbidden");
-          } else if (projects.length === 0) {
-            expect(row.uiState).not.toBe("ready");
+          expect(row.uiState).toBe(row.expectedUiState);
+          if (projects.length === 0) {
             expect(row.alphaLeak).toBe(false);
-          } else {
-            expect(row.uiState).toBe("ready");
           }
 
           row.status = "PASS";
@@ -150,9 +152,19 @@ test("Projects role x every route state matrix", async ({ browser }, testInfo) =
             SCREENSHOT_DIR,
             `${role.role}-${slug(route)}.png`
           );
-          await page.screenshot({ path: screenshotPath });
-          row.screenshot = relative(REPO_ROOT, screenshotPath).replaceAll("\\", "/");
-          rows.push(row);
+          try {
+            await page.screenshot({ path: screenshotPath });
+            row.screenshot = relative(REPO_ROOT, screenshotPath).replaceAll("\\", "/");
+          } catch (error) {
+            const screenshotError = error instanceof Error ? error.message : String(error);
+            row.status = "FAIL";
+            row.error = row.error
+              ? `${row.error}\nScreenshot: ${screenshotError}`
+              : `Screenshot: ${screenshotError}`;
+            failures.push(`${role.role} ${route} screenshot: ${screenshotError}`);
+          } finally {
+            rows.push(row);
+          }
         }
       }
     } catch (error) {
@@ -226,7 +238,6 @@ async function waitForSettledSurface(page: Page) {
 async function detectUiState(page: Page): Promise<UiState> {
   const text = await page.locator("body").innerText();
   if (text.includes("Доступ ограничен")) return "forbidden";
-  if (text.includes("Нет проектов") || text.includes("Проект не найден")) return "empty";
   if (
     text.includes("Не удалось загрузить") ||
     text.includes("Ошибка загрузки") ||
@@ -234,7 +245,19 @@ async function detectUiState(page: Page): Promise<UiState> {
   ) {
     return "error";
   }
+  if (text.includes("Нет проектов") || text.includes("Проект не найден")) return "empty";
   return "ready";
+}
+
+function getExpectedUiState(
+  projectsApiStatus: number,
+  projectsCount: number,
+  route: string
+): UiState {
+  if (projectsApiStatus === 403) return "forbidden";
+  if (projectsCount > 0) return "ready";
+  const routeSegments = route.split("/").filter(Boolean);
+  return routeSegments.length <= 2 ? "empty" : "error";
 }
 
 function slug(route: string) {

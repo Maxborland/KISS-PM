@@ -1,0 +1,70 @@
+{
+  "generatedAt": "2026-07-10T05:37:15.809Z",
+  "scope": [
+    "PROJ-004",
+    "PROJ-011",
+    "PROJ-025",
+    "PROJ-028",
+    "PROJ-087",
+    "PROJ-095",
+    "PROJ-110"
+  ],
+  "verdict": "pass",
+  "matrixDelta": {
+    "rowsPromoted": 15,
+    "from": {
+      "fail": 71,
+      "pass": 55
+    },
+    "to": {
+      "fail": 56,
+      "pass": 70
+    }
+  },
+  "verification": [
+    {
+      "command": "focused navigation Vitest",
+      "result": "9 files, 35/35 passed"
+    },
+    {
+      "command": "web typecheck",
+      "result": "passed"
+    },
+    {
+      "command": "projects-navigation.spec.ts",
+      "result": "23/23 action and data-state checks; native list links, 9 routes, visible CTAs, tab/internal Baseline/sidebar/browser Back staged guards, sentinel cleanup; 0 fail; 0 inconclusive",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/projects-navigation.json"
+    },
+    {
+      "command": "projects-role-routes.spec.ts",
+      "result": "55/55 exact role x route rows; 33 ready, 2 empty, 11 forbidden, 9 error; 0 expected-state mismatches; 0 missing; 0 duplicates",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/projects-role-routes.json"
+    }
+  ],
+  "workerEvidence": [
+    ".superloopy/evidence/projects-2026-07-10/worker-navigation-tabs.md",
+    ".superloopy/evidence/projects-2026-07-10/worker-navigation-project-list.md",
+    ".superloopy/evidence/projects-2026-07-10/worker-navigation-overview.md",
+    ".superloopy/evidence/projects-2026-07-10/worker-navigation-baseline.md",
+    ".superloopy/evidence/projects-2026-07-10/worker-navigation-calendars.md",
+    ".superloopy/evidence/projects-2026-07-10/worker-navigation-settings.md",
+    ".superloopy/evidence/projects-2026-07-10/worker-navigation-unsaved-guard.md",
+    ".superloopy/evidence/projects-2026-07-10/worker-navigation-commits-error.md",
+    ".superloopy/evidence/projects-2026-07-10/worker-navigation-screenshot-fix.md",
+    ".superloopy/evidence/projects-2026-07-10/worker-navigation-role-state-fix.md",
+    ".superloopy/evidence/projects-2026-07-10/worker-navigation-sentinel-fix.md"
+  ],
+  "independentReview": [
+    ".superloopy/evidence/projects-2026-07-10/qa-navigation-code-review.md",
+    ".superloopy/evidence/projects-2026-07-10/qa-navigation-browser-audit.md",
+    ".superloopy/evidence/projects-2026-07-10/qa-navigation-matrix-audit.md"
+  ],
+  "independentReviewVerdicts": {
+    "code": "APPROVE",
+    "browserEvidence": "APPROVE",
+    "matrix": "APPROVE"
+  },
+  "orchestratorEvidence": [
+    ".superloopy/evidence/projects-2026-07-10/orchestrator-navigation-role-matrix-integrity.md"
+  ]
+}

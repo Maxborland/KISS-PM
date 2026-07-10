@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-09T23:11:15.846Z",
+  "generatedAt": "2026-07-10T05:25:08.353Z",
   "baseURL": "http://127.0.0.1:3180",
   "roles": [
     {
@@ -29,13 +29,10 @@
       "route": "/projects",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects",
       "apiResponses": [
-        {
-          "status": 200,
-          "path": "/api/workspace/projects"
-        },
         {
           "status": 200,
           "path": "/api/workspace/projects"
@@ -51,6 +48,7 @@
       "route": "/projects/project-vektor-portal",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal",
       "apiResponses": [
@@ -73,6 +71,7 @@
       "route": "/projects/project-vektor-portal/overview",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "apiResponses": [
@@ -95,6 +94,7 @@
       "route": "/projects/project-vektor-portal/schedule",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
       "apiResponses": [
@@ -117,6 +117,7 @@
       "route": "/projects/project-vektor-portal/resources",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
       "apiResponses": [
@@ -139,6 +140,7 @@
       "route": "/projects/project-vektor-portal/assignments",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
       "apiResponses": [
@@ -161,6 +163,7 @@
       "route": "/projects/project-vektor-portal/calendars",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
       "apiResponses": [
@@ -183,6 +186,7 @@
       "route": "/projects/project-vektor-portal/scenarios",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
       "apiResponses": [
@@ -205,6 +209,7 @@
       "route": "/projects/project-vektor-portal/baseline",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
       "apiResponses": [
@@ -227,6 +232,7 @@
       "route": "/projects/project-vektor-portal/commits",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
       "apiResponses": [
@@ -249,6 +255,7 @@
       "route": "/projects/project-vektor-portal/settings",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
       "apiResponses": [
@@ -271,13 +278,10 @@
       "route": "/projects",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects",
       "apiResponses": [
-        {
-          "status": 200,
-          "path": "/api/workspace/projects"
-        },
         {
           "status": 200,
           "path": "/api/workspace/projects"
@@ -293,6 +297,7 @@
       "route": "/projects/project-vektor-portal",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal",
       "apiResponses": [
@@ -315,6 +320,7 @@
       "route": "/projects/project-vektor-portal/overview",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "apiResponses": [
@@ -337,6 +343,7 @@
       "route": "/projects/project-vektor-portal/schedule",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
       "apiResponses": [
@@ -359,6 +366,7 @@
       "route": "/projects/project-vektor-portal/resources",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
       "apiResponses": [
@@ -381,6 +389,7 @@
       "route": "/projects/project-vektor-portal/assignments",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
       "apiResponses": [
@@ -403,6 +412,7 @@
       "route": "/projects/project-vektor-portal/calendars",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
       "apiResponses": [
@@ -425,6 +435,7 @@
       "route": "/projects/project-vektor-portal/scenarios",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
       "apiResponses": [
@@ -447,13 +458,10 @@
       "route": "/projects/project-vektor-portal/baseline",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
       "apiResponses": [
-        {
-          "status": 200,
-          "path": "/api/workspace/projects/project-vektor-portal/planning/scenarios/preview"
-        },
         {
           "status": 200,
           "path": "/api/workspace/projects/project-vektor-portal"
@@ -473,6 +481,7 @@
       "route": "/projects/project-vektor-portal/commits",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
       "apiResponses": [
@@ -495,6 +504,7 @@
       "route": "/projects/project-vektor-portal/settings",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
       "apiResponses": [
@@ -517,9 +527,14 @@
       "route": "/projects",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects",
       "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects"
+        },
         {
           "status": 200,
           "path": "/api/workspace/projects"
@@ -535,6 +550,7 @@
       "route": "/projects/project-vektor-portal",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal",
       "apiResponses": [
@@ -557,6 +573,7 @@
       "route": "/projects/project-vektor-portal/overview",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "apiResponses": [
@@ -579,6 +596,7 @@
       "route": "/projects/project-vektor-portal/schedule",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
       "apiResponses": [
@@ -601,6 +619,7 @@
       "route": "/projects/project-vektor-portal/resources",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
       "apiResponses": [
@@ -623,6 +642,7 @@
       "route": "/projects/project-vektor-portal/assignments",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
       "apiResponses": [
@@ -645,6 +665,7 @@
       "route": "/projects/project-vektor-portal/calendars",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
       "apiResponses": [
@@ -667,6 +688,7 @@
       "route": "/projects/project-vektor-portal/scenarios",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
       "apiResponses": [
@@ -677,10 +699,6 @@
         {
           "status": 200,
           "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
-        },
-        {
-          "status": 403,
-          "path": "/api/workspace/projects/project-vektor-portal/planning/scenarios/preview"
         }
       ],
       "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects-project-vektor-portal-scenarios.png",
@@ -693,6 +711,7 @@
       "route": "/projects/project-vektor-portal/baseline",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
       "apiResponses": [
@@ -715,6 +734,7 @@
       "route": "/projects/project-vektor-portal/commits",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
       "apiResponses": [
@@ -737,6 +757,7 @@
       "route": "/projects/project-vektor-portal/settings",
       "projectsApiStatus": 200,
       "projectsCount": 3,
+      "expectedUiState": "ready",
       "uiState": "ready",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
       "apiResponses": [
@@ -759,6 +780,7 @@
       "route": "/projects",
       "projectsApiStatus": 403,
       "projectsCount": 0,
+      "expectedUiState": "forbidden",
       "uiState": "forbidden",
       "finalUrl": "http://127.0.0.1:3180/projects",
       "apiResponses": [
@@ -781,6 +803,7 @@
       "route": "/projects/project-vektor-portal",
       "projectsApiStatus": 403,
       "projectsCount": 0,
+      "expectedUiState": "forbidden",
       "uiState": "forbidden",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal",
       "apiResponses": [
@@ -803,6 +826,7 @@
       "route": "/projects/project-vektor-portal/overview",
       "projectsApiStatus": 403,
       "projectsCount": 0,
+      "expectedUiState": "forbidden",
       "uiState": "forbidden",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "apiResponses": [
@@ -825,16 +849,17 @@
       "route": "/projects/project-vektor-portal/schedule",
       "projectsApiStatus": 403,
       "projectsCount": 0,
+      "expectedUiState": "forbidden",
       "uiState": "forbidden",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
       "apiResponses": [
         {
           "status": 403,
-          "path": "/api/workspace/projects/project-vektor-portal"
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
         },
         {
           "status": 403,
-          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+          "path": "/api/workspace/projects/project-vektor-portal"
         }
       ],
       "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal-schedule.png",
@@ -847,6 +872,7 @@
       "route": "/projects/project-vektor-portal/resources",
       "projectsApiStatus": 403,
       "projectsCount": 0,
+      "expectedUiState": "forbidden",
       "uiState": "forbidden",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
       "apiResponses": [
@@ -869,6 +895,7 @@
       "route": "/projects/project-vektor-portal/assignments",
       "projectsApiStatus": 403,
       "projectsCount": 0,
+      "expectedUiState": "forbidden",
       "uiState": "forbidden",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
       "apiResponses": [
@@ -891,16 +918,17 @@
       "route": "/projects/project-vektor-portal/calendars",
       "projectsApiStatus": 403,
       "projectsCount": 0,
+      "expectedUiState": "forbidden",
       "uiState": "forbidden",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
       "apiResponses": [
         {
           "status": 403,
-          "path": "/api/workspace/projects/project-vektor-portal"
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
         },
         {
           "status": 403,
-          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+          "path": "/api/workspace/projects/project-vektor-portal"
         }
       ],
       "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal-calendars.png",
@@ -913,6 +941,7 @@
       "route": "/projects/project-vektor-portal/scenarios",
       "projectsApiStatus": 403,
       "projectsCount": 0,
+      "expectedUiState": "forbidden",
       "uiState": "forbidden",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
       "apiResponses": [
@@ -935,6 +964,7 @@
       "route": "/projects/project-vektor-portal/baseline",
       "projectsApiStatus": 403,
       "projectsCount": 0,
+      "expectedUiState": "forbidden",
       "uiState": "forbidden",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
       "apiResponses": [
@@ -957,6 +987,7 @@
       "route": "/projects/project-vektor-portal/commits",
       "projectsApiStatus": 403,
       "projectsCount": 0,
+      "expectedUiState": "forbidden",
       "uiState": "forbidden",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
       "apiResponses": [
@@ -979,6 +1010,7 @@
       "route": "/projects/project-vektor-portal/settings",
       "projectsApiStatus": 403,
       "projectsCount": 0,
+      "expectedUiState": "forbidden",
       "uiState": "forbidden",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
       "apiResponses": [
@@ -1001,17 +1033,10 @@
       "route": "/projects",
       "projectsApiStatus": 200,
       "projectsCount": 0,
+      "expectedUiState": "empty",
       "uiState": "empty",
       "finalUrl": "http://127.0.0.1:3180/projects",
       "apiResponses": [
-        {
-          "status": 200,
-          "path": "/api/workspace/projects"
-        },
-        {
-          "status": 200,
-          "path": "/api/workspace/projects"
-        },
         {
           "status": 200,
           "path": "/api/workspace/projects"
@@ -1027,6 +1052,7 @@
       "route": "/projects/project-vektor-portal",
       "projectsApiStatus": 200,
       "projectsCount": 0,
+      "expectedUiState": "empty",
       "uiState": "empty",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal",
       "apiResponses": [
@@ -1049,7 +1075,8 @@
       "route": "/projects/project-vektor-portal/overview",
       "projectsApiStatus": 200,
       "projectsCount": 0,
-      "uiState": "empty",
+      "expectedUiState": "error",
+      "uiState": "error",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "apiResponses": [
         {
@@ -1071,7 +1098,8 @@
       "route": "/projects/project-vektor-portal/schedule",
       "projectsApiStatus": 200,
       "projectsCount": 0,
-      "uiState": "empty",
+      "expectedUiState": "error",
+      "uiState": "error",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
       "apiResponses": [
         {
@@ -1093,7 +1121,8 @@
       "route": "/projects/project-vektor-portal/resources",
       "projectsApiStatus": 200,
       "projectsCount": 0,
-      "uiState": "empty",
+      "expectedUiState": "error",
+      "uiState": "error",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
       "apiResponses": [
         {
@@ -1115,16 +1144,17 @@
       "route": "/projects/project-vektor-portal/assignments",
       "projectsApiStatus": 200,
       "projectsCount": 0,
-      "uiState": "empty",
+      "expectedUiState": "error",
+      "uiState": "error",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
       "apiResponses": [
         {
           "status": 404,
-          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+          "path": "/api/workspace/projects/project-vektor-portal"
         },
         {
           "status": 404,
-          "path": "/api/workspace/projects/project-vektor-portal"
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
         }
       ],
       "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal-assignments.png",
@@ -1137,7 +1167,8 @@
       "route": "/projects/project-vektor-portal/calendars",
       "projectsApiStatus": 200,
       "projectsCount": 0,
-      "uiState": "empty",
+      "expectedUiState": "error",
+      "uiState": "error",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
       "apiResponses": [
         {
@@ -1159,7 +1190,8 @@
       "route": "/projects/project-vektor-portal/scenarios",
       "projectsApiStatus": 200,
       "projectsCount": 0,
-      "uiState": "empty",
+      "expectedUiState": "error",
+      "uiState": "error",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
       "apiResponses": [
         {
@@ -1181,16 +1213,17 @@
       "route": "/projects/project-vektor-portal/baseline",
       "projectsApiStatus": 200,
       "projectsCount": 0,
-      "uiState": "empty",
+      "expectedUiState": "error",
+      "uiState": "error",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
       "apiResponses": [
         {
           "status": 404,
-          "path": "/api/workspace/projects/project-vektor-portal"
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
         },
         {
           "status": 404,
-          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+          "path": "/api/workspace/projects/project-vektor-portal"
         }
       ],
       "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal-baseline.png",
@@ -1203,7 +1236,8 @@
       "route": "/projects/project-vektor-portal/commits",
       "projectsApiStatus": 200,
       "projectsCount": 0,
-      "uiState": "empty",
+      "expectedUiState": "error",
+      "uiState": "error",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
       "apiResponses": [
         {
@@ -1225,7 +1259,8 @@
       "route": "/projects/project-vektor-portal/settings",
       "projectsApiStatus": 200,
       "projectsCount": 0,
-      "uiState": "empty",
+      "expectedUiState": "error",
+      "uiState": "error",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
       "apiResponses": [
         {
@@ -1249,9 +1284,9 @@
     "fail": 0,
     "states": {
       "ready": 33,
-      "empty": 11,
+      "empty": 2,
       "forbidden": 11,
-      "error": 0
+      "error": 9
     }
   },
   "failures": []

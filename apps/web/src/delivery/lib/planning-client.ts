@@ -76,9 +76,7 @@ export function createDeliveryPlanningClient(live: boolean) {
     // audit.beforeState недостаточен). Произвольный исторический откат — будущая серверная задача.
     const body = await requestJson<{ auditEvents: PlanningAuditEvent[] }>(
       `/api/tenant/current/audit-events?projectId=${encodeURIComponent(projectId)}`
-    ).catch(() => {
-      throw new Error("audit_events_failed");
-    });
+    );
     const last = lastApply;
     const commits: CommitMetaView[] = body.auditEvents
       .filter((event) => event.sourceWorkflow === "planning" && event.afterState?.planVersion != null)

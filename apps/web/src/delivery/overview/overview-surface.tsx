@@ -30,6 +30,18 @@ const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Dat
 const ddmmyyyy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
 
+type CommitsState =
+  | { status: "loading"; commits: CommitMetaView[] }
+  | { status: "ready"; commits: CommitMetaView[] }
+  | { status: "forbidden"; commits: CommitMetaView[] }
+  | { status: "error"; commits: CommitMetaView[] };
+
+function isForbiddenCommitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const apiError = error as Error & { status?: number; code?: string };
+  return apiError.status === 403 || apiError.code === "forbidden";
+}
+
 function toneIcon(tone: "danger" | "warning" | "info") { return { danger: "bg-[var(--danger)] text-white", warning: "bg-[var(--warning)] text-white", info: "bg-[var(--accent)] text-white" }[tone]; }
 function toneBorder(tone: "danger" | "warning" | "info") { return { danger: "border-[var(--danger)]", warning: "border-[var(--warning)]", info: "border-[var(--accent)]" }[tone]; }
 function ProgressBar({ value, critical }: { value: number; critical?: boolean }) {
@@ -43,11 +55,27 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // Фолбэк имени: под ограниченной ролью справочник людей может отдать 403 — резолвер вернёт сырой id.
   // Показываем «Участник xxxx» вместо user-/r-идентификатора (G8-08).
   const resName = (id: string) => { const n = resDir.name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
-  const [commits, setCommits] = useState<CommitMetaView[]>([]);
+  const [commitsState, setCommitsState] = useState<CommitsState>({ status: "loading", commits: [] });
 
   useEffect(() => {
     if (!readModel) return;
-    void loadCommits().then((c) => setCommits(c.commits.slice(0, 4)));
+    let cancelled = false;
+    setCommitsState({ status: "loading", commits: [] });
+    void loadCommits()
+      .then((result) => {
+        if (!cancelled) setCommitsState({ status: "ready", commits: result.commits.slice(0, 4) });
+      })
+      .catch((commitError: unknown) => {
+        if (!cancelled) {
+          setCommitsState({
+            status: isForbiddenCommitError(commitError) ? "forbidden" : "error",
+            commits: []
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [readModel, loadCommits]);
 
   const model = useMemo(() => {
@@ -217,7 +245,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         <BentoCard span={5} title="Последние коммиты" subtitle="История изменений плана (PM-as-code)" actions={<GitCommit className="size-4 text-[var(--muted)]" aria-hidden />} flush
           footer={<span className="flex items-center justify-between"><span>Полная история и откат — на вкладке «Коммиты»</span><Button asChild variant="link" size="sm" className="h-auto p-0 text-[var(--accent)]"><Link href={`/projects/${projectId}/commits`}>Все</Link></Button></span>}>
           <ul className="py-1">
-            {commits.map((c) => (
+            {commitsState.commits.map((c) => (
               <li key={c.auditEventId} className="v4-row group flex items-start gap-2.5 px-4 py-2.5">
                 <span className="mt-[5px] size-2 shrink-0 rounded-full bg-[var(--accent)] ring-2 ring-[var(--accent-soft)]" />
                 <span className="v4-num mt-0.5 w-[78px] shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{hhmm(c.at)}</span>
@@ -227,7 +255,10 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 </div>
               </li>
             ))}
-            {commits.length === 0 ? <li className="px-4 py-3 text-[length:var(--text-sm)] text-[var(--muted)]">История пуста.</li> : null}
+            {commitsState.status === "loading" ? <li className="px-4 py-3 text-[length:var(--text-sm)] text-[var(--muted)]">Загрузка истории…</li> : null}
+            {commitsState.status === "forbidden" ? <li className="px-4 py-3 text-[length:var(--text-sm)] text-[var(--muted)]">История изменений недоступна: недостаточно прав.</li> : null}
+            {commitsState.status === "error" ? <li role="alert" className="px-4 py-3 text-[length:var(--text-sm)] text-[var(--danger)]">Не удалось загрузить историю изменений.</li> : null}
+            {commitsState.status === "ready" && commitsState.commits.length === 0 ? <li className="px-4 py-3 text-[length:var(--text-sm)] text-[var(--muted)]">История пуста.</li> : null}
           </ul>
         </BentoCard>
       </Bento>

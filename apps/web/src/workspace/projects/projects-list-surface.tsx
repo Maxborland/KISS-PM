@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
@@ -24,8 +23,7 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
      переключение на боевой = apiOrigin; данные in-memory.
    - Контракт отдаёт ТОЛЬКО активные проекты, поэтому список не показывает
      фильтр «Все»: архив/закрытые в этой ручке недоступны.
-   - Клик по строке навигации НЕ выполняет (cursor-default + title):
-     карточка проекта — отдельный экран рабочего приложения.
+   - Название каждого проекта — нативная ссылка на его карточку.
 
    Состояния — только через <SurfaceState> (loading/error/empty).
    ============================================================ */
@@ -151,7 +149,6 @@ function ProtoBanner() {
 
 // Таблица проектов: Проект · Клиент · Статус · Срок · Сумма · План.часы · Спрос.
 function ProjectsTable({ projects, userColor }: { projects: ProjectRecord[]; userColor: (id: string) => BemAvatarColor }) {
-  const router = useRouter();
   return (
     <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
       <table className="w-full border-collapse text-[length:var(--text-sm)]">
@@ -170,16 +167,15 @@ function ProjectsTable({ projects, userColor }: { projects: ProjectRecord[]; use
           {projects.map((p) => (
             <tr
               key={p.id}
-              className="v4-row cursor-pointer border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--panel-subtle)]"
-              onClick={() => router.push(`/projects/${p.id}/overview`)}
-              role="link"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") router.push(`/projects/${p.id}/overview`);
-              }}
+              className="v4-row border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--panel-subtle)]"
             >
               <td className="px-3 py-2">
-                <div className="font-medium text-[var(--text-strong)]">{p.title}</div>
+                <Link
+                  href={`/projects/${p.id}`}
+                  className="font-medium text-[var(--text-strong)] hover:underline focus-visible:underline"
+                >
+                  {p.title}
+                </Link>
                 {prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{p.id}</div> : null}
               </td>
               <td className="px-3 py-2">

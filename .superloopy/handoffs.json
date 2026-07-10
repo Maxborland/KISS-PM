@@ -188,6 +188,72 @@
       "artifact": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_SUPERSEDING_AUDIT.md",
       "recordedAt": "2026-07-09T21:32:37.039Z",
       "updatedAt": "2026-07-09T21:32:37.039Z"
+    },
+    {
+      "id": "H018",
+      "agent": "Pasteur2",
+      "assignment": "Fix target-bound route screenshots before goBack",
+      "status": "completed",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/worker-navigation-screenshot-fix.md",
+      "recordedAt": "2026-07-10T05:08:07.790Z",
+      "updatedAt": "2026-07-10T05:34:41.834Z"
+    },
+    {
+      "id": "H019",
+      "agent": "Franklin3",
+      "assignment": "Fix strict role-route expected UI states",
+      "status": "completed",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/worker-navigation-role-state-fix.md",
+      "recordedAt": "2026-07-10T05:08:08.310Z",
+      "updatedAt": "2026-07-10T05:34:41.834Z"
+    },
+    {
+      "id": "H020",
+      "agent": "Bernoulli",
+      "assignment": "Fix schedule history sentinel lifecycle and tests",
+      "status": "completed",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/worker-navigation-sentinel-fix.md",
+      "recordedAt": "2026-07-10T05:08:08.856Z",
+      "updatedAt": "2026-07-10T05:34:41.834Z"
+    },
+    {
+      "id": "H021",
+      "agent": "navigation-code-review",
+      "assignment": "Final schedule sentinel and navigation code audit",
+      "status": "completed",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/qa-navigation-code-review.md",
+      "recordedAt": "2026-07-10T05:39:07.767Z",
+      "updatedAt": "2026-07-10T05:39:07.767Z"
+    },
+    {
+      "id": "H022",
+      "agent": "navigation-browser-audit",
+      "assignment": "Final in-app browser and evidence audit",
+      "status": "completed",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/qa-navigation-browser-audit.md",
+      "recordedAt": "2026-07-10T05:39:08.315Z",
+      "updatedAt": "2026-07-10T05:39:08.315Z"
+    },
+    {
+      "id": "H023",
+      "agent": "navigation-matrix-audit",
+      "assignment": "Final Cartesian matrix and screenshot consistency audit",
+      "status": "completed",
+      "verdict": "PASS",
+      "normalizedVerdict": "accept",
+      "artifact": ".superloopy/evidence/projects-2026-07-10/qa-navigation-matrix-audit.md",
+      "recordedAt": "2026-07-10T05:39:08.817Z",
+      "updatedAt": "2026-07-10T05:39:08.817Z"
     }
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-09T23:09:05.831Z",
+  "generatedAt": "2026-07-10T05:18:46.517Z",
   "baseURL": "http://127.0.0.1:3180",
   "projects": [
     {
@@ -19,6 +19,7 @@
     {
       "route": "/projects/project-vektor-portal/overview",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
       "activeTab": "Обзор",
       "tabLinks": 9,
       "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/overview.png",
@@ -28,6 +29,7 @@
     {
       "route": "/projects/project-vektor-portal/schedule",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "activeTab": "График",
       "tabLinks": 9,
       "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/schedule.png",
@@ -37,6 +39,7 @@
     {
       "route": "/projects/project-vektor-portal/resources",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "activeTab": "Ресурсы",
       "tabLinks": 9,
       "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/resources.png",
@@ -46,6 +49,7 @@
     {
       "route": "/projects/project-vektor-portal/assignments",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "activeTab": "Назначения",
       "tabLinks": 9,
       "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/assignments.png",
@@ -55,6 +59,7 @@
     {
       "route": "/projects/project-vektor-portal/calendars",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "activeTab": "Календари",
       "tabLinks": 9,
       "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/calendars.png",
@@ -64,6 +69,7 @@
     {
       "route": "/projects/project-vektor-portal/scenarios",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "activeTab": "Сценарии",
       "tabLinks": 9,
       "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/scenarios.png",
@@ -73,6 +79,7 @@
     {
       "route": "/projects/project-vektor-portal/baseline",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "activeTab": "Baseline",
       "tabLinks": 9,
       "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/baseline.png",
@@ -82,6 +89,7 @@
     {
       "route": "/projects/project-vektor-portal/commits",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "activeTab": "Коммиты",
       "tabLinks": 9,
       "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/commits.png",
@@ -91,9 +99,142 @@
     {
       "route": "/projects/project-vektor-portal/settings",
       "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "activeTab": "Настройки",
       "tabLinks": 9,
       "screenshot": ".superloopy/evidence/projects-2026-07-10/navigation/screenshots/settings.png",
+      "status": "PASS",
+      "error": ""
+    }
+  ],
+  "navigation": [
+    {
+      "check": "projects-list-native-anchor",
+      "origin": "/projects",
+      "expectedHref": "/projects/project-vektor-portal",
+      "actualHref": "/projects/project-vektor-portal",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal",
+      "restoredUrl": "http://127.0.0.1:3180/projects",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "schedule-staged-navigation-guard",
+      "origin": "/projects/project-vektor-portal/schedule",
+      "expectedHref": "/projects/project-vektor-portal/settings",
+      "actualHref": "/projects/project-vektor-portal/settings",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
+      "restoredUrl": "tab/baseline/sidebar/back cancelled on origin before confirm",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "overview-signal-1:Открыть График",
+      "origin": "/projects/project-vektor-portal/overview",
+      "expectedHref": "/projects/project-vektor-portal/schedule",
+      "actualHref": "/projects/project-vektor-portal/schedule",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "overview-signal-2:Открыть Сценарии",
+      "origin": "/projects/project-vektor-portal/overview",
+      "expectedHref": "/projects/project-vektor-portal/scenarios",
+      "actualHref": "/projects/project-vektor-portal/scenarios",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "overview-signal-3:Открыть Baseline",
+      "origin": "/projects/project-vektor-portal/overview",
+      "expectedHref": "/projects/project-vektor-portal/baseline",
+      "actualHref": "/projects/project-vektor-portal/baseline",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "overview-signal-4:Открыть График",
+      "origin": "/projects/project-vektor-portal/overview",
+      "expectedHref": "/projects/project-vektor-portal/schedule",
+      "actualHref": "/projects/project-vektor-portal/schedule",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "overview-signal-5:Показать путь",
+      "origin": "/projects/project-vektor-portal/overview",
+      "expectedHref": "/projects/project-vektor-portal/schedule",
+      "actualHref": "/projects/project-vektor-portal/schedule",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "overview-all-commits",
+      "origin": "/projects/project-vektor-portal/overview",
+      "expectedHref": "/projects/project-vektor-portal/commits",
+      "actualHref": "/projects/project-vektor-portal/commits",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "baseline-open-schedule",
+      "origin": "/projects/project-vektor-portal/baseline",
+      "expectedHref": "/projects/project-vektor-portal/schedule",
+      "actualHref": "/projects/project-vektor-portal/schedule",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "calendars-conflict-open-schedule",
+      "origin": "/projects/project-vektor-portal/calendars",
+      "expectedHref": "/projects/project-vektor-portal/schedule",
+      "actualHref": "/projects/project-vektor-portal/schedule",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "settings-open-calendars",
+      "origin": "/projects/project-vektor-portal/settings",
+      "expectedHref": "/projects/project-vektor-portal/calendars",
+      "actualHref": "/projects/project-vektor-portal/calendars",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "overview-empty-planning-history",
+      "origin": "/projects/project-gorset-migration/overview",
+      "expectedHref": "/projects/project-gorset-migration/overview",
+      "actualHref": "/projects/project-gorset-migration/overview",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-gorset-migration/overview",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-gorset-migration/overview",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "overview-forbidden-planning-history",
+      "origin": "/projects/project-vektor-portal/overview",
+      "expectedHref": "/projects/project-vektor-portal/overview",
+      "actualHref": "/projects/project-vektor-portal/overview",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "restoredUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
       "status": "PASS",
       "error": ""
     }
@@ -103,12 +244,15 @@
     "to": "project-gorset-migration",
     "reloadPersisted": true,
     "backRestored": true,
-    "status": "PASS"
+    "status": "PASS",
+    "error": ""
   },
   "summary": {
-    "total": 10,
-    "pass": 10,
-    "fail": 0
+    "total": 23,
+    "pass": 23,
+    "fail": 0,
+    "inconclusive": 0
   },
-  "failures": []
+  "failures": [],
+  "inconclusive": []
 }

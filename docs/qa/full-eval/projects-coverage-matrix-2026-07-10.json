@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-10T03:47:54.289Z",
+  "generatedAt": "2026-07-10T04:47:08.267Z",
   "source": "docs/qa/full-eval/inventory/projects.md",
   "evidenceRule": "Only rows linked to fresh 2026-07-10 artifacts may be pass; historical checks remain historical_evidence_only.",
   "schema": "role x scenario x surface x expectedBehavior x evidence x status",
@@ -12,7 +12,7 @@
     },
     {
       "status": "fail",
-      "count": 71
+      "count": 56
     },
     {
       "status": "historical_evidence_only",
@@ -24,7 +24,7 @@
     },
     {
       "status": "pass",
-      "count": 55
+      "count": 70
     },
     {
       "status": "unverified",
@@ -146,11 +146,11 @@
       "scenario": "Таб-бар поверхностей («Обзор» … «Настройки», DELIVERY_TABS)",
       "surface": "`/projects/[id]/*`",
       "apiOrDataSurface": "—",
-      "expectedBehavior": "**Фейковый контрол (критично)**: табы — `<span>` с title «Демо-прототип: переключение поверхностей появится», навигации между `/overview`,`/schedule`… НЕТ, хотя все роуты существуют. Должны быть `<Link>`",
-      "dataStateAndEdges": "прямой URL работает, клик по табу — нет; aria-current без роли link; переход с несохранённым пакетом правок (schedule)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-07"
+      "expectedBehavior": "Все 9 delivery tabs — нативные project-specific ссылки с единственным aria-current; staged Schedule batch требует явного подтверждения ухода",
+      "dataStateAndEdges": "clean navigation без prompt; Cancel сохраняет staged state; Leave сбрасывает optimistic batch без API write; reload/close защищён beforeunload",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live 9/9 tabs A/PR/RR + staged Cancel/Leave/no-write; beforeunload unit"
     },
     {
       "role": "PR",
@@ -158,11 +158,11 @@
       "scenario": "Таб-бар поверхностей («Обзор» … «Настройки», DELIVERY_TABS)",
       "surface": "`/projects/[id]/*`",
       "apiOrDataSurface": "—",
-      "expectedBehavior": "**Фейковый контрол (критично)**: табы — `<span>` с title «Демо-прототип: переключение поверхностей появится», навигации между `/overview`,`/schedule`… НЕТ, хотя все роуты существуют. Должны быть `<Link>`",
-      "dataStateAndEdges": "прямой URL работает, клик по табу — нет; aria-current без роли link; переход с несохранённым пакетом правок (schedule)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-07"
+      "expectedBehavior": "Все 9 delivery tabs — нативные project-specific ссылки с единственным aria-current; staged Schedule batch требует явного подтверждения ухода",
+      "dataStateAndEdges": "clean navigation без prompt; Cancel сохраняет staged state; Leave сбрасывает optimistic batch без API write; reload/close защищён beforeunload",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live 9/9 tabs A/PR/RR + staged Cancel/Leave/no-write; beforeunload unit"
     },
     {
       "role": "RR",
@@ -170,11 +170,11 @@
       "scenario": "Таб-бар поверхностей («Обзор» … «Настройки», DELIVERY_TABS)",
       "surface": "`/projects/[id]/*`",
       "apiOrDataSurface": "—",
-      "expectedBehavior": "**Фейковый контрол (критично)**: табы — `<span>` с title «Демо-прототип: переключение поверхностей появится», навигации между `/overview`,`/schedule`… НЕТ, хотя все роуты существуют. Должны быть `<Link>`",
-      "dataStateAndEdges": "прямой URL работает, клик по табу — нет; aria-current без роли link; переход с несохранённым пакетом правок (schedule)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-07"
+      "expectedBehavior": "Все 9 delivery tabs — нативные project-specific ссылки с единственным aria-current; staged Schedule batch требует явного подтверждения ухода",
+      "dataStateAndEdges": "clean navigation без prompt; Cancel сохраняет staged state; Leave сбрасывает optimistic batch без API write; reload/close защищён beforeunload",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live 9/9 tabs A/PR/RR + staged Cancel/Leave/no-write; beforeunload unit"
     },
     {
       "role": "A",
@@ -362,11 +362,11 @@
       "scenario": "Переход в карточку проекта по строке",
       "surface": "`/projects`",
       "apiOrDataSurface": "—",
-      "expectedBehavior": "**Фейковый контрол (критично)**: `<tr cursor-default>` c title «Демо-прототип», хотя роут `/projects/[id]` существует. Строка должна быть ссылкой",
-      "dataStateAndEdges": "двойной клик/средняя кнопка ничего не делают; недостижимость `/projects/[id]` из UI",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-06"
+      "expectedBehavior": "Название каждого доступного проекта — нативная ссылка на /projects/[id] с keyboard и browser link affordances",
+      "dataStateAndEdges": "click/final URL/back; loading/error/empty не содержат ложных detail links",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ native detail links + live click/final URL/back"
     },
     {
       "role": "PR",
@@ -374,11 +374,11 @@
       "scenario": "Переход в карточку проекта по строке",
       "surface": "`/projects`",
       "apiOrDataSurface": "—",
-      "expectedBehavior": "**Фейковый контрол (критично)**: `<tr cursor-default>` c title «Демо-прототип», хотя роут `/projects/[id]` существует. Строка должна быть ссылкой",
-      "dataStateAndEdges": "двойной клик/средняя кнопка ничего не делают; недостижимость `/projects/[id]` из UI",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-06"
+      "expectedBehavior": "Название каждого доступного проекта — нативная ссылка на /projects/[id] с keyboard и browser link affordances",
+      "dataStateAndEdges": "click/final URL/back; loading/error/empty не содержат ложных detail links",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ native detail links + live click/final URL/back"
     },
     {
       "role": "A",
@@ -698,11 +698,11 @@
       "scenario": "Кнопки действий сигналов («Открыть График», «Открыть Сценарии», «Открыть Baseline», «Показать путь»)",
       "surface": "`/overview`",
       "apiOrDataSurface": "—",
-      "expectedBehavior": "**Фейковый контрол**: `demoAction` (disabled) на прод-роуте, хотя целевые роуты существуют — должны быть ссылками",
-      "dataStateAndEdges": "disabled-кнопка с accent-стилем выглядит рабочей",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-09"
+      "expectedBehavior": "Каждый видимый planning signal ведёт в project-specific Schedule, Scenarios или Baseline",
+      "dataStateAndEdges": "проверены все 5 live signal CTA, точные href, final URL и browser back",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live 5/5 signal CTA navigation"
     },
     {
       "role": "PR",
@@ -710,11 +710,11 @@
       "scenario": "Кнопки действий сигналов («Открыть График», «Открыть Сценарии», «Открыть Baseline», «Показать путь»)",
       "surface": "`/overview`",
       "apiOrDataSurface": "—",
-      "expectedBehavior": "**Фейковый контрол**: `demoAction` (disabled) на прод-роуте, хотя целевые роуты существуют — должны быть ссылками",
-      "dataStateAndEdges": "disabled-кнопка с accent-стилем выглядит рабочей",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-09"
+      "expectedBehavior": "Каждый видимый planning signal ведёт в project-specific Schedule, Scenarios или Baseline",
+      "dataStateAndEdges": "проверены все 5 live signal CTA, точные href, final URL и browser back",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live 5/5 signal CTA navigation"
     },
     {
       "role": "A",
@@ -770,11 +770,11 @@
       "scenario": "«Последние коммиты» (4 шт) + кнопка «Все»",
       "surface": "`/overview`",
       "apiOrDataSurface": "GET `/api/tenant/current/audit-events?projectId`",
-      "expectedBehavior": "Реальные planning-события (vN, summary, auditEventId); «Все» — **demoAction-фейк**, хотя роут `/commits` есть",
-      "dataStateAndEdges": "история пуста; события не-planning отфильтрованы; PR: право на audit-events?",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-09 («Все» — фейк; PR: 403 маскируется под «История пуста» — BUG-PROJ-15)"
+      "expectedBehavior": "Planning commits загружаются из audit-events; Все ведёт в Commits; loading, true empty, forbidden и error различимы",
+      "dataStateAndEdges": "ADMIN true empty подтверждён API+UI; PR audit-events 403 показывает явный forbidden state, не пустую историю",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live All→Commits + true empty + PR 403 distinct from empty"
     },
     {
       "role": "PR",
@@ -782,11 +782,11 @@
       "scenario": "«Последние коммиты» (4 шт) + кнопка «Все»",
       "surface": "`/overview`",
       "apiOrDataSurface": "GET `/api/tenant/current/audit-events?projectId`",
-      "expectedBehavior": "Реальные planning-события (vN, summary, auditEventId); «Все» — **demoAction-фейк**, хотя роут `/commits` есть",
-      "dataStateAndEdges": "история пуста; события не-planning отфильтрованы; PR: право на audit-events?",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-09 («Все» — фейк; PR: 403 маскируется под «История пуста» — BUG-PROJ-15)"
+      "expectedBehavior": "Planning commits загружаются из audit-events; Все ведёт в Commits; loading, true empty, forbidden и error различимы",
+      "dataStateAndEdges": "ADMIN true empty подтверждён API+UI; PR audit-events 403 показывает явный forbidden state, не пустую историю",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live All→Commits + true empty + PR 403 distinct from empty"
     },
     {
       "role": "A",
@@ -1838,11 +1838,11 @@
       "scenario": "Кнопка «Overlay в График»",
       "surface": "`/baseline`",
       "apiOrDataSurface": "—",
-      "expectedBehavior": "**Фейковый контрол** (`cursor-default` + demo-title); при этом baseline-подложка на Графике уже реально рисуется",
-      "dataStateAndEdges": "—",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-09 (фейк demoAction, title «Демо-прототип: наложение…»)"
+      "expectedBehavior": "Baseline CTA — нативная project-specific ссылка на Schedule, где отображается baseline overlay",
+      "dataStateAndEdges": "A/PR focused contract + live click/final URL/back",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live Baseline→Schedule navigation"
     },
     {
       "role": "PR",
@@ -1850,11 +1850,11 @@
       "scenario": "Кнопка «Overlay в График»",
       "surface": "`/baseline`",
       "apiOrDataSurface": "—",
-      "expectedBehavior": "**Фейковый контрол** (`cursor-default` + demo-title); при этом baseline-подложка на Графике уже реально рисуется",
-      "dataStateAndEdges": "—",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-09 (фейк demoAction, title «Демо-прототип: наложение…»)"
+      "expectedBehavior": "Baseline CTA — нативная project-specific ссылка на Schedule, где отображается baseline overlay",
+      "dataStateAndEdges": "A/PR focused contract + live click/final URL/back",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live Baseline→Schedule navigation"
     },
     {
       "role": "A",
@@ -2006,11 +2006,11 @@
       "scenario": "Плашка «Конфликт с расписанием» + кнопка «Открыть График»",
       "surface": "`/calendars`",
       "apiOrDataSurface": "—",
-      "expectedBehavior": "Задачи, пересекающие праздник; счётчик «И ещё N»",
-      "dataStateAndEdges": "**«Открыть График» — фейк** (demo-title), роут существует",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "✅ баннер «Конфликт с расписанием» работает (задача на нерабочий день) · ❌ BUG-PROJ-09 кнопка «Открыть График» фейк (demo-title)"
+      "expectedBehavior": "При calendar conflict баннер показывает задачу/счётчик, а CTA ведёт в project-specific Schedule",
+      "dataStateAndEdges": "live exception создан на дате реальной задачи, CTA пройден, exception нейтрализован в cleanup",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live generated conflict→Schedule + cleanup; A/PR focused states"
     },
     {
       "role": "PR",
@@ -2018,11 +2018,11 @@
       "scenario": "Плашка «Конфликт с расписанием» + кнопка «Открыть График»",
       "surface": "`/calendars`",
       "apiOrDataSurface": "—",
-      "expectedBehavior": "Задачи, пересекающие праздник; счётчик «И ещё N»",
-      "dataStateAndEdges": "**«Открыть График» — фейк** (demo-title), роут существует",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "✅ баннер «Конфликт с расписанием» работает (задача на нерабочий день) · ❌ BUG-PROJ-09 кнопка «Открыть График» фейк (demo-title)"
+      "expectedBehavior": "При calendar conflict баннер показывает задачу/счётчик, а CTA ведёт в project-specific Schedule",
+      "dataStateAndEdges": "live exception создан на дате реальной задачи, CTA пройден, exception нейтрализован в cleanup",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live generated conflict→Schedule + cleanup; A/PR focused states"
     },
     {
       "role": "A",
@@ -2342,11 +2342,11 @@
       "scenario": "«Календарь по умолчанию» (read-only) + кнопка «Открыть Календарь»",
       "surface": "`/settings`",
       "apiOrDataSurface": "read-model (`project.calendarId`, `calendars`)",
-      "expectedBehavior": "Подпись из реального календаря (дни/часы); **кнопка — demoAction-фейк**, роут `/calendars` существует",
-      "dataStateAndEdges": "calendarId не найден в списке → показ raw id / «— (не задан)»",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "✅ данные («Производственный · Пн–Пт 8 ч») · ❌ BUG-PROJ-09 (кнопка «Открыть Календарь» disabled/demo-title, не новый баг — тот же класс)"
+      "expectedBehavior": "Read-only календарь показывает real/missing/none label; CTA ведёт в project-specific Calendars",
+      "dataStateAndEdges": "live click/final URL/back; focused real calendar, raw id и no-calendar states",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live Settings→Calendars + calendar label edge states"
     },
     {
       "role": "PR",
@@ -2354,11 +2354,11 @@
       "scenario": "«Календарь по умолчанию» (read-only) + кнопка «Открыть Календарь»",
       "surface": "`/settings`",
       "apiOrDataSurface": "read-model (`project.calendarId`, `calendars`)",
-      "expectedBehavior": "Подпись из реального календаря (дни/часы); **кнопка — demoAction-фейк**, роут `/calendars` существует",
-      "dataStateAndEdges": "calendarId не найден в списке → показ raw id / «— (не задан)»",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "✅ данные («Производственный · Пн–Пт 8 ч») · ❌ BUG-PROJ-09 (кнопка «Открыть Календарь» disabled/demo-title, не новый баг — тот же класс)"
+      "expectedBehavior": "Read-only календарь показывает real/missing/none label; CTA ведёт в project-specific Calendars",
+      "dataStateAndEdges": "live click/final URL/back; focused real calendar, raw id и no-calendar states",
+      "evidence": ".superloopy/evidence/projects-2026-07-10/navigation-fix.json; .superloopy/evidence/projects-2026-07-10/projects-navigation.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
+      "status": "pass",
+      "inventoryStatus": "✅ live Settings→Calendars + calendar label edge states"
     },
     {
       "role": "A",

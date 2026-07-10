@@ -32,6 +32,7 @@ import { buildMilestoneCommands } from "@/delivery/schedule/schedule-milestone";
 const HPD = 8; // часов в рабочем дне
 const genId = createClientId;
 const PLAN_MANAGE_PERMISSION = "tenant.project_plan.manage";
+const SCHEDULE_NAVIGATION_GUARD_STATE_KEY = "__kissPmScheduleNavigationGuard";
 
 export function canManageScheduleControls({ live, permissions }: { live: boolean; permissions: readonly string[] }): boolean {
   return !live || hasPermission(permissions, PLAN_MANAGE_PERMISSION);
@@ -226,6 +227,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const lastCommitRef = useRef<{ commands: PlanningCommand[]; before: PlanningReadModel; afterVersion: number } | null>(null);
   const batchBaseRef = useRef<PlanningReadModel | null>(null);
   const operationRef = useRef(false);
+  const navigationGuardRestoringRef = useRef(false);
+  const navigationGuardBypassAnchorRef = useRef<HTMLAnchorElement | null>(null);
   const lastAppliedPasteRef = useRef<string | null>(null);
   const quickCreateRef = useRef<HTMLInputElement | null>(null);
   const rowElementsRef = useRef<Map<string, HTMLTableRowElement>>(new Map()).current;
@@ -244,6 +247,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const dayWRef = useRef(dayW);
   dayWRef.current = dayW;
   const timelineOriginDayRef = useRef(0);
+
   function toTimelineX(day: number): number {
     return (day - timelineOriginDayRef.current) * dayWRef.current;
   }
@@ -359,6 +363,20 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     setBusy(false);
   }
 
+  function consumeNavigationSentinel(afterConsume?: () => void) {
+    const state = window.history.state;
+    if (!state || typeof state !== "object" || state[SCHEDULE_NAVIGATION_GUARD_STATE_KEY] !== `schedule:${projectId}`) {
+      afterConsume?.();
+      return;
+    }
+    navigationGuardRestoringRef.current = true;
+    window.addEventListener("popstate", () => {
+      navigationGuardRestoringRef.current = false;
+      afterConsume?.();
+    }, { once: true });
+    window.history.back();
+  }
+
   async function applyStaged() {
     if (!canManagePlan) return;
     if (staged.length === 0) return;
@@ -367,7 +385,9 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     const base = batchBaseRef.current;
     let res: ApplyResult;
     try { res = await applyBatch(cmds); } finally { endOperation(); }
+    consumeNavigationSentinel();
     setStaged([]);
+    batchBaseRef.current = null;
     if (res.ok) {
       lastCommitRef.current = base ? { commands: cmds, before: base, afterVersion: res.planVersion } : null;
       setCanUndo(base != null && buildCompensatingCommandBatch(cmds, base).length > 0);
@@ -385,12 +405,84 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       await reload();
     }
   }
-  function discardStaged() {
+  function resetStagedReadModel() {
+    const base = batchBaseRef.current;
+    batchBaseRef.current = null;
     setStaged([]);
     setErrors(new Map());
+    if (base) setReadModel(base);
+  }
+  function discardStaged() {
+    consumeNavigationSentinel();
+    resetStagedReadModel();
     toast.success("Пакет сброшен");
     void reload();
   }
+  useEffect(() => {
+    if (staged.length === 0) return;
+
+    const guardId = `schedule:${projectId}`;
+    const currentState = window.history.state;
+    if (!currentState || typeof currentState !== "object" || currentState[SCHEDULE_NAVIGATION_GUARD_STATE_KEY] !== guardId) {
+      const nextState = currentState && typeof currentState === "object"
+        ? { ...currentState, [SCHEDULE_NAVIGATION_GUARD_STATE_KEY]: guardId }
+        : { [SCHEDULE_NAVIGATION_GUARD_STATE_KEY]: guardId };
+      window.history.pushState(nextState, "", window.location.href);
+    }
+
+    const confirmDiscard = () => {
+      if (!window.confirm("Есть неприменённые изменения графика. Покинуть страницу и сбросить пакет?")) return false;
+      resetStagedReadModel();
+      return true;
+    };
+    const preventUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const guardAnchorNavigation = (event: globalThis.MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const target = event.target;
+      const anchor = target instanceof Element ? target.closest<HTMLAnchorElement>("a[href]") : null;
+      if (!anchor || (anchor.target && anchor.target !== "_self")) return;
+      if (navigationGuardBypassAnchorRef.current === anchor) {
+        navigationGuardBypassAnchorRef.current = null;
+        return;
+      }
+      const nextUrl = new URL(anchor.href, window.location.href);
+      if (nextUrl.origin !== window.location.origin || nextUrl.href === window.location.href) return;
+      if (!confirmDiscard()) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      navigationGuardBypassAnchorRef.current = anchor;
+      consumeNavigationSentinel(() => anchor.click());
+    };
+    const guardHistoryTraversal = () => {
+      if (navigationGuardRestoringRef.current) {
+        navigationGuardRestoringRef.current = false;
+        return;
+      }
+      if (!confirmDiscard()) {
+        navigationGuardRestoringRef.current = true;
+        window.history.go(1);
+        return;
+      }
+      navigationGuardRestoringRef.current = true;
+      window.setTimeout(() => window.history.back(), 0);
+    };
+
+    document.addEventListener("click", guardAnchorNavigation, true);
+    window.addEventListener("beforeunload", preventUnload);
+    window.addEventListener("popstate", guardHistoryTraversal);
+    return () => {
+      document.removeEventListener("click", guardAnchorNavigation, true);
+      window.removeEventListener("beforeunload", preventUnload);
+      window.removeEventListener("popstate", guardHistoryTraversal);
+    };
+  }, [projectId, staged.length]);
   async function undo() {
     if (!canManagePlan) return;
     const lc = lastCommitRef.current;
