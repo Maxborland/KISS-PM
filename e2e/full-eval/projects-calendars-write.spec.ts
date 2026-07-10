@@ -24,22 +24,36 @@ type CalendarException = {
 };
 
 type ReadModel = {
-  project: { calendarId: string | null };
+  project: {
+    calendarId: string | null;
+    plannedStart: string | null;
+    plannedFinish: string | null;
+  };
   calendars: Array<{
     id: string;
+    workingWeekdays: number[];
     workingMinutesPerDay: number;
   }>;
   calendarExceptions: CalendarException[];
   planVersion: number;
 };
 
+type CalendarCommand = {
+  type: "calendar.exception.upsert";
+  payload: CalendarException;
+};
+
 type CalendarCommandEnvelope = {
-  command: {
-    type: "calendar.exception.upsert";
-    payload: CalendarException;
-  };
+  command: CalendarCommand;
   clientPlanVersion: number;
 };
+
+type CalendarCommandBatchEnvelope = {
+  commands: CalendarCommand[];
+  clientPlanVersion: number;
+};
+
+type WorkspaceUser = { id: string; name: string };
 
 test.describe("Projects calendars write flows", () => {
   test("ADMIN creates and removes a project calendar exception with API readback and reload", async ({
@@ -146,6 +160,127 @@ test.describe("Projects calendars write flows", () => {
     }
   });
 
+  test("ADMIN creates and removes a resource absence through the Calendars exception dialog", async ({ page }) => {
+    test.setTimeout(90_000);
+    const projectId = await loginAndGetProject(page, ADMIN);
+    const before = await getReadModel(page, projectId);
+    const absenceDate = chooseUnusedWorkingDate(before);
+    const users = await getWorkspaceUsers(page);
+    const resource = users.find((candidate) =>
+      users.filter((item) => item.name === candidate.name).length === 1
+    ) ?? users[0]!;
+    let created: CalendarException | undefined;
+
+    try {
+      await openProjectCalendar(page, projectId);
+      await selectCalendarResource(page, resource);
+      const dialog = await openCalendarAbsenceDialog(page);
+      const resourceSelect = dialog.getByRole("combobox", { name: "Сотрудник", exact: true });
+      await expect(resourceSelect).toHaveValue(resource.id);
+      expect(await resourceSelect.locator("option").evaluateAll((options) =>
+        options.map((option) => (option as HTMLOptionElement).value)
+      )).toEqual(users.map((user) => user.id));
+      await fillOneDayAbsence(dialog, absenceDate);
+
+      const createPreviewPromise = waitForPlanningResponse(
+        page,
+        projectId,
+        "preview-command-batch"
+      );
+      await dialog
+        .getByRole("button", { name: "Добавить отсутствие", exact: true })
+        .click();
+      const createPreviewResponse = await createPreviewPromise;
+      expect(createPreviewResponse.status()).toBe(200);
+
+      const createPreviewEnvelope =
+        createPreviewResponse.request().postDataJSON() as CalendarCommandBatchEnvelope;
+      expect(createPreviewEnvelope.commands).toHaveLength(1);
+
+      const createResponsePromise = waitForPlanningResponse(
+        page,
+        projectId,
+        "apply-command-batch"
+      );
+      await confirmPlanningPreview(page);
+      const createResponse = await createResponsePromise;
+      expect(createResponse.status()).toBe(200);
+
+      const createEnvelope =
+        createResponse.request().postDataJSON() as CalendarCommandBatchEnvelope;
+      expect(createEnvelope).toEqual(createPreviewEnvelope);
+      created = createEnvelope.commands[0]!.payload;
+      expect(created).toMatchObject({
+        resourceId: resource.id,
+        date: absenceDate,
+        workingMinutes: 0,
+        reason: "Отпуск"
+      });
+
+      const createdModel = await getReadModel(page, projectId);
+      expect(findActiveException(createdModel, created.id)).toEqual(created);
+      expect(createdModel.planVersion).toBeGreaterThan(createEnvelope.clientPlanVersion);
+      await expect(exceptionRow(page, created.date)).toContainText("Отпуск");
+
+      await page.reload();
+      await waitForCalendar(page);
+      await selectCalendarResource(page, resource);
+      await expect(exceptionRow(page, created.date)).toContainText("Отпуск");
+      expect(findActiveException(await getReadModel(page, projectId), created.id)).toEqual(created);
+
+      const removePreviewPromise = waitForPlanningResponse(
+        page,
+        projectId,
+        "preview-command"
+      );
+      await exceptionRow(page, created.date).getByTitle("Снять исключение").click();
+      const removePreviewResponse = await removePreviewPromise;
+      expect(removePreviewResponse.status()).toBe(200);
+      const removePreviewEnvelope =
+        removePreviewResponse.request().postDataJSON() as CalendarCommandEnvelope;
+
+      const removeResponsePromise = waitForPlanningResponse(
+        page,
+        projectId,
+        "apply-command"
+      );
+      await confirmPlanningPreview(page);
+      const removeResponse = await removeResponsePromise;
+      expect(removeResponse.status()).toBe(200);
+      const removeEnvelope =
+        removeResponse.request().postDataJSON() as CalendarCommandEnvelope;
+      expect(removeEnvelope).toEqual(removePreviewEnvelope);
+      expect(removeEnvelope.command).toMatchObject({
+        type: "calendar.exception.upsert",
+        payload: {
+          id: created.id,
+          calendarId: created.calendarId,
+          resourceId: resource.id,
+          date: created.date,
+          reason: ""
+        }
+      });
+
+      const removedModel = await getReadModel(page, projectId);
+      const calendar = removedModel.calendars.find((item) => item.id === created!.calendarId);
+      expect(calendar).toBeTruthy();
+      expect(findException(removedModel, created.id)?.workingMinutes).toBe(
+        calendar!.workingMinutesPerDay
+      );
+      expect(findActiveException(removedModel, created.id)).toBeUndefined();
+      expect(removedModel.planVersion).toBeGreaterThan(removeEnvelope.clientPlanVersion);
+
+      await page.reload();
+      await waitForCalendar(page);
+      await selectCalendarResource(page, resource);
+      await expect(exceptionDate(page, created.date)).toHaveCount(0);
+    } finally {
+      if (created) {
+        await cleanupCalendarException(page, projectId, created);
+      }
+    }
+  });
+
   test("PLAN reader sees a read-only calendar and direct preview is denied", async ({ page }) => {
     test.setTimeout(90_000);
     const projectId = await loginAndGetProject(page, PLAN_READER);
@@ -238,6 +373,83 @@ async function waitForCalendar(page: Page) {
     page.getByRole("heading", { name: "Календари проекта и ресурсов" })
   ).toBeVisible();
   await expect(page.getByText("Календарь проекта · базовый", { exact: true })).toBeVisible();
+}
+
+async function getWorkspaceUsers(page: Page): Promise<WorkspaceUser[]> {
+  const response = await page.request.get("/api/workspace/users");
+  expect(response.status()).toBe(200);
+  const body = (await response.json()) as { users: WorkspaceUser[] };
+  expect(body.users.length).toBeGreaterThan(0);
+  return body.users;
+}
+
+async function selectCalendarResource(page: Page, resource: WorkspaceUser) {
+  const resourceButton = page
+    .getByRole("button")
+    .filter({ has: page.getByText(resource.name, { exact: true }) });
+  await expect(resourceButton).toHaveCount(1);
+  await expect(resourceButton).toBeVisible();
+  await resourceButton.click();
+  await expect(
+    page.getByText(`${resource.name} · наследует календарь проекта`, { exact: true })
+  ).toBeVisible();
+}
+
+async function openCalendarAbsenceDialog(page: Page) {
+  await page.getByRole("button", { name: "Исключение", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Отсутствие сотрудника" });
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("combobox", { name: "Сотрудник", exact: true }).locator("option")
+  ).not.toHaveCount(0);
+  return dialog;
+}
+
+async function fillOneDayAbsence(
+  dialog: ReturnType<Page["getByRole"]>,
+  absenceDate: string
+) {
+  await dialog.getByRole("button", { name: "Отпуск", exact: true }).click();
+  await dialog.getByLabel("С", { exact: true }).fill(absenceDate);
+  await dialog.getByLabel("По", { exact: true }).fill(absenceDate);
+}
+
+function chooseUnusedWorkingDate(readModel: ReadModel) {
+  const calendar =
+    readModel.calendars.find((item) => item.id === readModel.project.calendarId) ??
+    readModel.calendars[0];
+  if (!calendar) throw new Error("calendar_absence_test_calendar_missing");
+
+  const start = parseIsoDate(readModel.project.plannedStart) ?? startOfUtcDay(new Date());
+  const plannedFinish = parseIsoDate(readModel.project.plannedFinish);
+  const finish = plannedFinish && plannedFinish >= start
+    ? plannedFinish
+    : shiftUtcDate(start, 370);
+  const occupiedDates = new Set(readModel.calendarExceptions.map((item) => item.date));
+
+  for (let date = start; date <= finish; date = shiftUtcDate(date, 1)) {
+    const isoDate = date.toISOString().slice(0, 10);
+    if (calendar.workingWeekdays.includes(date.getUTCDay()) && !occupiedDates.has(isoDate)) {
+      return isoDate;
+    }
+  }
+  throw new Error("calendar_absence_test_unused_working_date_missing");
+}
+
+function parseIsoDate(value: string | null) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function startOfUtcDay(value: Date) {
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+}
+
+function shiftUtcDate(value: Date, days: number) {
+  const result = new Date(value);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
 }
 
 function firstAvailableWorkingDay(page: Page) {

@@ -69,15 +69,41 @@ const ABSENCE_TYPES = [
   { id: "sick", label: "Больничный" },
   { id: "dayoff", label: "Отгул" }
 ];
-export function AbsenceDialog({ onSubmit, resources = RESOURCES, children }: { onSubmit: (resourceId: string, type: string, start: string, finish: string) => void; resources?: Resource[]; children: ReactNode }) {
+type AbsenceDialogProps = {
+  onSubmit: (resourceId: string, type: string, start: string, finish: string) => void;
+  resources?: Resource[];
+  initialResourceId?: string;
+  initialStart?: string;
+  initialFinish?: string;
+  children: ReactNode;
+};
+
+export function AbsenceDialog({
+  onSubmit,
+  resources = RESOURCES,
+  initialResourceId,
+  initialStart,
+  initialFinish,
+  children
+}: AbsenceDialogProps) {
+  const initialResource = () => resources.some((resource) => resource.id === initialResourceId)
+    ? initialResourceId!
+    : resources[0]?.id ?? "";
   const [open, setOpen] = useState(false);
-  const [resourceId, setResourceId] = useState(resources[0]?.id ?? "");
+  const [resourceId, setResourceId] = useState(initialResource);
   const [type, setType] = useState("vacation");
-  const [start, setStart] = useState(isoToday());
-  const [finish, setFinish] = useState(isoToday(4));
+  const [start, setStart] = useState(initialStart ?? isoToday());
+  const [finish, setFinish] = useState(initialFinish ?? isoToday(4));
   const submit = () => { if (resourceId && start && finish && finish >= start) { onSubmit(resourceId, ABSENCE_TYPES.find((t) => t.id === type)?.label ?? "Отсутствие", start, finish); setOpen(false); } };
+  const onOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) return;
+    setResourceId(initialResource());
+    setStart(initialStart ?? isoToday());
+    setFinish(initialFinish ?? isoToday(4));
+  };
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => { setOpen(o); if (o && !resourceId) setResourceId(resources[0]?.id ?? ""); }}>
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Trigger asChild>{children}</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className={OVERLAY} />
@@ -98,7 +124,7 @@ export function AbsenceDialog({ onSubmit, resources = RESOURCES, children }: { o
               <label className="flex flex-col gap-1"><span className={LABEL}>С</span><input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={FIELD} /></label>
               <label className="flex flex-col gap-1"><span className={LABEL}>По</span><input type="date" value={finish} onChange={(e) => setFinish(e.target.value)} className={FIELD} /></label>
             </div>
-            <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Применится одним пакетом (исключения календаря по рабочим дням диапазона).</p>
+            <Dialog.Description className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Применится одним пакетом (исключения календаря по рабочим дням диапазона).</Dialog.Description>
           </div>
           <div className="mt-4 flex items-center justify-end gap-2">
             <Dialog.Close className="rounded-[var(--radius-sm)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)]">Отмена</Dialog.Close>

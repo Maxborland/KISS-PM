@@ -1,0 +1,57 @@
+{
+  "generatedAt": "2026-07-10T01:07:09.3812425Z",
+  "status": "PASS",
+  "bug": "BUG-PROJ-20",
+  "scenarios": [
+    "PROJ-071",
+    "PROJ-092"
+  ],
+  "browser": {
+    "surface": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
+    "selectedResourceId": "user-alpha-engineer",
+    "selectedResourceName": "Игорь Инженер",
+    "optionResourceIds": [
+      "user-alpha-admin",
+      "user-alpha-engineer",
+      "user-alpha-plan-reader-no-resources",
+      "user-alpha-resource-reader"
+    ],
+    "initialDates": [
+      "2026-06-01",
+      "2026-06-05"
+    ],
+    "screenshot": ".superloopy/evidence/projects-2026-07-10/calendar-live-resource-dialog.png"
+  },
+  "focusedVitest": {
+    "files": 3,
+    "tests": 5,
+    "passed": 5
+  },
+  "livePlaywright": {
+    "file": "e2e/full-eval/projects-calendars-write.spec.ts",
+    "tests": 3,
+    "passed": 3,
+    "flows": [
+      "project holiday create/remove",
+      "resource absence create/readback/reload/remove/cleanup",
+      "reader UI read-only + direct preview 403"
+    ],
+    "artifact": ".superloopy/evidence/projects-2026-07-10/calendar-live-resource-playwright.json",
+    "orchestratorRerun": "3 passed, 0 skipped, 0 unexpected, 0 flaky, 10.7s"
+  },
+  "edge": {
+    "fullyNonWorkingRange": "explicit error toast",
+    "previewRequests": 0,
+    "applyRequests": 0,
+    "mixedRange": "2026-07-10..14 produces only July 10 and July 14; weekend July 11..12 and project holiday July 13 are skipped"
+  },
+  "caveats": [
+    "The first orchestrator rerun was infrastructure-blocked by a transient concurrent schedule compile error. After recovery, the complete Calendar suite passed 3/3. Full web typecheck is currently red only in schedule-rows.test.ts because the separate persistence block added BaselineComparison.label; no Calendar-owned error was reported."
+  ],
+  "independentReview": ".superloopy/evidence/projects-2026-07-10/qa-calendar-live-resource-independent.md",
+  "raceIdempotency": {
+    "evidence": ".superloopy/evidence/projects-2026-07-10/lane-03-race-idempotency.md",
+    "coverage": "generic planning apply-command-batch boundary used by calendar absence",
+    "status": "PASS when keyed; stale shared version serializes to one success and one 409 without key"
+  }
+}

@@ -35,6 +35,24 @@ const nid = createClientId;
 const PLAN_MANAGE_PERMISSION = "tenant.project_plan.manage";
 const RESOURCE_MANAGE_PERMISSION = "tenant.project_resources.manage";
 
+function absenceRangeForMonth(monthKey: string, projectStart?: string | null, projectFinish?: string | null) {
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+    const fallback = currentPlanDate();
+    return { start: fallback, finish: fallback };
+  }
+  const [year, month] = monthKey.split("-").map(Number);
+  const monthStart = `${monthKey}-01`;
+  const monthFinish = new Date(Date.UTC(year!, month!, 0)).toISOString().slice(0, 10);
+  const start = projectStart && projectStart >= monthStart && projectStart <= monthFinish
+    ? projectStart
+    : monthStart;
+  const fiveDayFinish = dayToIso(Math.min(isoToDay(start) + 4, isoToDay(monthFinish)));
+  const finish = projectFinish && projectFinish >= start && projectFinish < fiveDayFinish
+    ? projectFinish
+    : fiveDayFinish;
+  return { start, finish };
+}
+
 export function canManageCalendarControls({ live, permissions, scope = "project" }: { live: boolean; permissions: readonly string[]; scope?: "project" | "resource" }): boolean {
   return !live || hasPermission(permissions, scope === "resource" ? RESOURCE_MANAGE_PERMISSION : PLAN_MANAGE_PERMISSION);
 }
@@ -133,6 +151,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const workdayHours = (model.full / 60).toLocaleString("ru-RU", { maximumFractionDigits: 1 });
   const focusMonth = model.monthsList[Math.max(0, Math.min(monthOffset, model.monthsList.length - 1))] ?? "";
   const monthLabel = focusMonth ? `${MONTHS_CAP[Number(focusMonth.slice(5, 7)) - 1]} ${focusMonth.slice(0, 4)}` : "";
+  const absenceRange = absenceRangeForMonth(focusMonth, readModel.project.plannedStart, readModel.project.plannedFinish);
   const isResourceView = selCal !== "project";
   const selRes = isResourceView ? resDir.of(selCal) : null;
   const absMap = isResourceView ? model.absByResDay.get(selCal) ?? new Map<number, PlanCalendarException>() : new Map<number, PlanCalendarException>();
@@ -185,7 +204,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       if (!model.cal.workingWeekdays.includes(utcDayOfWeek(d)) || model.holidayByDay.has(d)) continue;
       cmds.push(createPlanningCommand({ type: "calendar.exception.upsert", payload: { id: nid("ex"), calendarId: model.cal.id, resourceId, date: dayToIso(d), workingMinutes: 0, reason: typeLabel } }));
     }
-    if (cmds.length === 0) return;
+    if (cmds.length === 0) { toast.error("В выбранном диапазоне нет рабочих дней"); return; }
     setBusy(true);
     const res = await applyBatch(cmds);
     setBusy(false);
@@ -208,7 +227,13 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
         </div>
         <div className="ml-auto">
           {(isResourceView ? canManageResources : canManagePlan) ? (isResourceView && selRes ? (
-            <AbsenceDialog onSubmit={doAbsence}><Button variant="default" size="sm" disabled={busy}><UserPlus className="size-3.5" aria-hidden />Исключение</Button></AbsenceDialog>
+            <AbsenceDialog
+              onSubmit={doAbsence}
+              resources={resDir.list}
+              initialResourceId={selCal}
+              initialStart={absenceRange.start}
+              initialFinish={absenceRange.finish}
+            ><Button variant="default" size="sm" disabled={busy}><UserPlus className="size-3.5" aria-hidden />Исключение</Button></AbsenceDialog>
           ) : <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Клик по дню сетки — добавить/снять праздник</span>) : null}
         </div>
       </div>
