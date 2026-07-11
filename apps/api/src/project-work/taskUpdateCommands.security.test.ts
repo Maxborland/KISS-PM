@@ -532,7 +532,7 @@ describe("updateTask status boundary", () => {
     );
   });
 
-  it("synchronizes hidden project assignments without reusing their ids", async () => {
+  it("preserves hidden assignments while reserving their ids", async () => {
     const task = createTask();
     const hiddenAssignmentId = planningAssignmentId(
       task.id,
@@ -580,7 +580,7 @@ describe("updateTask status boundary", () => {
         })
       })
     );
-    expect(harness.appliedCommands).toContainEqual({
+    expect(harness.appliedCommands).not.toContainEqual({
       type: "assignment.delete",
       payload: { assignmentId: hiddenAssignmentId }
     });

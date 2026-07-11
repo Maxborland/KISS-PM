@@ -121,7 +121,7 @@ export function buildUpdateTaskPlanningCommands(input: {
     workModelChanged ||
     !planningParticipantsSemanticallyEqual(input.task.participants, input.participants)
   ) {
-    const currentAssignments = input.projectAssignments.filter(
+    const currentAssignments = input.snapshot.assignments.filter(
       (assignment) => assignment.taskId === input.task.id
     );
     const assignmentWorkModel = workModelChanged
