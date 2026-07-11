@@ -162,6 +162,15 @@ describe("planning parsers", () => {
         idempotencyKey: "revert-safe "
       })
     ).toEqual({ ok: false, error: "planning_revert_invalid" });
+    for (const terminator of ["\n", "\r", "\u2028", "\u2029"]) {
+      expect(
+        parsePlanningCommandEnvelope({
+          command,
+          clientPlanVersion: 1,
+          idempotencyKey: `plan-command${terminator}`
+        })
+      ).toEqual({ ok: false, error: "planning_command_invalid" });
+    }
     expect(
       parsePlanningCommandEnvelope({
         command,
@@ -207,7 +216,7 @@ describe("planning parsers", () => {
     ).toEqual({ ok: false, error: "planning_scenario_invalid" });
   });
 
-  it.each(["\ud800", "\ufffd", "задача", " task-safe ", "\ttask-safe"])(
+  it.each(["\ud800", "\ufffd", "задача", " task-safe ", "\ttask-safe", "task-safe\n", "task-safe\r", "task-safe\u2028", "task-safe\u2029"])(
     "rejects non-ASCII persisted planning IDs %j before apply",
     (unsafeId) => {
       const commands = [
@@ -278,7 +287,7 @@ describe("planning parsers", () => {
       }
     }
   );
-  it.each(["\ud800", "\ufffd", "коммит-один", " commit-safe "])(
+  it.each(["\ud800", "\ufffd", "коммит-один", " commit-safe ", "commit-safe\n", "commit-safe\r", "commit-safe\u2028", "commit-safe\u2029"])(
     "rejects unsafe planning revert target ID %j",
     (targetCommitId) => {
       expect(
@@ -297,7 +306,11 @@ describe("planning parsers", () => {
     ":2026-06-10",
     "resource-alpha:2026-02-30",
     "resource-alpha:2026-13-01",
-    " resource-alpha:2026-06-10 "
+    " resource-alpha:2026-06-10 ",
+    "resource-alpha:2026-06-10\n",
+    "resource-alpha:2026-06-10\r",
+    "resource-alpha:2026-06-10\u2028",
+    "resource-alpha:2026-06-10\u2029"
   ])("rejects malformed accepted overload ID %j", (overloadId) => {
     expect(
       parsePlanningCommandEnvelope({

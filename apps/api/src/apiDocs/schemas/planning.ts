@@ -61,18 +61,20 @@ const planningResourceLoadBucketProperties = {
   calendarExceptionIds: { type: "array", items: stringIdSchema }
 };
 
+const planningPersistedIdPattern = "^[A-Za-z0-9._:-]+(?![\\s\\S])";
+
 const planningPersistedIdSchema = {
   type: "string",
   minLength: 1,
   maxLength: 500,
-  pattern: "^[A-Za-z0-9._:-]+$"
+  pattern: planningPersistedIdPattern
 };
 
 const planningNullablePersistedIdSchema = {
   type: ["string", "null"],
   minLength: 1,
   maxLength: 500,
-  pattern: "^[A-Za-z0-9._:-]+$"
+  pattern: planningPersistedIdPattern
 };
 
 const gregorianPlanDatePattern =
@@ -89,7 +91,7 @@ const gregorianPlanDatePattern =
 const acceptedOverloadIdSchema = {
   ...planningPersistedIdSchema,
   maxLength: 511,
-  pattern: `^[A-Za-z0-9._:-]+:${gregorianPlanDatePattern}$`
+  pattern: `^[A-Za-z0-9._:-]+:${gregorianPlanDatePattern}(?![\\s\\S])`
 };
 
 export const planningSchemas = openApiSchemaFragment({
@@ -727,7 +729,7 @@ export const planningSchemas = openApiSchemaFragment({
     properties: {
       command: schemaRef("PlanningCommand"),
       clientPlanVersion: { type: "integer", minimum: 1 },
-      idempotencyKey: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z0-9._:-]+$" }
+      idempotencyKey: { type: "string", minLength: 1, maxLength: 120, pattern: planningPersistedIdPattern }
     },
     additionalProperties: false
   },
@@ -737,7 +739,7 @@ export const planningSchemas = openApiSchemaFragment({
     properties: {
       commands: { type: "array", items: schemaRef("PlanningCommand"), minItems: 1 },
       clientPlanVersion: { type: "integer", minimum: 1 },
-      idempotencyKey: { type: "string", minLength: 1, maxLength: 120, pattern: "^[A-Za-z0-9._:-]+$" }
+      idempotencyKey: { type: "string", minLength: 1, maxLength: 120, pattern: planningPersistedIdPattern }
     },
     additionalProperties: false
   },
@@ -918,7 +920,7 @@ export const planningSchemas = openApiSchemaFragment({
         type: "string",
         minLength: 1,
         maxLength: 120,
-        pattern: "^[A-Za-z0-9._:-]+$"
+        pattern: planningPersistedIdPattern
       }
     },
     additionalProperties: false

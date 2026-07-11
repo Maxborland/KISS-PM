@@ -141,14 +141,18 @@ describe("OpenAPI route inventory", () => {
       type: "string",
       minLength: 1,
       maxLength: 500,
-      pattern: "^[A-Za-z0-9._:-]+$"
+      pattern: "^[A-Za-z0-9._:-]+(?![\\s\\S])"
     };
     const nullablePersistedId = {
       type: ["string", "null"],
       minLength: 1,
       maxLength: 500,
-      pattern: "^[A-Za-z0-9._:-]+$"
+      pattern: "^[A-Za-z0-9._:-]+(?![\\s\\S])"
     };
+    const persistedIdPattern = new RegExp(persistedId.pattern);
+    for (const terminator of ["\n", "\r", "\u2028", "\u2029"]) {
+      expect(persistedIdPattern.test(`task-safe${terminator}`)).toBe(false);
+    }
     const createPayload = schemas.PlanningTaskCreateCommand?.properties?.payload as JsonSchema;
     const calendarPayload = schemas.PlanningCalendarExceptionUpsertCommand?.properties
       ?.payload as JsonSchema;
@@ -182,7 +186,11 @@ describe("OpenAPI route inventory", () => {
       "resource-alpha:2026-6-1",
       "resource-alpha:2026-02-30",
       "resource-alpha:1900-02-29",
-      "resource-alpha:2026-06-10:suffix"
+      "resource-alpha:2026-06-10:suffix",
+      "resource-alpha:2026-06-10\n",
+      "resource-alpha:2026-06-10\r",
+      "resource-alpha:2026-06-10\u2028",
+      "resource-alpha:2026-06-10\u2029"
     ]) {
       expect(overloadIdPattern.test(invalidId)).toBe(false);
     }

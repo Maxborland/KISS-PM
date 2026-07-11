@@ -470,7 +470,7 @@ function parsePersistedId(value: unknown): string | null {
   return typeof value === "string" &&
     value.length >= 1 &&
     value.length <= maxPlanningStringLength &&
-    /^[A-Za-z0-9._:-]+$/.test(value)
+    /^[A-Za-z0-9._:-]+(?![\s\S])/.test(value)
     ? value
     : null;
 }
@@ -480,7 +480,7 @@ function parseAcceptedOverloadId(value: unknown): string | null {
     typeof value !== "string" ||
     value.length < 12 ||
     value.length > maxAcceptedOverloadIdLength ||
-    !/^[A-Za-z0-9._:-]+$/.test(value)
+    !/^[A-Za-z0-9._:-]+(?![\s\S])/.test(value)
   ) {
     return null;
   }
@@ -548,7 +548,7 @@ function parseIdempotencyKey(input: Record<string, unknown>): string | undefined
     typeof value !== "string" ||
     value.length === 0 ||
     value.length > 120 ||
-    !/^[A-Za-z0-9._:-]+$/.test(value)
+    !/^[A-Za-z0-9._:-]+(?![\s\S])/.test(value)
   ) {
     return false;
   }
