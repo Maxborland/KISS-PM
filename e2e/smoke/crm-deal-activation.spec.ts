@@ -123,6 +123,18 @@ test("current CRM routes open deals and assign an unstaged deal", async ({ page 
   await expect(page).toHaveURL(new RegExp(`/crm/deals/${STAGED_DEAL.id}$`));
   await expect(page.getByRole("heading", { name: STAGED_DEAL.title, exact: true })).toBeVisible();
 
+  const unstagedMutationRequests: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (
+      request.method() !== "GET" &&
+      (path.includes(`/api/workspace/opportunities/${UNSTAGED_DEAL.id}`) ||
+        path.includes(`/api/workspace/crm/opportunity/${UNSTAGED_DEAL.id}`))
+    ) {
+      unstagedMutationRequests.push(`${request.method()} ${path}`);
+    }
+  });
+
   await page.goto("/crm/deals");
 
   const unstagedLink = page.getByRole("link", { name: dealLinkName(UNSTAGED_DEAL.title), exact: true });
@@ -133,6 +145,20 @@ test("current CRM routes open deals and assign an unstaged deal", async ({ page 
   await expect(page.getByLabel("Название", { exact: true })).toBeDisabled();
   await expect(page.getByRole("combobox", { name: "Стадия", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Сохранить", exact: true })).toBeDisabled();
+  const stageAssignmentReason = "Сначала назначьте сделке стадию в списке";
+  const unstagedActionButtons = [
+    page.getByRole("button", { name: "Проверить", exact: true }),
+    page.getByRole("button", { name: "Активировать в проект", exact: true }),
+    page.getByRole("button", { name: "Выиграна", exact: true }),
+    page.getByRole("button", { name: "Проиграна", exact: true })
+  ];
+  for (const button of unstagedActionButtons) {
+    await expect(button).toBeDisabled();
+    await expect(button).toHaveAttribute("title", stageAssignmentReason);
+  }
+  await expect(page.getByPlaceholder("Написать комментарий…")).toHaveCount(0);
+  await page.locator("button:disabled").evaluateAll((buttons) => buttons.forEach((button) => (button as HTMLButtonElement).click()));
+  await expect.poll(() => unstagedMutationRequests).toEqual([]);
   const assignInListLink = page.getByRole("link", { name: "Назначить стадию в списке", exact: true });
   await assignInListLink.focus();
   await expect(assignInListLink).toBeFocused();

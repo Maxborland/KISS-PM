@@ -216,19 +216,28 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   const effectivePipelineId = useMemo(() => resolveOpportunityPipelineId(opp, data.dealStages), [data.dealStages, opp]);
   const stages = useMemo(() => stagesForOpportunity(opp, data.dealStages), [data.dealStages, opp]);
   const requiresStageAssignment = !opp.stageId || !effectivePipelineId;
-  const canEditParameters = canManage && !requiresStageAssignment;
-  const editDisabledReason = requiresStageAssignment
-    ? "Сначала назначьте сделке стадию в списке"
-    : readOnlyReason;
+  const stageAssignmentReason = "Сначала назначьте сделке стадию в списке";
+  const canMutateStaged = canManage && !requiresStageAssignment;
+  const canEditParameters = canMutateStaged;
+  const editDisabledReason = requiresStageAssignment ? stageAssignmentReason : readOnlyReason;
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(formOf(opp)), [form, opp]);
   const currentFeasibilityStatus = opp.feasibilityStatus;
-  const activationBlockReason = getActivationBlockReason(
-    canActivate,
-    currentFeasibilityStatus,
-    riskReason,
-    dirty,
-    activationDisabledReason
-  );
+  const feasibilityActionReason = requiresStageAssignment
+    ? stageAssignmentReason
+    : !canCheckFeasibility
+      ? feasibilityDisabledReason
+      : dirty
+        ? "Сначала сохраните изменения"
+        : null;
+  const activationBlockReason = requiresStageAssignment
+    ? stageAssignmentReason
+    : getActivationBlockReason(
+        canActivate,
+        currentFeasibilityStatus,
+        riskReason,
+        dirty,
+        activationDisabledReason
+      );
   const pipelineName = data.pipelines.find((p) => p.id === effectivePipelineId)?.name ?? "—";
   const stageName = (id: string | null) => data.dealStages.find((s) => s.id === id)?.name ?? "— без стадии —";
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -244,6 +253,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   const plannedHours = (() => { const v = Number(form.contractValue), r = Number(form.plannedHourlyRate); return r > 0 && v > 0 ? Math.floor(v / r) : 0; })();
 
   async function save() {
+    if (!canEditParameters || locked || busy) return;
     setBusy(true);
     const res = await crm.updateOpportunity(opp.id, {
       clientId: opp.clientId ?? "",
@@ -274,6 +284,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   }
 
   async function check() {
+    if (feasibilityActionReason !== null || locked || busy) return;
     setBusy(true);
     const res = await crm.checkFeasibility(opp.id);
     setBusy(false);
@@ -287,6 +298,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   }
 
   async function activate() {
+    if (activationBlockReason !== null || locked || busy) return;
     setBusy(true);
     const res = await crm.activate(opp.id, riskReason.trim() ? { acceptedRiskReason: riskReason.trim() } : undefined);
     setBusy(false);
@@ -295,6 +307,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   }
 
   async function finalize(stt: "won_closed" | "lost_rejected") {
+    if (!canMutateStaged || locked || busy) return;
     setBusy(true);
     const res = await crm.finalize(opp.id, stt, stt === "won_closed" ? "Закрыта вручную" : "Отказ клиента");
     setBusy(false);
@@ -303,6 +316,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   }
 
   async function sendComment() {
+    if (!canMutateStaged || locked || busy) return;
     if (!comment.trim()) return;
     setBusy(true);
     const res = await crm.createComment("opportunity", opp.id, comment.trim());
@@ -312,6 +326,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   }
 
   async function toggleTask(a: CrmActivity) {
+    if (!canMutateStaged || locked || busy) return;
     setBusy(true);
     const res = await crm.updateTaskStatus("opportunity", opp.id, a.id, a.status === "done" ? "todo" : "done");
     setBusy(false);
@@ -386,19 +401,19 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
 
           <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
             <h3 className="mb-3 text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Лента активности</h3>
-            {!locked && canManage ? (
+            {!locked && canMutateStaged ? (
               <div className="mb-3 flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] p-2.5">
                 <Textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Написать комментарий…" />
                 <div className="flex justify-end"><Button variant="default" size="sm" disabled={busy || !comment.trim()} onClick={() => void sendComment()}><Send className="size-3.5" aria-hidden />Отправить</Button></div>
               </div>
-            ) : <p className="mb-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">{locked ? "Сделка завершена — новые записи в ленту недоступны." : "Лента доступна только для чтения."}</p>}
+            ) : <p className="mb-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">{locked ? "Сделка завершена — новые записи в ленту недоступны." : requiresStageAssignment ? `${stageAssignmentReason}. Лента доступна только для чтения.` : "Лента доступна только для чтения."}</p>}
             {activities === null ? (
               <div className="flex items-center gap-2 py-4 text-[length:var(--text-xs)] text-[var(--muted)]"><Loader2 className="size-3.5 animate-spin" aria-hidden /> Загрузка ленты…</div>
             ) : activities.length === 0 ? (
               <p className="py-4 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Пока нет активностей.</p>
             ) : (
               <ul className="flex flex-col gap-2.5">
-                {activities.map((a) => <ActivityItem key={a.id} a={a} users={users} busy={busy} canToggle={canManage && !locked} onToggle={() => void toggleTask(a)} />)}
+                {activities.map((a) => <ActivityItem key={a.id} a={a} users={users} busy={busy} canToggle={canMutateStaged && !locked} disabledReason={requiresStageAssignment ? stageAssignmentReason : readOnlyReason} onToggle={() => void toggleTask(a)} />)}
               </ul>
             )}
           </section>
@@ -409,7 +424,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
           <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Осуществимость</h3>
-              <Button variant="secondary" size="sm" disabled={busy || locked || !canCheckFeasibility || dirty} onClick={() => void check()} title={!canCheckFeasibility ? feasibilityDisabledReason : dirty ? "Сначала сохраните изменения" : undefined}><FlaskConical className="size-3.5" aria-hidden />Проверить</Button>
+              <Button variant="secondary" size="sm" disabled={busy || locked || feasibilityActionReason !== null} onClick={() => void check()} title={feasibilityActionReason ?? undefined}><FlaskConical className="size-3.5" aria-hidden />Проверить</Button>
             </div>
             {feasibility ? <FeasibilityWidget a={feasibility} checkedAt={opp.feasibilityCheckedAt} /> : (
               <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Проверка осуществимости ещё не запускалась. Нажмите «Проверить» — сервер оценит ресурсы по плановым часам, спросу и активным проектам.</p>
@@ -426,7 +441,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
             ) : (
               <div className="flex flex-col gap-2.5">
                 {currentFeasibilityStatus === "conflict" ? (
-                  <label className={labelCls}>Обоснование риска (для активации при конфликте)<Input value={riskReason} onChange={(e) => setRiskReason(e.target.value)} disabled={!canActivate} placeholder="Почему запускаем несмотря на конфликт…" /></label>
+                  <label className={labelCls}>Обоснование риска (для активации при конфликте)<Input value={riskReason} onChange={(e) => setRiskReason(e.target.value)} disabled={!canActivate || requiresStageAssignment} placeholder="Почему запускаем несмотря на конфликт…" /></label>
                 ) : null}
                 <Button variant="default" disabled={busy || activationBlockReason !== null} onClick={() => void activate()} title={activationBlockReason ?? undefined}><Rocket className="size-3.5" aria-hidden />Активировать в проект</Button>
                 <div className="flex gap-2">
@@ -437,7 +452,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
                     confirmLabel="Выиграна"
                     onConfirm={() => finalize("won_closed")}
                   >
-                    <Button variant="secondary" size="sm" className="flex-1" disabled={busy || !canManage} title={canManage ? undefined : readOnlyReason}><Trophy className="size-3.5" aria-hidden />Выиграна</Button>
+                    <Button variant="secondary" size="sm" className="flex-1" disabled={busy || !canMutateStaged} title={canMutateStaged ? undefined : editDisabledReason}><Trophy className="size-3.5" aria-hidden />Выиграна</Button>
                   </ConfirmDialog>
                   <ConfirmDialog
                     title="Закрыть сделку как проигранную?"
@@ -445,7 +460,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
                     confirmLabel="Проиграна"
                     onConfirm={() => finalize("lost_rejected")}
                   >
-                    <Button variant="ghost" size="sm" className="flex-1" disabled={busy || !canManage} title={canManage ? undefined : readOnlyReason}><XCircle className="size-3.5" aria-hidden />Проиграна</Button>
+                    <Button variant="ghost" size="sm" className="flex-1" disabled={busy || !canMutateStaged} title={canMutateStaged ? undefined : editDisabledReason}><XCircle className="size-3.5" aria-hidden />Проиграна</Button>
                   </ConfirmDialog>
                 </div>
                 {opp.feasibilityStatus == null ? <p className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Активация станет доступна после проверки осуществимости.</p> : null}
@@ -495,7 +510,7 @@ function FeasibilityWidget({ a, checkedAt }: { a: FeasibilityAssessment; checked
   );
 }
 
-function ActivityItem({ a, users, busy, canToggle, onToggle }: { a: CrmActivity; users: CrmUsersIndex; busy: boolean; canToggle: boolean; onToggle: () => void }) {
+function ActivityItem({ a, users, busy, canToggle, disabledReason, onToggle }: { a: CrmActivity; users: CrmUsersIndex; busy: boolean; canToggle: boolean; disabledReason: string; onToggle: () => void }) {
   const author = ownerName(users, a.authorUserId);
   const when = new Date(a.createdAt).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   return (
@@ -510,7 +525,7 @@ function ActivityItem({ a, users, busy, canToggle, onToggle }: { a: CrmActivity;
         </div>
         {a.type === "task" ? (
           <div className="mt-0.5 flex items-start gap-1.5">
-            <button type="button" disabled={busy || !canToggle} onClick={onToggle} title={canToggle ? a.status === "done" ? "Вернуть в работу" : "Отметить выполненной" : "Недостаточно прав для изменения"} className="mt-0.5 shrink-0 text-[var(--muted)] hover:text-[var(--accent)] disabled:opacity-50">
+            <button type="button" disabled={busy || !canToggle} onClick={onToggle} title={canToggle ? a.status === "done" ? "Вернуть в работу" : "Отметить выполненной" : disabledReason} className="mt-0.5 shrink-0 text-[var(--muted)] hover:text-[var(--accent)] disabled:opacity-50">
               {a.status === "done" ? <CheckCircle2 className="size-4 text-[var(--success-text)]" aria-hidden /> : <Square className="size-4" aria-hidden />}
             </button>
             <div className="min-w-0">
