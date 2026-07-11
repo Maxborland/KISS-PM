@@ -139,7 +139,7 @@ describe("KISS PM API Phase 1 shell", () => {
         type: "string",
         minLength: 1,
         maxLength: 511,
-        pattern: "^[A-Za-z0-9._:-]+:\\d{4}-\\d{2}-\\d{2}$"
+        pattern: expect.any(String)
       }
     });
     expect(document.components.schemas.PlanningResourceOverload.required).toContain(

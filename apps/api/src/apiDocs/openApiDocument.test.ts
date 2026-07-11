@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { parsePlanDate } from "@kiss-pm/domain";
 import {
   createKissPmOpenApiDocument,
   listAllKnownApiRoutes,
@@ -159,11 +160,61 @@ describe("OpenAPI route inventory", () => {
     expect(createPayload.properties?.projectId).toEqual(persistedId);
     expect(createPayload.properties?.parentTaskId).toEqual(nullablePersistedId);
     expect(calendarPayload.properties?.resourceId).toEqual(nullablePersistedId);
-    expect(overloadPayload.properties?.overloadId).toEqual({
+    const overloadIdSchema = overloadPayload.properties?.overloadId as JsonSchema;
+    expect(overloadIdSchema).toMatchObject({
       ...persistedId,
       maxLength: 511,
-      pattern: "^[A-Za-z0-9._:-]+:\\d{4}-\\d{2}-\\d{2}$"
+      pattern: expect.any(String)
     });
+    const overloadIdPattern = new RegExp(
+      (overloadIdSchema as unknown as { pattern: string }).pattern
+    );
+    for (const validId of [
+      "resource-alpha:2026-06-10",
+      "resource:alpha:2026-02-28",
+      "resource-alpha:2000-02-29"
+    ]) {
+      expect(overloadIdPattern.test(validId)).toBe(true);
+    }
+    for (const invalidId of [
+      ":2026-06-10",
+      "resource alpha:2026-06-10",
+      "resource-alpha:2026-6-1",
+      "resource-alpha:2026-02-30",
+      "resource-alpha:1900-02-29",
+      "resource-alpha:2026-06-10:suffix"
+    ]) {
+      expect(overloadIdPattern.test(invalidId)).toBe(false);
+    }
+    const mismatches: string[] = [];
+    const years = [
+      ...Array.from({ length: 400 }, (_, year) => year),
+      1896,
+      1900,
+      2000,
+      2100,
+      2400,
+      9999
+    ];
+    for (const year of years) {
+      for (let month = 1; month <= 12; month += 1) {
+        for (let day = 1; day <= 31; day += 1) {
+          const date = [year, month, day]
+            .map((part, index) => part.toString().padStart(index === 0 ? 4 : 2, "0"))
+            .join("-");
+          let runtimeAccepts = true;
+          try {
+            parsePlanDate(date);
+          } catch {
+            runtimeAccepts = false;
+          }
+          if (overloadIdPattern.test(`resource:alpha:${date}`) !== runtimeAccepts) {
+            mismatches.push(date);
+          }
+        }
+      }
+    }
+    expect(mismatches).toEqual([]);
     expect(schemas.PlanningScenarioTarget?.properties?.resourceId).toEqual(persistedId);
     expect(schemas.PlanningScenarioTarget?.properties?.taskIds).toEqual({
       type: "array",
