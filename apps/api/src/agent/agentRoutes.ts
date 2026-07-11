@@ -11,6 +11,7 @@ import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRo
 import { createUploadConcurrencyLimiter } from "../attachmentUploadRequest";
 import { readLimitedJsonBody } from "../jsonBody";
 import { createPlanningReadModel } from "../planning/planningReadModel";
+import { canReadPlanningReadModel } from "../planning/planningRouteAuth";
 import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
 import { canEditTaskFields, canParticipateInTaskActivity, canParticipantTransitionTask } from "../project-work/taskCommandGuards";
 import { runAgentLoop, type AgentLoopEvent, type AnalyzeExecutor } from "./agentLoop";
@@ -90,6 +91,22 @@ export async function buildProposalActionMetadata(
         ? { capability: { allowed: false, reason: "task_participant_required" } }
         : {})
     };
+  }
+  if (action.tool === "apply_plan_commands" || action.tool === "apply_resource_resolution") {
+    const planRead = canReadPlanningReadModel({ actor, profile });
+    if (!planRead.allowed) {
+      const commandCount = Array.isArray(action.input.commands) ? action.input.commands.length : 1;
+      return {
+        preview: {
+          before: "Версия плана недоступна",
+          after: action.tool === "apply_plan_commands"
+            ? `Команд плана: ${commandCount}`
+            : "Применить проверенный сценарий"
+        },
+        preconditionVersions: {},
+        capability: { allowed: false, reason: planRead.reason }
+      };
+    }
   }
   if (action.tool !== "change_task_status") {
     return { preview: await buildActionPreview(dataSource, actor.tenantId, action), preconditionVersions: {} };

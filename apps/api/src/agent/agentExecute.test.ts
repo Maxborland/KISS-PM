@@ -489,12 +489,39 @@ describe("agent apply truth contract", () => {
     expect(activityReads).toBe(1);
   });
 
+  it("does not read plan snapshots for a plan manager without planning read access", async () => {
+    let snapshotReads = 0;
+    const dataSource = {
+      async getPlanSnapshot() {
+        snapshotReads += 1;
+        throw new Error("plan snapshot must not be read");
+      }
+    } as unknown as ApiTenantDataSource;
+    const actor = { id: "user-planner", tenantId: "tenant-1" } as TenantUser;
+    const profile = { id: "planner", permissions: ["tenant.project_plan.manage"] } as AccessProfile;
+
+    await expect(buildProposalActionMetadata(dataSource, actor, profile, {
+      tool: "apply_plan_commands",
+      input: { projectId: "project-1", commands: [{}] }
+    })).resolves.toEqual({
+      preview: {
+        before: "Версия плана недоступна",
+        after: "Команд плана: 1"
+      },
+      preconditionVersions: {},
+      capability: { allowed: false, reason: "permission_missing" }
+    });
+    expect(snapshotReads).toBe(0);
+  });
   it("offers read-only bindings but withholds mutations without a complete review preview", () => {
     const byName = new Map(AGENT_TOOLS.map((tool) => [tool.name, tool]));
 
     expect(isAgentToolOfferable(byName.get("check_opportunity_feasibility")!)).toBe(true);
     expect(isAgentToolOfferable(byName.get("change_task_status")!)).toBe(true);
+    expect(isAgentToolOfferable(byName.get("comment_task")!)).toBe(true);
     expect(isAgentToolOfferable(byName.get("create_crm_client")!)).toBe(false);
+    expect(isAgentToolOfferable(byName.get("create_task")!)).toBe(false);
+    expect(isAgentToolOfferable(byName.get("apply_resource_resolution")!)).toBe(false);
     expect(isAgentToolOfferable(byName.get("apply_plan_commands")!)).toBe(false);
   });
 });
