@@ -454,6 +454,78 @@ describe("planning API routes", () => {
     }
   );
 
+  it.each([
+    ["single command", "/api/workspace/projects/project-alpha/planning/apply-command", false],
+    ["command batch", "/api/workspace/projects/project-alpha/planning/apply-command-batch", true],
+    [
+      "scenario apply",
+      "/api/workspace/projects/project-alpha/planning/scenario-proposals/planning-scenario-missing/apply",
+      null
+    ]
+  ] as const)("fails %s closed when the planning lock is unavailable", async (_label, path, batch) => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-lock-required",
+      title: "Planning lock required",
+      start: "2026-06-01",
+      finish: "2026-06-02"
+    });
+    const before = await client`
+      SELECT
+        (SELECT version FROM plan_versions
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS version,
+        (SELECT progress FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha'
+            AND id = 'task-lock-required') AS progress
+    `;
+    const planVersion = Number(before[0]?.version);
+    const command = {
+      type: "task.update_progress",
+      payload: { taskId: "task-lock-required", percentComplete: 42 }
+    };
+    const baseDataSource = createPostgresTenantDataSource(createDatabase(client));
+    const noLockDataSource: PostgresTenantDataSource = {
+      ...baseDataSource,
+      async withTransaction<T>(
+        operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
+      ): Promise<T> {
+        return baseDataSource.withTransaction(async (transactionDataSource) => {
+          const transactionWithoutLock = { ...transactionDataSource };
+          Reflect.deleteProperty(transactionWithoutLock, "lockTenantResourcePlanning");
+          return operation(transactionWithoutLock as PostgresTenantDataSource);
+        });
+      }
+    };
+    const noLockApp = createApp({ dataSource: noLockDataSource });
+    const response = await noLockApp.request(path, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        ...(batch === true ? { commands: [command] } : batch === false ? { command } : {}),
+        clientPlanVersion: planVersion
+      })
+    });
+
+    const responseBody = await response.json();
+    expect({ status: response.status, body: responseBody }).toEqual({
+      status: 501,
+      body: { error: "persistence_not_configured" }
+    });
+    const after = await client`
+      SELECT
+        (SELECT version FROM plan_versions
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS version,
+        (SELECT progress FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha'
+            AND id = 'task-lock-required') AS progress
+    `;
+    expect(after[0]).toEqual(before[0]);
+  });
+
   it("exposes task CRUD records through planning read-model and applies dependency commands with versioned audit", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const readerCookie = await loginAs("executor@kiss-pm.local", "executor12345");

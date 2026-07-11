@@ -55,6 +55,14 @@ describe("create task planning lock capability", () => {
     ).resolves.toEqual(unavailable);
   });
 
+  it("rejects a planning lock capability key whose value is undefined", () => {
+    const deps = createDeps(true);
+    Object.defineProperty(deps.dataSource, "lockTenantResourcePlanning", { value: undefined });
+
+    expect(hasWorkspaceInboxCreateTaskDeps(deps)).toBe(false);
+    expect(hasProjectCreateTaskDeps(deps)).toBe(false);
+  });
+
   it("accepts both complete create capability sets", () => {
     const deps = createDeps(true);
 
