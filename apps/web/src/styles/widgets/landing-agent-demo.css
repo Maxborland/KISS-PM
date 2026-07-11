@@ -611,7 +611,7 @@
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   gap: 14px;
   overflow: hidden;
   padding: 28px 24px 0;
@@ -899,16 +899,14 @@
 }
 
 .lad-apply-result {
-  position: absolute;
-  left: 50%;
-  bottom: 124px;
+  position: static;
   z-index: 3;
-  width: min(340px, calc(100% - 48px));
+  width: 100%;
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  transform: translateX(-50%);
+  transform: none;
   padding: 12px 14px;
   border: 1px solid color-mix(in oklab, var(--lad-green), var(--lad-border) 50%);
   border-radius: 14px;
@@ -916,7 +914,6 @@
   color: var(--lad-green);
   box-shadow: 0 12px 28px rgba(16, 24, 40, 0.1);
   pointer-events: none;
-  animation: lad-apply-toast-in var(--duration-base) var(--ease-out);
 }
 
 .lad-apply-result svg {

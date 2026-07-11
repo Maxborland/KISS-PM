@@ -34,6 +34,7 @@ export type WorkspaceError = {
   ok: false;
   status: 400 | 403 | 404 | 409 | 501;
   error: string;
+  currentVersions?: { taskUpdatedAt: string };
 };
 
 export type PreflightResult = { ok: true } | WorkspaceError;
@@ -55,6 +56,7 @@ export type TransitionTaskStatusInput = WorkspaceInput & {
   projectId: string;
   taskId: string;
   body: UpdateTaskStatusBody;
+  clientUpdatedAt?: Date;
 };
 export type CreateTaskCommentInput = WorkspaceInput & {
   taskId: string;

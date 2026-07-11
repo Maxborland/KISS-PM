@@ -18,7 +18,17 @@ export type LandingAgentDemoPreset =
   | "second-prompt-thinking"
   | "reset-demo";
 
-export type ChangeStatus = "выбрано" | "изменено" | "отклонено" | "требует прав" | "применено";
+export type ChangeStatus =
+  | "выбрано"
+  | "изменено"
+  | "отклонено"
+  | "требует прав"
+  | "применено"
+  | "пропущено"
+  | "отказано"
+  | "конфликт"
+  | "ошибка"
+  | "неизвестно";
 
 export type ChangeKind = "date" | "owner" | "text" | "status";
 

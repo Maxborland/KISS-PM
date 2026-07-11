@@ -15,20 +15,6 @@ import type { DemoChange, DemoMessage, DemoPhase } from "@/widgets/landing-agent
 import { useAgent } from "@/workspace/agent/use-agent";
 import type { AgentActionInput, ProposedAction } from "@/workspace/agent/agent-client";
 
-// Человекочитаемое имя статуса (mock: status-*, боевой: task-status-*).
-const STATUS_NAME: Record<string, string> = {
-  new: "Новая", waiting: "Ожидание", "in-progress": "В работе", inprogress: "В работе", review: "На проверке", done: "Готово"
-};
-const humanizeStatus = (id: string): string => {
-  const key = id.replace(/^(task-)?status-/, "");
-  return STATUS_NAME[key] ?? key.replace(/-/g, " ");
-};
-
-const summarize = (input: Record<string, unknown>): string =>
-  Object.entries(input)
-    .filter(([, v]) => typeof v === "string" || typeof v === "number")
-    .map(([k, v]) => `${k}: ${String(v)}`)
-    .join(" · ");
 
 // Какое поле action редактируется ручной правкой в панели сверки. Структурные действия
 // (статус/ресурсы/план) сюда НЕ входят — их значение нельзя безопасно вывести из текста, поэтому
@@ -55,49 +41,28 @@ const PRODUCT_NAV_ITEMS = [
 
 function actionToChange(action: ProposedAction, index: number): DemoChange {
   const allowed = action.capability.allowed;
-  const kind = KIND_BY_TOOL[action.tool] ?? "text";
-  let before = "—";
-  let after = summarize(action.input);
-  if (action.tool === "change_task_status") {
-    before = "текущий статус";
-    after = humanizeStatus(String(action.input.statusId ?? ""));
-  } else if (action.tool === "apply_resource_resolution") {
-    before = "ресурсная перегрузка";
-    after = "план разрешения";
-  } else if (action.tool === "apply_plan_commands") {
-    before = "текущий план";
-    const count = Array.isArray(action.input.commands) ? action.input.commands.length : 0;
-    after = `${count} ${pluralRu(count, "изменение", "изменения", "изменений")} плана`;
-  } else if (action.tool === "comment_task") {
-    before = "комментарий";
-    after = String(action.input.body ?? ""); // редактируемое поле = текст комментария
-  } else if (action.tool === "create_task") {
-    before = "новая задача";
-    after = String(action.input.title ?? ""); // редактируемое поле = название задачи
-  }
   return {
     id: `chg-${index}`,
     number: index + 1,
     title: action.title,
-    before,
-    after,
+    before: action.preview.before,
+    after: action.preview.after,
     status: allowed ? "выбрано" : "требует прав",
     selected: allowed,
-    kind
+    kind: KIND_BY_TOOL[action.tool] ?? "text"
   };
 }
+const CHANGE_STATUS_BY_EXECUTION = {
+  applied: "применено",
+  skipped: "пропущено",
+  denied: "отказано",
+  conflict: "конфликт",
+  failed: "ошибка"
+} as const;
 
 const formatMessageTime = (date = new Date()): string =>
   date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 
-// Русская плюрализация: 1 изменение / 2 изменения / 5 изменений (G7-17).
-function pluralRu(n: number, one: string, few: string, many: string): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
-}
 
 /**
  * Агент — полноценный чат с AI-ассистентом, действующим в рамках прав сотрудника.
@@ -117,6 +82,7 @@ export function AgentSurface() {
   const [anchorId, setAnchorId] = useState("");
   const [projects, setProjects] = useState<Array<{ id: string; label: string }>>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const applyInFlight = useRef(false);
   const [changes, setChanges] = useState<DemoChange[]>([]);
   const [activeChangeId, setActiveChangeId] = useState("");
   const [editingChangeId, setEditingChangeId] = useState<string | undefined>(undefined);
@@ -161,6 +127,7 @@ export function AgentSurface() {
   }
 
   async function sendMessage() {
+    if (applyInFlight.current) return;
     const goal = inputValue.trim();
     if (goal.length === 0) return;
     if (provider?.configured === false) {
@@ -190,10 +157,17 @@ export function AgentSurface() {
       return;
     }
     setAttachments([]); // успех — вложения учтены агентом, чистим панель
+    setEditingChangeId(undefined);
     const data = res.data;
     const newChanges = data.proposedActions.map(actionToChange);
     const map: Record<string, AgentActionInput> = {};
-    data.proposedActions.forEach((action, i) => { map[`chg-${i}`] = { tool: action.tool, input: action.input }; });
+    data.proposedActions.forEach((action, i) => {
+      map[`chg-${i}`] = {
+        tool: action.tool,
+        input: action.input,
+        ...(action.preconditionVersions ? { preconditionVersions: action.preconditionVersions } : {})
+      };
+    });
     setActionMap(map);
     setChanges(newChanges);
     setActiveChangeId(newChanges[0]?.id ?? "");
@@ -202,22 +176,64 @@ export function AgentSurface() {
   }
 
   async function applySelected() {
-    const selected = changes.filter((c) => c.selected && c.status !== "отклонено" && c.status !== "требует прав" && c.status !== "применено");
-    const actions = selected.map((c) => actionMap[c.id]).filter((a): a is AgentActionInput => Boolean(a));
+    if (applyInFlight.current) return;
+    const selected = changes.filter((change) =>
+      change.selected && ["выбрано", "изменено", "ошибка"].includes(change.status)
+    );
+    const actions = selected.map((change) => actionMap[change.id]).filter((action): action is AgentActionInput => Boolean(action));
     if (actions.length === 0) return;
-    const res = await execute(actions);
-    if (res.ok && res.data.applied) {
-      const okCount = res.data.results.filter((r) => r.ok).length;
-      setChanges((cs) => cs.map((c) => (selected.includes(c) ? { ...c, status: "применено" } : c)));
-      setPhase("applied");
-      addMessage("henry", `Применил ${okCount} ${pluralRu(okCount, "изменение", "изменения", "изменений")}. Готово — данные обновлены.`);
-    } else {
-      const failure = res.ok ? res.data.results.find((r) => !r.ok)?.error ?? "не применено" : res.code;
-      addMessage("henry", `Не удалось применить: ${failure}.`);
+    applyInFlight.current = true;
+    const res = await execute(actions).finally(() => {
+      applyInFlight.current = false;
+    });
+    if (!res.ok) {
+      setEditingChangeId(undefined);
+      if (res.uncertain) {
+        setChanges((current) => current.map((change) =>
+          selected.some((sent) => sent.id === change.id)
+            ? { ...change, status: "неизвестно", selected: false }
+            : change
+        ));
+        addMessage(
+          "henry",
+          `Ответ на применение потерян (${res.code}). Итог отправленных изменений неизвестен — обновите данные и сформируйте предложение заново.`
+        );
+      } else {
+        setChanges((current) => current.map((change) =>
+          selected.some((sent) => sent.id === change.id) ? { ...change, status: "ошибка" } : change
+        ));
+        addMessage("henry", `Изменения не применены: ${res.code}. Исправьте причину и повторите только отмеченные действия.`);
+      }
+      return;
+    }
+    setEditingChangeId(undefined);
+
+    const resultByChangeId = new Map(selected.map((change, index) => [change.id, res.data.results[index]]));
+    setChanges((current) => current.map((change) => {
+      const result = resultByChangeId.get(change.id);
+      if (!result) return change;
+      return {
+        ...change,
+        status: CHANGE_STATUS_BY_EXECUTION[result.status],
+        selected: result.status === "failed"
+      };
+    }));
+    setPhase(res.data.summary.failed > 0 ? "review-open" : "applied");
+    const { applied, skipped, denied, conflict, failed } = res.data.summary;
+    addMessage(
+      "henry",
+      `Результат: применено ${applied}, пропущено ${skipped}, отказано ${denied}, конфликтов ${conflict}, ошибок ${failed}.`
+    );
+    if (res.data.results.some((result) => result.error === "task_version_conflict")) {
+      addMessage(
+        "henry",
+        "Предложение по задаче устарело: данные изменились после проверки. Обновите данные и сформируйте предложение заново — конфликт не будет применён повторно."
+      );
     }
   }
 
   function resetDemo() {
+    if (applyInFlight.current) return;
     setMessages([]);
     setLiveSteps([]);
     setAttachments([]);
@@ -263,6 +279,7 @@ export function AgentSurface() {
           phase={status === "proposing" ? "thinking" : phase}
           agentMenuOpen={agentMenuOpen}
           reviewVisible={reviewVisible}
+          disabled={status === "executing"}
           attachSlot={
             projects.length > 0 || attachments.length > 0 ? (
               <div className="lad-attach-bar">
@@ -313,16 +330,28 @@ export function AgentSurface() {
           editingChangeId={editingChangeId}
           mobileOpen={reviewVisible && mobileReview}
           onCloseMobile={() => setMobileReview(false)}
-          onSelectChange={(id) =>
-            setChanges((cs) => cs.map((c) => (c.id === id && c.status !== "требует прав" && c.status !== "применено"
-              ? { ...c, selected: !c.selected, status: c.selected ? "отклонено" : "выбрано" }
-              : c)))
-          }
+          busy={status === "executing"}
+          onSelectChange={(id) => {
+            if (applyInFlight.current) return;
+            setChanges((cs) => cs.map((c) =>
+              c.id === id && !["требует прав", "применено", "пропущено", "отказано", "конфликт", "неизвестно"].includes(c.status)
+                ? { ...c, selected: !c.selected, status: c.selected ? "отклонено" : "выбрано" }
+                : c
+            ));
+          }}
           onFocusChange={setActiveChangeId}
-          onRejectChange={(id) =>
-            setChanges((cs) => cs.map((c) => (c.id === id ? { ...c, selected: false, status: "отклонено" } : c)))
-          }
+          onRejectChange={(id) => {
+            if (applyInFlight.current) return;
+            setChanges((cs) => cs.map((c) =>
+              c.id === id && !["применено", "пропущено", "отказано", "конфликт", "неизвестно"].includes(c.status)
+                ? { ...c, selected: false, status: "отклонено" }
+                : c
+            ));
+          }}
           onEditChange={(id) => {
+            if (applyInFlight.current) return;
+            const change = changes.find((item) => item.id === id);
+            if (!change || ["применено", "пропущено", "отказано", "конфликт", "неизвестно"].includes(change.status)) return;
             // Правка возможна только для действий с явным редактируемым полем (текст).
             if (!EDITABLE_FIELD[actionMap[id]?.tool ?? ""]) {
               addMessage("henry", "Это действие нельзя отредактировать вручную — отклоните его и уточните запрос, и я предложу новый вариант.");
@@ -332,12 +361,13 @@ export function AgentSurface() {
             setEditingChangeId(id);
           }}
           onUpdateChange={(id, value) => {
+            if (applyInFlight.current) return;
             // Правка реально попадает в action (а не только в отображение) — закрывает дыру доверия.
             const field = EDITABLE_FIELD[actionMap[id]?.tool ?? ""];
             if (field) {
               setActionMap((m) => (m[id] ? { ...m, [id]: { ...m[id]!, input: { ...m[id]!.input, [field]: value } } } : m));
+              setChanges((cs) => cs.map((c) => (c.id === id ? { ...c, after: value, status: "изменено", selected: true } : c)));
             }
-            setChanges((cs) => cs.map((c) => (c.id === id ? { ...c, after: value, status: "изменено", selected: true } : c)));
           }}
           onApply={() => void applySelected()}
           onReset={resetDemo}

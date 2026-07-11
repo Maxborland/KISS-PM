@@ -18,6 +18,9 @@ import { createMockAgentFetch } from "./mock-agent-backend";
 
 export type AgentStatus = "loading" | "idle" | "proposing" | "executing";
 export type AgentResult<T> = { ok: true; data: T } | { ok: false; code: string };
+export type AgentExecuteResult =
+  | { ok: true; data: AgentExecuteResponse }
+  | { ok: false; code: string; status: number | null; uncertain: boolean };
 
 /**
  * Хук агента. Транспорт по WorkspaceRuntime: live → боевой createAgentClient (fetch на
@@ -120,16 +123,17 @@ export function useAgent() {
   );
 
   const execute = useCallback(
-    async (actions: AgentActionInput[]): Promise<AgentResult<AgentExecuteResponse>> => {
+    async (actions: AgentActionInput[]): Promise<AgentExecuteResult> => {
       setStatus("executing");
       setError(null);
       try {
         const data = await client.execute(actions);
         return { ok: true, data };
       } catch (e) {
+        const status = e instanceof AgentApiError ? e.status : null;
         const code = e instanceof AgentApiError ? e.code : "request_failed";
         setError(code);
-        return { ok: false, code };
+        return { ok: false, code, status, uncertain: status === null || status >= 500 };
       } finally {
         setStatus("idle");
       }

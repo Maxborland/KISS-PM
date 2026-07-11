@@ -10,7 +10,7 @@
    Переключение на боевой LLM/бэк = apiOrigin (live) + ANTHROPIC_API_KEY на сервере.
    ============================================================ */
 
-type MockTask = { id: string; title: string; statusId: string; projectId: string };
+type MockTask = { id: string; title: string; statusId: string; projectId: string; updatedAt: string };
 
 // Forward-путь по категориям статусов (подмножество ALLOWED_TRANSITIONS).
 const FORWARD: Record<string, string> = { new: "in_progress", waiting: "in_progress", in_progress: "review", review: "done", done: "" };
@@ -37,9 +37,9 @@ const err = (error: string, status: number) => json({ error }, status);
 
 export function createMockAgentFetch(): typeof fetch {
   const tasks: MockTask[] = [
-    { id: "task-portal-1", title: "Согласовать макеты с клиентом", statusId: "status-in-progress", projectId: "proj-portal" },
-    { id: "task-portal-2", title: "Сбор требований к витрине", statusId: "status-new", projectId: "proj-portal" },
-    { id: "task-portal-3", title: "Финальная приёмка портала", statusId: "status-review", projectId: "proj-portal" }
+    { id: "task-portal-1", title: "Согласовать макеты с клиентом", statusId: "status-in-progress", projectId: "proj-portal", updatedAt: "2026-06-01T10:00:00.000Z" },
+    { id: "task-portal-2", title: "Сбор требований к витрине", statusId: "status-new", projectId: "proj-portal", updatedAt: "2026-06-01T10:00:00.000Z" },
+    { id: "task-portal-3", title: "Финальная приёмка портала", statusId: "status-review", projectId: "proj-portal", updatedAt: "2026-06-01T10:00:00.000Z" }
   ];
 
   const mockFetch: typeof fetch = async (input, init) => {
@@ -69,7 +69,12 @@ export function createMockAgentFetch(): typeof fetch {
             tool: "change_task_status",
             title: "Сменить статус задачи",
             input: { projectId: pick.task.projectId, taskId: pick.task.id, statusId: statusForCat(pick.nextCat)! },
-            capability: { allowed: true, reason: "same_tenant_permission_granted" }
+            capability: { allowed: true, reason: "same_tenant_permission_granted" },
+            preview: {
+              before: STATUS_NAME[pick.task.statusId] ?? pick.task.statusId,
+              after: STATUS_NAME[statusForCat(pick.nextCat)!] ?? statusForCat(pick.nextCat)!
+            },
+            preconditionVersions: { taskUpdatedAt: pick.task.updatedAt }
           }]
         : [];
       return json({
@@ -89,20 +94,36 @@ export function createMockAgentFetch(): typeof fetch {
       const actions = Array.isArray(body.actions) ? body.actions : [];
       if (actions.length === 0 || actions.length > 20) return err("invalid_actions", 400);
       const results = actions.map((raw: unknown) => {
-        const a = (raw && typeof raw === "object" ? raw : {}) as { tool?: unknown; input?: unknown };
+        const a = (raw && typeof raw === "object" ? raw : {}) as { tool?: unknown; input?: unknown; preconditionVersions?: unknown };
         const tool = typeof a.tool === "string" ? a.tool : "";
         const inp = (a.input && typeof a.input === "object" ? a.input : {}) as Record<string, unknown>;
-        if (tool !== "change_task_status") return { tool, ok: false, status: 501, error: "tool_not_executable_yet" };
+        if (tool !== "change_task_status") return { tool, ok: false, status: "failed" as const, error: "tool_not_executable_yet" };
         const task = tasks.find((t) => t.id === inp.taskId);
-        if (!task) return { tool, ok: false, status: 404, error: "task_not_found" };
+        if (!task) return { tool, ok: false, status: "failed" as const, error: "task_not_found" };
+        const preconditionVersions = (a.preconditionVersions && typeof a.preconditionVersions === "object"
+          ? a.preconditionVersions
+          : {}) as { taskUpdatedAt?: unknown };
+        if (preconditionVersions.taskUpdatedAt !== task.updatedAt) {
+          return {
+            tool,
+            ok: false,
+            status: "conflict" as const,
+            error: "task_version_conflict",
+            currentVersions: { taskUpdatedAt: task.updatedAt }
+          };
+        }
         const targetCat = STATUS_CAT[String(inp.statusId)];
         const allowedNext = FORWARD[STATUS_CAT[task.statusId] ?? ""];
-        if (!targetCat || targetCat !== allowedNext) return { tool, ok: false, status: 409, error: "task_status_transition_forbidden" };
+        if (!targetCat || targetCat !== allowedNext) return { tool, ok: false, status: "conflict" as const, error: "task_status_transition_forbidden" };
         task.statusId = String(inp.statusId);
-        return { tool, ok: true, result: { task: { id: task.id, statusId: task.statusId } } };
+        task.updatedAt = new Date(Date.parse(task.updatedAt) + 1).toISOString();
+        return { tool, ok: true, status: "applied" as const, result: { task: { id: task.id, statusId: task.statusId, updatedAt: task.updatedAt } } };
       });
-      const applied = results.some((r) => r.ok);
-      return json({ results, applied }, applied ? 200 : 422);
+      const summary = results.reduce(
+        (counts, result) => ({ ...counts, [result.status]: counts[result.status] + 1 }),
+        { applied: 0, skipped: 0, denied: 0, conflict: 0, failed: 0 }
+      );
+      return json({ results, applied: summary.applied > 0, summary });
     }
 
     return err("not_found", 404);
