@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "PROJ-063",
+  "role": "planReader",
+  "key": "PROJ-063:planReader",
+  "status": "pass",
+  "runId": "project-resources-20260711-final3",
+  "generatedAt": "2026-07-11T03:43:35.160Z",
+  "assertions": [
+    "Day, week and month controls were live and switched the matrix",
+    "Month navigation existed for windowed day/week modes and disappeared for full-horizon month mode",
+    "Navigation controls exposed disabled boundaries rather than wrapping"
+  ],
+  "details": {},
+  "screenshots": [
+    "screenshots/proj-063-planReader-month-full-horizon.png"
+  ],
+  "receipt": "receipts/proj-063-planReader.json"
+}

@@ -61,11 +61,13 @@ type CalendarCommand = {
 type CalendarCommandEnvelope = {
   command: CalendarCommand;
   clientPlanVersion: number;
+  idempotencyKey?: string;
 };
 
 type CalendarCommandBatchEnvelope = {
   commands: CalendarCommand[];
   clientPlanVersion: number;
+  idempotencyKey?: string;
 };
 
 test.describe("Projects resources absence write flows", () => {
@@ -111,7 +113,9 @@ test.describe("Projects resources absence write flows", () => {
 
       const createEnvelope =
         createResponse.request().postDataJSON() as CalendarCommandBatchEnvelope;
-      expect(createEnvelope).toEqual(createPreviewEnvelope);
+      expect(createEnvelope.commands).toEqual(createPreviewEnvelope.commands);
+      expect(createEnvelope.clientPlanVersion).toBe(createPreviewEnvelope.clientPlanVersion);
+      expect(createEnvelope.idempotencyKey).toMatch(/^planning-batch-[0-9a-f-]{36}$/i);
       created = createEnvelope.commands[0]!.payload;
       expect(created).toMatchObject({
         resourceId: resource.id,
@@ -155,7 +159,9 @@ test.describe("Projects resources absence write flows", () => {
 
       const removeEnvelope =
         removeResponse.request().postDataJSON() as CalendarCommandEnvelope;
-      expect(removeEnvelope).toEqual(removePreviewEnvelope);
+      expect(removeEnvelope.command).toEqual(removePreviewEnvelope.command);
+      expect(removeEnvelope.clientPlanVersion).toBe(removePreviewEnvelope.clientPlanVersion);
+      expect(removeEnvelope.idempotencyKey).toMatch(/^planning-apply-[0-9a-f-]{36}$/i);
       expect(removeEnvelope.command).toMatchObject({
         type: "calendar.exception.upsert",
         payload: {

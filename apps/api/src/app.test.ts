@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app";
+import {
+  canReadWorkspaceUserDirectory,
+  workspaceUserDirectoryEntry
+} from "./workspaceUserRoutes";
 import { verifyLoginPassword } from "./authRoutes";
 import type { ApiTenantDataSource, ProjectRecord, WorkspaceUserRecord } from "./apiTypes";
 import type { ControlSignal, KpiDefinition, PlanSnapshot, PlanningCommand } from "@kiss-pm/domain";
@@ -3842,6 +3846,48 @@ describe("KISS PM API Phase 1 shell", () => {
     await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
     expect(appliedCommand).toBeNull();
   });
+  it("allows project-plan readers, but not project-only readers, to resolve the resource directory", () => {
+    const actor = { id: "reader", tenantId: "tenant-alpha", name: "Reader", accessProfileId: "profile" };
+    expect(
+      canReadWorkspaceUserDirectory({
+        actor,
+        targetTenantId: "tenant-alpha",
+        profile: { id: "profile", permissions: ["tenant.project_plan.read"] }
+      })
+    ).toEqual({ allowed: true, reason: "same_tenant_permission_granted" });
+    expect(
+      canReadWorkspaceUserDirectory({
+        actor,
+        targetTenantId: "tenant-alpha",
+        profile: { id: "profile", permissions: ["tenant.projects.read"] }
+      })
+    ).toEqual({ allowed: false, reason: "permission_missing" });
+  });
+  it("projects the resource directory without private workspace-user fields", () => {
+    const user = {
+      id: "user-alpha",
+      tenantId: "tenant-alpha",
+      name: "Alpha",
+      accessProfileId: "profile-alpha",
+      email: "alpha@example.test",
+      positionId: "position-alpha",
+      positionName: "Engineer",
+      phone: "+70000000000",
+      telegram: "alpha",
+      status: "active",
+      theme: "light",
+      accentColor: "#0f766e"
+    };
+
+    expect(workspaceUserDirectoryEntry(user, false)).toEqual({
+      id: "user-alpha",
+      name: "Alpha",
+      positionId: "position-alpha",
+      positionName: "Engineer"
+    });
+    expect(workspaceUserDirectoryEntry(user, true)).toBe(user);
+  });
+
 });
 
 function createControlActionSnapshot(): PlanSnapshot {

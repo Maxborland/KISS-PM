@@ -1,0 +1,239 @@
+{
+  "scenarioId": "PROJ-077",
+  "role": "A",
+  "key": "PROJ-077:A",
+  "status": "pass",
+  "runId": "project-assignments-20260711-final4",
+  "generatedAt": "2026-07-11T03:48:08.302Z",
+  "assertions": [
+    "Inspector resource options come from the live users API",
+    "Resource, role, clamped units and work blur-commit through preview/apply",
+    "Every edit agrees in API, PostgreSQL and after reload"
+  ],
+  "details": {
+    "liveUserIds": [
+      "user-alpha-admin",
+      "user-alpha-engineer",
+      "user-alpha-plan-reader-no-resources",
+      "user-alpha-resource-reader"
+    ],
+    "operations": [
+      {
+        "name": "resource",
+        "previewEnvelope": {
+          "command": {
+            "type": "assignment.upsert",
+            "payload": {
+              "id": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "role": "executor",
+              "unitsPermille": 500,
+              "workMinutes": 1080
+            }
+          },
+          "clientPlanVersion": 2
+        },
+        "applyEnvelope": {
+          "command": {
+            "type": "assignment.upsert",
+            "payload": {
+              "id": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "role": "executor",
+              "unitsPermille": 500,
+              "workMinutes": 1080
+            }
+          },
+          "clientPlanVersion": 2,
+          "idempotencyKey": "planning-apply-565a83c5-4ad0-4ef4-9a7f-98f8c219ec76"
+        },
+        "apiReadback": {
+          "planVersion": 3,
+          "assignment": {
+            "id": "assignment-vektor-arch-admin",
+            "taskId": "task-vektor-arch",
+            "resourceId": "user-alpha-plan-reader-no-resources",
+            "role": "executor",
+            "unitsPermille": 500,
+            "workMinutes": 1080,
+            "calendarId": null
+          }
+        },
+        "postgresReadbackVerified": true,
+        "reloadVerifiedBeforeNextOperation": true
+      },
+      {
+        "name": "role",
+        "previewEnvelope": {
+          "command": {
+            "type": "assignment.upsert",
+            "payload": {
+              "id": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "role": "co_executor",
+              "unitsPermille": 500,
+              "workMinutes": 1080
+            }
+          },
+          "clientPlanVersion": 3
+        },
+        "applyEnvelope": {
+          "command": {
+            "type": "assignment.upsert",
+            "payload": {
+              "id": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "role": "co_executor",
+              "unitsPermille": 500,
+              "workMinutes": 1080
+            }
+          },
+          "clientPlanVersion": 3,
+          "idempotencyKey": "planning-apply-044b8c4f-43a1-4367-a356-15fc2aa2cc0d"
+        },
+        "apiReadback": {
+          "planVersion": 4,
+          "assignment": {
+            "id": "assignment-vektor-arch-admin",
+            "taskId": "task-vektor-arch",
+            "resourceId": "user-alpha-plan-reader-no-resources",
+            "role": "co_executor",
+            "unitsPermille": 500,
+            "workMinutes": 1080,
+            "calendarId": null
+          }
+        },
+        "postgresReadbackVerified": true,
+        "reloadVerifiedBeforeNextOperation": true
+      },
+      {
+        "name": "units-clamped",
+        "previewEnvelope": {
+          "command": {
+            "type": "assignment.upsert",
+            "payload": {
+              "id": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "role": "co_executor",
+              "unitsPermille": 10,
+              "workMinutes": 1080
+            }
+          },
+          "clientPlanVersion": 4
+        },
+        "applyEnvelope": {
+          "command": {
+            "type": "assignment.upsert",
+            "payload": {
+              "id": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "role": "co_executor",
+              "unitsPermille": 10,
+              "workMinutes": 1080
+            }
+          },
+          "clientPlanVersion": 4,
+          "idempotencyKey": "planning-apply-0534a13a-2978-4036-9a1c-ad7da9f7bc35"
+        },
+        "apiReadback": {
+          "planVersion": 5,
+          "assignment": {
+            "id": "assignment-vektor-arch-admin",
+            "taskId": "task-vektor-arch",
+            "resourceId": "user-alpha-plan-reader-no-resources",
+            "role": "co_executor",
+            "unitsPermille": 10,
+            "workMinutes": 1080,
+            "calendarId": null
+          }
+        },
+        "postgresReadbackVerified": true,
+        "reloadVerifiedBeforeNextOperation": true
+      },
+      {
+        "name": "work",
+        "previewEnvelope": {
+          "command": {
+            "type": "assignment.upsert",
+            "payload": {
+              "id": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "role": "co_executor",
+              "unitsPermille": 10,
+              "workMinutes": 1140
+            }
+          },
+          "clientPlanVersion": 5
+        },
+        "applyEnvelope": {
+          "command": {
+            "type": "assignment.upsert",
+            "payload": {
+              "id": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "role": "co_executor",
+              "unitsPermille": 10,
+              "workMinutes": 1140
+            }
+          },
+          "clientPlanVersion": 5,
+          "idempotencyKey": "planning-apply-c96a624a-0dcc-44cc-a8a1-287bacac2556"
+        },
+        "apiReadback": {
+          "planVersion": 6,
+          "assignment": {
+            "id": "assignment-vektor-arch-admin",
+            "taskId": "task-vektor-arch",
+            "resourceId": "user-alpha-plan-reader-no-resources",
+            "role": "co_executor",
+            "unitsPermille": 10,
+            "workMinutes": 1140,
+            "calendarId": null
+          }
+        },
+        "postgresReadbackVerified": true,
+        "reloadVerifiedBeforeNextOperation": true
+      }
+    ],
+    "cleanup": {
+      "scope": "shared_fixture_run",
+      "coversRows": [
+        "PROJ-074:A",
+        "PROJ-074:PR",
+        "PROJ-075:A",
+        "PROJ-075:PR",
+        "PROJ-077:A",
+        "PROJ-078:A",
+        "PROJ-079:A",
+        "PROJ-080:A"
+      ],
+      "assignmentId": "assignment-vektor-arch-admin",
+      "apiReadback": {
+        "assignment": {
+          "id": "assignment-vektor-arch-admin",
+          "taskId": "task-vektor-arch",
+          "resourceId": "user-alpha-admin",
+          "role": "executor",
+          "unitsPermille": 500,
+          "workMinutes": 1080,
+          "calendarId": null
+        },
+        "allocations": [],
+        "planVersion": 15
+      },
+      "postgresReadbackVerified": true,
+      "restoredEmptyTaskRemoved": true,
+      "reloadVerified": true
+    }
+  },
+  "screenshot": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-077-a.png",
+  "blocker": null
+}

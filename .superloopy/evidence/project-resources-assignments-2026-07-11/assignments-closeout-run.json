@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "runId": "project-assignments-20260711-final4",
+  "generatedAt": "2026-07-11T03:48:26.037Z",
+  "targetRows": [
+    "PROJ-074:A",
+    "PROJ-074:PR",
+    "PROJ-075:A",
+    "PROJ-075:PR",
+    "PROJ-077:A",
+    "PROJ-078:A",
+    "PROJ-079:A",
+    "PROJ-080:A"
+  ],
+  "receiptStatuses": {
+    "PROJ-077:A": "pass",
+    "PROJ-078:A": "pass",
+    "PROJ-074:A": "pass",
+    "PROJ-075:A": "pass",
+    "PROJ-074:PR": "pass",
+    "PROJ-075:PR": "pass",
+    "PROJ-079:A": "pass",
+    "PROJ-080:A": "pass"
+  },
+  "cleanupCompleted": true,
+  "failureCount": 0,
+  "status": "pass"
+}

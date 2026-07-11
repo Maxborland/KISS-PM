@@ -40,6 +40,7 @@ type CommandEnvelope = {
     payload: Record<string, unknown>;
   };
   clientPlanVersion: number;
+  idempotencyKey?: string;
 };
 
 test.describe("Projects assignments write flows", () => {
@@ -101,7 +102,9 @@ test.describe("Projects assignments write flows", () => {
       expect(createResponse.status()).toBe(200);
 
       const createEnvelope = createResponse.request().postDataJSON() as CommandEnvelope;
-      expect(createEnvelope).toEqual(createPreviewEnvelope);
+      expect(createEnvelope.command).toEqual(createPreviewEnvelope.command);
+      expect(createEnvelope.clientPlanVersion).toBe(createPreviewEnvelope.clientPlanVersion);
+      expect(createEnvelope.idempotencyKey).toMatch(/^planning-apply-[0-9a-f-]{36}$/i);
       createdAssignmentId = String(createEnvelope.command.payload.id ?? "");
       expect(createdAssignmentId).toMatch(/^a-[0-9a-f-]{36}$/i);
 
@@ -161,7 +164,9 @@ test.describe("Projects assignments write flows", () => {
       expect(deleteResponse.status()).toBe(200);
 
       const deleteEnvelope = deleteResponse.request().postDataJSON() as CommandEnvelope;
-      expect(deleteEnvelope).toEqual(deletePreviewEnvelope);
+      expect(deleteEnvelope.command).toEqual(deletePreviewEnvelope.command);
+      expect(deleteEnvelope.clientPlanVersion).toBe(deletePreviewEnvelope.clientPlanVersion);
+      expect(deleteEnvelope.idempotencyKey).toMatch(/^planning-apply-[0-9a-f-]{36}$/i);
 
       readModel = await getReadModel(page, projectId);
       expect(

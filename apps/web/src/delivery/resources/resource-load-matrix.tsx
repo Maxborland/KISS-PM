@@ -97,6 +97,11 @@ const CROSS_FOCAL = "shadow-[inset_0_0_0_9999px_color-mix(in_oklab,var(--accent)
 
 const committedOf = (b: RBucket) => b.assignedMinutes + b.reservedMinutes + b.occupiedMinutes;
 const h1 = (min: number) => (Math.round((min / 60) * 10) / 10).toLocaleString("ru-RU");
+export function parseResourceAssignmentHours(value: string): number | null {
+  if (value.trim() === "") return null;
+  const hours = Number(value);
+  return Number.isFinite(hours) && hours >= 0 ? hours : null;
+}
 
 function periodLabel(iso: string, gran: Gran): { top: string; sub: string; weekend: boolean } {
   const d = new Date(iso + "T00:00:00Z");
@@ -272,7 +277,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
     // KPI по видимым ресурсам × видимым периодам (учитывают окно и все фильтры)
     let kCap = 0, kCommitted = 0, kOverHours = 0;
     for (const r of visibleResList) for (const d of periods) { const c = cellFor(r.id, d); kCap += c.capacity; kCommitted += c.committed; if (c.overload && !c.accepted) kOverHours += Math.max(0, c.committed - c.capacity); }
-    const kLoad = kCap > 0 ? Math.round((kCommitted / kCap) * 100) : 0;
+    const kLoad = kCap > 0 ? Math.round((kCommitted / kCap) * 100) : null;
     const kFree = Math.max(0, kCap - kCommitted);
     const overloadedCount = visibleResList.filter((r) => periods.some((d) => { const c = cellFor(r.id, d); return c.overload && !c.accepted; })).length;
     const allVisibleIds = visibleResList.map((r) => r.id);
@@ -297,7 +302,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
   const selCap = selBucket ? selBucket.capacityMinutes : 0;
   const selPct = selCap > 0 ? Math.round((selCommitted / selCap) * 100) : selCommitted > 0 ? 999 : 0;
   const selAsg = selBucket ? [...selBucket.assignmentContributions.filter((ac) => projectFilter === "all" || projOf(ac.taskId) === projectFilter).reduce((m, ac) => { const e = m.get(ac.assignmentId); if (e) e.minutes += ac.workMinutes; else m.set(ac.assignmentId, { taskId: ac.taskId, minutes: ac.workMinutes }); return m; }, new Map<string, { taskId: string; minutes: number }>()).entries()] : [];
-  const selOcc = selBucket ? [...new Set(selBucket.occupancyContributions.map((o) => o.occupancyId))] : [];
+  const selOcc = selBucket?.occupancyContributions ?? [];
 
   const LEFT_W = 348;
 
@@ -437,7 +442,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
         {[
           { label: "Ёмкость", value: `${h1(kCap)} ч`, sub: `${windowed ? `за ${monthLabel}` : `весь ${scope.windowNoun}`} · ${visibleResList.length} чел.`, tone: "text-[var(--text-strong)]" },
           { label: "Назначено", value: `${h1(kCommitted)} ч`, sub: onlyOverload ? "фильтр: перегруженные" : "по реальным задачам", tone: "text-[var(--accent)]" },
-          { label: "Загрузка", value: `${kLoad}%`, sub: `${Math.round(kCommitted / 60)} / ${Math.round(kCap / 60)} ч`, tone: kLoad > 100 ? "text-[var(--danger)]" : "text-[var(--text-strong)]" },
+          { label: "Загрузка", value: kLoad === null ? "—" : `${kLoad}%`, sub: `${h1(kCommitted)} / ${h1(kCap)} ч`, tone: kLoad !== null && kLoad > 100 ? "text-[var(--danger)]" : "text-[var(--text-strong)]" },
           { label: "Свободно", value: `${h1(kFree)} ч`, sub: "остаток ёмкости", tone: "text-[var(--success-text)]" },
           { label: "Перегруз", value: `${overloadedCount} чел.`, sub: overloadedCount > 0 ? `+${h1(kOverHours)} ч сверх ёмкости` : "нет перегруза", tone: overloadedCount > 0 ? "text-[var(--danger)]" : "text-[var(--muted-soft)]" }
         ].map((k) => (
@@ -449,7 +454,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
         ))}
       </div>
 
-      <div className="relative">
+      <div className="relative" data-testid="resource-load-matrix">
         <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
           <div className="flex min-w-full align-top" onMouseLeave={() => setHover(null)}>
             {/* sticky-left: имена + загрузка часами */}
@@ -515,9 +520,9 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
                           ) : null}
                           {asg && onEditAssignmentHours ? (
                             edit === assignmentId ? (
-                              <span className="mt-0.5 flex items-center gap-1 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">всего <input autoFocus type="number" value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => { setEdit(null); onEditAssignmentHours(asg, Number(draft)); }} onKeyDown={(e) => { if (e.key === "Enter") { setEdit(null); onEditAssignmentHours(asg, Number(draft)); } if (e.key === "Escape") setEdit(null); }} className="w-14 rounded border border-[var(--accent)] bg-[var(--panel)] px-1 text-right tabular-nums outline-none" /> ч</span>
+                              <span className="mt-0.5 flex items-center gap-1 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">всего <input autoFocus type="number" step={0.5} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={(e) => { setEdit(null); if (e.currentTarget.dataset.cancelled === "true") return; const hours = parseResourceAssignmentHours(draft); if (hours !== null && Math.round(hours * 60) !== asg.workMinutes) onEditAssignmentHours(asg, hours); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } if (e.key === "Escape") { e.preventDefault(); e.currentTarget.dataset.cancelled = "true"; e.currentTarget.blur(); } }} className="w-14 rounded border border-[var(--accent)] bg-[var(--panel)] px-1 text-right tabular-nums outline-none" /> ч</span>
                             ) : (
-                              <button type="button" onClick={() => { setEdit(assignmentId); setDraft(String(Math.round(asg.workMinutes / 60))); }} className="text-[length:var(--text-2xs)] text-[var(--muted-soft)] hover:text-[var(--accent)]" title="Изменить трудозатраты по задаче (всего)">всего {h1(asg.workMinutes)} ч · изменить</button>
+                              <button type="button" onClick={() => { setEdit(assignmentId); setDraft(String(Math.round((asg.workMinutes / 60) * 100) / 100)); }} className="text-[length:var(--text-2xs)] text-[var(--muted-soft)] hover:text-[var(--accent)]" title="Изменить трудозатраты по задаче (всего)">всего {h1(asg.workMinutes)} ч · изменить</button>
                             )
                           ) : asg ? (
                             <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">всего {h1(asg.workMinutes)} ч</span>
@@ -527,7 +532,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
                       </li>
                     );
                   })}
-                  {selOcc.map((occId) => <li key={occId} className="flex items-center gap-2 px-2 py-1 text-[var(--violet)]"><UserPlus className="size-3.5 shrink-0" aria-hidden />Отсутствие (отпуск)</li>)}
+                  {selOcc.map((occ) => <li key={occ.occupancyId} className="flex items-center gap-2 px-2 py-1 text-[var(--violet)]"><UserPlus className="size-3.5 shrink-0" aria-hidden /><span className="flex-1">{occ.sourceType === "absence" ? "Отсутствие" : occ.sourceType === "meeting" ? "Встреча" : occ.sourceType === "focus" ? "Фокус-время" : `Занятость: ${occ.sourceType}`}</span><span className="font-semibold tabular-nums">{h1(occ.workMinutes)} ч</span></li>)}
                 </ul>
               ) : <p className="text-[var(--muted)]">{selBucket && selBucket.capacityMinutes === 0 ? "Нерабочий день." : "Нет нагрузки в этот период."}</p>}
               {scope.level === "project" ? <p className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Клик по часам — правка трудозатрат назначения (загрузка пересчитается).</p> : <p className="mt-3 inline-flex items-center gap-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]"><ShieldCheck className="size-3.5" aria-hidden />Отчётный уровень — правки делаются в проекте.</p>}

@@ -1,5 +1,6 @@
 import {
   canManageTenantUsers,
+  canReadProjectPlan,
   canReadTenantUsers,
   type PolicyDecision
 } from "@kiss-pm/access-control";
@@ -9,11 +10,31 @@ import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRou
 import { readLimitedJsonBody } from "./jsonBody";
 import { authorizeRoute } from "./routeAuth";
 import { parseUserIdParam } from "./routeParamParsers";
+import type { WorkspaceUserRecord } from "./apiTypes";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import {
   parseWorkspaceUserBody,
   parseWorkspaceUserPatchBody
 } from "./workspaceParsers";
+
+export function canReadWorkspaceUserDirectory(
+  input: Parameters<typeof canReadTenantUsers>[0]
+): PolicyDecision {
+  const direct = canReadTenantUsers(input);
+  return direct.allowed ? direct : canReadProjectPlan(input);
+}
+export function workspaceUserDirectoryEntry(
+  user: WorkspaceUserRecord,
+  includePrivateFields: boolean
+) {
+  if (includePrivateFields) return user;
+  return {
+    id: user.id,
+    name: user.name,
+    positionId: user.positionId,
+    positionName: user.positionName
+  };
+}
 
 export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
   const {
@@ -26,7 +47,7 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
   app.get("/api/workspace/users", async (context) => {
     const auth = await authorizeRoute(context, deps, {
-      permission: canReadTenantUsers,
+      permission: canReadWorkspaceUserDirectory,
       capabilities: ["listWorkspaceUsers"],
       onDenied: ({ actor, decision }) =>
         appendWorkspaceUserDeniedAudit(deps, actor, {
@@ -37,10 +58,17 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
         })
     });
     if (!auth.ok) return auth.response;
-    const { actor, dataSource } = auth.value;
+    const { actor, profile, dataSource } = auth.value;
+    const includePrivateFields = canReadTenantUsers({
+      actor,
+      profile,
+      targetTenantId: actor.tenantId
+    }).allowed;
 
     return context.json({
-      users: await dataSource.listWorkspaceUsers(actor.tenantId)
+      users: (await dataSource.listWorkspaceUsers(actor.tenantId)).map((user) =>
+        workspaceUserDirectoryEntry(user, includePrivateFields)
+      )
     });
   });
 

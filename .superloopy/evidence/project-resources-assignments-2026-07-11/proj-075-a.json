@@ -1,0 +1,73 @@
+{
+  "scenarioId": "PROJ-075",
+  "role": "A",
+  "key": "PROJ-075:A",
+  "status": "pass",
+  "runId": "project-assignments-20260711-final4",
+  "generatedAt": "2026-07-11T03:48:14.879Z",
+  "assertions": [
+    "Admin month arrows stop disabled at both edges",
+    "Week columns are Monday anchored and inspector survives navigation"
+  ],
+  "details": {
+    "forwardMoves": 1,
+    "backwardMoves": 1,
+    "weekLabels": [
+      {
+        "day": "01",
+        "month": "Июн"
+      },
+      {
+        "day": "08",
+        "month": "Июн"
+      },
+      {
+        "day": "15",
+        "month": "Июн"
+      },
+      {
+        "day": "22",
+        "month": "Июн"
+      },
+      {
+        "day": "29",
+        "month": "Июн"
+      }
+    ],
+    "planVersion": 9,
+    "inspectorStayedOpen": true,
+    "readOnly": false,
+    "cleanup": {
+      "scope": "shared_fixture_run",
+      "coversRows": [
+        "PROJ-074:A",
+        "PROJ-074:PR",
+        "PROJ-075:A",
+        "PROJ-075:PR",
+        "PROJ-077:A",
+        "PROJ-078:A",
+        "PROJ-079:A",
+        "PROJ-080:A"
+      ],
+      "assignmentId": "assignment-vektor-arch-admin",
+      "apiReadback": {
+        "assignment": {
+          "id": "assignment-vektor-arch-admin",
+          "taskId": "task-vektor-arch",
+          "resourceId": "user-alpha-admin",
+          "role": "executor",
+          "unitsPermille": 500,
+          "workMinutes": 1080,
+          "calendarId": null
+        },
+        "allocations": [],
+        "planVersion": 15
+      },
+      "postgresReadbackVerified": true,
+      "restoredEmptyTaskRemoved": true,
+      "reloadVerified": true
+    }
+  },
+  "screenshot": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-075-a.png",
+  "blocker": null
+}

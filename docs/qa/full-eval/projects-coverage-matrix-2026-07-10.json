@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-07-10T16:57:46.899Z",
+  "generatedAt": "2026-07-10T21:16:25.3342114Z",
   "source": "docs/qa/full-eval/inventory/projects.md",
-  "evidenceRule": "Only rows linked to fresh 2026-07-10 artifacts may be pass; historical checks remain historical_evidence_only.",
+  "evidenceRule": "Only rows linked to fresh artifacts captured on or after 2026-07-10 may be pass; historical checks remain historical_evidence_only.",
   "schema": "role x scenario x surface x expectedBehavior x evidence x status",
   "sourceScenarioCount": 130,
   "expandedMatrixRowCount": 223,
@@ -12,11 +12,11 @@
     },
     {
       "status": "fail",
-      "count": 10
+      "count": 6
     },
     {
       "status": "historical_evidence_only",
-      "count": 40
+      "count": 19
     },
     {
       "status": "partial",
@@ -24,7 +24,7 @@
     },
     {
       "status": "pass",
-      "count": 169
+      "count": 194
     },
     {
       "status": "unverified",
@@ -1348,8 +1348,8 @@
       "apiOrDataSurface": "read-model (`resourceLoad.buckets`)",
       "expectedBehavior": "Свод-строки — мини-бары (не редактируемые), сотрудник — цветные ячейки; «прицел» при наведении",
       "dataStateAndEdges": "на live team/positionName — из `/api/workspace/users` c дефолтами (teamId=positionId, capacity 480) — группировка «Команда проекта» для всех без позиции",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-062-admin.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ (иерархия команда→роль→сотрудник, «Итого», свернуть/развернуть)"
     },
     {
@@ -1360,8 +1360,8 @@
       "apiOrDataSurface": "read-model (`resourceLoad.buckets`)",
       "expectedBehavior": "Свод-строки — мини-бары (не редактируемые), сотрудник — цветные ячейки; «прицел» при наведении",
       "dataStateAndEdges": "на live team/positionName — из `/api/workspace/users` c дефолтами (teamId=positionId, capacity 480) — группировка «Команда проекта» для всех без позиции",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-062-planReader.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ (иерархия команда→роль→сотрудник, «Итого», свернуть/развернуть)"
     },
     {
@@ -1372,8 +1372,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Окно по месяцу; стрелки disabled на краях",
       "dataStateAndEdges": "план в одном месяце; переключение гранулярности сбрасывает выделение?",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-063-admin.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ (День/Неделя/Месяц; стрелки disabled на краях)"
     },
     {
@@ -1384,8 +1384,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Окно по месяцу; стрелки disabled на краях",
       "dataStateAndEdges": "план в одном месяце; переключение гранулярности сбрасывает выделение?",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-063-planReader.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ (День/Неделя/Месяц; стрелки disabled на краях)"
     },
     {
@@ -1396,8 +1396,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Смена команды сбрасывает фильтр роли; KPI пересчитываются по видимым",
       "dataStateAndEdges": "все отфильтровано → пустая матрица (нет плашки?)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-064-admin.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ (Команда=Руководитель проекта → только Анна; KPI пересчитываются)"
     },
     {
@@ -1408,8 +1408,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Смена команды сбрасывает фильтр роли; KPI пересчитываются по видимым",
       "dataStateAndEdges": "все отфильтровано → пустая матрица (нет плашки?)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-064-planReader.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ (Команда=Руководитель проекта → только Анна; KPI пересчитываются)"
     },
     {
@@ -1420,8 +1420,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Скрывает ресурсы без загрузки в окне",
       "dataStateAndEdges": "все незанятые → пусто",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-065-admin.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ («Только перегруженные» → только Игорь; тогл работает)"
     },
     {
@@ -1432,8 +1432,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Скрывает ресурсы без загрузки в окне",
       "dataStateAndEdges": "все незанятые → пусто",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-065-planReader.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ («Только перегруженные» → только Игорь; тогл работает)"
     },
     {
@@ -1444,8 +1444,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Учитывают фильтры и период",
       "dataStateAndEdges": "нулевая ёмкость (сплошные праздники)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-066-admin.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ (KPI Ёмкость/Назначено/Загрузка/Свободно/Перегруз по окну и фильтрам)"
     },
     {
@@ -1456,8 +1456,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Учитывают фильтры и период",
       "dataStateAndEdges": "нулевая ёмкость (сплошные праздники)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-066-planReader.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ (KPI Ёмкость/Назначено/Загрузка/Свободно/Перегруз по окну и фильтрам)"
     },
     {
@@ -1468,8 +1468,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Клик по ячейке сотрудника; список задач с карандашом (открывает TaskModal edit)",
       "dataStateAndEdges": "ячейка без бакета; неизвестный taskId в контрибуциях",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-067-admin.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ (drilldown: разбивка задач/оккупаций; занудство: meeting occupancy подписан «Отсутствие (отпуск)» — см. bugs)"
     },
     {
@@ -1480,8 +1480,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Клик по ячейке сотрудника; список задач с карандашом (открывает TaskModal edit)",
       "dataStateAndEdges": "ячейка без бакета; неизвестный taskId в контрибуциях",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-067-planReader.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ (drilldown: разбивка задач/оккупаций; занудство: meeting occupancy подписан «Отсутствие (отпуск)» — см. bugs)"
     },
     {
@@ -1504,8 +1504,8 @@
       "apiOrDataSurface": "apply-command (assignment.upsert по id)",
       "expectedBehavior": "Часы → минуты; матрица пересчитывается",
       "dataStateAndEdges": "0 часов; конфликт версий",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-069-admin.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
       "inventoryStatus": "✅ (клик по «всего N ч · изменить» → инпут; 24→20 ч сохранено, восстановлено)"
     },
     {
@@ -1516,9 +1516,9 @@
       "apiOrDataSurface": "apply-command-batch",
       "expectedBehavior": "Пресет resourceId из drilldown",
       "dataStateAndEdges": "**исполнитель в модалке — мок RESOURCES** (тот же баг, что PROJ-043)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-01/BUG-PROJ-02 (TaskModal: statusId:\"todo\" хардкод + мок-исполнитель — как на /schedule)"
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-070-admin.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
+      "inventoryStatus": "✅ FIXED: live resource directory preset, preview/apply/readback/reload and cleanup verified"
     },
     {
       "role": "A",
@@ -1540,9 +1540,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": ">100% — красный; cap=0 различает отпуск/праздник/выходной",
       "dataStateAndEdges": "принятый перегруз — визуально отличим («перегруз принят» в title)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "✅ (легенда норма/перегруз/выходной/праздник/отсутствие; >100% красный; но «принятый перегруз» недостижим — BUG-PROJ-19)"
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-072-admin.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
+      "inventoryStatus": "✅ FIXED: normal/overload/weekend/holiday/absence and accepted-overload semantics verified"
     },
     {
       "role": "PR",
@@ -1552,9 +1552,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": ">100% — красный; cap=0 различает отпуск/праздник/выходной",
       "dataStateAndEdges": "принятый перегруз — визуально отличим («перегруз принят» в title)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "✅ (легенда норма/перегруз/выходной/праздник/отсутствие; >100% красный; но «принятый перегруз» недостижим — BUG-PROJ-19)"
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/receipts/proj-072-planReader.json; row-owned live UI/API evidence with unique screenshot; final Resources closeout 3/3 Playwright tests",
+      "status": "pass",
+      "inventoryStatus": "✅ FIXED: normal/overload/weekend/holiday/absence and accepted-overload semantics verified"
     },
     {
       "role": "A",
@@ -1600,8 +1600,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Origin таймлайна = project.plannedStart из read-model (НЕ хардкод); суммы строки задачи = Σ исполнителей; учёт праздников/отсутствий календаря",
       "dataStateAndEdges": "задача без назначений («нет исполнителей»); назначение с явной кривой (маркер «кривая»); нерабочие роли (контролёр) не создают нагрузку",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-074-a.json; row-owned live UI/API/PostgreSQL receipt with reload and cleanup; final Assignments closeout 1/1 Playwright test",
+      "status": "pass",
       "inventoryStatus": "✅ (origin=plannedStart корректный: vektor Июн, demo Май; суммы Σ исполнителей; спрос vs факт «32/24 ч» показан)"
     },
     {
@@ -1612,8 +1612,8 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Origin таймлайна = project.plannedStart из read-model (НЕ хардкод); суммы строки задачи = Σ исполнителей; учёт праздников/отсутствий календаря",
       "dataStateAndEdges": "задача без назначений («нет исполнителей»); назначение с явной кривой (маркер «кривая»); нерабочие роли (контролёр) не создают нагрузку",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-074-pr.json; row-owned live UI/API/PostgreSQL receipt with reload and cleanup; final Assignments closeout 1/1 Playwright test",
+      "status": "pass",
       "inventoryStatus": "✅ (origin=plannedStart корректный: vektor Июн, demo Май; суммы Σ исполнителей; спрос vs факт «32/24 ч» показан)"
     },
     {
@@ -1624,8 +1624,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Стрелки disabled на краях; недели — понедельники",
       "dataStateAndEdges": "план целиком в одном месяце; переключение при открытом инспекторе",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-075-a.json; row-owned live UI/API/PostgreSQL receipt with reload and cleanup; final Assignments closeout 1/1 Playwright test",
+      "status": "pass",
       "inventoryStatus": "✅ (стрелки disabled на краях; День/Неделя переключается)"
     },
     {
@@ -1636,8 +1636,8 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Стрелки disabled на краях; недели — понедельники",
       "dataStateAndEdges": "план целиком в одном месяце; переключение при открытом инспекторе",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-075-pr.json; row-owned live UI/API/PostgreSQL receipt with reload and cleanup; final Assignments closeout 1/1 Playwright test",
+      "status": "pass",
       "inventoryStatus": "✅ (стрелки disabled на краях; День/Неделя переключается)"
     },
     {
@@ -1660,8 +1660,8 @@
       "apiOrDataSurface": "apply-command (assignment.upsert по id)",
       "expectedBehavior": "Изменение труда/единиц сбрасывает кривую к равномерной (подпись); blur-коммит",
       "dataStateAndEdges": "смена ресурса на уже назначенного на ту же задачу (конфликт назначений — должен отклонить бэк?); единицы 0/отрицательные (кламп ≥1)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-077-a.json; row-owned live UI/API/PostgreSQL receipt with reload and cleanup; final Assignments closeout 1/1 Playwright test",
+      "status": "pass",
       "inventoryStatus": "✅ (селект «Ресурс» = live users; units/труд редактируются, blur-коммит)"
     },
     {
@@ -1672,8 +1672,8 @@
       "apiOrDataSurface": "apply-command (assignment.allocations.replace)",
       "expectedBehavior": "Раскладка Гамильтона — сумма ТОЧНО равна труду; только рабочие дни (минус праздники/отсутствия)",
       "dataStateAndEdges": "0 рабочих дней в расписании (кнопки disabled); задача из 1 дня",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-078-a.json; row-owned live UI/API/PostgreSQL receipt with reload and cleanup; final Assignments closeout 1/1 Playwright test",
+      "status": "pass",
       "inventoryStatus": "✅ (Фронт/Равномерно/Бэк → сбалансированная раскладка, коммит; маркер «кривая»)"
     },
     {
@@ -1684,8 +1684,8 @@
       "apiOrDataSurface": "apply-command (assignment.allocations.replace)",
       "expectedBehavior": "Несбалансированная сумма → отказ бэка → красная ошибка с требуемой суммой; успех сбрасывает draft",
       "dataStateAndEdges": "дни кривой вне текущего расписания (после сдвига задачи) показаны в редакторе; 0 во всех днях; дробные часы (шаг 0.5)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-079-a.json; row-owned live UI/API/PostgreSQL receipt with reload and cleanup; final Assignments closeout 1/1 Playwright test",
+      "status": "pass",
       "inventoryStatus": "✅ (несбалансированная сумма 3/6 ч → красный отказ бэка «Сумма allocation…должна совпадать»)"
     },
     {
@@ -1696,8 +1696,8 @@
       "apiOrDataSurface": "allocations.replace `[]`",
       "expectedBehavior": "Маркер «кривая» исчезает; грид возвращается к flat-раскладке",
       "dataStateAndEdges": "сброс при конфликте версий",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-080-a.json; row-owned live UI/API/PostgreSQL receipt with reload and cleanup; final Assignments closeout 1/1 Playwright test",
+      "status": "pass",
       "inventoryStatus": "✅ (allocations.replace [] → маркер «кривая» исчез, alloc пуст)"
     },
     {
@@ -2500,9 +2500,9 @@
       "apiOrDataSurface": "assignment.*, risk.accept_overload",
       "expectedBehavior": "Часы согласованы между Графиком (труд), Назначениями (кривая) и Ресурсами (загрузка)",
       "dataStateAndEdges": "конфликт назначений (один ресурс, пересекающиеся задачи сверх ёмкости)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-17/BUG-PROJ-19 (частично блокирует полный воркфлоу): добавить НОВОГО исполнителя из UI нельзя (диалоги «+»/AddAssignee — мок RESOURCES → 409), «принять перегруз» — no-op на бэке; при этом СОГЛАСОВАННОСТЬ часов между /schedule, /assignments, /resources для СУЩЕСТВУЮЩИХ назначений подтверждена (напр. реассайн от сценария виден на /assignments идентично)"
+      "evidence": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-118-admin-receipt.json; live assignment -> curve -> overload -> idempotency replay/conflict -> acceptance/reload -> resolution flow; final Playwright 1/1",
+      "status": "pass",
+      "inventoryStatus": "✅ FIXED: UI add assignment → explicit curve → overload → accept/idempotency → reload → resolve verified"
     },
     {
       "role": "A",

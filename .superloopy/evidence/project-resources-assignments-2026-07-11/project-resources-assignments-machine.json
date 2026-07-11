@@ -1,0 +1,525 @@
+{
+  "schemaVersion": 1,
+  "runId": "project-resources-20260711-final3",
+  "generatedAt": "2026-07-11T03:43:46.645Z",
+  "targetRowCount": 16,
+  "statusCounts": {
+    "pass": 16,
+    "fail": 0,
+    "pending": 0
+  },
+  "rows": [
+    {
+      "scenarioId": "PROJ-062",
+      "role": "admin",
+      "key": "PROJ-062:admin",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:30.187Z",
+      "assertions": [
+        "Live read-model resource buckets rendered team, role, person and total rows",
+        "Collapsing a summary row removed descendants and exposed the matching expand control",
+        "Summary rows remained controls while person cells retained date-specific titles"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-062-admin-collapsed-live-hierarchy.png"
+      ],
+      "receipt": "receipts/proj-062-admin.json"
+    },
+    {
+      "scenarioId": "PROJ-062",
+      "role": "planReader",
+      "key": "PROJ-062:planReader",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:34.790Z",
+      "assertions": [
+        "Live read-model resource buckets rendered team, role, person and total rows",
+        "Collapsing a summary row removed descendants and exposed the matching expand control",
+        "Summary rows remained controls while person cells retained date-specific titles"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-062-planReader-collapsed-live-hierarchy.png"
+      ],
+      "receipt": "receipts/proj-062-planReader.json"
+    },
+    {
+      "scenarioId": "PROJ-063",
+      "role": "admin",
+      "key": "PROJ-063:admin",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:30.580Z",
+      "assertions": [
+        "Day, week and month controls were live and switched the matrix",
+        "Month navigation existed for windowed day/week modes and disappeared for full-horizon month mode",
+        "Navigation controls exposed disabled boundaries rather than wrapping"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-063-admin-month-full-horizon.png"
+      ],
+      "receipt": "receipts/proj-063-admin.json"
+    },
+    {
+      "scenarioId": "PROJ-063",
+      "role": "planReader",
+      "key": "PROJ-063:planReader",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:35.160Z",
+      "assertions": [
+        "Day, week and month controls were live and switched the matrix",
+        "Month navigation existed for windowed day/week modes and disappeared for full-horizon month mode",
+        "Navigation controls exposed disabled boundaries rather than wrapping"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-063-planReader-month-full-horizon.png"
+      ],
+      "receipt": "receipts/proj-063-planReader.json"
+    },
+    {
+      "scenarioId": "PROJ-064",
+      "role": "admin",
+      "key": "PROJ-064:admin",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:30.974Z",
+      "assertions": [
+        "Live Team and Role selects both offered non-All values",
+        "Changing Team reset Role to All",
+        "The selected live team remained active while Role reset to All"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-064-admin-team-reset-role-kpi.png"
+      ],
+      "receipt": "receipts/proj-064-admin.json"
+    },
+    {
+      "scenarioId": "PROJ-064",
+      "role": "planReader",
+      "key": "PROJ-064:planReader",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:35.539Z",
+      "assertions": [
+        "Live Team and Role selects both offered non-All values",
+        "Changing Team reset Role to All",
+        "The selected live team remained active while Role reset to All"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-064-planReader-team-reset-role-kpi.png"
+      ],
+      "receipt": "receipts/proj-064-planReader.json"
+    },
+    {
+      "scenarioId": "PROJ-065",
+      "role": "admin",
+      "key": "PROJ-065:admin",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:31.232Z",
+      "assertions": [
+        "Derived idle resources from live day buckets for the visible month",
+        "Hide idle removed every zero-commitment resource",
+        "A live resource with committed work remained visible"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-065-admin-idle-resources-hidden.png"
+      ],
+      "receipt": "receipts/proj-065-admin.json"
+    },
+    {
+      "scenarioId": "PROJ-065",
+      "role": "planReader",
+      "key": "PROJ-065:planReader",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:35.792Z",
+      "assertions": [
+        "Derived idle resources from live day buckets for the visible month",
+        "Hide idle removed every zero-commitment resource",
+        "A live resource with committed work remained visible"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-065-planReader-idle-resources-hidden.png"
+      ],
+      "receipt": "receipts/proj-065-planReader.json"
+    },
+    {
+      "scenarioId": "PROJ-066",
+      "role": "admin",
+      "key": "PROJ-066:admin",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:31.837Z",
+      "assertions": [
+        "LIVE: capacity and committed minutes were summed from first-month API day buckets",
+        "LIVE: Capacity, Assigned, Load and Free UI values matched the API-derived values",
+        "SYNTHETIC ROUTE FIXTURE: deterministic zero capacity and zero commitment rendered 0 h, an undefined-load dash with 0 / 0 h, and 0 overload through the production matrix"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-066-admin-synthetic-zero-capacity-kpis.png"
+      ],
+      "receipt": "receipts/proj-066-admin.json"
+    },
+    {
+      "scenarioId": "PROJ-066",
+      "role": "planReader",
+      "key": "PROJ-066:planReader",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:36.355Z",
+      "assertions": [
+        "LIVE: capacity and committed minutes were summed from first-month API day buckets",
+        "LIVE: Capacity, Assigned, Load and Free UI values matched the API-derived values",
+        "SYNTHETIC ROUTE FIXTURE: deterministic zero capacity and zero commitment rendered 0 h, an undefined-load dash with 0 / 0 h, and 0 overload through the production matrix"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-066-planReader-synthetic-zero-capacity-kpis.png"
+      ],
+      "receipt": "receipts/proj-066-planReader.json"
+    },
+    {
+      "scenarioId": "PROJ-067",
+      "role": "admin",
+      "key": "PROJ-067:admin",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:32.401Z",
+      "assertions": [
+        "Clicked a live person/day bucket selected from API assignment contributions",
+        "Inspector identity, date and authored task title matched the read-model",
+        "ADMIN received task and assignment edit controls"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-067-admin-live-contribution-drilldown.png"
+      ],
+      "receipt": "receipts/proj-067-admin.json"
+    },
+    {
+      "scenarioId": "PROJ-067",
+      "role": "planReader",
+      "key": "PROJ-067:planReader",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:36.937Z",
+      "assertions": [
+        "Clicked a live person/day bucket selected from API assignment contributions",
+        "Inspector identity, date and authored task title matched the read-model",
+        "PLAN reader received the same contribution detail without write controls"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-067-planReader-live-contribution-drilldown.png"
+      ],
+      "receipt": "receipts/proj-067-planReader.json"
+    },
+    {
+      "scenarioId": "PROJ-072",
+      "role": "admin",
+      "key": "PROJ-072:admin",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:33.092Z",
+      "assertions": [
+        "SYNTHETIC ROUTE FIXTURE: deterministic normal, overload, absence, holiday and weekend buckets rendered through the production matrix",
+        "SYNTHETIC ROUTE FIXTURE: all five semantic classes produced distinct inline background values",
+        "SYNTHETIC ROUTE FIXTURE: accepted overload rendered a check mark and literal accepted-overload title while the semantic legend remained visible"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-072-admin-synthetic-five-cell-semantics.png"
+      ],
+      "receipt": "receipts/proj-072-admin.json"
+    },
+    {
+      "scenarioId": "PROJ-072",
+      "role": "planReader",
+      "key": "PROJ-072:planReader",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:37.699Z",
+      "assertions": [
+        "SYNTHETIC ROUTE FIXTURE: deterministic normal, overload, absence, holiday and weekend buckets rendered through the production matrix",
+        "SYNTHETIC ROUTE FIXTURE: all five semantic classes produced distinct inline background values",
+        "SYNTHETIC ROUTE FIXTURE: accepted overload rendered a check mark and literal accepted-overload title while the semantic legend remained visible"
+      ],
+      "details": {},
+      "screenshots": [
+        "screenshots/proj-072-planReader-synthetic-five-cell-semantics.png"
+      ],
+      "receipt": "receipts/proj-072-planReader.json"
+    },
+    {
+      "scenarioId": "PROJ-069",
+      "role": "admin",
+      "key": "PROJ-069:admin",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:41.999Z",
+      "assertions": [
+        "UI hours edit emitted matching assignment.upsert preview and apply envelopes",
+        "API readback converted hours to exact minutes and survived reload",
+        "A second UI preview/apply restored the exact original assignment and survived cleanup reload"
+      ],
+      "details": {
+        "previewEnvelope": {
+          "command": {
+            "type": "assignment.upsert",
+            "payload": {
+              "id": "assignment-gorset-audit-engineer",
+              "taskId": "task-gorset-audit",
+              "resourceId": "user-alpha-engineer",
+              "role": "executor",
+              "unitsPermille": 1000,
+              "workMinutes": 1380
+            }
+          },
+          "clientPlanVersion": 6
+        },
+        "applyEnvelope": {
+          "command": {
+            "type": "assignment.upsert",
+            "payload": {
+              "id": "assignment-gorset-audit-engineer",
+              "taskId": "task-gorset-audit",
+              "resourceId": "user-alpha-engineer",
+              "role": "executor",
+              "unitsPermille": 1000,
+              "workMinutes": 1380
+            }
+          },
+          "clientPlanVersion": 6,
+          "idempotencyKey": "planning-apply-3df8228e-c42d-46f5-bd5e-7a08374312c4"
+        },
+        "reloadReadback": {
+          "reloaded": true,
+          "planVersion": 7,
+          "assignment": {
+            "id": "assignment-gorset-audit-engineer",
+            "taskId": "task-gorset-audit",
+            "resourceId": "user-alpha-engineer",
+            "role": "executor",
+            "unitsPermille": 1000,
+            "workMinutes": 1380,
+            "calendarId": null
+          }
+        },
+        "cleanup": {
+          "assignmentPreviewEnvelope": {
+            "command": {
+              "type": "assignment.upsert",
+              "payload": {
+                "id": "assignment-gorset-audit-engineer",
+                "taskId": "task-gorset-audit",
+                "resourceId": "user-alpha-engineer",
+                "role": "executor",
+                "unitsPermille": 1000,
+                "workMinutes": 1440
+              }
+            },
+            "clientPlanVersion": 7
+          },
+          "assignmentApplyEnvelope": {
+            "command": {
+              "type": "assignment.upsert",
+              "payload": {
+                "id": "assignment-gorset-audit-engineer",
+                "taskId": "task-gorset-audit",
+                "resourceId": "user-alpha-engineer",
+                "role": "executor",
+                "unitsPermille": 1000,
+                "workMinutes": 1440
+              }
+            },
+            "clientPlanVersion": 7,
+            "idempotencyKey": "planning-apply-f9c4b98f-cbd0-4aeb-86d1-ee5589a7e14f"
+          },
+          "allocations": {
+            "previewEnvelope": {
+              "command": {
+                "type": "assignment.allocations.replace",
+                "payload": {
+                  "assignmentId": "assignment-gorset-audit-engineer",
+                  "allocations": []
+                }
+              },
+              "clientPlanVersion": 8
+            },
+            "previewStatus": 200,
+            "applyEnvelope": {
+              "command": {
+                "type": "assignment.allocations.replace",
+                "payload": {
+                  "assignmentId": "assignment-gorset-audit-engineer",
+                  "allocations": []
+                }
+              },
+              "clientPlanVersion": 8
+            },
+            "applyStatus": 200,
+            "planVersion": 9
+          },
+          "finalPlanVersion": 9,
+          "restoredAssignment": {
+            "id": "assignment-gorset-audit-engineer",
+            "taskId": "task-gorset-audit",
+            "resourceId": "user-alpha-engineer",
+            "role": "executor",
+            "unitsPermille": 1000,
+            "workMinutes": 1440,
+            "calendarId": null
+          },
+          "restoredAllocations": []
+        }
+      },
+      "screenshots": [
+        "screenshots/proj-069-admin-applied-readback-reload.png"
+      ],
+      "receipt": "receipts/proj-069-admin.json"
+    },
+    {
+      "scenarioId": "PROJ-070",
+      "role": "admin",
+      "key": "PROJ-070:admin",
+      "status": "pass",
+      "runId": "project-resources-20260711-final3",
+      "generatedAt": "2026-07-11T03:43:46.329Z",
+      "assertions": [
+        "Selected a live person/day cell and proved TaskModal preset the exact resourceId",
+        "UI create emitted matching batch preview/apply commands and API readback contained task plus assignment",
+        "Reload preserved the task; cleanup preview/apply removed it and cleanup reload confirmed absence"
+      ],
+      "details": {
+        "previewEnvelope": {
+          "commands": [
+            {
+              "type": "task.create",
+              "payload": {
+                "id": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "projectId": "project-gorset-migration",
+                "parentTaskId": null,
+                "title": "PROJ-070 preset project-resources-20260711-final3",
+                "statusId": "todo",
+                "plannedStart": "2026-05-25",
+                "plannedFinish": "2026-05-26",
+                "durationMinutes": 480,
+                "workMinutes": 60,
+                "assignments": []
+              }
+            },
+            {
+              "type": "task.update_schedule",
+              "payload": {
+                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "plannedStart": "2026-05-25",
+                "plannedFinish": "2026-05-26"
+              }
+            },
+            {
+              "type": "assignment.upsert",
+              "payload": {
+                "id": "a-816050fc-e648-4dc9-98dc-4c810a896b5c",
+                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "resourceId": "user-alpha-admin",
+                "role": "executor",
+                "unitsPermille": 1000,
+                "workMinutes": 60
+              }
+            }
+          ],
+          "clientPlanVersion": 9
+        },
+        "applyEnvelope": {
+          "commands": [
+            {
+              "type": "task.create",
+              "payload": {
+                "id": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "projectId": "project-gorset-migration",
+                "parentTaskId": null,
+                "title": "PROJ-070 preset project-resources-20260711-final3",
+                "statusId": "todo",
+                "plannedStart": "2026-05-25",
+                "plannedFinish": "2026-05-26",
+                "durationMinutes": 480,
+                "workMinutes": 60,
+                "assignments": []
+              }
+            },
+            {
+              "type": "task.update_schedule",
+              "payload": {
+                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "plannedStart": "2026-05-25",
+                "plannedFinish": "2026-05-26"
+              }
+            },
+            {
+              "type": "assignment.upsert",
+              "payload": {
+                "id": "a-816050fc-e648-4dc9-98dc-4c810a896b5c",
+                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "resourceId": "user-alpha-admin",
+                "role": "executor",
+                "unitsPermille": 1000,
+                "workMinutes": 60
+              }
+            }
+          ],
+          "clientPlanVersion": 9,
+          "idempotencyKey": "planning-batch-0e05f755-8604-4c20-a61a-a8ff36664381"
+        },
+        "reloadReadback": {
+          "reloaded": true,
+          "planVersion": 10,
+          "taskId": "",
+          "resourceId": "user-alpha-admin"
+        },
+        "cleanup": {
+          "previewEnvelope": {
+            "command": {
+              "type": "task.delete_or_archive",
+              "payload": {
+                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "mode": "delete"
+              }
+            },
+            "clientPlanVersion": 10
+          },
+          "previewStatus": 200,
+          "applyEnvelope": {
+            "command": {
+              "type": "task.delete_or_archive",
+              "payload": {
+                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "mode": "delete"
+              }
+            },
+            "clientPlanVersion": 10
+          },
+          "applyStatus": 200,
+          "planVersion": 11,
+          "finalPlanVersion": 11,
+          "taskAbsent": true,
+          "assignmentAbsent": true
+        }
+      },
+      "screenshots": [
+        "screenshots/proj-070-admin-preset-created-reload.png"
+      ],
+      "receipt": "receipts/proj-070-admin.json"
+    }
+  ]
+}

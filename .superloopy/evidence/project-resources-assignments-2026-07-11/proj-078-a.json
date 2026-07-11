@@ -1,0 +1,415 @@
+{
+  "scenarioId": "PROJ-078",
+  "role": "A",
+  "key": "PROJ-078:A",
+  "status": "pass",
+  "runId": "project-assignments-20260711-final4",
+  "generatedAt": "2026-07-11T03:48:12.519Z",
+  "assertions": [
+    "Even, front and back presets each preview/apply through the UI",
+    "Each explicit allocation curve sums exactly to assignment work",
+    "API, PostgreSQL, marker and reload agree"
+  ],
+  "details": {
+    "presets": [
+      {
+        "label": "Равномерно",
+        "previewEnvelope": {
+          "command": {
+            "type": "assignment.allocations.replace",
+            "payload": {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "allocations": [
+                {
+                  "date": "2026-06-05",
+                  "workMinutes": 190
+                },
+                {
+                  "date": "2026-06-08",
+                  "workMinutes": 190
+                },
+                {
+                  "date": "2026-06-09",
+                  "workMinutes": 190
+                },
+                {
+                  "date": "2026-06-10",
+                  "workMinutes": 190
+                },
+                {
+                  "date": "2026-06-11",
+                  "workMinutes": 190
+                },
+                {
+                  "date": "2026-06-12",
+                  "workMinutes": 190
+                }
+              ]
+            }
+          },
+          "clientPlanVersion": 6
+        },
+        "applyEnvelope": {
+          "command": {
+            "type": "assignment.allocations.replace",
+            "payload": {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "allocations": [
+                {
+                  "date": "2026-06-05",
+                  "workMinutes": 190
+                },
+                {
+                  "date": "2026-06-08",
+                  "workMinutes": 190
+                },
+                {
+                  "date": "2026-06-09",
+                  "workMinutes": 190
+                },
+                {
+                  "date": "2026-06-10",
+                  "workMinutes": 190
+                },
+                {
+                  "date": "2026-06-11",
+                  "workMinutes": 190
+                },
+                {
+                  "date": "2026-06-12",
+                  "workMinutes": 190
+                }
+              ]
+            }
+          },
+          "clientPlanVersion": 6,
+          "idempotencyKey": "planning-apply-300dcd0f-f41c-4d05-9078-53d9f03e3e3c"
+        },
+        "apiReadback": {
+          "planVersion": 7,
+          "allocations": [
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-05",
+              "workMinutes": 190
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-08",
+              "workMinutes": 190
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-09",
+              "workMinutes": 190
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-10",
+              "workMinutes": 190
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-11",
+              "workMinutes": 190
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-12",
+              "workMinutes": 190
+            }
+          ]
+        },
+        "reloadMarkerVisible": true
+      },
+      {
+        "label": "К началу",
+        "previewEnvelope": {
+          "command": {
+            "type": "assignment.allocations.replace",
+            "payload": {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "allocations": [
+                {
+                  "date": "2026-06-05",
+                  "workMinutes": 266
+                },
+                {
+                  "date": "2026-06-08",
+                  "workMinutes": 236
+                },
+                {
+                  "date": "2026-06-09",
+                  "workMinutes": 205
+                },
+                {
+                  "date": "2026-06-10",
+                  "workMinutes": 175
+                },
+                {
+                  "date": "2026-06-11",
+                  "workMinutes": 144
+                },
+                {
+                  "date": "2026-06-12",
+                  "workMinutes": 114
+                }
+              ]
+            }
+          },
+          "clientPlanVersion": 7
+        },
+        "applyEnvelope": {
+          "command": {
+            "type": "assignment.allocations.replace",
+            "payload": {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "allocations": [
+                {
+                  "date": "2026-06-05",
+                  "workMinutes": 266
+                },
+                {
+                  "date": "2026-06-08",
+                  "workMinutes": 236
+                },
+                {
+                  "date": "2026-06-09",
+                  "workMinutes": 205
+                },
+                {
+                  "date": "2026-06-10",
+                  "workMinutes": 175
+                },
+                {
+                  "date": "2026-06-11",
+                  "workMinutes": 144
+                },
+                {
+                  "date": "2026-06-12",
+                  "workMinutes": 114
+                }
+              ]
+            }
+          },
+          "clientPlanVersion": 7,
+          "idempotencyKey": "planning-apply-53aa4b23-f431-4667-909d-ae50cb7b2332"
+        },
+        "apiReadback": {
+          "planVersion": 8,
+          "allocations": [
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-05",
+              "workMinutes": 266
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-08",
+              "workMinutes": 236
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-09",
+              "workMinutes": 205
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-10",
+              "workMinutes": 175
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-11",
+              "workMinutes": 144
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-12",
+              "workMinutes": 114
+            }
+          ]
+        },
+        "reloadMarkerVisible": true
+      },
+      {
+        "label": "К концу",
+        "previewEnvelope": {
+          "command": {
+            "type": "assignment.allocations.replace",
+            "payload": {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "allocations": [
+                {
+                  "date": "2026-06-05",
+                  "workMinutes": 114
+                },
+                {
+                  "date": "2026-06-08",
+                  "workMinutes": 144
+                },
+                {
+                  "date": "2026-06-09",
+                  "workMinutes": 175
+                },
+                {
+                  "date": "2026-06-10",
+                  "workMinutes": 205
+                },
+                {
+                  "date": "2026-06-11",
+                  "workMinutes": 236
+                },
+                {
+                  "date": "2026-06-12",
+                  "workMinutes": 266
+                }
+              ]
+            }
+          },
+          "clientPlanVersion": 8
+        },
+        "applyEnvelope": {
+          "command": {
+            "type": "assignment.allocations.replace",
+            "payload": {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "allocations": [
+                {
+                  "date": "2026-06-05",
+                  "workMinutes": 114
+                },
+                {
+                  "date": "2026-06-08",
+                  "workMinutes": 144
+                },
+                {
+                  "date": "2026-06-09",
+                  "workMinutes": 175
+                },
+                {
+                  "date": "2026-06-10",
+                  "workMinutes": 205
+                },
+                {
+                  "date": "2026-06-11",
+                  "workMinutes": 236
+                },
+                {
+                  "date": "2026-06-12",
+                  "workMinutes": 266
+                }
+              ]
+            }
+          },
+          "clientPlanVersion": 8,
+          "idempotencyKey": "planning-apply-fae9d5cf-baab-4224-b005-9989568b9228"
+        },
+        "apiReadback": {
+          "planVersion": 9,
+          "allocations": [
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-05",
+              "workMinutes": 114
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-08",
+              "workMinutes": 144
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-09",
+              "workMinutes": 175
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-10",
+              "workMinutes": 205
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-11",
+              "workMinutes": 236
+            },
+            {
+              "assignmentId": "assignment-vektor-arch-admin",
+              "taskId": "task-vektor-arch",
+              "resourceId": "user-alpha-plan-reader-no-resources",
+              "date": "2026-06-12",
+              "workMinutes": 266
+            }
+          ]
+        },
+        "reloadMarkerVisible": true
+      }
+    ],
+    "cleanup": {
+      "scope": "shared_fixture_run",
+      "coversRows": [
+        "PROJ-074:A",
+        "PROJ-074:PR",
+        "PROJ-075:A",
+        "PROJ-075:PR",
+        "PROJ-077:A",
+        "PROJ-078:A",
+        "PROJ-079:A",
+        "PROJ-080:A"
+      ],
+      "assignmentId": "assignment-vektor-arch-admin",
+      "apiReadback": {
+        "assignment": {
+          "id": "assignment-vektor-arch-admin",
+          "taskId": "task-vektor-arch",
+          "resourceId": "user-alpha-admin",
+          "role": "executor",
+          "unitsPermille": 500,
+          "workMinutes": 1080,
+          "calendarId": null
+        },
+        "allocations": [],
+        "planVersion": 15
+      },
+      "postgresReadbackVerified": true,
+      "restoredEmptyTaskRemoved": true,
+      "reloadVerified": true
+    }
+  },
+  "screenshot": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-078-a.png",
+  "blocker": null
+}

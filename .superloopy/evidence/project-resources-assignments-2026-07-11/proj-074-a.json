@@ -1,0 +1,109 @@
+{
+  "scenarioId": "PROJ-074",
+  "role": "A",
+  "key": "PROJ-074:A",
+  "status": "pass",
+  "runId": "project-assignments-20260711-final4",
+  "generatedAt": "2026-07-11T03:48:13.424Z",
+  "assertions": [
+    "Grid origin and month are derived from the live read-model",
+    "Task totals equal working-role assignment totals",
+    "Empty assignments, explicit curve marker, weekend cells and crosshair render"
+  ],
+  "details": {
+    "projectPlannedStart": "2026-06-01",
+    "projectPlannedFinish": "2026-07-10",
+    "taskId": "task-vektor-arch",
+    "assignmentId": "assignment-vektor-arch-admin",
+    "taskWorkMinutes": 2160,
+    "workingRoleAssignmentMinutes": 2220,
+    "explicitAllocationMinutes": 1140,
+    "postgres": {
+      "assignment": {
+        "id": "assignment-vektor-arch-admin",
+        "taskId": "task-vektor-arch",
+        "resourceId": "user-alpha-plan-reader-no-resources",
+        "role": "co_executor",
+        "unitsPermille": 10,
+        "workMinutes": 1140,
+        "calendarId": null
+      },
+      "allocations": [
+        {
+          "assignmentId": "assignment-vektor-arch-admin",
+          "taskId": "task-vektor-arch",
+          "resourceId": "user-alpha-plan-reader-no-resources",
+          "date": "2026-06-05",
+          "workMinutes": 114
+        },
+        {
+          "assignmentId": "assignment-vektor-arch-admin",
+          "taskId": "task-vektor-arch",
+          "resourceId": "user-alpha-plan-reader-no-resources",
+          "date": "2026-06-08",
+          "workMinutes": 144
+        },
+        {
+          "assignmentId": "assignment-vektor-arch-admin",
+          "taskId": "task-vektor-arch",
+          "resourceId": "user-alpha-plan-reader-no-resources",
+          "date": "2026-06-09",
+          "workMinutes": 175
+        },
+        {
+          "assignmentId": "assignment-vektor-arch-admin",
+          "taskId": "task-vektor-arch",
+          "resourceId": "user-alpha-plan-reader-no-resources",
+          "date": "2026-06-10",
+          "workMinutes": 205
+        },
+        {
+          "assignmentId": "assignment-vektor-arch-admin",
+          "taskId": "task-vektor-arch",
+          "resourceId": "user-alpha-plan-reader-no-resources",
+          "date": "2026-06-11",
+          "workMinutes": 236
+        },
+        {
+          "assignmentId": "assignment-vektor-arch-admin",
+          "taskId": "task-vektor-arch",
+          "resourceId": "user-alpha-plan-reader-no-resources",
+          "date": "2026-06-12",
+          "workMinutes": 266
+        }
+      ]
+    },
+    "cleanup": {
+      "scope": "shared_fixture_run",
+      "coversRows": [
+        "PROJ-074:A",
+        "PROJ-074:PR",
+        "PROJ-075:A",
+        "PROJ-075:PR",
+        "PROJ-077:A",
+        "PROJ-078:A",
+        "PROJ-079:A",
+        "PROJ-080:A"
+      ],
+      "assignmentId": "assignment-vektor-arch-admin",
+      "apiReadback": {
+        "assignment": {
+          "id": "assignment-vektor-arch-admin",
+          "taskId": "task-vektor-arch",
+          "resourceId": "user-alpha-admin",
+          "role": "executor",
+          "unitsPermille": 500,
+          "workMinutes": 1080,
+          "calendarId": null
+        },
+        "allocations": [],
+        "planVersion": 15
+      },
+      "postgresReadbackVerified": true,
+      "restoredEmptyTaskRemoved": true,
+      "reloadVerified": true
+    }
+  },
+  "screenshot": ".superloopy/evidence/project-resources-assignments-2026-07-11/proj-074-a.png",
+  "blocker": null
+}

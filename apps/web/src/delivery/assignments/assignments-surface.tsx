@@ -44,7 +44,19 @@ const CROSS_FOCAL = "shadow-[inset_0_0_0_9999px_color-mix(in_oklab,var(--accent)
 // строки, поэтому на выбранной (accent-soft) строке не закрашивает подсветку серым (без «полос»).
 // На белом фоне (panel=#fff) визуально идентичен непрозрачному muted-soft 18%.
 const WEEKEND_BG = "color-mix(in oklab, var(--muted-soft) 18%, transparent)";
-const h1 = (min: number) => (Math.round((min / 60) * 10) / 10).toLocaleString("ru-RU");
+export const formatAssignmentHours = (min: number) => (Math.round((min / 60) * 10) / 10).toLocaleString("ru-RU");
+export const assignmentHoursInputValue = (min: number) => Math.round((min / 60) * 100) / 100;
+export function parseAssignmentHours(value: string): number | null {
+  if (value.trim() === "") return null;
+  const hours = Number(value);
+  return Number.isFinite(hours) ? Math.max(0, Math.round(hours * 60)) : null;
+}
+export function parseAssignmentUnits(value: string): number | null {
+  if (value.trim() === "") return null;
+  const percent = Number(value);
+  return Number.isFinite(percent) ? Math.max(10, Math.round(percent) * 10) : null;
+}
+const h1 = formatAssignmentHours;
 // Источник дат таймлайна — read-model (project.plannedStart), а не хардкод mock-бэка: «переключение на live = смена apiOrigin».
 // Чистые помощники относительно произвольного начала (baseMs); внутри компонента биндятся на origin плана.
 const dayToIsoAt = (baseMs: number, day: number) => new Date(baseMs + day * 86_400_000).toISOString().slice(0, 10);
@@ -52,7 +64,7 @@ const isoToDayAt = (baseMs: number, iso: string) => Math.round((Date.parse(iso +
 
 const nid = createClientId;
 
-type AsgMeta = { asg: AsgRaw; days: number[]; scheduledSet: Set<number>; flatPer: number; explicit: Map<number, number>; hasExplicit: boolean };
+type AsgMeta = { asg: AsgRaw; days: number[]; resolved: Map<number, number>; explicit: Map<number, number>; hasExplicit: boolean };
 
 export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, apply } = usePlanning(projectId);
@@ -92,21 +104,32 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
     const allocByAsg = new Map<string, Map<number, number>>();
     for (const al of authored.assignmentAllocations) { let m = allocByAsg.get(al.assignmentId); if (!m) { m = new Map(); allocByAsg.set(al.assignmentId, m); } m.set(isoToDayAt(baseMs, al.date), (m.get(isoToDayAt(baseMs, al.date)) ?? 0) + al.workMinutes); }
 
-    // нерабочие дни календаря: праздники (resourceId=null) и отсутствия по ресурсу (workingMinutes < полного дня) —
-    // тот же фильтр, что на вкладке «Календари». Пресеты не должны раскладывать труд на праздник/отсутствие (нулевая ёмкость).
+    const resolvedByAsg = new Map<string, Map<number, number>>();
+    for (const bucket of readModel.resourceLoad?.buckets ?? []) {
+      if (bucket.granularity !== "day") continue;
+      const day = isoToDayAt(baseMs, bucket.date);
+      for (const contribution of bucket.assignmentContributions ?? []) {
+        let distribution = resolvedByAsg.get(contribution.assignmentId);
+        if (!distribution) {
+          distribution = new Map();
+          resolvedByAsg.set(contribution.assignmentId, distribution);
+        }
+        distribution.set(day, (distribution.get(day) ?? 0) + contribution.workMinutes);
+      }
+    }
+
+    // Исключения задают фактическую доступность дня. Пресеты исключают только дни с нулевой ёмкостью.
     const cal = resolveProjectCalendar({ project: readModel.project, calendars: readModel.calendars });
     const full = cal?.workingMinutesPerDay ?? MIN_PER_DAY;
-    const exns = (readModel.calendarExceptions ?? []).filter(
-      (x) => cal !== null && x.calendarId === cal.id && x.workingMinutes < full
-    );
-    const holidayDays = new Set<number>();
-    const absenceByRes = new Map<string, Set<number>>();
-    for (const x of exns) {
-      const day = isoToDayAt(baseMs, x.date);
-      if (x.resourceId === null) holidayDays.add(day);
-      else { let s = absenceByRes.get(x.resourceId); if (!s) { s = new Set(); absenceByRes.set(x.resourceId, s); } s.add(day); }
-    }
-    const isWorkingFor = (resourceId: string, day: number) => cal !== null && isCalendarWorkingWeekday(cal, new Date(baseMs + day * 86_400_000).getUTCDay()) && !holidayDays.has(day) && !(absenceByRes.get(resourceId)?.has(day) ?? false);
+    const exns = (readModel.calendarExceptions ?? []).filter((x) => cal !== null && x.calendarId === cal.id);
+    const workingMinutesFor = (resourceId: string, day: number) => {
+      if (!cal) return 0;
+      const date = dayToIsoAt(baseMs, day);
+      let minutes = isCalendarWorkingWeekday(cal, new Date(baseMs + day * 86_400_000).getUTCDay()) ? full : 0;
+      for (const exception of exns) if (exception.date === date && exception.resourceId === null) minutes = exception.workingMinutes;
+      for (const exception of exns) if (exception.date === date && exception.resourceId === resourceId) minutes = exception.workingMinutes;
+      return Math.max(0, minutes);
+    };
 
     const metaByAsg = new Map<string, AsgMeta>();
     for (const a of assignments) {
@@ -115,17 +138,17 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
       const es = c?.calculatedStart ? isoToDayAt(baseMs, c.calculatedStart) : 0;
       const ef = c?.calculatedFinish ? isoToDayAt(baseMs, c.calculatedFinish) : es;
       const days: number[] = [];
-      for (let d = es; d < Math.max(ef, es + 1); d++) if (isWorkingFor(a.resourceId, d)) days.push(d);
+      for (let d = es; d <= Math.max(ef, es); d++) if (workingMinutesFor(a.resourceId, d) > 0) days.push(d);
       const explicit = allocByAsg.get(a.id) ?? new Map<number, number>();
-      const span = Math.max(1, ef - es);
-      // flatPer как у движка загрузки (явный workMinutes — абсолютная работа, без масштаба units),
-      // чтобы грид совпадал с экраном «Ресурсы» и с продовым resolveAssignmentWork
-      metaByAsg.set(a.id, { asg: a, days, scheduledSet: new Set(days), flatPer: Math.round(a.workMinutes / span), explicit, hasExplicit: explicit.size > 0 });
+      const resolved = WORKING.has(a.role) ? resolvedByAsg.get(a.id) ?? new Map<number, number>() : new Map<number, number>();
+      metaByAsg.set(a.id, { asg: a, days, resolved, explicit, hasExplicit: explicit.size > 0 });
     }
     // диапазон дней для окна
-    let minDay = 9999, maxDay = 0;
-    for (const m of metaByAsg.values()) for (const d of m.days) { minDay = Math.min(minDay, d); maxDay = Math.max(maxDay, d); }
-    if (minDay > maxDay) { minDay = 0; maxDay = 34; }
+    const minDay = 0;
+    let maxDay = readModel.project.plannedFinish ? Math.max(0, isoToDayAt(baseMs, readModel.project.plannedFinish)) : 34;
+    for (const m of metaByAsg.values()) {
+      for (const d of [...m.days, ...m.explicit.keys(), ...m.resolved.keys()]) maxDay = Math.max(maxDay, d);
+    }
     return { leafTasks, asgByTask, metaByAsg, calcById, minDay, maxDay, hasProjectCalendar: cal !== null };
   }, [readModel, baseMs]);
 
@@ -163,7 +186,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
     for (const d of windowDays) { const wd = new Date(baseMs + d * 86_400_000).getUTCDay(); const monday = d - (wd === 0 ? 6 : wd - 1); if (seen.has(monday)) continue; seen.add(monday); const dt = new Date(baseMs + monday * 86_400_000); periods.push({ key: monday, days: [0, 1, 2, 3, 4].map((k) => monday + k), top: String(dt.getUTCDate()).padStart(2, "0"), sub: MONTHS_CAP[dt.getUTCMonth() + 1] ?? "", weekend: false }); }
   }
 
-  const minutesOn = (m: AsgMeta, day: number) => (m.hasExplicit ? m.explicit.get(day) ?? 0 : m.scheduledSet.has(day) ? m.flatPer : 0);
+  const minutesOn = (m: AsgMeta, day: number) => m.resolved.get(day) ?? 0;
   const cellMin = (m: AsgMeta, p: { days: number[] }) => p.days.reduce((s, d) => s + minutesOn(m, d), 0);
 
   async function applyCmd(command: PlanningCommand, okMsg: string): Promise<ApplyResult> {
@@ -225,7 +248,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
         <div className="ml-auto flex items-center gap-2">
           <div className="flex items-center gap-0.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-0.5 py-0.5">
             <button type="button" onClick={() => setMonthOffset((o) => Math.max(0, o - 1))} disabled={monthOffset <= 0} className="grid size-6 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)] disabled:opacity-40" aria-label="Предыдущий месяц"><ChevronLeft className="size-4" aria-hidden /></button>
-            <span className="min-w-[92px] text-center text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{monthLabel}</span>
+            <span data-testid="assignments-month-label" className="min-w-[92px] text-center text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{monthLabel}</span>
             <button type="button" onClick={() => setMonthOffset((o) => Math.min(monthsList.length - 1, o + 1))} disabled={monthOffset >= monthsList.length - 1} className="grid size-6 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)] disabled:opacity-40" aria-label="Следующий месяц"><ChevronRight className="size-4" aria-hidden /></button>
           </div>
           <div className="flex items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-0.5">
@@ -248,7 +271,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
         </div>
       ) : null}
 
-      <div className="relative">
+      <div className="relative" data-testid="assignments-grid">
         <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
           <div className="flex min-w-full align-top" onMouseLeave={() => setHover(null)}>
             {/* sticky-left: задачи и исполнители */}
@@ -277,7 +300,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                       const m = model.metaByAsg.get(a.id)!;
                       const isSel = sel === a.id;
                       return (
-                        <button key={a.id} type="button" onMouseEnter={() => setHover({ key: `a:${a.id}`, col: -1 })} onClick={() => { setSel(a.id); setDraft(null); }} className={cn("flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-2 text-left outline-none hover:bg-[var(--panel-subtle)]", isSel ? "bg-[var(--accent-soft)]" : crosshair?.key === `a:${a.id}` && CROSS_SOFT)} style={{ height: ROW_H, width: LEFT_W, paddingLeft: 24 }}>
+                        <button key={a.id} type="button" data-testid={`assignment-row-${a.id}`} onMouseEnter={() => setHover({ key: `a:${a.id}`, col: -1 })} onClick={() => { setSel(a.id); setDraft(null); }} className={cn("flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-2 text-left outline-none hover:bg-[var(--panel-subtle)]", isSel ? "bg-[var(--accent-soft)]" : crosshair?.key === `a:${a.id}` && CROSS_SOFT)} style={{ height: ROW_H, width: LEFT_W, paddingLeft: 24 }}>
                         <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{r?.name.slice(0, 1)}</span>
                         <span className="min-w-0 flex-1 truncate text-[length:var(--text-sm)] text-[var(--text)]">{r?.name}{m.hasExplicit ? <span className="ml-1 text-[length:var(--text-2xs)] text-[var(--accent)]">кривая</span> : null}</span>
                         <span className="w-[120px] shrink-0 truncate text-right text-[length:var(--text-xs)] text-[var(--muted)]">{roleLabel(a.role)} · {Math.round(a.unitsPermille / 10)}% · {h1(a.workMinutes)} ч</span>
@@ -300,7 +323,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                 return (
                   <div key={t.id}>
                     <div onMouseEnter={() => setHover((h) => ({ key: `t:${t.id}`, col: h?.col ?? -1 }))} className="flex border-b border-[var(--border-subtle)] bg-[color-mix(in_oklab,var(--panel-strong)_22%,var(--panel))]" style={{ height: ROW_H }}>
-                      {periods.map((p) => { const tot = metas.reduce((s, m) => s + cellMin(m, p), 0); const inCross = crosshair?.col === p.key || crosshair?.key === `t:${t.id}`; const isFocal = crosshair?.col === p.key && crosshair?.key === `t:${t.id}`; return <span key={p.key} onMouseEnter={() => setHover({ key: `t:${t.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] font-semibold tabular-nums text-[var(--muted-strong)]", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, ...(p.weekend ? { background: WEEKEND_BG } : {}) }}>{tot > 0 ? Math.round(tot / 60) : ""}</span>; })}
+                      {periods.map((p) => { const tot = metas.reduce((s, m) => s + cellMin(m, p), 0); const inCross = crosshair?.col === p.key || crosshair?.key === `t:${t.id}`; const isFocal = crosshair?.col === p.key && crosshair?.key === `t:${t.id}`; return <span key={p.key} onMouseEnter={() => setHover({ key: `t:${t.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] font-semibold tabular-nums text-[var(--muted-strong)]", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, ...(p.weekend ? { background: WEEKEND_BG } : {}) }}>{tot > 0 ? h1(tot) : ""}</span>; })}
                     </div>
                     {asgs.length === 0 ? <div className="border-b border-[var(--border-subtle)]" style={{ height: ROW_H }} /> : metas.map((m) => (
                       <div key={m.asg.id} onMouseEnter={() => setHover((h) => ({ key: `a:${m.asg.id}`, col: h?.col ?? -1 }))} className={cn("flex border-b border-[var(--border-subtle)]", sel === m.asg.id && "bg-[var(--accent-soft)]")} style={{ height: ROW_H }}>
@@ -311,7 +334,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                           const inCross = crosshair?.col === p.key || crosshair?.key === `a:${m.asg.id}`;
                           const isFocal = crosshair?.col === p.key && crosshair?.key === `a:${m.asg.id}`;
                           const bg = mm > 0 ? `color-mix(in oklab, var(--accent) ${Math.round(14 + intensity * 46)}%, var(--panel))` : p.weekend ? WEEKEND_BG : "transparent";
-                          return <span key={p.key} onMouseEnter={() => setHover({ key: `a:${m.asg.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] tabular-nums", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: bg, color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resName(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? Math.round(hrs) : ""}</span>;
+                          return <span key={p.key} onMouseEnter={() => setHover({ key: `a:${m.asg.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] tabular-nums", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: bg, color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resName(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? h1(mm) : ""}</span>;
                         })}
                       </div>
                     ))}
@@ -324,7 +347,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
 
         {/* инспектор назначения */}
         {selMeta && selTask ? (
-          <aside className="absolute right-0 top-0 z-30 flex h-full w-[380px] flex-col border-l border-[var(--border-strong)] bg-[var(--panel)] shadow-[var(--shadow-pop)]">
+          <aside data-testid="assignment-inspector" className="absolute right-0 top-0 z-30 flex h-full w-[380px] flex-col border-l border-[var(--border-strong)] bg-[var(--panel)] shadow-[var(--shadow-pop)]">
             <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
               <div className="min-w-0">
                 <div className="mono text-[length:var(--text-xs)] text-[var(--muted)]">{selTask.wbsCode} · {selTask.title}</div>
@@ -338,20 +361,20 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
               {/* атрибуты назначения */}
               <div className="grid grid-cols-2 gap-2">
                 <label className="col-span-2 block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Ресурс</span>
-                  <select value={selMeta.asg.resourceId} onChange={(e) => void upsert(selMeta.asg, { resourceId: e.target.value })} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
+                  <select data-testid="assignment-resource-select" value={selMeta.asg.resourceId} onChange={(e) => void upsert(selMeta.asg, { resourceId: e.target.value })} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
                     {resDir.list.map((r) => <option key={r.id} value={r.id}>{r.name} · {r.positionName}</option>)}
                   </select>
                 </label>
                 <label className="block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Роль</span>
-                  <select value={selMeta.asg.role} onChange={(e) => void upsert(selMeta.asg, { role: e.target.value })} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
+                  <select data-testid="assignment-role-select" value={selMeta.asg.role} onChange={(e) => void upsert(selMeta.asg, { role: e.target.value })} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
                     {ROLES.map(([id, lbl]) => <option key={id} value={id}>{lbl}</option>)}
                   </select>
                 </label>
                 <label className="block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Единицы %</span>
-                  <input key={`u-${selMeta.asg.id}-${selMeta.asg.unitsPermille}`} type="number" defaultValue={Math.round(selMeta.asg.unitsPermille / 10)} onBlur={(e) => { const v = Math.max(1, Math.round(Number(e.target.value))); if (v !== Math.round(selMeta.asg.unitsPermille / 10)) void upsert(selMeta.asg, { unitsPermille: v * 10 }); }} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
+                  <input data-testid="assignment-units-input" key={`u-${selMeta.asg.id}-${selMeta.asg.unitsPermille}`} type="number" defaultValue={Math.round(selMeta.asg.unitsPermille / 10)} onBlur={(e) => { const unitsPermille = parseAssignmentUnits(e.target.value); if (unitsPermille === null) { e.currentTarget.value = String(Math.round(selMeta.asg.unitsPermille / 10)); return; } if (unitsPermille !== selMeta.asg.unitsPermille) void upsert(selMeta.asg, { unitsPermille }); }} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
                 </label>
                 <label className="col-span-2 block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Трудозатраты, ч</span>
-                  <input key={`w-${selMeta.asg.id}-${selMeta.asg.workMinutes}`} type="number" defaultValue={Math.round(selMeta.asg.workMinutes / 60)} onBlur={(e) => { const v = Math.max(0, Math.round(Number(e.target.value))); if (v * 60 !== selMeta.asg.workMinutes) void upsert(selMeta.asg, { workMinutes: v * 60 }); }} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
+                  <input data-testid="assignment-work-input" key={`w-${selMeta.asg.id}-${selMeta.asg.workMinutes}`} type="number" defaultValue={assignmentHoursInputValue(selMeta.asg.workMinutes)} step={0.5} onBlur={(e) => { const minutes = parseAssignmentHours(e.target.value); if (minutes === null) { e.currentTarget.value = String(assignmentHoursInputValue(selMeta.asg.workMinutes)); return; } if (minutes !== selMeta.asg.workMinutes) void upsert(selMeta.asg, { workMinutes: minutes }); }} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
                   <span className="mt-0.5 block text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Изменение труда/единиц сбрасывает кривую к равномерной.</span>
                 </label>
               </div>
@@ -375,7 +398,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                   return (
                     <label key={d} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-1 last:border-b-0">
                       <span className="mono w-[78px] shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{String(dt.getUTCDate()).padStart(2, "0")}.{String(dt.getUTCMonth() + 1).padStart(2, "0")} {DOW[dt.getUTCDay()]}</span>
-                      <input type="number" value={Math.round((cur / 60) * 10) / 10} step={0.5} min={0} onChange={(e) => { const map = new Map(curDraft(selMeta)); map.set(d, Math.max(0, Math.round(Number(e.target.value) * 60))); setDraft(map); }} className="h-7 flex-1 rounded border border-[var(--border)] bg-[var(--panel)] px-1 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
+                      <input data-testid={`curve-day-${dayToIso(d)}`} type="number" value={Math.round((cur / 60) * 10) / 10} step={0.5} min={0} onChange={(e) => { const map = new Map(curDraft(selMeta)); map.set(d, Math.max(0, Math.round(Number(e.target.value) * 60))); setDraft(map); }} className="h-7 flex-1 rounded border border-[var(--border)] bg-[var(--panel)] px-1 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
                       <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">ч</span>
                     </label>
                   );

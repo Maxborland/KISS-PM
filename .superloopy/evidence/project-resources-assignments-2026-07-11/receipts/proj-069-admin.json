@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "PROJ-069",
+  "role": "admin",
+  "key": "PROJ-069:admin",
+  "status": "pass",
+  "runId": "project-resources-20260711-final3",
+  "generatedAt": "2026-07-11T03:43:41.999Z",
+  "assertions": [
+    "UI hours edit emitted matching assignment.upsert preview and apply envelopes",
+    "API readback converted hours to exact minutes and survived reload",
+    "A second UI preview/apply restored the exact original assignment and survived cleanup reload"
+  ],
+  "details": {
+    "previewEnvelope": {
+      "command": {
+        "type": "assignment.upsert",
+        "payload": {
+          "id": "assignment-gorset-audit-engineer",
+          "taskId": "task-gorset-audit",
+          "resourceId": "user-alpha-engineer",
+          "role": "executor",
+          "unitsPermille": 1000,
+          "workMinutes": 1380
+        }
+      },
+      "clientPlanVersion": 6
+    },
+    "applyEnvelope": {
+      "command": {
+        "type": "assignment.upsert",
+        "payload": {
+          "id": "assignment-gorset-audit-engineer",
+          "taskId": "task-gorset-audit",
+          "resourceId": "user-alpha-engineer",
+          "role": "executor",
+          "unitsPermille": 1000,
+          "workMinutes": 1380
+        }
+      },
+      "clientPlanVersion": 6,
+      "idempotencyKey": "planning-apply-3df8228e-c42d-46f5-bd5e-7a08374312c4"
+    },
+    "reloadReadback": {
+      "reloaded": true,
+      "planVersion": 7,
+      "assignment": {
+        "id": "assignment-gorset-audit-engineer",
+        "taskId": "task-gorset-audit",
+        "resourceId": "user-alpha-engineer",
+        "role": "executor",
+        "unitsPermille": 1000,
+        "workMinutes": 1380,
+        "calendarId": null
+      }
+    },
+    "cleanup": {
+      "assignmentPreviewEnvelope": {
+        "command": {
+          "type": "assignment.upsert",
+          "payload": {
+            "id": "assignment-gorset-audit-engineer",
+            "taskId": "task-gorset-audit",
+            "resourceId": "user-alpha-engineer",
+            "role": "executor",
+            "unitsPermille": 1000,
+            "workMinutes": 1440
+          }
+        },
+        "clientPlanVersion": 7
+      },
+      "assignmentApplyEnvelope": {
+        "command": {
+          "type": "assignment.upsert",
+          "payload": {
+            "id": "assignment-gorset-audit-engineer",
+            "taskId": "task-gorset-audit",
+            "resourceId": "user-alpha-engineer",
+            "role": "executor",
+            "unitsPermille": 1000,
+            "workMinutes": 1440
+          }
+        },
+        "clientPlanVersion": 7,
+        "idempotencyKey": "planning-apply-f9c4b98f-cbd0-4aeb-86d1-ee5589a7e14f"
+      },
+      "allocations": {
+        "previewEnvelope": {
+          "command": {
+            "type": "assignment.allocations.replace",
+            "payload": {
+              "assignmentId": "assignment-gorset-audit-engineer",
+              "allocations": []
+            }
+          },
+          "clientPlanVersion": 8
+        },
+        "previewStatus": 200,
+        "applyEnvelope": {
+          "command": {
+            "type": "assignment.allocations.replace",
+            "payload": {
+              "assignmentId": "assignment-gorset-audit-engineer",
+              "allocations": []
+            }
+          },
+          "clientPlanVersion": 8
+        },
+        "applyStatus": 200,
+        "planVersion": 9
+      },
+      "finalPlanVersion": 9,
+      "restoredAssignment": {
+        "id": "assignment-gorset-audit-engineer",
+        "taskId": "task-gorset-audit",
+        "resourceId": "user-alpha-engineer",
+        "role": "executor",
+        "unitsPermille": 1000,
+        "workMinutes": 1440,
+        "calendarId": null
+      },
+      "restoredAllocations": []
+    }
+  },
+  "screenshots": [
+    "screenshots/proj-069-admin-applied-readback-reload.png"
+  ],
+  "receipt": "receipts/proj-069-admin.json"
+}
