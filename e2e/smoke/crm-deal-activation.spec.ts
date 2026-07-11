@@ -144,6 +144,7 @@ test("current CRM routes open deals and assign an unstaged deal", async ({ page 
     exact: true
   });
   await expect(assignStage).toBeVisible();
+  await expect(assignStage).toHaveText(`Назначить «${UNSTAGED_DEAL.stageName}»`);
   await assignStage.focus();
   await expect(assignStage).toBeFocused();
   await page.keyboard.press("Enter");
