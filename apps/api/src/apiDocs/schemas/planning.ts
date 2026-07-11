@@ -61,10 +61,23 @@ const planningResourceLoadBucketProperties = {
   calendarExceptionIds: { type: "array", items: stringIdSchema }
 };
 
-const acceptedOverloadIdSchema = {
+const planningPersistedIdSchema = {
   type: "string",
   minLength: 1,
-  pattern: "^[^:]+:\\d{4}-\\d{2}-\\d{2}$"
+  maxLength: 500,
+  pattern: "^[A-Za-z0-9._:-]+$"
+};
+
+const planningNullablePersistedIdSchema = {
+  type: ["string", "null"],
+  minLength: 1,
+  maxLength: 500,
+  pattern: "^[A-Za-z0-9._:-]+$"
+};
+
+const acceptedOverloadIdSchema = {
+  ...planningPersistedIdSchema,
+  pattern: "^[A-Za-z0-9._-]+:\\d{4}-\\d{2}-\\d{2}$"
 };
 
 export const planningSchemas = openApiSchemaFragment({
@@ -329,11 +342,11 @@ export const planningSchemas = openApiSchemaFragment({
         type: "object",
         required: ["id", "projectId", "title", "statusId", "plannedStart", "plannedFinish", "workMinutes", "assignments"],
         properties: {
-          id: stringIdSchema,
-          projectId: stringIdSchema,
-          parentTaskId: nullableStringSchema,
+          id: planningPersistedIdSchema,
+          projectId: planningPersistedIdSchema,
+          parentTaskId: planningNullablePersistedIdSchema,
           title: { type: "string", minLength: 1, maxLength: 500 },
-          statusId: stringIdSchema,
+          statusId: planningPersistedIdSchema,
           plannedStart: planDateOrNullSchema,
           plannedFinish: planDateOrNullSchema,
           durationMinutes: { type: ["integer", "null"], minimum: 1 },
@@ -349,8 +362,8 @@ export const planningSchemas = openApiSchemaFragment({
     type: "object",
     required: ["resourceId", "role", "unitsPermille", "workMinutes"],
     properties: {
-      id: stringIdSchema,
-      resourceId: stringIdSchema,
+      id: planningPersistedIdSchema,
+      resourceId: planningPersistedIdSchema,
       role: planningAssignmentRoleSchema,
       unitsPermille: { type: "integer", minimum: 1 },
       workMinutes: { type: ["integer", "null"], minimum: 0 }
@@ -365,7 +378,7 @@ export const planningSchemas = openApiSchemaFragment({
       payload: {
         type: "object",
         required: ["taskId", "title"],
-        properties: { taskId: stringIdSchema, title: { type: "string", minLength: 1, maxLength: 500 } },
+        properties: { taskId: planningPersistedIdSchema, title: { type: "string", minLength: 1, maxLength: 500 } },
         additionalProperties: false
       }
     },
@@ -379,7 +392,7 @@ export const planningSchemas = openApiSchemaFragment({
       payload: {
         type: "object",
         required: ["taskId", "plannedStart", "plannedFinish"],
-        properties: { taskId: stringIdSchema, plannedStart: planDateOrNullSchema, plannedFinish: planDateOrNullSchema },
+        properties: { taskId: planningPersistedIdSchema, plannedStart: planDateOrNullSchema, plannedFinish: planDateOrNullSchema },
         additionalProperties: false
       }
     },
@@ -394,7 +407,7 @@ export const planningSchemas = openApiSchemaFragment({
         type: "object",
         required: ["taskId", "taskType", "effortDriven", "durationMinutes", "workMinutes"],
         properties: {
-          taskId: stringIdSchema,
+          taskId: planningPersistedIdSchema,
           taskType: planningTaskTypeSchema,
           effortDriven: { type: "boolean" },
           durationMinutes: { type: ["integer", "null"], minimum: 1 },
@@ -413,7 +426,7 @@ export const planningSchemas = openApiSchemaFragment({
       payload: {
         type: "object",
         required: ["taskId", "statusId"],
-        properties: { taskId: stringIdSchema, statusId: stringIdSchema },
+        properties: { taskId: planningPersistedIdSchema, statusId: planningPersistedIdSchema },
         additionalProperties: false
       }
     },
@@ -427,7 +440,7 @@ export const planningSchemas = openApiSchemaFragment({
       payload: {
         type: "object",
         required: ["taskId", "percentComplete"],
-        properties: { taskId: stringIdSchema, percentComplete: { type: "integer", minimum: 0, maximum: 100 } },
+        properties: { taskId: planningPersistedIdSchema, percentComplete: { type: "integer", minimum: 0, maximum: 100 } },
         additionalProperties: false
       }
     },
@@ -441,7 +454,7 @@ export const planningSchemas = openApiSchemaFragment({
       payload: {
         type: "object",
         required: ["taskId", "parentTaskId", "sortOrder"],
-        properties: { taskId: stringIdSchema, parentTaskId: nullableStringSchema, sortOrder: { type: "integer", minimum: 0 } },
+        properties: { taskId: planningPersistedIdSchema, parentTaskId: planningNullablePersistedIdSchema, sortOrder: { type: "integer", minimum: 0 } },
         additionalProperties: false
       }
     },
@@ -455,7 +468,7 @@ export const planningSchemas = openApiSchemaFragment({
       payload: {
         type: "object",
         required: ["taskId", "mode"],
-        properties: { taskId: stringIdSchema, mode: { type: "string", enum: ["archive", "delete"] } },
+        properties: { taskId: planningPersistedIdSchema, mode: { type: "string", enum: ["archive", "delete"] } },
         additionalProperties: false
       }
     },
@@ -470,9 +483,9 @@ export const planningSchemas = openApiSchemaFragment({
         type: "object",
         required: ["id", "predecessorTaskId", "successorTaskId", "dependencyType", "lagMinutes"],
         properties: {
-          id: stringIdSchema,
-          predecessorTaskId: stringIdSchema,
-          successorTaskId: stringIdSchema,
+          id: planningPersistedIdSchema,
+          predecessorTaskId: planningPersistedIdSchema,
+          successorTaskId: planningPersistedIdSchema,
           dependencyType: planningDependencyTypeSchema,
           lagMinutes: { type: "integer" }
         },
@@ -489,7 +502,7 @@ export const planningSchemas = openApiSchemaFragment({
       payload: {
         type: "object",
         required: ["dependencyId"],
-        properties: { dependencyId: stringIdSchema },
+        properties: { dependencyId: planningPersistedIdSchema },
         additionalProperties: false
       }
     },
@@ -504,9 +517,9 @@ export const planningSchemas = openApiSchemaFragment({
         type: "object",
         required: ["id", "taskId", "resourceId", "role", "unitsPermille", "workMinutes"],
         properties: {
-          id: stringIdSchema,
-          taskId: stringIdSchema,
-          resourceId: stringIdSchema,
+          id: planningPersistedIdSchema,
+          taskId: planningPersistedIdSchema,
+          resourceId: planningPersistedIdSchema,
           role: planningAssignmentRoleSchema,
           unitsPermille: { type: "integer", minimum: 1 },
           workMinutes: { type: ["integer", "null"], minimum: 0 }
@@ -525,7 +538,7 @@ export const planningSchemas = openApiSchemaFragment({
         type: "object",
         required: ["assignmentId", "allocations"],
         properties: {
-          assignmentId: stringIdSchema,
+          assignmentId: planningPersistedIdSchema,
           allocations: {
             type: "array",
             items: {
@@ -552,7 +565,7 @@ export const planningSchemas = openApiSchemaFragment({
       payload: {
         type: "object",
         required: ["assignmentId"],
-        properties: { assignmentId: stringIdSchema },
+        properties: { assignmentId: planningPersistedIdSchema },
         additionalProperties: false
       }
     },
@@ -566,7 +579,7 @@ export const planningSchemas = openApiSchemaFragment({
       payload: {
         type: "object",
         required: ["baselineId", "label"],
-        properties: { baselineId: stringIdSchema, label: { type: "string", minLength: 1, maxLength: 500 } },
+        properties: { baselineId: planningPersistedIdSchema, label: { type: "string", minLength: 1, maxLength: 500 } },
         additionalProperties: false
       }
     },
@@ -581,9 +594,9 @@ export const planningSchemas = openApiSchemaFragment({
         type: "object",
         required: ["id", "calendarId", "resourceId", "date", "workingMinutes", "reason"],
         properties: {
-          id: stringIdSchema,
-          calendarId: stringIdSchema,
-          resourceId: nullableStringSchema,
+          id: planningPersistedIdSchema,
+          calendarId: planningPersistedIdSchema,
+          resourceId: planningNullablePersistedIdSchema,
           date: dateSchema,
           workingMinutes: { type: "integer", minimum: 0 },
           reason: nullableStringSchema
@@ -602,8 +615,8 @@ export const planningSchemas = openApiSchemaFragment({
         type: "object",
         required: ["taskId", "constraintId", "type", "date"],
         properties: {
-          taskId: stringIdSchema,
-          constraintId: stringIdSchema,
+          taskId: planningPersistedIdSchema,
+          constraintId: planningPersistedIdSchema,
           type: planningConstraintTypeSchema,
           date: planDateOrNullSchema
         },
@@ -621,8 +634,8 @@ export const planningSchemas = openApiSchemaFragment({
         type: "object",
         required: ["id", "resourceId", "start", "finish", "workMinutes", "reason"],
         properties: {
-          id: stringIdSchema,
-          resourceId: stringIdSchema,
+          id: planningPersistedIdSchema,
+          resourceId: planningPersistedIdSchema,
           start: dateSchema,
           finish: dateSchema,
           workMinutes: { type: "integer", minimum: 0 },
@@ -672,7 +685,7 @@ export const planningSchemas = openApiSchemaFragment({
       payload: {
         type: "object",
         required: ["calendarId"],
-        properties: { calendarId: nullableStringSchema },
+        properties: { calendarId: planningNullablePersistedIdSchema },
         additionalProperties: false
       }
     },
@@ -687,7 +700,7 @@ export const planningSchemas = openApiSchemaFragment({
         type: "object",
         required: ["taskId", "fieldKey", "value"],
         properties: {
-          taskId: stringIdSchema,
+          taskId: planningPersistedIdSchema,
           fieldKey: { type: "string", pattern: "^[A-Za-z0-9_-]+$", maxLength: 120 },
           value: { type: ["string", "number", "boolean", "null"] }
         },
@@ -887,7 +900,7 @@ export const planningSchemas = openApiSchemaFragment({
     type: "object",
     required: ["targetCommitId", "clientPlanVersion", "idempotencyKey"],
     properties: {
-      targetCommitId: { type: "string", minLength: 1, maxLength: 500 },
+      targetCommitId: planningPersistedIdSchema,
       clientPlanVersion: { type: "integer", minimum: 1 },
       idempotencyKey: {
         type: "string",
@@ -974,10 +987,10 @@ export const planningSchemas = openApiSchemaFragment({
     required: ["type", "resourceId", "date", "overloadMinutes", "taskIds"],
     properties: {
       type: { type: "string", const: "resource_overload" },
-      resourceId: stringIdSchema,
+      resourceId: planningPersistedIdSchema,
       date: dateSchema,
       overloadMinutes: { type: "integer", minimum: 1 },
-      taskIds: { type: "array", items: stringIdSchema }
+      taskIds: { type: "array", items: planningPersistedIdSchema }
     },
     additionalProperties: false
   },

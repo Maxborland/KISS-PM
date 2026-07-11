@@ -356,6 +356,77 @@ describe("planning API routes", () => {
     }
   );
 
+  it("rejects unsafe persisted IDs from direct planning apply before database writes", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const before = await client`
+      SELECT
+        (SELECT version FROM plan_versions
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS version,
+        (SELECT count(*)::int FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS task_count,
+        (SELECT count(*)::int FROM task_assignments
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS assignment_count
+    `;
+    const clientPlanVersion = Number(before[0]?.version);
+    const commands = ["\ud800", "\ufffd"].flatMap((unsafeId) => [
+      {
+        type: "task.create",
+        payload: {
+          id: unsafeId,
+          projectId: "project-alpha",
+          title: "Unsafe direct task",
+          statusId: "task-status-new",
+          plannedStart: "2026-06-01",
+          plannedFinish: "2026-06-02",
+          durationMinutes: 480,
+          workMinutes: 480,
+          assignments: []
+        }
+      },
+      {
+        type: "assignment.upsert",
+        payload: {
+          id: unsafeId,
+          taskId: "task-alpha",
+          resourceId: "user-alpha-executor",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: null
+        }
+      }
+    ]);
+
+    for (const command of commands) {
+      const response = await app.request(
+        "/api/workspace/projects/project-alpha/planning/apply-command",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-kiss-pm-action": "same-origin",
+            cookie: adminCookie
+          },
+          body: JSON.stringify({ command, clientPlanVersion })
+        }
+      );
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "planning_command_invalid"
+      });
+    }
+
+    const after = await client`
+      SELECT
+        (SELECT version FROM plan_versions
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS version,
+        (SELECT count(*)::int FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS task_count,
+        (SELECT count(*)::int FROM task_assignments
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS assignment_count
+    `;
+    expect(after[0]).toEqual(before[0]);
+  });
+
   it.each(["single", "batch"] as const)(
     "rolls back task, version, audit, and idempotency when post-write readback is missing for %s apply",
     async (applyMode) => {

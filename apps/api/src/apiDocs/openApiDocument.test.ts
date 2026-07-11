@@ -133,6 +133,43 @@ describe("OpenAPI route inventory", () => {
       | undefined;
     expect(errorCodes?.enum).toContain("same_origin_action_required");
   });
+  it("documents the safe persisted-ID boundary for planning write requests", () => {
+    const document = createTestDocument();
+    const schemas = document.components.schemas as Record<string, JsonSchema>;
+    const persistedId = {
+      type: "string",
+      minLength: 1,
+      maxLength: 500,
+      pattern: "^[A-Za-z0-9._:-]+$"
+    };
+    const nullablePersistedId = {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 500,
+      pattern: "^[A-Za-z0-9._:-]+$"
+    };
+    const createPayload = schemas.PlanningTaskCreateCommand?.properties?.payload as JsonSchema;
+    const calendarPayload = schemas.PlanningCalendarExceptionUpsertCommand?.properties
+      ?.payload as JsonSchema;
+    const overloadPayload = schemas.PlanningRiskAcceptOverloadCommand?.properties
+      ?.payload as JsonSchema;
+
+    expect(schemas.PlanningRevertRequest?.properties?.targetCommitId).toEqual(persistedId);
+    expect(createPayload.properties?.id).toEqual(persistedId);
+    expect(createPayload.properties?.projectId).toEqual(persistedId);
+    expect(createPayload.properties?.parentTaskId).toEqual(nullablePersistedId);
+    expect(calendarPayload.properties?.resourceId).toEqual(nullablePersistedId);
+    expect(overloadPayload.properties?.overloadId).toEqual({
+      ...persistedId,
+      pattern: "^[A-Za-z0-9._-]+:\\d{4}-\\d{2}-\\d{2}$"
+    });
+    expect(schemas.PlanningScenarioTarget?.properties?.resourceId).toEqual(persistedId);
+    expect(schemas.PlanningScenarioTarget?.properties?.taskIds).toEqual({
+      type: "array",
+      items: persistedId
+    });
+  });
+
 
   it("keeps Saved View create, rename, and delete contracts in the API document", () => {
     const document = createTestDocument();

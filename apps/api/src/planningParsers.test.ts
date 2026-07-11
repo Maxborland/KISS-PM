@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   parsePlanningCommandEnvelope,
+  parsePlanningRevertEnvelope,
   parseScenarioApplyEnvelope,
   parseScenarioPreviewEnvelope
 } from "./planningParsers";
@@ -169,6 +170,91 @@ describe("planning parsers", () => {
       })
     ).toEqual({ ok: false, error: "planning_scenario_invalid" });
   });
+
+  it.each(["\ud800", "\ufffd", "задача"])(
+    "rejects non-ASCII persisted planning IDs %j before apply",
+    (unsafeId) => {
+      const commands = [
+        {
+          type: "task.create",
+          payload: {
+            id: unsafeId,
+            projectId: "project-alpha",
+            title: "Unsafe task",
+            statusId: "task-status-new",
+            plannedStart: "2026-06-01",
+            plannedFinish: "2026-06-02",
+            durationMinutes: 480,
+            workMinutes: 480,
+            assignments: []
+          }
+        },
+        {
+          type: "task.create",
+          payload: {
+            id: "task-safe",
+            projectId: "project-alpha",
+            title: "Unsafe assignment",
+            statusId: "task-status-new",
+            plannedStart: "2026-06-01",
+            plannedFinish: "2026-06-02",
+            durationMinutes: 480,
+            workMinutes: 480,
+            assignments: [
+              {
+                id: unsafeId,
+                resourceId: "user-alpha-executor",
+                role: "executor",
+                unitsPermille: 1000,
+                workMinutes: 480
+              }
+            ]
+          }
+        },
+        {
+          type: "assignment.upsert",
+          payload: {
+            id: unsafeId,
+            taskId: "task-safe",
+            resourceId: "user-alpha-executor",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: null
+          }
+        },
+        {
+          type: "assignment.delete",
+          payload: { assignmentId: unsafeId }
+        },
+        {
+          type: "assignment.allocations.replace",
+          payload: {
+            assignmentId: unsafeId,
+            allocations: [{ date: "2026-06-10", workMinutes: 240 }]
+          }
+        }
+      ];
+
+      for (const command of commands) {
+        expect(
+          parsePlanningCommandEnvelope({ command, clientPlanVersion: 1 })
+        ).toEqual({ ok: false, error: "planning_command_invalid" });
+      }
+    }
+  );
+  it.each(["\ud800", "\ufffd", "коммит-один"])(
+    "rejects unsafe planning revert target ID %j",
+    (targetCommitId) => {
+      expect(
+        parsePlanningRevertEnvelope({
+          targetCommitId,
+          clientPlanVersion: 1,
+          idempotencyKey: "revert-safe"
+        })
+      ).toEqual({ ok: false, error: "planning_revert_invalid" });
+    }
+  );
+
 
   it("rejects unsafe task custom-field commands", () => {
     expect(

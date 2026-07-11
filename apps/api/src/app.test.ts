@@ -138,7 +138,8 @@ describe("KISS PM API Phase 1 shell", () => {
       items: {
         type: "string",
         minLength: 1,
-        pattern: "^[^:]+:\\d{4}-\\d{2}-\\d{2}$"
+        maxLength: 500,
+        pattern: "^[A-Za-z0-9._-]+:\\d{4}-\\d{2}-\\d{2}$"
       }
     });
     expect(document.components.schemas.PlanningResourceOverload.required).toContain(
