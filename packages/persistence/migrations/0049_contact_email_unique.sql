@@ -1,25 +1,53 @@
--- Data cleanup BEFORE the unique index: existing workspaces predate this constraint and may
--- already hold two contacts with the same non-null email in a tenant. A bare CREATE UNIQUE INDEX
--- would fail there and block the upgrade. De-duplicate non-destructively: keep the oldest row's
--- email untouched (canonical), and make every later duplicate unique+recoverable by suffixing its
--- own id. NULL emails are excluded (NULLs are distinct in a btree unique index, so they never clash).
-WITH ranked AS (
-  SELECT
-    "id",
-    "tenant_id",
-    row_number() OVER (
-      PARTITION BY "tenant_id", "email"
-      ORDER BY "created_at", "id"
-    ) AS rn
-  FROM "contacts"
-  WHERE "email" IS NOT NULL
-)
-UPDATE "contacts" AS c
-SET "email" = c."email" || '.dup.' || c."id"
-FROM ranked AS r
-WHERE c."id" = r."id"
-  AND c."tenant_id" = r."tenant_id"
-  AND r.rn > 1;
+-- Existing workspaces may contain duplicate emails. Keep the oldest value canonical and
+-- choose a recoverable suffix for every later row, retrying when that suffix already exists.
+LOCK TABLE "contacts" IN SHARE ROW EXCLUSIVE MODE;
+
+DO $$
+DECLARE
+  duplicate_row record;
+  candidate text;
+  attempt integer;
+BEGIN
+  FOR duplicate_row IN
+    SELECT "id", "tenant_id", "email"
+    FROM (
+      SELECT
+        "id",
+        "tenant_id",
+        "email",
+        row_number() OVER (
+          PARTITION BY "tenant_id", "email"
+          ORDER BY "created_at", "id"
+        ) AS duplicate_rank
+      FROM "contacts"
+      WHERE "email" IS NOT NULL
+    ) AS ranked
+    WHERE duplicate_rank > 1
+    ORDER BY "tenant_id", "email", duplicate_rank
+  LOOP
+    attempt := 0;
+    LOOP
+      candidate := duplicate_row.email || '.dup.' || duplicate_row.id
+        || CASE WHEN attempt = 0 THEN '' ELSE '.' || attempt::text END;
+
+      EXIT WHEN NOT EXISTS (
+        SELECT 1
+        FROM "contacts" AS existing
+        WHERE existing."tenant_id" = duplicate_row.tenant_id
+          AND existing."email" = candidate
+          AND existing."id" <> duplicate_row.id
+      );
+
+      attempt := attempt + 1;
+    END LOOP;
+
+    UPDATE "contacts"
+    SET "email" = candidate
+    WHERE "tenant_id" = duplicate_row.tenant_id
+      AND "id" = duplicate_row.id;
+  END LOOP;
+END
+$$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "contacts_tenant_id_email_uidx"
 ON "contacts" USING btree ("tenant_id","email");

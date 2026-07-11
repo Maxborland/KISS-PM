@@ -1916,6 +1916,41 @@ describe("API with PostgreSQL data source", () => {
     });
   });
 
+  it("returns user_id_taken when concurrent workspace user creates reuse an id", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+    const base = {
+      id: "user-id-race",
+      name: "Гонка ID",
+      accessProfileId: "access-profile-alpha-reader",
+      password: "race12345"
+    };
+
+    const [first, second] = await Promise.all([
+      app.request("/api/workspace/users", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...base, email: "id-race-a@kiss-pm.local" })
+      }),
+      app.request("/api/workspace/users", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...base, email: "id-race-b@kiss-pm.local" })
+      })
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+
+    expect(statuses).toEqual([201, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "user_id_taken"
+    });
+  });
+
   it("returns a stable conflict when concurrent workspace user creates reuse an email", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {

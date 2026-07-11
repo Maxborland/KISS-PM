@@ -91,6 +91,9 @@ export function buildCompensatingCommands(
           }
         ];
       }
+      const allocations = (before.assignmentAllocations ?? [])
+        .filter((allocation) => allocation.assignmentId === existing.id)
+        .map(({ date, workMinutes }) => ({ date, workMinutes }));
       return [
         {
           type: "assignment.upsert",
@@ -102,7 +105,13 @@ export function buildCompensatingCommands(
             unitsPermille: existing.unitsPermille,
             workMinutes: existing.workMinutes
           }
-        }
+        },
+        ...(allocations.length > 0
+          ? [{
+              type: "assignment.allocations.replace" as const,
+              payload: { assignmentId: existing.id, allocations }
+            }]
+          : [])
       ];
     }
     case "assignment.delete": {
@@ -110,6 +119,9 @@ export function buildCompensatingCommands(
         (assignment) => assignment.id === command.payload.assignmentId
       );
       if (!existing) return [];
+      const allocations = (before.assignmentAllocations ?? [])
+        .filter((allocation) => allocation.assignmentId === existing.id)
+        .map(({ date, workMinutes }) => ({ date, workMinutes }));
       return [
         {
           type: "assignment.upsert",
@@ -121,7 +133,13 @@ export function buildCompensatingCommands(
             unitsPermille: existing.unitsPermille,
             workMinutes: existing.workMinutes
           }
-        }
+        },
+        ...(allocations.length > 0
+          ? [{
+              type: "assignment.allocations.replace" as const,
+              payload: { assignmentId: existing.id, allocations }
+            }]
+          : [])
       ];
     }
     case "dependency.upsert": {

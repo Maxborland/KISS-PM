@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-import { AdminApiError, createAdminClient, type UserCreateInput } from "./admin-client";
+import {
+  AdminApiError,
+  createAdminClient,
+  workspaceUserCountsAreKnown,
+  type UserCreateInput
+} from "./admin-client";
 import { ALL_PERMISSIONS, createMockAdminFetch } from "./mock-admin-backend";
 
 function client() {
@@ -26,7 +31,10 @@ describe("contract-mock admin backend", () => {
 
   it("lists seeded users (sorted by name) and positions", async () => {
     const c = client();
-    const { users } = await c.listUsers();
+    const response = await c.listUsers();
+    const { users } = response;
+    expect(workspaceUserCountsAreKnown(response)).toBe(true);
+    expect(workspaceUserCountsAreKnown({ users: [], privateFieldsIncluded: false })).toBe(false);
     const { positions } = await c.listPositions();
     expect(users.length).toBe(5);
     expect(users.map((u) => u.name)).toEqual([...users.map((u) => u.name)].sort((a, b) => a.localeCompare(b, "ru")));

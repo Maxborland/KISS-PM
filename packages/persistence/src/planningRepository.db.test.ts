@@ -367,6 +367,36 @@ describe("planning repository", () => {
     ).rejects.toThrow();
   });
 
+  it("deletes a task custom-field key when the command value is null", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.update_custom_field",
+        payload: { taskId: "task-alpha", fieldKey: "sprint", value: "S1" }
+      }
+    });
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.update_custom_field",
+        payload: { taskId: "task-alpha", fieldKey: "sprint", value: null }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    expect(snapshot?.tasks.find((task) => task.id === "task-alpha")?.customFields).toEqual({});
+  });
+
   it("persists the first accepted overload unchanged across repeated and concurrent commands", async () => {
     const db = createDatabase(client);
     const intakeRepository = createProjectIntakeRepository(db);

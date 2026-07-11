@@ -1,7 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ProjectSchedule } from "./schedule-surface";
+import {
+  canManageScheduleResourceControls,
+  ProjectSchedule
+} from "./schedule-surface";
 
 let permissions: string[] = [];
 
@@ -76,5 +79,16 @@ describe("schedule permission controls worker 09", () => {
 
     expect(managerMarkup).toContain(">Пакет<");
     expect(managerMarkup).toContain("Новая задача — Enter");
+  });
+
+  it("requires resource-manage permission for resource controls in live mode", () => {
+    expect(canManageScheduleResourceControls({
+      live: true,
+      permissions: ["tenant.project_plan.manage"]
+    })).toBe(false);
+    expect(canManageScheduleResourceControls({
+      live: true,
+      permissions: ["tenant.project_plan.manage", "tenant.project_resources.manage"]
+    })).toBe(true);
   });
 });

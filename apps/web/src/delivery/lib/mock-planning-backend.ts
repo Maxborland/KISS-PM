@@ -1206,7 +1206,9 @@ export function createMockPlanningFetch(): typeof fetch {
       });
     }
 
-    if (method === "POST" && /\/planning\/apply-command-batch$/.test(path)) {
+    const isBatchPreview = method === "POST" && /\/planning\/preview-command-batch$/.test(path);
+    const isBatchApply = method === "POST" && /\/planning\/apply-command-batch$/.test(path);
+    if (isBatchPreview || isBatchApply) {
       const reqBody = init?.body ? (JSON.parse(String(init.body)) as { commands: PlanningCommand[]; clientPlanVersion: number }) : null;
       if (!reqBody) return json({ error: "validation_error" }, 400);
       if (reqBody.clientPlanVersion !== planVersion) return json({ error: "plan_version_conflict", currentPlanVersion: planVersion }, 409);
@@ -1222,6 +1224,21 @@ export function createMockPlanningFetch(): typeof fetch {
         r.changedTaskIds.forEach((cid) => allChanged.add(cid));
       }
       changedByCascade(before, after).forEach((cid) => allChanged.add(cid));
+      if (isBatchPreview) {
+        return json({
+          before: buildReadModel(before, planVersion),
+          after: buildReadModel(after, planVersion + 1),
+          planDelta: { changedTaskIds: [...allChanged], changedAssignmentIds: [], changedDependencyIds: [] },
+          validationIssues: [],
+          permissionPreviews: reqBody.commands.map(() => ({ allowed: true, reason: "manage_project_plan" })),
+          auditPreview: {
+            actionType: "planning.command_batch.applied",
+            sourceWorkflow: "planning",
+            planVersionBefore: planVersion,
+            planVersionAfter: planVersion + 1
+          }
+        });
+      }
       authored = after;
       planVersion += 1;
       pushCommit(reqBody.commands, [...allChanged], reqBody.commands.length === 1 ? summarizeCommand(reqBody.commands[0]!, before) : `Пакет правок (${reqBody.commands.length})`, AUDIT_ACTION[(reqBody.commands[0] as { type: string } | undefined)?.type ?? ""] ?? "planning.command.applied", buildReadModel(before, planVersion - 1));

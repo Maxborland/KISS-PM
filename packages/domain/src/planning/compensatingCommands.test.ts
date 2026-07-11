@@ -110,6 +110,68 @@ describe("buildCompensatingCommands", () => {
     });
   });
 
+  it.each(["assignment.upsert", "assignment.delete"] as const)(
+    "restores allocation curves when reverting %s",
+    (type) => {
+      const before = snapshot({});
+      before.assignments = [
+        {
+          id: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-a",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: 480,
+          calendarId: null
+        }
+      ];
+      before.assignmentAllocations = [
+        {
+          assignmentId: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-a",
+          date: "2026-06-02",
+          workMinutes: 480
+        }
+      ];
+
+      const command = type === "assignment.upsert"
+        ? {
+            type,
+            payload: {
+              id: "assignment-a",
+              taskId: "task-a",
+              resourceId: "resource-b",
+              role: "executor" as const,
+              unitsPermille: 500,
+              workMinutes: 240
+            }
+          }
+        : { type, payload: { assignmentId: "assignment-a" } };
+
+      expect(buildCompensatingCommands(command, before)).toEqual([
+        {
+          type: "assignment.upsert",
+          payload: {
+            id: "assignment-a",
+            taskId: "task-a",
+            resourceId: "resource-a",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: 480
+          }
+        },
+        {
+          type: "assignment.allocations.replace",
+          payload: {
+            assignmentId: "assignment-a",
+            allocations: [{ date: "2026-06-02", workMinutes: 480 }]
+          }
+        }
+      ]);
+    }
+  );
+
   it("does not publish a partially reversible compensation batch", () => {
     expect(
       buildCompensatingCommandBatch(

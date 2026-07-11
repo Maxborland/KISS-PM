@@ -66,6 +66,26 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     expect(moved.wbsCode).toBe("1.1.1");
   });
 
+  it("previews a command batch without mutating the mock plan", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const preview = await c.previewCommandBatch(MOCK_PROJECT_ID, {
+      commands: [
+        { type: "task.update_progress", payload: { taskId: "t-1.1", percentComplete: 10 } },
+        { type: "task.update_progress", payload: { taskId: "t-1.2", percentComplete: 20 } }
+      ] as PlanningCommand[],
+      clientPlanVersion: rm.planVersion
+    });
+
+    expect(preview.after.planVersion).toBe(rm.planVersion + 1);
+    expect(preview.planDelta.changedTaskIds).toEqual(
+      expect.arrayContaining(["t-1.1", "t-1.2"])
+    );
+    await expect(c.getPlanReadModel(MOCK_PROJECT_ID)).resolves.toMatchObject({
+      planVersion: rm.planVersion
+    });
+  });
+
   it("applies a batch of commands as a single plan-version bump", async () => {
     const c = client();
     const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);

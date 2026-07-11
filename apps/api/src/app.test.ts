@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "./app";
 import {
   canReadWorkspaceUserDirectory,
-  workspaceUserDirectoryEntry
+  workspaceUserDirectoryEntry,
+  workspaceUserDirectoryResponse
 } from "./workspaceUserRoutes";
 import { verifyLoginPassword } from "./authRoutes";
 import type { ApiTenantDataSource, ProjectRecord, WorkspaceUserRecord } from "./apiTypes";
@@ -3886,6 +3887,19 @@ describe("KISS PM API Phase 1 shell", () => {
       positionName: "Engineer"
     });
     expect(workspaceUserDirectoryEntry(user, true)).toBe(user);
+    expect(workspaceUserDirectoryResponse([user], false)).toEqual({
+      privateFieldsIncluded: false,
+      users: [{
+        id: "user-alpha",
+        name: "Alpha",
+        positionId: "position-alpha",
+        positionName: "Engineer"
+      }]
+    });
+    expect(workspaceUserDirectoryResponse([user], true)).toEqual({
+      privateFieldsIncluded: true,
+      users: [user]
+    });
   });
 
 });

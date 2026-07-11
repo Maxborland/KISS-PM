@@ -36,6 +36,16 @@ export function workspaceUserDirectoryEntry(
   };
 }
 
+export function workspaceUserDirectoryResponse(
+  users: WorkspaceUserRecord[],
+  includePrivateFields: boolean
+) {
+  return {
+    privateFieldsIncluded: includePrivateFields,
+    users: users.map((user) => workspaceUserDirectoryEntry(user, includePrivateFields))
+  };
+}
+
 export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
   const {
     appendManagementAuditEvent,
@@ -65,11 +75,12 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       targetTenantId: actor.tenantId
     }).allowed;
 
-    return context.json({
-      users: (await dataSource.listWorkspaceUsers(actor.tenantId)).map((user) =>
-        workspaceUserDirectoryEntry(user, includePrivateFields)
+    return context.json(
+      workspaceUserDirectoryResponse(
+        await dataSource.listWorkspaceUsers(actor.tenantId),
+        includePrivateFields
       )
-    });
+    );
   });
 
   app.post("/api/workspace/users", async (context) => {
@@ -437,7 +448,10 @@ function workspaceUserUniqueConflict(
     };
     if (rec.code === "23505") {
       const marker = String(rec.constraint ?? rec.constraint_name ?? rec.message ?? "");
-      if (marker.includes("tenant_users_tenant_id_id_uidx")) return "user_id_taken";
+      if (
+        marker.includes("tenant_users_tenant_id_id_uidx") ||
+        marker.includes("tenant_users_pkey")
+      ) return "user_id_taken";
       if (marker.includes("tenant_users_tenant_id_email_uidx")) return "user_email_taken";
       if (marker.includes("user_credentials_email_uidx")) return "user_email_taken";
     }

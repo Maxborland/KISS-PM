@@ -1204,10 +1204,12 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             )
             .limit(1);
           if (!existing) throw new Error("task_not_found");
-          const nextCustomFields = {
-            ...(existing.customFields ?? {}),
-            [input.command.payload.fieldKey]: input.command.payload.value
-          };
+          const nextCustomFields = { ...(existing.customFields ?? {}) };
+          if (input.command.payload.value === null) {
+            delete nextCustomFields[input.command.payload.fieldKey];
+          } else {
+            nextCustomFields[input.command.payload.fieldKey] = input.command.payload.value;
+          }
           await db
             .update(tasks)
             .set({ customFields: nextCustomFields, updatedAt: new Date() })

@@ -271,7 +271,10 @@ export function createMockAdminFetch(): typeof fetch {
     /* ---- users (пользователи) ---- */
     // Список: сортировка по name (боевой repositories: orderBy tenantUsers.name).
     if (path === "/api/workspace/users" && method === "GET") {
-      return json({ users: [...db.users].sort((a, b) => a.name.localeCompare(b.name, "ru")) });
+      return json({
+        privateFieldsIncluded: true,
+        users: [...db.users].sort((a, b) => a.name.localeCompare(b.name, "ru"))
+      });
     }
     if (path === "/api/workspace/users" && method === "POST") {
       // Порядок (зеркало parseWorkspaceUserBody + handler): id → accessProfileId формат → positionId формат →

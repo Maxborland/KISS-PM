@@ -7,6 +7,7 @@ import { useDomainClient } from "../../lib/use-domain-client";
 import { useResource, type LoadStatus } from "../../lib/use-resource";
 import {
   createAdminClient,
+  workspaceUserCountsAreKnown,
   type AccessProfile, type AccessRoleCreateInput, type AccessRoleUpdateInput,
   type Permission, type Position, type UserCreateInput, type UserUpdateInput, type WorkspaceUser
 } from "./admin-client";
@@ -75,7 +76,10 @@ export function useAdmin(scope: AdminLoadScope = "all") {
       const [roles, users, catalog] = await Promise.all([
         client.listAccessRoles(),
         optionalForbidden(
-          client.listUsers().then((r) => ({ users: r.users, usersReadable: true })),
+          client.listUsers().then((r) => {
+            const usersReadable = workspaceUserCountsAreKnown(r);
+            return { users: usersReadable ? r.users : [], usersReadable };
+          }),
           { users: [], usersReadable: false }
         ),
         client.listPermissionCatalog()

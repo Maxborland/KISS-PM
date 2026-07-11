@@ -71,6 +71,28 @@ describe("OpenAPI route inventory", () => {
     expect(document.paths["/api/auth/login"]?.post?.requestBody).toBeDefined();
   });
 
+  it("documents duplicate participant-state updates with a nullable event", () => {
+    const document = createTestDocument();
+    const schemas = document.components.schemas as Record<string, JsonSchema>;
+
+    expect(schemas.CallParticipantStateResponse?.properties?.event).toEqual({
+      oneOf: [
+        { $ref: "#/components/schemas/CallEvent" },
+        { type: "null" }
+      ]
+    });
+  });
+
+  it("documents whether workspace-user directory entries include private fields", () => {
+    const document = createTestDocument();
+    const schemas = document.components.schemas as Record<string, JsonSchema>;
+    const response = schemas.WorkspaceUsersResponse;
+
+    expect(response?.required).toContain("privateFieldsIncluded");
+    expect(response?.properties?.privateFieldsIncluded).toEqual({ type: "boolean" });
+    expect(response?.additionalProperties).toBe(false);
+  });
+
   it("documents the planning revert request, result, and errors with strict schemas", () => {
     const document = createTestDocument();
     const operation = document.paths[

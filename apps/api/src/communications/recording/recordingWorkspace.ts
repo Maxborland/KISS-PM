@@ -150,7 +150,19 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
         return { ok: false, status: 409, error: "call_recording_provider_unsupported" };
       }
 
-      return dataSource.withTransaction(async (transactionDataSource) => {
+      type StartRecordingResult = RecordingResult<{
+        recordingGroupId: string;
+        recordings: CallRecording[];
+      }>;
+      type StartedEgress = {
+        egressId: string;
+        track: Awaited<ReturnType<LiveKitEgressProvider["listRoomTracks"]>>[number];
+      };
+      const compensation = {
+        pending: null as { recordingGroupId: string; orphaned: StartedEgress[] } | null
+      };
+
+      return dataSource.withTransaction<StartRecordingResult>(async (transactionDataSource) => {
         requireFn(transactionDataSource.lockCallRecordingStart);
         requireFn(transactionDataSource.listCallRecordings);
         requireFn(transactionDataSource.createCallRecording);
@@ -184,7 +196,7 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
         const recordings: CallRecording[] = [];
         // Track the started egress AND its track so a compensating row (below) can carry real
         // participant/track/kind values if we have to persist an orphan outside the rollback.
-        const started: Array<{ egressId: string; track: (typeof tracks)[number] }> = [];
+        const started: StartedEgress[] = [];
 
         try {
           for (const track of tracks) {
@@ -256,41 +268,41 @@ export function createCommunicationRecordingWorkspace(deps: CommunicationRecordi
               orphaned.push(item);
             }
           }
-          // Compensating durability: if a started egress could NOT be stopped, this transaction is
-          // about to roll back and would erase every recording row — leaving that egress recording/
-          // billing with NO durable record for the reconcile/janitor path to discover and stop.
-          // Persist a "recording" row OUTSIDE the rollback boundary (via the pooled dataSource, which
-          // commits on its own connection) so reconcile can reap it. Best-effort: if this also fails
-          // there is nothing more we can do here.
-          if (orphaned.length > 0 && dataSource.createCallRecording) {
-            for (const item of orphaned) {
-              try {
-                await dataSource.createCallRecording({
-                  id: `call-recording-${randomUUID()}`,
-                  tenantId: input.actor.tenantId,
-                  roomId: input.room.id,
-                  sessionId: input.session.id,
-                  recordingGroupId,
-                  attachmentId: null,
-                  egressId: item.egressId,
-                  participantId: item.track.participantIdentity,
-                  trackId: item.track.trackId,
-                  kind: item.track.kind,
-                  status: "recording",
-                  durationSeconds: null,
-                  endedAt: null,
-                  title: `Запись · ${item.track.participantIdentity} (компенсация)`,
-                  createdByUserId: input.actor.id
-                });
-              } catch {
-                // best-effort durable compensation
-              }
-            }
-          }
+          compensation.pending = { recordingGroupId, orphaned };
           throw cause;
         }
 
         return { ok: true, recordingGroupId, recordings };
+      }).catch(async (cause) => {
+        // The transaction promise rejects only after rollback. A pooled compensation insert can
+        // then reuse (tenant_id, egress_id) without waiting on the aborted unique-key lock.
+        const pending = compensation.pending;
+        if (pending) {
+          for (const item of pending.orphaned) {
+            try {
+              await dataSource.createCallRecording({
+                id: `call-recording-${randomUUID()}`,
+                tenantId: input.actor.tenantId,
+                roomId: input.room.id,
+                sessionId: input.session.id,
+                recordingGroupId: pending.recordingGroupId,
+                attachmentId: null,
+                egressId: item.egressId,
+                participantId: item.track.participantIdentity,
+                trackId: item.track.trackId,
+                kind: item.track.kind,
+                status: "recording",
+                durationSeconds: null,
+                endedAt: null,
+                title: `Запись · ${item.track.participantIdentity} (компенсация)`,
+                createdByUserId: input.actor.id
+              });
+            } catch {
+              // best-effort durable compensation
+            }
+          }
+        }
+        throw cause;
       });
     },
     /** Stop all active egresses in a recording group scoped to the resolved room. */

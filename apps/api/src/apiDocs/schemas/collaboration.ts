@@ -862,7 +862,7 @@ export const collaborationSchemas = openApiSchemaFragment({
     required: ["participantState", "event"],
     properties: {
       participantState: schemaRef("CallParticipantState"),
-      event: schemaRef("CallEvent")
+      event: { oneOf: [schemaRef("CallEvent"), { type: "null" }] }
     },
     additionalProperties: false
   },

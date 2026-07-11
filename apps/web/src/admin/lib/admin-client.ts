@@ -38,6 +38,14 @@ export type WorkspaceUser = {
   phone: string | null; telegram: string | null; status: UserStatus;
   theme: string; accentColor: string;
 };
+export type WorkspaceUserListResponse = {
+  users: WorkspaceUser[];
+  privateFieldsIncluded?: boolean;
+};
+
+export function workspaceUserCountsAreKnown(response: WorkspaceUserListResponse): boolean {
+  return response.privateFieldsIncluded !== false;
+}
 // Позиция (должность). Боевой PositionRecord.
 export type Position = { id: string; tenantId: string; name: string; description: string | null };
 
@@ -89,7 +97,7 @@ export function createAdminClient(options: AdminApiClientOptions) {
     deleteAccessRole(roleId: string) { return requestJson<{ status: "deleted" }>(`/api/workspace/access-roles/${enc(roleId)}`, { method: "DELETE" }); },
 
     // пользователи
-    listUsers() { return requestJson<{ users: WorkspaceUser[] }>("/api/workspace/users"); },
+    listUsers() { return requestJson<WorkspaceUserListResponse>("/api/workspace/users"); },
     createUser(input: UserCreateInput) { return requestJson<{ user: WorkspaceUser }>("/api/workspace/users", { method: "POST", body: JSON.stringify(input) }); },
     updateUser(userId: string, input: UserUpdateInput) { return requestJson<{ user: WorkspaceUser }>(`/api/workspace/users/${enc(userId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     // Деактивация = PATCH status:"inactive" (отдельной ручки нет; self_access_change_forbidden 400 для себя).

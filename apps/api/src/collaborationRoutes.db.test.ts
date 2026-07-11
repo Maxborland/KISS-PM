@@ -1386,6 +1386,20 @@ describe("collaboration and communications API", () => {
     const duplicateMeetingPayload = await duplicateMeeting.json() as { meeting: { id: string } };
     expect(duplicateMeetingPayload.meeting.id).toBe(firstMeetingPayload.meeting.id);
 
+    const changedMeetingTime = await app.request("/api/workspace/meetings", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        ...meetingBody,
+        scheduledStart: "2026-06-02T11:00:00.000Z",
+        scheduledFinish: "2026-06-02T11:30:00.000Z"
+      })
+    });
+    expect(changedMeetingTime.status).toBe(409);
+    await expect(changedMeetingTime.json()).resolves.toEqual({
+      error: "idempotency_key_conflict"
+    });
+
     const linkBody = {
       provider: "google_meet",
       title: "Без дублей",

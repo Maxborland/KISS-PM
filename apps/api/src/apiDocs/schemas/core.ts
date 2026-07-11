@@ -231,8 +231,9 @@ export const coreSchemas = openApiSchemaFragment({
   },
   WorkspaceUsersResponse: {
     type: "object",
-    required: ["users"],
+    required: ["privateFieldsIncluded", "users"],
     properties: {
+      privateFieldsIncluded: { type: "boolean" },
       users: { type: "array", items: schemaRef("WorkspaceUser") }
     },
     additionalProperties: false
