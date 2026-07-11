@@ -79,6 +79,7 @@ test("canonical task route persists edits and comments", async ({ page }) => {
   expect(createResponse.status()).toBe(201);
   const created = (await createResponse.json()) as { task: { id: string } };
 
+  try {
   await page.goto(`/tasks/${created.task.id}`);
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   await page.getByRole("button", { name: "Редактировать", exact: true }).click();
@@ -131,6 +132,12 @@ test("canonical task route persists edits and comments", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("heading", { name: editedTitle })).toBeVisible();
   await expect(page.getByText(comment)).toBeVisible();
+  } finally {
+    const cleanupResponse = await page.request.delete(`/api/workspace/tasks/${created.task.id}`, {
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect([200, 404]).toContain(cleanupResponse.status());
+  }
 });
 
 test("canonical task route exposes loading, not-found, forbidden and retryable error states", async ({

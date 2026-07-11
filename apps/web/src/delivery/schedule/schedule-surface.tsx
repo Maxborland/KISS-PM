@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, type ClipboardEvent as ReactClipboardEvent, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, Columns3, Filter, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Layers, Plus, TriangleAlert, Undo2, X } from "lucide-react";
+import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, Columns3, Filter, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Layers, Plus, TriangleAlert, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -898,7 +898,11 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const ganttH = visibleRows.length * ROW_H;
   const selected = rows.find((r) => r.id === sel) ?? null;
 
-  const openRow = (id: string) => { setSel(id); setInspectorOpen(true); };
+  const openTaskPeek = (id: string) => {
+    setSel(id);
+    taskPeekTriggerRefs.current.get(id)?.click();
+  };
+  const openRow = openTaskPeek;
   const cancelEditableClick = () => {
     if (editableClickTimerRef.current !== null) window.clearTimeout(editableClickTimerRef.current);
     editableClickTimerRef.current = null;
@@ -911,10 +915,6 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       openRow(row.id);
       editableClickTimerRef.current = null;
     }, 180);
-  };
-  const openTaskPeek = (id: string) => {
-    setSel(id);
-    taskPeekTriggerRefs.current.get(id)?.click();
   };
 
   // --- команды ---
@@ -940,11 +940,6 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     workEdit(r, days, scaledWorkMinutes(r, durationMinutes) / 60);
   };
   const editWork = (r: Row, workH: number) => workEdit(r, r.durDays, workH);
-  const editUnits = (r: Row, pct: number) => workEdit(
-    r,
-    r.durDays,
-    Math.max(0, Math.round(rowDurationMinutes(r) * pct / 100)) / 60
-  );
   const editName = (r: Row, title: string) => void applyCmd(createPlanningCommand({ type: "task.update_identity", payload: { taskId: r.id, title } }));
   const editPct = (r: Row, pct: number) => void applyCmd(createPlanningCommand({ type: "task.update_progress", payload: { taskId: r.id, percentComplete: Math.max(0, Math.min(100, pct)) } }));
   const editDate = (r: Row, iso: string) =>
@@ -1767,43 +1762,6 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           </div>
         </div>
 
-        {/* Side-peek инспектор */}
-        {inspectorOpen && selected ? (
-          <aside className="absolute right-0 top-0 z-30 flex h-full w-[340px] flex-col border-l border-[var(--border-strong)] bg-[var(--panel)] shadow-[var(--shadow-pop)]">
-            <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--muted)]"><span className="mono">WBS {selected.wbs}</span>{selected.critical ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--danger-text)]">критпуть</span> : null}</div>
-                <h3 className="mt-0.5 truncate text-[length:var(--text-base)] font-bold text-[var(--text-strong)]">{selected.name}</h3>
-              </div>
-              <button type="button" onClick={() => setInspectorOpen(false)} className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)] hover:text-[var(--text)]" aria-label="Закрыть"><X className="size-4" aria-hidden /></button>
-            </div>
-            <div className="flex-1 overflow-auto px-4 py-3 text-[length:var(--text-sm)]">
-              <div className="mb-3">
-                <div className="mb-1 flex items-center justify-between text-[var(--muted)]"><span>Прогресс</span><span className="font-semibold text-[var(--text)]">{selected.pct}%</span></div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-[var(--panel-strong)]"><span className="block h-full rounded-full bg-[var(--success)]" style={{ width: `${selected.pct}%` }} /></div>
-              </div>
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
-                <Fact label="Режим" value={selected.mode === "auto" ? "Авто" : "Ручной"} />
-                <Fact label="Длительность" value={`${selected.durDays} дн`} />
-                <Fact label="Трудозатраты" value={`${selected.workH} ч`} />
-                {canManagePlan ? <FactNum label="Единицы" value={scheduleUnitsPercent(selected)} suffix="%" disabled={selected.kind !== "task"} onCommit={(n) => editUnits(selected, n)} /> : <Fact label="Единицы" value={`${scheduleUnitsPercent(selected)}%`} />}
-                <Fact label="Начало" value={fmtDate(selected.startIso)} mono />
-                <Fact label="Окончание" value={fmtDate(selected.finishIso)} mono />
-                <Fact label="Слак" value={selected.slackDays != null ? `${selected.slackDays} дн` : "—"} />
-                <Fact label="Ресурсы" value={selected.res} span />
-              </dl>
-              <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">Треугольник планирования: Труд = Длительность × {selected.workingMinutesPerDay / 60} ч × Единицы. Изменишь длительность — пересчитается труд; изменишь труд — изменятся единицы.</p>
-              <div className="mt-3 border-t border-[var(--border)] pt-3">
-                <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Зависимости</div>
-                {selected.predList.length ? (
-                  <ul className="space-y-1">
-                    {selected.predList.map((p) => { const pr = rows.find((x) => x.id === p.predId); return <li key={p.depId} className="flex items-center gap-2 text-[var(--text)]"><span className="mono text-[var(--muted)]">{pr?.wbs}</span><span className="truncate">{pr?.name}</span><span className="ml-auto rounded bg-[var(--panel-strong)] px-1 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{DEP_RU[p.type]}{p.lagDays ? ` ${p.lagDays > 0 ? "+" : ""}${p.lagDays}д` : ""}</span></li>; })}
-                  </ul>
-                ) : <span className="text-[var(--muted)]">нет</span>}
-              </div>
-            </div>
-          </aside>
-        ) : null}
       </div>
 
       {canManagePlan && staged.length > 0 ? (

@@ -271,7 +271,7 @@ export function createMockWorkspaceFetch(): typeof fetch {
       if (!task) return err("task_not_found", 404);
       const commentBody = str(body.body);
       if (!commentBody) return err("invalid_task_comment", 400);
-      const createdAt = nowIso();
+      const createdAt = new Date().toISOString();
       const activity: TaskActivityRecord = {
         id: genId("task-activity"),
         taskId: task.id,
