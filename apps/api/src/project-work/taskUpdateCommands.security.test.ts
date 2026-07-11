@@ -4,6 +4,8 @@ import type { TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
 import { describe, expect, it } from "vitest";
 
 import type { ApiTenantDataSource } from "../apiTypes";
+import { buildUpdateTaskPlanningCommands } from "../planningTaskCompatibility";
+import type { UpdateTaskBody } from "../projectWorkParsers";
 import { canApplyTaskCompatibilityPlanningCommands } from "./taskCommandGuards";
 import { createTaskCommandWorkspace } from "./taskCommandWorkspace";
 
@@ -219,7 +221,10 @@ function createHarness(
   };
 }
 
-function updateBody(task: TaskRecord, overrides: Record<string, unknown> = {}) {
+function updateBody(
+  task: TaskRecord,
+  overrides: Partial<UpdateTaskBody> = {}
+): UpdateTaskBody {
   return {
     title: task.title,
     description: task.description,
@@ -416,5 +421,183 @@ describe("updateTask status boundary", () => {
     expect(result).toMatchObject({ ok: false, status: 403 });
     expect(harness.appliedCommands).toEqual([]);
     expect(harness.metadataCalls).toBe(0);
+  });
+
+  it("requires resource management when executor order changes the task owner", async () => {
+    const task = createTask({
+      participants: [
+        { userId: actor.id, role: "requester" },
+        { userId: "user-executor", role: "executor" },
+        { userId: "user-next-executor", role: "executor" }
+      ]
+    });
+    const harness = createHarness(task);
+
+    const result = await harness.workspace.updateTask({
+      actor,
+      profile: taskOnlyEditorProfile,
+      taskId: task.id,
+      body: updateBody(task, {
+        participants: [
+          { userId: actor.id, role: "requester" },
+          { userId: "user-next-executor", role: "executor" },
+          { userId: "user-executor", role: "executor" }
+        ]
+      })
+    });
+
+    expect(result).toMatchObject({ ok: false, status: 403 });
+    expect(harness.appliedCommands).toEqual([]);
+    expect(harness.metadataCalls).toBe(0);
+  });
+
+  it("uses the persisted work model when a participant-only edit synchronizes assignments", async () => {
+    const task = createTask({ plannedWork: 2, durationWorkingDays: 2 });
+    const harness = createHarness(
+      task,
+      undefined,
+      {
+        id: "assignment-imported-executor",
+        unitsPermille: 150,
+        workMinutes: null
+      },
+      {
+        workMinutes: 90,
+        durationMinutes: 600
+      }
+    );
+
+    const result = await harness.workspace.updateTask({
+      actor,
+      profile: taskEditorProfile,
+      taskId: task.id,
+      body: updateBody(task, {
+        participants: [
+          { userId: actor.id, role: "requester" },
+          { userId: "user-next-executor", role: "executor" }
+        ]
+      })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      task: { ownerUserId: "user-next-executor" }
+    });
+    expect(harness.appliedCommands).toContainEqual(
+      expect.objectContaining({
+        type: "assignment.upsert",
+        payload: expect.objectContaining({
+          resourceId: "user-next-executor",
+          unitsPermille: 150
+        })
+      })
+    );
+    expect(harness.appliedCommands).not.toContainEqual(
+      expect.objectContaining({ type: "task.update_work_model" })
+    );
+  });
+
+  it("allocates unique ids when an imported assignment collides with a new deterministic id", () => {
+    const task = createTask();
+    const collidingId = `${task.id}-user-next-executor-co_executor`;
+    const body = updateBody(task, {
+      participants: [
+        { userId: actor.id, role: "requester" },
+        { userId: "user-next-executor", role: "co_executor" },
+        { userId: "user-executor", role: "executor" }
+      ]
+    });
+    const snapshot = {
+      tenantId: actor.tenantId,
+      projectId: task.projectId,
+      planVersion: 1,
+      tasks: [],
+      assignments: [
+        {
+          id: collidingId,
+          taskId: task.id,
+          resourceId: "user-executor",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: null
+        }
+      ]
+    } as unknown as PlanSnapshot;
+
+    const commands = buildUpdateTaskPlanningCommands({
+      task,
+      body,
+      participants: body.participants,
+      snapshot
+    });
+    const assignmentUpserts = commands.filter(
+      (command) => command.type === "assignment.upsert"
+    );
+    const existingExecutorUpsert = assignmentUpserts.find(
+      (command) => command.payload.resourceId === "user-executor"
+    );
+    const newCoExecutorUpsert = assignmentUpserts.find(
+      (command) => command.payload.resourceId === "user-next-executor"
+    );
+
+    expect(assignmentUpserts).toHaveLength(2);
+    expect(existingExecutorUpsert?.payload.id).toBe(collidingId);
+    expect(newCoExecutorUpsert?.payload.id).not.toBe(collidingId);
+    expect(new Set(assignmentUpserts.map((command) => command.payload.id)).size).toBe(2);
+  });
+
+  it("does not reuse an assignment id reserved by another task in the project", () => {
+    const task = createTask();
+    const reservedForeignId = `${task.id}-user-next-executor-co_executor`;
+    const body = updateBody(task, {
+      participants: [
+        { userId: actor.id, role: "requester" },
+        { userId: "user-executor", role: "executor" },
+        { userId: "user-next-executor", role: "co_executor" }
+      ]
+    });
+    const snapshot = {
+      tenantId: actor.tenantId,
+      projectId: task.projectId,
+      planVersion: 1,
+      tasks: [],
+      assignments: [
+        {
+          id: `${task.id}-user-executor-executor`,
+          taskId: task.id,
+          resourceId: "user-executor",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: null
+        },
+        {
+          id: reservedForeignId,
+          taskId: "task-foreign",
+          resourceId: "user-foreign",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: null
+        }
+      ]
+    } as unknown as PlanSnapshot;
+
+    const commands = buildUpdateTaskPlanningCommands({
+      task,
+      body,
+      participants: body.participants,
+      snapshot
+    });
+    const assignmentUpserts = commands.filter(
+      (command) => command.type === "assignment.upsert"
+    );
+
+    expect(assignmentUpserts).toContainEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          id: `${reservedForeignId}-2`,
+          resourceId: "user-next-executor"
+        })
+      })
+    );
   });
 });

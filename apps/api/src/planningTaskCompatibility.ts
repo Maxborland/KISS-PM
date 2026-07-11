@@ -117,12 +117,20 @@ export function buildUpdateTaskPlanningCommands(input: {
     const currentAssignments = input.snapshot.assignments.filter(
       (assignment) => assignment.taskId === input.task.id
     );
+    const assignmentWorkModel = workModelChanged
+      ? {
+          durationMinutes: desiredDurationMinutes,
+          workMinutes: desiredWorkMinutes
+        }
+      : {
+          durationMinutes:
+            snapshotTask?.durationMinutes ?? input.task.durationWorkingDays * 480,
+          workMinutes: snapshotTask?.workMinutes ?? input.task.plannedWork * 60
+        };
     const desiredAssignments = preserveExistingAssignmentIds(
       currentAssignments,
-      taskParticipantsToAssignments(input.task.id, input.participants, {
-        durationMinutes: desiredDurationMinutes,
-        workMinutes: desiredWorkMinutes
-      })
+      taskParticipantsToAssignments(input.task.id, input.participants, assignmentWorkModel),
+      new Set(input.snapshot.assignments.map((assignment) => assignment.id))
     );
 
     commands.push(
@@ -259,16 +267,30 @@ function assignmentSemanticKey(assignment: {
 
 function preserveExistingAssignmentIds(
   currentAssignments: PlanAssignment[],
-  desiredAssignments: TaskPlanningAssignment[]
+  desiredAssignments: TaskPlanningAssignment[],
+  reservedIds: ReadonlySet<string>
 ): TaskPlanningAssignment[] {
   const currentByParticipant = new Map(
     currentAssignments.map((assignment) => [assignmentSemanticKey(assignment), assignment])
   );
+  const allocatedIds = new Set<string>();
 
-  return desiredAssignments.map((desired) => ({
-    ...desired,
-    id: currentByParticipant.get(assignmentSemanticKey(desired))?.id ?? desired.id
-  }));
+  return desiredAssignments.map((desired) => {
+    const current = currentByParticipant.get(assignmentSemanticKey(desired));
+    if (current) {
+      allocatedIds.add(current.id);
+      return { ...desired, id: current.id };
+    }
+
+    let id = desired.id;
+    let suffix = 2;
+    while (reservedIds.has(id) || allocatedIds.has(id)) {
+      id = `${desired.id}-${suffix}`;
+      suffix += 1;
+    }
+    allocatedIds.add(id);
+    return { ...desired, id };
+  });
 }
 
 

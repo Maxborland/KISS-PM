@@ -108,11 +108,14 @@ export async function updateTask(
     if (currentTask.updatedAt.getTime() !== input.body.clientUpdatedAt.getTime()) {
       return { ok: false as const, status: 409, error: "task_version_conflict" };
     }
+    const planningParticipantsChanged =
+      !planningParticipantsSemanticallyEqual(currentTask.participants, participants) ||
+      currentTask.ownerUserId !== ownerUserId;
     const planningCompatibilityDecision = canApplyTaskCompatibilityPlanningCommands(
       input.actor,
       input.profile,
       planningCommands,
-      !planningParticipantsSemanticallyEqual(currentTask.participants, participants)
+      planningParticipantsChanged
     );
     if (!planningCompatibilityDecision.allowed) {
       return { ok: false as const, status: 403, error: planningCompatibilityDecision.reason };
