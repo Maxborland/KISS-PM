@@ -145,14 +145,14 @@ describe("AgentSurface production shell contract", () => {
             capability: { allowed: true, reason: "allowed" },
             input: { taskId: "task-1", projectId: "project-1", statusId: "status-review" },
             preview: { before: "В работе", after: "На проверке" },
-            title: "Перевести задачу 1",
+            title: "Сменить статус задачи: «Проверить смету» · проект project-1, задача task-1",
             tool: "change_task_status"
           },
           {
             capability: { allowed: true, reason: "allowed" },
             input: { taskId: "task-2", projectId: "project-1", statusId: "status-review" },
             preview: { before: "В работе", after: "На проверке" },
-            title: "Перевести задачу 2",
+            title: "Сменить статус задачи: «Проверить смету» · проект project-1, задача task-2",
             tool: "change_task_status"
           }
         ],
@@ -178,6 +178,11 @@ describe("AgentSurface production shell contract", () => {
     await act(async () => {
       form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
+
+    expect(Array.from(document.querySelectorAll(".lad-change__top strong"), (title) => title.textContent)).toEqual([
+      "Сменить статус задачи: «Проверить смету» · проект project-1, задача task-1",
+      "Сменить статус задачи: «Проверить смету» · проект project-1, задача task-2"
+    ]);
 
     const rejectButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
       .filter((button) => button.textContent?.trim() === "Отклонить");

@@ -174,11 +174,13 @@ describe("mock-agent-backend optimistic contract", () => {
     const proposal = await proposalResponse.json() as {
       proposedActions: Array<{
         tool: string;
+        title: string;
         input: Record<string, unknown>;
         preconditionVersions: { taskUpdatedAt: string };
       }>;
     };
     const action = proposal.proposedActions[0]!;
+    expect(action.title).toBe("Сменить статус задачи: «Согласовать макеты с клиентом» · проект proj-portal, задача task-portal-1");
 
     const staleResponse = await fetchImpl("/api/workspace/agent/execute", {
       method: "POST",

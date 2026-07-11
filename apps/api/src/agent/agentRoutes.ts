@@ -68,6 +68,7 @@ export async function buildProposalActionMetadata(
   profile: AccessProfile,
   action: PreviewableAction
 ): Promise<{
+  title?: string;
   preview: AgentActionPreview;
   preconditionVersions: AgentActionPreconditionVersions;
   capability?: { allowed: boolean; reason: string };
@@ -80,6 +81,9 @@ export async function buildProposalActionMetadata(
       canEditTaskFields(actor, profile, task).allowed
     );
     return {
+      ...(canReadTaskMetadata && task
+        ? { title: `Прокомментировать задачу: «${task.title}» · проект ${task.projectId}, задача ${task.id}` }
+        : {}),
       preview: canReadTaskMetadata
         ? await buildActionPreview(dataSource, actor.tenantId, action)
         : {
@@ -122,6 +126,9 @@ export async function buildProposalActionMetadata(
     canParticipantTransitionTask(actor.id, task)
   );
   return {
+    ...(canReadTaskMetadata && task
+      ? { title: `Сменить статус задачи: «${task.title}» · проект ${task.projectId}, задача ${task.id}` }
+      : {}),
     preview: {
       before: canReadTaskMetadata ? (task.statusName ?? task.statusId) : taskId,
       after: statuses.find((status) => status.id === statusId)?.name ?? statusId

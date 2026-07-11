@@ -67,7 +67,7 @@ export function createMockAgentFetch(): typeof fetch {
       const proposedActions = pick
         ? [{
             tool: "change_task_status",
-            title: "Сменить статус задачи",
+            title: `Сменить статус задачи: «${pick.task.title}» · проект ${pick.task.projectId}, задача ${pick.task.id}`,
             input: { projectId: pick.task.projectId, taskId: pick.task.id, statusId: statusForCat(pick.nextCat)! },
             capability: { allowed: true, reason: "same_tenant_permission_granted" },
             preview: {

@@ -395,6 +395,7 @@ describe("agent apply truth contract", () => {
       tool: "change_task_status",
       input: { taskId: "task-1", statusId: "task-status-review" }
     })).resolves.toEqual({
+      title: "Сменить статус задачи: «Подготовить смету» · проект project-1, задача task-1",
       preview: {
         before: "В работе",
         after: "Сверка заказчиком"
@@ -442,6 +443,7 @@ describe("agent apply truth contract", () => {
       id: "task-1",
       tenantId: "tenant-1",
       projectId: "project-1",
+      title: "Подготовить смету",
       requesterUserId: "user-planner",
       participants: [{ userId: "user-planner", role: "executor" }]
     } as TaskRecord;
@@ -480,6 +482,7 @@ describe("agent apply truth contract", () => {
       { id: "editor", permissions: ["tenant.tasks.edit"] } as AccessProfile,
       action
     )).resolves.toEqual({
+      title: "Прокомментировать задачу: «Подготовить смету» · проект project-1, задача task-1",
       preview: {
         before: "Комментариев: 1",
         after: "Готово"
@@ -489,6 +492,53 @@ describe("agent apply truth contract", () => {
     expect(activityReads).toBe(1);
   });
 
+  it("labels otherwise identical authorized task proposals with server-derived target identity", async () => {
+    const tasks: Record<string, TaskRecord> = {
+      "task-a": {
+        id: "task-a",
+        tenantId: "tenant-1",
+        projectId: "project-1",
+        title: "Проверить смету",
+        statusId: "task-status-in-progress",
+        statusName: "В работе",
+        updatedAt: new Date("2026-06-01T10:00:00.000Z"),
+        participants: [{ userId: "user-planner", role: "executor" }]
+      } as TaskRecord,
+      "task-b": {
+        id: "task-b",
+        tenantId: "tenant-1",
+        projectId: "project-1",
+        title: "Проверить смету",
+        statusId: "task-status-in-progress",
+        statusName: "В работе",
+        updatedAt: new Date("2026-06-01T10:00:00.000Z"),
+        participants: [{ userId: "user-planner", role: "executor" }]
+      } as TaskRecord
+    };
+    const dataSource = {
+      async findTaskById(_tenantId: string, taskId: string) { return tasks[taskId]; },
+      async listTaskStatuses() {
+        return [{ id: "task-status-review", name: "Сверка заказчиком" }];
+      }
+    } as unknown as ApiTenantDataSource;
+    const actor = { id: "user-planner", tenantId: "tenant-1" } as TenantUser;
+    const profile = { id: "reader", permissions: ["tenant.projects.read"] } as AccessProfile;
+
+    const first = await buildProposalActionMetadata(dataSource, actor, profile, {
+      tool: "change_task_status",
+      input: { taskId: "task-a", statusId: "task-status-review" }
+    });
+    const second = await buildProposalActionMetadata(dataSource, actor, profile, {
+      tool: "change_task_status",
+      input: { taskId: "task-b", statusId: "task-status-review" }
+    });
+
+    expect(first.preview).toEqual(second.preview);
+    expect([first.title, second.title]).toEqual([
+      "Сменить статус задачи: «Проверить смету» · проект project-1, задача task-a",
+      "Сменить статус задачи: «Проверить смету» · проект project-1, задача task-b"
+    ]);
+  });
   it("does not read plan snapshots for a plan manager without planning read access", async () => {
     let snapshotReads = 0;
     const dataSource = {
