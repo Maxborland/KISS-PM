@@ -1,10 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import { createMockWorkspaceFetch, CURRENT_USER_ID, MOCK_PROJECT_ID } from "./mock-workspace-backend";
-import { WorkspaceApiError, createWorkspaceClient } from "./workspace-client";
+import { WorkspaceApiError, createWorkspaceClient, type TaskRecord } from "./workspace-client";
 
 function client() {
   return createWorkspaceClient({ apiOrigin: "", fetchImpl: createMockWorkspaceFetch() });
+}
+
+function taskUpdateInput(task: TaskRecord) {
+  return {
+    title: task.title,
+    description: task.description,
+    priority: task.priority,
+    statusId: task.statusId,
+    plannedStart: task.plannedStart.slice(0, 10),
+    plannedFinish: task.plannedFinish.slice(0, 10),
+    durationWorkingDays: task.durationWorkingDays,
+    plannedWork: task.plannedWork,
+    requiresAcceptance: task.requiresAcceptance,
+    participants: task.participants,
+    clientUpdatedAt: task.updatedAt
+  };
 }
 
 describe("contract-mock workspace backend", () => {
@@ -107,5 +123,37 @@ describe("contract-mock workspace backend", () => {
     const { task } = await c.updateTaskStatus(MOCK_PROJECT_ID, "task-r2-acceptance", "status-done");
     expect(task.status).toBe("done");
     expect(task.progress).toBe(100);
+  });
+
+  it("mirrors live task version conflicts after same-millisecond task mutations", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-02T08:00:00.000Z"));
+    try {
+      const c = client();
+      const { task } = await c.getTaskDetail("task-loyalty-integration");
+      const staleUpdate = taskUpdateInput(task);
+
+      const { task: edited } = await c.updateTask(task.id, {
+        ...staleUpdate,
+        title: `${task.title} (обновлена)`
+      });
+      expect(edited.updatedAt).toBe("2026-03-02T08:00:00.001Z");
+      await expect(c.updateTask(task.id, staleUpdate))
+        .rejects.toMatchObject({ status: 409, code: "task_version_conflict" });
+
+      const afterStatus = client();
+      const { task: statusTask } = await afterStatus.getTaskDetail("task-loyalty-integration");
+      const staleAfterStatus = taskUpdateInput(statusTask);
+      const { task: statusChanged } = await afterStatus.updateTaskStatus(
+        "proj-loyalty",
+        statusTask.id,
+        "status-in-progress"
+      );
+      expect(statusChanged.updatedAt).toBe("2026-03-02T08:00:00.001Z");
+      await expect(afterStatus.updateTask(statusTask.id, staleAfterStatus))
+        .rejects.toMatchObject({ status: 409, code: "task_version_conflict" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

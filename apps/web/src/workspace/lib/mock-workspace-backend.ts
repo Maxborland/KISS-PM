@@ -78,7 +78,7 @@ export const WORKSPACE_USERS: WorkspaceUser[] = [
   { id: "u-kuznetsov", name: "Кузнецов Н." }
 ];
 
-const nowIso = () => new Date().toISOString();
+const nextUpdatedAt = (previous: string) => new Date(Math.max(Date.now(), Date.parse(previous) + 1)).toISOString();
 let SEQ = 0;
 const genId = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(SEQ += 1).toString(36)}`;
 
@@ -242,11 +242,11 @@ export function createMockWorkspaceFetch(): typeof fetch {
       const plannedWork = Number(body.plannedWork);
       if (title.length < 3 || title.length > 160) return err("invalid_task_title", 400);
       if (!Number.isFinite(plannedWork) || plannedWork < 0) return err("invalid_task_work", 400);
-      if (str(body.clientUpdatedAt) !== task.updatedAt) return err("task_update_conflict", 409);
+      if (str(body.clientUpdatedAt) !== task.updatedAt) return err("task_version_conflict", 409);
       const beforeTitle = task.title;
       task.title = title;
       task.plannedWork = plannedWork;
-      task.updatedAt = nowIso();
+      task.updatedAt = nextUpdatedAt(task.updatedAt);
       db.activities.unshift({
         id: genId("task-activity"),
         taskId: task.id,
@@ -338,7 +338,7 @@ export function createMockWorkspaceFetch(): typeof fetch {
       task.status = target.category; task.statusId = target.id; task.statusName = target.name; task.statusCategory = target.category;
       if (target.category === "done") task.progress = 100;
       else if (target.category === "new") task.progress = 0;
-      task.updatedAt = nowIso();
+      task.updatedAt = nextUpdatedAt(task.updatedAt);
       return json({ task });
     }
 
