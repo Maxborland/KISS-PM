@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, type ClipboardEvent as ReactClipboardEvent, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Plus, TriangleAlert, Undo2, X } from "lucide-react";
+import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, Columns3, Filter, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Layers, Plus, TriangleAlert, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import {
   scheduleWorkingMinutesThroughDate,
   type ScheduleCalendarSource
 } from "@/delivery/schedule/schedule-working-time";
+import { TaskPeek, type TaskPeekRecord } from "@/workspace/task-peek/task-peek";
 
 const genId = createClientId;
 const PLAN_MANAGE_PERMISSION = "tenant.project_plan.manage";
@@ -305,6 +306,7 @@ function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}.${m}.${y}`;
 }
+
 const ZOOM_DAY_W = { day: 36, week: 20, month: 8 } as const;
 type Zoom = ScheduleZoom;
 type DragMode = "move" | "resize" | "resizeLeft" | "progress";
@@ -339,6 +341,19 @@ const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 const numInput = "w-full rounded-[var(--radius-xs)] border border-[var(--accent)] bg-[var(--panel)] px-1 text-right text-[length:var(--text-sm)] tabular-nums outline-none";
 const cellBtn = "block w-full cursor-pointer truncate rounded-[var(--radius-xs)] px-1 text-left hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]";
 
+function taskPeekRecordFromScheduleRow(row: Row, projectId: string, projectName: string): TaskPeekRecord {
+  return {
+    id: row.id,
+    title: row.name,
+    project: { id: projectId, name: projectName },
+    ...(row.startIso ? { plannedStart: row.startIso } : {}),
+    ...(row.finishIso ? { plannedFinish: row.finishIso } : {}),
+    durationWorkingDays: row.durDays,
+    plannedWork: row.workH,
+    progress: row.pct
+  };
+}
+
 export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { live } = usePlanningRuntime();
   const sessionUser = useSessionUser();
@@ -361,9 +376,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }, [planningResources]);
   const [zoom, setZoom] = useState<Zoom>("week");
   const [sel, setSel] = useState<string | null>("t-3.2.1");
-  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  const [edit, setEdit] = useState<{ id: string; field: "name" | "dur" | "work" | "pct" | "units" } | null>(null);
+  const [edit, setEdit] = useState<{ id: string; field: EditField } | null>(null);
   const [draft, setDraft] = useState("");
   // Excel-подобная инлайн-строка создания внизу WBS: имя → Enter создаёт + очищает для следующей.
   const [newTask, setNewTask] = useState("");
@@ -425,6 +439,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const rowElementsRef = useRef<Map<string, HTMLTableRowElement>>(new Map()).current;
   const fillDragTargetRef = useRef<string | null>(null);
   const ganttRef = useRef<HTMLDivElement>(null);
+  const taskPeekTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
   // Актуальный read-model для window-обработчиков drag/resize (без устаревшего замыкания эффекта):
   // нужен, чтобы в момент отпускания резолвить текущее назначение задачи и синхронить его труд.
   const readModelRef = useRef(readModel);
@@ -897,6 +912,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       editableClickTimerRef.current = null;
     }, 180);
   };
+  const openTaskPeek = (id: string) => {
+    setSel(id);
+    taskPeekTriggerRefs.current.get(id)?.click();
+  };
 
   // --- команды ---
   // Текущее назначение задачи из read-model (по taskId): нужен его id, чтобы upsert
@@ -1157,9 +1176,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     if (f === "dur") { if (n > 0 && n !== r.durDays) editDuration(r, n); else if (n <= 0) setErrors((prev) => new Map(prev).set(r.id, ["Длительность задачи должна быть больше 0 (для вехи — пункт меню «Сделать вехой»)"])); }
     else if (f === "work" && n >= 0 && n !== r.workH) editWork(r, n);
     else if (f === "pct" && n !== r.pct) editPct(r, n);
-    else if (f === "units" && n > 0) editUnits(r, n);
   }
-  const beginEdit = (r: Row, field: "name" | "dur" | "work" | "pct" | "units", cur: string | number) => { setEdit({ id: r.id, field }); setDraft(String(cur)); };
+  const beginEdit = (r: Row, field: EditField, cur: string | number) => { setEdit({ id: r.id, field }); setDraft(String(cur)); };
 
   // Excel-навигация по редактируемым ячейкам существующих строк.
   // Поля строки: name всегда; dur/work/pct — только у task (summary/milestone их пропускают).
@@ -1523,7 +1541,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       canIndent={canIndent(r)}
                       canOutdent={canOutdent(r)}
                       canMakeMilestone={r.kind === "task"}
-                      onOpen={() => openRow(r.id)}
+                      onOpen={() => openTaskPeek(r.id)}
                       onEdit={() => openEdit(r)}
                       onAddSub={() => setInlineNew({ parentId: r.id, afterId: r.id, draft: "" })}
                       onAddBelow={() => setInlineNew({ parentId: r.parentId, afterId: r.id, draft: "" })}
@@ -1560,7 +1578,26 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                             {r.warning ? <span className="inline-flex shrink-0" title={r.warnMsg ?? "Предупреждение планировщика"}><TriangleAlert className="size-3 text-[var(--warning)]" aria-hidden /></span> : null}
                             {canManagePlan && edit?.id === r.id && edit.field === "name" ? (
                               <input autoFocus value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "name")} className="w-full rounded-[var(--radius-xs)] border border-[var(--accent)] bg-[var(--panel)] px-1 text-[length:var(--text-sm)] outline-none" />
-                            ) : <span className={cn("truncate", r.kind === "summary" ? "font-bold text-[var(--text-strong)]" : "font-medium text-[var(--text)]")}>{r.name}</span>}
+                            ) : (
+                              <>
+                                <span className={cn("min-w-0 flex-1 truncate", r.kind === "summary" ? "font-bold text-[var(--text-strong)]" : "font-medium text-[var(--text)]")}>{r.name}</span>
+                                <TaskPeek task={taskPeekRecordFromScheduleRow(r, projectId, projectMeta.name)}>
+                                  <button
+                                    ref={(node) => {
+                                      if (node) taskPeekTriggerRefs.current.set(r.id, node);
+                                      else taskPeekTriggerRefs.current.delete(r.id);
+                                    }}
+                                    type="button"
+                                    onClick={(e) => { stop(e); setSel(r.id); }}
+                                    className="grid size-4 shrink-0 place-items-center rounded-[var(--radius-xs)] text-[var(--muted)] outline-none transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1"
+                                    aria-label={`Открыть задачу «${r.name}»`}
+                                    title="Открыть задачу"
+                                  >
+                                    <ChevronRight className="size-3.5" aria-hidden />
+                                  </button>
+                                </TaskPeek>
+                              </>
+                            )}
                           </span>
                         </td>
                         <td className="num muted" onClick={canManagePlan ? (e) => selectEditableCell(e, r) : undefined} onDoubleClick={canManagePlan ? (e) => { if (r.kind === "task") { stop(e); cancelEditableClick(); beginEdit(r, "dur", r.durDays); } } : undefined}>
@@ -1669,7 +1706,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 const barRight = left + width;
                 const fillPct = dragging && drag.mode === "progress" ? drag.curPct : r.pct;
                 return (
-                  <div key={r.id} data-task-id={r.id} onClick={() => openRow(r.id)} className={cn("group relative h-[var(--row-h)] cursor-pointer border-b border-[var(--border-subtle)] last:border-0", errors.has(r.id) ? "bg-[var(--danger-soft)]" : sel === r.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--panel-subtle)]")} style={{ backgroundImage: sel === r.id || errors.has(r.id) ? undefined : `repeating-linear-gradient(to right, transparent, transparent ${weekW - 1}px, var(--border-subtle) ${weekW - 1}px, var(--border-subtle) ${weekW}px)` }}>
+                  <div key={r.id} data-task-id={r.id} onClick={() => setSel(r.id)} className={cn("group relative h-[var(--row-h)] cursor-pointer border-b border-[var(--border-subtle)] last:border-0", errors.has(r.id) ? "bg-[var(--danger-soft)]" : sel === r.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--panel-subtle)]")} style={{ backgroundImage: sel === r.id || errors.has(r.id) ? undefined : `repeating-linear-gradient(to right, transparent, transparent ${weekW - 1}px, var(--border-subtle) ${weekW - 1}px, var(--border-subtle) ${weekW}px)` }}>
                     {r.kind === "milestone" ? (
                       <>
                         {r.baseDay != null ? <span className="gantt-baseline-milestone absolute bottom-1 size-2.5 -translate-x-1/2 rotate-45 rounded-[2px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" style={{ left: toTimelineX(r.baseDay) }} title={readModel.baselineComparison?.label ?? "Базовый план"} /> : null}
@@ -1886,29 +1923,5 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       ) : null}
       </div>
     </DeliveryFrame>
-  );
-}
-
-function Fact({ label, value, mono, span }: { label: string; value: string; mono?: boolean; span?: boolean }) {
-  return (
-    <div className={cn(span && "col-span-2")}>
-      <dt className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">{label}</dt>
-      <dd className={cn("text-[var(--text)]", mono && "mono")}>{value}</dd>
-    </div>
-  );
-}
-
-function FactNum({ label, value, suffix, disabled, onCommit }: { label: string; value: number; suffix?: string; disabled?: boolean; onCommit: (n: number) => void }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(value));
-  return (
-    <div>
-      <dt className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">{label}</dt>
-      {editing && !disabled ? (
-        <input autoFocus type="number" value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => { setEditing(false); const n = Number(draft); if (!Number.isNaN(n) && n !== value) onCommit(n); }} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditing(false); }} className="w-16 rounded-[var(--radius-xs)] border border-[var(--accent)] bg-[var(--panel)] px-1 text-[length:var(--text-sm)] tabular-nums outline-none" />
-      ) : (
-        <dd className={cn("text-[var(--text)]", !disabled && "cursor-pointer rounded px-0.5 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]")} onClick={() => { if (!disabled) { setDraft(String(value)); setEditing(true); } }}>{value}{suffix}</dd>
-      )}
-    </div>
   );
 }

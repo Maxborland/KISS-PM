@@ -22,8 +22,8 @@ export async function loginToWorkspace(
   page: Page,
   input: { email?: string; password: string }
 ) {
-  await page.getByLabel("Email").fill(input.email ?? "admin@kiss-pm.local");
-  await page.getByLabel("Пароль", { exact: true }).fill(input.password);
+  await page.getByLabel("Email", { exact: true }).fill(input.email ?? "admin@kiss-pm.local");
+  await page.locator('input[name="password"]').fill(input.password);
   const loginResponse = page.waitForResponse((response) =>
     response.url().includes("/api/auth/login")
   );

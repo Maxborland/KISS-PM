@@ -50,7 +50,7 @@ test("task workspace supports kanban creation, detail activity, drag status and 
   await expect(page.getByText("Задача обновлена.")).toBeVisible();
   await expect(page.getByRole("heading", { name: editedTaskTitle })).toBeVisible();
   await page
-    .getByPlaceholder("Написать комментарий, @упомянуть участника или добавить файл...")
+    .getByLabel("Комментарий")
     .first()
     .fill(`Комментарий по задаче ${suffix}`);
   await page.getByRole("button", { name: "Отправить комментарий" }).first().click();

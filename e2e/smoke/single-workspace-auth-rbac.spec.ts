@@ -37,6 +37,7 @@ test("single-workspace auth and RBAC scaffold works from the browser", async ({ 
   await expect(page.getByRole("navigation").getByRole("link", { name: "Пользователи" })).toHaveAttribute("href", "/admin/users");
   await expect(page.getByRole("button", { name: "Создать пользователя" })).toBeVisible();
 
+
   expect(
     (
       await page.request.post("/api/tenant/current/access-profiles", {

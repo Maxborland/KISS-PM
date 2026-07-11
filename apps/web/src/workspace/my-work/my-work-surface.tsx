@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { GripVertical, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
@@ -16,6 +16,7 @@ import { cn } from "@/lib/cn";
 import { useSessionUser } from "@/shell/use-session-user";
 import { useMyWork, useProjects, useWorkspaceTaskStatuses, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
 import type { TaskPriority, TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
+import { TaskPeek, taskPeekRecordFromWorkspace } from "@/workspace/task-peek/task-peek";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
@@ -281,7 +282,15 @@ export function MyWorkSurface() {
                       return (
                         <tr key={t.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
                           <td className="px-3 py-2">
-                            <div className="font-medium text-[var(--text-strong)]">{t.title}</div>
+                            <TaskPeek task={taskPeekRecordFromWorkspace(t)}>
+                              <button
+                                type="button"
+                                aria-label={`Открыть задачу «${t.title}»`}
+                                className="cursor-pointer border-0 bg-transparent p-0 text-left font-medium text-[var(--text-strong)] outline-none focus-visible:rounded-[var(--radius-sm)] focus-visible:shadow-[var(--ring-focus)]"
+                              >
+                                {t.title}
+                              </button>
+                            </TaskPeek>
                             {prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{t.id}</div> : null}
                           </td>
                           <td className="px-3 py-2 text-[var(--muted-strong)]">{projectName(t.projectId)}</td>
@@ -394,20 +403,44 @@ function TaskCard({
   const due = dueLabel(task.plannedFinish);
   return (
     <article
-      draggable={!busy}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
       className={cn(
         "rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]",
-        busy ? "opacity-60" : "cursor-grab active:cursor-grabbing",
+        busy ? "opacity-60" : "",
         dragging && "opacity-50"
       )}
     >
       <div className="mb-1 flex items-center justify-between gap-2">
         <Chip variant={PRIORITY_CHIP[task.priority]}>{PRIORITY_LABEL[task.priority]}</Chip>
-        <BemAvatar initials={initials(userName(task.ownerUserId))} color={userColor(task.ownerUserId)} size="sm" title={userName(task.ownerUserId)} />
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            aria-label={`Переместить задачу ${task.title}`}
+            title="Переместить задачу"
+            disabled={busy}
+            draggable={!busy}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            className={cn(
+              "inline-flex size-6 items-center justify-center rounded-[var(--radius-sm)] border-0 bg-transparent p-0 text-[var(--muted-soft)] outline-none focus-visible:shadow-[var(--ring-focus)]",
+              busy ? "cursor-not-allowed opacity-60" : "cursor-grab active:cursor-grabbing"
+            )}
+          >
+            <GripVertical aria-hidden="true" className="size-3.5" />
+          </button>
+          <BemAvatar initials={initials(userName(task.ownerUserId))} color={userColor(task.ownerUserId)} size="sm" title={userName(task.ownerUserId)} />
+        </div>
       </div>
-      <h3 className="text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">{task.title}</h3>
+      <h3>
+        <TaskPeek task={taskPeekRecordFromWorkspace(task)}>
+          <button
+            type="button"
+            aria-label={`Открыть задачу «${task.title}»`}
+            className="cursor-pointer border-0 bg-transparent p-0 text-left text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)] outline-none focus-visible:rounded-[var(--radius-sm)] focus-visible:shadow-[var(--ring-focus)]"
+          >
+            {task.title}
+          </button>
+        </TaskPeek>
+      </h3>
       <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{projectName(task.projectId)}</p>
 
       {/* Прогресс задачи (progress 0…100). */}
