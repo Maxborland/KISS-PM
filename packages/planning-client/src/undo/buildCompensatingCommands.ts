@@ -115,6 +115,9 @@ export function buildCompensatingCommands(
         (assignment) => String((assignment as { id?: unknown }).id) === command.payload.id
       ) as Record<string, unknown> | undefined;
       if (existing) {
+        const allocations = before.authored.assignmentAllocations
+          .filter((allocation) => String(allocation.assignmentId) === command.payload.id)
+          .map(({ date, workMinutes }) => ({ date, workMinutes }));
         return [
           {
             type: "assignment.upsert",
@@ -126,7 +129,13 @@ export function buildCompensatingCommands(
               unitsPermille: Number(existing.unitsPermille ?? 1000),
               workMinutes: existing.workMinutes == null ? null : Number(existing.workMinutes)
             }
-          } as PlanningCommand
+          } as PlanningCommand,
+          ...(allocations.length > 0
+            ? [{
+                type: "assignment.allocations.replace" as const,
+                payload: { assignmentId: command.payload.id, allocations }
+              }]
+            : [])
         ];
       }
       return [{ type: "assignment.delete", payload: { assignmentId: command.payload.id } }];
@@ -136,6 +145,9 @@ export function buildCompensatingCommands(
         (assignment) => String((assignment as { id?: unknown }).id) === command.payload.assignmentId
       ) as Record<string, unknown> | undefined;
       if (!existing) return [];
+      const allocations = before.authored.assignmentAllocations
+        .filter((allocation) => String(allocation.assignmentId) === command.payload.assignmentId)
+        .map(({ date, workMinutes }) => ({ date, workMinutes }));
       return [
         {
           type: "assignment.upsert",
@@ -147,7 +159,13 @@ export function buildCompensatingCommands(
             unitsPermille: Number(existing.unitsPermille ?? 1000),
             workMinutes: existing.workMinutes == null ? null : Number(existing.workMinutes)
           }
-        } as PlanningCommand
+        } as PlanningCommand,
+        ...(allocations.length > 0
+          ? [{
+              type: "assignment.allocations.replace" as const,
+              payload: { assignmentId: command.payload.assignmentId, allocations }
+            }]
+          : [])
       ];
     }
     case "dependency.upsert": {
