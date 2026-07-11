@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-07-07T21:53:48+07:00",
+  "id": "RISK-AGENT-REAL-LLM-SSE-PARSER-TAIL",
+  "status": "fixed-by-current-branch",
+  "linkedRiskZones": [
+    "RISK-AGENT-REAL-LLM-SSE"
+  ],
+  "previousEvidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-llm-sse-configured-provider-2026-07-07.json",
+  "scope": "Atomic tail after configured-provider evidence: client SSE parser CRLF handling, incomplete stream error, and backend provider-blocked behavior with absent provider keys.",
+  "proof": {
+    "freshTests": [
+      "apps/web/src/workspace/agent/agent-stream.test.ts: CRLF SSE frames parse into reasoning/done events.",
+      "apps/web/src/workspace/agent/agent-stream.test.ts: stream closed without done rejects with stream_incomplete.",
+      "apps/api/src/agent/agentProviderDegraded.test.ts: absent provider keys keep /propose and /propose/stream blocked with 503 agent_provider_not_configured."
+    ],
+    "commands": [
+      "& .\\node_modules\\.bin\\vitest.cmd run apps/web/src/workspace/agent/agent-stream.test.ts apps/api/src/agent/agentProviderDegraded.test.ts -> 2 files passed; 5 tests passed",
+      "provider env probe -> OPENROUTER_API_KEY=ABSENT; ANTHROPIC_API_KEY=ABSENT"
+    ]
+  },
+  "providerStatus": {
+    "openRouterApiKey": "ABSENT",
+    "anthropicApiKey": "ABSENT",
+    "liveProviderSmoke": "blocked"
+  },
+  "remainingRisk": "Real network/provider quality and live browser SSE traversal are still unverified until a provider key is present. Do not mark live LLM pass from this slice."
+}

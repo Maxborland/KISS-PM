@@ -1,0 +1,23 @@
+{
+  "scenarioId": "PROJ-108",
+  "role": "PR",
+  "status": "pass",
+  "runId": "final29-commits-review-r1",
+  "generatedAt": "2026-07-11T05:35:22.814Z",
+  "assertions": [
+    "Used a newly activated real project without request interception",
+    "API readback proved the initial planVersion and no planning audit events",
+    "Feed and details rendered their distinct empty states",
+    "Both empty states survived a full reload"
+  ],
+  "details": {
+    "projectId": "project-commits-1783748120344-b50d0d",
+    "planVersion": 1,
+    "allProjectEvents": [],
+    "creation": null
+  },
+  "screenshots": [
+    "screenshots/proj-108-planReader-actual-empty-history-reload.png"
+  ],
+  "screenshotPathBase": "lane_root"
+}

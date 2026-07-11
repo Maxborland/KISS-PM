@@ -27,7 +27,7 @@ type ClientBodyReaderResult =
   | { ok: true; value: unknown }
   | { ok: false; status: 400 | 413 | 415; error: string };
 
-type ClientCommandErrorStatus = 400 | 403 | 404 | 413 | 415;
+type ClientCommandErrorStatus = 400 | 403 | 404 | 409 | 413 | 415;
 
 type ClientCommandResult =
   | { status: 200; body: { client: ClientRecord } }
@@ -63,25 +63,32 @@ export async function executeCreateClientCommand(input: {
   const parsed = parseClientBody(body.value, input.actor.tenantId);
   if (!parsed.ok) return { status: 400, body: { error: parsed.error } };
 
-  const client = await input.deps.runDataSourceTransaction(async (transactionDataSource) => {
-    if (!transactionDataSource.createClient) {
-      throw new Error("transactional_client_create_not_configured");
-    }
-    const created = await transactionDataSource.createClient(parsed.value);
-    await input.deps.appendManagementAuditEvent(
-      clientAuditInput({
-        actor: input.actor,
-        actionType: "client.created",
-        sourceEntity: { type: "Client", id: created.id },
-        commandInput: parsed.value,
-        beforeState: null,
-        afterState: created,
-        permissionResult: decision
-      }),
-      transactionDataSource
-    );
-    return created;
-  });
+  let client: ClientRecord;
+  try {
+    client = await input.deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.createClient) {
+        throw new Error("transactional_client_create_not_configured");
+      }
+      const created = await transactionDataSource.createClient(parsed.value);
+      await input.deps.appendManagementAuditEvent(
+        clientAuditInput({
+          actor: input.actor,
+          actionType: "client.created",
+          sourceEntity: { type: "Client", id: created.id },
+          commandInput: parsed.value,
+          beforeState: null,
+          afterState: created,
+          permissionResult: decision
+        }),
+        transactionDataSource
+      );
+      return created;
+    });
+  } catch (error) {
+    const conflict = clientUniqueConflict(error);
+    if (conflict) return { status: 409, body: { error: conflict } };
+    throw error;
+  }
 
   return { status: 201, body: { client } };
 }
@@ -124,25 +131,32 @@ export async function executeUpdateClientCommand(input: {
   const parsed = parseClientBody({ ...body.value, id: input.clientId }, input.actor.tenantId);
   if (!parsed.ok) return { status: 400, body: { error: parsed.error } };
 
-  const client = await input.deps.runDataSourceTransaction(async (transactionDataSource) => {
-    if (!transactionDataSource.updateClient) {
-      throw new Error("transactional_client_update_not_configured");
-    }
-    const updated = await transactionDataSource.updateClient(parsed.value);
-    await input.deps.appendManagementAuditEvent(
-      clientAuditInput({
-        actor: input.actor,
-        actionType: "client.updated",
-        sourceEntity: { type: "Client", id: updated.id },
-        commandInput: parsed.value,
-        beforeState,
-        afterState: updated,
-        permissionResult: decision
-      }),
-      transactionDataSource
-    );
-    return updated;
-  });
+  let client: ClientRecord;
+  try {
+    client = await input.deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.updateClient) {
+        throw new Error("transactional_client_update_not_configured");
+      }
+      const updated = await transactionDataSource.updateClient(parsed.value);
+      await input.deps.appendManagementAuditEvent(
+        clientAuditInput({
+          actor: input.actor,
+          actionType: "client.updated",
+          sourceEntity: { type: "Client", id: updated.id },
+          commandInput: parsed.value,
+          beforeState,
+          afterState: updated,
+          permissionResult: decision
+        }),
+        transactionDataSource
+      );
+      return updated;
+    });
+  } catch (error) {
+    const conflict = clientUniqueConflict(error);
+    if (conflict) return { status: 409, body: { error: conflict } };
+    throw error;
+  }
 
   return { status: 200, body: { client } };
 }
@@ -195,6 +209,25 @@ function clientAuditInput(input: {
   };
 }
 
+
+function clientUniqueConflict(error: unknown): "client_name_taken" | null {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 8; depth += 1) {
+    const rec = current as {
+      code?: unknown;
+      constraint?: unknown;
+      constraint_name?: unknown;
+      message?: unknown;
+      cause?: unknown;
+    };
+    if (rec.code === "23505") {
+      const marker = String(rec.constraint ?? rec.constraint_name ?? rec.message ?? "");
+      if (marker.includes("clients_tenant_id_name_uidx")) return "client_name_taken";
+    }
+    current = rec.cause;
+  }
+  return null;
+}
 function isObjectBody(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

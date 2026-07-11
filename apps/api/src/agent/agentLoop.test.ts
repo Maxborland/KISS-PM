@@ -67,6 +67,25 @@ describe("runAgentLoop", () => {
     expect(result.reasoning).toContain("Нет безопасных действий");
     expect(result.stopReason).toBe("completed");
   });
+  it("заменяет словесное подтверждение действий без tool_use на безопасный fallback", async () => {
+    const result = await runAgentLoop({
+      provider: createMockLlmProvider([
+        {
+          stopReason: "end_turn",
+          content: [{ type: "text", text: "Предлагаю создать две задачи. Подтвердите действие 1 и действие 2." }]
+        }
+      ]),
+      system: "test",
+      goal: "создай задачи",
+      tools: [changeStatus],
+      executeAnalyze: vi.fn()
+    });
+
+    expect(result.proposedActions).toHaveLength(0);
+    expect(result.reasoning).toContain("не сформировал применимых действий");
+    expect(result.reasoning).not.toContain("Подтвердите действие");
+  });
+
 
   it("останавливается по токен-бюджету (stopReason=token_budget)", async () => {
     // Каждый ответ зовёт analyze (цикл продолжается) + тратит 600 токенов; бюджет 1000 → стоп после 2-го.

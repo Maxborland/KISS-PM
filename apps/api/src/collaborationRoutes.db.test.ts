@@ -11,6 +11,7 @@ import {
 
 import { createApp } from "./app";
 import type { ApiTenantDataSource } from "./apiTypes";
+import { createVideoProvider } from "./videoProvider";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
@@ -188,6 +189,136 @@ describe("collaboration and communications API", () => {
       conversations: Array<{ readState: { unreadCount: number } }>;
     };
     expect(executorPayload.conversations[0]?.readState.unreadCount).toBe(1);
+  });
+
+  it("keeps notification read timestamps stable on repeated read requests", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+
+    const conversations = await app.request(
+      "/api/workspace/conversations?entityType=project&entityId=project-alpha",
+      { headers: { cookie: adminCookie } }
+    );
+    expect(conversations.status).toBe(200);
+    const conversationsPayload = await conversations.json() as {
+      conversations: Array<{ id: string }>;
+    };
+    const conversationId = conversationsPayload.conversations[0]?.id;
+    expect(conversationId).toBeTruthy();
+
+    const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({ body: "Егор, проверь повторное прочтение @user-alpha-executor" })
+    });
+    expect(message.status).toBe(201);
+
+    const unread = await app.request("/api/workspace/notifications?status=unread", {
+      headers: { cookie: executorCookie }
+    });
+    expect(unread.status).toBe(200);
+    const unreadPayload = await unread.json() as {
+      notifications: Array<{ id: string; readAt: string | null }>;
+    };
+    const notificationId = unreadPayload.notifications[0]?.id;
+    expect(notificationId).toBeTruthy();
+    expect(unreadPayload.notifications[0]?.readAt).toBeNull();
+
+    const firstRead = await app.request(`/api/workspace/notifications/${notificationId}/read`, {
+      method: "POST",
+      headers: jsonHeaders(executorCookie)
+    });
+    expect(firstRead.status).toBe(200);
+    const firstReadPayload = await firstRead.json() as { notification: { readAt: string | null } };
+    expect(firstReadPayload.notification.readAt).toBeTruthy();
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const secondRead = await app.request(`/api/workspace/notifications/${notificationId}/read`, {
+      method: "POST",
+      headers: jsonHeaders(executorCookie)
+    });
+    expect(secondRead.status).toBe(200);
+    const secondReadPayload = await secondRead.json() as { notification: { readAt: string | null } };
+    expect(secondReadPayload.notification.readAt).toBe(firstReadPayload.notification.readAt);
+
+    const summary = await app.request("/api/workspace/unread-summary", {
+      headers: { cookie: executorCookie }
+    });
+    expect(summary.status).toBe(200);
+    await expect(summary.json()).resolves.toMatchObject({ notifications: 0 });
+  });
+
+  it("keeps notification read timestamps stable on concurrent read requests", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+
+    const conversations = await app.request(
+      "/api/workspace/conversations?entityType=project&entityId=project-alpha",
+      { headers: { cookie: adminCookie } }
+    );
+    expect(conversations.status).toBe(200);
+    const conversationsPayload = await conversations.json() as {
+      conversations: Array<{ id: string }>;
+    };
+    const conversationId = conversationsPayload.conversations[0]?.id;
+    expect(conversationId).toBeTruthy();
+
+    const message = await app.request(`/api/workspace/conversations/${conversationId}/messages`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({ body: "Егор, проверь параллельное прочтение @user-alpha-executor" })
+    });
+    expect(message.status).toBe(201);
+
+    const unread = await app.request("/api/workspace/notifications?status=unread", {
+      headers: { cookie: executorCookie }
+    });
+    expect(unread.status).toBe(200);
+    const unreadPayload = await unread.json() as {
+      notifications: Array<{ id: string; readAt: string | null }>;
+    };
+    const notificationId = unreadPayload.notifications[0]?.id;
+    expect(notificationId).toBeTruthy();
+    expect(unreadPayload.notifications[0]?.readAt).toBeNull();
+
+    const [firstRead, secondRead] = await Promise.all([
+      app.request(`/api/workspace/notifications/${notificationId}/read`, {
+        method: "POST",
+        headers: jsonHeaders(executorCookie)
+      }),
+      app.request(`/api/workspace/notifications/${notificationId}/read`, {
+        method: "POST",
+        headers: jsonHeaders(executorCookie)
+      })
+    ]);
+    expect(firstRead.status).toBe(200);
+    expect(secondRead.status).toBe(200);
+    const firstReadPayload = await firstRead.json() as { notification: { readAt: string | null } };
+    const secondReadPayload = await secondRead.json() as {
+      notification: { readAt: string | null };
+    };
+    expect(firstReadPayload.notification.readAt).toBeTruthy();
+    expect(secondReadPayload.notification.readAt).toBe(firstReadPayload.notification.readAt);
+
+    const summary = await app.request("/api/workspace/unread-summary", {
+      headers: { cookie: executorCookie }
+    });
+    expect(summary.status).toBe(200);
+    await expect(summary.json()).resolves.toMatchObject({ notifications: 0 });
+
+    const readback = await app.request("/api/workspace/notifications?status=read", {
+      headers: { cookie: executorCookie }
+    });
+    expect(readback.status).toBe(200);
+    const readbackPayload = await readback.json() as {
+      notifications: Array<{ id: string; readAt: string | null }>;
+    };
+    const readNotifications = readbackPayload.notifications.filter(
+      (notification) => notification.id === notificationId
+    );
+    expect(readNotifications).toHaveLength(1);
+    expect(readNotifications[0]?.readAt).toBe(firstReadPayload.notification.readAt);
   });
 
   it("supports workspace channel conversations, mentions, reactions and sticker import", async () => {
@@ -596,6 +727,130 @@ describe("collaboration and communications API", () => {
     });
   });
 
+  it("keeps communication channel rename retry idempotent without duplicate audit", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const idempotentChannel = await app.request("/api/workspace/communication-channels", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        channelType: "custom",
+        title: "Канал для retry"
+      })
+    });
+    expect(idempotentChannel.status).toBe(201);
+    const idempotentChannelPayload = await idempotentChannel.json() as {
+      channel: { id: string; updatedAt: string };
+    };
+    const retryPatchBody = {
+      title: "Канал после retry",
+      description: "Повтор не должен двигать версию",
+      clientUpdatedAt: idempotentChannelPayload.channel.updatedAt
+    };
+    const firstRetryPatch = await app.request(
+      `/api/workspace/communication-channels/${idempotentChannelPayload.channel.id}`,
+      {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(retryPatchBody)
+      }
+    );
+    expect(firstRetryPatch.status).toBe(200);
+    const firstRetryPatchPayload = await firstRetryPatch.json() as {
+      channel: { title: string; description: string; updatedAt: string };
+    };
+    const secondRetryPatch = await app.request(
+      `/api/workspace/communication-channels/${idempotentChannelPayload.channel.id}`,
+      {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(retryPatchBody)
+      }
+    );
+    expect(secondRetryPatch.status).toBe(200);
+    const secondRetryPatchPayload = await secondRetryPatch.json() as {
+      channel: { title: string; description: string; updatedAt: string };
+    };
+    expect(secondRetryPatchPayload.channel).toMatchObject({
+      title: firstRetryPatchPayload.channel.title,
+      description: firstRetryPatchPayload.channel.description
+    });
+    expect(secondRetryPatchPayload.channel.updatedAt).toBe(firstRetryPatchPayload.channel.updatedAt);
+    const retryAuditRows = await client`
+      SELECT count(*)::int AS count
+      FROM audit_events
+      WHERE tenant_id = 'tenant-alpha'
+        AND action_type = 'communications.channel_updated'
+        AND source_entity ->> 'id' = ${idempotentChannelPayload.channel.id}`;
+    expect(Number(retryAuditRows[0]?.count ?? 0)).toBe(1);
+  });
+
+  it("rejects divergent concurrent communication channel rename from the same version", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const conflictChannel = await app.request("/api/workspace/communication-channels", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        channelType: "custom",
+        title: "Канал для конфликта"
+      })
+    });
+    expect(conflictChannel.status).toBe(201);
+    const conflictChannelPayload = await conflictChannel.json() as {
+      channel: { id: string; updatedAt: string };
+    };
+    const baseClientUpdatedAt = conflictChannelPayload.channel.updatedAt;
+    const [firstConflictPatch, secondConflictPatch] = await Promise.all([
+      app.request(`/api/workspace/communication-channels/${conflictChannelPayload.channel.id}`, {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({
+          title: "Победитель A",
+          description: "Версия A",
+          clientUpdatedAt: baseClientUpdatedAt
+        })
+      }),
+      app.request(`/api/workspace/communication-channels/${conflictChannelPayload.channel.id}`, {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({
+          title: "Победитель B",
+          description: "Версия B",
+          clientUpdatedAt: baseClientUpdatedAt
+        })
+      })
+    ]);
+    const conflictResponses = [firstConflictPatch, secondConflictPatch];
+    expect(conflictResponses.map((response) => response.status).sort()).toEqual([200, 409]);
+    const winnerResponse = conflictResponses.find((response) => response.status === 200);
+    const conflictResponse = conflictResponses.find((response) => response.status === 409);
+    expect(winnerResponse).toBeTruthy();
+    expect(conflictResponse).toBeTruthy();
+    await expect(conflictResponse?.json()).resolves.toEqual({
+      error: "communication_channel_version_conflict"
+    });
+    const winnerPayload = await winnerResponse!.json() as {
+      channel: { title: string; description: string };
+    };
+    const finalConflictRead = await app.request(
+      `/api/workspace/communication-channels/${conflictChannelPayload.channel.id}`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(finalConflictRead.status).toBe(200);
+    await expect(finalConflictRead.json()).resolves.toMatchObject({
+      channel: {
+        title: winnerPayload.channel.title,
+        description: winnerPayload.channel.description
+      }
+    });
+    const conflictAuditRows = await client`
+      SELECT count(*)::int AS count
+      FROM audit_events
+      WHERE tenant_id = 'tenant-alpha'
+        AND action_type = 'communications.channel_updated'
+        AND source_entity ->> 'id' = ${conflictChannelPayload.channel.id}`;
+    expect(Number(conflictAuditRows[0]?.count ?? 0)).toBe(1);
+  });
+
   it("rolls back channel member mutations when management audit fails", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const channelResponse = await app.request("/api/workspace/communication-channels", {
@@ -645,6 +900,59 @@ describe("collaboration and communications API", () => {
       member.userId === "user-alpha-executor" && !member.archivedAt
     )).toBe(false);
   });
+
+  it("keeps concurrent channel member adds idempotent at the active membership row", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const channelResponse = await app.request("/api/workspace/communication-channels", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        channelType: "custom",
+        title: "Concurrent member room"
+      })
+    });
+    expect(channelResponse.status).toBe(201);
+    const channelPayload = await channelResponse.json() as { channel: { id: string } };
+
+    const memberBody = JSON.stringify({ userId: "user-alpha-executor", role: "member" });
+    const [firstAdd, secondAdd] = await Promise.all([
+      app.request(`/api/workspace/communication-channels/${channelPayload.channel.id}/members`, {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: memberBody
+      }),
+      app.request(`/api/workspace/communication-channels/${channelPayload.channel.id}/members`, {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: memberBody
+      })
+    ]);
+    expect([firstAdd.status, secondAdd.status]).toEqual([201, 201]);
+
+    const readback = await app.request(
+      `/api/workspace/communication-channels/${channelPayload.channel.id}`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(readback.status).toBe(200);
+    const readbackPayload = await readback.json() as {
+      members: Array<{ userId: string; role: string; archivedAt: string | null }>;
+    };
+    const executorMembers = readbackPayload.members.filter(
+      (member) => member.userId === "user-alpha-executor"
+    );
+    expect(executorMembers).toHaveLength(1);
+    expect(executorMembers[0]).toMatchObject({ role: "member", archivedAt: null });
+
+    const memberRows = await client`
+      SELECT count(*)::int AS count
+      FROM communication_channel_members
+      WHERE tenant_id = 'tenant-alpha'
+        AND channel_id = ${channelPayload.channel.id}
+        AND user_id = 'user-alpha-executor'
+        AND archived_at IS NULL`;
+    expect(Number(memberRows[0]?.count ?? 0)).toBe(1);
+  });
+
   it("lists the latest conversation messages and pages older history by cursor", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const conversations = await app.request(
@@ -728,6 +1036,72 @@ describe("collaboration and communications API", () => {
     });
     expect(unsafeLink.status).toBe(400);
     await expect(unsafeLink.json()).resolves.toEqual({ error: "external_url_private_host" });
+  });
+
+  it("fails closed for media join tokens when the video provider is disabled", async () => {
+    const disabledVideoApp = createApp({
+      dataSource: createPostgresTenantDataSource(createDatabase(client)),
+      videoProvider: createVideoProvider({ kind: "disabled" })
+    });
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+
+    const roomResponse = await disabledVideoApp.request("/api/workspace/call-rooms", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        entityType: "project",
+        entityId: "project-alpha",
+        title: "Звонок без провайдера",
+        mediaKind: "video",
+        provider: "livekit",
+        providerRoomId: "disabled-provider-room"
+      })
+    });
+    expect(roomResponse.status).toBe(201);
+    const roomPayload = await roomResponse.json() as {
+      callRoom: { roomId: string; provider: string };
+    };
+    expect(roomPayload.callRoom.provider).toBe("livekit");
+
+    const startResponse = await disabledVideoApp.request(
+      `/api/workspace/call-rooms/${roomPayload.callRoom.roomId}/sessions/start`,
+      { method: "POST", headers: jsonHeaders(adminCookie) }
+    );
+    expect(startResponse.status).toBe(201);
+    const startPayload = await startResponse.json() as { session: { id: string } };
+
+    const joinResponse = await disabledVideoApp.request(
+      `/api/workspace/call-rooms/${roomPayload.callRoom.roomId}/sessions/${startPayload.session.id}/join-token`,
+      { method: "POST", headers: jsonHeaders(executorCookie) }
+    );
+    expect(joinResponse.status).toBe(501);
+    await expect(joinResponse.json()).resolves.toEqual({ error: "video_provider_disabled" });
+
+    const eventsResponse = await disabledVideoApp.request(
+      `/api/workspace/call-rooms/${roomPayload.callRoom.roomId}/events`,
+      { headers: { cookie: adminCookie } }
+    );
+    expect(eventsResponse.status).toBe(200);
+    const eventsPayload = await eventsResponse.json() as {
+      events: Array<{ eventType: string }>;
+    };
+    expect(eventsPayload.events).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ eventType: "join_token_issued" })])
+    );
+
+    const auditResponse = await disabledVideoApp.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    expect(auditResponse.status).toBe(200);
+    const auditPayload = await auditResponse.json() as {
+      auditEvents: Array<{ actionType: string }>;
+    };
+    expect(auditPayload.auditEvents).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ actionType: "communications.call_join_token_issued" })
+      ])
+    );
   });
 
   it("supports task and opportunity scoped discussions", async () => {
@@ -846,6 +1220,271 @@ describe("collaboration and communications API", () => {
     );
   });
 
+  it("treats duplicate meeting action item status updates as idempotent", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const meeting = await createMeeting(adminCookie);
+
+    const actionItem = await app.request(`/api/workspace/meetings/${meeting.meeting.id}/action-items`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        title: "Закрыть риск по повторному клику",
+        ownerUserId: "user-alpha-executor",
+        targetEntityType: "project",
+        targetEntityId: "project-alpha"
+      })
+    });
+    expect(actionItem.status).toBe(201);
+    const actionItemPayload = await actionItem.json() as {
+      actionItem: { id: string; status: string };
+    };
+
+    const firstUpdate = await app.request(
+      `/api/workspace/meetings/${meeting.meeting.id}/action-items/${actionItemPayload.actionItem.id}`,
+      {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ status: "done" })
+      }
+    );
+    expect(firstUpdate.status).toBe(200);
+    await expect(firstUpdate.json()).resolves.toMatchObject({
+      actionItem: { id: actionItemPayload.actionItem.id, status: "done" }
+    });
+
+    const duplicateUpdate = await app.request(
+      `/api/workspace/meetings/${meeting.meeting.id}/action-items/${actionItemPayload.actionItem.id}`,
+      {
+        method: "PATCH",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify({ status: "done" })
+      }
+    );
+    expect(duplicateUpdate.status).toBe(200);
+    await expect(duplicateUpdate.json()).resolves.toMatchObject({
+      actionItem: { id: actionItemPayload.actionItem.id, status: "done" }
+    });
+
+    const detail = await app.request(`/api/workspace/meetings/${meeting.meeting.id}`, {
+      headers: { cookie: adminCookie }
+    });
+    expect(detail.status).toBe(200);
+    const detailPayload = await detail.json() as {
+      actionItems: Array<{ id: string; status: string }>;
+    };
+    expect(
+      detailPayload.actionItems.filter((item) => item.id === actionItemPayload.actionItem.id)
+    ).toEqual([expect.objectContaining({ status: "done" })]);
+
+    const audit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    const auditPayload = await audit.json() as { auditEvents: Array<{ actionType: string }> };
+    expect(
+      auditPayload.auditEvents.filter(
+        (event) => event.actionType === "collaboration.meeting_action_item_updated"
+      )
+    ).toHaveLength(1);
+
+    const concurrentActionItem = await app.request(`/api/workspace/meetings/${meeting.meeting.id}/action-items`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        title: "Закрыть риск по гонке статуса",
+        ownerUserId: "user-alpha-executor",
+        targetEntityType: "project",
+        targetEntityId: "project-alpha"
+      })
+    });
+    expect(concurrentActionItem.status).toBe(201);
+    const concurrentActionItemPayload = await concurrentActionItem.json() as {
+      actionItem: { id: string; status: string };
+    };
+
+    const concurrentResponses = await Promise.all([
+      app.request(
+        `/api/workspace/meetings/${meeting.meeting.id}/action-items/${concurrentActionItemPayload.actionItem.id}`,
+        {
+          method: "PATCH",
+          headers: jsonHeaders(adminCookie),
+          body: JSON.stringify({ status: "done" })
+        }
+      ),
+      app.request(
+        `/api/workspace/meetings/${meeting.meeting.id}/action-items/${concurrentActionItemPayload.actionItem.id}`,
+        {
+          method: "PATCH",
+          headers: jsonHeaders(adminCookie),
+          body: JSON.stringify({ status: "done" })
+        }
+      )
+    ]);
+    expect(concurrentResponses.map((response) => response.status).sort()).toEqual([200, 200]);
+    const concurrentBodies = await Promise.all(concurrentResponses.map((response) => response.json())) as Array<{
+      actionItem: { id: string; status: string };
+    }>;
+    expect(concurrentBodies).toEqual([
+      expect.objectContaining({ actionItem: expect.objectContaining({ status: "done" }) }),
+      expect.objectContaining({ actionItem: expect.objectContaining({ status: "done" }) })
+    ]);
+
+    const concurrentDetail = await app.request(`/api/workspace/meetings/${meeting.meeting.id}`, {
+      headers: { cookie: adminCookie }
+    });
+    expect(concurrentDetail.status).toBe(200);
+    const concurrentDetailPayload = await concurrentDetail.json() as {
+      actionItems: Array<{ id: string; status: string }>;
+    };
+    expect(
+      concurrentDetailPayload.actionItems.filter(
+        (item) => item.id === concurrentActionItemPayload.actionItem.id
+      )
+    ).toEqual([expect.objectContaining({ status: "done" })]);
+
+    const concurrentAudit = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    const concurrentAuditPayload = await concurrentAudit.json() as {
+      auditEvents: Array<{ actionType: string }>;
+    };
+    expect(
+      concurrentAuditPayload.auditEvents.filter(
+        (event) => event.actionType === "collaboration.meeting_action_item_updated"
+      )
+    ).toHaveLength(2);
+  });
+
+  it("keeps duplicate meeting create, external link and note requests idempotent", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+    const meetingBody = {
+      entityType: "project",
+      entityId: "project-alpha",
+      title: "Планерка без дублей",
+      agenda: "Проверяем повторный submit",
+      scheduledStart: "2026-06-02T10:00:00.000Z",
+      scheduledFinish: "2026-06-02T10:30:00.000Z",
+      participants: [{ userId: "user-alpha-executor", role: "required" }],
+      clientRequestId: "meeting-create-double-submit"
+    };
+
+    const [firstMeeting, duplicateMeeting] = await Promise.all([
+      app.request("/api/workspace/meetings", {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(meetingBody)
+      }),
+      app.request("/api/workspace/meetings", {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(meetingBody)
+      })
+    ]);
+    expect(firstMeeting.status).toBe(201);
+    expect(duplicateMeeting.status).toBe(201);
+    const firstMeetingPayload = await firstMeeting.json() as { meeting: { id: string } };
+    const duplicateMeetingPayload = await duplicateMeeting.json() as { meeting: { id: string } };
+    expect(duplicateMeetingPayload.meeting.id).toBe(firstMeetingPayload.meeting.id);
+
+    const changedMeetingTime = await app.request("/api/workspace/meetings", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        ...meetingBody,
+        scheduledStart: "2026-06-02T11:00:00.000Z",
+        scheduledFinish: "2026-06-02T11:30:00.000Z"
+      })
+    });
+    expect(changedMeetingTime.status).toBe(409);
+    await expect(changedMeetingTime.json()).resolves.toEqual({
+      error: "idempotency_key_conflict"
+    });
+
+    const linkBody = {
+      provider: "google_meet",
+      title: "Без дублей",
+      url: "https://meet.google.com/no-duplicate-submit",
+      clientRequestId: "meeting-link-double-submit"
+    };
+    const [firstLink, duplicateLink] = await Promise.all([
+      app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}/external-links`, {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(linkBody)
+      }),
+      app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}/external-links`, {
+        method: "POST",
+        headers: jsonHeaders(adminCookie),
+        body: JSON.stringify(linkBody)
+      })
+    ]);
+    expect(firstLink.status).toBe(201);
+    expect(duplicateLink.status).toBe(201);
+    const firstLinkPayload = await firstLink.json() as { externalLink: { id: string } };
+    const duplicateLinkPayload = await duplicateLink.json() as { externalLink: { id: string } };
+    expect(duplicateLinkPayload.externalLink.id).toBe(firstLinkPayload.externalLink.id);
+
+    const noteBody = {
+      body: "Одна заметка при двойном клике.",
+      clientRequestId: "meeting-note-double-submit"
+    };
+    const [firstNote, duplicateNote] = await Promise.all([
+      app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}/notes`, {
+        method: "POST",
+        headers: jsonHeaders(executorCookie),
+        body: JSON.stringify(noteBody)
+      }),
+      app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}/notes`, {
+        method: "POST",
+        headers: jsonHeaders(executorCookie),
+        body: JSON.stringify(noteBody)
+      })
+    ]);
+    expect(firstNote.status).toBe(201);
+    expect(duplicateNote.status).toBe(201);
+    const firstNotePayload = await firstNote.json() as { note: { id: string } };
+    const duplicateNotePayload = await duplicateNote.json() as { note: { id: string } };
+    expect(duplicateNotePayload.note.id).toBe(firstNotePayload.note.id);
+
+    const secondIntent = await app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}/notes`, {
+      method: "POST",
+      headers: jsonHeaders(executorCookie),
+      body: JSON.stringify({
+        ...noteBody,
+        clientRequestId: "meeting-note-second-intent"
+      })
+    });
+    expect(secondIntent.status).toBe(201);
+    const secondIntentPayload = await secondIntent.json() as { note: { id: string } };
+    expect(secondIntentPayload.note.id).not.toBe(firstNotePayload.note.id);
+
+    const detail = await app.request(`/api/workspace/meetings/${firstMeetingPayload.meeting.id}`, {
+      headers: { cookie: adminCookie }
+    });
+    expect(detail.status).toBe(200);
+    const detailPayload = await detail.json() as {
+      externalLinks: Array<{ id: string; title: string }>;
+      notes: Array<{ id: string; body: string }>;
+    };
+    expect(detailPayload.externalLinks.filter((link) => link.title === "Без дублей")).toHaveLength(1);
+    expect(detailPayload.notes.filter((note) => note.body === noteBody.body)).toHaveLength(2);
+
+    const auditRows = await client`
+      SELECT action_type, count(*)::int AS count
+      FROM audit_events
+      WHERE tenant_id = 'tenant-alpha'
+        AND action_type IN (
+          'collaboration.meeting_created',
+          'collaboration.external_meeting_link_added',
+          'collaboration.meeting_note_created'
+        )
+      GROUP BY action_type
+    `;
+    const counts = new Map(auditRows.map((row) => [String(row.action_type), Number(row.count)]));
+    expect(counts.get("collaboration.meeting_created")).toBe(1);
+    expect(counts.get("collaboration.external_meeting_link_added")).toBe(1);
+    expect(counts.get("collaboration.meeting_note_created")).toBe(2);
+  });
   it("requires explicit action item target for non-actionable meeting scopes", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const meeting = await app.request("/api/workspace/meetings", {
@@ -933,6 +1572,65 @@ describe("collaboration and communications API", () => {
         expect.objectContaining({ channel: "in_app", notificationType: "mention" })
       ]
     });
+  });
+
+  it("keeps concurrent notification preference writes unique with readback", async () => {
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+    const preferenceBody = JSON.stringify({
+      preferences: [
+        {
+          channel: "digest",
+          notificationType: "mention",
+          enabled: true,
+          digestFrequency: "weekly"
+        }
+      ]
+    });
+
+    const [firstWrite, secondWrite] = await Promise.all([
+      app.request("/api/workspace/notification-preferences", {
+        method: "PUT",
+        headers: jsonHeaders(executorCookie),
+        body: preferenceBody
+      }),
+      app.request("/api/workspace/notification-preferences", {
+        method: "PUT",
+        headers: jsonHeaders(executorCookie),
+        body: preferenceBody
+      })
+    ]);
+    expect([firstWrite.status, secondWrite.status]).toEqual([200, 200]);
+
+    const list = await app.request("/api/workspace/notification-preferences", {
+      headers: { cookie: executorCookie }
+    });
+    expect(list.status).toBe(200);
+    const listPayload = await list.json() as {
+      preferences: Array<{
+        channel: string;
+        notificationType: string;
+        enabled: boolean;
+        digestFrequency: string;
+      }>;
+    };
+    const mentionDigestPreferences = listPayload.preferences.filter(
+      (preference) =>
+        preference.channel === "digest" && preference.notificationType === "mention"
+    );
+    expect(mentionDigestPreferences).toHaveLength(1);
+    expect(mentionDigestPreferences[0]).toMatchObject({
+      enabled: true,
+      digestFrequency: "weekly"
+    });
+
+    const preferenceRows = await client`
+      SELECT count(*)::int AS count
+      FROM notification_preferences
+      WHERE tenant_id = 'tenant-alpha'
+        AND user_id = 'user-alpha-executor'
+        AND channel = 'digest'
+        AND notification_type = 'mention'`;
+    expect(Number(preferenceRows[0]?.count ?? 0)).toBe(1);
   });
 
   it("rolls back message edits when success audit cannot be written", async () => {

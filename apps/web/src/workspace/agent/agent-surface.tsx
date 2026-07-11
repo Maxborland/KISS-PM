@@ -44,6 +44,15 @@ const KIND_BY_TOOL: Record<string, DemoChange["kind"]> = {
   apply_plan_commands: "date"
 };
 
+const PRODUCT_NAV_ITEMS = [
+  { label: "Агент", href: "/agent" },
+  { label: "Проекты", href: "/projects" },
+  { label: "Мои задачи", href: "/my-work" },
+  { label: "Дашборд", href: "/dashboard" },
+  { label: "Коммуникации", href: "/communications/chat" },
+  { label: "Администрирование", href: "/admin" }
+];
+
 function actionToChange(action: ProposedAction, index: number): DemoChange {
   const allowed = action.capability.allowed;
   const kind = KIND_BY_TOOL[action.tool] ?? "text";
@@ -78,7 +87,8 @@ function actionToChange(action: ProposedAction, index: number): DemoChange {
   };
 }
 
-const clock = (offsetMs: number): string => new Date(offsetMs).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+const formatMessageTime = (date = new Date()): string =>
+  date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 
 // Русская плюрализация: 1 изменение / 2 изменения / 5 изменений (G7-17).
 function pluralRu(n: number, one: string, few: string, many: string): string {
@@ -115,10 +125,9 @@ export function AgentSurface() {
   const [navExpanded, setNavExpanded] = useState(false);
   const [mobileLeft, setMobileLeft] = useState(false);
   const [mobileReview, setMobileReview] = useState(false);
-  const [seq, setSeq] = useState(0);
 
   const reviewVisible = changes.length > 0 && phase !== "draft" && phase !== "thinking";
-  const now = () => { const t = 10 * 3600_000 + 41 * 60_000 + seq * 60_000; setSeq((s) => s + 1); return clock(t); };
+  const now = () => formatMessageTime();
 
   const addMessage = (author: "user" | "henry", text: string) =>
     setMessages((m) => [...m, { id: `${author}-${m.length}`, author, time: now(), text }]);
@@ -154,6 +163,10 @@ export function AgentSurface() {
   async function sendMessage() {
     const goal = inputValue.trim();
     if (goal.length === 0) return;
+    if (provider?.configured === false) {
+      addMessage("henry", `LLM-провайдер не настроен (провайдер ${provider.model}) — задайте OPENROUTER_API_KEY или ANTHROPIC_API_KEY на сервере.`);
+      return;
+    }
     // Историю собираем ДО добавления текущей реплики (память чата: прошлые ходы → контекст агента).
     const history = messages.map((message) => ({ role: message.author === "user" ? ("user" as const) : ("assistant" as const), text: message.text }));
     addMessage("user", goal);
@@ -214,7 +227,6 @@ export function AgentSurface() {
     setActiveChangeId("");
     setEditingChangeId(undefined);
     setPhase("draft");
-    setSeq(0);
   }
 
   return (
@@ -234,9 +246,15 @@ export function AgentSurface() {
         </div>
       ) : null}
       <div className={cn("lad-layout", navExpanded && "lad-layout--nav-expanded", reviewVisible && "lad-layout--review-open")}>
-        <CollapsedAppNav expanded={navExpanded} mobileOpen={mobileLeft} onToggle={() => setNavExpanded((v) => !v)} />
+        <CollapsedAppNav
+          expanded={navExpanded}
+          mobileOpen={mobileLeft}
+          onToggle={() => setNavExpanded((v) => !v)}
+          items={PRODUCT_NAV_ITEMS}
+          activeHref="/agent"
+        />
         <MobileDrawerBackdrop visible={mobileLeft || mobileReview} onClick={() => { setMobileLeft(false); setMobileReview(false); }} />
-        <AgentConversationList />
+        <AgentConversationList items={[]} />
         <AgentChatPanel
           messages={messages}
           inputValue={inputValue}

@@ -1,0 +1,33 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-PLANNING-BATCH-CONCURRENT-IDEMPOTENCY",
+  "generatedAt": "2026-07-08T00:00:00Z",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "status": "pass",
+  "scope": "Planning apply-command-batch concurrent duplicate idempotency.",
+  "surfaces": [
+    "POST /api/workspace/projects/:projectId/planning/apply-command-batch",
+    "GET /api/workspace/projects/:projectId/planning/read-model"
+  ],
+  "expected": "Two concurrent identical apply-command-batch requests with the same idempotency key and client plan version should return the same successful response, apply the batch once, bump planVersion once, and read back both task updates after refresh.",
+  "actual": "Pass: concurrent duplicate apply-command-batch calls returned 200/200 with equal bodies, newPlanVersion was exactly initial planVersion + 1, and read-model readback after both requests contained both renamed tasks with only one planVersion bump.",
+  "verification": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"deduplicates concurrent apply-command-batch\"",
+      "observed": "1 selected test passed, 23 skipped",
+      "notes": "Vitest emitted the existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts, unrelated to this slice. The local dev database was reseeded after the DB test because the DB test harness truncates test data.",
+      "result": "pass"
+    },
+    {
+      "command": "DATABASE_URL=<local-dev-db> node_modules\\.bin\\tsx.cmd scripts\\seed-dev.ts",
+      "observed": "Seeded dev tenants, users, org structure, CRM, projects and communications data",
+      "notes": "Restored local browser/dev seed state after the targeted DB test.",
+      "result": "pass"
+    }
+  ],
+  "changedFiles": [
+    "apps/api/src/planningRoutes.db.test.ts",
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-batch-concurrent-idempotency-2026-07-08.json",
+    "docs/qa/full-eval/reconciliation-matrix-2026-07-07.json"
+  ],
+  "coverageImpact": "Adds fresh DB/API evidence for planning apply-command-batch concurrent duplicate submission with an idempotency key. Broader RISK-WRITE-FLOW-RACE-IDEMPOTENCY remains open for other write surfaces."
+}

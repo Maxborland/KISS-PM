@@ -12,9 +12,17 @@ export type ScenarioTarget = {
   taskIds: string[];
 };
 
+export type ScenarioUnavailableReason =
+  | "target_bucket_not_found"
+  | "target_assignment_not_found"
+  | "no_eligible_alternate_resource"
+  | "alternate_resource_has_insufficient_capacity";
+
 export type ScenarioProposal = {
   id: string;
   profile: ScenarioProfile;
+  availability: "available" | "unavailable";
+  unavailableReason: ScenarioUnavailableReason | null;
   conflictEffect: "accepted" | "reduced" | "removed";
   planDelta: PlanDelta;
   explainability: {
@@ -51,7 +59,7 @@ export function proposePlanningScenarios(input: {
     ]),
     createReassignmentProposal("balanced", "reduced", input),
     createReassignmentProposal("resilient", "removed", input)
-  ].filter(isScenarioProposal);
+  ];
 }
 
 export function applyPlanDeltaToSnapshot(
@@ -73,80 +81,175 @@ function createReassignmentProposal(
     resourceLoad: ResourceLoadMatrix;
     target: ScenarioTarget;
   }
-): ScenarioProposal | null {
+): ScenarioProposal {
   const targetBucket = findTargetBucket(input.resourceLoad, input.target);
-  if (!targetBucket) return null;
-  const taskId = targetBucket.taskIds[0] ?? input.target.taskIds[0];
-  if (!taskId) return null;
-  const targetAssignment = input.snapshot.assignments.find(
-    (assignment) =>
-      assignment.taskId === taskId &&
-      assignment.resourceId === input.target.resourceId &&
-      (assignment.role === "executor" || assignment.role === "co_executor")
+  if (!targetBucket) return createUnavailableProposal(profile, effect, input, "target_bucket_not_found");
+  const targetTaskIds = new Set(
+    targetBucket.taskIds.length > 0 ? targetBucket.taskIds : input.target.taskIds
   );
-  if (!targetAssignment) return null;
-  // BUG-PROJ-25: кандидат переназначения должен быть ТОЙ ЖЕ позиции (может выполнять
-  // работу), иначе сценарий предлагал случайного постороннего. Среди подходящих
-  // предпочитаем наименее загруженного в день перегруза; нет кандидата → профиль без решения.
-  const targetResource = input.snapshot.resources.find((resource) => resource.id === input.target.resourceId);
-  const eligible = input.snapshot.resources.filter(
-    (resource) =>
-      resource.id !== input.target.resourceId &&
-      (targetResource?.positionId ? resource.positionId === targetResource.positionId : true)
+  const targetAssignments = input.snapshot.assignments
+    .filter(
+      (assignment) =>
+        targetTaskIds.has(assignment.taskId) &&
+        assignment.resourceId === input.target.resourceId &&
+        (assignment.role === "executor" || assignment.role === "co_executor")
+    )
+    .sort(
+      (left, right) =>
+        left.taskId.localeCompare(right.taskId) || left.id.localeCompare(right.id)
+    );
+  if (targetAssignments.length === 0) {
+    return createUnavailableProposal(profile, effect, input, "target_assignment_not_found");
+  }
+  const targetResource = input.snapshot.resources.find(
+    (resource) => resource.id === input.target.resourceId
   );
-  const alternateResource = eligible[0];
-  if (!alternateResource) return null;
+  const eligible = input.snapshot.resources
+    .filter(
+      (resource) =>
+        resource.id !== input.target.resourceId &&
+        (targetResource?.positionId ? resource.positionId === targetResource.positionId : true)
+    )
+    .map((resource) => ({
+      resource,
+      spareMinutes: resourceSpareMinutes(input.resourceLoad, resource.id, input.target.date)
+    }))
+    .sort(
+      (left, right) =>
+        right.spareMinutes - left.spareMinutes ||
+        left.resource.id.localeCompare(right.resource.id)
+    );
+  if (eligible.length === 0) {
+    return createUnavailableProposal(profile, effect, input, "no_eligible_alternate_resource");
+  }
 
-  const originalWork = targetAssignment.workMinutes ?? targetBucket.assignedMinutes;
-  const desiredTargetWork = effect === "removed"
-    ? Math.max(0, targetBucket.capacityMinutes - targetBucket.reservedMinutes)
-    : Math.max(
-        0,
-        originalWork - Math.max(1, Math.floor(input.target.overloadMinutes / 2))
+  const totalSourceWork = targetAssignments.reduce(
+    (total, assignment) =>
+      total +
+      (assignment.workMinutes ??
+        (targetAssignments.length === 1 ? targetBucket.assignedMinutes : 0)),
+    0
+  );
+  const requestedMove =
+    effect === "removed"
+      ? input.target.overloadMinutes
+      : Math.max(1, Math.floor(input.target.overloadMinutes / 2));
+  const movedWork = Math.min(totalSourceWork, requestedMove);
+  if (movedWork <= 0) {
+    return createUnavailableProposal(
+      profile,
+      effect,
+      input,
+      "alternate_resource_has_insufficient_capacity"
+    );
+  }
+
+  let remainingMove = movedWork;
+  const sources = targetAssignments.flatMap((assignment) => {
+    if (remainingMove <= 0) return [];
+    const originalWork =
+      assignment.workMinutes ??
+      (targetAssignments.length === 1 ? targetBucket.assignedMinutes : 0);
+    const moved = Math.min(originalWork, remainingMove);
+    remainingMove -= moved;
+    return moved > 0 ? [{ assignment, originalWork, moved }] : [];
+  });
+  if (remainingMove > 0) {
+    return createUnavailableProposal(
+      profile,
+      effect,
+      input,
+      "alternate_resource_has_insufficient_capacity"
+    );
+  }
+  for (const candidate of eligible) {
+    if (candidate.spareMinutes < movedWork) continue;
+    const commands: PlanningCommand[] = [];
+    for (const source of sources) {
+      const assignment = source.assignment;
+      commands.push(
+        {
+          type: "assignment.upsert",
+          payload: {
+            id: assignment.id,
+            taskId: assignment.taskId,
+            resourceId: assignment.resourceId,
+            role: assignment.role,
+            unitsPermille: assignment.unitsPermille,
+            workMinutes: source.originalWork - source.moved
+          }
+        },
+        {
+          type: "assignment.upsert",
+          payload: {
+            id: `${assignment.id}-${profile}-reassign`,
+            taskId: assignment.taskId,
+            resourceId: candidate.resource.id,
+            role: "co_executor",
+            unitsPermille: 1000,
+            workMinutes: source.moved
+          }
+        }
       );
-  if (desiredTargetWork >= originalWork) return null;
-  const movedWork = originalWork - desiredTargetWork;
-  const commands: PlanningCommand[] = [
-    {
-      type: "assignment.upsert",
-      payload: {
-        id: targetAssignment.id,
-        taskId,
-        resourceId: targetAssignment.resourceId,
-        role: targetAssignment.role,
-        unitsPermille: targetAssignment.unitsPermille,
-        workMinutes: desiredTargetWork
-      }
-    },
-    {
-      type: "assignment.upsert",
-      payload: {
-        id: `${targetAssignment.id}-${profile}-reassign`,
-        taskId,
-        resourceId: alternateResource.id,
-        role: "co_executor",
-        unitsPermille: 1000,
-        workMinutes: movedWork
-      }
     }
-  ];
 
-  const provisionalProposal = createProposal(profile, effect, input, commands);
-  const evaluation = evaluateProposalEffect(input, provisionalProposal.planDelta);
-  const proposal = createProposal(
+    const provisionalProposal = createProposal(profile, effect, input, commands);
+    const evaluation = evaluateProposalEffect(input, provisionalProposal.planDelta);
+    const proposal = createProposal(
+      profile,
+      effect,
+      {
+        ...input,
+        calculatedPlan: evaluation.calculatedPlan,
+        resourceLoad: evaluation.resourceLoad
+      },
+      commands
+    );
+    if (proposalMatchesEffect(proposal, input, evaluation.resourceLoad)) return proposal;
+  }
+
+  return createUnavailableProposal(
     profile,
     effect,
-    {
-      ...input,
-      calculatedPlan: evaluation.calculatedPlan,
-      resourceLoad: evaluation.resourceLoad
-    },
-    commands
+    input,
+    "alternate_resource_has_insufficient_capacity"
   );
-
-  return proposalMatchesEffect(proposal, input, evaluation.resourceLoad) ? proposal : null;
 }
 
+function createUnavailableProposal(
+  profile: Extract<ScenarioProfile, "balanced" | "resilient">,
+  effect: Extract<ScenarioProposal["conflictEffect"], "reduced" | "removed">,
+  input: {
+    calculatedPlan: CalculatedPlan;
+    resourceLoad: ResourceLoadMatrix;
+    target: ScenarioTarget;
+  },
+  unavailableReason: ScenarioUnavailableReason
+): ScenarioProposal {
+  return {
+    ...createProposal(profile, effect, input, []),
+    availability: "unavailable",
+    unavailableReason
+  };
+}
+
+function resourceSpareMinutes(
+  resourceLoad: ResourceLoadMatrix,
+  resourceId: string,
+  date: string
+): number {
+  const bucket = resourceLoad.buckets.find(
+    (candidate) =>
+      candidate.granularity === "day" &&
+      candidate.resourceId === resourceId &&
+      candidate.date === date
+  );
+  if (!bucket) return 0;
+  return Math.max(
+    0,
+    bucket.capacityMinutes - bucket.reservedMinutes - bucket.assignedMinutes
+  );
+}
 function evaluateProposalEffect(
   input: {
     snapshot: PlanSnapshot;
@@ -242,6 +345,8 @@ function createProposal(
   return {
     id: `scenario-${profile}-${input.target.resourceId}-${input.target.date}`,
     profile,
+    availability: "available",
+    unavailableReason: null,
     conflictEffect,
     planDelta,
     explainability: {

@@ -7,15 +7,17 @@ import {
   createTenantAdminSeedProfile,
   seedTenantDataset,
   type PostgresClient,
+  type PostgresTenantDataSource,
   type SeedTenantDataset
 } from "@kiss-pm/persistence";
 import { createHash } from "node:crypto";
 
 import { createApp } from "./app";
 
-const databaseUrl =
-  process.env.DATABASE_URL ??
-  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error("planningRoutes.db.test requires an explicit disposable DATABASE_URL");
+}
 
 const dataset: SeedTenantDataset = {
   tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],
@@ -34,7 +36,7 @@ const dataset: SeedTenantDataset = {
       id: "access-profile-plan-reader-no-resources",
       tenantId: "tenant-alpha",
       name: "Наблюдатель плана без ресурсов",
-      permissions: ["tenant.projects.read", "tenant.project_plan.read"]
+      permissions: ["tenant.projects.read", "tenant.project_plan.read", "tenant.planning_scenarios.preview"]
     },
     {
       id: "access-profile-plan-manager-no-read",
@@ -254,6 +256,203 @@ describe("planning API routes", () => {
     await client`TRUNCATE audit_events, planning_command_idempotency_keys, planning_scenario_runs, resource_reservations, project_baseline_assignments, project_baseline_tasks, project_baselines, task_dependencies, task_assignments, calendar_exceptions, resource_calendars, project_calendars, plan_versions, task_activities, task_participants, tasks, user_sessions, user_credentials, tenant_user_org_placements, tenant_org_nodes, tenant_users, project_position_demands, projects, opportunity_demands, opportunities, crm_pipeline_stage_automation_definitions, crm_pipeline_transition_rules, crm_pipeline_stages, crm_pipelines, products, contacts, clients, project_types, custom_field_definitions, project_templates, positions, access_profiles, tenants RESTART IDENTITY CASCADE`;
     await client.end();
   });
+
+  it.each(["draft", "paused", "closed", "cancelled"] as const)(
+    "denies planning read, preview, apply, and batch endpoints for a %s project",
+    async (projectStatus) => {
+      const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+      await createTask(adminCookie, {
+        id: "task-inactive-project",
+        title: "Lifecycle guard",
+        start: "2026-06-02",
+        finish: "2026-06-03"
+      });
+      const activeRead = await app.request(
+        "/api/workspace/projects/project-alpha/planning/read-model",
+        { headers: { cookie: adminCookie } }
+      );
+      expect(activeRead.status).toBe(200);
+      const planVersion = (await activeRead.json()).planVersion as number;
+      const command = {
+        type: "task.update_progress",
+        payload: { taskId: "task-inactive-project", percentComplete: 42 }
+      };
+      const headers = {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      };
+      const beforeState = await client`
+        SELECT
+          (SELECT version FROM plan_versions
+            WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS plan_version,
+          (SELECT progress FROM tasks
+            WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha'
+              AND id = 'task-inactive-project') AS task_progress,
+          (SELECT count(*)::int FROM audit_events
+            WHERE tenant_id = 'tenant-alpha' AND source_entity ->> 'id' = 'project-alpha') AS audit_count,
+          (SELECT count(*)::int FROM planning_command_idempotency_keys
+            WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS idempotency_count
+      `;
+
+      await client`
+        UPDATE projects
+        SET status = ${projectStatus}
+        WHERE tenant_id = 'tenant-alpha' AND id = 'project-alpha'
+      `;
+
+      const requests = [
+        app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+          headers: { cookie: adminCookie }
+        }),
+        app.request("/api/workspace/projects/project-alpha/planning/preview-command", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ command, clientPlanVersion: planVersion })
+        }),
+        app.request("/api/workspace/projects/project-alpha/planning/preview-command-batch", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ commands: [command], clientPlanVersion: planVersion })
+        }),
+        app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            command,
+            clientPlanVersion: planVersion,
+            idempotencyKey: `inactive-single-${projectStatus}`
+          })
+        }),
+        app.request("/api/workspace/projects/project-alpha/planning/apply-command-batch", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            commands: [command],
+            clientPlanVersion: planVersion,
+            idempotencyKey: `inactive-batch-${projectStatus}`
+          })
+        })
+      ];
+
+      for (const response of await Promise.all(requests)) {
+        expect(response.status).toBe(404);
+        await expect(response.json()).resolves.toEqual({ error: "project_not_found" });
+      }
+
+      const afterState = await client`
+        SELECT
+          (SELECT version FROM plan_versions
+            WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS plan_version,
+          (SELECT progress FROM tasks
+            WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha'
+              AND id = 'task-inactive-project') AS task_progress,
+          (SELECT count(*)::int FROM audit_events
+            WHERE tenant_id = 'tenant-alpha' AND source_entity ->> 'id' = 'project-alpha') AS audit_count,
+          (SELECT count(*)::int FROM planning_command_idempotency_keys
+            WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS idempotency_count
+      `;
+      expect(afterState[0]).toEqual(beforeState[0]);
+    }
+  );
+
+  it.each(["single", "batch"] as const)(
+    "rolls back task, version, audit, and idempotency when post-write readback is missing for %s apply",
+    async (applyMode) => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-readback-rollback",
+      title: "Readback rollback",
+      start: "2026-06-02",
+      finish: "2026-06-03"
+    });
+    const initialRead = await app.request(
+      "/api/workspace/projects/project-alpha/planning/read-model",
+      { headers: { cookie: adminCookie } }
+    );
+    expect(initialRead.status).toBe(200);
+    const planVersion = (await initialRead.json()).planVersion as number;
+    const beforeState = await client`
+      SELECT
+        (SELECT planned_start::text FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha'
+            AND id = 'task-readback-rollback') AS planned_start,
+        (SELECT planned_finish::text FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha'
+            AND id = 'task-readback-rollback') AS planned_finish,
+        (SELECT version FROM plan_versions
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS plan_version,
+        (SELECT count(*)::int FROM audit_events
+          WHERE tenant_id = 'tenant-alpha' AND source_entity ->> 'id' = 'project-alpha') AS audit_count,
+        (SELECT count(*)::int FROM planning_command_idempotency_keys
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS idempotency_count
+    `;
+
+    const baseDataSource = createPostgresTenantDataSource(createDatabase(client));
+    const faultInjectedDataSource: PostgresTenantDataSource = {
+      ...baseDataSource,
+      async withTransaction<T>(
+        operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
+      ): Promise<T> {
+        return baseDataSource.withTransaction(async (transactionDataSource) => {
+          let snapshotReadCount = 0;
+          return operation({
+            ...transactionDataSource,
+            async getPlanSnapshot(tenantId, projectId) {
+              snapshotReadCount += 1;
+              if (snapshotReadCount === 2) return undefined;
+              return transactionDataSource.getPlanSnapshot(tenantId, projectId);
+            }
+          });
+        });
+      }
+    };
+    const faultInjectedApp = createApp({ dataSource: faultInjectedDataSource });
+    const command = {
+      type: "task.update_schedule",
+      payload: {
+        taskId: "task-readback-rollback",
+        plannedStart: "2026-06-10",
+        plannedFinish: "2026-06-12"
+      }
+    };
+    const response = await faultInjectedApp.request(
+      `/api/workspace/projects/project-alpha/planning/apply-command${applyMode === "batch" ? "-batch" : ""}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          ...(applyMode === "batch" ? { commands: [command] } : { command }),
+          clientPlanVersion: planVersion,
+          idempotencyKey: `post-write-readback-rollback-${applyMode}`
+        })
+      }
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "project_not_found" });
+    const afterState = await client`
+      SELECT
+        (SELECT planned_start::text FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha'
+            AND id = 'task-readback-rollback') AS planned_start,
+        (SELECT planned_finish::text FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha'
+            AND id = 'task-readback-rollback') AS planned_finish,
+        (SELECT version FROM plan_versions
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS plan_version,
+        (SELECT count(*)::int FROM audit_events
+          WHERE tenant_id = 'tenant-alpha' AND source_entity ->> 'id' = 'project-alpha') AS audit_count,
+        (SELECT count(*)::int FROM planning_command_idempotency_keys
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS idempotency_count
+    `;
+    expect(afterState[0]).toEqual(beforeState[0]);
+    }
+  );
 
   it("exposes task CRUD records through planning read-model and applies dependency commands with versioned audit", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
@@ -1113,9 +1312,18 @@ describe("planning API routes", () => {
       })
     });
     expect(upd.status).toBe(200);
+    const updBody = await upd.json();
 
-    // откат последнего коммита → прогресс возвращается к 0
-    const revert = await app.request("/api/workspace/projects/project-alpha/planning/revert-last", { method: "POST", headers });
+    // откат выбранного коммита → прогресс возвращается к 0
+    const revert = await app.request("/api/workspace/projects/project-alpha/planning/revert-last", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        targetCommitId: updBody.auditEventId,
+        clientPlanVersion: updBody.newPlanVersion,
+        idempotencyKey: "planning-revert-regression"
+      })
+    });
     expect(revert.status).toBe(200);
 
     const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", { headers: { cookie: adminCookie } });
@@ -1253,6 +1461,7 @@ describe("planning API routes", () => {
     expect(initialReadModel.status).toBe(200);
     expect(initialBody.baselineComparison).toEqual({
       baselineId: null,
+      label: null,
       capturedAt: null,
       tasks: []
     });
@@ -1318,6 +1527,7 @@ describe("planning API routes", () => {
     expect(finalBody.planVersion).toBe(workUpdateBody.newPlanVersion);
     expect(finalBody.baselineComparison).toMatchObject({
       baselineId: "baseline-api-a",
+      label: "Стартовый baseline",
       tasks: [
         expect.objectContaining({
           taskId: "task-baseline-a",
@@ -1369,6 +1579,8 @@ describe("planning API routes", () => {
       baselineId: string;
       tasks: Array<{ startDeltaDays: number | null; finishDeltaDays: number | null; workDeltaMinutes: number | null }>;
     };
+    const freshBaseline = (afterBody.authored.baselines as Array<{ id: string; label: string }>).find((baseline) => baseline.id === "baseline-fresh");
+    expect(freshBaseline?.label).toBe("Свежий");
     expect(comparison.baselineId).toBe("baseline-fresh");
     expect(comparison.tasks.length).toBeGreaterThan(0);
     for (const t of comparison.tasks) {
@@ -1902,6 +2114,24 @@ describe("planning API routes", () => {
         expect.objectContaining({ id: "task-plan-b", title: "Batch rename B" })
       ])
     );
+    const auditResponse = await app.request("/api/tenant/current/audit-events", {
+      headers: { cookie: adminCookie }
+    });
+    expect(auditResponse.status).toBe(200);
+    const auditBody = await auditResponse.json();
+    const batchAudit = auditBody.auditEvents.find(
+      (event: { id: string }) => event.id === appliedBody.auditEventId
+    );
+    expect(batchAudit?.afterState?.compensatingCommands).toEqual([
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-plan-b", title: "Согласовать план" }
+      },
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-plan-a", title: "Подготовить план" }
+      }
+    ]);
 
     const retried = await app.request(
       "/api/workspace/projects/project-alpha/planning/apply-command-batch",
@@ -1949,6 +2179,368 @@ describe("planning API routes", () => {
     });
   });
 
+  it("deduplicates concurrent apply-command-batch requests with the same idempotency key", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-batch-race-a",
+      title: "Batch race A",
+      start: "2026-06-01",
+      finish: "2026-06-03"
+    });
+    await createTask(adminCookie, {
+      id: "task-batch-race-b",
+      title: "Batch race B",
+      start: "2026-06-04",
+      finish: "2026-06-05"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    expect(initial.status).toBe(200);
+
+    const commands = [
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-batch-race-a", title: "Concurrent batch rename A" }
+      },
+      {
+        type: "task.update_identity",
+        payload: { taskId: "task-batch-race-b", title: "Concurrent batch rename B" }
+      }
+    ];
+    const request = () =>
+      app.request("/api/workspace/projects/project-alpha/planning/apply-command-batch", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          commands,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "planning-batch-race-key"
+        })
+      });
+
+    const [first, second] = await Promise.all([request(), request()]);
+    const firstBody = await first.json();
+    const secondBody = await second.json();
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(secondBody).toEqual(firstBody);
+    expect(firstBody.newPlanVersion).toBe(initialBody.planVersion + 1);
+    expect(firstBody.readModel.authored.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "task-batch-race-a", title: "Concurrent batch rename A" }),
+        expect.objectContaining({ id: "task-batch-race-b", title: "Concurrent batch rename B" })
+      ])
+    );
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    expect(after.status).toBe(200);
+    expect(afterBody.planVersion).toBe(initialBody.planVersion + 1);
+    expect(afterBody.authored.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "task-batch-race-a", title: "Concurrent batch rename A" }),
+        expect.objectContaining({ id: "task-batch-race-b", title: "Concurrent batch rename B" })
+      ])
+    );
+  });
+
+  it("deduplicates concurrent baseline.capture apply requests with the same idempotency key", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-baseline-race",
+      title: "Baseline race",
+      start: "2026-06-02",
+      finish: "2026-06-03"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    const command = {
+      type: "baseline.capture",
+      payload: {
+        baselineId: "baseline-race",
+        label: "Race baseline"
+      }
+    };
+    const request = () =>
+      app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "baseline-capture-race-key"
+        })
+      });
+
+    const [first, second] = await Promise.all([request(), request()]);
+    const firstBody = await first.json();
+    const secondBody = await second.json();
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(secondBody).toEqual(firstBody);
+    expect(firstBody.newPlanVersion).toBe(initialBody.planVersion + 1);
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    const capturedBaselines = (afterBody.authored.baselines as Array<{ id: string; label: string }>).filter(
+      (baseline) => baseline.id === "baseline-race"
+    );
+    expect(afterBody.planVersion).toBe(initialBody.planVersion + 1);
+    expect(capturedBaselines).toHaveLength(1);
+    expect(capturedBaselines[0]).toMatchObject({ id: "baseline-race", label: "Race baseline" });
+
+    const conflicting = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        command: {
+          ...command,
+          payload: { ...command.payload, label: "Conflicting race baseline" }
+        },
+        clientPlanVersion: initialBody.planVersion,
+        idempotencyKey: "baseline-capture-race-key"
+      })
+    });
+
+    expect(conflicting.status).toBe(409);
+    await expect(conflicting.json()).resolves.toEqual({ error: "idempotency_key_conflict" });
+  });
+
+  it("deduplicates concurrent task.update_schedule apply requests with the same idempotency key", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-schedule-race",
+      title: "Schedule race",
+      start: "2026-06-02",
+      finish: "2026-06-03"
+    });
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    const command = {
+      type: "task.update_schedule",
+      payload: {
+        taskId: "task-schedule-race",
+        plannedStart: "2026-06-05",
+        plannedFinish: "2026-06-08"
+      }
+    };
+    const request = () =>
+      app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command,
+          clientPlanVersion: initialBody.planVersion,
+          idempotencyKey: "task-update-schedule-race-key"
+        })
+      });
+
+    const [first, second] = await Promise.all([request(), request()]);
+    const firstBody = await first.json();
+    const secondBody = await second.json();
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(secondBody).toEqual(firstBody);
+    expect(firstBody.newPlanVersion).toBe(initialBody.planVersion + 1);
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    const updatedTask = (afterBody.authored.tasks as Array<{
+      id: string;
+      plannedStart: string | null;
+      plannedFinish: string | null;
+    }>).find((task) => task.id === "task-schedule-race");
+    expect(afterBody.planVersion).toBe(initialBody.planVersion + 1);
+    expect(updatedTask).toMatchObject({
+      plannedStart: "2026-06-05",
+      plannedFinish: "2026-06-08"
+    });
+
+    const conflicting = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        command: {
+          ...command,
+          payload: {
+            ...command.payload,
+            plannedFinish: "2026-06-09"
+          }
+        },
+        clientPlanVersion: initialBody.planVersion,
+        idempotencyKey: "task-update-schedule-race-key"
+      })
+    });
+
+    expect(conflicting.status).toBe(409);
+    await expect(conflicting.json()).resolves.toEqual({ error: "idempotency_key_conflict" });
+  });
+
+  it("keeps scenario apply single-use under concurrent duplicate requests", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-scenario-race",
+      title: "Scenario race overload",
+      start: "2026-06-08",
+      finish: "2026-06-08",
+      plannedWork: 40
+    });
+
+    const initial = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const initialBody = await initial.json();
+    expect(initial.status).toBe(200);
+
+    const assignmentApplied = await app.request(
+      "/api/workspace/projects/project-alpha/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          command: {
+            type: "assignment.upsert",
+            payload: {
+              id: "assignment-scenario-race",
+              taskId: "task-scenario-race",
+              resourceId: "user-alpha-executor",
+              role: "executor",
+              unitsPermille: 1000,
+              workMinutes: 4_800
+            }
+          },
+          clientPlanVersion: initialBody.planVersion
+        })
+      }
+    );
+    const assignmentAppliedBody = await assignmentApplied.json();
+    expect(assignmentApplied.status).toBe(200);
+
+    const overload = assignmentAppliedBody.readModel.resourceLoad.overloads.find(
+      (candidate: { resourceId: string; taskIds: string[] }) =>
+        candidate.resourceId === "user-alpha-executor" &&
+        candidate.taskIds.includes("task-scenario-race")
+    );
+    expect(overload).toBeTruthy();
+
+    const scenarioPreview = await app.request(
+      "/api/workspace/projects/project-alpha/planning/scenario-proposals",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          clientPlanVersion: assignmentAppliedBody.newPlanVersion,
+          target: {
+            type: "resource_overload",
+            resourceId: overload.resourceId,
+            date: overload.date,
+            overloadMinutes: overload.overloadMinutes,
+            taskIds: overload.taskIds
+          }
+        })
+      }
+    );
+    const scenarioPreviewBody = await scenarioPreview.json();
+    expect(scenarioPreview.status).toBe(200);
+    const scenarioId = scenarioPreviewBody.proposals[0].id;
+    expect(scenarioId).toMatch(/^planning-scenario-/);
+
+    const applyScenario = () =>
+      app.request(
+        `/api/workspace/projects/project-alpha/planning/scenario-proposals/${scenarioId}/apply`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-kiss-pm-action": "same-origin",
+            cookie: adminCookie
+          },
+          body: JSON.stringify({
+            clientPlanVersion: assignmentAppliedBody.newPlanVersion,
+            acceptedRiskReason: "Concurrent duplicate scenario apply test"
+          })
+        }
+      );
+
+    const [first, second] = await Promise.all([applyScenario(), applyScenario()]);
+    const results = await Promise.all([
+      first.json().then((body) => ({ status: first.status, body })),
+      second.json().then((body) => ({ status: second.status, body }))
+    ]);
+    const successes = results.filter((result) => result.status === 200);
+    const conflicts = results.filter((result) => result.status === 409);
+
+    expect(successes).toHaveLength(1);
+    expect(conflicts).toHaveLength(1);
+    expect(successes[0]?.body).toMatchObject({
+      scenarioRunId: scenarioId,
+      newPlanVersion: assignmentAppliedBody.newPlanVersion + 1,
+      readModel: { planVersion: assignmentAppliedBody.newPlanVersion + 1 }
+    });
+    expect(conflicts[0]?.body).toMatchObject({
+      error: expect.stringMatching(/^(plan_version_conflict|planning_scenario_already_applied)$/)
+    });
+
+    const after = await app.request("/api/workspace/projects/project-alpha/planning/read-model", {
+      headers: { cookie: adminCookie }
+    });
+    const afterBody = await after.json();
+    expect(after.status).toBe(200);
+    expect(afterBody.planVersion).toBe(assignmentAppliedBody.newPlanVersion + 1);
+
+    const scenarioRows = await client`
+      SELECT applied_at
+      FROM planning_scenario_runs
+      WHERE tenant_id = 'tenant-alpha'
+        AND project_id = 'project-alpha'
+        AND id = ${scenarioId}
+    `;
+    expect(scenarioRows).toHaveLength(1);
+    expect(scenarioRows[0]?.applied_at).toBeTruthy();
+  });
   it("rejects batch when a middle command has blocking validation", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     await createTask(adminCookie, {
@@ -2030,8 +2622,13 @@ describe("planning API routes", () => {
     expect(response.headers.get("content-type")).toContain("text/event-stream");
   });
 
-  it("lists and creates saved views with stable API keys", async () => {
+  it("creates, renames, replays, reads back, and deletes a saved view", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+    const otherManagerCookie = await loginAs(
+      "plan-manager-no-read@kiss-pm.local",
+      "manager12345"
+    );
     const listEmpty = await app.request(
       "/api/workspace/projects/project-alpha/planning/saved-views",
       { headers: { cookie: adminCookie } }
@@ -2049,6 +2646,7 @@ describe("planning API routes", () => {
           "x-kiss-pm-action": "same-origin"
         },
         body: JSON.stringify({
+          clientRequestId: "planning-saved-view-create-db-test",
           name: "Мой вид",
           scope: "user",
           payload: { visibleColumnIds: ["title", "start"] }
@@ -2063,6 +2661,80 @@ describe("planning API routes", () => {
       payload: { visibleColumnIds: ["title", "start"] }
     });
 
+    const viewId = createdBody.savedView.id as string;
+    const renamePath =
+      `/api/workspace/projects/project-alpha/planning/saved-views/${viewId}`;
+    const renameBody = {
+      clientRequestId: "planning-saved-view-rename-db-test",
+      name: "Мой рабочий вид"
+    };
+
+    const readerRename = await app.request(renamePath, {
+      method: "PATCH",
+      headers: {
+        cookie: readerCookie,
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin"
+      },
+      body: JSON.stringify(renameBody)
+    });
+    expect(readerRename.status).toBe(403);
+
+    const inaccessibleRename = await app.request(renamePath, {
+      method: "PATCH",
+      headers: {
+        cookie: otherManagerCookie,
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin"
+      },
+      body: JSON.stringify(renameBody)
+    });
+    expect(inaccessibleRename.status).toBe(404);
+
+    const rename = await app.request(renamePath, {
+      method: "PATCH",
+      headers: {
+        cookie: adminCookie,
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin"
+      },
+      body: JSON.stringify(renameBody)
+    });
+    expect(rename.status).toBe(200);
+    const renamedBody = await rename.json();
+    expect(renamedBody.savedView).toMatchObject({
+      id: viewId,
+      name: "Мой рабочий вид",
+      scope: "user",
+      payload: { visibleColumnIds: ["title", "start"] }
+    });
+
+    const replay = await app.request(renamePath, {
+      method: "PATCH",
+      headers: {
+        cookie: adminCookie,
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin"
+      },
+      body: JSON.stringify(renameBody)
+    });
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toEqual(renamedBody);
+
+    const conflict = await app.request(renamePath, {
+      method: "PATCH",
+      headers: {
+        cookie: adminCookie,
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin"
+      },
+      body: JSON.stringify({ ...renameBody, name: "Другое имя" })
+    });
+    expect(conflict.status).toBe(409);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "idempotency_key_conflict"
+    });
+
     const listAfter = await app.request(
       "/api/workspace/projects/project-alpha/planning/saved-views",
       { headers: { cookie: adminCookie } }
@@ -2070,10 +2742,145 @@ describe("planning API routes", () => {
     const listBody = await listAfter.json();
     expect(listAfter.status).toBe(200);
     expect(listBody.savedViews).toEqual(
-      expect.arrayContaining([expect.objectContaining({ name: "Мой вид" })])
+      expect.arrayContaining([
+        expect.objectContaining({ id: viewId, name: "Мой рабочий вид" })
+      ])
     );
+
+    const deleteBody = JSON.stringify({ clientRequestId: "planning-saved-view-delete-db-test" });
+    const deleteInit = {
+      method: "DELETE",
+      headers: {
+        cookie: adminCookie,
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin"
+      },
+      body: deleteBody
+    };
+    const [removeLeft, removeRight] = await Promise.all([
+      app.request(renamePath, deleteInit),
+      app.request(renamePath, deleteInit)
+    ]);
+    expect([removeLeft.status, removeRight.status]).toEqual([200, 200]);
+    const removeReplay = await app.request(renamePath, deleteInit);
+    expect(removeReplay.status).toBe(200);
+
+    const listDeleted = await app.request(
+      "/api/workspace/projects/project-alpha/planning/saved-views",
+      { headers: { cookie: adminCookie } }
+    );
+    expect(listDeleted.status).toBe(200);
+    await expect(listDeleted.json()).resolves.toEqual({ savedViews: [] });
   });
 
+  it("deduplicates concurrent saved-view create, rename, and delete writes", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const endpoint = "/api/workspace/projects/project-alpha/planning/saved-views";
+    const headers = {
+      cookie: adminCookie,
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin"
+    };
+    const request = (path: string, method: "POST" | "PATCH" | "DELETE", body: unknown) =>
+      app.request(path, { method, headers, body: JSON.stringify(body) });
+    const payload = { version: 1, zoom: "day", columnWidths: Array(11).fill(80), collapsedTaskIds: [] };
+
+    const createRaceBody = {
+      clientRequestId: "saved-view-db-create-race-same",
+      name: "Create race same key",
+      scope: "project",
+      payload
+    };
+    const [createLeft, createRight] = await Promise.all([
+      request(endpoint, "POST", createRaceBody),
+      request(endpoint, "POST", createRaceBody)
+    ]);
+    expect([createLeft.status, createRight.status]).toEqual([201, 201]);
+    const createLeftBody = await createLeft.json();
+    const createRightBody = await createRight.json();
+    expect(createRightBody).toEqual(createLeftBody);
+
+    const createNameRace = await Promise.all([
+      request(endpoint, "POST", {
+        clientRequestId: "saved-view-db-create-name-left",
+        name: "Create name collision",
+        scope: "project",
+        payload
+      }),
+      request(endpoint, "POST", {
+        clientRequestId: "saved-view-db-create-name-right",
+        name: "CREATE NAME COLLISION",
+        scope: "project",
+        payload
+      })
+    ]);
+    expect(createNameRace.map((response) => response.status).sort()).toEqual([201, 409]);
+    const createNameConflict = createNameRace.find((response) => response.status === 409)!;
+    await expect(createNameConflict.json()).resolves.toEqual({ error: "saved_view_name_conflict" });
+
+    const makeView = async (name: string, key: string) => {
+      const response = await request(endpoint, "POST", {
+        clientRequestId: key,
+        name,
+        scope: "project",
+        payload
+      });
+      expect(response.status).toBe(201);
+      return (await response.json()).savedView as { id: string; name: string };
+    };
+    const renameA = await makeView("Rename A", "saved-view-db-rename-a-create");
+    const renameB = await makeView("Rename B", "saved-view-db-rename-b-create");
+    const renamePathA = endpoint + "/" + renameA.id;
+    const renamePathB = endpoint + "/" + renameB.id;
+    const renameRaceBody = {
+      clientRequestId: "saved-view-db-rename-race-same",
+      name: "Rename A replayed"
+    };
+    const [renameLeft, renameRight] = await Promise.all([
+      request(renamePathA, "PATCH", renameRaceBody),
+      request(renamePathA, "PATCH", renameRaceBody)
+    ]);
+    expect([renameLeft.status, renameRight.status]).toEqual([200, 200]);
+    expect(await renameRight.json()).toEqual(await renameLeft.json());
+
+    const renameNameRace = await Promise.all([
+      request(renamePathA, "PATCH", {
+        clientRequestId: "saved-view-db-rename-name-left",
+        name: "Rename collision"
+      }),
+      request(renamePathB, "PATCH", {
+        clientRequestId: "saved-view-db-rename-name-right",
+        name: "RENAME COLLISION"
+      })
+    ]);
+    expect(renameNameRace.map((response) => response.status).sort()).toEqual([200, 409]);
+    const renameNameConflict = renameNameRace.find((response) => response.status === 409)!;
+    await expect(renameNameConflict.json()).resolves.toEqual({ error: "saved_view_name_conflict" });
+
+    const deleteTarget = await makeView("Delete race target", "saved-view-db-delete-target-create");
+    const deleteOther = await makeView("Delete race other", "saved-view-db-delete-other-create");
+    const deletePath = endpoint + "/" + deleteTarget.id;
+    const deleteBody = { clientRequestId: "saved-view-db-delete-race-same" };
+    const [deleteLeft, deleteRight] = await Promise.all([
+      request(deletePath, "DELETE", deleteBody),
+      request(deletePath, "DELETE", deleteBody)
+    ]);
+    expect([deleteLeft.status, deleteRight.status]).toEqual([200, 200]);
+    await expect(deleteLeft.json()).resolves.toEqual({ ok: true });
+    await expect(deleteRight.json()).resolves.toEqual({ ok: true });
+    const deleteReplay = await request(deletePath, "DELETE", deleteBody);
+    expect(deleteReplay.status).toBe(200);
+    await expect(deleteReplay.json()).resolves.toEqual({ ok: true });
+
+    const divergentDelete = await request(endpoint + "/" + deleteOther.id, "DELETE", deleteBody);
+    expect(divergentDelete.status).toBe(409);
+    await expect(divergentDelete.json()).resolves.toEqual({ error: "idempotency_key_conflict" });
+    const finalList = await app.request(endpoint, { headers: { cookie: adminCookie } });
+    expect(finalList.status).toBe(200);
+    const finalViews = (await finalList.json()).savedViews as Array<{ id: string }>;
+    expect(finalViews.some((view) => view.id === deleteTarget.id)).toBe(false);
+    expect(finalViews.some((view) => view.id === deleteOther.id)).toBe(true);
+  });
   it("allows plan-only reader to load read-model and SSE without resource read", async () => {
     const planOnlyCookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "reader12345");
     const readModel = await app.request(
@@ -2086,6 +2893,16 @@ describe("planning API routes", () => {
       headers: { cookie: planOnlyCookie, Accept: "text/event-stream" }
     });
     expect(events.status).toBe(200);
+
+    const commits = await app.request(
+      "/api/workspace/projects/project-alpha/planning/commits",
+      { headers: { cookie: planOnlyCookie } }
+    );
+    expect(commits.status).toBe(200);
+    const commitsBody = await commits.json() as {
+      auditEvents: Array<{ sourceWorkflow: string | null }>;
+    };
+    expect(commitsBody.auditEvents.every((event) => event.sourceWorkflow === "planning")).toBe(true);
   });
 
   it("applies project.settings.update with audit and plan recalc", async () => {

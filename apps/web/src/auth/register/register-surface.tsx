@@ -125,9 +125,10 @@ export function RegisterSurface() {
           />
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <Label>Пароль</Label>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="register-password">Пароль</Label>
           <PasswordField
+            id="register-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Минимум 8 символов"
@@ -138,7 +139,7 @@ export function RegisterSurface() {
           <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">
             Не короче 8 символов, без управляющих символов.
           </span>
-        </label>
+        </div>
 
         <Button type="submit" variant="default" disabled={!valid || busy} className="w-full">
           {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <UserPlus className="size-4" aria-hidden />}

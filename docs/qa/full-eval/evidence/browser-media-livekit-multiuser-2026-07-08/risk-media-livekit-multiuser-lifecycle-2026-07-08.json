@@ -1,0 +1,770 @@
+{
+  "id": "RISK-MEDIA-LIVEKIT-MULTIUSER-LIFECYCLE-2026-07-08",
+  "createdAt": "2026-07-08T11:02:44.055Z",
+  "marker": "kisspm-livekit-multi-202607081102",
+  "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+  "roomUrl": "http://127.0.0.1:3180/calls/call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+  "users": {
+    "admin": {
+      "email": "admin@kiss-pm.local",
+      "id": "user-alpha-admin",
+      "name": "Анна Администратор"
+    },
+    "engineer": {
+      "email": "engineer@kiss-pm.local",
+      "id": "user-alpha-engineer",
+      "name": "Игорь Инженер"
+    }
+  },
+  "environment": {
+    "browser": "Playwright Chromium isolated contexts with fake media device and granted camera/microphone permissions",
+    "web": "http://127.0.0.1:3180",
+    "api": "http://127.0.0.1:4180 via web /api proxy",
+    "livekit": "self-hosted LiveKit Docker profile on localhost:7880"
+  },
+  "codeFixes": {
+    "strictModeJoinTokenGuard": "useCallEngine now returns after joinOrStartCallSession if disposed, before fetchJoinToken/fetchTurnCredentials, preventing unmounted dev StrictMode pass from emitting join_token_issued."
+  },
+  "preFixObservedIssue": "Earlier run in this same slice emitted duplicate join_token_issued events per real browser join because cleanup could dispose the first dev/StrictMode effect after joinOrStartCallSession but before fetchJoinToken. Raw pre-fix console was not persisted because it included token-bearing LiveKit URLs.",
+  "checkpoints": {
+    "afterAdminJoin": {
+      "title": "KISS PM",
+      "url": "http://127.0.0.1:3180/calls/call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+      "bodyText": "Звонок команды\nВ эфире\nАА\nВы\nМикрофон\nКамера\nЭкран\nФон\nЗавершить\nЧат звонка\nСообщения во время встречи\n\nПока нет сообщений. Начните обсуждение.\n\nОтправить",
+      "buttons": [
+        {
+          "text": "Микрофон",
+          "aria": "Включить микрофон",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Камера",
+          "aria": "Включить камеру",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Экран",
+          "aria": "Демонстрировать экран",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Фон",
+          "aria": "Сменить фон",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Завершить",
+          "aria": "Завершить звонок",
+          "pressed": null,
+          "disabled": false
+        },
+        {
+          "text": "Отправить",
+          "aria": null,
+          "pressed": null,
+          "disabled": false
+        }
+      ],
+      "videos": []
+    },
+    "afterBothJoinAdmin": {
+      "title": "KISS PM",
+      "url": "http://127.0.0.1:3180/calls/call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+      "bodyText": "Звонок команды\nВ эфире\nИИ\nИгорь Инженер\nВы\nМикрофон\nКамера\nЭкран\nФон\nЗавершить\nЧат звонка\nСообщения во время встречи\n\nПока нет сообщений. Начните обсуждение.\n\nОтправить",
+      "buttons": [
+        {
+          "text": "Микрофон",
+          "aria": "Выключить микрофон",
+          "pressed": "true",
+          "disabled": false
+        },
+        {
+          "text": "Камера",
+          "aria": "Выключить камеру",
+          "pressed": "true",
+          "disabled": false
+        },
+        {
+          "text": "Экран",
+          "aria": "Демонстрировать экран",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Фон",
+          "aria": "Сменить фон",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Завершить",
+          "aria": "Завершить звонок",
+          "pressed": null,
+          "disabled": false
+        },
+        {
+          "text": "Отправить",
+          "aria": null,
+          "pressed": null,
+          "disabled": false
+        }
+      ],
+      "videos": [
+        {
+          "width": 1280,
+          "height": 720,
+          "paused": false,
+          "muted": true,
+          "readyState": 4
+        }
+      ]
+    },
+    "afterBothJoinEngineer": {
+      "title": "KISS PM",
+      "url": "http://127.0.0.1:3180/calls/call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+      "bodyText": "Звонок команды\nВ эфире\nАнна Администратор\nИИ\nВы\nМикрофон\nКамера\nЭкран\nФон\nЗавершить\nЧат звонка\nСообщения во время встречи\n\nПока нет сообщений. Начните обсуждение.\n\nОтправить",
+      "buttons": [
+        {
+          "text": "Микрофон",
+          "aria": "Выключить микрофон",
+          "pressed": "true",
+          "disabled": false
+        },
+        {
+          "text": "Камера",
+          "aria": "Включить камеру",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Экран",
+          "aria": "Демонстрировать экран",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Фон",
+          "aria": "Сменить фон",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Завершить",
+          "aria": "Завершить звонок",
+          "pressed": null,
+          "disabled": false
+        },
+        {
+          "text": "Отправить",
+          "aria": null,
+          "pressed": null,
+          "disabled": false
+        }
+      ],
+      "videos": [
+        {
+          "width": 320,
+          "height": 180,
+          "paused": false,
+          "muted": true,
+          "readyState": 4
+        }
+      ]
+    },
+    "afterEngineerLeaveAdmin": {
+      "title": "KISS PM",
+      "url": "http://127.0.0.1:3180/calls/call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+      "bodyText": "Звонок команды\nВ эфире\nВы\nМикрофон\nКамера\nЭкран\nФон\nЗавершить\nЧат звонка\nСообщения во время встречи\n\nПока нет сообщений. Начните обсуждение.\n\nОтправить",
+      "buttons": [
+        {
+          "text": "Микрофон",
+          "aria": "Выключить микрофон",
+          "pressed": "true",
+          "disabled": false
+        },
+        {
+          "text": "Камера",
+          "aria": "Выключить камеру",
+          "pressed": "true",
+          "disabled": false
+        },
+        {
+          "text": "Экран",
+          "aria": "Демонстрировать экран",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Фон",
+          "aria": "Сменить фон",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Завершить",
+          "aria": "Завершить звонок",
+          "pressed": null,
+          "disabled": false
+        },
+        {
+          "text": "Отправить",
+          "aria": null,
+          "pressed": null,
+          "disabled": false
+        }
+      ],
+      "videos": [
+        {
+          "width": 1280,
+          "height": 720,
+          "paused": false,
+          "muted": true,
+          "readyState": 4
+        }
+      ]
+    },
+    "afterEngineerLeaveEngineer": {
+      "title": "KISS PM",
+      "url": "http://127.0.0.1:3180/calls/call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+      "bodyText": "Звонок команды\nЗвонок завершён\nИИ\nВы\nМикрофон\nКамера\nЭкран\nФон\nЗавершить\nЧат звонка\nСообщения во время встречи\n\nПока нет сообщений. Начните обсуждение.\n\nОтправить",
+      "buttons": [
+        {
+          "text": "Микрофон",
+          "aria": "Включить микрофон",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Камера",
+          "aria": "Включить камеру",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Экран",
+          "aria": "Демонстрировать экран",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Фон",
+          "aria": "Сменить фон",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Завершить",
+          "aria": "Завершить звонок",
+          "pressed": null,
+          "disabled": false
+        },
+        {
+          "text": "Отправить",
+          "aria": null,
+          "pressed": null,
+          "disabled": false
+        }
+      ],
+      "videos": []
+    },
+    "afterEngineerRejoinAdmin": {
+      "title": "KISS PM",
+      "url": "http://127.0.0.1:3180/calls/call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+      "bodyText": "Звонок команды\nВ эфире\nИИ\nИгорь Инженер\nВы\nМикрофон\nКамера\nЭкран\nФон\nЗавершить\nЧат звонка\nСообщения во время встречи\n\nПока нет сообщений. Начните обсуждение.\n\nОтправить",
+      "buttons": [
+        {
+          "text": "Микрофон",
+          "aria": "Выключить микрофон",
+          "pressed": "true",
+          "disabled": false
+        },
+        {
+          "text": "Камера",
+          "aria": "Выключить камеру",
+          "pressed": "true",
+          "disabled": false
+        },
+        {
+          "text": "Экран",
+          "aria": "Демонстрировать экран",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Фон",
+          "aria": "Сменить фон",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Завершить",
+          "aria": "Завершить звонок",
+          "pressed": null,
+          "disabled": false
+        },
+        {
+          "text": "Отправить",
+          "aria": null,
+          "pressed": null,
+          "disabled": false
+        }
+      ],
+      "videos": [
+        {
+          "width": 1280,
+          "height": 720,
+          "paused": false,
+          "muted": true,
+          "readyState": 4
+        }
+      ]
+    },
+    "afterEngineerReloadJoinAdmin": {
+      "title": "KISS PM",
+      "url": "http://127.0.0.1:3180/calls/call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+      "bodyText": "Звонок команды\nВ эфире\nИИ\nИгорь Инженер\nВы\nМикрофон\nКамера\nЭкран\nФон\nЗавершить\nЧат звонка\nСообщения во время встречи\n\nПока нет сообщений. Начните обсуждение.\n\nОтправить",
+      "buttons": [
+        {
+          "text": "Микрофон",
+          "aria": "Выключить микрофон",
+          "pressed": "true",
+          "disabled": false
+        },
+        {
+          "text": "Камера",
+          "aria": "Выключить камеру",
+          "pressed": "true",
+          "disabled": false
+        },
+        {
+          "text": "Экран",
+          "aria": "Демонстрировать экран",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Фон",
+          "aria": "Сменить фон",
+          "pressed": "false",
+          "disabled": false
+        },
+        {
+          "text": "Завершить",
+          "aria": "Завершить звонок",
+          "pressed": null,
+          "disabled": false
+        },
+        {
+          "text": "Отправить",
+          "aria": null,
+          "pressed": null,
+          "disabled": false
+        }
+      ],
+      "videos": [
+        {
+          "width": 1280,
+          "height": 720,
+          "paused": false,
+          "muted": true,
+          "readyState": 4
+        }
+      ]
+    }
+  },
+  "apiReadback": {
+    "detail": {
+      "callRoom": {
+        "entityId": "project-vektor-portal",
+        "entityType": "project",
+        "mediaKind": "video",
+        "provider": "livekit",
+        "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+        "status": "active",
+        "createdAt": "2026-07-08T11:02:39.038Z",
+        "createdByUserId": "user-alpha-admin",
+        "meetingId": null,
+        "title": "LiveKit multi-user QA kisspm-livekit-multi-202607081102",
+        "updatedAt": "2026-07-08T11:02:39.578Z"
+      },
+      "activeSession": {
+        "endedAt": null,
+        "endedByUserId": null,
+        "failureReason": null,
+        "id": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133",
+        "providerSessionId": null,
+        "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+        "startedAt": "2026-07-08T11:02:39.576Z",
+        "startedByUserId": "user-alpha-admin",
+        "status": "active"
+      },
+      "events": [
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:43.688Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-60108d67-7e28-4ca8-849c-b7e935e25447",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T11:12:43.000Z"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:43.151Z",
+          "eventType": "participant_joined",
+          "id": "call-event-5ae308f1-b46a-4443-9e71-deed11af0c88",
+          "payload": {
+            "state": "joined",
+            "userId": "user-alpha-engineer"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:42.848Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-1a135b8b-d550-4c11-88a9-4f5b86e6e3d7",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T11:12:42.000Z"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:40.798Z",
+          "eventType": "participant_left",
+          "id": "call-event-1041ce0a-0d3c-4456-ad84-9143a50d7a09",
+          "payload": {
+            "state": "left",
+            "userId": "user-alpha-engineer"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:40.691Z",
+          "eventType": "participant_joined",
+          "id": "call-event-6e24dbb2-6984-4392-889b-f56c511e736a",
+          "payload": {
+            "state": "joined",
+            "userId": "user-alpha-engineer"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:40.384Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-4773afcc-a099-493e-87de-bd0f834f5c12",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T11:12:40.000Z"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T11:02:39.964Z",
+          "eventType": "participant_joined",
+          "id": "call-event-98649e06-f97a-4549-ae6e-4de493af64c3",
+          "payload": {
+            "state": "joined",
+            "userId": "user-alpha-admin"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T11:02:39.637Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-15c7a0d4-6e06-466e-a4d5-7940a14524ae",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T11:12:39.000Z"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T11:02:39.580Z",
+          "eventType": "session_started",
+          "id": "call-event-ac12f4ba-1f8e-4e53-bbef-b0388b977f3f",
+          "payload": {
+            "provider": "livekit"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T11:02:39.041Z",
+          "eventType": "room_created",
+          "id": "call-event-4c3f8878-5ff1-47a9-9e27-33afdcb10404",
+          "payload": {
+            "provider": "livekit",
+            "mediaKind": "video"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": null
+        }
+      ],
+      "recordings": []
+    },
+    "events": {
+      "events": [
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:43.688Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-60108d67-7e28-4ca8-849c-b7e935e25447",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T11:12:43.000Z"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:43.151Z",
+          "eventType": "participant_joined",
+          "id": "call-event-5ae308f1-b46a-4443-9e71-deed11af0c88",
+          "payload": {
+            "state": "joined",
+            "userId": "user-alpha-engineer"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:42.848Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-1a135b8b-d550-4c11-88a9-4f5b86e6e3d7",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T11:12:42.000Z"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:40.798Z",
+          "eventType": "participant_left",
+          "id": "call-event-1041ce0a-0d3c-4456-ad84-9143a50d7a09",
+          "payload": {
+            "state": "left",
+            "userId": "user-alpha-engineer"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:40.691Z",
+          "eventType": "participant_joined",
+          "id": "call-event-6e24dbb2-6984-4392-889b-f56c511e736a",
+          "payload": {
+            "state": "joined",
+            "userId": "user-alpha-engineer"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-engineer",
+          "createdAt": "2026-07-08T11:02:40.384Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-4773afcc-a099-493e-87de-bd0f834f5c12",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T11:12:40.000Z"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T11:02:39.964Z",
+          "eventType": "participant_joined",
+          "id": "call-event-98649e06-f97a-4549-ae6e-4de493af64c3",
+          "payload": {
+            "state": "joined",
+            "userId": "user-alpha-admin"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T11:02:39.637Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-15c7a0d4-6e06-466e-a4d5-7940a14524ae",
+          "payload": {
+            "provider": "livekit",
+            "expiresAt": "2026-07-08T11:12:39.000Z"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T11:02:39.580Z",
+          "eventType": "session_started",
+          "id": "call-event-ac12f4ba-1f8e-4e53-bbef-b0388b977f3f",
+          "payload": {
+            "provider": "livekit"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": "call-session-4c2e886d-0764-43f8-9f18-9ed141763133"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T11:02:39.041Z",
+          "eventType": "room_created",
+          "id": "call-event-4c3f8878-5ff1-47a9-9e27-33afdcb10404",
+          "payload": {
+            "provider": "livekit",
+            "mediaKind": "video"
+          },
+          "roomId": "call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa",
+          "sessionId": null
+        }
+      ]
+    },
+    "eventSummary": [
+      {
+        "type": "join_token_issued",
+        "user": "user-alpha-engineer",
+        "state": null,
+        "at": "2026-07-08T11:02:43.688Z"
+      },
+      {
+        "type": "participant_joined",
+        "user": "user-alpha-engineer",
+        "state": "joined",
+        "at": "2026-07-08T11:02:43.151Z"
+      },
+      {
+        "type": "join_token_issued",
+        "user": "user-alpha-engineer",
+        "state": null,
+        "at": "2026-07-08T11:02:42.848Z"
+      },
+      {
+        "type": "participant_left",
+        "user": "user-alpha-engineer",
+        "state": "left",
+        "at": "2026-07-08T11:02:40.798Z"
+      },
+      {
+        "type": "participant_joined",
+        "user": "user-alpha-engineer",
+        "state": "joined",
+        "at": "2026-07-08T11:02:40.691Z"
+      },
+      {
+        "type": "join_token_issued",
+        "user": "user-alpha-engineer",
+        "state": null,
+        "at": "2026-07-08T11:02:40.384Z"
+      },
+      {
+        "type": "participant_joined",
+        "user": "user-alpha-admin",
+        "state": "joined",
+        "at": "2026-07-08T11:02:39.964Z"
+      },
+      {
+        "type": "join_token_issued",
+        "user": "user-alpha-admin",
+        "state": null,
+        "at": "2026-07-08T11:02:39.637Z"
+      },
+      {
+        "type": "session_started",
+        "user": "user-alpha-admin",
+        "state": null,
+        "at": "2026-07-08T11:02:39.580Z"
+      },
+      {
+        "type": "room_created",
+        "user": "user-alpha-admin",
+        "state": null,
+        "at": "2026-07-08T11:02:39.041Z"
+      }
+    ],
+    "counts": {
+      "join_token_issued:user-alpha-engineer": 3,
+      "participant_joined:user-alpha-engineer": 2,
+      "participant_left:user-alpha-engineer": 1,
+      "participant_joined:user-alpha-admin": 1,
+      "join_token_issued:user-alpha-admin": 1,
+      "session_started:user-alpha-admin": 1,
+      "room_created:user-alpha-admin": 1
+    }
+  },
+  "consoleSummary": {
+    "admin": [
+      "Failed to load resource: the server responded with a status of 409 (Conflict)",
+      "publisher data channel 'DATA_TRACK_LOSSY' closed unexpectedly {room: kisspm-livekit-multi-202607081102, roomID: RM_evDB6iXuTd8g, participant: user-alpha-admin, participantID: PA_F8tCKH3enfxJ}"
+    ],
+    "engineer": [
+      "publisher data channel 'DATA_TRACK_LOSSY' closed unexpectedly {room: kisspm-livekit-multi-202607081102, roomID: RM_evDB6iXuTd8g, participant: user-alpha-engineer, participantID: PA_2TpMDqasrjP8}",
+      "publisher data channel 'DATA_TRACK_LOSSY' closed unexpectedly {room: kisspm-livekit-multi-202607081102, roomID: RM_evDB6iXuTd8g, participant: user-alpha-engineer, participantID: PA_wtP6AE8H2UDS}",
+      "publisher data channel 'DATA_TRACK_LOSSY' closed unexpectedly {room: kisspm-livekit-multi-202607081102, roomID: RM_evDB6iXuTd8g, participant: user-alpha-engineer, participantID: PA_su6F6VNAMKgT}"
+    ]
+  },
+  "screenshots": [
+    "admin-sees-engineer-joined.png",
+    "engineer-sees-admin-joined.png",
+    "admin-sees-engineer-after-rejoin-reload.png"
+  ],
+  "assertions": {
+    "adminSawEngineer": true,
+    "engineerSawAdmin": true,
+    "adminStillActiveAfterEngineerLeave": true,
+    "engineerReappearsAfterRejoin": true,
+    "engineerReappearsAfterReloadJoin": true,
+    "activeSessionStillActive": true,
+    "noSessionEndedEvent": true,
+    "noDuplicateJoinTokenPerObservedJoinAfterFix": true
+  },
+  "status": "partial_risk_zone_pass_self_hosted_livekit_multiuser_synthetic_media",
+  "livekitReadback": {
+    "marker": "kisspm-livekit-multi-202607081102",
+    "lines": [
+      "2026-07-08T11:02:40.231Z participant active participant=user-alpha-admin browser=HeadlessChrome connectionType=udp",
+      "2026-07-08T11:02:40.311Z mediaTrack published participant=user-alpha-admin kind=audio source=MICROPHONE mime=audio/red",
+      "2026-07-08T11:02:40.375Z mediaTrack published participant=user-alpha-admin kind=video source=CAMERA mime=video/VP9 1280x720",
+      "2026-07-08T11:02:40.928Z participant active participant=user-alpha-engineer browser=HeadlessChrome connectionType=udp",
+      "2026-07-08T11:02:41.013Z mediaTrack published participant=user-alpha-engineer kind=audio source=MICROPHONE mime=audio/red",
+      "2026-07-08T11:02:41.073Z mediaTrack published participant=user-alpha-engineer kind=video source=CAMERA mime=video/VP9 1280x720",
+      "2026-07-08T11:02:41.185Z participant closing participant=user-alpha-engineer reason=CLIENT_REQUEST_LEAVE",
+      "2026-07-08T11:02:43.267Z participant active participant=user-alpha-engineer after explicit rejoin",
+      "2026-07-08T11:02:44.051Z participant active participant=user-alpha-engineer after reload join"
+    ],
+    "redaction": "Stored excerpt omits raw SDP, ICE credentials, full candidates, track ids, and token-bearing URLs."
+  },
+  "residualRisk": [
+    "Second browser contexts used Playwright fake media devices, not physical OBS/real camera; this closes LiveKit multi-user lifecycle and media publish plumbing but not physical camera-source validation.",
+    "Jitsi external media remains outside this evidence because meet.jit.si moderator/auth gate is a separate provider tail.",
+    "Console still reports LiveKit DATA_TRACK_LOSSY publisher data channel closed unexpectedly during connect; media and UI pass, but this should stay visible as a technical follow-up if data-channel features become user-facing."
+  ]
+}

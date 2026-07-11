@@ -1,0 +1,1140 @@
+{
+  "id": "RISK-MEDIA-LIVEKIT-RECONNECT-2026-07-10",
+  "createdAt": "2026-07-09T18:59:34.868Z",
+  "startedAt": "2026-07-09T18:58:57.799Z",
+  "marker": "kisspm-livekit-reconnect-1783623537799",
+  "roomId": "call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+  "sessionId": "call-session-0276ace7-c761-4a08-8a21-d57eaf1aaa45",
+  "environment": {
+    "baseUrl": "http://127.0.0.1:3180",
+    "browser": "Playwright Chromium with synthetic camera and microphone",
+    "scenarios": [
+      "engineer context offline/online",
+      "LiveKit container pause/unpause"
+    ]
+  },
+  "observations": [
+    {
+      "phase": "setup",
+      "roomId": "call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+      "sessionId": "call-session-0276ace7-c761-4a08-8a21-d57eaf1aaa45",
+      "createStatus": 201,
+      "startStatus": 201
+    },
+    {
+      "phase": "baseline",
+      "admin": {
+        "url": "http://127.0.0.1:3180/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+        "phase": "В эфире",
+        "participants": [
+          "Игорь Инженер",
+          "Вы"
+        ],
+        "controls": [
+          {
+            "label": "Выключить микрофон",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Выключить камеру",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Демонстрировать экран",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Сменить фон",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Завершить звонок",
+            "pressed": null,
+            "disabled": false
+          }
+        ],
+        "videos": [
+          {
+            "width": 1280,
+            "height": 720,
+            "paused": false,
+            "readyState": 4
+          }
+        ]
+      },
+      "engineer": {
+        "url": "http://127.0.0.1:3180/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+        "phase": "В эфире",
+        "participants": [
+          "Анна Администратор",
+          "Вы"
+        ],
+        "controls": [
+          {
+            "label": "Выключить микрофон",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Включить камеру",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Демонстрировать экран",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Сменить фон",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Завершить звонок",
+            "pressed": null,
+            "disabled": false
+          }
+        ],
+        "videos": [
+          {
+            "width": 320,
+            "height": 180,
+            "paused": false,
+            "readyState": 4
+          }
+        ]
+      }
+    },
+    {
+      "phase": "client-offline",
+      "admin": {
+        "url": "http://127.0.0.1:3180/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+        "phase": "В эфире",
+        "participants": [
+          "Игорь Инженер",
+          "Вы"
+        ],
+        "controls": [
+          {
+            "label": "Выключить микрофон",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Выключить камеру",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Демонстрировать экран",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Сменить фон",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Завершить звонок",
+            "pressed": null,
+            "disabled": false
+          }
+        ],
+        "videos": [
+          {
+            "width": 320,
+            "height": 180,
+            "paused": false,
+            "readyState": 4
+          },
+          {
+            "width": 1280,
+            "height": 720,
+            "paused": false,
+            "readyState": 4
+          }
+        ]
+      },
+      "engineer": {
+        "url": "http://127.0.0.1:3180/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+        "phase": "Переподключение…",
+        "participants": [
+          "Анна Администратор",
+          "Вы"
+        ],
+        "controls": [
+          {
+            "label": "Выключить микрофон",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Выключить камеру",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Демонстрировать экран",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Сменить фон",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Завершить звонок",
+            "pressed": null,
+            "disabled": false
+          }
+        ],
+        "videos": [
+          {
+            "width": 320,
+            "height": 180,
+            "paused": false,
+            "readyState": 4
+          },
+          {
+            "width": 1280,
+            "height": 720,
+            "paused": false,
+            "readyState": 4
+          }
+        ]
+      }
+    },
+    {
+      "phase": "client-recovered",
+      "admin": {
+        "url": "http://127.0.0.1:3180/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+        "phase": "В эфире",
+        "participants": [
+          "Игорь Инженер",
+          "Вы"
+        ],
+        "controls": [
+          {
+            "label": "Выключить микрофон",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Выключить камеру",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Демонстрировать экран",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Сменить фон",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Завершить звонок",
+            "pressed": null,
+            "disabled": false
+          }
+        ],
+        "videos": [
+          {
+            "width": 320,
+            "height": 180,
+            "paused": false,
+            "readyState": 4
+          },
+          {
+            "width": 1280,
+            "height": 720,
+            "paused": false,
+            "readyState": 4
+          }
+        ]
+      },
+      "engineer": {
+        "url": "http://127.0.0.1:3180/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+        "phase": "В эфире",
+        "participants": [
+          "Анна Администратор",
+          "Вы"
+        ],
+        "controls": [
+          {
+            "label": "Выключить микрофон",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Выключить камеру",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Демонстрировать экран",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Сменить фон",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Завершить звонок",
+            "pressed": null,
+            "disabled": false
+          }
+        ],
+        "videos": [
+          {
+            "width": 320,
+            "height": 180,
+            "paused": false,
+            "readyState": 4
+          },
+          {
+            "width": 1280,
+            "height": 720,
+            "paused": false,
+            "readyState": 4
+          }
+        ]
+      }
+    },
+    {
+      "phase": "server-paused",
+      "admin": {
+        "url": "http://127.0.0.1:3180/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+        "phase": "Переподключение…",
+        "participants": [
+          "Игорь Инженер",
+          "Вы"
+        ],
+        "controls": [
+          {
+            "label": "Выключить микрофон",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Выключить камеру",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Демонстрировать экран",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Сменить фон",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Завершить звонок",
+            "pressed": null,
+            "disabled": false
+          }
+        ],
+        "videos": [
+          {
+            "width": 320,
+            "height": 180,
+            "paused": false,
+            "readyState": 4
+          },
+          {
+            "width": 1280,
+            "height": 720,
+            "paused": false,
+            "readyState": 4
+          }
+        ]
+      },
+      "engineer": {
+        "url": "http://127.0.0.1:3180/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+        "phase": "Переподключение…",
+        "participants": [
+          "Анна Администратор",
+          "Вы"
+        ],
+        "controls": [
+          {
+            "label": "Выключить микрофон",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Выключить камеру",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Демонстрировать экран",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Сменить фон",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Завершить звонок",
+            "pressed": null,
+            "disabled": false
+          }
+        ],
+        "videos": [
+          {
+            "width": 320,
+            "height": 180,
+            "paused": false,
+            "readyState": 4
+          },
+          {
+            "width": 1280,
+            "height": 720,
+            "paused": false,
+            "readyState": 4
+          }
+        ]
+      }
+    },
+    {
+      "phase": "server-recovered",
+      "admin": {
+        "url": "http://127.0.0.1:3180/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+        "phase": "В эфире",
+        "participants": [
+          "Игорь Инженер",
+          "Вы"
+        ],
+        "controls": [
+          {
+            "label": "Выключить микрофон",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Выключить камеру",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Демонстрировать экран",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Сменить фон",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Завершить звонок",
+            "pressed": null,
+            "disabled": false
+          }
+        ],
+        "videos": [
+          {
+            "width": 320,
+            "height": 180,
+            "paused": false,
+            "readyState": 4
+          },
+          {
+            "width": 1280,
+            "height": 720,
+            "paused": false,
+            "readyState": 4
+          }
+        ]
+      },
+      "engineer": {
+        "url": "http://127.0.0.1:3180/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+        "phase": "В эфире",
+        "participants": [
+          "Анна Администратор",
+          "Вы"
+        ],
+        "controls": [
+          {
+            "label": "Выключить микрофон",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Выключить камеру",
+            "pressed": "true",
+            "disabled": false
+          },
+          {
+            "label": "Демонстрировать экран",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Сменить фон",
+            "pressed": "false",
+            "disabled": false
+          },
+          {
+            "label": "Завершить звонок",
+            "pressed": null,
+            "disabled": false
+          }
+        ],
+        "videos": [
+          {
+            "width": 320,
+            "height": 180,
+            "paused": false,
+            "readyState": 4
+          },
+          {
+            "width": 1280,
+            "height": 720,
+            "paused": false,
+            "readyState": 4
+          }
+        ]
+      }
+    },
+    {
+      "phase": "api-readback",
+      "eventSummary": [
+        {
+          "type": "participant_joined",
+          "user": "user-alpha-engineer",
+          "state": "joined",
+          "at": "2026-07-09T18:59:00.817Z"
+        },
+        {
+          "type": "join_token_issued",
+          "user": "user-alpha-engineer",
+          "state": null,
+          "at": "2026-07-09T18:59:00.517Z"
+        },
+        {
+          "type": "participant_joined",
+          "user": "user-alpha-admin",
+          "state": "joined",
+          "at": "2026-07-09T18:59:00.031Z"
+        },
+        {
+          "type": "join_token_issued",
+          "user": "user-alpha-admin",
+          "state": null,
+          "at": "2026-07-09T18:58:59.480Z"
+        },
+        {
+          "type": "session_started",
+          "user": "user-alpha-admin",
+          "state": null,
+          "at": "2026-07-09T18:58:58.955Z"
+        },
+        {
+          "type": "room_created",
+          "user": "user-alpha-admin",
+          "state": null,
+          "at": "2026-07-09T18:58:58.922Z"
+        }
+      ],
+      "counts": {
+        "participant_joined:user-alpha-engineer": 1,
+        "join_token_issued:user-alpha-engineer": 1,
+        "participant_joined:user-alpha-admin": 1,
+        "join_token_issued:user-alpha-admin": 1,
+        "session_started:user-alpha-admin": 1,
+        "room_created:user-alpha-admin": 1
+      },
+      "invariants": {
+        "activeSessionStillActive": true,
+        "noSessionEndedEvent": true,
+        "noParticipantLeftDuringTransportRecovery": true,
+        "oneAdminJoinToken": true,
+        "oneEngineerJoinToken": true,
+        "oneAdminJoinedEvent": true,
+        "oneEngineerJoinedEvent": true
+      }
+    }
+  ],
+  "screenshots": [
+    "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/baseline-admin.png",
+    "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/baseline-engineer.png",
+    "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/client-offline-reconnecting.png",
+    "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/client-recovered.png",
+    "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/server-paused-admin-reconnecting.png",
+    "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/server-paused-engineer-reconnecting.png",
+    "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/server-recovered-admin.png",
+    "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/server-recovered-engineer.png"
+  ],
+  "runtimeIssueSummary": {
+    "counts": {
+      "admin:console.error:other_error": 1,
+      "engineer:console.error:other_error": 1,
+      "admin:console.error:livekit_error": 1,
+      "engineer:console.error:livekit_error": 1,
+      "engineer:requestfailed:network_error": 1,
+      "engineer:console.error:network_error": 1,
+      "engineer:console.error:websocket_error": 2,
+      "engineer:requestfailed:other_error": 1
+    },
+    "samples": [
+      {
+        "actor": "admin",
+        "kind": "console.error",
+        "category": "other_error"
+      },
+      {
+        "actor": "engineer",
+        "kind": "console.error",
+        "category": "other_error"
+      },
+      {
+        "actor": "admin",
+        "kind": "console.error",
+        "category": "livekit_error"
+      },
+      {
+        "actor": "engineer",
+        "kind": "console.error",
+        "category": "livekit_error"
+      },
+      {
+        "actor": "engineer",
+        "kind": "requestfailed",
+        "category": "network_error",
+        "resource": "fetch",
+        "path": "/"
+      },
+      {
+        "actor": "engineer",
+        "kind": "console.error",
+        "category": "network_error"
+      },
+      {
+        "actor": "engineer",
+        "kind": "console.error",
+        "category": "websocket_error"
+      },
+      {
+        "actor": "engineer",
+        "kind": "requestfailed",
+        "category": "other_error",
+        "resource": "fetch",
+        "path": "/"
+      },
+      {
+        "actor": "engineer",
+        "kind": "console.error",
+        "category": "websocket_error"
+      }
+    ]
+  },
+  "livekitLogSummary": {
+    "exitCode": 0,
+    "entries": [
+      {
+        "timestamp": null,
+        "event": "room_selected",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": null,
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "participant_connected",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "transport_connected",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": "udp",
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "media_track",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": "audio",
+        "mime": "audio/red",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "media_track",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": "video",
+        "mime": "video/VP9",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "ice_pair_changed",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": "PUBLISHER",
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "participant_connected",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "transport_connected",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": "udp",
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "media_track",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": "audio",
+        "mime": "audio/red",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "media_track",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": "video",
+        "mime": "video/VP9",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": "video/VP9",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": "video/VP9",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": "audio/red",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": "audio/red",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": "video/VP9",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": "video/VP9",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": "video/VP9",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "participant_connected",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "participant_state",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "ice_pair_changed",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": "PUBLISHER",
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": "audio/red",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": "audio/red",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": "video/VP9",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_selected",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": null,
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_selected",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": null,
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "participant_connected",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "participant_connected",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "participant_state",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "participant_state",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": "audio/red",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "ice_pair_changed",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": "PUBLISHER",
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": "audio/red",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-engineer",
+        "kind": null,
+        "mime": null,
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      },
+      {
+        "timestamp": null,
+        "event": "room_activity",
+        "room": "kisspm-livekit-reconnect-1783623537799",
+        "participant": "user-alpha-admin",
+        "kind": null,
+        "mime": "video/VP9",
+        "state": null,
+        "connectionType": null,
+        "transport": null,
+        "expectedToResume": null
+      }
+    ]
+  },
+  "verdict": {
+    "status": "passed",
+    "failure": null,
+    "note": "Both transport interruptions visibly entered reconnecting and recovered without a new join token, participant-left event, or ended session."
+  },
+  "redaction": "Evidence stores no join tokens, cookies, raw SDP, ICE credentials/candidates, TURN credentials, or URL query strings."
+}

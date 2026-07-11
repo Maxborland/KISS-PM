@@ -1,0 +1,38 @@
+{
+  "id": "BUG-SHELL-13-AGENT-DEMO-CHROME-OPEN",
+  "linkedOldIds": [
+    "BUG-SHELL-13"
+  ],
+  "status": "confirmed-open",
+  "coverageStatus": "targeted-code-review",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "generatedAt": "2026-07-07",
+  "surface": [
+    "/agent"
+  ],
+  "expected": [
+    "Production /agent history must be backed by real sessions or not be rendered as clickable history.",
+    "Production /agent mini-navigation must navigate to real product routes or not be exposed as fake navigation.",
+    "Message timestamps must reflect real message creation time rather than a synthetic demo sequence."
+  ],
+  "actual": [
+    "apps/web/src/workspace/agent/agent-surface.tsx imports production frame pieces from @/widgets/landing-agent-demo/components.",
+    "apps/web/src/widgets/landing-agent-demo/components.tsx renders HISTORY_ITEMS from the landing-demo scenario as clickable buttons.",
+    "The agent surface still uses demo message types and synthetic/demo chrome inherited from the landing demo components."
+  ],
+  "evidence": [
+    "Subagent targeted review on 2026-07-07 inspected llmProvider.ts, agentRoutes.ts, agent-client.ts, use-agent.ts, agent-surface.tsx, and landing-agent-demo/components.tsx.",
+    "No-provider proposal/SSE fake success is fixed separately, but static history/nav/timestamp demo chrome remains code-visible and does not require LLM provider keys to fix."
+  ],
+  "suspectedArea": [
+    "apps/web/src/workspace/agent/agent-surface.tsx",
+    "apps/web/src/widgets/landing-agent-demo/components.tsx",
+    "apps/web/src/widgets/landing-agent-demo/scenario.ts"
+  ],
+  "fixRecommendation": [
+    "Split production Agent workspace chrome from landing demo chrome or add explicit production props that disable demo history and convert nav to real links.",
+    "Stamp production messages at creation time and render those timestamps instead of deterministic demo offsets.",
+    "Keep the landing demo behavior only on landing/demo surfaces."
+  ],
+  "regressionRisk": "Medium. The production /agent page and landing demo share components; the fix must preserve the marketing demo while removing fake controls from the product route."
+}

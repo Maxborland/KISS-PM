@@ -112,7 +112,21 @@ describe("scenario planning", () => {
       }
     });
 
-    expect(proposals.map((proposal) => proposal.profile)).toEqual(["aggressive"]);
+    expect(proposals.map((proposal) => proposal.profile)).toEqual([
+      "aggressive",
+      "balanced",
+      "resilient"
+    ]);
+    expect(proposals.find((proposal) => proposal.profile === "balanced")).toMatchObject({
+      availability: "unavailable",
+      unavailableReason: "alternate_resource_has_insufficient_capacity",
+      planDelta: { commands: [] }
+    });
+    expect(proposals.find((proposal) => proposal.profile === "resilient")).toMatchObject({
+      availability: "unavailable",
+      unavailableReason: "alternate_resource_has_insufficient_capacity",
+      planDelta: { commands: [] }
+    });
   });
 
   // Регресс BUG-PROJ-25: переназначение не предлагает ресурс ДРУГОЙ позиции (посторонний).
@@ -151,6 +165,21 @@ describe("scenario planning", () => {
         taskIds: ["task-a"]
       }
     });
+    expect(proposals).toHaveLength(3);
+    expect(proposals.filter((proposal) => proposal.availability === "unavailable")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          profile: "balanced",
+          unavailableReason: "no_eligible_alternate_resource",
+          planDelta: expect.objectContaining({ commands: [] })
+        }),
+        expect.objectContaining({
+          profile: "resilient",
+          unavailableReason: "no_eligible_alternate_resource",
+          planDelta: expect.objectContaining({ commands: [] })
+        })
+      ])
+    );
     // ни один профиль не переносит нагрузку на постороннюю позицию resource-beta
     const reassignsToBeta = proposals.some((proposal) =>
       proposal.planDelta.commands.some(
@@ -158,6 +187,67 @@ describe("scenario planning", () => {
       )
     );
     expect(reassignsToBeta).toBe(false);
+  });
+
+  it("removes a multi-task overload by moving only the excess work", () => {
+    const base = createOverloadedSnapshot();
+    const firstTask = { ...base.tasks[0]!, workMinutes: 300 };
+    const secondTask = {
+      ...base.tasks[0]!,
+      id: "task-b",
+      wbsCode: "2",
+      title: "B",
+      workMinutes: 300
+    };
+    const firstAssignment = { ...base.assignments[0]!, workMinutes: 300 };
+    const secondAssignment = {
+      ...base.assignments[0]!,
+      id: "assignment-b",
+      taskId: "task-b",
+      workMinutes: 300
+    };
+    const snapshot: PlanSnapshot = {
+      ...base,
+      tasks: [firstTask, secondTask],
+      assignments: [firstAssignment, secondAssignment]
+    };
+    const calculatedPlan = calculatePlan(snapshot, {
+      calculatedAt: "2026-05-21T00:00:00.000Z",
+      engineVersion: "planning-core-v1"
+    });
+    const resourceLoad = buildResourceLoadMatrix({
+      plan: calculatedPlan,
+      resources: snapshot.resources,
+      assignments: snapshot.assignments,
+      calendars: snapshot.calendars,
+      calendarExceptions: snapshot.calendarExceptions,
+      reservations: snapshot.reservations,
+      rangeStart: "2026-06-01",
+      rangeFinish: "2026-06-01",
+      granularities: ["day"]
+    });
+    const proposals = proposePlanningScenarios({
+      snapshot,
+      calculatedPlan,
+      resourceLoad,
+      target: {
+        type: "resource_overload",
+        resourceId: "resource-alpha",
+        date: "2026-06-01",
+        overloadMinutes: 120,
+        taskIds: ["task-a", "task-b"]
+      }
+    });
+    const resilient = proposals.find((proposal) => proposal.profile === "resilient")!;
+
+    expect(resilient).toMatchObject({
+      availability: "available",
+      conflictEffect: "removed",
+      explainability: { overloadMinutes: 0 }
+    });
+    expect(resilient.planDelta.commands.filter((command) => command.type === "assignment.upsert"))
+      .toHaveLength(2);
+    assertProposalEffect(snapshot, resilient);
   });
 });
 

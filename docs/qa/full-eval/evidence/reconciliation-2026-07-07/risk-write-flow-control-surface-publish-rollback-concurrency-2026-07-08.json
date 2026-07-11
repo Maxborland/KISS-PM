@@ -1,0 +1,65 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-CONTROL-SURFACE-PUBLISH-ROLLBACK-CONCURRENCY",
+  "generatedAt": "2026-07-08T11:36:00+07:00",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "status": "pass",
+  "scope": "Control surface publish/rollback duplicate-submit and stale-version conflict handling.",
+  "surfaces": [
+    "POST /api/tenant/current/control-surfaces/:surfaceId/publish",
+    "POST /api/tenant/current/control-surfaces/:surfaceId/rollback",
+    "control_surface_definitions optimistic version fields",
+    "control_surface_versions immutable history"
+  ],
+  "expected": "A duplicate or stale publish/rollback must not create another control_surface_versions row, must not produce a second success audit/event id, and must return a stable conflict instead of succeeding as a no-op version bump or leaking a database race as 500.",
+  "redEvidence": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts packages/persistence/src/controlSurfaceRepository.db.test.ts -t \"rejects duplicate\"",
+      "observed": "Failed before fix: duplicate publish resolved successfully with currentVersion=2 and audit-publish-duplicate; duplicate rollback resolved successfully with currentVersion=4 and audit-rollback-duplicate.",
+      "result": "fail-before-fix"
+    }
+  ],
+  "actual": "Pass: duplicate publish and duplicate rollback now throw control_surface_version_conflict, version history remains single-use for each real transition, and the only persisted auditEventIds are the real publish/rollback ids. API routes pass expectedDraftVersion/expectedCurrentVersion and map repository conflicts to stable 409 responses.",
+  "codeChanges": [
+    "packages/persistence/src/controlSurfaceRepository.ts adds expectedDraftVersion/expectedCurrentVersion inputs, compares current draft/published definitions for no-op duplicate detection, and guards updates with current/draft version CAS predicates.",
+    "apps/api/src/controlSurfaceRoutes.ts passes the read-before-write version to publish/rollback and maps control_surface_version_conflict to 409 before appending success audit events.",
+    "packages/persistence/src/controlSurfaceRepository.db.test.ts adds RED/GREEN DB tests for duplicate publish and duplicate rollback without extra immutable version rows."
+  ],
+  "verification": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts packages/persistence/src/controlSurfaceRepository.db.test.ts -t \"rejects duplicate\"",
+      "observed": "2 selected tests passed, 2 skipped",
+      "notes": "Vitest emitted the existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts, unrelated to this slice.",
+      "result": "pass"
+    },
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts packages/persistence/src/controlSurfaceRepository.db.test.ts",
+      "observed": "4 tests passed",
+      "notes": "Same pre-existing planning commandReducer warning.",
+      "result": "pass"
+    },
+    {
+      "command": "node_modules\\.bin\\vitest.cmd run apps/api/src/controlSurfaceRoutes.test.ts",
+      "observed": "12 tests passed",
+      "notes": "First sandboxed attempt hit esbuild spawn EPERM; rerun outside sandbox passed. Same pre-existing planning commandReducer warning.",
+      "result": "pass"
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.cmd -p apps/api/tsconfig.json --pretty false",
+      "observed": "passed with no output",
+      "result": "pass"
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.cmd -p packages/persistence/tsconfig.json --pretty false",
+      "observed": "passed with no output",
+      "result": "pass"
+    }
+  ],
+  "changedFiles": [
+    "apps/api/src/controlSurfaceRoutes.ts",
+    "packages/persistence/src/controlSurfaceRepository.ts",
+    "packages/persistence/src/controlSurfaceRepository.db.test.ts",
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-control-surface-publish-rollback-concurrency-2026-07-08.json",
+    "docs/qa/full-eval/reconciliation-matrix-2026-07-07.json"
+  ],
+  "coverageImpact": "Covers the control-surface publish/rollback atom inside RISK-WRITE-FLOW-RACE-IDEMPOTENCY at DB/API level. It does not close unrelated meeting create/link/note, task comment, or retrospective close atoms."
+}

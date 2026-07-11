@@ -63,6 +63,7 @@ function phaseFromConnectionState(state: ConnectionState): CallPhase {
     case ConnectionState.Connected:
       return "connected";
     case ConnectionState.Reconnecting:
+    case ConnectionState.SignalReconnecting:
       return "reconnecting";
     case ConnectionState.Disconnected:
       return "disconnected";
@@ -139,6 +140,7 @@ export type CallEngineState = {
   controls: CallLocalControls;
   handlers: CallControlHandlers;
   error: string | null;
+  externalJoin: { provider: "jitsi" | "manual"; joinUrl: string } | null;
   chat: MessageView[];
   sendChat: (text: string) => void;
 };
@@ -148,6 +150,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
   const [stage, setStage] = useState<CallStageView>({ phase: "idle", participants: [] });
   const [controls, setControls] = useState<CallLocalControls>({ micOn: false, cameraOn: false });
   const [error, setError] = useState<string | null>(null);
+  const [externalJoin, setExternalJoin] = useState<CallEngineState["externalJoin"]>(null);
   const [chat, setChat] = useState<MessageView[]>([]);
   const backgroundRef = useRef<CallBackgroundController | null>(null);
   if (!backgroundRef.current) {
@@ -157,12 +160,20 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
   const backgroundSupported = useMemo(() => backgroundProcessorsSupported(), []);
   const conversationIdRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const joinedSessionIdRef = useRef<string | null>(null);
   // Remote audio is attached to detached <audio> elements the engine owns (the tile only
   // renders video); kept here so they are removed on teardown.
   const audioElementsRef = useRef<HTMLMediaElement[]>([]);
   // In-call messages sent before the durable conversation resolves are queued, then flushed.
   const pendingMessagesRef = useRef<string[]>([]);
 
+  const markParticipantLeft = useCallback(() => {
+    const sessionId = joinedSessionIdRef.current;
+    if (!sessionId) return;
+    joinedSessionIdRef.current = null;
+    sessionIdRef.current = null;
+    void postParticipantState(roomId, sessionId, "left");
+  }, [roomId]);
   const refresh = useCallback(() => {
     const room = roomRef.current;
     if (!room) return;
@@ -273,11 +284,16 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     void (async () => {
       try {
         const session = await joinOrStartCallSession(roomId);
+        if (disposed) return;
         sessionIdRef.current = session.id;
         const [join, turn] = await Promise.all([
           fetchJoinToken(roomId, session.id),
           fetchTurnCredentials(roomId, session.id)
         ]);
+        if ((join.provider === "jitsi" || join.provider === "manual") && join.joinUrl) {
+          setExternalJoin({ provider: join.provider, joinUrl: join.joinUrl });
+          return;
+        }
         if (join.provider !== "livekit" || !join.token) {
           throw new Error("video_provider_unavailable");
         }
@@ -292,12 +308,21 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
           iceServers ? { rtcConfig: { iceServers } } : undefined
         );
         if (disposed) return;
-        await room.localParticipant.setMicrophoneEnabled(options?.micOn ?? true);
-        await room.localParticipant.setCameraEnabled(options?.cameraOn ?? true);
+        try {
+          await room.localParticipant.setMicrophoneEnabled(options?.micOn ?? true);
+        } catch {
+          // Stay in the room if the selected input device cannot start.
+        }
+        try {
+          await room.localParticipant.setCameraEnabled(options?.cameraOn ?? true);
+        } catch {
+          // Camera failures should degrade to camera-off, not fail the whole call.
+        }
         // Unblock playback of subscribed remote audio (the lobby join is the user gesture).
         void room.startAudio();
         refresh();
         // Record presence so the call shows up in occupancy (the recipe is connect → state).
+        joinedSessionIdRef.current = session.id;
         void postParticipantState(roomId, session.id, "joined");
         // Resolve the durable conversation for the room's parent entity (best-effort).
         const entity = await fetchCallRoomEntity(roomId);
@@ -329,6 +354,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     return () => {
       disposed = true;
       room.removeAllListeners();
+      markParticipantLeft();
       void room.disconnect();
       void backgroundRef.current?.dispose();
       for (const element of audioElementsRef.current) element.remove();
@@ -336,9 +362,10 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
       pendingMessagesRef.current = [];
       conversationIdRef.current = null;
       sessionIdRef.current = null;
+      joinedSessionIdRef.current = null;
       roomRef.current = null;
     };
-  }, [roomId, refresh, options]);
+  }, [roomId, refresh, options, markParticipantLeft]);
 
   const handlers = useMemo<CallControlHandlers>(
     () => ({
@@ -347,34 +374,33 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
         if (!room) return;
         void room.localParticipant
           .setMicrophoneEnabled(!room.localParticipant.isMicrophoneEnabled)
-          .then(refresh);
+          .catch(() => undefined)
+          .finally(refresh);
       },
       onToggleCamera: () => {
         const room = roomRef.current;
         if (!room) return;
         void room.localParticipant
           .setCameraEnabled(!room.localParticipant.isCameraEnabled)
-          .then(refresh);
+          .catch(() => undefined)
+          .finally(refresh);
       },
       onToggleScreenShare: () => {
         const room = roomRef.current;
         if (!room) return;
         void room.localParticipant
           .setScreenShareEnabled(!room.localParticipant.isScreenShareEnabled)
-          .then(refresh);
+          .catch(() => undefined)
+          .finally(refresh);
       },
       onLeave: () => {
-        const sessionId = sessionIdRef.current;
-        if (sessionId) {
-          // Record that this participant left. The session is NOT ended here — others may
-          // still be in it, and the next participant joins this same active session.
-          void postParticipantState(roomId, sessionId, "left");
-          sessionIdRef.current = null;
-        }
+        // Record that this participant left. The session is NOT ended here - others may
+        // still be in it, and the next participant joins this same active session.
+        markParticipantLeft();
         void roomRef.current?.disconnect();
       }
     }),
-    [refresh, roomId]
+    [markParticipantLeft, refresh]
   );
 
   const sendChat = useCallback((text: string) => {
@@ -411,6 +437,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     controls: { ...controls, background, backgroundSupported },
     handlers: { ...handlers, onCycleBackground },
     error,
+    externalJoin,
     chat,
     sendChat
   };

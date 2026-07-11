@@ -67,8 +67,8 @@ export function useAuth() {
   const [sessions, setSessions] = useState<AuthSession[]>([]);
 
   // Рефетч сессии: me() → state из ответа (НЕ из cookie). 401 session_required → anonymous (это не ошибка).
-  const refresh = useCallback(async () => {
-    setStatus("loading");
+  const refresh = useCallback(async ({ quiet = false }: { quiet?: boolean } = {}) => {
+    if (!quiet) setStatus("loading");
     try {
       const me: AuthMeResponse = await client.me();
       setUser(me.user);
@@ -161,7 +161,7 @@ export function useAuth() {
     (input: ProfileUpdateInput): Promise<AuthMutationResult> =>
       guard(async () => {
         await client.updateProfile(input);
-        await refresh();
+        await refresh({ quiet: true });
       }),
     [client, refresh]
   );
@@ -171,7 +171,7 @@ export function useAuth() {
     (input: ThemeUpdateInput): Promise<AuthMutationResult> =>
       guard(async () => {
         await client.updateTheme(input);
-        await refresh();
+        await refresh({ quiet: true });
       }),
     [client, refresh]
   );

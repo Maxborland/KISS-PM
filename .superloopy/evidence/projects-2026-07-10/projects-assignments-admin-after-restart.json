@@ -1,0 +1,142 @@
+{
+  "config": {
+    "configFile": "E:\\KISS-PM\\playwright.config.ts",
+    "rootDir": "E:/KISS-PM/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "E:/KISS-PM/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "E:/KISS-PM/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "full-eval\\projects-assignments-write.spec.ts",
+      "file": "full-eval/projects-assignments-write.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Projects assignments write flows",
+          "file": "full-eval/projects-assignments-write.spec.ts",
+          "line": 45,
+          "column": 6,
+          "specs": [
+            {
+              "title": "ADMIN adds and removes an assignment with API readback and reload",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 90191,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 90000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 90000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 90000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\full-eval\\projects-assignments-write.spec.ts",
+                            "column": 61,
+                            "line": 75
+                          },
+                          "message": "Error: locator.selectOption: Test timeout of 90000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Добавить исполнителя' }).getByLabel('Ресурс', { exact: true })\u001b[22m\n\n\n  73 |       const addDialog = page.getByRole(\"dialog\", { name: \"Добавить исполнителя\" });\n  74 |       await expect(addDialog).toContainText(fixture.task.title);\n> 75 |       await addDialog.getByLabel(\"Ресурс\", { exact: true }).selectOption(fixture.user.id);\n     |                                                             ^\n  76 |       await addDialog.getByLabel(\"Роль\", { exact: true }).selectOption(\"observer\");\n  77 |\n  78 |       const createPreviewPromise = waitForPlanningResponse(\n    at E:\\KISS-PM\\e2e\\full-eval\\projects-assignments-write.spec.ts:75:61"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T23:21:46.196Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\full-eval-projects-assignm-8a56f-ith-API-readback-and-reload-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\full-eval-projects-assignm-8a56f-ith-API-readback-and-reload-chromium\\trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "af28d93f1d636b84381a-89cc81fd549d04d410cc",
+              "file": "full-eval/projects-assignments-write.spec.ts",
+              "line": 46,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-09T23:21:45.285Z",
+    "duration": 91437.496,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

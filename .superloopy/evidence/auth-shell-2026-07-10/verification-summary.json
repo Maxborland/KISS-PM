@@ -1,0 +1,44 @@
+{
+  "generatedAt": "2026-07-09T21:28:21.251Z",
+  "playwright": {
+    "total": 38,
+    "passed": 38,
+    "failed": 0,
+    "stats": {
+      "startTime": "2026-07-09T21:24:25.335Z",
+      "duration": 180832.974,
+      "expected": 38,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "artifact": ".superloopy/evidence/auth-shell-2026-07-10/playwright-auth-shell-final.json"
+  },
+  "vitest": {
+    "total": 17,
+    "passed": 17,
+    "failed": 0,
+    "success": true,
+    "artifact": ".superloopy/evidence/auth-shell-2026-07-10/vitest-auth-reset-final.json"
+  },
+  "typecheck": {
+    "api": "pass",
+    "web": "pass"
+  },
+  "coverage": {
+    "total": 155,
+    "statuses": {
+      "pass": 154,
+      "partial_live_rereadback": 1
+    }
+  },
+  "sha256": {
+    "apps/api/src/authRegistrationRoutes.ts": "d457008fc9a4d92d25964450e1d7f9294320657264cc39c4ab66b271d4fb6875",
+    "apps/api/src/authRegistrationRoutes.test.ts": "3907ec520c2e625ebe63800b942384c8850d8964fcac0ce688bec3413286d4c4",
+    "apps/web/src/auth/avatar-menu/shell-user-menu.tsx": "2c9f43539d3c37ec40c1e81237099c4684ea26a1b80639e55176956af7a2b392",
+    "apps/web/src/auth/lib/use-auth.ts": "3f33c83a2625332dbd83959ab599333093f1fe9c190ee2d2247a5e513c1aefca",
+    "apps/web/src/auth/profile/profile-surface.tsx": "91bc5d128d2f9b95c196888cefa639c9f9ecfd12d6469070298bc749c75b371c",
+    "apps/web/src/workspace/my-work/my-work-surface.tsx": "008a659186031330a5a5e579f34797d276c590a913767e37bf5d045ba9a6240c",
+    "e2e/full-eval/mywork-role-actions.spec.ts": "7f4790f103d5acebf5f9938692aa7f383d90d5a2b3fde3a1413ef48a3537b20a"
+  }
+}

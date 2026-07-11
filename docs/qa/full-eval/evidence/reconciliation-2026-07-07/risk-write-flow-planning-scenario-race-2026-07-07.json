@@ -1,0 +1,63 @@
+{
+  "id": "RISK-WRITE-FLOW-PLANNING-SCENARIO-RACE",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "status": "targeted-coverage-added",
+  "coverageStatus": "partial-risk-zone",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "generatedAt": "2026-07-07",
+  "surface": [
+    "POST /api/workspace/projects/:projectId/planning/scenario-proposals",
+    "POST /api/workspace/projects/:projectId/planning/scenario-proposals/:proposalId/apply",
+    "GET /api/workspace/projects/:projectId/planning/read-model",
+    "planning_scenario_runs readback"
+  ],
+  "writeFlowsCovered": [
+    "scenario proposal apply duplicate/race",
+    "baseline.capture concurrent idempotency regression",
+    "task.update_schedule concurrent idempotency regression"
+  ],
+  "expected": [
+    "Two concurrent duplicate applies of the same scenario proposal must not double-apply the plan delta.",
+    "Exactly one duplicate scenario apply succeeds; the other receives a conflict after serialized state is observed.",
+    "Fresh readback shows one planVersion bump and one applied scenario run row."
+  ],
+  "fixApplied": [
+    "Added DB/API integration coverage for concurrent duplicate scenario apply requests.",
+    "No production code change was required; current planning route lock/version/applied_at behavior passed the new coverage."
+  ],
+  "changedFiles": [
+    "apps/api/src/planningRoutes.db.test.ts",
+    "docs/qa/full-eval/agent-reports/planning-write-race-2026-07-07.md",
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-scenario-race-2026-07-07.json"
+  ],
+  "greenEvidence": [
+    "$env:DATABASE_URL='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm'; .\\node_modules\\.bin\\vitest.CMD run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"keeps scenario apply single-use\" -> 1 selected test passed, 22 skipped.",
+    "$env:DATABASE_URL='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm'; .\\node_modules\\.bin\\vitest.CMD run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"deduplicates concurrent|keeps scenario apply single-use\" -> 3 selected tests passed, 20 skipped.",
+    "git diff --check -- apps/api/src/planningRoutes.db.test.ts -> passed.",
+    "codegraph sync -> passed, already up to date."
+  ],
+  "knownWarnings": [
+    "Vitest emitted the pre-existing duplicate assignment.delete case warning in packages/domain/src/planning/commandReducer.ts; unrelated to this slice.",
+    "git diff --check emitted a CRLF-to-LF warning for apps/api/src/planningRoutes.db.test.ts."
+  ],
+  "codeGraph": {
+    "before": [
+      "CodeGraph status healthy: 2164 indexed files, 23852 nodes, 51896 edges.",
+      "registerPlanningRoutes contains scenario preview/apply route wiring and serialized scenario apply behavior.",
+      "planningRoutes.db.test.ts already had baseline.capture and task.update_schedule concurrent idempotency coverage."
+    ],
+    "after": [
+      "codegraph sync passed and reported already up to date.",
+      "Production CodeGraph nodes/edges unchanged.",
+      "Manual index: added Vitest test block at apps/api/src/planningRoutes.db.test.ts:2112 because CodeGraph does not expose the callback as a symbol node."
+    ]
+  },
+  "limitations": [
+    "Full planningRoutes.db.test.ts suite was not run; targeted DB/API race/idempotency tests passed.",
+    "Scenario preview/create duplicate proposal creation is not covered in this atom; the covered write mutation is scenario apply.",
+    "No e2e or reconciliation matrix changes were made by instruction."
+  ],
+  "regressionRisk": "Low. Test-only change; production code unchanged."
+}

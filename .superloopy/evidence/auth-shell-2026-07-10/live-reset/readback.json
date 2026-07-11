@@ -1,0 +1,45 @@
+{
+  "recordedAt": "2026-07-10T04:20:00+07:00",
+  "runtime": {
+    "webOrigin": "http://127.0.0.1:3180",
+    "apiOrigin": "http://127.0.0.1:4190",
+    "emailProvider": "smtp"
+  },
+  "browserTraversal": {
+    "appBrowser": "Codex in-app Browser",
+    "mailboxBrowser": "user Chrome Gmail session",
+    "requestSurface": "/password-reset",
+    "requestUiStatus": "Если адрес зарегистрирован — мы отправили инструкции по сбросу пароля.",
+    "mailSearchMatched": 1,
+    "mailSubject": "KISS PM password reset",
+    "tokenLength": 64,
+    "tokenRedacted": true,
+    "confirmSurface": "/password-reset/confirm?token=<redacted>",
+    "confirmUiStatus": "Пароль изменён — войдите с новым паролем.",
+    "oldPasswordLogin": "rejected_invalid_credentials",
+    "newPasswordLogin": "accepted_dashboard",
+    "reload": "session_preserved",
+    "logout": "session_revoked",
+    "tokenReuse": "rejected_reset_token_used"
+  },
+  "finding": {
+    "id": "AUTH-SHELL-07",
+    "severity": "high",
+    "actualBeforeFix": "The live SMTP message linked to the internal API origin http://127.0.0.1:4190.",
+    "expected": "The message must link to the browser application origin http://127.0.0.1:3180.",
+    "rootCause": "buildResetUrl used context.req.url after the Next.js API rewrite instead of the already validated browser Origin header.",
+    "fix": "Use the trusted browser Origin and retain request-origin fallback for server-to-server calls."
+  },
+  "postFixEvidence": {
+    "apiRegression": "apps/api/src/authRegistrationRoutes.test.ts: 17/17 passed; separate app and API origins resolve the reset URL to the app origin.",
+    "browserRoute": "The in-app browser loaded /password-reset/confirm?token=<64 hex> after a clean Next.js route rebuild.",
+    "smtpRuntime": "The combined Auth + Shell run received delivery=email from the SMTP-enabled API.",
+    "providerRereadback": "A second real message was requested after the fix. REG.RU IMAP does not retain routed messages locally; routing forwards them to Gmail. Computer Use stopped before a second Gmail content readback, so no second mailbox-content claim is made."
+  },
+  "artifacts": [
+    ".superloopy/evidence/auth-shell-2026-07-10/live-reset/token-reuse-rejected.png",
+    ".superloopy/evidence/auth-shell-2026-07-10/playwright-auth-shell-final.json",
+    ".superloopy/evidence/auth-shell-2026-07-10/vitest-auth-reset-final.json",
+    ".superloopy/evidence/auth-shell-2026-07-10/verification-summary.json"
+  ]
+}

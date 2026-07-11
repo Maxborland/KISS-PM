@@ -22,6 +22,30 @@ import type {
   TaskResult
 } from "./taskCommandTypes";
 
+function taskCreateConflict(error: unknown): "task_id_taken" | null {
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 8; depth += 1) {
+    const record = current as {
+      cause?: unknown;
+      code?: unknown;
+      constraint?: unknown;
+      constraint_name?: unknown;
+      message?: unknown;
+    };
+    const marker = [
+      record.constraint,
+      record.constraint_name,
+      record.message,
+      String(current)
+    ].filter(Boolean).join(" ");
+    if (record.code === "23505" && marker.includes("tasks_pkey")) {
+      return "task_id_taken";
+    }
+    current = record.cause;
+  }
+  return null;
+}
+
 export async function createWorkspaceInboxTask(
   deps: TaskCommandWorkspaceDeps,
   input: CreateWorkspaceInboxTaskInput
@@ -40,7 +64,7 @@ export async function createWorkspaceInboxTask(
   const { participants, ownerUserId, requesterUserId } = participantResult;
   const taskId = input.body.id ?? `task-${randomUUID()}`;
 
-  return deps.runDataSourceTransaction(async (transactionDataSource) => {
+  return deps.runDataSourceTransaction<TaskResult>(async (transactionDataSource) => {
     if (
       !transactionDataSource.ensureWorkspaceInboxProject ||
       !transactionDataSource.listWorkspaceUsers ||
@@ -147,6 +171,12 @@ export async function createWorkspaceInboxTask(
       project: inboxProject,
       planVersion
     };
+  }).catch((error: unknown) => {
+    const conflict = input.body.id !== undefined ? taskCreateConflict(error) : null;
+    if (conflict) {
+      return { ok: false as const, status: 409 as const, error: conflict };
+    }
+    throw error;
   });
 }
 
@@ -175,114 +205,122 @@ export async function createProjectTask(
   const { participants, ownerUserId, requesterUserId } = participantResult;
   const taskId = input.body.id ?? `task-${randomUUID()}`;
 
-  return deps.runDataSourceTransaction(async (transactionDataSource) => {
-    if (
-      !transactionDataSource.listProjects ||
-      !transactionDataSource.listWorkspaceUsers ||
-      !transactionDataSource.listTaskStatuses ||
-      !transactionDataSource.applyPlanningCommand ||
-      !transactionDataSource.updateTaskMetadata ||
-      !transactionDataSource.findTaskById ||
-      !transactionDataSource.incrementPlanVersion ||
-      !transactionDataSource.createTaskActivity
-    ) {
-      throw new Error("persistence_not_configured");
-    }
+  try {
+    return await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (
+        !transactionDataSource.listProjects ||
+        !transactionDataSource.listWorkspaceUsers ||
+        !transactionDataSource.listTaskStatuses ||
+        !transactionDataSource.applyPlanningCommand ||
+        !transactionDataSource.updateTaskMetadata ||
+        !transactionDataSource.findTaskById ||
+        !transactionDataSource.incrementPlanVersion ||
+        !transactionDataSource.createTaskActivity
+      ) {
+        throw new Error("persistence_not_configured");
+      }
 
-    await transactionDataSource.lockTenantResourcePlanning?.(input.actor.tenantId);
-    const currentProject = await findActiveProject(
-      transactionDataSource,
-      input.actor.tenantId,
-      project.id
-    );
-    if (!currentProject) {
-      return { ok: false as const, status: 404, error: "project_not_found" };
-    }
+      await transactionDataSource.lockTenantResourcePlanning?.(input.actor.tenantId);
+      const currentProject = await findActiveProject(
+        transactionDataSource,
+        input.actor.tenantId,
+        project.id
+      );
+      if (!currentProject) {
+        return { ok: false as const, status: 404, error: "project_not_found" };
+      }
 
-    const users = await transactionDataSource.listWorkspaceUsers(input.actor.tenantId);
-    if (!validateCreateTaskParticipants(participants, users)) {
-      return { ok: false as const, status: 400, error: "invalid_task_participant" };
-    }
+      const users = await transactionDataSource.listWorkspaceUsers(input.actor.tenantId);
+      if (!validateCreateTaskParticipants(participants, users)) {
+        return { ok: false as const, status: 400, error: "invalid_task_participant" };
+      }
 
-    const statuses = await transactionDataSource.listTaskStatuses(input.actor.tenantId);
-    const currentTaskStatus = resolveCreateTaskStatus(statuses, input.body.statusId);
-    if (!currentTaskStatus) {
-      return { ok: false as const, status: 400, error: "task_status_not_found" };
-    }
+      const statuses = await transactionDataSource.listTaskStatuses(input.actor.tenantId);
+      const currentTaskStatus = resolveCreateTaskStatus(statuses, input.body.statusId);
+      if (!currentTaskStatus) {
+        return { ok: false as const, status: 400, error: "task_status_not_found" };
+      }
 
-    const currentPlanningCommand = buildCreateTaskPlanningCommand({
-      taskId,
-      projectId: currentProject.id,
-      statusId: currentTaskStatus.id,
-      body: input.body,
-      participants
-    });
-    const planningPermission = permissionForCommand(
-      currentPlanningCommand,
-      input.actor,
-      input.profile
-    );
-    if (!planningPermission.allowed) {
-      return { ok: false as const, status: 403, error: planningPermission.reason };
-    }
-    await transactionDataSource.applyPlanningCommand({
-      tenantId: input.actor.tenantId,
-      projectId: currentProject.id,
-      actorUserId: input.actor.id,
-      command: currentPlanningCommand
-    });
-    const metadataTask = await transactionDataSource.updateTaskMetadata({
-      tenantId: input.actor.tenantId,
-      taskId,
-      description: input.body.description,
-      priority: input.body.priority,
-      requesterUserId,
-      ownerUserId,
-      requiresAcceptance: input.body.requiresAcceptance,
-      participants
-    });
-    if (!metadataTask) throw new Error("task_create_metadata_failed");
-    const createdTask =
-      (await transactionDataSource.findTaskById(input.actor.tenantId, taskId)) ?? metadataTask;
-    const planVersion = await transactionDataSource.incrementPlanVersion(
-      input.actor.tenantId,
-      currentProject.id
-    );
-
-    await deps.appendManagementAuditEvent(
-      {
+      const currentPlanningCommand = buildCreateTaskPlanningCommand({
+        taskId,
+        projectId: currentProject.id,
+        statusId: currentTaskStatus.id,
+        body: input.body,
+        participants
+      });
+      const planningPermission = permissionForCommand(
+        currentPlanningCommand,
+        input.actor,
+        input.profile
+      );
+      if (!planningPermission.allowed) {
+        return { ok: false as const, status: 403, error: planningPermission.reason };
+      }
+      await transactionDataSource.applyPlanningCommand({
         tenantId: input.actor.tenantId,
+        projectId: currentProject.id,
         actorUserId: input.actor.id,
-        actionType: "task.created",
-        sourceWorkflow: "project_work",
-        sourceEntity: { type: "Task", id: createdTask.id },
-        commandInput: {
-          projectId: currentProject.id,
-          title: createdTask.title,
-          participants: createdTask.participants,
-          planningCommands: [currentPlanningCommand]
-        },
-        beforeState: null,
-        afterState: {
-          id: createdTask.id,
-          projectId: createdTask.projectId,
-          status: createdTask.status,
-          statusId: createdTask.statusId,
-          participants: createdTask.participants,
-          planVersion
-        },
-        permissionResult: createPermissionResult(createPermission)
-      },
-      transactionDataSource
-    );
-    await appendCreatedTaskActivity(transactionDataSource, {
-      tenantId: input.actor.tenantId,
-      taskId: createdTask.id,
-      actorUserId: input.actor.id,
-      statusName: currentTaskStatus.name,
-      ownerUserId
-    });
+        command: currentPlanningCommand
+      });
+      const metadataTask = await transactionDataSource.updateTaskMetadata({
+        tenantId: input.actor.tenantId,
+        taskId,
+        description: input.body.description,
+        priority: input.body.priority,
+        requesterUserId,
+        ownerUserId,
+        requiresAcceptance: input.body.requiresAcceptance,
+        participants
+      });
+      if (!metadataTask) throw new Error("task_create_metadata_failed");
+      const createdTask =
+        (await transactionDataSource.findTaskById(input.actor.tenantId, taskId)) ?? metadataTask;
+      const planVersion = await transactionDataSource.incrementPlanVersion(
+        input.actor.tenantId,
+        currentProject.id
+      );
 
-    return { ok: true as const, task: createdTask };
-  });
+      await deps.appendManagementAuditEvent(
+        {
+          tenantId: input.actor.tenantId,
+          actorUserId: input.actor.id,
+          actionType: "task.created",
+          sourceWorkflow: "project_work",
+          sourceEntity: { type: "Task", id: createdTask.id },
+          commandInput: {
+            projectId: currentProject.id,
+            title: createdTask.title,
+            participants: createdTask.participants,
+            planningCommands: [currentPlanningCommand]
+          },
+          beforeState: null,
+          afterState: {
+            id: createdTask.id,
+            projectId: createdTask.projectId,
+            status: createdTask.status,
+            statusId: createdTask.statusId,
+            participants: createdTask.participants,
+            planVersion
+          },
+          permissionResult: createPermissionResult(createPermission)
+        },
+        transactionDataSource
+      );
+      await appendCreatedTaskActivity(transactionDataSource, {
+        tenantId: input.actor.tenantId,
+        taskId: createdTask.id,
+        actorUserId: input.actor.id,
+        statusName: currentTaskStatus.name,
+        ownerUserId
+      });
+
+      return { ok: true as const, task: createdTask };
+    });
+  } catch (error) {
+    const conflict = taskCreateConflict(error);
+    if (conflict) {
+      return { ok: false, status: 409, error: conflict };
+    }
+    throw error;
+  }
 }

@@ -1,0 +1,19 @@
+{
+  "id": "BUG-PROJ-13",
+  "linkedOldIds": ["BUG-PROJ-13"],
+  "status": "fixed-by-current-branch",
+  "coverageStatus": "targeted",
+  "date": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "surface": ["/projects/[id]/schedule", "schedule row mapping", "summary row interactions"],
+  "expected": "Tasks with children by parentTaskId are treated as non-leaf summary rows even without mock customFields.kind or WBS conventions; unsafe leaf edits/drag are blocked for summary rows.",
+  "redEvidence": ["A live-style parent/child schedule-rows test was added; pre-fix test environment could not reach assertion because the helper imported React UI, so clean assertion RED was unavailable and recorded by the agent."],
+  "greenEvidence": [
+    "bun test apps/web/src/delivery/lib/mock-planning-backend.test.ts apps/web/src/delivery/schedule/schedule-rows.test.ts apps/web/src/workspace/projects/projects-list-surface.test.ts -> 34 tests passed.",
+    "corepack pnpm --filter @kiss-pm/web typecheck -> passed."
+  ],
+  "changedFiles": ["apps/web/src/delivery/schedule/schedule-rows.ts", "apps/web/src/delivery/schedule/schedule-surface.tsx", "apps/web/src/delivery/schedule/schedule-editors.tsx", "apps/web/src/delivery/schedule/schedule-rows.test.ts"],
+  "fixApplied": "Schedule row mapping and UI tree operations now use parentTaskId parent-chain. Summary rows get rollups, collapse affordance, descendant filtering/deletion, disabled edit menu, and drag/edit guards.",
+  "limitations": ["Browser interaction traversal was not run in this slice."],
+  "regressionRisk": "Medium. Tree semantics changed from WBS-prefix heuristics to parentTaskId; targeted tests and web typecheck pass."
+}

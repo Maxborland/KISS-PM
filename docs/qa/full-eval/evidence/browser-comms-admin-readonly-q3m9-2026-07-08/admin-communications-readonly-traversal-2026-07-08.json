@@ -1,0 +1,3841 @@
+{
+  "id": "CURRENT-RISK-FULL-BROWSER-TRAVERSAL-ADMIN-COMMS-READONLY",
+  "date": "2026-07-08",
+  "status": "pass-with-gaps",
+  "riskZones": [
+    "RISK-FULL-BROWSER-TRAVERSAL"
+  ],
+  "scope": "Admin read-only browser traversal for compact communications route cluster: /communications/channels, /communications/chat, /communications/meetings, /communications/calls, /communications/notifications.",
+  "role": "admin",
+  "actor": {
+    "email": "admin@kiss-pm.local",
+    "password": "[redacted]"
+  },
+  "environment": {
+    "baseUrl": "http://127.0.0.1:3108",
+    "apiViaWebProxy": "http://127.0.0.1:3108/api",
+    "browser": "chromium",
+    "headless": true
+  },
+  "commands": [
+    "node stdin Playwright runner against http://127.0.0.1:3108; credentials supplied via env and redacted from evidence"
+  ],
+  "routeSummaries": [
+    {
+      "route": "/login",
+      "pass": true,
+      "expected": "admin authenticated and redirected to /dashboard",
+      "actualSummary": {
+        "loginStatus": 200,
+        "currentUrl": "http://127.0.0.1:3108/dashboard"
+      },
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/00-admin-dashboard-after-login.png"
+      ]
+    },
+    {
+      "route": "/communications/channels",
+      "pass": true,
+      "expected": "Admin sees channels surface with workspace/project channels and no white screen.",
+      "actualSummary": {
+        "currentUrl": "http://127.0.0.1:3108/communications/channels",
+        "h1": [
+          "Коммуникации"
+        ],
+        "visibleErrorSignals": [],
+        "hasWhiteScreen": false,
+        "endpointResults": [
+          {
+            "part": "/api/workspace/communication-channels",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/users",
+            "status": 200,
+            "ok": true
+          }
+        ]
+      },
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/01-communications-channels.png"
+      ]
+    },
+    {
+      "route": "/communications/chat",
+      "pass": true,
+      "expected": "Admin reaches chat surface; entity conversation area should either load or show explicit recoverable state.",
+      "actualSummary": {
+        "currentUrl": "http://127.0.0.1:3108/communications/chat",
+        "h1": [
+          "Коммуникации"
+        ],
+        "visibleErrorSignals": [],
+        "hasWhiteScreen": false,
+        "endpointResults": [
+          {
+            "part": "/api/workspace/conversations/direct",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/projects",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/users",
+            "status": 200,
+            "ok": true
+          }
+        ]
+      },
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/02-communications-chat.png"
+      ]
+    },
+    {
+      "route": "/communications/meetings",
+      "pass": true,
+      "expected": "Admin reaches meetings surface for a resolved project scope; list/detail or explicit empty/error state is visible.",
+      "actualSummary": {
+        "currentUrl": "http://127.0.0.1:3108/communications/meetings",
+        "h1": [
+          "Коммуникации"
+        ],
+        "visibleErrorSignals": [],
+        "hasWhiteScreen": false,
+        "endpointResults": [
+          {
+            "part": "/api/workspace/meetings",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/projects",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/users",
+            "status": 200,
+            "ok": true
+          }
+        ]
+      },
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/03-communications-meetings.png"
+      ]
+    },
+    {
+      "route": "/communications/calls",
+      "pass": true,
+      "expected": "Admin reaches calls surface for a resolved project scope; room list/detail or explicit empty/error state is visible.",
+      "actualSummary": {
+        "currentUrl": "http://127.0.0.1:3108/communications/calls",
+        "h1": [
+          "Коммуникации"
+        ],
+        "visibleErrorSignals": [],
+        "hasWhiteScreen": false,
+        "endpointResults": [
+          {
+            "part": "/api/workspace/call-rooms",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/projects",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/users",
+            "status": 200,
+            "ok": true
+          }
+        ]
+      },
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/04-communications-calls.png"
+      ]
+    },
+    {
+      "route": "/communications/notifications",
+      "pass": true,
+      "expected": "Admin sees notifications inbox with readable list/empty state and no white screen.",
+      "actualSummary": {
+        "currentUrl": "http://127.0.0.1:3108/communications/notifications",
+        "h1": [
+          "Коммуникации"
+        ],
+        "visibleErrorSignals": [],
+        "hasWhiteScreen": false,
+        "endpointResults": [
+          {
+            "part": "/api/workspace/notifications",
+            "status": 200,
+            "ok": true
+          }
+        ]
+      },
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/05-communications-notifications.png"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "route": "/login",
+      "actionsTried": [
+        "fill Email",
+        "fill password",
+        "click Войти"
+      ],
+      "expected": "admin authenticated and redirected to /dashboard",
+      "actual": {
+        "loginStatus": 200,
+        "currentUrl": "http://127.0.0.1:3108/dashboard"
+      },
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/00-admin-dashboard-after-login.png"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/communications/channels",
+      "actionsTried": [
+        "direct browser navigation",
+        "wait for route-specific API responses",
+        "capture full-page screenshot",
+        "read visible headings/buttons/error state"
+      ],
+      "expected": "Admin sees channels surface with workspace/project channels and no white screen.",
+      "actual": {
+        "endpointResults": [
+          {
+            "part": "/api/workspace/communication-channels",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/users",
+            "status": 200,
+            "ok": true
+          }
+        ],
+        "ui": {
+          "url": "http://127.0.0.1:3108/communications/channels",
+          "title": "Каналы — Коммуникации — KISS PM",
+          "h1": [
+            "Коммуникации"
+          ],
+          "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nКомм.\nКоммуникации\n\nКаналы рабочей области и проектов\n\nКанал\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\nКаналы\n2\nОбщий канал Альфа\nОбщий\nОтдел внедрения\nКоманда\nОбщий канал Альфа\nОбщий\nсистемный\n\nОбщие объявления и обсуждения команды.\n\nЛента канала\nСообщений пока нет — начните беседу канала.\nОтправить\nУчастники\n4\n\nСистемный канал «Общий» доступен всей рабочей области — список участников не управляется.",
+          "textLength": 527,
+          "buttons": [
+            "АА",
+            "Канал",
+            "Общий канал АльфаОбщий",
+            "Отдел внедренияКоманда",
+            "Отправить"
+          ],
+          "links": [
+            {
+              "text": "Мои задачи",
+              "href": "/my-work"
+            },
+            {
+              "text": "Проекты",
+              "href": "/projects"
+            },
+            {
+              "text": "Сделки",
+              "href": "/crm/deals"
+            },
+            {
+              "text": "Дашборд",
+              "href": "/dashboard"
+            },
+            {
+              "text": "Коммуникации",
+              "href": "/communications/chat"
+            },
+            {
+              "text": "Администрирование",
+              "href": "/admin"
+            },
+            {
+              "text": "Чат",
+              "href": "/communications/chat"
+            },
+            {
+              "text": "Каналы",
+              "href": "/communications/channels"
+            },
+            {
+              "text": "Звонки",
+              "href": "/communications/calls"
+            },
+            {
+              "text": "Встречи",
+              "href": "/communications/meetings"
+            },
+            {
+              "text": "Уведомления1",
+              "href": "/communications/notifications"
+            }
+          ],
+          "visibleErrorSignals": [],
+          "hasWhiteScreen": false
+        }
+      },
+      "networkStatuses": [
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/contacts",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/products",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/project-types",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/pipelines",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/projects",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/communications/channels",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/media/051742360c26797e-s.p.0f97p8c3305p~.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/media/0b1dc8ddaa74ba49-s.p.04o39dzmj.ey..woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/media/26f284dcc38c84c0-s.p.10hk62x1-0d9n.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/media/9c72aa0f40e4eef8-s.p.0m6w47a4e5dy9.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/media/fba5a26ea33df6a3-s.p.0eehd8tgys7nv.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Broot-of-the-server%5D__0j8s5l0._.css",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03t4m_5._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_next-devtools_index_07k8249.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_react-dom_07d00jz._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_react-server-dom-turbopack_12.1u.a._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_0fo0le~._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_client_0u2s9ih._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_0uq~hyz._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_0rqeker._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/turbopack-apps_web_0g3dxru._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/node_modules__pnpm_10~fqho._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_0_n61y3._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/0i4a_%40swc_helpers_cjs_0hvz.20._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_00kppbc._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_not-found_tsx_0ggbhh-._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_client_components_builtin_global-error_0ggbhh-.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_communications_channels_page_tsx_0ggbhh-._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/node_modules__pnpm_0-syp60._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/_0d.oqdd._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0gqvhwm._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/unread-summary",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/users",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/communication-channels",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/projects",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/communication-channels/channel-alpha-general",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/communication-channels/channel-alpha-general/conversation",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/projects",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/communication-channels/channel-alpha-general",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/communication-channels/channel-alpha-general/conversation",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/channels",
+          "method": "GET",
+          "url": "/api/workspace/conversations/conversation-2871d5b1-4fec-47f9-93a0-7189e8b06b31/messages?limit=20",
+          "status": 200
+        }
+      ],
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/01-communications-channels.png"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/communications/chat",
+      "actionsTried": [
+        "direct browser navigation",
+        "wait for route-specific API responses",
+        "capture full-page screenshot",
+        "read visible headings/buttons/error state"
+      ],
+      "expected": "Admin reaches chat surface; entity conversation area should either load or show explicit recoverable state.",
+      "actual": {
+        "endpointResults": [
+          {
+            "part": "/api/workspace/conversations/direct",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/projects",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/users",
+            "status": 200,
+            "ok": true
+          }
+        ],
+        "ui": {
+          "url": "http://127.0.0.1:3108/communications/chat",
+          "title": "Чат — Коммуникации — KISS PM",
+          "h1": [
+            "Коммуникации"
+          ],
+          "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nКомм.\nКоммуникации\n\nБеседы · Портал подрядчиков Вектор\n\nПроект\nПортал подрядчиков Вектор\nМиграция данных Горсеть\nCRM intake\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\nБЕСЕДЫ\n\nБесед пока нет.\n\nЛИЧНЫЕ СООБЩЕНИЯ\n\nЛичных бесед пока нет.\n\nНет бесед\n\nУ этой сущности пока нет бесед.",
+          "textLength": 398,
+          "buttons": [
+            "АА"
+          ],
+          "links": [
+            {
+              "text": "Мои задачи",
+              "href": "/my-work"
+            },
+            {
+              "text": "Проекты",
+              "href": "/projects"
+            },
+            {
+              "text": "Сделки",
+              "href": "/crm/deals"
+            },
+            {
+              "text": "Дашборд",
+              "href": "/dashboard"
+            },
+            {
+              "text": "Коммуникации",
+              "href": "/communications/chat"
+            },
+            {
+              "text": "Администрирование",
+              "href": "/admin"
+            },
+            {
+              "text": "Чат",
+              "href": "/communications/chat"
+            },
+            {
+              "text": "Каналы",
+              "href": "/communications/channels"
+            },
+            {
+              "text": "Звонки",
+              "href": "/communications/calls"
+            },
+            {
+              "text": "Встречи",
+              "href": "/communications/meetings"
+            },
+            {
+              "text": "Уведомления1",
+              "href": "/communications/notifications"
+            }
+          ],
+          "visibleErrorSignals": [],
+          "hasWhiteScreen": false
+        }
+      },
+      "networkStatuses": [
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/communications/chat",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/media/051742360c26797e-s.p.0f97p8c3305p~.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/media/0b1dc8ddaa74ba49-s.p.04o39dzmj.ey..woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/media/26f284dcc38c84c0-s.p.10hk62x1-0d9n.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/media/9c72aa0f40e4eef8-s.p.0m6w47a4e5dy9.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/media/fba5a26ea33df6a3-s.p.0eehd8tgys7nv.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Broot-of-the-server%5D__0j8s5l0._.css",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03t4m_5._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_next-devtools_index_07k8249.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_react-dom_07d00jz._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_react-server-dom-turbopack_12.1u.a._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_0fo0le~._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_client_0u2s9ih._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_0uq~hyz._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_0rqeker._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/turbopack-apps_web_0g3dxru._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/node_modules__pnpm_10~fqho._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_0_n61y3._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/0i4a_%40swc_helpers_cjs_0hvz.20._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_00kppbc._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_not-found_tsx_0ggbhh-._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_client_components_builtin_global-error_0ggbhh-.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_communications_chat_page_tsx_0ggbhh-._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0gqvhwm._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/node_modules__pnpm_0e2z.eq._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/_next/static/chunks/_03ho6rd._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/api/workspace/unread-summary",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/api/workspace/presence",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/api/workspace/conversations/direct",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/api/workspace/users",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/api/workspace/projects",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/chat",
+          "method": "GET",
+          "url": "/api/workspace/conversations?entityType=project&entityId=project-vektor-portal",
+          "status": 200
+        }
+      ],
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/02-communications-chat.png"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/communications/meetings",
+      "actionsTried": [
+        "direct browser navigation",
+        "wait for route-specific API responses",
+        "capture full-page screenshot",
+        "read visible headings/buttons/error state"
+      ],
+      "expected": "Admin reaches meetings surface for a resolved project scope; list/detail or explicit empty/error state is visible.",
+      "actual": {
+        "endpointResults": [
+          {
+            "part": "/api/workspace/meetings",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/projects",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/users",
+            "status": 200,
+            "ok": true
+          }
+        ],
+        "ui": {
+          "url": "http://127.0.0.1:3108/communications/meetings",
+          "title": "Встречи — Коммуникации — KISS PM",
+          "h1": [
+            "Коммуникации"
+          ],
+          "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nКомм.\nКоммуникации\n\nВстречи · Портал подрядчиков Вектор\n\nПроект\nПортал подрядчиков Вектор\nМиграция данных Горсеть\nCRM intake\nВстреча\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\nВстречи\n1\nКик-офф: Портал Вектор\nЗапланирована\n2 июн., 14:00 — 15:00\n· 2 июн.\nКик-офф: Портал Вектор\n\n2 июн., 14:00 — 15:00\n\nЗапланирована\nСтатус\nЗапланирована\nЗавершена\nОтменена\nПовестка\n\nЦели проекта, состав команды и ближайшие шаги.\n\nУчастники\n3\nРР\nРоман Ресурсный\nОпционально\nОжидает\nАА\nАнна Администратор\nОрганизатор\nПринял\nИИ\nИгорь Инженер\nОбязателен\nПринял\nВнешние ссылки\n0\n\nСсылок пока нет.\n\nПровайдер\nZoom\nTeams\nGoogle Meet\nСсылка\nДругое\nНазвание\nURL\n\nСсылки на приватные адреса (localhost, внутренняя сеть) отклоняются сервером.\n\nДобавить\nЗаметки\n0\nДобавить\n\nПока нет заметок.\n\nЗадачи по итогам\n0\n\nСоздаются со статусом «Открыта»; статус можно изменить селектом.\n\nЗадач по итогам встречи пока нет.\n\nЗадача\nОтветственный\nАнна Администратор\nИгорь Инженер\nНикита Без Ресурсов\nРоман Ресурсный\nСрок\nДобавить",
+          "textLength": 1110,
+          "buttons": [
+            "АА",
+            "Встреча",
+            "Кик-офф: Портал ВекторЗапланирована2 июн., 14:00 — 15:00· 2 июн.",
+            "Добавить",
+            "Добавить",
+            "Добавить"
+          ],
+          "links": [
+            {
+              "text": "Мои задачи",
+              "href": "/my-work"
+            },
+            {
+              "text": "Проекты",
+              "href": "/projects"
+            },
+            {
+              "text": "Сделки",
+              "href": "/crm/deals"
+            },
+            {
+              "text": "Дашборд",
+              "href": "/dashboard"
+            },
+            {
+              "text": "Коммуникации",
+              "href": "/communications/chat"
+            },
+            {
+              "text": "Администрирование",
+              "href": "/admin"
+            },
+            {
+              "text": "Чат",
+              "href": "/communications/chat"
+            },
+            {
+              "text": "Каналы",
+              "href": "/communications/channels"
+            },
+            {
+              "text": "Звонки",
+              "href": "/communications/calls"
+            },
+            {
+              "text": "Встречи",
+              "href": "/communications/meetings"
+            },
+            {
+              "text": "Уведомления1",
+              "href": "/communications/notifications"
+            }
+          ],
+          "visibleErrorSignals": [],
+          "hasWhiteScreen": false
+        }
+      },
+      "networkStatuses": [
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/workspace/conversations/conversation-vektor-portal/messages",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/communications/meetings",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/media/051742360c26797e-s.p.0f97p8c3305p~.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/media/0b1dc8ddaa74ba49-s.p.04o39dzmj.ey..woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/media/26f284dcc38c84c0-s.p.10hk62x1-0d9n.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/media/9c72aa0f40e4eef8-s.p.0m6w47a4e5dy9.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/media/fba5a26ea33df6a3-s.p.0eehd8tgys7nv.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Broot-of-the-server%5D__0j8s5l0._.css",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03t4m_5._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_next-devtools_index_07k8249.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_react-dom_07d00jz._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_react-server-dom-turbopack_12.1u.a._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_0fo0le~._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_client_0u2s9ih._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_0uq~hyz._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/0i4a_%40swc_helpers_cjs_0hvz.20._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_0rqeker._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/turbopack-apps_web_0g3dxru._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/node_modules__pnpm_10~fqho._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_0_n61y3._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_00kppbc._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_not-found_tsx_0ggbhh-._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_client_components_builtin_global-error_0ggbhh-.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_communications_meetings_page_tsx_0ggbhh-._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0gqvhwm._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/node_modules__pnpm_0qlzx~u._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/_next/static/chunks/_11h22~7._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/workspace/unread-summary",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/workspace/projects",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/workspace/users",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/workspace/unread-summary",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/workspace/meetings?entityType=project&entityId=project-vektor-portal",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/workspace/unread-summary",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/workspace/users",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/workspace/meetings?entityType=project&entityId=project-vektor-portal",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/workspace/meetings/meeting-alpha-vektor-kickoff",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/meetings",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        }
+      ],
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/03-communications-meetings.png"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/communications/calls",
+      "actionsTried": [
+        "direct browser navigation",
+        "wait for route-specific API responses",
+        "capture full-page screenshot",
+        "read visible headings/buttons/error state"
+      ],
+      "expected": "Admin reaches calls surface for a resolved project scope; room list/detail or explicit empty/error state is visible.",
+      "actual": {
+        "endpointResults": [
+          {
+            "part": "/api/workspace/call-rooms",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/projects",
+            "status": 200,
+            "ok": true
+          },
+          {
+            "part": "/api/workspace/users",
+            "status": 200,
+            "ok": true
+          }
+        ],
+        "ui": {
+          "url": "http://127.0.0.1:3108/communications/calls",
+          "title": "Звонки — Коммуникации — KISS PM",
+          "h1": [
+            "Коммуникации"
+          ],
+          "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nКомм.\nКоммуникации\n\nЗвонки · Портал подрядчиков Вектор\n\nПроект\nПортал подрядчиков Вектор\nМиграция данных Горсеть\nCRM intake\nКомната\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\nBrowser media room 1783448257140\nИдёт\nJitsi\nВидео\nBrowser media room 1783448257140\n\nсоздал Анна Администратор · 2 мин назад\n\nИдёт\nJitsi\nВидео\nУправление сессией\nПодключиться\nЯ вошёл\nЯ вышел\nЗавершить сессию\nЛента событий\nСессия начата\n1 мин назад\n\nАнна Администратор · Jitsi\n\nКомната создана\n2 мин назад\n\nАнна Администратор · Jitsi\n\nЗаписи\n\nЗаписей нет. Запись прикрепляется к звонку после загрузки вложения.",
+          "textLength": 705,
+          "buttons": [
+            "АА",
+            "Комната",
+            "Browser media room 1783448257140ИдётJitsiВидео",
+            "Подключиться",
+            "Я вошёл",
+            "Я вышел",
+            "Завершить сессию"
+          ],
+          "links": [
+            {
+              "text": "Мои задачи",
+              "href": "/my-work"
+            },
+            {
+              "text": "Проекты",
+              "href": "/projects"
+            },
+            {
+              "text": "Сделки",
+              "href": "/crm/deals"
+            },
+            {
+              "text": "Дашборд",
+              "href": "/dashboard"
+            },
+            {
+              "text": "Коммуникации",
+              "href": "/communications/chat"
+            },
+            {
+              "text": "Администрирование",
+              "href": "/admin"
+            },
+            {
+              "text": "Чат",
+              "href": "/communications/chat"
+            },
+            {
+              "text": "Каналы",
+              "href": "/communications/channels"
+            },
+            {
+              "text": "Звонки",
+              "href": "/communications/calls"
+            },
+            {
+              "text": "Встречи",
+              "href": "/communications/meetings"
+            },
+            {
+              "text": "Уведомления1",
+              "href": "/communications/notifications"
+            }
+          ],
+          "visibleErrorSignals": [],
+          "hasWhiteScreen": false
+        }
+      },
+      "networkStatuses": [
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/communications/calls",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/media/051742360c26797e-s.p.0f97p8c3305p~.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/media/0b1dc8ddaa74ba49-s.p.04o39dzmj.ey..woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/media/26f284dcc38c84c0-s.p.10hk62x1-0d9n.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/media/9c72aa0f40e4eef8-s.p.0m6w47a4e5dy9.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/media/fba5a26ea33df6a3-s.p.0eehd8tgys7nv.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Broot-of-the-server%5D__0j8s5l0._.css",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03t4m_5._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_react-server-dom-turbopack_12.1u.a._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_0fo0le~._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/0i4a_%40swc_helpers_cjs_0hvz.20._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_0rqeker._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_0uq~hyz._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/turbopack-apps_web_0g3dxru._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_react-dom_07d00jz._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_client_0u2s9ih._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_0_n61y3._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_00kppbc._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_not-found_tsx_0ggbhh-._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_communications_calls_page_tsx_0ggbhh-._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_client_components_builtin_global-error_0ggbhh-.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_next-devtools_index_07k8249.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/node_modules__pnpm_10~fqho._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/node_modules__pnpm_0zkp-h7._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0gqvhwm._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/_next/static/chunks/_11-fyp8._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/workspace/unread-summary",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/workspace/projects",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/workspace/unread-summary",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/workspace/call-rooms?entityType=project&entityId=project-vektor-portal",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/workspace/users",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/workspace/unread-summary",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/workspace/users",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/workspace/call-rooms?entityType=project&entityId=project-vektor-portal",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/workspace/call-rooms/call-room-c8e047e9-ffc7-47c0-baa3-3dfce7a5d1a9",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/calls",
+          "method": "GET",
+          "url": "/api/workspace/call-rooms/call-room-c8e047e9-ffc7-47c0-baa3-3dfce7a5d1a9",
+          "status": 200
+        }
+      ],
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/04-communications-calls.png"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/communications/notifications",
+      "actionsTried": [
+        "direct browser navigation",
+        "wait for route-specific API responses",
+        "capture full-page screenshot",
+        "read visible headings/buttons/error state"
+      ],
+      "expected": "Admin sees notifications inbox with readable list/empty state and no white screen.",
+      "actual": {
+        "endpointResults": [
+          {
+            "part": "/api/workspace/notifications",
+            "status": 200,
+            "ok": true
+          }
+        ],
+        "ui": {
+          "url": "http://127.0.0.1:3108/communications/notifications",
+          "title": "Уведомления — Коммуникации — KISS PM",
+          "h1": [
+            "Коммуникации"
+          ],
+          "textSample": "К\nKISS PM\nРАБОТА\nМои задачи\nПроекты\nСделки\nАНАЛИТИКА\nДашборд\nКОММУНИКАЦИИ\nКоммуникации\nАДМИНИСТРИРОВАНИЕ\nАдминистрирование\nАА\nКомм.\nКоммуникации\n\nЛента уведомлений и настройки доставки\n\nЛента\nНастройки\nЧат\nКаналы\nЗвонки\nВстречи\nУведомления1\nВсе\nНепрочитанные\nПрочитанные\n1 непрочит.\nПрочитать все\nРиск срыва срока\nРиск дедлайна\n22 мая\nНОВОЕ\n\nПроект «Портал Вектор» приближается к дедлайну.\n\nПерейти\nПрочитать",
+          "textLength": 408,
+          "buttons": [
+            "АА",
+            "Прочитать все",
+            "Прочитать"
+          ],
+          "links": [
+            {
+              "text": "Мои задачи",
+              "href": "/my-work"
+            },
+            {
+              "text": "Проекты",
+              "href": "/projects"
+            },
+            {
+              "text": "Сделки",
+              "href": "/crm/deals"
+            },
+            {
+              "text": "Дашборд",
+              "href": "/dashboard"
+            },
+            {
+              "text": "Коммуникации",
+              "href": "/communications/chat"
+            },
+            {
+              "text": "Администрирование",
+              "href": "/admin"
+            },
+            {
+              "text": "Чат",
+              "href": "/communications/chat"
+            },
+            {
+              "text": "Каналы",
+              "href": "/communications/channels"
+            },
+            {
+              "text": "Звонки",
+              "href": "/communications/calls"
+            },
+            {
+              "text": "Встречи",
+              "href": "/communications/meetings"
+            },
+            {
+              "text": "Уведомления1",
+              "href": "/communications/notifications"
+            },
+            {
+              "text": "Перейти",
+              "href": "/projects/project-vektor-portal"
+            }
+          ],
+          "visibleErrorSignals": [],
+          "hasWhiteScreen": false
+        }
+      },
+      "networkStatuses": [
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/communications/notifications",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/media/051742360c26797e-s.p.0f97p8c3305p~.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/media/0b1dc8ddaa74ba49-s.p.04o39dzmj.ey..woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/media/26f284dcc38c84c0-s.p.10hk62x1-0d9n.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/media/9c72aa0f40e4eef8-s.p.0m6w47a4e5dy9.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/media/fba5a26ea33df6a3-s.p.0eehd8tgys7nv.woff2",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_next-devtools_index_07k8249.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Broot-of-the-server%5D__0j8s5l0._.css",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03t4m_5._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_react-dom_07d00jz._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_react-server-dom-turbopack_12.1u.a._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_compiled_0fo0le~._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_client_0u2s9ih._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_0uq~hyz._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_0rqeker._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/0i4a_%40swc_helpers_cjs_0hvz.20._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/turbopack-apps_web_0g3dxru._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/node_modules__pnpm_10~fqho._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_0_n61y3._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_00kppbc._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_not-found_tsx_0ggbhh-._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/apps_web_src_app_communications_notifications_page_tsx_0ggbhh-._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/0cco_next_dist_client_components_builtin_global-error_0ggbhh-.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/node_modules__pnpm_056nfyw._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0gqvhwm._.js",
+          "status": 304
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/_next/static/chunks/_0eup7~w._.js",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/api/workspace/unread-summary",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/api/workspace/notifications",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        },
+        {
+          "routeContext": "/communications/notifications",
+          "method": "GET",
+          "url": "/api/auth/me",
+          "status": 200
+        }
+      ],
+      "screenshots": [
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/05-communications-notifications.png"
+      ],
+      "pass": true
+    }
+  ],
+  "networkStatuses": [
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/login",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Broot-of-the-server%5D__0j8s5l0._.css",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/media/051742360c26797e-s.p.0f97p8c3305p~.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/media/0b1dc8ddaa74ba49-s.p.04o39dzmj.ey..woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03t4m_5._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/media/26f284dcc38c84c0-s.p.10hk62x1-0d9n.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-server-dom-turbopack_12.1u.a._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_0fo0le~._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/media/9c72aa0f40e4eef8-s.p.0m6w47a4e5dy9.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/media/fba5a26ea33df6a3-s.p.0eehd8tgys7nv.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/0i4a_%40swc_helpers_cjs_0hvz.20._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_0rqeker._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_0uq~hyz._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/turbopack-apps_web_0g3dxru._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_0_n61y3._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_0u2s9ih._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_next-devtools_index_07k8249.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-dom_07d00jz._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_not-found_tsx_0ggbhh-._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_(auth)_login_page_tsx_0ggbhh-._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_00kppbc._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_07yj.j0._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_components_builtin_global-error_0ggbhh-.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_034_4er._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_10~fqho._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0gqvhwm._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 401
+    },
+    {
+      "routeContext": "login",
+      "method": "POST",
+      "url": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/dashboard?_rsc=qYT2Wy2QR8kXuUU6",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_dashboard_page_tsx_0ggbhh-._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_02v1uw~._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/_0ejwvh6._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/_0ejwvh6._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_02v1uw~._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_dashboard_page_tsx_0ggbhh-._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/projects",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/clients",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/my-work",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/deal-stages",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/opportunities",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/contacts",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/products",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/project-types",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/pipelines",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/clients",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/projects",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/deal-stages",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/my-work",
+      "status": 200
+    },
+    {
+      "routeContext": "login",
+      "method": "GET",
+      "url": "/api/workspace/opportunities",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/contacts",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/products",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/project-types",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/pipelines",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/projects",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/communications/channels",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/media/051742360c26797e-s.p.0f97p8c3305p~.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/media/0b1dc8ddaa74ba49-s.p.04o39dzmj.ey..woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/media/26f284dcc38c84c0-s.p.10hk62x1-0d9n.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/media/9c72aa0f40e4eef8-s.p.0m6w47a4e5dy9.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/media/fba5a26ea33df6a3-s.p.0eehd8tgys7nv.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Broot-of-the-server%5D__0j8s5l0._.css",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03t4m_5._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_next-devtools_index_07k8249.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-dom_07d00jz._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-server-dom-turbopack_12.1u.a._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_0fo0le~._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_0u2s9ih._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_0uq~hyz._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_0rqeker._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/turbopack-apps_web_0g3dxru._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_10~fqho._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_0_n61y3._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/0i4a_%40swc_helpers_cjs_0hvz.20._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_00kppbc._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_not-found_tsx_0ggbhh-._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_components_builtin_global-error_0ggbhh-.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_communications_channels_page_tsx_0ggbhh-._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_0-syp60._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/_0d.oqdd._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0gqvhwm._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/unread-summary",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/users",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/communication-channels",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/projects",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/communication-channels/channel-alpha-general",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/communication-channels/channel-alpha-general/conversation",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/projects",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/communication-channels/channel-alpha-general",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/communication-channels/channel-alpha-general/conversation",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/channels",
+      "method": "GET",
+      "url": "/api/workspace/conversations/conversation-2871d5b1-4fec-47f9-93a0-7189e8b06b31/messages?limit=20",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/communications/chat",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/media/051742360c26797e-s.p.0f97p8c3305p~.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/media/0b1dc8ddaa74ba49-s.p.04o39dzmj.ey..woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/media/26f284dcc38c84c0-s.p.10hk62x1-0d9n.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/media/9c72aa0f40e4eef8-s.p.0m6w47a4e5dy9.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/media/fba5a26ea33df6a3-s.p.0eehd8tgys7nv.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Broot-of-the-server%5D__0j8s5l0._.css",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03t4m_5._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_next-devtools_index_07k8249.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-dom_07d00jz._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-server-dom-turbopack_12.1u.a._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_0fo0le~._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_0u2s9ih._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_0uq~hyz._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_0rqeker._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/turbopack-apps_web_0g3dxru._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_10~fqho._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_0_n61y3._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/0i4a_%40swc_helpers_cjs_0hvz.20._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_00kppbc._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_not-found_tsx_0ggbhh-._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_components_builtin_global-error_0ggbhh-.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_communications_chat_page_tsx_0ggbhh-._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0gqvhwm._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_0e2z.eq._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/_next/static/chunks/_03ho6rd._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/api/workspace/unread-summary",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/api/workspace/presence",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/api/workspace/conversations/direct",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/api/workspace/users",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/api/workspace/projects",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/chat",
+      "method": "GET",
+      "url": "/api/workspace/conversations?entityType=project&entityId=project-vektor-portal",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/workspace/conversations/conversation-vektor-portal/messages",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/communications/meetings",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/media/051742360c26797e-s.p.0f97p8c3305p~.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/media/0b1dc8ddaa74ba49-s.p.04o39dzmj.ey..woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/media/26f284dcc38c84c0-s.p.10hk62x1-0d9n.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/media/9c72aa0f40e4eef8-s.p.0m6w47a4e5dy9.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/media/fba5a26ea33df6a3-s.p.0eehd8tgys7nv.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Broot-of-the-server%5D__0j8s5l0._.css",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03t4m_5._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_next-devtools_index_07k8249.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-dom_07d00jz._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-server-dom-turbopack_12.1u.a._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_0fo0le~._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_0u2s9ih._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_0uq~hyz._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/0i4a_%40swc_helpers_cjs_0hvz.20._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_0rqeker._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/turbopack-apps_web_0g3dxru._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_10~fqho._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_0_n61y3._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_00kppbc._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_not-found_tsx_0ggbhh-._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_components_builtin_global-error_0ggbhh-.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_communications_meetings_page_tsx_0ggbhh-._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0gqvhwm._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_0qlzx~u._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/_next/static/chunks/_11h22~7._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/workspace/unread-summary",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/workspace/projects",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/workspace/users",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/workspace/unread-summary",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/workspace/meetings?entityType=project&entityId=project-vektor-portal",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/workspace/unread-summary",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/workspace/users",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/workspace/meetings?entityType=project&entityId=project-vektor-portal",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/workspace/meetings/meeting-alpha-vektor-kickoff",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/meetings",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/communications/calls",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/media/051742360c26797e-s.p.0f97p8c3305p~.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/media/0b1dc8ddaa74ba49-s.p.04o39dzmj.ey..woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/media/26f284dcc38c84c0-s.p.10hk62x1-0d9n.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/media/9c72aa0f40e4eef8-s.p.0m6w47a4e5dy9.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/media/fba5a26ea33df6a3-s.p.0eehd8tgys7nv.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Broot-of-the-server%5D__0j8s5l0._.css",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03t4m_5._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-server-dom-turbopack_12.1u.a._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_0fo0le~._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/0i4a_%40swc_helpers_cjs_0hvz.20._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_0rqeker._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_0uq~hyz._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/turbopack-apps_web_0g3dxru._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-dom_07d00jz._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_0u2s9ih._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_0_n61y3._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_00kppbc._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_not-found_tsx_0ggbhh-._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_communications_calls_page_tsx_0ggbhh-._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_components_builtin_global-error_0ggbhh-.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_next-devtools_index_07k8249.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_10~fqho._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_0zkp-h7._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0gqvhwm._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/_next/static/chunks/_11-fyp8._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/workspace/unread-summary",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/workspace/projects",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/workspace/unread-summary",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/workspace/call-rooms?entityType=project&entityId=project-vektor-portal",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/workspace/users",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/workspace/unread-summary",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/workspace/users",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/workspace/call-rooms?entityType=project&entityId=project-vektor-portal",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/workspace/call-rooms/call-room-c8e047e9-ffc7-47c0-baa3-3dfce7a5d1a9",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/calls",
+      "method": "GET",
+      "url": "/api/workspace/call-rooms/call-room-c8e047e9-ffc7-47c0-baa3-3dfce7a5d1a9",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/communications/notifications",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/media/051742360c26797e-s.p.0f97p8c3305p~.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/media/0b1dc8ddaa74ba49-s.p.04o39dzmj.ey..woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/media/26f284dcc38c84c0-s.p.10hk62x1-0d9n.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/media/9c72aa0f40e4eef8-s.p.0m6w47a4e5dy9.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/media/fba5a26ea33df6a3-s.p.0eehd8tgys7nv.woff2",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_next-devtools_index_07k8249.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Broot-of-the-server%5D__0j8s5l0._.css",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_03t4m_5._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-dom_07d00jz._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_react-server-dom-turbopack_12.1u.a._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_compiled_0fo0le~._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_0u2s9ih._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_0uq~hyz._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_0rqeker._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/0i4a_%40swc_helpers_cjs_0hvz.20._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/turbopack-apps_web_0g3dxru._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_10~fqho._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_0_n61y3._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_layout_tsx_11hqtn8._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_03vdin5._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_error_tsx_0ggbhh-._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_00kppbc._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_not-found_tsx_0ggbhh-._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/apps_web_src_app_communications_notifications_page_tsx_0ggbhh-._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/0cco_next_dist_client_components_builtin_global-error_0ggbhh-.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/node_modules__pnpm_056nfyw._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0gqvhwm._.js",
+      "status": 304
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/_next/static/chunks/_0eup7~w._.js",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/api/workspace/unread-summary",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/api/workspace/notifications",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "routeContext": "/communications/notifications",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200
+    }
+  ],
+  "consoleMessages": [
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "log",
+      "text": "[HMR] connected"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] rebuilding"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] done in 152ms"
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "log",
+      "text": "[HMR] connected"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] rebuilding"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] done in 182ms"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] rebuilding"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] done in 125ms"
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "log",
+      "text": "[HMR] connected"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] rebuilding"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] done in 116ms"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] rebuilding"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] done in 116ms"
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "log",
+      "text": "[HMR] connected"
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "log",
+      "text": "[HMR] connected"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] rebuilding"
+    },
+    {
+      "type": "log",
+      "text": "[Fast Refresh] done in 122ms"
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "log",
+      "text": "[HMR] connected"
+    }
+  ],
+  "screenshots": {
+    "/login-0": "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/00-admin-dashboard-after-login.png",
+    "/communications/channels-0": "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/01-communications-channels.png",
+    "/communications/chat-0": "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/02-communications-chat.png",
+    "/communications/meetings-0": "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/03-communications-meetings.png",
+    "/communications/calls-0": "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/04-communications-calls.png",
+    "/communications/notifications-0": "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/05-communications-notifications.png"
+  },
+  "notCovered": [
+    "No destructive or mutating communications actions were clicked: create/edit/archive/channel message/read notification/start call were intentionally not exercised in this read-only atom.",
+    "No mobile/responsive traversal.",
+    "No multi-role comparison beyond admin.",
+    "No /calls/[roomId] runtime traversal; this atom covers top-level /communications route cluster only.",
+    "No direct API contract mutation checks; network evidence is from browser page loads only."
+  ],
+  "notes": [
+    "This is evidence-only and read-only: source files, reconciliation-matrix, commits, and pushes were not touched.",
+    "A route is not marked pass solely from navigation; each route includes screenshot and route-specific network evidence.",
+    "Existing running dev servers were reused after /login and /health checks; fresh seed/migrate was not needed for this read-only route traversal."
+  ]
+}

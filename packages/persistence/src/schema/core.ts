@@ -31,7 +31,8 @@ export const accessProfiles = pgTable(
       name: "access_profiles_pkey",
       columns: [table.tenantId, table.id]
     }),
-    index("access_profiles_tenant_id_idx").on(table.tenantId)
+    index("access_profiles_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("access_profiles_tenant_id_name_uidx").on(table.tenantId, table.name)
   ]
 );
 
@@ -159,5 +160,31 @@ export const passwordResetTokens = pgTable(
     }).onDelete("cascade"),
     uniqueIndex("password_reset_tokens_token_hash_uidx").on(table.tokenHash),
     index("password_reset_tokens_user_id_idx").on(table.tenantId, table.userId)
+  ]
+);
+export const writeFlowIdempotencyKeys = pgTable(
+  "write_flow_idempotency_keys",
+  {
+    tenantId: text("tenant_id").notNull(),
+    surface: text("surface").notNull(),
+    actorUserId: text("actor_user_id").notNull(),
+    clientRequestId: text("client_request_id").notNull(),
+    resourceId: text("resource_id").notNull(),
+    // sha256 of the request payload. Reusing the same clientRequestId with a DIFFERENT body must
+    // conflict (not silently return the old resource). Nullable for rows written before this column.
+    requestHash: text("request_hash"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+  },
+  (table) => [
+    primaryKey({
+      name: "write_flow_idempotency_keys_pkey",
+      columns: [table.tenantId, table.surface, table.actorUserId, table.clientRequestId]
+    }),
+    foreignKey({
+      name: "write_flow_idempotency_keys_actor_fk",
+      columns: [table.tenantId, table.actorUserId],
+      foreignColumns: [tenantUsers.tenantId, tenantUsers.id]
+    }).onDelete("cascade"),
+    index("write_flow_idempotency_keys_tenant_created_idx").on(table.tenantId, table.createdAt)
   ]
 );

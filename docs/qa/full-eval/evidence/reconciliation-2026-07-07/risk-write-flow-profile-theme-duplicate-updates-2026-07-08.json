@@ -1,0 +1,28 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-PROFILE-THEME-DUPLICATE-UPDATES",
+  "generatedAt": "2026-07-07T20:44:05.6106955Z",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "status": "pass",
+  "scope": "Profile and theme duplicate PATCH write-flow stability/readback.",
+  "surfaces": [
+    "PATCH /api/profile",
+    "PATCH /api/profile/theme",
+    "GET /api/auth/me"
+  ],
+  "expected": "Duplicate identical profile/theme updates should not return conflicts or internal errors; final session readback should reflect the submitted profile fields, theme, and normalized accent color.",
+  "actual": "Pass: two concurrent identical PATCH /api/profile calls returned 200/200; two concurrent identical PATCH /api/profile/theme calls returned 200/200; GET /api/auth/me read back the submitted name/phone/telegram/theme and lower-cased accent color.",
+  "verification": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"duplicate profile and theme\"",
+      "observed": "1 selected test passed, 30 skipped",
+      "notes": "Initial sandbox run failed with spawn EPERM before tests loaded; default DB URL run failed authentication before behavior was exercised; rerun with the local test DB passed. Vitest emitted the existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts, unrelated to this slice.",
+      "result": "pass"
+    }
+  ],
+  "changedFiles": [
+    "apps/api/src/app.db.test.ts",
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-profile-theme-duplicate-updates-2026-07-08.json",
+    "docs/qa/full-eval/reconciliation-matrix-2026-07-07.json"
+  ],
+  "coverageImpact": "Adds fresh DB/API evidence for profile contact update and theme preference duplicate-submit stability. Broader RISK-WRITE-FLOW-RACE-IDEMPOTENCY remains open for other write surfaces."
+}

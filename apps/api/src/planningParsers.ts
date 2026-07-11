@@ -21,12 +21,22 @@ export type PlanningCommandBatchEnvelope = {
   idempotencyKey?: string;
 };
 
+export type PlanningRevertEnvelope = {
+  targetCommitId: string;
+  clientPlanVersion: number;
+  idempotencyKey: string;
+};
+
 export type PlanningCommandEnvelopeParseResult =
   | { ok: true; value: PlanningCommandEnvelope }
   | { ok: false; error: string };
 
 export type PlanningCommandBatchEnvelopeParseResult =
   | { ok: true; value: PlanningCommandBatchEnvelope }
+  | { ok: false; error: string };
+
+export type PlanningRevertEnvelopeParseResult =
+  | { ok: true; value: PlanningRevertEnvelope }
   | { ok: false; error: string };
 
 export type ScenarioPreviewEnvelope = {
@@ -90,6 +100,27 @@ export function parsePlanningCommandBatchEnvelope(
   return { ok: true, value };
 }
 
+export function parsePlanningRevertEnvelope(input: unknown): PlanningRevertEnvelopeParseResult {
+  if (!isObject(input)) return { ok: false, error: "planning_revert_invalid" };
+  const targetCommitId = parseBoundedString(input.targetCommitId);
+  const envelopeFields = parseCommandEnvelopeFields(input);
+  if (
+    targetCommitId === null ||
+    !envelopeFields.ok ||
+    envelopeFields.value.idempotencyKey === undefined
+  ) {
+    return { ok: false, error: "planning_revert_invalid" };
+  }
+  return {
+    ok: true,
+    value: {
+      targetCommitId,
+      clientPlanVersion: envelopeFields.value.clientPlanVersion,
+      idempotencyKey: envelopeFields.value.idempotencyKey
+    }
+  };
+}
+
 export function parseScenarioPreviewEnvelope(input: unknown):
   | { ok: true; value: ScenarioPreviewEnvelope }
   | { ok: false; error: string } {
@@ -145,7 +176,10 @@ export function parsePlanningCommand(input: unknown):
       if (!id || !projectId || !title || !statusId || plannedStart === undefined || plannedFinish === undefined || workMinutes === null || workMinutes < 0 || !assignments.ok) {
         return { ok: false, error: "planning_command_invalid" };
       }
-      if (durationMinutes !== null && durationMinutes <= 0) {
+      if (
+        durationMinutes !== null &&
+        (durationMinutes < 0 || (durationMinutes === 0 && workMinutes > 0))
+      ) {
         return { ok: false, error: "planning_command_invalid" };
       }
       const createPayload: CreateTaskPayload = {

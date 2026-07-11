@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-07-07T21:12:00+07:00",
+  "id": "RISK-AGENT-LLM-SSE-CONFIGURED-PROVIDER",
+  "status": "fixed-by-current-branch",
+  "linkedRiskZones": [
+    "RISK-AGENT-REAL-LLM-SSE"
+  ],
+  "scope": "Agent degraded provider contract, OpenRouter adapter translation, loop/SSE events, stream parsing, and apply/reject filtering",
+  "fix": {
+    "files": [
+      "apps/web/src/workspace/agent/agent-surface.test.tsx",
+      "docs/qa/full-eval/agent-reports/agent-llm-sse-2026-07-07.md"
+    ],
+    "behavior": [
+      "No-provider API behavior is explicit degraded 503/provider status instead of silent mock success.",
+      "OpenRouter adapter maps internal messages/tools to provider format and provider tool_calls back to internal tool_use blocks using injected fetch tests.",
+      "Agent loop/SSE emits reasoning/analyze/proposal/done behavior and the web stream parser handles chunking/CRLF/error/incomplete stream cases.",
+      "Web apply/reject UX now has targeted evidence that rejected proposed actions are excluded from execute and only selected actions are sent."
+    ]
+  },
+  "green": {
+    "tests": [
+      "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/agent/agentProviderDegraded.test.ts apps/api/src/agent/openRouterProvider.test.ts apps/api/src/agent/agentLoop.test.ts\" -> 3 files passed; 15 tests passed",
+      "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/web/src/workspace/agent/agent-stream.test.ts apps/web/src/workspace/agent/agent-surface.test.tsx\" -> 2 files passed; 6 tests passed",
+      "corepack pnpm --filter @kiss-pm/web typecheck -> passed"
+    ],
+    "env": [
+      "OPENROUTER_API_KEY=ABSENT",
+      "ANTHROPIC_API_KEY=ABSENT"
+    ],
+    "warning": "Existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts remains unrelated."
+  },
+  "remainingRisk": "No live OpenRouter/Anthropic provider smoke was run because provider keys are absent. Real network/provider quality and live browser SSE traversal remain unverified."
+}

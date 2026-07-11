@@ -1,0 +1,35 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-MEDIA-RECORDING-DUPLICATE-START",
+  "generatedAt": "2026-07-08T00:00:00Z",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "status": "pass",
+  "scope": "Communication call recording start duplicate-submit behavior after an active recording exists.",
+  "surfaces": [
+    "POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/recordings/start",
+    "dataSource.listCallRecordings",
+    "dataSource.listCallEvents",
+    "dataSource.listAuditEventsByTenantId"
+  ],
+  "expected": "A duplicate recording start for the same active session should be rejected with call_recording_already_active and must not start a second LiveKit egress, create a second recording row, create a second recording_started event, or create a second recording-start audit event.",
+  "actual": "Pass: first recording start returned 201; second start returned 409 call_recording_already_active; fake egress saw exactly one startTrackEgress call; DB readback showed exactly one recording row, one recording_started event, and one communications.call_recording_started audit event.",
+  "verification": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \"rejects duplicate recording start\"",
+      "observed": "1 selected test passed, 24 skipped",
+      "notes": "Vitest emitted the existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts, unrelated to this slice. This covers duplicate-submit after an active recording exists; it does not claim a full first-start concurrent race lock.",
+      "result": "pass"
+    },
+    {
+      "command": "DATABASE_URL=<local-dev-db> node_modules\\.bin\\tsx.cmd scripts\\seed-dev.ts",
+      "observed": "Seeded dev tenants, users, org structure, CRM, projects and communications data",
+      "notes": "Restored local browser/dev seed state after the targeted DB test.",
+      "result": "pass"
+    }
+  ],
+  "changedFiles": [
+    "apps/api/src/communicationRealtimeRoutes.db.test.ts",
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-duplicate-start-2026-07-08.json",
+    "docs/qa/full-eval/reconciliation-matrix-2026-07-07.json"
+  ],
+  "coverageImpact": "Adds fresh DB/API evidence for media recording start duplicate-submit suppression and readback. Broader RISK-WRITE-FLOW-RACE-IDEMPOTENCY remains open for concurrent first-start race locks and other write surfaces."
+}

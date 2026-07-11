@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Camera, Check, GitCommitVertical, X } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +12,10 @@ import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
+import { createClientId } from "@/delivery/lib/client-id";
+import { hasPermission } from "@/lib/permissions";
+import { useSessionUser } from "@/shell/use-session-user";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { createPlanningCommand } from "@kiss-pm/domain";
 
@@ -22,10 +27,17 @@ const dt = (iso: string) => { const d = new Date(iso); return `${String(d.getUTC
 const deltaCls = (d: number) => (d > 0 ? "text-[var(--warning-text)]" : d < 0 ? "text-[var(--success-text)]" : "text-[var(--muted)]");
 const signDays = (d: number) => `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d)} дн.`;
 const signH = (m: number) => `${m > 0 ? "+" : m < 0 ? "−" : ""}${h(Math.abs(m))} ч`;
-let NID = 0;
-const nid = (p: string) => `${p}-n${(NID += 1)}`;
+const nid = createClientId;
+const BASELINE_MANAGE_PERMISSION = "tenant.project_baselines.manage";
+
+export function canManageBaselineControls({ live, permissions }: { live: boolean; permissions: readonly string[] }): boolean {
+  return !live || hasPermission(permissions, BASELINE_MANAGE_PERMISSION);
+}
 
 export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
+  const { live } = usePlanningRuntime();
+  const sessionUser = useSessionUser();
+  const canManageBaselines = canManageBaselineControls({ live, permissions: sessionUser?.permissions ?? [] });
   const { readModel, status, error, reload, apply } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const [onlyChanged, setOnlyChanged] = useState(false);
@@ -48,7 +60,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Baseline">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} projectId={projectId} activeTab="Baseline">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
           <span />
         </SurfaceState>
@@ -76,6 +88,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const spanDay = Math.max(1, Math.max(curFinishDay, baseFinishDay));
 
   const onCapture = async () => {
+    if (!canManageBaselines) return;
     setBusy(true);
     const res = await apply(createPlanningCommand({ type: "baseline.capture", payload: { baselineId: nid("baseline"), label: label.trim() || "Снимок плана" } }));
     setBusy(false); setCapturing(false); setLabel("");
@@ -90,21 +103,21 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   ];
 
   return (
-    <DeliveryFrame project={projectMeta} activeTab="Baseline">
+    <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Baseline">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Базовый план</h2>
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Сравнение текущего плана с зафиксированным базовым: отклонения по срокам и трудозатратам.</p>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          <button type="button" title="Наложение базового плана на «График» появится в одном из следующих обновлений" className="inline-flex cursor-default items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1 text-[length:var(--text-sm)] text-[var(--muted-soft)]">Слой в «Графике»</button>
-          {capturing ? (
+          <Button asChild variant="secondary" size="sm"><Link href={`/projects/${projectId}/schedule`}>Слой в «Графике»</Link></Button>
+          {canManageBaselines && capturing ? (
             <div className="flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-1.5 py-1">
               <input autoFocus value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Название снимка" className="h-7 w-[160px] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]" />
               <Button variant="default" size="sm" disabled={busy} onClick={() => void onCapture()}><Check className="size-3.5" aria-hidden />Зафиксировать</Button>
               <button type="button" onClick={() => { setCapturing(false); setLabel(""); }} className="grid size-7 place-items-center rounded text-[var(--muted)] hover:bg-[var(--panel-strong)]" aria-label="Отмена"><X className="size-4" aria-hidden /></button>
             </div>
-          ) : <Button variant="default" size="sm" disabled={busy} onClick={() => setCapturing(true)}><Camera className="size-3.5" aria-hidden />Зафиксировать базовый план</Button>}
+          ) : canManageBaselines ? <Button variant="default" size="sm" disabled={busy} onClick={() => setCapturing(true)}><Camera className="size-3.5" aria-hidden />Зафиксировать базовый план</Button> : null}
         </div>
       </div>
 
@@ -126,7 +139,7 @@ export function ProjectBaseline({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 <div key={b.id} className={cn("flex items-start gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0", active && "bg-[var(--info-soft)]")}>
                   <GitCommitVertical className={cn("mt-0.5 size-4 shrink-0", active ? "text-[var(--info)]" : "text-[var(--muted-soft)]")} aria-hidden />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">{/* PlanBaseline не хранит label: команда baseline.capture принимает label, но редьюсер его не сохраняет — снимок всегда безымянный. */}<span className="truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Снимок плана</span>
+                    <div className="flex items-center gap-1.5"><span className="truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{b.label || "Снимок плана"}</span>
                       <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", active ? "bg-[var(--info-soft)] text-[var(--info)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{active ? "активный" : "архив"}</span>
                     </div>
                     <div className="mono mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{dt(b.capturedAt)} · {b.tasks.length} задач</div>

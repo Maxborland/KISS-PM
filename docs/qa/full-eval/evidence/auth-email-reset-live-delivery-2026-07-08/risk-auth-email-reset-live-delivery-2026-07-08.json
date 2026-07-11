@@ -1,0 +1,111 @@
+{
+  "id": "RISK-AUTH-EMAIL-RESET-LIVE-DELIVERY-2026-07-08",
+  "generatedAt": "2026-07-08T10:02:45.914Z",
+  "linkedRiskZones": [
+    "RISK-AUTH-EMAIL-RESET-HAPPY-PATH"
+  ],
+  "status": "passed",
+  "scope": "Live password-reset request through KISS PM auth routes with REG.RU SMTP, Cloudflare Email Routing delivery to Gmail, token extraction from delivered email, confirm/readback, and repeat-token behavior.",
+  "secretsPolicy": "Raw reset token, passwords, SMTP password, and API keys are intentionally omitted. Token was extracted from Gmail in-memory only and not written to disk.",
+  "harness": {
+    "file": "docs/qa/full-eval/tools/live-auth-reset-harness.ts",
+    "url": "http://127.0.0.1:4188",
+    "dataSource": "isolated auth-capable in-memory dataSource injected into createApp; product auth routes and SMTP provider are real",
+    "limitation": "This is not the full production Postgres stack; previous browser mechanics were already covered, and this run closes the external delivery/extraction gap."
+  },
+  "account": {
+    "email": "reset-20260708-165952@kisspm.app",
+    "registeredViaRoute": true
+  },
+  "routeResults": {
+    "register": {
+      "status": 201
+    },
+    "resetRequest": {
+      "status": 202,
+      "delivery": "email",
+      "resetTokensAfterRequest": 1
+    },
+    "confirm": {
+      "body": {
+        "status": "ok"
+      },
+      "status": 200
+    },
+    "oldPasswordLogin": {
+      "body": {
+        "error": "invalid_credentials"
+      },
+      "status": 401
+    },
+    "newPasswordLogin": {
+      "status": 200,
+      "hasSetCookie": true
+    },
+    "repeatTokenConfirm": {
+      "body": {
+        "error": "reset_token_used"
+      },
+      "status": 400
+    },
+    "finalState": {
+      "auditEvents": 2,
+      "resetTokenHashMatchesExtractedToken": true,
+      "resetTokens": [
+        {
+          "consumed": true,
+          "userId": "user-b33301e8-8a47-4d44-b09c-6966428587b6"
+        }
+      ],
+      "sessions": 1
+    }
+  },
+  "mailReadback": {
+    "providerPath": "REG.RU SMTP -> Cloudflare Email Routing -> Gmail",
+    "gmailSearchFound": true,
+    "subject": "KISS PM password reset",
+    "tokenExtractedFromDeliveredBody": true,
+    "resetLinkHost": "127.0.0.1:4188",
+    "authResults": {
+      "hasSpfPass": true,
+      "hasDkimPass": true,
+      "hasDmarcPass": true,
+      "authLines": [
+        "SPF:\tPASS с IP-адресом 104.30.8.156. Подробнее…",
+        "DKIM:\t'PASS', домен kisspm.app Подробнее…",
+        "DMARC:\t'PASS' Подробнее…",
+        "Delivered-To: butmaxim95@gmail.com",
+        "ARC-Message-Signature: i=2; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327; h=message-id:content-transfer-encoding:mime-version:date:subject:to :from:dkim-signature:feedback-id:dkim-signature:dkim-signature; bh=YZTlSIKsvuENqUvLntG7/mgeCXREQdxNmRReiXD2AyM=; fh=/UeIiBpZB7/F0yvdkVf+vPHI00MV84TxNxtB85CzPdU=; b=HZnk/8D4zYdyZXVdzxhLyhtV7eSJRqCdkTlVcUBeglcPAl8f6avK9JHtRWL+irYDFp Uapa1ngQf9+4wW/cvcgAFkFV30a63ITkl81jeMQ3JLnRHygpENQ15yZfcF3LEo7BN/IF HtCGt07V3QKO+xWfYWV5KOJMCNea/15fwALbRRA5xkLqOjTVL9o3GU8c1wQkrEUUjsEf RZS1ziPZWGhE9gSxFgD5PTiz2Hn2cvrLjieq6k+5aXcgepbCUkOgZGg7vVak7ANuVSIJ J7YU3IVv0KVBkvK4xGmIDFIBBT9KH49hzlYJbfhVPZjhSSSvR8uvERjvz9QpgR9pfZh1 A4ag==; dara=google.com",
+        "ARC-Authentication-Results: i=2; mx.google.com; dkim=pass header.i=@cloudflare-email.net header.s=cf2024-1 header.b=QMkvdakY; dkim=pass header.i=@kisspm.app header.s=cf2024-1 header.b=R9+5n4Ku; dkim=pass header.i=@kisspm.app header.s=dkim header.b=tJul3lFm; arc=pass (i=1 spf=pass spfdomain=kisspm.app dkim=pass dkdomain=kisspm.app dmarc=pass fromdomain=kisspm.app); spf=pass (google.com: domain of hello@kisspm.app designates 104.30.8.156 as permitted sender) smtp.mailfrom=hello@kisspm.app; dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=kisspm.app",
+        "Received-SPF: pass (google.com: domain of hello@kisspm.app designates 104.30.8.156 as permitted sender) client-ip=104.30.8.156;",
+        "Authentication-Results: mx.google.com; dkim=pass header.i=@cloudflare-email.net header.s=cf2024-1 header.b=QMkvdakY; dkim=pass header.i=@kisspm.app header.s=cf2024-1 header.b=R9+5n4Ku; dkim=pass header.i=@kisspm.app header.s=dkim header.b=tJul3lFm; arc=pass (i=1 spf=pass spfdomain=kisspm.app dkim=pass dkdomain=kisspm.app dmarc=pass fromdomain=kisspm.app); spf=pass (google.com: domain of hello@kisspm.app designates 104.30.8.156 as permitted sender) smtp.mailfrom=hello@kisspm.app; dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=kisspm.app",
+        "DKIM-Signature: v=1; a=rsa-sha256; s=cf2024-1; d=cloudflare-email.net; c=relaxed/relaxed; h=Date:Subject:To:From:Feedback-ID:from:reply-to:cc:resent-date :resent-from:resent-to:resent-cc:in-reply-to:references:list-id:list-help :list-unsubscribe:list-unsubscribe-post:list-subscribe:list-post :list-owner:list-archive; t=1783504796; x=1784109596; bh=YZTlSIKsvuENqUvLnt G7/mgeCXREQdxNmRReiXD2AyM=; b=QMkvdakYF8q1Lba9pwen8IEQMSh3BJ1nyzf6Y3GG1q746 RpFcidiI6l1y2a5E+9AQT4ac/+qn7J7FYQdqMtJQemSopI71/SIKjaBi1fVh8+UNziT3qwcS2AA wgcT9BjJIi/CzRJOz01SKE8FWZjmG6sckj/iSIogtVCYOsOh/IvpINKdAYiGov20I0QMmb5QNYt FjLOKYxg/8Ag6KpF6SMHN41brNxreMr8Bwzzf/oCXa9bX0fyZlAtmMj1ee4jaLCRWZDCgo6iZA2 YSCMdPCeKJti/QCywJhF2uCqZ5sO/JGgh4bYAF29Xqilkn5l6iONjn4H9F2/FeQ0L/mO7dwg==;",
+        "DKIM-Signature: v=1; a=rsa-sha256; s=cf2024-1; d=kisspm.app; c=relaxed/relaxed; h=Date:Subject:To:From:Feedback-ID:from:reply-to:cc:resent-date :resent-from:resent-to:resent-cc:in-reply-to:references:list-id:list-help :list-unsubscribe:list-unsubscribe-post:list-subscribe:list-post :list-owner:list-archive; t=1783504796; x=1784109596; bh=YZTlSIKsvuENqUvLnt G7/mgeCXREQdxNmRReiXD2AyM=; b=R9+5n4KuOwVLpqEDHgKC7NRh3UjC1KkjeKdgju3Buf/bt v0QX2W0dBqDpKC3AC84IDMVGaqP/jVtDzEjsAanv4TLxU8+AxN4jO6w11f1ZWwngZrmy270SYpC /McO2vDYzL810S042/ItDQYcx3eIc9E4bUCgRG3HYntv57m3cFaUehLZF5Fic4Ab8DHseQzsTLW UL047eRqQ9IqPLMJl+V1etJJeyl/yo8tuzfF3e0UkAdaz+/lVDifu5RB4mf4eeipcct3HgGkgIe qsu5q8z0xv3+qMmjKsIh8jM0JdEeH16NKvA3L63T2jRPZRugau+2aZVQSRt3znS2aeW9KX1A==;",
+        "X-Forwarded-To: butmaxim95@gmail.com",
+        "ARC-Message-Signature: i=1; a=rsa-sha256; s=cf2024-1; d=cloudflare-email.net; c=relaxed/relaxed; h=Date:Subject:To:From:from:reply-to:cc:resent-date:resent-from:resent-to :resent-cc:in-reply-to:references:list-id:list-help:list-subscribe :list-post:list-owner:list-archive; t=1783504795; x=1784109595; bh=YZTlSIKs vuENqUvLntG7/mgeCXREQdxNmRReiXD2AyM=; b=FpIhTayK4iS6FpuQbW2WIwVR3FO9Z4b2KTV T9eDzg+0/kGJbuOZeRvuociam7SHnEPeOtG35m8hLYSV199j1RekTQJ1lYQ6wyPcSbFjsA2//ns bXFw7srUOXKuD05hjEVsfdjuY1k6dNvAiMImq4jgDdHvZBZKYqc8KSsVAi11u0XYt7e9S7NQ3FH f3ICFe632edLsd5dhS5dM+2sN4yJKoyLY2O8hOCDt2YcD5+RgzNtGko/2ewu71dZiF5H6NcD7qn 9rrqbK5CFR3LuTCEkQZ9CnlD/3x4Fr8YlyTHL3jeLfvSfSwdqWSoUHK2v8GAmtdbkkhle+E5ojY bHIGnmA==;",
+        "ARC-Authentication-Results: i=1; mx.cloudflare.net; dkim=pass header.d=kisspm.app header.s=dkim header.b=tJul3lFm; dmarc=pass header.from=kisspm.app policy.dmarc=none; spf=none (mx.cloudflare.net: no SPF records found for postmaster@sm33.hosting.reg.ru) smtp.helo=sm33.hosting.reg.ru; spf=pass (mx.cloudflare.net: domain of hello@kisspm.app designates 31.31.197.67 as permitted sender) smtp.mailfrom=hello@kisspm.app; arc=none smtp.remote-ip=31.31.197.67",
+        "Received-SPF: pass (mx.cloudflare.net: domain of hello@kisspm.app designates 31.31.197.67 as permitted sender) receiver=mx.cloudflare.net; client-ip=31.31.197.67; envelope-from=\"hello@kisspm.app\"; helo=sm33.hosting.reg.ru;",
+        "Authentication-Results: mx.cloudflare.net; dkim=pass header.d=kisspm.app header.s=dkim header.b=tJul3lFm; dmarc=pass header.from=kisspm.app policy.dmarc=none; spf=none (mx.cloudflare.net: no SPF records found for postmaster@sm33.hosting.reg.ru) smtp.helo=sm33.hosting.reg.ru; spf=pass (mx.cloudflare.net: domain of hello@kisspm.app designates 31.31.197.67 as permitted sender) smtp.mailfrom=hello@kisspm.app; arc=none smtp.remote-ip=31.31.197.67",
+        "DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=kisspm.app; s=dkim; h=Message-Id:Content-Transfer-Encoding:Content-Type:MIME-Version:Date :Subject:To:From:Sender:Reply-To:Cc:Content-ID:Content-Description: Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID: In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:List-Subscribe: List-Post:List-Owner:List-Archive; bh=YZTlSIKsvuENqUvLntG7/mgeCXREQdxNmRReiXD2AyM=; b=tJul3lFmeJlgCAagOmHkTEyVrd AhDtY3ZHBgCqM5zPxrpw+eNLRzGyJIqAb8NRbO6Og1Pl2RPsY51wZomtF1yXT/XZbHOUsr/quzkNT et+5blXLaAKHiv/cYEvDyDr7y0X1ne6TN0Zs5eWMiR2h4pZAHUm58lzu+MQDDhH0ocTI=;",
+        "To: reset-20260708-165952@kisspm.app",
+        "Subject: KISS PM password reset"
+      ]
+    },
+    "screenshots": [
+      "docs/qa/full-eval/evidence/auth-email-reset-live-delivery-2026-07-08/gmail-reset-email.png",
+      "docs/qa/full-eval/evidence/auth-email-reset-live-delivery-2026-07-08/gmail-reset-original-auth-results.png"
+    ]
+  },
+  "passCriteria": [
+    "Registered a fresh auth user with a unique @kisspm.app address.",
+    "POST /api/auth/password-reset/request returned 202 with delivery=email and created one reset token.",
+    "Gmail search found the delivered KISS PM password reset email for the unique recipient.",
+    "Extracted a 64-character reset token from the delivered email body, not from server memory.",
+    "POST /api/auth/password-reset/confirm with the delivered token returned 200 {status:ok}.",
+    "Old password login returned 401 invalid_credentials.",
+    "New password login returned 200 and Set-Cookie.",
+    "Repeating the same token returned 400 reset_token_used.",
+    "Original reset email shows SPF PASS, DKIM PASS, and DMARC PASS."
+  ],
+  "matrixImpact": "Closes RISK-AUTH-EMAIL-RESET-HAPPY-PATH for live SMTP/email-client delivery and token extraction. Remaining risk zones are full browser traversal breadth and live media provider behavior."
+}

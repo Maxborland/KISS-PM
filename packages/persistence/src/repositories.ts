@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
@@ -18,7 +18,8 @@ import {
   tenants,
   tenantUsers,
   userCredentials,
-  userSessions
+  userSessions,
+  writeFlowIdempotencyKeys
 } from "./schema";
 import { createAttachmentRepository, type AttachmentRepository } from "./attachmentRepository";
 import { createCollaborationRepository, type CollaborationRepository } from "./collaborationRepository";
@@ -137,6 +138,14 @@ export type PasswordResetTokenRecord = {
   requestedIp: string | null;
   createdAt: Date;
 };
+export type WriteFlowIdempotencyClaim = {
+  claimed: boolean;
+  resourceId: string;
+  // true when an existing key was found but with a DIFFERENT request hash (same clientRequestId
+  // reused for a different payload). The caller must reject with 409 rather than return the old row.
+  conflict: boolean;
+};
+
 export type PostgresTenantDataSource = CrmRepository &
   ProjectIntakeRepository &
   PlanningRepository &
@@ -181,6 +190,10 @@ export type PostgresTenantDataSource = CrmRepository &
   createCustomFieldDefinition(
     input: CustomFieldDefinitionInput
   ): Promise<CustomFieldDefinitionRecord>;
+  deleteCustomFieldDefinition(
+    tenantId: TenantId,
+    fieldId: string
+  ): Promise<CustomFieldDefinitionRecord | undefined>;
   updateCustomFieldDefinition(
     input: CustomFieldDefinitionInput
   ): Promise<CustomFieldDefinitionRecord>;
@@ -219,10 +232,24 @@ export type PostgresTenantDataSource = CrmRepository &
     tenantId: TenantId,
     userId: UserId
   ): Promise<void>;
+  deleteOtherPasswordResetTokensByUserId(
+    tenantId: TenantId,
+    userId: UserId,
+    preservedTokenId: string
+  ): Promise<void>;
   withTransaction<T>(
     operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
   ): Promise<T>;
   lockTenantResourcePlanning(tenantId: TenantId): Promise<void>;
+  lockCallRecordingStart(tenantId: TenantId, roomId: string, sessionId: string): Promise<void>;
+  claimWriteFlowIdempotencyKey(input: {
+    tenantId: TenantId;
+    actorUserId: UserId;
+    surface: string;
+    clientRequestId: string;
+    resourceId: string;
+    requestHash?: string;
+  }): Promise<WriteFlowIdempotencyClaim>;
   appendAuditEvent(input: AuditEventRecordInput): Promise<void>;
   listAuditEventsByTenantId(
     tenantId: TenantId,
@@ -703,6 +730,17 @@ export function createPostgresTenantDataSource(
           )
         );
     },
+    async deleteOtherPasswordResetTokensByUserId(tenantId, userId, preservedTokenId) {
+      await db
+        .delete(passwordResetTokens)
+        .where(
+          and(
+            eq(passwordResetTokens.tenantId, tenantId),
+            eq(passwordResetTokens.userId, userId),
+            ne(passwordResetTokens.id, preservedTokenId)
+          )
+        );
+    },
     async withTransaction(operation) {
       return db.transaction((transaction) =>
         operation(
@@ -719,6 +757,62 @@ export function createPostgresTenantDataSource(
           hashtext('kiss_pm_resource_planning')
         )
       `);
+    },
+    async lockCallRecordingStart(tenantId, roomId, sessionId) {
+      await db.execute(sql`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${tenantId}),
+          hashtext(${`call_recording_start:${roomId}:${sessionId}`})
+        )
+      `);
+    },
+    async claimWriteFlowIdempotencyKey(input) {
+      const [inserted] = await db
+        .insert(writeFlowIdempotencyKeys)
+        .values({
+          tenantId: input.tenantId,
+          surface: input.surface,
+          actorUserId: input.actorUserId,
+          clientRequestId: input.clientRequestId,
+          resourceId: input.resourceId,
+          requestHash: input.requestHash ?? null,
+          createdAt: new Date()
+        })
+        .onConflictDoNothing({
+          target: [
+            writeFlowIdempotencyKeys.tenantId,
+            writeFlowIdempotencyKeys.surface,
+            writeFlowIdempotencyKeys.actorUserId,
+            writeFlowIdempotencyKeys.clientRequestId
+          ]
+        })
+        .returning({ resourceId: writeFlowIdempotencyKeys.resourceId });
+      if (inserted) return { claimed: true, resourceId: inserted.resourceId, conflict: false };
+
+      const [existing] = await db
+        .select({
+          resourceId: writeFlowIdempotencyKeys.resourceId,
+          requestHash: writeFlowIdempotencyKeys.requestHash
+        })
+        .from(writeFlowIdempotencyKeys)
+        .where(
+          and(
+            eq(writeFlowIdempotencyKeys.tenantId, input.tenantId),
+            eq(writeFlowIdempotencyKeys.surface, input.surface),
+            eq(writeFlowIdempotencyKeys.actorUserId, input.actorUserId),
+            eq(writeFlowIdempotencyKeys.clientRequestId, input.clientRequestId)
+          )
+        )
+        .limit(1);
+      if (!existing) throw new Error("write_flow_idempotency_key_missing");
+      // Same key, different payload → conflict (otherwise the caller returns the OLD resource as a
+      // success and silently drops the new content). Legacy rows (null stored hash) are treated as
+      // non-conflicting so pre-migration keys keep replaying rather than hard-failing.
+      const conflict =
+        input.requestHash != null &&
+        existing.requestHash != null &&
+        existing.requestHash !== input.requestHash;
+      return { claimed: false, resourceId: existing.resourceId, conflict };
     },
     async appendAuditEvent(input) {
       const event = createAuditEventRecord(input);

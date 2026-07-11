@@ -76,6 +76,7 @@ export type CreateTaskStatusParseResult =
 
 export type TaskCommentBody = {
   body: string;
+  clientRequestId: string | null;
 };
 
 export type TaskCommentParseResult =
@@ -213,9 +214,21 @@ export function parseTaskCommentBody(input: unknown): TaskCommentParseResult {
   if (body.length < 1 || body.length > 4000 || !isSafeMultilineText(body)) {
     return { ok: false, error: "invalid_task_comment" };
   }
-  return { ok: true, value: { body } };
+  const clientRequestId = parseOptionalClientRequestId(input);
+  if (!clientRequestId.ok) return clientRequestId;
+  return { ok: true, value: { body, clientRequestId: clientRequestId.value } };
 }
 
+function parseOptionalClientRequestId(input: unknown):
+  | { ok: true; value: string | null }
+  | { ok: false; error: string } {
+  const value = getOptionalString(input, "clientRequestId");
+  if (!value) return { ok: true, value: null };
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,119}$/.test(value)) {
+    return { ok: false, error: "client_request_id_invalid" };
+  }
+  return { ok: true, value };
+}
 function parseParticipants(
   input: unknown
 ):

@@ -5,7 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
+import type { Resource } from "@/delivery/lib/planning-demo-data";
 
 export const ROLES: Array<[string, string]> = [
   ["executor", "Исполнитель"],
@@ -44,9 +44,9 @@ export function presetWeights(n: number, kind: "even" | "front" | "back"): numbe
 }
 
 /** Диалог добавления исполнителя на задачу. */
-export function AddAssigneeDialog({ taskTitle, excludeIds, onSubmit, children }: { taskTitle: string; excludeIds: string[]; onSubmit: (resourceId: string, role: string) => void; children: ReactNode }) {
+export function AddAssigneeDialog({ taskTitle, excludeIds, resources, onSubmit, children }: { taskTitle: string; excludeIds: string[]; resources: Resource[]; onSubmit: (resourceId: string, role: string) => void; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const resources = useResourceDirectory().list; // live: /api/workspace/users; mock: статичный RESOURCES
+
   const avail = resources.filter((r) => !excludeIds.includes(r.id));
   const [resourceId, setResourceId] = useState<string>(avail[0]?.id ?? "");
   const [role, setRole] = useState<string>("co_executor");

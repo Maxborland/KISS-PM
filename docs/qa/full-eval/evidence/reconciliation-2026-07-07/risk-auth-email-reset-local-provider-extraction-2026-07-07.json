@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-07-07T21:54:35+07:00",
+  "id": "RISK-AUTH-EMAIL-RESET-LOCAL-PROVIDER-EXTRACTION",
+  "status": "partial-risk-zone-evidence-added",
+  "linkedRiskZones": [
+    "RISK-AUTH-EMAIL-RESET-HAPPY-PATH"
+  ],
+  "scope": "Route-level password reset request -> local provider rawToken extraction -> confirm -> old password rejection -> login with new password, without external mailbox.",
+  "spec": {
+    "goal": "Prove the next minimal reset happy-path slice that is possible without a real mailbox.",
+    "nonGoals": [
+      "Do not mark RISK-AUTH-EMAIL-RESET-HAPPY-PATH as pass.",
+      "Do not touch e2e/smoke/*.",
+      "Do not claim live SMTP/mailcatcher delivery."
+    ],
+    "acceptanceCriteria": [
+      "AC1: An existing-user reset request stores a reset token and exposes the sent rawToken through the injected local EmailProvider seam.",
+      "AC2: The extracted rawToken confirms successfully through POST /api/auth/password-reset/confirm.",
+      "AC3: The old password is rejected after confirm.",
+      "AC4: The new password logs in and receives a session cookie."
+    ]
+  },
+  "evidence": {
+    "testUpdated": "apps/api/src/authRegistrationRoutes.test.ts:283 full password reset happy path now asserts old password login returns 401 invalid_credentials before new-password login succeeds.",
+    "localExtractionPath": "createInMemoryEmailProvider().lastPasswordReset.rawToken captures the raw token passed to EmailProvider.sendPasswordReset by the real route handler.",
+    "commands": [
+      {
+        "command": "node_modules\\.bin\\vitest.cmd run apps/api/src/authRegistrationRoutes.test.ts -t \"password-reset\"",
+        "result": "passed: 1 file, 12 tests passed, 5 skipped",
+        "notes": "First sandboxed attempt failed with spawn EPERM while starting Vite/esbuild; rerun outside sandbox passed. Existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts is unrelated."
+      },
+      {
+        "command": "node_modules\\.bin\\tsc.cmd -p apps/api/tsconfig.json --pretty false",
+        "result": "blocked by unrelated existing error: apps/api/src/collaborationRoutes.db.test.ts(1043,22): Cannot find name 'createVideoProvider'."
+      },
+      {
+        "command": "pnpm --filter @kiss-pm/api typecheck",
+        "result": "blocked before typecheck by existing ERR_PNPM_IGNORED_BUILDS."
+      }
+    ]
+  },
+  "remainingBlocker": "Live mailbox delivery/extraction remains unverified: current browser/runtime path returns delivery=none, docker compose has no local mailcatcher/MailHog/Mailpit service, and the running server exposes no guarded e2e token extraction hook. Need configured SMTP/local mailcatcher API or an explicit test-only extraction hook before full browser request -> mailbox token -> confirm UI -> new-password login can be marked pass."
+}

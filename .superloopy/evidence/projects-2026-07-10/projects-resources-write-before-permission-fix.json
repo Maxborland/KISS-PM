@@ -1,0 +1,184 @@
+{
+  "config": {
+    "configFile": "E:\\KISS-PM\\playwright.config.ts",
+    "rootDir": "E:/KISS-PM/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "E:/KISS-PM/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "E:/KISS-PM/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "full-eval\\projects-resources-write.spec.ts",
+      "file": "full-eval/projects-resources-write.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Projects resources absence write flows",
+          "file": "full-eval/projects-resources-write.spec.ts",
+          "line": 58,
+          "column": 6,
+          "specs": [
+            {
+              "title": "ADMIN creates and removes a resource absence with API readback and reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5261,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T23:28:13.903Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d12fd96212964daa8916-71d0dd5f221ffe10023d",
+              "file": "full-eval/projects-resources-write.spec.ts",
+              "line": 59,
+              "column": 3
+            },
+            {
+              "title": "PLAN reader without resource permission is rejected and leaves the plan unchanged",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 11811,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog', { name: 'Отсутствие сотрудника' }).getByRole('combobox', { name: 'Сотрудник', exact: true }).locator('option')\nExpected: not \u001b[32m0\u001b[39m\nReceived: \u001b[31m0\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"not toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Отсутствие сотрудника' }).getByRole('combobox', { name: 'Сотрудник', exact: true }).locator('option')\u001b[22m\n\u001b[2m    23 × locator resolved to 0 elements\u001b[22m\n\u001b[2m       - unexpected value \"0\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog', { name: 'Отсутствие сотрудника' }).getByRole('combobox', { name: 'Сотрудник', exact: true }).locator('option')\nExpected: not \u001b[32m0\u001b[39m\nReceived: \u001b[31m0\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"not toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Отсутствие сотрудника' }).getByRole('combobox', { name: 'Сотрудник', exact: true }).locator('option')\u001b[22m\n\u001b[2m    23 × locator resolved to 0 elements\u001b[22m\n\u001b[2m       - unexpected value \"0\"\u001b[22m\n\n    at openAbsenceDialog (E:\\KISS-PM\\e2e\\full-eval\\projects-resources-write.spec.ts:275:104)\n    at E:\\KISS-PM\\e2e\\full-eval\\projects-resources-write.spec.ts:190:20",
+                        "location": {
+                          "file": "E:\\KISS-PM\\e2e\\full-eval\\projects-resources-write.spec.ts",
+                          "column": 104,
+                          "line": 275
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 273 |\u001b[39m   \u001b[36mconst\u001b[39m dialog \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"dialog\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Отсутствие сотрудника\"\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m 274 |\u001b[39m   \u001b[36mawait\u001b[39m expect(dialog)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 275 |\u001b[39m   \u001b[36mawait\u001b[39m expect(dialog\u001b[33m.\u001b[39mgetByRole(\u001b[32m\"combobox\"\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m\"Сотрудник\"\u001b[39m\u001b[33m,\u001b[39m exact\u001b[33m:\u001b[39m \u001b[36mtrue\u001b[39m })\u001b[33m.\u001b[39mlocator(\u001b[32m\"option\"\u001b[39m))\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39mtoHaveCount(\u001b[35m0\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                                                                                        \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 276 |\u001b[39m   \u001b[36mreturn\u001b[39m dialog\u001b[33m;\u001b[39m\n \u001b[90m 277 |\u001b[39m }\n \u001b[90m 278 |\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\full-eval\\projects-resources-write.spec.ts",
+                            "column": 104,
+                            "line": 275
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog', { name: 'Отсутствие сотрудника' }).getByRole('combobox', { name: 'Сотрудник', exact: true }).locator('option')\nExpected: not \u001b[32m0\u001b[39m\nReceived: \u001b[31m0\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"not toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Отсутствие сотрудника' }).getByRole('combobox', { name: 'Сотрудник', exact: true }).locator('option')\u001b[22m\n\u001b[2m    23 × locator resolved to 0 elements\u001b[22m\n\u001b[2m       - unexpected value \"0\"\u001b[22m\n\n\n  273 |   const dialog = page.getByRole(\"dialog\", { name: \"Отсутствие сотрудника\" });\n  274 |   await expect(dialog).toBeVisible();\n> 275 |   await expect(dialog.getByRole(\"combobox\", { name: \"Сотрудник\", exact: true }).locator(\"option\")).not.toHaveCount(0);\n      |                                                                                                        ^\n  276 |   return dialog;\n  277 | }\n  278 |\n    at openAbsenceDialog (E:\\KISS-PM\\e2e\\full-eval\\projects-resources-write.spec.ts:275:104)\n    at E:\\KISS-PM\\e2e\\full-eval\\projects-resources-write.spec.ts:190:20"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-09T23:28:19.272Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "E:\\KISS-PM\\test-results\\full-eval-projects-resourc-bd2ed-d-leaves-the-plan-unchanged-chromium\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "E:\\KISS-PM\\test-results\\full-eval-projects-resourc-bd2ed-d-leaves-the-plan-unchanged-chromium\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "E:\\KISS-PM\\e2e\\full-eval\\projects-resources-write.spec.ts",
+                        "column": 104,
+                        "line": 275
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d12fd96212964daa8916-9c6b13e92ee9c3d3a0cf",
+              "file": "full-eval/projects-resources-write.spec.ts",
+              "line": 181,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-09T23:28:12.952Z",
+    "duration": 18650.138,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

@@ -129,6 +129,36 @@ describe("planning command reducer", () => {
     }
   });
 
+  it("accepts a zero-duration zero-work milestone model", () => {
+    const result = reducePlanningCommand(createSnapshot(), {
+      type: "task.update_work_model",
+      payload: {
+        taskId: "task-a",
+        taskType: "fixed_duration",
+        effortDriven: false,
+        durationMinutes: 0,
+        workMinutes: 0
+      }
+    });
+
+    expect(result.validationIssues).toEqual([]);
+    expect(result.nextSnapshot.tasks[0]).toMatchObject({
+      durationMinutes: 0,
+      workMinutes: 0
+    });
+  });
+
+  it("removes a custom field when compensation writes null", () => {
+    const snapshot = createSnapshot();
+    snapshot.tasks[0]!.customFields = { kind: "milestone", keep: true };
+    const result = reducePlanningCommand(snapshot, {
+      type: "task.update_custom_field",
+      payload: { taskId: "task-a", fieldKey: "kind", value: null }
+    });
+
+    expect(result.validationIssues).toEqual([]);
+    expect(result.nextSnapshot.tasks[0]!.customFields).toEqual({ keep: true });
+  });
   it("rejects task.create for another project without mutating the snapshot", () => {
     const snapshot = createSnapshot();
     const result = reducePlanningCommand(snapshot, {
@@ -503,6 +533,36 @@ describe("planning command reducer", () => {
         expect.objectContaining({ code: "planning_command_invalid", severity: "error" })
       ]);
     }
+  });
+
+  it("rejects summary dependency endpoints and exact duplicate triples", () => {
+    const summarySnapshot = createSnapshot();
+    summarySnapshot.tasks.push({ ...createTask("task-child", "1.1"), parentTaskId: "task-a" });
+    const summary = reducePlanningCommand(summarySnapshot, {
+      type: "dependency.upsert",
+      payload: { id: "dep-summary", predecessorTaskId: "task-a", successorTaskId: "task-b", dependencyType: "SS", lagMinutes: 0 }
+    });
+    expect(summary.nextSnapshot).toBe(summarySnapshot);
+    expect(summary.validationIssues).toEqual([
+      expect.objectContaining({ code: "planning_command_invalid", message: "Зависимость можно создавать только между конечными задачами" })
+    ]);
+
+    const duplicateSnapshot = createSnapshot();
+    const duplicate = reducePlanningCommand(duplicateSnapshot, {
+      type: "dependency.upsert",
+      payload: { id: "dep-duplicate", predecessorTaskId: "task-a", successorTaskId: "task-b", dependencyType: "FS", lagMinutes: 0 }
+    });
+    expect(duplicate.nextSnapshot).toBe(duplicateSnapshot);
+    expect(duplicate.validationIssues).toEqual([
+      expect.objectContaining({ code: "planning_command_invalid", message: "Такая зависимость уже существует" })
+    ]);
+
+    const parallelType = reducePlanningCommand(duplicateSnapshot, {
+      type: "dependency.upsert",
+      payload: { id: "dep-parallel", predecessorTaskId: "task-a", successorTaskId: "task-b", dependencyType: "SS", lagMinutes: 0 }
+    });
+    expect(parallelType.validationIssues).toEqual([]);
+    expect(parallelType.nextSnapshot.dependencies.map((dependency) => dependency.type)).toEqual(["FS", "SS"]);
   });
 });
 

@@ -32,6 +32,7 @@ export type BaselineComparisonTask = {
 
 export type BaselineComparison = {
   baselineId: string | null;
+  label: string | null;
   capturedAt: PlanDateTime | null;
   tasks: BaselineComparisonTask[];
 };
@@ -81,12 +82,13 @@ export function buildBaselineComparison(
       right.capturedAt.localeCompare(left.capturedAt) || right.id.localeCompare(left.id)
   )[0];
   if (!baseline) {
-    return { baselineId: null, capturedAt: null, tasks: [] };
+    return { baselineId: null, label: null, capturedAt: null, tasks: [] };
   }
 
   const calculatedTasksById = new Map(calculatedPlan.tasks.map((task) => [task.id, task]));
   return {
     baselineId: baseline.id,
+    label: baseline.label,
     capturedAt: baseline.capturedAt,
     tasks: baseline.tasks.map((baselineTask) => {
       const current = calculatedTasksById.get(baselineTask.taskId);

@@ -1,13 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { Segmented } from "@/components/ui/segmented";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { useProjects, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
@@ -23,16 +21,18 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
    - Баннер «Прототип»: боевой контракт GET /api/workspace/projects
      (только status === "active"); транспорт — contract-mock,
      переключение на боевой = apiOrigin; данные in-memory.
-   - Фильтр «Все/Активные»: контракт отдаёт ТОЛЬКО активные проекты,
-     поэтому «Активные» — настоящий вид, а «Все» — демо-переключатель
-     (архив/закрытые в этой ручке недоступны).
-   - Клик по строке навигации НЕ выполняет (cursor-default + title):
-     карточка проекта — отдельный экран рабочего приложения.
+   - Контракт отдаёт ТОЛЬКО активные проекты, поэтому список не показывает
+     фильтр «Все»: архив/закрытые в этой ручке недоступны.
+   - Название каждого проекта — нативная ссылка на его карточку.
 
    Состояния — только через <SurfaceState> (loading/error/empty).
    ============================================================ */
 
-type Filter = "active" | "all";
+export const PROJECTS_LIST_AVAILABLE_FILTERS = [{ value: "active", label: "Активные" }] as const;
+
+export function getVisibleProjects(projects: ProjectRecord[]): ProjectRecord[] {
+  return projects.filter((p) => p.status === "active");
+}
 
 // Аватары/инициалы/цвет — по образцу deals-surface (детерминированно по справочнику).
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
@@ -59,7 +59,7 @@ const ERR_RU: Record<string, string> = {
   request_failed: "Запрос не выполнен",
   invalid_json_response: "Некорректный ответ сервера"
 };
-const projectsErr = (code?: string) => (code && ERR_RU[code]) || code || "Не удалось загрузить";
+export const projectsErrorMessage = (code?: string) => (code && ERR_RU[code]) || (code ? "Запрос не выполнен" : "Не удалось загрузить");
 
 // Человекочитаемый статус проекта (боевой status — свободная строка; известные — переводим).
 const STATUS_LABEL: Record<string, string> = {
@@ -78,14 +78,11 @@ export function ProjectsListSurface() {
     return i < 0 ? "c5" : AV[i % AV.length]!;
   };
   const { data, status, error, reload } = useProjects();
-  const [filter, setFilter] = useState<Filter>("active");
 
-  // Контракт отдаёт только активные → оба таба показывают один и тот же список.
-  // «Активные» честно фильтрует по status==="active"; «Все» — демо (архив недоступен).
+  // Контракт отдаёт только активные; локальная защита не даёт не-active строкам попасть в UI.
   const projects = useMemo<ProjectRecord[]>(() => {
-    const all = data?.projects ?? [];
-    return filter === "active" ? all.filter((p) => p.status === "active") : all;
-  }, [data, filter]);
+    return getVisibleProjects(data?.projects ?? []);
+  }, [data]);
 
   // Статус поверхности: есть данные → ready; ошибка → error; иначе loading.
   // Пустой список активных проектов → empty.
@@ -105,33 +102,22 @@ export function ProjectsListSurface() {
       <main className="min-w-0 flex-1 overflow-auto p-4">
         <ProtoBanner />
 
-        <div className="mb-3">
-          <h1 className="text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Проекты</h1>
-          <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Активные проекты рабочей области</p>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Проекты</h1>
+            <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Активные проекты рабочей области</p>
+          </div>
+          <Button asChild variant="default" size="sm">
+            <Link href="/crm/deals">Создать проект</Link>
+          </Button>
         </div>
 
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <Segmented
-            name="projects-filter"
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { value: "all", label: "Все" },
-              { value: "active", label: "Активные" }
-            ]}
-          />
-          {filter === "all" && prototypeNotesEnabled ? (
-            <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">
-              Демо-переключатель: GET /api/workspace/projects отдаёт только активные — архив/закрытые в этой ручке недоступны.
-            </span>
-          ) : null}
-        </div>
 
         <SurfaceState
           status={surfaceStatus}
           error={error}
           onRetry={() => void reload()}
-          errorFormat={projectsErr}
+          errorFormat={projectsErrorMessage}
           loadingLabel="Загрузка проектов…"
           empty={{
             title: "Нет проектов",
@@ -168,7 +154,6 @@ function ProtoBanner() {
 
 // Таблица проектов: Проект · Клиент · Статус · Срок · Сумма · План.часы · Спрос.
 function ProjectsTable({ projects, userColor }: { projects: ProjectRecord[]; userColor: (id: string) => BemAvatarColor }) {
-  const router = useRouter();
   return (
     <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
       <table className="w-full border-collapse text-[length:var(--text-sm)]">
@@ -187,16 +172,15 @@ function ProjectsTable({ projects, userColor }: { projects: ProjectRecord[]; use
           {projects.map((p) => (
             <tr
               key={p.id}
-              className="v4-row cursor-pointer border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--panel-subtle)]"
-              onClick={() => router.push(`/projects/${p.id}/overview`)}
-              role="link"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") router.push(`/projects/${p.id}/overview`);
-              }}
+              className="v4-row border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--panel-subtle)]"
             >
               <td className="px-3 py-2">
-                <div className="font-medium text-[var(--text-strong)]">{p.title}</div>
+                <Link
+                  href={`/projects/${p.id}`}
+                  className="font-medium text-[var(--text-strong)] hover:underline focus-visible:underline"
+                >
+                  {p.title}
+                </Link>
                 {prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{p.id}</div> : null}
               </td>
               <td className="px-3 py-2">

@@ -1,0 +1,15 @@
+{
+  "scenarioId": "PROJ-115",
+  "role": "admin",
+  "status": "pass",
+  "runId": "final29-settings-review-r1",
+  "generatedAt": "2026-07-11T05:35:25.241Z",
+  "assertions": [
+    "Интеграции rendered from the live project surface for admin",
+    "Unsupported integrations were visibly disabled without fake success"
+  ],
+  "details": {},
+  "screenshots": [
+    "screenshots/proj-115-admin.png"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "scenarioId": "PROJ-114",
+  "role": "admin",
+  "status": "pass",
+  "runId": "final29-settings-review-r1",
+  "generatedAt": "2026-07-11T05:35:25.128Z",
+  "assertions": [
+    "Права на проект rendered from the live project surface for admin",
+    "The surface exposed no fake write affordance for this read-only state"
+  ],
+  "details": {},
+  "screenshots": [
+    "screenshots/proj-114-admin.png"
+  ]
+}

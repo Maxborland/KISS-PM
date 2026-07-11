@@ -72,6 +72,8 @@
 
 **Доказательства:** bug-proj-03-overview-header-today.png (vektor), прогон demo-crm-intake (та же шапка), RR-прогон («план v17» без прав на read-model).
 
+**Исправление 2026-07-10:** `useProjectBase` получает live title/status по запрошенному projectId, немедленно сбрасывает прежнюю identity при смене id и используется всеми 9 delivery surfaces. Свежий browser-run: 9/9 headers; focused: mock/live active-only, отсутствие flash старого проекта и отсутствие same-id reuse после denied response.
+
 ---
 
 ## BUG-PROJ-05 · MAJOR · Мок-эпоха времени: «Сегодня»=28.04.2026, таймлайн от 02.03.2026, просрочки от 23.06.2026 (реальная дата 04.07.2026)
@@ -103,6 +105,8 @@
 
 **Доказательства:** bug-proj-01-projects-list.png; DOM-проверка: `{title:"Демо-прототип…", cursor:"default", hasLink:false, onclick:false}` у всех строк.
 
+**Исправление 2026-07-10:** названия проектов — нативные ссылки `/projects/[id]`; свежий live click/final URL/back и focused loading/error/empty contracts проходят.
+
 ---
 
 ## BUG-PROJ-07 · MAJOR · Таб-бар поверхностей (Обзор…Настройки) — спаны без навигации
@@ -116,6 +120,8 @@
 **Факт:** табы — `<span title="Демо-прототип: переключение поверхностей появится в приложении">`, клик ничего не делает. Переключение поверхностей возможно только ручным URL.
 
 **Доказательства:** DOM-проверка: `{tag:"SPAN", title:"Демо-прототип…", href:null}` для всех неактивных табов.
+
+**Исправление 2026-07-10:** все 9 табов — реальные project-specific links с `aria-current`; staged Schedule batch защищён Cancel/Leave/no-write и `beforeunload`; live action gate и role-route traversal проходят.
 
 ---
 
@@ -149,6 +155,8 @@
 
 **Доказательства:** DOM-дамп кнопок: `{disabled:true, title:"Демо-прототип…"}` у всех 6 на overview и 3 на schedule.
 
+**Исправление navigation locations 2026-07-10:** Overview signals/«Все», Baseline overlay, Calendars conflict и Settings calendar CTA стали реальными links; 23/23 live actions/data states проходят. Отдельные отсутствующие Schedule-функции («Фильтры», «Колонки») этим исправлением не закрываются.
+
 ---
 
 ## BUG-PROJ-10 · MAJOR · /projects/[id]: несуществующий id тихо подменяется первым проектом; селектор не меняет URL
@@ -164,6 +172,8 @@
 **Факт:** (1) URL остаётся `/projects/project-does-not-exist-xyz`, но показана карточка **project-vektor-portal** — fetch 404 проглатывается, id подменяется первым в списке; RU-состояние `project_not_found` не показывается никогда. (2) Селектор реально грузит `getProjectDetail('project-demo-crm-intake')`, URL не меняется — refresh/шаринг ссылки теряют выбор.
 
 **Доказательства:** bug-proj-02-fake-id-substitution.png; network: `GET /api/workspace/projects/project-does-not-exist-xyz → 404 {"error":"project_not_found"}` + рендер карточки Вектор.
+
+**Исправление 2026-07-10:** selector меняет canonical URL; admin и planReader проходят select → readback → reload → Back → Forward. Invalid id под admin/planReader/beta остаётся в URL, API возвращает 404 и UI показывает «Проект не найден» без подмены; RR получает 403 forbidden.
 
 ---
 
@@ -233,6 +243,8 @@
 
 **Ожидание:** человекочитаемые RU-тексты для permission_missing; различать «пусто» и «нет прав».
 
+**Частичное исправление 2026-07-10:** Overview больше не маскирует audit-events 403 как пустую историю; `DomainApiError` сохраняет status/code/body, UI показывает «недостаточно прав». Fresh browser отдельно подтверждает ADMIN true empty и PR 403. Остальные raw-code локации BUG-PROJ-15 остаются в backlog.
+
 ---
 
 ## BUG-PROJ-16 · LOW · Фильтр «Все/Активные» — демо-переключатель без пояснения; в таблице нет сортировки и поиска
@@ -289,7 +301,7 @@
 
 ---
 
-## BUG-PROJ-19 · MAJOR · Resources: «Снять перегруз» (risk.accept_overload) — пустышка на DB-бэкенде; перегруз не снимается и не принимается
+## BUG-PROJ-19 · MAJOR · FIXED 2026-07-10 · Resources: принятие перегруза не сохранялось на DB-бэкенде
 
 **Где:** `/projects/[id]/resources` — drilldown ячейки → «Снять перегруз» (`resource-load-matrix.tsx` → `risk.accept_overload`).
 
@@ -307,9 +319,12 @@
 
 **Доказательства:** код `planningRepository.ts:1117`; runtime: apply 200 / newVersion 23 / acceptedOverloads absent / overloadStillPresent true; матрица после — перегруз на месте.
 
+**Исправление 2026-07-10:** risk.accept_overload сохраняет первую запись принятия по ключу resourceId:YYYY-MM-DD; повторные и конкурентные команды не меняют reason/actor/timestamp. Некорректный ID блокируется API-precondition и дополнительно отклоняется persistence. Auto-solver исправлен с resourceId:taskId на дату фактической перегруженной allocation. Подпись UI теперь честная: «Принять перегруз как риск».
+
+**Fresh evidence:** .superloopy/evidence/projects-2026-07-10/persistence-overload-playwright.json, planningRepository.db.test.ts 29/29 (включая conflicting initial writers), focused API/OpenAPI/domain 70/70, .superloopy/evidence/projects-2026-07-10/persistence-data-integrity-fix.json.
 ---
 
-## BUG-PROJ-20 · MAJOR · Resources+Calendars: диалог «Отсутствие»/«Исключение» — МОК RESOURCES + хардкод-даты 04–08.05.2026; отсутствие невозможно добавить
+## BUG-PROJ-20 · MAJOR · FIXED 2026-07-10 · Resources+Calendars: диалог «Отсутствие»/«Исключение» использовал mock resources и даты вне проекта
 
 **Где:** `/projects/[id]/resources` кнопка «Отсутствие» и `/projects/[id]/calendars` кнопка «Исключение» — общий AbsenceDialog (`resources-editors.tsx`, импорт `RESOURCES`).
 
@@ -327,9 +342,14 @@
 
 **Доказательства:** опции диалога (мок) на обеих вкладках; network `apply-command-batch → 409` + response body с validationIssues; нотис «Отклонено: planning_precondition_failed».
 
+
+**Исправление 2026-07-10:** AbsenceDialog получает live /api/workspace/users, при каждом открытии синхронизирует выбранного ресурса и диапазон видимого месяца в границах проекта. Диапазон без рабочих дней показывает явный отказ и не открывает preview/не отправляет batch. Свежий ADMIN E2E проходит полный цикл Calendar: selected live resource → one-command batch preview → apply → API readback → reload → remove → reload/cleanup; reader/direct 403 сохранён.
+
+**Fresh evidence:** .superloopy/evidence/projects-2026-07-10/calendar-live-resource-fix.json, .superloopy/evidence/projects-2026-07-10/calendar-live-resource-dialog.png, focused Vitest 5/5, Calendar Playwright 3/3, planning batch race/idempotency matrix.
+
 ---
 
-## BUG-PROJ-21 · MINOR · Baseline: имя снимка, введённое пользователем, нигде не отображается — все снимки называются «Снимок плана»
+## BUG-PROJ-21 · MINOR · FIXED 2026-07-10 · Baseline: имя снимка не возвращалось в read-model
 
 **Где:** `/projects/[id]/baseline` — форма «Зафиксировать базовый план» (поле «Название снимка») + история снимков.
 
@@ -343,9 +363,12 @@
 
 **Доказательства:** read-model baselines: keys `[id, capturedAt, tasks]` (нет name/label); UI-история показывает «Снимок плана · активный» и «Снимок плана · архив».
 
+**Исправление 2026-07-10:** label включён в PlanBaseline, baseline comparison и OpenAPI; введённое имя отображается в истории и сохраняется после reload. ID снимка immutable: conflicting replay не переписывает label/capturedAt/content.
+
+**Fresh evidence:** .superloopy/evidence/projects-2026-07-10/persistence-baseline-playwright-final.json, planningRepository.db.test.ts 29/29, planningRoutes.db.test.ts 24/24.
 ---
 
-## BUG-PROJ-22 · MAJOR · Baseline: свежезафиксированный снимок сразу показывает ложные отклонения сроков (Δ дн. ≠ 0 при Δ работы 0) — capture морозит authored-даты, сравнение идёт против calculated-плана
+## BUG-PROJ-22 · MAJOR · FIXED 2026-07-10 · Baseline: свежий снимок показывал ложные отклонения authored-vs-calculated
 
 **Где:** `/projects/[id]/baseline` — плитки + таблица «Отклонения от базового плана» (`baselineComparison`).
 
@@ -359,6 +382,9 @@
 
 **Доказательства:** bug-proj-22-baseline-spurious-deltas.png; read-model: baseline-n1 task-demo-description plannedFinish 2026-05-23 vs calculatedFinish 2026-05-27; comparison.baselineId=baseline-n1 (активный свежий).
 
+**Исправление 2026-07-10:** capture замораживает calculated start/finish внутри одной транзакции; свежий baseline сразу даёт нулевые start/finish/work deltas. Заголовок и дочерние строки пишутся атомарно; принудительный сбой child insert подтверждает rollback без orphan header.
+
+**Fresh evidence:** .superloopy/evidence/projects-2026-07-10/persistence-baseline-playwright-final.json, forced-failure rollback + conflicting initial-writer DB tests в planningRepository.db.test.ts (29/29), полный planningRoutes.db.test.ts (24/24).
 ---
 
 ## BUG-PROJ-23 · КРИТИЧЕСКИЙ · Одна невалидная задача (веха с invalid_work_model) навсегда блокирует ВСЕ planning-команды проекта — /schedule, /scenarios, /baseline, /assignments, /calendars, /settings
@@ -436,7 +462,7 @@
 
 ## Прочее (часть B, без отдельного номера)
 
-- **demoAction-фейки на существующих роутах (класс BUG-PROJ-09), новые локации:** `/baseline` «Overlay в График» (title «Демо-прототип: наложение…», cursor default), `/calendars` «Открыть График» (title «Демо-прототип: переход на График…»). Роуты существуют, кнопки мертвы.
+- **Исправлено 2026-07-10:** `/baseline` «Слой в Графике» и `/calendars` «Открыть График» — реальные project-specific links; live CTA traversal и generated conflict state проходят.
 - **Resources drilldown, мелкое:** оккупация-встреча (meeting occupancy, `meeting-alpha-vektor-kickoff`) в разбивке «ИЗ ЧЕГО СЛОЖИЛАСЬ ЗАГРУЗКА» подписана как «Отсутствие (отпуск)» — неверная категория (это митинг, не отпуск).
 - **Calendars, мелкое:** исключение с `workingMinutes=240` (частичный/полу-рабочий день) в списке и в баннере конфликта подписано как «праздник»/«нерабочий день» (25.05.2026 у demo) — на деле день частично рабочий.
 - **Мок-эпоха на /calendars (класс BUG-PROJ-05):** список месяцев стартует с «Март 2026» (`BASE_MS=2026-03-02`), хотя demo-проект — май–июнь; 2 пустых месяца (март, апрель) перед стартом, вид по умолчанию — март.
@@ -450,3 +476,20 @@
 - защита бэка: неизвестный ресурс/статус → 409 precondition_failed (порчи данных нет), циклическая зависимость (3→1 при существующей 1→3) → 400, план не изменён;
 - indent/outdent (task.move_wbs), DateEditor «Начало», «Сделать вехой» (update_custom_field kind), удаление задачи, режим «Пакет» (2 правки → один коммит), «Откат» (компенсирующий коммит), инспектор side-peek, DependencyEditor (исключение себя/предшественников), зум День/Неделя/Месяц (36/8/20px);
 - RBAC-ядро: PR читает план, мутации → 403; RR → forbidden на planning-вкладках и отказ на /projects; beta (tenant-beta) не видит проекты alpha (пустой список, 404 на чужой id).
+## BUG-PROJ-27 · MAJOR · Schedule lost spreadsheet productivity contracts
+
+Fresh rerun of the repository-owned planning suite confirms that TSV paste, date drag-fill and the Insert/F2 keyboard grid workflow have no current equivalent contract. The current quick-create textbox covers simple Enter/Tab creation but not rectangular paste, multi-row fill or the original keyboard navigation flow.
+
+Evidence: projects-old-planning-suite-batch2.json, projects-legacy-contract-reconciliation.json, PROJ-123..125.
+
+## BUG-PROJ-28 · MAJOR · Saved views and custom-field definitions disappeared from current surfaces
+
+The current Schedule has no saved-view selector or persistence. Project Settings shows neither custom WBS field definitions nor an explicit empty state, despite repository-owned E2E contracts for both.
+
+Evidence: saved-views.spec.ts, custom-fields.spec.ts, PROJ-127..128.
+
+## BUG-PROJ-29 · MINOR · Legacy planning E2E is not migrated to the current UI contract
+
+Eleven of eighteen tests assert removed planning testids, stale labels, hardcoded project-alpha, or derive /projects/undefined. Equivalent current flows are covered elsewhere, but the old suite remains red and its a11y and conflict assertions no longer protect the current WBS/Gantt.
+
+Evidence: full disposable rerun 17 failed / 1 skipped and diagnostic batch2 12 failed / 0 flaky.

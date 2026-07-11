@@ -8,12 +8,16 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { cn } from "@/lib/cn";
+import { hasPermission } from "@/lib/permissions";
+import { useSessionUser } from "@/shell/use-session-user";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { MIN_PER_DAY, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
+import { isCalendarWorkingWeekday, resolveProjectCalendar } from "@/delivery/lib/project-calendar";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { AddAssigneeDialog, distribute, presetWeights, ROLES, roleLabel } from "@/delivery/assignments/assignments-editors";
+import { createClientId } from "@/delivery/lib/client-id";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
@@ -30,6 +34,7 @@ const COL_W: Record<Gran, number> = { day: 30, week: 44 };
 const ROW_H = 34;
 const HEADER_H = 40;
 const LEFT_W = 360;
+const ASSIGNMENTS_MANAGE_PERMISSION = "tenant.project_resources.manage";
 const WORKING = new Set(["executor", "co_executor"]); // только эти роли создают нагрузку и учитываются в труде
 // «прицел» (как в матрице ресурсов): тонирующий inset-shadow строки/столбца под курсором
 const CROSS = "shadow-[inset_0_0_0_9999px_color-mix(in_oklab,var(--accent)_14%,transparent)]";
@@ -39,22 +44,34 @@ const CROSS_FOCAL = "shadow-[inset_0_0_0_9999px_color-mix(in_oklab,var(--accent)
 // строки, поэтому на выбранной (accent-soft) строке не закрашивает подсветку серым (без «полос»).
 // На белом фоне (panel=#fff) визуально идентичен непрозрачному muted-soft 18%.
 const WEEKEND_BG = "color-mix(in oklab, var(--muted-soft) 18%, transparent)";
-const h1 = (min: number) => (Math.round((min / 60) * 10) / 10).toLocaleString("ru-RU");
+export const formatAssignmentHours = (min: number) => (Math.round((min / 60) * 10) / 10).toLocaleString("ru-RU");
+export const assignmentHoursInputValue = (min: number) => Math.round((min / 60) * 100) / 100;
+export function parseAssignmentHours(value: string): number | null {
+  if (value.trim() === "") return null;
+  const hours = Number(value);
+  return Number.isFinite(hours) ? Math.max(0, Math.round(hours * 60)) : null;
+}
+export function parseAssignmentUnits(value: string): number | null {
+  if (value.trim() === "") return null;
+  const percent = Number(value);
+  return Number.isFinite(percent) ? Math.max(10, Math.round(percent) * 10) : null;
+}
+const h1 = formatAssignmentHours;
 // Источник дат таймлайна — read-model (project.plannedStart), а не хардкод mock-бэка: «переключение на live = смена apiOrigin».
 // Чистые помощники относительно произвольного начала (baseMs); внутри компонента биндятся на origin плана.
 const dayToIsoAt = (baseMs: number, day: number) => new Date(baseMs + day * 86_400_000).toISOString().slice(0, 10);
 const isoToDayAt = (baseMs: number, iso: string) => Math.round((Date.parse(iso + "T00:00:00Z") - baseMs) / 86_400_000);
-const isWeekdayAt = (baseMs: number, day: number) => { const d = new Date(baseMs + day * 86_400_000).getUTCDay(); return d >= 1 && d <= 5; };
 
-let NID = 0;
-const nid = (p: string) => `${p}-n${(NID += 1)}`;
+const nid = createClientId;
 
-type AsgMeta = { asg: AsgRaw; days: number[]; scheduledSet: Set<number>; flatPer: number; explicit: Map<number, number>; hasExplicit: boolean };
+type AsgMeta = { asg: AsgRaw; days: number[]; resolved: Map<number, number>; explicit: Map<number, number>; hasExplicit: boolean };
 
 export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, apply } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
+  const sessionUser = useSessionUser();
+  const canManageAssignments = hasPermission(sessionUser?.permissions ?? [], ASSIGNMENTS_MANAGE_PERMISSION);
   // Фолбэк имени: под ограниченной ролью справочник людей может отдать 403 — резолвер вернёт сырой id.
   // Показываем «Участник xxxx» вместо user-/r-идентификатора (G8-08).
   const resName = (id: string) => { const n = resDir.name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
@@ -87,19 +104,32 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
     const allocByAsg = new Map<string, Map<number, number>>();
     for (const al of authored.assignmentAllocations) { let m = allocByAsg.get(al.assignmentId); if (!m) { m = new Map(); allocByAsg.set(al.assignmentId, m); } m.set(isoToDayAt(baseMs, al.date), (m.get(isoToDayAt(baseMs, al.date)) ?? 0) + al.workMinutes); }
 
-    // нерабочие дни календаря: праздники (resourceId=null) и отсутствия по ресурсу (workingMinutes < полного дня) —
-    // тот же фильтр, что на вкладке «Календари». Пресеты не должны раскладывать труд на праздник/отсутствие (нулевая ёмкость).
-    const cal = (readModel.calendars ?? [])[0];
-    const full = cal?.workingMinutesPerDay ?? MIN_PER_DAY;
-    const exns = (readModel.calendarExceptions ?? []).filter((x) => x.workingMinutes < full);
-    const holidayDays = new Set<number>();
-    const absenceByRes = new Map<string, Set<number>>();
-    for (const x of exns) {
-      const day = isoToDayAt(baseMs, x.date);
-      if (x.resourceId === null) holidayDays.add(day);
-      else { let s = absenceByRes.get(x.resourceId); if (!s) { s = new Set(); absenceByRes.set(x.resourceId, s); } s.add(day); }
+    const resolvedByAsg = new Map<string, Map<number, number>>();
+    for (const bucket of readModel.resourceLoad?.buckets ?? []) {
+      if (bucket.granularity !== "day") continue;
+      const day = isoToDayAt(baseMs, bucket.date);
+      for (const contribution of bucket.assignmentContributions ?? []) {
+        let distribution = resolvedByAsg.get(contribution.assignmentId);
+        if (!distribution) {
+          distribution = new Map();
+          resolvedByAsg.set(contribution.assignmentId, distribution);
+        }
+        distribution.set(day, (distribution.get(day) ?? 0) + contribution.workMinutes);
+      }
     }
-    const isWorkingFor = (resourceId: string, day: number) => isWeekdayAt(baseMs, day) && !holidayDays.has(day) && !(absenceByRes.get(resourceId)?.has(day) ?? false);
+
+    // Исключения задают фактическую доступность дня. Пресеты исключают только дни с нулевой ёмкостью.
+    const cal = resolveProjectCalendar({ project: readModel.project, calendars: readModel.calendars });
+    const full = cal?.workingMinutesPerDay ?? MIN_PER_DAY;
+    const exns = (readModel.calendarExceptions ?? []).filter((x) => cal !== null && x.calendarId === cal.id);
+    const workingMinutesFor = (resourceId: string, day: number) => {
+      if (!cal) return 0;
+      const date = dayToIsoAt(baseMs, day);
+      let minutes = isCalendarWorkingWeekday(cal, new Date(baseMs + day * 86_400_000).getUTCDay()) ? full : 0;
+      for (const exception of exns) if (exception.date === date && exception.resourceId === null) minutes = exception.workingMinutes;
+      for (const exception of exns) if (exception.date === date && exception.resourceId === resourceId) minutes = exception.workingMinutes;
+      return Math.max(0, minutes);
+    };
 
     const metaByAsg = new Map<string, AsgMeta>();
     for (const a of assignments) {
@@ -108,18 +138,18 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
       const es = c?.calculatedStart ? isoToDayAt(baseMs, c.calculatedStart) : 0;
       const ef = c?.calculatedFinish ? isoToDayAt(baseMs, c.calculatedFinish) : es;
       const days: number[] = [];
-      for (let d = es; d < Math.max(ef, es + 1); d++) if (isWorkingFor(a.resourceId, d)) days.push(d);
+      for (let d = es; d <= Math.max(ef, es); d++) if (workingMinutesFor(a.resourceId, d) > 0) days.push(d);
       const explicit = allocByAsg.get(a.id) ?? new Map<number, number>();
-      const span = Math.max(1, ef - es);
-      // flatPer как у движка загрузки (явный workMinutes — абсолютная работа, без масштаба units),
-      // чтобы грид совпадал с экраном «Ресурсы» и с продовым resolveAssignmentWork
-      metaByAsg.set(a.id, { asg: a, days, scheduledSet: new Set(days), flatPer: Math.round(a.workMinutes / span), explicit, hasExplicit: explicit.size > 0 });
+      const resolved = WORKING.has(a.role) ? resolvedByAsg.get(a.id) ?? new Map<number, number>() : new Map<number, number>();
+      metaByAsg.set(a.id, { asg: a, days, resolved, explicit, hasExplicit: explicit.size > 0 });
     }
     // диапазон дней для окна
-    let minDay = 9999, maxDay = 0;
-    for (const m of metaByAsg.values()) for (const d of m.days) { minDay = Math.min(minDay, d); maxDay = Math.max(maxDay, d); }
-    if (minDay > maxDay) { minDay = 0; maxDay = 34; }
-    return { leafTasks, asgByTask, metaByAsg, calcById, minDay, maxDay };
+    const minDay = 0;
+    let maxDay = readModel.project.plannedFinish ? Math.max(0, isoToDayAt(baseMs, readModel.project.plannedFinish)) : 34;
+    for (const m of metaByAsg.values()) {
+      for (const d of [...m.days, ...m.explicit.keys(), ...m.resolved.keys()]) maxDay = Math.max(maxDay, d);
+    }
+    return { leafTasks, asgByTask, metaByAsg, calcById, minDay, maxDay, hasProjectCalendar: cal !== null };
   }, [readModel, baseMs]);
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
@@ -127,7 +157,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Назначения">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} projectId={projectId} activeTab="Назначения">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка назначений…">
           <span />
         </SurfaceState>
@@ -156,7 +186,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
     for (const d of windowDays) { const wd = new Date(baseMs + d * 86_400_000).getUTCDay(); const monday = d - (wd === 0 ? 6 : wd - 1); if (seen.has(monday)) continue; seen.add(monday); const dt = new Date(baseMs + monday * 86_400_000); periods.push({ key: monday, days: [0, 1, 2, 3, 4].map((k) => monday + k), top: String(dt.getUTCDate()).padStart(2, "0"), sub: MONTHS_CAP[dt.getUTCMonth() + 1] ?? "", weekend: false }); }
   }
 
-  const minutesOn = (m: AsgMeta, day: number) => (m.hasExplicit ? m.explicit.get(day) ?? 0 : m.scheduledSet.has(day) ? m.flatPer : 0);
+  const minutesOn = (m: AsgMeta, day: number) => m.resolved.get(day) ?? 0;
   const cellMin = (m: AsgMeta, p: { days: number[] }) => p.days.reduce((s, d) => s + minutesOn(m, d), 0);
 
   async function applyCmd(command: PlanningCommand, okMsg: string): Promise<ApplyResult> {
@@ -212,13 +242,13 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
   const sumAsgWork = (taskId: string) => (model.asgByTask.get(taskId) ?? []).filter((a) => WORKING.has(a.role)).reduce((s, a) => s + a.workMinutes, 0);
 
   return (
-    <DeliveryFrame project={projectMeta} activeTab="Назначения">
+    <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Назначения">
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
-        <div className="text-[length:var(--text-sm)] text-[var(--muted)]">Задача → исполнители с дневной кривой распределения. Клик по исполнителю — инспектор и редактор кривой.</div>
+        <div className="text-[length:var(--text-sm)] text-[var(--muted)]">Задача → исполнители с дневной кривой распределения. Клик по исполнителю — {canManageAssignments ? "инспектор и редактор кривой" : "инспектор назначения"}.</div>
         <div className="ml-auto flex items-center gap-2">
           <div className="flex items-center gap-0.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-0.5 py-0.5">
             <button type="button" onClick={() => setMonthOffset((o) => Math.max(0, o - 1))} disabled={monthOffset <= 0} className="grid size-6 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)] disabled:opacity-40" aria-label="Предыдущий месяц"><ChevronLeft className="size-4" aria-hidden /></button>
-            <span className="min-w-[92px] text-center text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{monthLabel}</span>
+            <span data-testid="assignments-month-label" className="min-w-[92px] text-center text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{monthLabel}</span>
             <button type="button" onClick={() => setMonthOffset((o) => Math.min(monthsList.length - 1, o + 1))} disabled={monthOffset >= monthsList.length - 1} className="grid size-6 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)] disabled:opacity-40" aria-label="Следующий месяц"><ChevronRight className="size-4" aria-hidden /></button>
           </div>
           <div className="flex items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-0.5">
@@ -229,14 +259,19 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
         </div>
       </div>
 
-      {prototypeNotesEnabled ? (
+      {prototypeNotesEnabled && canManageAssignments ? (
         <div className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
           Реальный контракт: assignment.upsert / assignment.allocations.replace (сумма кривой = трудоёмкости) / assignment.delete. Кривая по дням редактируема; пресеты дают сбалансированную раскладку. Данные in-memory.
         </div>
       ) : null}
+      {!model.hasProjectCalendar ? (
+        <div role="status" className="mb-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--warning-text)]">
+          Календарь проекта не настроен. Дневное распределение трудозатрат недоступно.
+        </div>
+      ) : null}
 
-      <div className="relative">
+      <div className="relative" data-testid="assignments-grid">
         <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
           <div className="flex min-w-full align-top" onMouseLeave={() => setHover(null)}>
             {/* sticky-left: задачи и исполнители */}
@@ -252,9 +287,11 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                       <span className="mono shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{t.wbsCode}</span>
                       <span className="min-w-0 flex-1 truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{t.title}</span>
                       <span className="shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]" title={`Труд задачи ${h1(t.workMinutes)} ч · сумма назначений ${h1(sumAsgWork(t.id))} ч`}>{h1(sumAsgWork(t.id))}/{h1(t.workMinutes)} ч</span>
-                      <AddAssigneeDialog taskTitle={t.title} excludeIds={asgs.map((a) => a.resourceId)} onSubmit={(rid, role) => addAssignee(t.id, rid, role)}>
-                        <button type="button" className="grid size-5 shrink-0 place-items-center rounded text-[var(--muted)] hover:bg-[var(--panel-strong)] hover:text-[var(--accent)]" title="Добавить исполнителя" disabled={busy}><Plus className="size-3.5" aria-hidden /></button>
-                      </AddAssigneeDialog>
+                      {canManageAssignments ? (
+                        <AddAssigneeDialog taskTitle={t.title} excludeIds={asgs.map((a) => a.resourceId)} resources={resDir.list} onSubmit={(rid, role) => addAssignee(t.id, rid, role)}>
+                          <button type="button" className="grid size-5 shrink-0 place-items-center rounded text-[var(--muted)] hover:bg-[var(--panel-strong)] hover:text-[var(--accent)]" title="Добавить исполнителя" disabled={busy}><Plus className="size-3.5" aria-hidden /></button>
+                        </AddAssigneeDialog>
+                      ) : null}
                     </div>
                     {asgs.length === 0 ? (
                       <div className="flex items-center border-b border-[var(--border-subtle)] px-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]" style={{ height: ROW_H, width: LEFT_W, paddingLeft: 28 }}>нет исполнителей</div>
@@ -263,7 +300,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                       const m = model.metaByAsg.get(a.id)!;
                       const isSel = sel === a.id;
                       return (
-                        <button key={a.id} type="button" onMouseEnter={() => setHover({ key: `a:${a.id}`, col: -1 })} onClick={() => { setSel(a.id); setDraft(null); }} className={cn("flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-2 text-left outline-none hover:bg-[var(--panel-subtle)]", isSel ? "bg-[var(--accent-soft)]" : crosshair?.key === `a:${a.id}` && CROSS_SOFT)} style={{ height: ROW_H, width: LEFT_W, paddingLeft: 24 }}>
+                        <button key={a.id} type="button" data-testid={`assignment-row-${a.id}`} onMouseEnter={() => setHover({ key: `a:${a.id}`, col: -1 })} onClick={() => { setSel(a.id); setDraft(null); }} className={cn("flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-2 text-left outline-none hover:bg-[var(--panel-subtle)]", isSel ? "bg-[var(--accent-soft)]" : crosshair?.key === `a:${a.id}` && CROSS_SOFT)} style={{ height: ROW_H, width: LEFT_W, paddingLeft: 24 }}>
                         <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{r?.name.slice(0, 1)}</span>
                         <span className="min-w-0 flex-1 truncate text-[length:var(--text-sm)] text-[var(--text)]">{r?.name}{m.hasExplicit ? <span className="ml-1 text-[length:var(--text-2xs)] text-[var(--accent)]">кривая</span> : null}</span>
                         <span className="w-[120px] shrink-0 truncate text-right text-[length:var(--text-xs)] text-[var(--muted)]">{roleLabel(a.role)} · {Math.round(a.unitsPermille / 10)}% · {h1(a.workMinutes)} ч</span>
@@ -286,7 +323,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                 return (
                   <div key={t.id}>
                     <div onMouseEnter={() => setHover((h) => ({ key: `t:${t.id}`, col: h?.col ?? -1 }))} className="flex border-b border-[var(--border-subtle)] bg-[color-mix(in_oklab,var(--panel-strong)_22%,var(--panel))]" style={{ height: ROW_H }}>
-                      {periods.map((p) => { const tot = metas.reduce((s, m) => s + cellMin(m, p), 0); const inCross = crosshair?.col === p.key || crosshair?.key === `t:${t.id}`; const isFocal = crosshair?.col === p.key && crosshair?.key === `t:${t.id}`; return <span key={p.key} onMouseEnter={() => setHover({ key: `t:${t.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] font-semibold tabular-nums text-[var(--muted-strong)]", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, ...(p.weekend ? { background: WEEKEND_BG } : {}) }}>{tot > 0 ? Math.round(tot / 60) : ""}</span>; })}
+                      {periods.map((p) => { const tot = metas.reduce((s, m) => s + cellMin(m, p), 0); const inCross = crosshair?.col === p.key || crosshair?.key === `t:${t.id}`; const isFocal = crosshair?.col === p.key && crosshair?.key === `t:${t.id}`; return <span key={p.key} onMouseEnter={() => setHover({ key: `t:${t.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] font-semibold tabular-nums text-[var(--muted-strong)]", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, ...(p.weekend ? { background: WEEKEND_BG } : {}) }}>{tot > 0 ? h1(tot) : ""}</span>; })}
                     </div>
                     {asgs.length === 0 ? <div className="border-b border-[var(--border-subtle)]" style={{ height: ROW_H }} /> : metas.map((m) => (
                       <div key={m.asg.id} onMouseEnter={() => setHover((h) => ({ key: `a:${m.asg.id}`, col: h?.col ?? -1 }))} className={cn("flex border-b border-[var(--border-subtle)]", sel === m.asg.id && "bg-[var(--accent-soft)]")} style={{ height: ROW_H }}>
@@ -297,7 +334,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                           const inCross = crosshair?.col === p.key || crosshair?.key === `a:${m.asg.id}`;
                           const isFocal = crosshair?.col === p.key && crosshair?.key === `a:${m.asg.id}`;
                           const bg = mm > 0 ? `color-mix(in oklab, var(--accent) ${Math.round(14 + intensity * 46)}%, var(--panel))` : p.weekend ? WEEKEND_BG : "transparent";
-                          return <span key={p.key} onMouseEnter={() => setHover({ key: `a:${m.asg.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] tabular-nums", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: bg, color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resName(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? Math.round(hrs) : ""}</span>;
+                          return <span key={p.key} onMouseEnter={() => setHover({ key: `a:${m.asg.id}`, col: p.key })} className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] tabular-nums", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")} style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: bg, color: intensity > 0.6 ? "#fff" : "var(--text)" }} title={mm > 0 ? `${resName(m.asg.resourceId)} · ${h1(mm)} ч` : ""}>{mm > 0 ? h1(mm) : ""}</span>;
                         })}
                       </div>
                     ))}
@@ -310,7 +347,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
 
         {/* инспектор назначения */}
         {selMeta && selTask ? (
-          <aside className="absolute right-0 top-0 z-30 flex h-full w-[380px] flex-col border-l border-[var(--border-strong)] bg-[var(--panel)] shadow-[var(--shadow-pop)]">
+          <aside data-testid="assignment-inspector" className="absolute right-0 top-0 z-30 flex h-full w-[380px] flex-col border-l border-[var(--border-strong)] bg-[var(--panel)] shadow-[var(--shadow-pop)]">
             <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
               <div className="min-w-0">
                 <div className="mono text-[length:var(--text-xs)] text-[var(--muted)]">{selTask.wbsCode} · {selTask.title}</div>
@@ -319,23 +356,25 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
               <button type="button" onClick={() => { setSel(null); setDraft(null); }} className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)]" aria-label="Закрыть"><X className="size-4" aria-hidden /></button>
             </div>
             <div className="flex-1 overflow-auto px-4 py-3 text-[length:var(--text-sm)]">
+              {canManageAssignments ? (
+                <>
               {/* атрибуты назначения */}
               <div className="grid grid-cols-2 gap-2">
                 <label className="col-span-2 block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Ресурс</span>
-                  <select value={selMeta.asg.resourceId} onChange={(e) => void upsert(selMeta.asg, { resourceId: e.target.value })} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
+                  <select data-testid="assignment-resource-select" value={selMeta.asg.resourceId} onChange={(e) => void upsert(selMeta.asg, { resourceId: e.target.value })} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
                     {resDir.list.map((r) => <option key={r.id} value={r.id}>{r.name} · {r.positionName}</option>)}
                   </select>
                 </label>
                 <label className="block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Роль</span>
-                  <select value={selMeta.asg.role} onChange={(e) => void upsert(selMeta.asg, { role: e.target.value })} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
+                  <select data-testid="assignment-role-select" value={selMeta.asg.role} onChange={(e) => void upsert(selMeta.asg, { role: e.target.value })} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
                     {ROLES.map(([id, lbl]) => <option key={id} value={id}>{lbl}</option>)}
                   </select>
                 </label>
                 <label className="block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Единицы %</span>
-                  <input key={`u-${selMeta.asg.id}-${selMeta.asg.unitsPermille}`} type="number" defaultValue={Math.round(selMeta.asg.unitsPermille / 10)} onBlur={(e) => { const v = Math.max(1, Math.round(Number(e.target.value))); if (v !== Math.round(selMeta.asg.unitsPermille / 10)) void upsert(selMeta.asg, { unitsPermille: v * 10 }); }} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
+                  <input data-testid="assignment-units-input" key={`u-${selMeta.asg.id}-${selMeta.asg.unitsPermille}`} type="number" defaultValue={Math.round(selMeta.asg.unitsPermille / 10)} onBlur={(e) => { const unitsPermille = parseAssignmentUnits(e.target.value); if (unitsPermille === null) { e.currentTarget.value = String(Math.round(selMeta.asg.unitsPermille / 10)); return; } if (unitsPermille !== selMeta.asg.unitsPermille) void upsert(selMeta.asg, { unitsPermille }); }} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
                 </label>
                 <label className="col-span-2 block"><span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Трудозатраты, ч</span>
-                  <input key={`w-${selMeta.asg.id}-${selMeta.asg.workMinutes}`} type="number" defaultValue={Math.round(selMeta.asg.workMinutes / 60)} onBlur={(e) => { const v = Math.max(0, Math.round(Number(e.target.value))); if (v * 60 !== selMeta.asg.workMinutes) void upsert(selMeta.asg, { workMinutes: v * 60 }); }} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
+                  <input data-testid="assignment-work-input" key={`w-${selMeta.asg.id}-${selMeta.asg.workMinutes}`} type="number" defaultValue={assignmentHoursInputValue(selMeta.asg.workMinutes)} step={0.5} onBlur={(e) => { const minutes = parseAssignmentHours(e.target.value); if (minutes === null) { e.currentTarget.value = String(assignmentHoursInputValue(selMeta.asg.workMinutes)); return; } if (minutes !== selMeta.asg.workMinutes) void upsert(selMeta.asg, { workMinutes: minutes }); }} disabled={busy} className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
                   <span className="mt-0.5 block text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Изменение труда/единиц сбрасывает кривую к равномерной.</span>
                 </label>
               </div>
@@ -359,7 +398,7 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                   return (
                     <label key={d} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-1 last:border-b-0">
                       <span className="mono w-[78px] shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{String(dt.getUTCDate()).padStart(2, "0")}.{String(dt.getUTCMonth() + 1).padStart(2, "0")} {DOW[dt.getUTCDay()]}</span>
-                      <input type="number" value={Math.round((cur / 60) * 10) / 10} step={0.5} min={0} onChange={(e) => { const map = new Map(curDraft(selMeta)); map.set(d, Math.max(0, Math.round(Number(e.target.value) * 60))); setDraft(map); }} className="h-7 flex-1 rounded border border-[var(--border)] bg-[var(--panel)] px-1 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
+                      <input data-testid={`curve-day-${dayToIso(d)}`} type="number" value={Math.round((cur / 60) * 10) / 10} step={0.5} min={0} onChange={(e) => { const map = new Map(curDraft(selMeta)); map.set(d, Math.max(0, Math.round(Number(e.target.value) * 60))); setDraft(map); }} className="h-7 flex-1 rounded border border-[var(--border)] bg-[var(--panel)] px-1 text-right tabular-nums outline-none focus:border-[var(--accent)]" />
                       <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">ч</span>
                     </label>
                   );
@@ -381,13 +420,54 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
                   <Button variant="ghost" size="sm" disabled={busy} className="text-[var(--danger-text)] hover:bg-[var(--danger-soft)]"><Trash2 className="size-3.5" aria-hidden />Снять исполнителя</Button>
                 </ConfirmDialog>
               </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Ресурс</span>
+                      <div className="text-[var(--text)]">{resName(selMeta.asg.resourceId)}</div>
+                    </div>
+                    <div>
+                      <span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Роль</span>
+                      <div className="text-[var(--text)]">{roleLabel(selMeta.asg.role)}</div>
+                    </div>
+                    <div>
+                      <span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Единицы</span>
+                      <div className="tabular-nums text-[var(--text)]">{Math.round(selMeta.asg.unitsPermille / 10)}%</div>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="mb-1 block text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Трудозатраты</span>
+                      <div className="tabular-nums text-[var(--text)]">{h1(selMeta.asg.workMinutes)} ч</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 mb-1.5 flex items-center justify-between">
+                    <span className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Кривая распределения</span>
+                    <span className="text-[length:var(--text-xs)] tabular-nums text-[var(--muted-strong)]">{h1(draftSum)} / {h1(selMeta.asg.workMinutes)} ч</span>
+                  </div>
+                  <div className="max-h-[240px] overflow-auto rounded-[var(--radius-md)] border border-[var(--border)]">
+                    {editDaysOf(selMeta).length === 0 ? <div className="px-2 py-3 text-center text-[length:var(--text-xs)] text-[var(--muted)]">Нет рабочих дней в расписании задачи.</div> : editDaysOf(selMeta).map((d) => {
+                      const dt = new Date(baseMs + d * 86_400_000);
+                      const cur = curDraft(selMeta).get(d) ?? 0;
+                      return (
+                        <div key={d} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-1 last:border-b-0">
+                          <span className="mono w-[78px] shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{String(dt.getUTCDate()).padStart(2, "0")}.{String(dt.getUTCMonth() + 1).padStart(2, "0")} {DOW[dt.getUTCDay()]}</span>
+                          <span className="flex-1 text-right tabular-nums text-[var(--text)]">{Math.round((cur / 60) * 10) / 10}</span>
+                          <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">ч</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </aside>
         ) : null}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
-        <span className="inline-flex items-center gap-1"><UserPlus className="size-3.5" aria-hidden />+ на строке задачи — добавить исполнителя</span>
+        {canManageAssignments ? <span className="inline-flex items-center gap-1"><UserPlus className="size-3.5" aria-hidden />+ на строке задачи — добавить исполнителя</span> : null}
         <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded" style={{ background: WEEKEND_BG }} /> выходной</span>
         <span>Число в ячейке — часы за период · «кривая» у имени — задана явная дневная раскладка · наведение — прицел</span>
       </div>

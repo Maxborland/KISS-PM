@@ -70,7 +70,8 @@ export const contacts = pgTable(
       table.tenantId,
       table.clientId,
       table.id
-    )
+    ),
+    uniqueIndex("contacts_tenant_id_email_uidx").on(table.tenantId, table.email)
   ]
 );
 

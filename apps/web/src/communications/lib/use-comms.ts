@@ -69,6 +69,16 @@ export type CommsDataResult<T> = MutationDataResult<T>;
 // Общий load-state (data/status/error + 403→forbidden) — ядро apps/web/src/lib/use-resource.ts.
 export type CommsLoadState<T> = ResourceState<T>;
 
+export function replaceChannelInList(channels: Channel[], updated: Channel): Channel[] {
+  let found = false;
+  const next = channels.map((channel) => {
+    if (channel.id !== updated.id) return channel;
+    found = true;
+    return updated;
+  });
+  return found ? next : channels;
+}
+
 // Общий клиент/транспорт. Два режима транспорта (см. CommsRuntimeProvider):
 //  • mock  — ОДИН createMockCommsFetch на весь модуль (общий in-memory стор). Раньше каждый
 //    хук строил свой стор → канал/комната, созданные родительским useChannels()/useCallRooms(),
@@ -210,13 +220,18 @@ export function useChannels() {
     [client, guard]
   );
 
+  const replaceChannel = useCallback(
+    (channel: Channel) => setData((d) => (d ? { ...d, channels: replaceChannelInList(d.channels, channel) } : d)),
+    [setData]
+  );
+
   // Архив канала (мягкое удаление): убираем из списка сразу после успешного DELETE.
   const archiveChannel = useCallback(
     (channelId: string) => guard(async () => { await client.archiveChannel(channelId); setData((d) => (d ? { ...d, channels: d.channels.filter((c) => c.id !== channelId) } : d)); }),
     [client, guard]
   );
 
-  return { client, data, status, error, reload: load, createChannel, archiveChannel };
+  return { client, data, status, error, reload: load, createChannel, replaceChannel, archiveChannel };
 }
 
 /* ============================================================
@@ -226,7 +241,7 @@ export type ChannelDetail = { channel: Channel; members: ChannelMember[]; conver
 
 export function useChannel(channelId: string) {
   const client = useCommsClient();
-  const { guard } = useGuard();
+  const { guard, guardData } = useGuard();
 
   const fetcher = useCallback(async (): Promise<ChannelDetail> => {
     const [detail, conv] = await Promise.all([client.getChannel(channelId), client.getChannelConversation(channelId)]);
@@ -235,8 +250,16 @@ export function useChannel(channelId: string) {
   const { data, status, error, setData, reload: load } = useResource(fetcher);
 
   const patchChannel = useCallback(
-    (input: ChannelPatchInput) => guard(async () => { const r = await client.patchChannel(channelId, input); setData((d) => (d ? { ...d, channel: r.channel } : d)); }),
-    [client, guard, channelId]
+    (input: ChannelPatchInput) => guardData(async () => {
+      const currentUpdatedAt = input.clientUpdatedAt ?? data?.channel.updatedAt;
+      const r = await client.patchChannel(
+        channelId,
+        currentUpdatedAt ? { ...input, clientUpdatedAt: currentUpdatedAt } : input
+      );
+      setData((d) => (d ? { ...d, channel: r.channel } : d));
+      return r.channel;
+    }),
+    [client, guardData, channelId, data?.channel.updatedAt]
   );
   const addMember = useCallback(
     (input: { userId: string; role?: CommunicationChannelRole }) => guard(async () => { await client.addChannelMember(channelId, input); await load(); }),

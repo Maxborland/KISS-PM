@@ -1,0 +1,64 @@
+{
+  "generatedAt": "2026-07-07T21:29:00+07:00",
+  "id": "RISK-WRITE-FLOW-COMMUNICATIONS-EXTRA-RACE",
+  "status": "done",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "scope": "Communications write-flow race/idempotency coverage beyond channel rename and notification read",
+  "spec": {
+    "expected": [
+      "Two concurrent identical channel member add requests for the same channel/user/role leave exactly one active communication_channel_members row.",
+      "Channel member add readback through GET /api/workspace/communication-channels/:channelId exposes one active member entry.",
+      "Two concurrent identical notification preference PUT requests for the same user/channel/type leave exactly one notification_preferences row.",
+      "Notification preference readback through GET /api/workspace/notification-preferences exposes the final digest/mention preference once."
+    ],
+    "nonGoals": [
+      "No e2e tests touched or added.",
+      "No docs/qa/full-eval/reconciliation-matrix-2026-07-07.json edit.",
+      "No production code change without a confirmed failing behavior.",
+      "No audit de-duplication assertion in this slice."
+    ]
+  },
+  "evidence": {
+    "testsAdded": [
+      "apps/api/src/collaborationRoutes.db.test.ts: keeps concurrent channel member adds idempotent at the active membership row",
+      "apps/api/src/collaborationRoutes.db.test.ts: keeps concurrent notification preference writes unique with readback"
+    ],
+    "commands": [
+      {
+        "command": "pnpm vitest run apps/api/src/collaborationRoutes.db.test.ts -t \"keeps concurrent channel member adds idempotent|keeps concurrent notification preference writes unique\"",
+        "result": "Blocked before Vitest by pnpm install guard: ERR_PNPM_IGNORED_BUILDS for better-sqlite3, esbuild, msw, sharp, unrs-resolver."
+      },
+      {
+        "command": "cmd /c node_modules\\.bin\\vitest.CMD run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"keeps concurrent channel member adds idempotent|keeps concurrent notification preference writes unique\"",
+        "result": "Sandboxed run blocked by esbuild spawn EPERM while loading config."
+      },
+      {
+        "command": "cmd /c node_modules\\.bin\\vitest.CMD run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"keeps concurrent channel member adds idempotent|keeps concurrent notification preference writes unique\"",
+        "result": "Escalated run executed Vitest; 2 targeted tests failed in DB setup with PostgresError: password authentication failed for user \"kiss_pm\" at truncateCollaborationState. Test bodies did not complete."
+      },
+      {
+        "command": "cmd /c node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false --noEmit",
+        "result": "Passed."
+      },
+      {
+        "command": "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"\"channel member add|notification preferences\"\"\"",
+        "result": "orchestrator rerun passed; 1 file passed, 2 tests passed, 15 skipped."
+      }
+    ],
+    "codeGraph": {
+      "status": "available",
+      "before": "codegraph_status passed with 2164 files, 23852 nodes, 51896 edges; codegraph_context/explore used for collaboration/communication route context.",
+      "fallback": "Used literal rg/direct reads for communication-channels route strings because CodeGraph context did not surface communicationUpgradeRoutes.ts for that exact route lookup."
+    }
+  },
+  "fix": {
+    "files": [
+      "apps/api/src/collaborationRoutes.db.test.ts"
+    ],
+    "behavior": "Coverage-only slice. Existing persistence code appears to provide row-level idempotency through composite-key upserts."
+  },
+  "remainingRisk": "Audit side-effect de-duplication for duplicate identical channel member/preference writes remains unverified; row-level idempotency and API readback are covered by targeted DB tests."
+}
+

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { LogOut, Settings, User } from "lucide-react";
 
 import { AuthRuntimeProvider } from "@/auth/lib/auth-runtime";
@@ -29,7 +28,6 @@ export function ShellUserMenu() {
 
 function ShellUserMenuInner() {
   const { user, logout } = useAuth();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -40,7 +38,7 @@ function ShellUserMenuInner() {
     await logout();
     setBusy(false);
     setOpen(false);
-    router.replace("/login");
+    window.location.replace("/login");
   }
 
   return (
@@ -51,7 +49,7 @@ function ShellUserMenuInner() {
         aria-haspopup="menu"
         aria-expanded={open}
         title={name}
-        className="grid size-8 place-items-center rounded-full bg-[var(--accent-soft)] text-[length:var(--text-xs)] font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-white"
+        className="grid size-8 place-items-center rounded-full bg-[var(--accent-soft)] text-[length:var(--text-xs)] font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-white [@media(pointer:coarse)]:size-[var(--touch-target)]"
       >
         {initials(name)}
       </button>
@@ -67,7 +65,7 @@ function ShellUserMenuInner() {
               href="/profile"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 text-[length:var(--text-sm)] text-[var(--muted-strong)] hover:bg-[var(--panel-subtle)]"
+              className="flex items-center gap-2 px-3 py-2 text-[length:var(--text-sm)] text-[var(--muted-strong)] hover:bg-[var(--panel-subtle)] [@media(pointer:coarse)]:min-h-[var(--touch-target)]"
             >
               <User className="size-4" aria-hidden /> Профиль
             </Link>
@@ -76,7 +74,7 @@ function ShellUserMenuInner() {
               href="/settings"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 text-[length:var(--text-sm)] text-[var(--muted-strong)] hover:bg-[var(--panel-subtle)]"
+              className="flex items-center gap-2 px-3 py-2 text-[length:var(--text-sm)] text-[var(--muted-strong)] hover:bg-[var(--panel-subtle)] [@media(pointer:coarse)]:min-h-[var(--touch-target)]"
             >
               <Settings className="size-4" aria-hidden /> Настройки
             </Link>
@@ -85,7 +83,7 @@ function ShellUserMenuInner() {
               role="menuitem"
               disabled={busy}
               onClick={() => void doLogout()}
-              className="flex w-full items-center gap-2 px-3 py-2 text-[length:var(--text-sm)] text-[var(--danger,var(--text-strong))] hover:bg-[var(--panel-subtle)] disabled:opacity-60"
+              className="flex w-full items-center gap-2 px-3 py-2 text-[length:var(--text-sm)] text-[var(--danger,var(--text-strong))] hover:bg-[var(--panel-subtle)] disabled:opacity-60 [@media(pointer:coarse)]:min-h-[var(--touch-target)]"
             >
               <LogOut className="size-4" aria-hidden /> {busy ? "Выходим…" : "Выйти"}
             </button>

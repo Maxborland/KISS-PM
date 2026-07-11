@@ -70,7 +70,113 @@ describe("OpenAPI route inventory", () => {
     ).toBeUndefined();
     expect(document.paths["/api/auth/login"]?.post?.requestBody).toBeDefined();
   });
+
+  it("documents duplicate participant-state updates with a nullable event", () => {
+    const document = createTestDocument();
+    const schemas = document.components.schemas as Record<string, JsonSchema>;
+
+    expect(schemas.CallParticipantStateResponse?.properties?.event).toEqual({
+      oneOf: [
+        { $ref: "#/components/schemas/CallEvent" },
+        { type: "null" }
+      ]
+    });
+  });
+
+  it("documents whether workspace-user directory entries include private fields", () => {
+    const document = createTestDocument();
+    const schemas = document.components.schemas as Record<string, JsonSchema>;
+    const response = schemas.WorkspaceUsersResponse;
+
+    expect(response?.required).toContain("privateFieldsIncluded");
+    expect(response?.properties?.privateFieldsIncluded).toEqual({ type: "boolean" });
+    expect(response?.additionalProperties).toBe(false);
+  });
+
+  it("documents the planning revert request, result, and errors with strict schemas", () => {
+    const document = createTestDocument();
+    const operation = document.paths[
+      "/api/workspace/projects/{projectId}/planning/revert-last"
+    ]?.post as unknown as JsonOperation;
+    const schemas = document.components.schemas as Record<string, JsonSchema>;
+
+    expect(operation.requestBody.content["application/json"]?.schema.$ref).toBe(
+      "#/components/schemas/PlanningRevertRequest"
+    );
+    expect(operation.responses["200"]?.content["application/json"]?.schema.$ref).toBe(
+      "#/components/schemas/PlanningRevertResponse"
+    );
+    for (const status of ["400", "401", "403", "404", "409", "413", "415", "501"]) {
+      expect(operation.responses[status]?.content["application/json"]?.schema.$ref).toBe(
+        "#/components/schemas/PlanningRevertErrorResponse"
+      );
+    }
+
+    expect(schemas.PlanningRevertRequest).toMatchObject({
+      required: ["targetCommitId", "clientPlanVersion", "idempotencyKey"],
+      additionalProperties: false
+    });
+    expect(schemas.PlanningRevertResponse).toMatchObject({
+      required: ["reverted", "applied", "newPlanVersion", "auditEventId", "readModel"],
+      additionalProperties: false
+    });
+    expect(schemas.PlanningRevertResponse?.properties?.reverted).toEqual({
+      type: "string",
+      minLength: 1
+    });
+    expect(schemas.PlanningRevertErrorResponse).toMatchObject({
+      required: ["error"],
+      additionalProperties: false
+    });
+    const errorCodes = schemas.PlanningRevertErrorResponse?.properties?.error as
+      | { enum?: string[] }
+      | undefined;
+    expect(errorCodes?.enum).toContain("same_origin_action_required");
+  });
+
+  it("keeps Saved View create, rename, and delete contracts in the API document", () => {
+    const document = createTestDocument();
+    const path = document.paths[
+      "/api/workspace/projects/{projectId}/planning/saved-views/{viewId}"
+    ];
+    const rename = path?.patch as unknown as JsonOperation;
+    const remove = path?.delete as unknown as JsonOperation;
+    const schemas = document.components.schemas as Record<string, JsonSchema>;
+
+    expect(rename.requestBody.content["application/json"]?.schema.$ref).toBe(
+      "#/components/schemas/PlanningSavedViewRenameRequest"
+    );
+    expect(remove.requestBody.content["application/json"]?.schema.$ref).toBe(
+      "#/components/schemas/PlanningSavedViewDeleteRequest"
+    );
+    expect(schemas.PlanningSavedViewCreateRequest?.required).toEqual([
+      "name",
+      "payload",
+      "clientRequestId"
+    ]);
+    expect(schemas.PlanningSavedViewRenameRequest).toMatchObject({
+      required: ["name", "clientRequestId"],
+      additionalProperties: false
+    });
+    expect(schemas.PlanningSavedViewDeleteRequest).toMatchObject({
+      required: ["clientRequestId"],
+      additionalProperties: false
+    });
+  });
 });
+
+type JsonOperation = {
+  requestBody: {
+    content: Record<string, { schema: { $ref: string } }>;
+  };
+  responses: Record<string, { content: Record<string, { schema: { $ref: string } }> }>;
+};
+
+type JsonSchema = {
+  required?: string[];
+  properties?: Record<string, unknown>;
+  additionalProperties?: boolean;
+};
 
 type TestOpenApiDocument = ReturnType<typeof createKissPmOpenApiDocument> & {
   paths: Record<
@@ -93,19 +199,38 @@ function createTestDocument(): TestOpenApiDocument {
 function listImplementedRoutes(rootDir: string) {
   const files = listSourceFiles(rootDir);
   const routes: string[] = [];
-  const routePattern = /app\.(get|post|put|patch|delete)\(\s*["']([^"']+)/g;
+  const routePattern = /app\.(get|post|put|patch|delete)\(\s*(?:["']([^"']+)["']|(\w+))/g;
 
   for (const file of files) {
     const text = readFileSync(file, "utf8");
+    const routeConstants = resolveRouteConstants(text);
     for (const match of text.matchAll(routePattern)) {
       const method = match[1];
-      const path = match[2];
+      const path = match[2] ?? routeConstants.get(match[3] ?? "");
       if (!method || !path) continue;
       routes.push(`${method.toLowerCase()} ${path}`);
     }
   }
 
   return routes;
+}
+
+function resolveRouteConstants(text: string): Map<string, string> {
+  const constants = new Map<string, string>();
+  for (const match of text.matchAll(/const\s+(\w+)\s*=\s*["']([^"']+)["']\s*;/g)) {
+    if (match[1] && match[2]) constants.set(match[1], match[2]);
+  }
+
+  for (const match of text.matchAll(/const\s+(\w+)\s*=\s*`([^`]+)`\s*;/g)) {
+    const name = match[1];
+    const template = match[2];
+    if (!name || !template) continue;
+    const resolved = template.replace(/\$\{(\w+)\}/g, (_, dependency: string) =>
+      constants.get(dependency) ?? "${" + dependency + "}"
+    );
+    if (!resolved.includes("${")) constants.set(name, resolved);
+  }
+  return constants;
 }
 
 function listSourceFiles(dir: string): string[] {

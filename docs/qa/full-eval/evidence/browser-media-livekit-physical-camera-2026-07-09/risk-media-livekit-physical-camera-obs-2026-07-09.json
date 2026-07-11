@@ -1,0 +1,508 @@
+{
+  "id": "RISK-MEDIA-LIVEKIT-PHYSICAL-CAMERA-OBS-2026-07-09",
+  "createdAt": "2026-07-08T19:55:37.462Z",
+  "scope": "User Chrome physical/OBS camera-source validation for /calls/[roomId] against self-hosted LiveKit provider",
+  "environment": {
+    "web": "http://127.0.0.1:3180",
+    "api": "http://127.0.0.1:4180",
+    "livekit": "livekit/livekit-server:v1.9 on localhost:7880",
+    "browser": "User Chrome via Codex extension",
+    "origin": "http://127.0.0.1:3180"
+  },
+  "room": {
+    "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+    "providerRoomId": "kisspm-physical-camera-20260709-0240",
+    "route": "/calls/call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+    "title": "LiveKit physical OBS camera QA kisspm-physical-camera-20260709-0240",
+    "status": "active"
+  },
+  "chromeMediaEvidence": {
+    "permissions": {
+      "camera": "granted",
+      "microphone": "granted"
+    },
+    "devices": [
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "audioinput",
+        "label": "Microphone (High Definition Audio Device)"
+      },
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "audioinput",
+        "label": "Микрофон (Virtual Desktop Audio)"
+      },
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "audioinput",
+        "label": "Микрофон (PicoStreamingMicrophone)"
+      },
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "audioinput",
+        "label": "Набор микрофонов (Pico Streaming Speaker)"
+      },
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "audioinput",
+        "label": "По умолчанию - Microphone (High Definition Audio Device)"
+      },
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "audioinput",
+        "label": "Оборудование - Микрофон (Virtual Desktop Audio)"
+      },
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "videoinput",
+        "label": "OBS Virtual Camera"
+      },
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "audiooutput",
+        "label": "По умолчанию - Динамики (High Definition Audio Device)"
+      },
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "audiooutput",
+        "label": "Оборудование - Динамики (High Definition Audio Device)"
+      },
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "audiooutput",
+        "label": "Digital Audio (S/PDIF) (High Definition Audio Device)"
+      },
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "audiooutput",
+        "label": "Динамики (High Definition Audio Device)"
+      },
+      {
+        "deviceId": "present",
+        "groupId": "present",
+        "kind": "audiooutput",
+        "label": "Динамики (Pico Streaming Speaker)"
+      }
+    ],
+    "directGetUserMediaVideo": {
+      "constraint": null,
+      "message": "Could not start video source",
+      "name": "NotReadableError",
+      "ok": false
+    }
+  },
+  "browserTraversal": {
+    "setup": [
+      "Opened existing authenticated user Chrome tab on http://127.0.0.1:3180",
+      "Created a new LiveKit video call room from /communications/calls UI",
+      "Started session from UI and opened /calls/[roomId] runtime route",
+      "Observed lobby and joined the call"
+    ],
+    "lobby": {
+      "text": "Я\nВы\nПеред входом\n\nПроверьте камеру и микрофон\n\nКамера недоступна\nКамера\nOBS Virtual Camera\nМикрофон\nMicrophone (High Definition Audio Device)\nМикрофон\nКамера\nПрисоединиться",
+      "buttons": [
+        {
+          "aria": null,
+          "disabled": false,
+          "i": 0,
+          "pressed": null,
+          "text": "OBS Virtual Camera"
+        },
+        {
+          "aria": null,
+          "disabled": false,
+          "i": 1,
+          "pressed": null,
+          "text": "Microphone (High Definition Audio Device)"
+        },
+        {
+          "aria": "Выключить микрофон",
+          "disabled": false,
+          "i": 2,
+          "pressed": "true",
+          "text": "Микрофон"
+        },
+        {
+          "aria": "Включить камеру",
+          "disabled": false,
+          "i": 3,
+          "pressed": "false",
+          "text": "Камера"
+        },
+        {
+          "aria": null,
+          "disabled": false,
+          "i": 4,
+          "pressed": null,
+          "text": "Присоединиться"
+        }
+      ],
+      "videos": []
+    },
+    "activeStage": {
+      "text": "Звонок команды\nВ эфире\nАА\nВы\nМикрофон\nКамера\nЭкран\nФон\nЗавершить\nЧат звонка\nСообщения во время встречи\n\nПока нет сообщений. Начните обсуждение.\n\nОтправить",
+      "buttons": [
+        {
+          "aria": "Выключить микрофон",
+          "disabled": false,
+          "i": 0,
+          "pressed": "true",
+          "text": "Микрофон"
+        },
+        {
+          "aria": "Включить камеру",
+          "disabled": false,
+          "i": 1,
+          "pressed": "false",
+          "text": "Камера"
+        },
+        {
+          "aria": "Демонстрировать экран",
+          "disabled": false,
+          "i": 2,
+          "pressed": "false",
+          "text": "Экран"
+        },
+        {
+          "aria": "Сменить фон",
+          "disabled": false,
+          "i": 3,
+          "pressed": "false",
+          "text": "Фон"
+        },
+        {
+          "aria": "Завершить звонок",
+          "disabled": false,
+          "i": 4,
+          "pressed": null,
+          "text": "Завершить"
+        },
+        {
+          "aria": null,
+          "disabled": false,
+          "i": 5,
+          "pressed": null,
+          "text": "Отправить"
+        }
+      ],
+      "videos": [],
+      "audios": [],
+      "screenshot": "livekit-physical-camera-degraded-active.png"
+    },
+    "consoleLogSummary": [
+      {
+        "level": "info",
+        "message": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "log",
+        "message": "[HMR] connected",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "log",
+        "message": "[Fast Refresh] rebuilding",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "log",
+        "message": "[Fast Refresh] done in 164ms",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "log",
+        "message": "[Fast Refresh] rebuilding",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "log",
+        "message": "[Fast Refresh] done in 120ms",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "log",
+        "message": "[Fast Refresh] rebuilding",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "log",
+        "message": "[Fast Refresh] done in 137ms",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "info",
+        "message": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "log",
+        "message": "[HMR] connected",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "warn",
+        "message": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "warn",
+        "message": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "warn",
+        "message": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "warn",
+        "message": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "info",
+        "message": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "log",
+        "message": "[HMR] connected",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "info",
+        "message": "connection state changed: disconnected -> connecting Object",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "info",
+        "message": "signal connecting to ws://127.0.0.1:7880/rtc/v1?<redacted-query>",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "info",
+        "message": "signal connected Object",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "info",
+        "message": "connected to Livekit Server edition: 0, version: 1.9.12, protocol: 16, region: , nodeId: ND_iVNXtLeWWoXj, debugInfo: , agentProtocol: 1 Object",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "error",
+        "message": "publisher data channel 'DATA_TRACK_LOSSY' closed unexpectedly Object",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "info",
+        "message": "connection state changed: connecting -> connected Object",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      },
+      {
+        "level": "info",
+        "message": "publishing track Object",
+        "url": "http://127.0.0.1:3180/_next/static/chunks/0cco_next_dist_0uq~hyz._.js"
+      }
+    ],
+    "consoleLogRedaction": "Console summaries scrub access_token, join_request, JWT-looking values, and rtc/v1 query strings."
+  },
+  "apiReadback": {
+    "detail": {
+      "activeSession": {
+        "endedAt": null,
+        "endedByUserId": null,
+        "failureReason": null,
+        "id": "call-session-af538e6a-2cae-476d-ac23-f00c99c9197c",
+        "providerSessionId": null,
+        "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+        "startedAt": "2026-07-08T19:52:59.337Z",
+        "startedByUserId": "user-alpha-admin",
+        "status": "active"
+      },
+      "callRoom": {
+        "createdAt": "2026-07-08T19:52:39.337Z",
+        "createdByUserId": "user-alpha-admin",
+        "entityId": "project-vektor-portal",
+        "entityType": "project",
+        "mediaKind": "video",
+        "meetingId": null,
+        "provider": "livekit",
+        "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+        "status": "active",
+        "title": "LiveKit physical OBS camera QA kisspm-physical-camera-20260709-0240",
+        "updatedAt": "2026-07-08T19:52:59.340Z"
+      },
+      "events": [
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T19:54:15.924Z",
+          "eventType": "participant_joined",
+          "id": "call-event-e7911dcb-8269-49bc-ac51-9f7362fc4088",
+          "payload": {
+            "state": "joined",
+            "userId": "user-alpha-admin"
+          },
+          "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+          "sessionId": "call-session-af538e6a-2cae-476d-ac23-f00c99c9197c"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T19:54:15.630Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-0364390c-c505-452f-836b-0f0d380d88e1",
+          "payload": {
+            "expiresAt": "2026-07-08T20:04:15.000Z",
+            "provider": "livekit"
+          },
+          "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+          "sessionId": "call-session-af538e6a-2cae-476d-ac23-f00c99c9197c"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T19:53:09.782Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-16b7d3ab-2a32-4cf7-a61b-5975b238d8bc",
+          "payload": {
+            "expiresAt": "2026-07-08T20:03:09.000Z",
+            "provider": "livekit"
+          },
+          "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+          "sessionId": "call-session-af538e6a-2cae-476d-ac23-f00c99c9197c"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T19:52:59.341Z",
+          "eventType": "session_started",
+          "id": "call-event-2fed6fb2-642d-4570-ad5d-c8d5d9139514",
+          "payload": {
+            "provider": "livekit"
+          },
+          "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+          "sessionId": "call-session-af538e6a-2cae-476d-ac23-f00c99c9197c"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T19:52:39.339Z",
+          "eventType": "room_created",
+          "id": "call-event-c9e5e75a-bc22-4cba-a6cc-ebb98eb169d4",
+          "payload": {
+            "mediaKind": "video",
+            "provider": "livekit"
+          },
+          "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+          "sessionId": null
+        }
+      ],
+      "recordings": []
+    },
+    "detailStatus": 200,
+    "events": {
+      "events": [
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T19:54:15.924Z",
+          "eventType": "participant_joined",
+          "id": "call-event-e7911dcb-8269-49bc-ac51-9f7362fc4088",
+          "payload": {
+            "state": "joined",
+            "userId": "user-alpha-admin"
+          },
+          "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+          "sessionId": "call-session-af538e6a-2cae-476d-ac23-f00c99c9197c"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T19:54:15.630Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-0364390c-c505-452f-836b-0f0d380d88e1",
+          "payload": {
+            "expiresAt": "2026-07-08T20:04:15.000Z",
+            "provider": "livekit"
+          },
+          "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+          "sessionId": "call-session-af538e6a-2cae-476d-ac23-f00c99c9197c"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T19:53:09.782Z",
+          "eventType": "join_token_issued",
+          "id": "call-event-16b7d3ab-2a32-4cf7-a61b-5975b238d8bc",
+          "payload": {
+            "expiresAt": "2026-07-08T20:03:09.000Z",
+            "provider": "livekit"
+          },
+          "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+          "sessionId": "call-session-af538e6a-2cae-476d-ac23-f00c99c9197c"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T19:52:59.341Z",
+          "eventType": "session_started",
+          "id": "call-event-2fed6fb2-642d-4570-ad5d-c8d5d9139514",
+          "payload": {
+            "provider": "livekit"
+          },
+          "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+          "sessionId": "call-session-af538e6a-2cae-476d-ac23-f00c99c9197c"
+        },
+        {
+          "actorUserId": "user-alpha-admin",
+          "createdAt": "2026-07-08T19:52:39.339Z",
+          "eventType": "room_created",
+          "id": "call-event-c9e5e75a-bc22-4cba-a6cc-ebb98eb169d4",
+          "payload": {
+            "mediaKind": "video",
+            "provider": "livekit"
+          },
+          "roomId": "call-room-dc4f06b4-ef11-4746-ac8e-de868479c28e",
+          "sessionId": null
+        }
+      ]
+    },
+    "eventsStatus": 200
+  },
+  "livekitReadback": {
+    "marker": "kisspm-physical-camera-20260709-0240",
+    "lines": [
+      "2026-07-08T19:54:15.068Z starting RTC session room=kisspm-physical-camera-20260709-0240 participant=user-alpha-admin sdk=JS version=2.20.0 browser=Chrome browserVersion=150.0.0",
+      "2026-07-08T19:54:15.167Z participant active room=kisspm-physical-camera-20260709-0240 participant=user-alpha-admin connectionType=udp browser=Chrome",
+      "2026-07-08T19:54:15.255Z mediaTrack published room=kisspm-physical-camera-20260709-0240 participant=user-alpha-admin kind=audio source=MICROPHONE mime=audio/red",
+      "2026-07-08T19:54:15.337Z ice reconnected or switched pair room=kisspm-physical-camera-20260709-0240 participant=user-alpha-admin transport=PUBLISHER"
+    ],
+    "absentEvidence": "No LiveKit mediaTrack published line with kind=video/source=CAMERA for this room; direct Chrome getUserMedia({video:true}) failed before join.",
+    "redaction": "Stored excerpt omits raw SDP, ICE credentials/candidates beyond high-level transport facts, join tokens, and full candidate addresses."
+  },
+  "verdict": {
+    "status": "partial_pass_with_external_camera_source_blocker",
+    "passed": [
+      "Chrome origin permissions are granted for camera and microphone.",
+      "Chrome enumerates OBS Virtual Camera and Microphone (High Definition Audio Device).",
+      "KISS PM lobby does not fake camera success; it shows camera unavailable when OBS source cannot start.",
+      "User can join active LiveKit call with microphone enabled and camera disabled.",
+      "API readback shows active room/session and participant_joined event.",
+      "LiveKit server logs show Chrome participant active and MICROPHONE audio track published."
+    ],
+    "blocked": [
+      "Physical/OBS video publish cannot be counted as pass because Chrome itself returns NotReadableError: Could not start video source for getUserMedia({ video: true }).",
+      "Need a working OBS Virtual Camera source or another physical camera to produce a real LiveKit CAMERA track."
+    ],
+    "notABug": "The observed camera failure happens outside KISS PM: direct browser getUserMedia fails on the same origin before LiveKit publish."
+  },
+  "residualRisk": [
+    "Real physical/OBS video publication remains unverified until the camera source starts successfully at OS/Chrome level.",
+    "This evidence covers graceful degradation and audio join, not successful CAMERA track publication."
+  ]
+}

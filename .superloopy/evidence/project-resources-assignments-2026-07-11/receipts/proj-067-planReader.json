@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "PROJ-067",
+  "role": "planReader",
+  "key": "PROJ-067:planReader",
+  "status": "pass",
+  "runId": "project-resources-20260711-final3",
+  "generatedAt": "2026-07-11T03:43:36.937Z",
+  "assertions": [
+    "Clicked a live person/day bucket selected from API assignment contributions",
+    "Inspector identity, date and authored task title matched the read-model",
+    "PLAN reader received the same contribution detail without write controls"
+  ],
+  "details": {},
+  "screenshots": [
+    "screenshots/proj-067-planReader-live-contribution-drilldown.png"
+  ],
+  "receipt": "receipts/proj-067-planReader.json"
+}

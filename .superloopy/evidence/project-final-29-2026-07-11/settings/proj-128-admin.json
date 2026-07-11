@@ -1,0 +1,53 @@
+{
+  "scenarioId": "PROJ-128",
+  "role": "admin",
+  "status": "pass",
+  "runId": "final29-settings-review-r1",
+  "generatedAt": "2026-07-11T05:35:26.124Z",
+  "assertions": [
+    "Admin created a project custom WBS definition through visible preview and apply",
+    "POST returned 201; API readback and browser reload preserved the exact definition"
+  ],
+  "details": {
+    "preview": {
+      "tenantLabel": "Контроль WBS",
+      "systemKey": "wbs_eval_1783748124122"
+    },
+    "applyStatus": 201,
+    "applyBody": {
+      "customField": {
+        "id": "field-f58cbc11-72ff-4100-a0e4-146adbbfdefa",
+        "tenantId": "tenant-alpha",
+        "systemKey": "wbs_eval_1783748124122",
+        "tenantLabel": "Контроль WBS",
+        "targetEntity": "project",
+        "fieldType": "number",
+        "required": true,
+        "status": "active",
+        "createdAt": "2026-07-11T05:35:25.529Z",
+        "updatedAt": "2026-07-11T05:35:25.529Z"
+      }
+    },
+    "readback": [
+      {
+        "id": "field-f58cbc11-72ff-4100-a0e4-146adbbfdefa",
+        "tenantId": "tenant-alpha",
+        "systemKey": "wbs_eval_1783748124122",
+        "tenantLabel": "Контроль WBS",
+        "targetEntity": "project",
+        "fieldType": "number",
+        "required": true,
+        "status": "active",
+        "createdAt": "2026-07-11T05:35:25.529Z",
+        "updatedAt": "2026-07-11T05:35:25.529Z"
+      }
+    ],
+    "deleteRaceStatuses": [
+      200,
+      404
+    ]
+  },
+  "screenshots": [
+    "screenshots/proj-128-admin.png"
+  ]
+}

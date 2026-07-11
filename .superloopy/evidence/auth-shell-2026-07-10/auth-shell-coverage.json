@@ -1,0 +1,3667 @@
+[
+  {
+    "role": "ANON",
+    "scenario": "login_invalid_email",
+    "surface": "/login",
+    "expectedBehavior": "Malformed email keeps HTML validity false and disables submit.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-LOGIN invalid email"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "login_password_reveal",
+    "surface": "/login",
+    "expectedBehavior": "Password reveal toggles input type password -> text -> password with matching accessible labels.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-LOGIN password reveal"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "login_invalid_credentials",
+    "surface": "POST /api/auth/login",
+    "expectedBehavior": "Enter submits; invalid credentials return 401 invalid_credentials and show the matching alert.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-LOGIN invalid password"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "login_success",
+    "surface": "/login -> /dashboard",
+    "expectedBehavior": "Seeded admin login returns 200, reaches dashboard, and /api/auth/me identifies the same user.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-LOGIN success"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "login_reload_persistence",
+    "surface": "/dashboard",
+    "expectedBehavior": "A full reload remains on dashboard and /api/auth/me exactly matches the pre-reload readback.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-LOGIN refresh"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "logout_revocation",
+    "surface": "user menu -> /login",
+    "expectedBehavior": "Logout returns 200 status=ok, returns to login, and /api/auth/me returns 401 session_required.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-LOGIN logout"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "register_password_reveal",
+    "surface": "/register",
+    "expectedBehavior": "Password reveal toggles the new-password input password -> text -> password.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-REGISTER password reveal"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "register_invalid_email",
+    "surface": "POST /api/auth/register",
+    "expectedBehavior": "Invalid email returns 400 invalid_registration_payload and shows the matching alert.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-REGISTER invalid email"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "register_weak_password",
+    "surface": "POST /api/auth/register",
+    "expectedBehavior": "Weak password returns 400 weak_password and shows the minimum-strength alert.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-REGISTER weak password"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "register_unique_success",
+    "surface": "/register -> /dashboard",
+    "expectedBehavior": "Unique registration returns 201, returns the submitted name and a tenant workspace, auto-authenticates, and /api/auth/me matches.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-REGISTER unique success"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "register_reload_persistence",
+    "surface": "/dashboard",
+    "expectedBehavior": "The newly registered session survives a full reload with identical /api/auth/me readback.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-REGISTER unique success"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "register_logout",
+    "surface": "user menu -> /login",
+    "expectedBehavior": "The newly registered user can log out with a 200 response and returns to login.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-REGISTER logout"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "register_duplicate",
+    "surface": "POST /api/auth/register",
+    "expectedBehavior": "Re-registering the same email returns 409 email_taken, shows the matching alert, and leaves /api/auth/me anonymous.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-REGISTER duplicate"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "reset_invalid_email",
+    "surface": "POST /api/auth/password-reset/request",
+    "expectedBehavior": "Invalid email returns 400 invalid_email and shows the matching alert.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-RESET invalid email"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "reset_request_accepted",
+    "surface": "/password-reset",
+    "expectedBehavior": "A request for the created user returns 202 status=ok and the UI truthfully reports the runtime's delivery mode.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-RESET request for created user"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS_WITH_BLOCKER."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "reset_confirm_prefill",
+    "surface": "/password-reset/confirm?token=<64-hex>",
+    "expectedBehavior": "The confirm route renders and pre-fills the 64-character token from the query string.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-RESET confirm route/prefill"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "reset_password_reveal",
+    "surface": "/password-reset/confirm",
+    "expectedBehavior": "The new-password reveal control changes the input type from password to text.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-RESET password reveal"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "reset_invalid_token",
+    "surface": "POST /api/auth/password-reset/confirm",
+    "expectedBehavior": "An invalid token returns 400 invalid_reset_token and shows the matching alert.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-RESET invalid token"
+      },
+      {
+        "kind": "atom_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "detail": "Report atom result: PASS."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Overall run failed at the intentional reset-delivery gate; use the report's per-atom result, not the suite status, for this atom."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "reset_live_delivery",
+    "surface": "SMTP delivery + token readback",
+    "expectedBehavior": "The live runtime returns delivery=email and exposes the raw reset token through a retrievable SMTP message.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-RESET live delivery gate and dependent flow"
+      },
+      {
+        "kind": "blocker_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "status": "blocked",
+        "detail": "Observed delivery=none; no SMTP message or raw-token extraction hook exists."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Final run observed delivery=none and intentionally failed Expected email / Received none."
+      },
+      {
+        "kind": "live_browser_mailbox_readback",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/live-reset/readback.json",
+        "status": "passed",
+        "detail": "Fresh in-app browser + Gmail traversal covered SMTP delivery, raw-token confirm, old/new login behavior, reload/logout, and token reuse rejection."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "reset_valid_confirm",
+    "surface": "POST /api/auth/password-reset/confirm",
+    "expectedBehavior": "A live-delivered raw token confirms the reset through the UI with the new password.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-RESET live delivery gate and dependent flow"
+      },
+      {
+        "kind": "blocker_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "status": "blocked",
+        "detail": "Blocked by unavailable raw token; only a token hash is persisted."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Final run observed delivery=none and intentionally failed Expected email / Received none."
+      },
+      {
+        "kind": "live_browser_mailbox_readback",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/live-reset/readback.json",
+        "status": "passed",
+        "detail": "Fresh in-app browser + Gmail traversal covered SMTP delivery, raw-token confirm, old/new login behavior, reload/logout, and token reuse rejection."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "reset_new_password_session_flow",
+    "surface": "/login -> /dashboard -> reload -> logout",
+    "expectedBehavior": "After valid reset confirmation, the new password logs in, survives reload, and logs out with session revocation.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-RESET live delivery gate and dependent flow"
+      },
+      {
+        "kind": "blocker_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "status": "blocked",
+        "detail": "Dependent on valid confirm, which was not reachable in this runtime."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Final run observed delivery=none and intentionally failed Expected email / Received none."
+      },
+      {
+        "kind": "live_browser_mailbox_readback",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/live-reset/readback.json",
+        "status": "passed",
+        "detail": "Fresh in-app browser + Gmail traversal covered SMTP delivery, raw-token confirm, old/new login behavior, reload/logout, and token reuse rejection."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "reset_token_reuse",
+    "surface": "POST /api/auth/password-reset/confirm",
+    "expectedBehavior": "A consumed live reset token cannot be reused and is rejected by the API/UI.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-public.spec.ts",
+        "detail": "AUTH-RESET live delivery gate and dependent flow"
+      },
+      {
+        "kind": "blocker_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-public.md",
+        "status": "blocked",
+        "detail": "Dependent on first consuming a valid raw token; no such token was available."
+      },
+      {
+        "kind": "suite_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/screenshots/auth-public/playwright-output/.last-run.json",
+        "status": "failed",
+        "detail": "Final run observed delivery=none and intentionally failed Expected email / Received none."
+      },
+      {
+        "kind": "live_browser_mailbox_readback",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/live-reset/readback.json",
+        "status": "passed",
+        "detail": "Fresh in-app browser + Gmail traversal covered SMTP delivery, raw-token confirm, old/new login behavior, reload/logout, and token reuse rejection."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_root_guard",
+    "surface": "/",
+    "expectedBehavior": "Anonymous root redirects to /login, remains there after reload, /api/auth/me stays 401, and no protected API request leaks.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/admin",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/admin, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /admin"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/admin; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/admin/audit",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/admin/audit, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /admin/audit"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/admin/audit; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/admin/roles",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/admin/roles, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /admin/roles"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/admin/roles; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/admin/security",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/admin/security, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /admin/security"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/admin/security; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/admin/users",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/admin/users, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /admin/users"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/admin/users; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/agent",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/agent, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /agent"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/agent; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/communications/calls",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/communications/calls, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /communications/calls"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/communications/calls; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/communications/channels",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/communications/channels, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /communications/channels"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/communications/channels; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/communications/chat",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/communications/chat, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /communications/chat"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/communications/chat; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/communications/meetings",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/communications/meetings, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /communications/meetings"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/communications/meetings; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/communications/notifications",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/communications/notifications, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /communications/notifications"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/communications/notifications; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/crm/clients",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/crm/clients, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /crm/clients"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/crm/clients; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/crm/contacts",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/crm/contacts, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /crm/contacts"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/crm/contacts; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/crm/deals",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/crm/deals, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /crm/deals"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/crm/deals; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/crm/deals/opportunity-vektor-portal",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/crm/deals/opportunity-vektor-portal, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /crm/deals/opportunity-vektor-portal"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/crm/deals/opportunity-vektor-portal; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/crm/products",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/crm/products, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /crm/products"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/crm/products; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/dashboard",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/dashboard, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /dashboard"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/dashboard; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/my-work",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/my-work, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /my-work"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/my-work; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/profile",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/profile, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /profile"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/profile; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/projects",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/projects, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /projects"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/projects; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/projects/project-vektor-portal",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/projects/project-vektor-portal, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /projects/project-vektor-portal"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/projects/project-vektor-portal; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/projects/project-vektor-portal/assignments",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/projects/project-vektor-portal/assignments, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /projects/project-vektor-portal/assignments"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/projects/project-vektor-portal/assignments; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/projects/project-vektor-portal/baseline",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/projects/project-vektor-portal/baseline, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /projects/project-vektor-portal/baseline"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/projects/project-vektor-portal/baseline; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/projects/project-vektor-portal/calendars",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/projects/project-vektor-portal/calendars, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /projects/project-vektor-portal/calendars"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/projects/project-vektor-portal/calendars; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/projects/project-vektor-portal/commits",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/projects/project-vektor-portal/commits, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /projects/project-vektor-portal/commits"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/projects/project-vektor-portal/commits; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/projects/project-vektor-portal/overview",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/projects/project-vektor-portal/overview, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /projects/project-vektor-portal/overview"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/projects/project-vektor-portal/overview; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/projects/project-vektor-portal/resources",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/projects/project-vektor-portal/resources, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /projects/project-vektor-portal/resources"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/projects/project-vektor-portal/resources; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/projects/project-vektor-portal/scenarios",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/projects/project-vektor-portal/scenarios, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /projects/project-vektor-portal/scenarios"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/projects/project-vektor-portal/scenarios; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/projects/project-vektor-portal/schedule",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/projects/project-vektor-portal/schedule, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /projects/project-vektor-portal/schedule"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/projects/project-vektor-portal/schedule; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/projects/project-vektor-portal/settings",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/projects/project-vektor-portal/settings, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /projects/project-vektor-portal/settings"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/projects/project-vektor-portal/settings; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/settings",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/settings, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /settings"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/settings; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "anonymous_protected_route_guard",
+    "surface": "/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0",
+    "expectedBehavior": "Anonymous navigation redirects to /login?from=/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0, preserves from on reload, keeps /api/auth/me at 401, and emits zero non-auth protected API requests.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row ANON /calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=ANON, route=/calls/call-room-a49fd816-7590-437a-bfa6-2dfc810bf0e0; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-admin in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row admin /"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=admin, route=/; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/login",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-admin in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row admin /login"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=admin, route=/login; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/register",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-admin in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row admin /register"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=admin, route=/register; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/password-reset",
+    "expectedBehavior": "Authenticated navigation ends at /password-reset, survives reload there, and /api/auth/me preserves user-alpha-admin in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row admin /password-reset"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=admin, route=/password-reset; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/password-reset/confirm",
+    "expectedBehavior": "Authenticated navigation ends at /password-reset/confirm, survives reload there, and /api/auth/me preserves user-alpha-admin in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row admin /password-reset/confirm"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=admin, route=/password-reset/confirm; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-engineer in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row engineer /"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=engineer, route=/; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/login",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-engineer in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row engineer /login"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=engineer, route=/login; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/register",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-engineer in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row engineer /register"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=engineer, route=/register; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/password-reset",
+    "expectedBehavior": "Authenticated navigation ends at /password-reset, survives reload there, and /api/auth/me preserves user-alpha-engineer in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row engineer /password-reset"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=engineer, route=/password-reset; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/password-reset/confirm",
+    "expectedBehavior": "Authenticated navigation ends at /password-reset/confirm, survives reload there, and /api/auth/me preserves user-alpha-engineer in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row engineer /password-reset/confirm"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=engineer, route=/password-reset/confirm; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "authenticated_public_route",
+    "surface": "/",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-plan-reader-no-resources in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row planReader /"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=planReader, route=/; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "authenticated_public_route",
+    "surface": "/login",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-plan-reader-no-resources in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row planReader /login"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=planReader, route=/login; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "authenticated_public_route",
+    "surface": "/register",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-plan-reader-no-resources in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row planReader /register"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=planReader, route=/register; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "authenticated_public_route",
+    "surface": "/password-reset",
+    "expectedBehavior": "Authenticated navigation ends at /password-reset, survives reload there, and /api/auth/me preserves user-alpha-plan-reader-no-resources in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row planReader /password-reset"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=planReader, route=/password-reset; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "authenticated_public_route",
+    "surface": "/password-reset/confirm",
+    "expectedBehavior": "Authenticated navigation ends at /password-reset/confirm, survives reload there, and /api/auth/me preserves user-alpha-plan-reader-no-resources in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row planReader /password-reset/confirm"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=planReader, route=/password-reset/confirm; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "authenticated_public_route",
+    "surface": "/",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-resource-reader in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row resourceReader /"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=resourceReader, route=/; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "authenticated_public_route",
+    "surface": "/login",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-resource-reader in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row resourceReader /login"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=resourceReader, route=/login; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "authenticated_public_route",
+    "surface": "/register",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-alpha-resource-reader in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row resourceReader /register"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=resourceReader, route=/register; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "authenticated_public_route",
+    "surface": "/password-reset",
+    "expectedBehavior": "Authenticated navigation ends at /password-reset, survives reload there, and /api/auth/me preserves user-alpha-resource-reader in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row resourceReader /password-reset"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=resourceReader, route=/password-reset; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "authenticated_public_route",
+    "surface": "/password-reset/confirm",
+    "expectedBehavior": "Authenticated navigation ends at /password-reset/confirm, survives reload there, and /api/auth/me preserves user-alpha-resource-reader in tenant-alpha.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row resourceReader /password-reset/confirm"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=resourceReader, route=/password-reset/confirm; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-beta-admin in tenant-beta.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row beta /"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=beta, route=/; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/login",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-beta-admin in tenant-beta.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row beta /login"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=beta, route=/login; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/register",
+    "expectedBehavior": "Authenticated navigation ends at /dashboard, survives reload there, and /api/auth/me preserves user-beta-admin in tenant-beta.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row beta /register"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=beta, route=/register; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/password-reset",
+    "expectedBehavior": "Authenticated navigation ends at /password-reset, survives reload there, and /api/auth/me preserves user-beta-admin in tenant-beta.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row beta /password-reset"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=beta, route=/password-reset; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "authenticated_public_route",
+    "surface": "/password-reset/confirm",
+    "expectedBehavior": "Authenticated navigation ends at /password-reset/confirm, survives reload there, and /api/auth/me preserves user-beta-admin in tenant-beta.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/auth-route-guards.spec.ts",
+        "detail": "Matrix row beta /password-reset/confirm"
+      },
+      {
+        "kind": "machine_readable_report_row",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/auth-route-guards.md",
+        "status": "PASS",
+        "detail": "CSV key role=beta, route=/password-reset/confirm; report verdict 58/58 passed."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "ANON",
+    "scenario": "dashboard_guard",
+    "surface": "/dashboard",
+    "expectedBehavior": "Redirect to /login?from=/dashboard occurs before any dashboard data source is requested.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/dashboard-role-states.spec.ts",
+        "detail": "ANON redirect test"
+      },
+      {
+        "kind": "lane_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/dashboard-role-states.md",
+        "status": "PASS",
+        "detail": "Role ANON; report verdict 7/7 browser E2E passed, including reload/readback."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "dashboard_role_state",
+    "surface": "/dashboard",
+    "expectedBehavior": "Four KPI surfaces render without no-access text; readback counts are 13/3/6. A full reload issues new source requests and preserves the same full state and statuses {\"myWork\":200,\"projects\":200,\"opportunities\":200}.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/dashboard-role-states.spec.ts",
+        "detail": "AADM full role-state test"
+      },
+      {
+        "kind": "lane_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/dashboard-role-states.md",
+        "status": "PASS",
+        "detail": "Role AADM; report verdict 7/7 browser E2E passed, including reload/readback."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "dashboard_role_state",
+    "surface": "/dashboard",
+    "expectedBehavior": "Four KPI surfaces render without no-access text; readback counts are 7/3/6. A full reload issues new source requests and preserves the same full state and statuses {\"myWork\":200,\"projects\":200,\"opportunities\":200}.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/dashboard-role-states.spec.ts",
+        "detail": "EADM full role-state test"
+      },
+      {
+        "kind": "lane_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/dashboard-role-states.md",
+        "status": "PASS",
+        "detail": "Role EADM; report verdict 7/7 browser E2E passed, including reload/readback."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "dashboard_role_state",
+    "surface": "/dashboard",
+    "expectedBehavior": "Tasks/projects render while CRM is explicitly unavailable; readback is 200/200/403. A full reload issues new source requests and preserves the same partial state and statuses {\"myWork\":200,\"projects\":200,\"opportunities\":403}.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/dashboard-role-states.spec.ts",
+        "detail": "PLAN partial role-state test"
+      },
+      {
+        "kind": "lane_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/dashboard-role-states.md",
+        "status": "PASS",
+        "detail": "Role PLAN; report verdict 7/7 browser E2E passed, including reload/readback."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "dashboard_role_state",
+    "surface": "/dashboard",
+    "expectedBehavior": "The dashboard shows the role-forbidden state and all three source readbacks are 403. A full reload issues new source requests and preserves the same forbidden state and statuses {\"myWork\":403,\"projects\":403,\"opportunities\":403}.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/dashboard-role-states.spec.ts",
+        "detail": "RES forbidden role-state test"
+      },
+      {
+        "kind": "lane_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/dashboard-role-states.md",
+        "status": "PASS",
+        "detail": "Role RES; report verdict 7/7 browser E2E passed, including reload/readback."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "dashboard_role_state",
+    "surface": "/dashboard",
+    "expectedBehavior": "The beta dashboard shows zero/empty states, all source arrays are empty, and alpha identities/data are absent. A full reload issues new source requests and preserves the same empty state and statuses {\"myWork\":200,\"projects\":200,\"opportunities\":200}.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/dashboard-role-states.spec.ts",
+        "detail": "BADM empty role-state test"
+      },
+      {
+        "kind": "lane_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/dashboard-role-states.md",
+        "status": "PASS",
+        "detail": "Role BADM; report verdict 7/7 browser E2E passed, including reload/readback."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "dashboard_source_retry",
+    "surface": "GET /api/workspace/my-work",
+    "expectedBehavior": "An injected first 500 shows a readable summary error and Retry; Retry issues request 2, receives the real 403, and restores the RES forbidden state.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/dashboard-role-states.spec.ts",
+        "detail": "Deterministic 500 -> Retry -> 403 recovery test"
+      },
+      {
+        "kind": "lane_report",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/dashboard-role-states.md",
+        "status": "PASS",
+        "detail": "Role RES; report verdict 7/7 browser E2E passed, including reload/readback."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "shell_identity_and_nav_shape",
+    "surface": "desktop sidebar",
+    "expectedBehavior": "Login and /api/auth/me identify user-alpha-admin / Анна Администратор; avatar is АА; visible nav is exactly [\"Мои задачи\",\"Проекты\",\"Сделки\",\"Дашборд\",\"Коммуникации\",\"Администрирование\"] and all other nav items are absent.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "AADM identity/nav"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "shell_nav_traversal",
+    "surface": "desktop sidebar links",
+    "expectedBehavior": "Every visible link has the expected href, real click reaches it, active styling is applied, and no permission_missing or access-limited error appears.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "AADM nav traversal"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "shell_global_search",
+    "surface": "global search",
+    "expectedBehavior": "GET /api/workspace/search?q=Вектор returns 200 and exposes project result Портал подрядчиков Вектор -> /projects/project-vektor-portal.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "AADM global search"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "shell_identity_menu",
+    "surface": "avatar user menu",
+    "expectedBehavior": "Menu text matches Анна Администратор and user-alpha-admin; Profile and Settings are real /profile and /settings links and preserve the same /api/auth/me identity.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "AADM identity menu"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "shell_logout_revocation",
+    "surface": "POST /api/auth/logout",
+    "expectedBehavior": "Logout returns 200, subsequent /api/auth/me is 401, and the browser renders the public login surface.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "AADM logout"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "shell_back_after_logout",
+    "surface": "browser history Back",
+    "expectedBehavior": "After logout, browser Back remains on /login and /api/auth/me remains revoked at 401.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "AADM browser Back after logout"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL: Back restored stale /profile for this role while /api/auth/me was 401; the fresh final run passed after remediation."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "shell_relogin_restore",
+    "surface": "/login?from=/profile -> /profile",
+    "expectedBehavior": "Public reload is 200; relogin returns to /profile with correct identity, avatar, and role-correct nav.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "AADM relogin"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "shell_identity_and_nav_shape",
+    "surface": "desktop sidebar",
+    "expectedBehavior": "Login and /api/auth/me identify user-alpha-engineer / Игорь Инженер; avatar is ИИ; visible nav is exactly [\"Мои задачи\",\"Проекты\",\"Сделки\",\"Дашборд\",\"Коммуникации\",\"Администрирование\"] and all other nav items are absent.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "EADM identity/nav"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "shell_nav_traversal",
+    "surface": "desktop sidebar links",
+    "expectedBehavior": "Every visible link has the expected href, real click reaches it, active styling is applied, and no permission_missing or access-limited error appears.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "EADM nav traversal"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "shell_global_search",
+    "surface": "global search",
+    "expectedBehavior": "GET /api/workspace/search?q=Вектор returns 200 and exposes project result Портал подрядчиков Вектор -> /projects/project-vektor-portal.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "EADM global search"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "shell_identity_menu",
+    "surface": "avatar user menu",
+    "expectedBehavior": "Menu text matches Игорь Инженер and user-alpha-engineer; Profile and Settings are real /profile and /settings links and preserve the same /api/auth/me identity.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "EADM identity menu"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "shell_logout_revocation",
+    "surface": "POST /api/auth/logout",
+    "expectedBehavior": "Logout returns 200, subsequent /api/auth/me is 401, and the browser renders the public login surface.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "EADM logout"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "shell_back_after_logout",
+    "surface": "browser history Back",
+    "expectedBehavior": "After logout, browser Back remains on /login and /api/auth/me remains revoked at 401.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "EADM browser Back after logout"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL: Back restored stale /profile for this role while /api/auth/me was 401; the fresh final run passed after remediation."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "shell_relogin_restore",
+    "surface": "/login?from=/profile -> /profile",
+    "expectedBehavior": "Public reload is 200; relogin returns to /profile with correct identity, avatar, and role-correct nav.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "EADM relogin"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "shell_identity_and_nav_shape",
+    "surface": "desktop sidebar",
+    "expectedBehavior": "Login and /api/auth/me identify user-alpha-plan-reader-no-resources / Никита Без Ресурсов; avatar is НБ; visible nav is exactly [\"Мои задачи\",\"Проекты\",\"Дашборд\"] and all other nav items are absent.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "PLAN identity/nav"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "shell_nav_traversal",
+    "surface": "desktop sidebar links",
+    "expectedBehavior": "Every visible link has the expected href, real click reaches it, active styling is applied, and no permission_missing or access-limited error appears.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "PLAN nav traversal"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "shell_global_search",
+    "surface": "global search",
+    "expectedBehavior": "GET /api/workspace/search?q=Вектор returns 200 and exposes project result Портал подрядчиков Вектор -> /projects/project-vektor-portal.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "PLAN global search"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "shell_identity_menu",
+    "surface": "avatar user menu",
+    "expectedBehavior": "Menu text matches Никита Без Ресурсов and user-alpha-plan-reader-no-resources; Profile and Settings are real /profile and /settings links and preserve the same /api/auth/me identity.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "PLAN identity menu"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "shell_logout_revocation",
+    "surface": "POST /api/auth/logout",
+    "expectedBehavior": "Logout returns 200, subsequent /api/auth/me is 401, and the browser renders the public login surface.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "PLAN logout"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "shell_back_after_logout",
+    "surface": "browser history Back",
+    "expectedBehavior": "After logout, browser Back remains on /login and /api/auth/me remains revoked at 401.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "PLAN browser Back after logout"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL: Back restored stale /profile for this role while /api/auth/me was 401; the fresh final run passed after remediation."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "shell_relogin_restore",
+    "surface": "/login?from=/profile -> /profile",
+    "expectedBehavior": "Public reload is 200; relogin returns to /profile with correct identity, avatar, and role-correct nav.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "PLAN relogin"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "shell_identity_and_nav_shape",
+    "surface": "desktop sidebar",
+    "expectedBehavior": "Login and /api/auth/me identify user-alpha-resource-reader / Роман Ресурсный; avatar is РР; visible nav is exactly [] and all other nav items are absent.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "RES identity/nav"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "shell_nav_traversal",
+    "surface": "desktop sidebar links",
+    "expectedBehavior": "Every visible link has the expected href, real click reaches it, active styling is applied, and no permission_missing or access-limited error appears.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "RES nav traversal"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "shell_global_search",
+    "surface": "global search",
+    "expectedBehavior": "GET /api/workspace/search?q=Вектор returns 200 and exposes zero results with honest empty state.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "RES global search"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "shell_identity_menu",
+    "surface": "avatar user menu",
+    "expectedBehavior": "Menu text matches Роман Ресурсный and user-alpha-resource-reader; Profile and Settings are real /profile and /settings links and preserve the same /api/auth/me identity.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "RES identity menu"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "shell_logout_revocation",
+    "surface": "POST /api/auth/logout",
+    "expectedBehavior": "Logout returns 200, subsequent /api/auth/me is 401, and the browser renders the public login surface.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "RES logout"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "shell_back_after_logout",
+    "surface": "browser history Back",
+    "expectedBehavior": "After logout, browser Back remains on /login and /api/auth/me remains revoked at 401.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "RES browser Back after logout"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL: Back restored stale /profile for this role while /api/auth/me was 401; the fresh final run passed after remediation."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "shell_relogin_restore",
+    "surface": "/login?from=/profile -> /profile",
+    "expectedBehavior": "Public reload is 200; relogin returns to /profile with correct identity, avatar, and role-correct nav.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "RES relogin"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "shell_identity_and_nav_shape",
+    "surface": "desktop sidebar",
+    "expectedBehavior": "Login and /api/auth/me identify user-beta-admin / Борис Администратор; avatar is БА; visible nav is exactly [\"Мои задачи\",\"Проекты\",\"Сделки\",\"Дашборд\",\"Коммуникации\",\"Администрирование\"] and all other nav items are absent.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "BADM identity/nav"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "shell_nav_traversal",
+    "surface": "desktop sidebar links",
+    "expectedBehavior": "Every visible link has the expected href, real click reaches it, active styling is applied, and no permission_missing or access-limited error appears.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "BADM nav traversal"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "shell_global_search",
+    "surface": "global search",
+    "expectedBehavior": "GET /api/workspace/search?q=Вектор returns 200 and exposes zero results in empty beta tenant with honest empty state.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "BADM global search"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "shell_identity_menu",
+    "surface": "avatar user menu",
+    "expectedBehavior": "Menu text matches Борис Администратор and user-beta-admin; Profile and Settings are real /profile and /settings links and preserve the same /api/auth/me identity.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "BADM identity menu"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "shell_logout_revocation",
+    "surface": "POST /api/auth/logout",
+    "expectedBehavior": "Logout returns 200, subsequent /api/auth/me is 401, and the browser renders the public login surface.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "BADM logout"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "shell_back_after_logout",
+    "surface": "browser history Back",
+    "expectedBehavior": "After logout, browser Back remains on /login and /api/auth/me remains revoked at 401.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "BADM browser Back after logout"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL: Back restored stale /profile for this role while /api/auth/me was 401; the fresh final run passed after remediation."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "shell_relogin_restore",
+    "surface": "/login?from=/profile -> /profile",
+    "expectedBehavior": "Public reload is 200; relogin returns to /profile with correct identity, avatar, and role-correct nav.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/shell-role-nav.spec.ts",
+        "detail": "BADM relogin"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/shell-role-nav.md",
+        "status": "historical_fail",
+        "detail": "Historical traversal passed this area; the five-test suite failed only because browser Back restored /profile after logout."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-shell-final-fixed/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "profile_settings_role_shape",
+    "surface": "/profile",
+    "expectedBehavior": "Tenant tenant-alpha is visible; name, phone, Telegram, accent, theme, and Save controls are enabled as appropriate, with Save disabled while pristine and no denial warning.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "AADM /profile role-correct edit shape"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "profile_settings_role_shape",
+    "surface": "/settings",
+    "expectedBehavior": "Tenant tenant-alpha is visible; name, phone, Telegram, accent, theme, and Save controls are enabled as appropriate, with Save disabled while pristine and no denial warning.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "AADM /settings role-correct edit shape"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "profile_settings_role_shape",
+    "surface": "/profile",
+    "expectedBehavior": "Tenant tenant-alpha is visible; name, phone, Telegram, accent, theme, and Save controls are enabled as appropriate, with Save disabled while pristine and no denial warning.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "EADM /profile role-correct edit shape"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "profile_settings_role_shape",
+    "surface": "/settings",
+    "expectedBehavior": "Tenant tenant-alpha is visible; name, phone, Telegram, accent, theme, and Save controls are enabled as appropriate, with Save disabled while pristine and no denial warning.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "EADM /settings role-correct edit shape"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "profile_settings_role_shape",
+    "surface": "/profile",
+    "expectedBehavior": "Tenant tenant-alpha is visible; every profile/theme mutation control and Save are disabled, and the insufficient-permission warning is visible.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "PLAN /profile role-correct edit shape"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "profile_settings_role_shape",
+    "surface": "/settings",
+    "expectedBehavior": "Tenant tenant-alpha is visible; every profile/theme mutation control and Save are disabled, and the insufficient-permission warning is visible.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "PLAN /settings role-correct edit shape"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "profile_settings_role_shape",
+    "surface": "/profile",
+    "expectedBehavior": "Tenant tenant-alpha is visible; every profile/theme mutation control and Save are disabled, and the insufficient-permission warning is visible.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "RES /profile role-correct edit shape"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "profile_settings_role_shape",
+    "surface": "/settings",
+    "expectedBehavior": "Tenant tenant-alpha is visible; every profile/theme mutation control and Save are disabled, and the insufficient-permission warning is visible.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "RES /settings role-correct edit shape"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "profile_settings_role_shape",
+    "surface": "/profile",
+    "expectedBehavior": "Tenant tenant-beta is visible; name, phone, Telegram, accent, theme, and Save controls are enabled as appropriate, with Save disabled while pristine and no denial warning.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "BADM /profile role-correct edit shape"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "profile_settings_role_shape",
+    "surface": "/settings",
+    "expectedBehavior": "Tenant tenant-beta is visible; name, phone, Telegram, accent, theme, and Save controls are enabled as appropriate, with Save disabled while pristine and no denial warning.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "BADM /settings role-correct edit shape"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "profile_settings_direct_denial",
+    "surface": "PATCH /api/profile + /api/profile/theme",
+    "expectedBehavior": "Direct profile and theme mutations both return 403 and /api/auth/me remains unchanged.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "PLAN direct denial readback"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "profile_settings_direct_denial",
+    "surface": "PATCH /api/profile + /api/profile/theme",
+    "expectedBehavior": "Direct profile and theme mutations both return 403 and /api/auth/me remains unchanged.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "RES direct denial readback"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "profile_validation_and_preview",
+    "surface": "/profile",
+    "expectedBehavior": "Dirty fields show a changed count; invalid #123 accent is aria-invalid with #RRGGBB guidance and disables Save; valid theme/accent preview applies to html before save.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "AADM validation and live preview"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "profile_conflict_retry",
+    "surface": "PATCH /api/profile",
+    "expectedBehavior": "An injected first 409 shows a readable error and leaves the dirty form retryable; the second profile and theme PATCH calls return 200.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "AADM 409 retry"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "profile_persistence_and_nullable",
+    "surface": "/profile + /api/auth/me",
+    "expectedBehavior": "Saved name/contact/theme/accent values survive API readback and reload; clearing phone/Telegram persists null and reloads as empty inputs; cleanup restores the original profile.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "AADM persistence, nullable fields, restore"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "settings_persistence",
+    "surface": "/settings",
+    "expectedBehavior": "A dirty phone field saves through PATCH 200, appears in /api/auth/me, survives reload, and is restored in cleanup.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "EADM settings mutation"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "settings_tenant_isolation",
+    "surface": "/settings",
+    "expectedBehavior": "Theme/accent PATCH and readback stay in tenant-beta, alpha identity is absent from the UI, reload preserves the beta value, and cleanup restores it.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "BADM tenant-beta mutation isolation"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "profile_load_retry",
+    "surface": "GET /api/auth/me on /profile",
+    "expectedBehavior": "Injected 503 responses render a readable Retry action; releasing the fault and retrying reaches a ready profile through a 200 response.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "AADM 5xx retry"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 9 passed / 2 failed; this non-bug traversal area passed while cancel and success-confirmation defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "settings_success_confirmation",
+    "surface": "/settings",
+    "expectedBehavior": "After a successful profile PATCH and matching /api/auth/me readback, one visible Сохранено confirmation remains.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "EADM success confirmation"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL L6-PS-02: PATCH/readback succeeded but auth refresh remounted the form and removed Сохранено; fresh final run passed."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "profile_settings_cancel",
+    "surface": "/profile",
+    "expectedBehavior": "A dirty form exposes one visible Отменить action that restores server-backed values without saving.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "AADM /profile cancel action"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL L6-PS-01: no Отменить action existed on either dirty form; fresh final run passed."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "profile_settings_cancel",
+    "surface": "/settings",
+    "expectedBehavior": "A dirty form exposes one visible Отменить action that restores server-backed values without saving.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/profile-settings-role.spec.ts",
+        "detail": "AADM /settings cancel action"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/profile-settings-role.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL L6-PS-01: no Отменить action existed on either dirty form; fresh final run passed."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-profile-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "mywork_resolved_labels",
+    "surface": "/my-work list",
+    "expectedBehavior": "Every seeded task row shows the resolved owner name and project title instead of raw ids.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/mywork-role-actions.spec.ts",
+        "detail": "AADM resolved labels"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL: project labels rendered raw project ids; fresh final run passed."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "mywork_resolved_labels",
+    "surface": "/my-work list",
+    "expectedBehavior": "Every seeded task row shows the resolved owner name and project title instead of raw ids.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/mywork-role-actions.spec.ts",
+        "detail": "EADM resolved labels"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL: project labels rendered raw project ids; fresh final run passed."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "mywork_resolved_labels",
+    "surface": "/my-work list",
+    "expectedBehavior": "Every seeded task row shows the resolved owner name, including the current user's Никита Без Ресурсов identity, and the resolved project title.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/mywork-role-actions.spec.ts",
+        "detail": "PLAN resolved labels"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL: current user rendered as Участник rces and project ids were raw; fresh final run passed."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "mywork_filter_across_views",
+    "surface": "Kanban/List + task filter",
+    "expectedBehavior": "Kanban and List expose the same seeded data; filtering to one task hides another and remains applied when switching back to Kanban.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/mywork-role-actions.spec.ts",
+        "detail": "AADM view/filter preservation"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "historical_fail",
+        "detail": "Historical FAIL: the task filter was missing; fresh final run passed."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "mywork_reversible_status_change",
+    "surface": "status select + PATCH + reload",
+    "expectedBehavior": "A reversible waiting/in_progress status change uses an enabled UI select, returns PATCH 200 with the marker, matches API readback and reload, then restores the original status with PATCH 200.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/mywork-role-actions.spec.ts",
+        "detail": "AADM allowed status mutation"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 7 passed / 4 failed; this area passed while label/name/filter defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "EADM",
+    "scenario": "mywork_reversible_status_change",
+    "surface": "status select + PATCH + reload",
+    "expectedBehavior": "A reversible waiting/in_progress status change uses an enabled UI select, returns PATCH 200 with the marker, matches API readback and reload, then restores the original status with PATCH 200.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/mywork-role-actions.spec.ts",
+        "detail": "EADM allowed status mutation"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 7 passed / 4 failed; this area passed while label/name/filter defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "mywork_reversible_status_change",
+    "surface": "status select + PATCH + reload",
+    "expectedBehavior": "When a reversible waiting/in_progress participant task exists, its status change should return PATCH 200, match API readback/reload, and restore the original status.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/mywork-role-actions.spec.ts",
+        "detail": "PLAN allowed status mutation"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 7 passed / 4 failed; this area passed while label/name/filter defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      },
+      {
+        "kind": "coverage_caveat",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "not_exercised",
+        "detail": "The seeded PLAN task was new, so the spec annotated mutation-unavailable and returned before exercising a reversible mutation."
+      },
+      {
+        "kind": "final_role_write_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-complete-final2/.last-run.json",
+        "status": "passed",
+        "detail": "A disposable waiting task was created for PLAN, mutated through UI PATCH, verified by API/reload, restored, archived in a guaranteed cleanup, then proved absent from active detail and My Work reads; current combined reporter passed."
+      },
+      {
+        "kind": "machine_result",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-auth-shell-final.json",
+        "status": "passed",
+        "detail": "Current-file JSON reporter includes all 38 Auth + Shell tests: 38 passed, 0 failed, 0 flaky."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "PLAN",
+    "scenario": "mywork_other_user_denial",
+    "surface": "other user's task + direct PATCH",
+    "expectedBehavior": "Another user's task has no UI affordance; direct status PATCH returns 403 task_participant_role_required; admin readback proves status unchanged.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/mywork-role-actions.spec.ts",
+        "detail": "PLAN other-user denial"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 7 passed / 4 failed; this area passed while label/name/filter defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "RES",
+    "scenario": "mywork_forbidden_denial",
+    "surface": "/my-work + direct PATCH",
+    "expectedBehavior": "GET /api/workspace/my-work returns 403 with a forbidden surface and no selects; direct PATCH returns 403 permission_missing; admin readback proves unchanged.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/mywork-role-actions.spec.ts",
+        "detail": "RES forbidden and direct denial"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 7 passed / 4 failed; this area passed while label/name/filter defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "BADM",
+    "scenario": "mywork_tenant_isolation",
+    "surface": "/my-work + cross-tenant PATCH",
+    "expectedBehavior": "Beta readback returns an empty task array and honest empty state with no alpha task; cross-tenant PATCH returns 404 project_not_found; alpha task remains unchanged.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/mywork-role-actions.spec.ts",
+        "detail": "BADM tenant isolation"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 7 passed / 4 failed; this area passed while label/name/filter defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "AADM",
+    "scenario": "mywork_load_retry",
+    "surface": "GET /api/workspace/my-work",
+    "expectedBehavior": "A deterministic first 503 shows Retry; clicking it issues a second request that returns 200 and restores the task surface.",
+    "evidence": [
+      {
+        "kind": "spec",
+        "path": "e2e/full-eval/mywork-role-actions.spec.ts",
+        "detail": "AADM 5xx retry"
+      },
+      {
+        "kind": "remediation_lineage",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/mywork-role-actions.md",
+        "status": "historical_fail",
+        "detail": "Historical suite was 7 passed / 4 failed; this area passed while label/name/filter defects remained."
+      },
+      {
+        "kind": "final_run",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/playwright-mywork-final/.last-run.json",
+        "status": "passed",
+        "detail": "Fresh aggregate .last-run evidence after remediation; failedTests is empty."
+      }
+    ],
+    "status": "pass"
+  },
+  {
+    "role": "NEW_USER",
+    "scenario": "reset_email_public_origin",
+    "surface": "SMTP reset link -> /password-reset/confirm",
+    "expectedBehavior": "When web and API origins differ, the emailed reset link targets the browser application origin and its confirm route.",
+    "evidence": [
+      {
+        "kind": "live_failure_and_remediation",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/live-reset/readback.json",
+        "status": "pre_fix_failure",
+        "detail": "Live SMTP exposed the internal-API-origin defect before the fix; it does not prove post-fix delivered-message content."
+      },
+      {
+        "kind": "api_regression",
+        "path": "apps/api/src/authRegistrationRoutes.test.ts",
+        "status": "passed",
+        "detail": "Fresh 17/17 suite includes distinct https://app.kiss-pm.test and https://api.kiss-pm.test origins and asserts resetUrl.origin equals the app origin."
+      },
+      {
+        "kind": "machine_result",
+        "path": ".superloopy/evidence/auth-shell-2026-07-10/vitest-auth-reset-final.json",
+        "status": "passed",
+        "detail": "Current-file JSON reporter: 17 total, 17 passed, 0 failed."
+      }
+    ],
+    "status": "partial_live_rereadback"
+  }
+]

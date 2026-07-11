@@ -1,0 +1,53 @@
+{
+  "id": "RISK-AGENT-GENERIC-CRM-REDISPATCH-2026-07-08",
+  "generatedAt": "2026-07-07T20:23:18.9991505Z",
+  "linkedRiskZones": [
+    "RISK-AGENT-REAL-LLM-SSE",
+    "BUG-SHELL-12"
+  ],
+  "status": "pass-partial-risk-not-closed",
+  "scope": "Live in-app browser traversal of generic bound tool create_crm_client against API 4160 and Web 3160 with OpenRouter configured.",
+  "secretsPolicy": "OpenRouter key was loaded from ignored .env.local and is not emitted. No cookies or credentials are stored in this evidence.",
+  "environment": {
+    "apiOrigin": "http://127.0.0.1:4160",
+    "webOrigin": "http://127.0.0.1:3160",
+    "provider": {
+      "model": "anthropic/claude-sonnet-4.6",
+      "live": true,
+      "configured": true
+    }
+  },
+  "steps": [
+    "Submitted browser prompt instructing exactly one generic mutation tool create_crm_client with unique client name and optional fields.",
+    "Observed live assistant response and review panel with selected action Создать клиента.",
+    "Clicked Применить выбранное in browser; UI reported Применил 1 изменение and selected action status became применено.",
+    "Read back GET /api/workspace/clients and found the created client."
+  ],
+  "expected": "A configured live provider should propose a generic CRM mutation, execute it through /api/workspace/clients, and the created client should be visible via readback.",
+  "actual": "Pass for the CRM generic redispatch browser variant: the UI applied create_crm_client and backend readback found the client.",
+  "readback": {
+    "endpoint": "GET /api/workspace/clients",
+    "matchedClient": {
+      "id": "client-d9be6fb2-2a4b-4d74-9514-9c6cf3c330ba",
+      "tenantId": "tenant-alpha",
+      "name": "Agent CRM redispatch evidence 2026-07-08 1783455688441",
+      "status": "active",
+      "createdAt": "2026-07-07T20:22:12.357Z",
+      "updatedAt": "2026-07-07T20:22:12.357Z"
+    }
+  },
+  "evidence": [
+    "docs/qa/full-eval/evidence/browser-agent-generic-crm-redispatch-2026-07-08/agent-generic-crm-client-applied.png",
+    "Browser UI showed Создать клиента selected/applied.",
+    "API client readback matched created name/status and creator tenant."
+  ],
+  "observations": [
+    "The create_crm_client tool description advertises optional email/phone/website/address fields, but /api/workspace/clients readback only exposed name/status/description for this client; this may be a stale tool description or route/read-model gap.",
+    "The review drawer again displayed 5 proposed changes while only 1 action was selected/applied and repeated the “4 изменения записаны в журнал проекта” copy/count inconsistency."
+  ],
+  "remainingForRisk": [
+    "Per-role /agent/tools matrix remains open.",
+    "Provider matrix beyond OpenRouter remains open unless intentionally scoped out.",
+    "Browser denied/degraded UI for missing provider remains open."
+  ]
+}

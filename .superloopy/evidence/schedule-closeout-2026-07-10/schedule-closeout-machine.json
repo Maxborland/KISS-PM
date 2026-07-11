@@ -1,0 +1,736 @@
+{
+  "schemaVersion": 2,
+  "runId": "schedule-closeout-20260710-final4",
+  "generatedAt": "2026-07-10T16:55:49.009Z",
+  "uiOrigin": "http://127.0.0.1:3180",
+  "apiOrigin": "http://127.0.0.1:4192",
+  "targetRowCount": 40,
+  "bundleCount": 11,
+  "statusCounts": {
+    "pending": 0,
+    "pass": 40,
+    "blocker": 0
+  },
+  "sourceStateAtStart": {
+    "apps\\api\\src\\apiDocs\\openApiDocument.ts": "7c4148e796c229b5a082284484e8d3f59613f474253ed02759155895eada2030",
+    "apps\\api\\src\\apiDocs\\schemas\\planning.ts": "4f48c1fe233bdd88d0b36baca652fde0686a5d081ec925eb21f679afca97c9c3",
+    "apps\\api\\src\\planningParsers.ts": "f7154541dcdb85606d1b0891f117f23488f239b8c446d895e890d26de50d662b",
+    "apps\\api\\src\\planningRoutes.db.test.ts": "a5bab556739f689bb981dd91250e841dea4d1565242c86744fa10ca9defa5b1c",
+    "apps\\api\\src\\planning\\planningRevertRoute.ts": "094cbd6ad27cecfa6b8e248719a604c839f6ed0467d4bbdc139cf221d8871509",
+    "apps\\api\\src\\planning\\planningSavedViewRoutes.ts": "b206dcae04d655076c980746e238236ab35ce3fe2d5ded159344eaf6e98a09e2",
+    "apps\\web\\src\\delivery\\commits\\commits-surface.tsx": "99c15b0de36a1a18a0909987c41cdc09b1dd6c233c93f495e5cdd05c06268904",
+    "apps\\web\\src\\delivery\\lib\\use-planning.ts": "0c0d136c1c3a33af6c332a933dda14dccd420718b294262f7ca809fa35fb8830",
+    "apps\\web\\src\\delivery\\schedule\\schedule-batch-integrity.test.tsx": "541492318dffe029830ea919d83f63b20d2c0ee1a6a28c8151acc22680a70721",
+    "apps\\web\\src\\delivery\\schedule\\schedule-calendar-semantics.test.ts": "ced645b660c9274c618c172730b9b0922110416e961b5314093af2b90af60eae",
+    "apps\\web\\src\\delivery\\schedule\\schedule-editors.test.tsx": "c7cf5c0f471a80572ca0aa25bf62fc7d73602803696435fe17bd73f14e5a3f4c",
+    "apps\\web\\src\\delivery\\schedule\\schedule-editors.tsx": "4c9eddaa720adae8c577b5c7d09f59b826520f65d7174b9285977caa3af7ae34",
+    "apps\\web\\src\\delivery\\schedule\\schedule-milestone.test.ts": "6d4f342af4dccbfb96ae935855011ec539f9a64e5fdd17cb3e68e81649c8110c",
+    "apps\\web\\src\\delivery\\schedule\\schedule-milestone.ts": "49a5e866e6513b25cdd13b404795f4c2cffb5ae5c3d4799a2f313435fe1fe065",
+    "apps\\web\\src\\delivery\\schedule\\schedule-navigation-guard.test.tsx": "2c7bd5c433dfdea760fe36c836f029fced413e5b6d09e37ebadfeb5fcb442dfd",
+    "apps\\web\\src\\delivery\\schedule\\schedule-permission-worker09.test.tsx": "6b9ba0e53a0aa1886fa304fc042a532350073f701b1219878b2c724350d20ec3",
+    "apps\\web\\src\\delivery\\schedule\\schedule-productivity-ui.test.tsx": "91e9363d3b8a9fba02cf441a928b73c31e9b5af94c5509f078b6e8ddd858aba1",
+    "apps\\web\\src\\delivery\\schedule\\schedule-productivity.test.ts": "db66358af41f93fe599e4a3ffe387b1f89741a87c844f98d9bf146e05cb15f0b",
+    "apps\\web\\src\\delivery\\schedule\\schedule-productivity.ts": "d54b49137bb31a9cd44b70d5500b9d8d63cc571c2f796d4c3f1423f1c39ecc78",
+    "apps\\web\\src\\delivery\\schedule\\schedule-rows.test.ts": "b50a0a8ad2a912b6cca87a4165582c77a3ba6749c83d8284bd28e708afa34831",
+    "apps\\web\\src\\delivery\\schedule\\schedule-rows.ts": "4b64fa43cd95ee9d813eede0353d5d405d6e56ece8b08b5250519b11b3097100",
+    "apps\\web\\src\\delivery\\schedule\\schedule-saved-views.test.ts": "92230258e42f88df2c1977922bd467b332b6c67ac3d9078d7c85cc474b38c788",
+    "apps\\web\\src\\delivery\\schedule\\schedule-saved-views.tsx": "3c6106b6662b54a8fb43815ac6d47f18f67c66e9a7da551f40e45b8f5f6f7599",
+    "apps\\web\\src\\delivery\\schedule\\schedule-surface.tsx": "010c7408d87861be2ceedbe849047d6d32af131f446474a5a1539f35d3a7a935",
+    "apps\\web\\src\\delivery\\schedule\\schedule-working-time.ts": "810eff72ff9f491d8baad473f0c9ddf6be301e20dc90454220d44b3fedad1478",
+    "apps\\web\\src\\delivery\\schedule\\schedule.stories.tsx": "93e70a18c3fb467238789f372c4e4df3800d9beeeb3450b89fc4fb547150005f",
+    "e2e\\full-eval\\projects-schedule-closeout.spec.ts": "046947b73485d994961835855722fccecfadee8995019955b6de5656479850df",
+    "packages\\persistence\\migrations\\0027_planning_saved_view_name_uniqueness.sql": "1bb68b2b04890430458480d071288fa98489a5853015a8598e9c436bc3e0ea2d",
+    "packages\\persistence\\src\\planningSavedViewsRepository.ts": "fd5e459ab19033102dbdf11994b250bd31d4f614cea8a975223020411b301edd",
+    "packages\\persistence\\src\\schema\\planning.ts": "033dec0d3407d4e61743d1eaf471c1186ad1f199612a62024ed33ab9eb42ee69",
+    "packages\\planning-client\\src\\api\\planningApiClient.ts": "84503656549c6dd651d6c3e6725e4473be7dbe64ce16061cd5997cf5e90ee1e2",
+    "packages\\planning-client\\src\\api\\types.ts": "b8d8e8975482368deae396e6bc088cd85c494d1a20f535d118f8af01683e0ff3"
+  },
+  "rows": [
+    {
+      "scenarioId": "PROJ-033",
+      "role": "admin",
+      "bundle": "C01",
+      "key": "PROJ-033:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:10.962Z",
+      "assertions": [
+        "Subtask disabled without selection; selected row becomes persisted parentTaskId"
+      ],
+      "screenshots": [
+        "c01-admin-authoring.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-034",
+      "role": "admin",
+      "bundle": "C01",
+      "key": "PROJ-034:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:10.963Z",
+      "assertions": [
+        "Create/edit modal persists all fields, clamps values, and reuses stable assignment id"
+      ],
+      "screenshots": [
+        "c01-admin-authoring.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-040",
+      "role": "admin",
+      "bundle": "C01",
+      "key": "PROJ-040:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:10.963Z",
+      "assertions": [
+        "Inline Enter/Escape/Tab/Shift+Tab navigation persists only committed editable task fields"
+      ],
+      "screenshots": [
+        "c01-admin-authoring.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-041",
+      "role": "admin",
+      "bundle": "C01",
+      "key": "PROJ-041:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:10.964Z",
+      "assertions": [
+        "Live start-date editor shifts schedule and persists through reload"
+      ],
+      "screenshots": [
+        "c01-admin-authoring.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-042",
+      "role": "admin",
+      "bundle": "C01",
+      "key": "PROJ-042:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:10.964Z",
+      "assertions": [
+        "Finish-date editor recalculates duration/work and keeps assignment id stable"
+      ],
+      "screenshots": [
+        "c01-admin-authoring.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-043",
+      "role": "admin",
+      "bundle": "C01",
+      "key": "PROJ-043:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:10.964Z",
+      "assertions": [
+        "Live resource editor persists real user id without duplicate assignment"
+      ],
+      "screenshots": [
+        "c01-admin-authoring.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-045",
+      "role": "admin",
+      "bundle": "C01",
+      "key": "PROJ-045:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:10.965Z",
+      "assertions": [
+        "All row-menu actions and disabled hierarchy states are traversed"
+      ],
+      "screenshots": [
+        "c01-admin-authoring.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-048",
+      "role": "admin",
+      "bundle": "C01",
+      "key": "PROJ-048:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:10.965Z",
+      "assertions": [
+        "Bottom and positioned quick-create cover Enter, Tab, Escape, validation, and readback"
+      ],
+      "screenshots": [
+        "c01-admin-authoring.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-035",
+      "role": "admin",
+      "bundle": "C02",
+      "key": "PROJ-035:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:25.431Z",
+      "assertions": [
+        "Indent/outdent boundaries and resulting WBS order persist after reload"
+      ],
+      "screenshots": [
+        "proj-035-indent.png",
+        "proj-035-outdent.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-036",
+      "role": "admin",
+      "bundle": "C02",
+      "key": "PROJ-036:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:25.432Z",
+      "assertions": [
+        "Two edits stage with zero writes, apply atomically, and reset with zero writes"
+      ],
+      "screenshots": [
+        "proj-036-batch-staged.png",
+        "proj-036-batch-applied.png",
+        "proj-036-batch-reset.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-037",
+      "role": "admin",
+      "bundle": "C02",
+      "key": "PROJ-037:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:25.433Z",
+      "assertions": [
+        "Compensating undo works once and rejects unsupported, stale, duplicate, and foreign targets"
+      ],
+      "screenshots": [
+        "proj-037-before-undo.png",
+        "proj-037-after-undo.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-038",
+      "role": "admin",
+      "bundle": "C03",
+      "key": "PROJ-038:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:37.767Z",
+      "assertions": [
+        "Admin Baseline route is real and undeclared Filters/Columns controls are absent"
+      ],
+      "screenshots": [
+        "c03-admin.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-038",
+      "role": "planReader",
+      "bundle": "C03",
+      "key": "PROJ-038:planReader",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:37.768Z",
+      "assertions": [
+        "Reader Baseline route is readable and undeclared Filters/Columns controls are absent"
+      ],
+      "screenshots": [
+        "c03-planReader.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-039",
+      "role": "admin",
+      "bundle": "C03",
+      "key": "PROJ-039:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:37.768Z",
+      "assertions": [
+        "Admin Day/Week/Month reflows bars, links, and markers at 36/20/8 px"
+      ],
+      "screenshots": [
+        "c03-admin.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-039",
+      "role": "planReader",
+      "bundle": "C03",
+      "key": "PROJ-039:planReader",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:37.769Z",
+      "assertions": [
+        "Reader Day/Week/Month reflows read-only bars, links, and markers at 36/20/8 px"
+      ],
+      "screenshots": [
+        "c03-planReader.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-049",
+      "role": "admin",
+      "bundle": "C03",
+      "key": "PROJ-049:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:37.769Z",
+      "assertions": [
+        "Admin nested collapse hides descendants and connectors, then restores them"
+      ],
+      "screenshots": [
+        "c03-admin.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-049",
+      "role": "planReader",
+      "bundle": "C03",
+      "key": "PROJ-049:planReader",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:37.770Z",
+      "assertions": [
+        "Reader nested collapse hides descendants and connectors without a write"
+      ],
+      "screenshots": [
+        "c03-planReader.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-050",
+      "role": "admin",
+      "bundle": "C03",
+      "key": "PROJ-050:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:37.770Z",
+      "assertions": [
+        "Admin column resize clamps at 36 px and resets on remount"
+      ],
+      "screenshots": [
+        "c03-admin.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-050",
+      "role": "planReader",
+      "bundle": "C03",
+      "key": "PROJ-050:planReader",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:37.770Z",
+      "assertions": [
+        "Reader column resize clamps at 36 px and resets on remount"
+      ],
+      "screenshots": [
+        "c03-planReader.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-056",
+      "role": "admin",
+      "bundle": "C03",
+      "key": "PROJ-056:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:37.771Z",
+      "assertions": [
+        "Admin inspector facts, close action, and units write persist"
+      ],
+      "screenshots": [
+        "c03-admin.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-056",
+      "role": "planReader",
+      "bundle": "C03",
+      "key": "PROJ-056:planReader",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:53:37.771Z",
+      "assertions": [
+        "Reader inspector exposes facts but no units write control"
+      ],
+      "screenshots": [
+        "c03-planReader.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-051",
+      "role": "admin",
+      "bundle": "C04",
+      "key": "PROJ-051:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:54:08.260Z",
+      "assertions": [
+        "Gantt body move covers positive, negative, zero, clamp, and release outside"
+      ],
+      "screenshots": [
+        "c04-gantt-gestures.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-052",
+      "role": "admin",
+      "bundle": "C04",
+      "key": "PROJ-052:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:54:08.260Z",
+      "assertions": [
+        "Gantt left/right resize clamps duration and synchronizes assignment work"
+      ],
+      "screenshots": [
+        "c04-gantt-gestures.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-053",
+      "role": "admin",
+      "bundle": "C04",
+      "key": "PROJ-053:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:54:08.261Z",
+      "assertions": [
+        "Gantt progress drag clamps 0..100 and zero delta emits no write"
+      ],
+      "screenshots": [
+        "c04-gantt-gestures.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-054",
+      "role": "admin",
+      "bundle": "C04",
+      "key": "PROJ-054:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:54:08.261Z",
+      "assertions": [
+        "Gantt link drag covers four edge types plus self, miss, duplicate, summary, and cycle rejection"
+      ],
+      "screenshots": [
+        "c04-gantt-gestures.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-044",
+      "role": "admin",
+      "bundle": "C05",
+      "key": "PROJ-044:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:54:27.591Z",
+      "assertions": [
+        "Dependency editor excludes invalid options and persists add/update/delete with signed lag"
+      ],
+      "screenshots": [
+        "c05-dependencies.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-055",
+      "role": "admin",
+      "bundle": "C05",
+      "key": "PROJ-055:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:54:27.592Z",
+      "assertions": [
+        "Selected-task link badge edits type/lag by stable dependency id and deletes it"
+      ],
+      "screenshots": [
+        "c05-dependencies.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-047",
+      "role": "admin",
+      "bundle": "C06",
+      "key": "PROJ-047:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:54:51.248Z",
+      "assertions": [
+        "Leaf and leaves-first summary deletion remove real assignments/dependencies and expose an honest empty plan"
+      ],
+      "screenshots": [
+        "c06-honest-empty-plan.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-057",
+      "role": "admin",
+      "bundle": "C06",
+      "key": "PROJ-057:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:54:51.249Z",
+      "assertions": [
+        "Local and server rejection roll back data, show multiple row/global issues, highlight rows, and clear after success"
+      ],
+      "screenshots": [
+        "c06-validation-rollback.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-058",
+      "role": "admin",
+      "bundle": "C06",
+      "key": "PROJ-058:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:54:51.250Z",
+      "assertions": [
+        "Optimistic patch is visible before preview resolves; authoritative commit notice/flash replace it; busy second input emits zero writes"
+      ],
+      "screenshots": [
+        "c06-optimistic-commit.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-059",
+      "role": "admin",
+      "bundle": "C07",
+      "key": "PROJ-059:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:55:20.407Z",
+      "assertions": [
+        "Single and batch stale writes return visible 409 outcomes and reload authoritative state without automatic retry"
+      ],
+      "screenshots": [
+        "c07-workflow-conflict.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-117",
+      "role": "admin",
+      "bundle": "C07",
+      "key": "PROJ-117:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:55:20.407Z",
+      "assertions": [
+        "10+ create/edit/dependency/milestone/delete steps increment versions monotonically with readback after every commit; reject adds zero versions"
+      ],
+      "screenshots": [
+        "c07-workflow-conflict.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-130",
+      "role": "admin",
+      "bundle": "C07",
+      "key": "PROJ-130:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:55:20.408Z",
+      "assertions": [
+        "Dirty single draft and staged batch conflict in two windows; staged retry succeeds only after explicit restage"
+      ],
+      "screenshots": [
+        "c07-workflow-conflict.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-060",
+      "role": "admin",
+      "bundle": "C08",
+      "key": "PROJ-060:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:55:25.498Z",
+      "assertions": [
+        "Admin timeline origin, week label, today marker, identity, baseline label, and assignment request derive from live data"
+      ],
+      "screenshots": [
+        "c08-admin-live-data.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-060",
+      "role": "planReader",
+      "bundle": "C08",
+      "key": "PROJ-060:planReader",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:55:25.499Z",
+      "assertions": [
+        "Reader timeline geometry derives from live data and every UI/API write path is absent or 403 with unchanged readback"
+      ],
+      "screenshots": [
+        "c08-planReader-live-data.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-119",
+      "role": "admin",
+      "bundle": "C09",
+      "key": "PROJ-119:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:55:31.844Z",
+      "assertions": [
+        "Baseline capture, finish-controlling shift, API/table/header/Gantt deltas, reload, and recapture-to-zero agree"
+      ],
+      "screenshots": [
+        "c09-baseline-cross-surface.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-127",
+      "role": "admin",
+      "bundle": "C10",
+      "key": "PROJ-127:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:55:37.843Z",
+      "assertions": [
+        "Admin saved views cover full payload, create/rename/delete, privacy, corrupt/empty states, duplicate races, replay, and divergent conflicts"
+      ],
+      "screenshots": [
+        "c10-admin-saved-views.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-127",
+      "role": "planReader",
+      "bundle": "C10",
+      "key": "PROJ-127:planReader",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:55:37.843Z",
+      "assertions": [
+        "Reader selects shared view, cannot see private views, has no mutation controls, and direct create/rename/delete are 403"
+      ],
+      "screenshots": [
+        "c10-plan-reader-saved-view.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-129",
+      "role": "admin",
+      "bundle": "C11",
+      "key": "PROJ-129:admin",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:55:48.998Z",
+      "assertions": [
+        "Admin default, inspector, dialog, preview, validation, and mobile states have zero critical axe violations"
+      ],
+      "screenshots": [
+        "c11-admin-default.png",
+        "c11-admin-inspector.png",
+        "c11-admin-dialog.png",
+        "c11-admin-preview.png",
+        "c11-admin-validation.png",
+        "c11-admin-mobile.png"
+      ],
+      "blocker": null
+    },
+    {
+      "scenarioId": "PROJ-129",
+      "role": "planReader",
+      "bundle": "C11",
+      "key": "PROJ-129:planReader",
+      "status": "pass",
+      "runId": "schedule-closeout-20260710-final4",
+      "generatedAt": "2026-07-10T16:55:48.998Z",
+      "assertions": [
+        "Reader default, inspector, forbidden, keyboard, and mobile states have zero critical axe violations and zero writes"
+      ],
+      "screenshots": [
+        "c11-planReader-default.png",
+        "c11-planReader-inspector.png",
+        "c11-planReader-mobile.png",
+        "c11-planReader-forbidden.png"
+      ],
+      "blocker": null
+    }
+  ],
+  "sourceStateAtEnd": {
+    "apps\\api\\src\\apiDocs\\openApiDocument.ts": "7c4148e796c229b5a082284484e8d3f59613f474253ed02759155895eada2030",
+    "apps\\api\\src\\apiDocs\\schemas\\planning.ts": "4f48c1fe233bdd88d0b36baca652fde0686a5d081ec925eb21f679afca97c9c3",
+    "apps\\api\\src\\planningParsers.ts": "f7154541dcdb85606d1b0891f117f23488f239b8c446d895e890d26de50d662b",
+    "apps\\api\\src\\planningRoutes.db.test.ts": "a5bab556739f689bb981dd91250e841dea4d1565242c86744fa10ca9defa5b1c",
+    "apps\\api\\src\\planning\\planningRevertRoute.ts": "094cbd6ad27cecfa6b8e248719a604c839f6ed0467d4bbdc139cf221d8871509",
+    "apps\\api\\src\\planning\\planningSavedViewRoutes.ts": "b206dcae04d655076c980746e238236ab35ce3fe2d5ded159344eaf6e98a09e2",
+    "apps\\web\\src\\delivery\\commits\\commits-surface.tsx": "99c15b0de36a1a18a0909987c41cdc09b1dd6c233c93f495e5cdd05c06268904",
+    "apps\\web\\src\\delivery\\lib\\use-planning.ts": "0c0d136c1c3a33af6c332a933dda14dccd420718b294262f7ca809fa35fb8830",
+    "apps\\web\\src\\delivery\\schedule\\schedule-batch-integrity.test.tsx": "541492318dffe029830ea919d83f63b20d2c0ee1a6a28c8151acc22680a70721",
+    "apps\\web\\src\\delivery\\schedule\\schedule-calendar-semantics.test.ts": "ced645b660c9274c618c172730b9b0922110416e961b5314093af2b90af60eae",
+    "apps\\web\\src\\delivery\\schedule\\schedule-editors.test.tsx": "c7cf5c0f471a80572ca0aa25bf62fc7d73602803696435fe17bd73f14e5a3f4c",
+    "apps\\web\\src\\delivery\\schedule\\schedule-editors.tsx": "4c9eddaa720adae8c577b5c7d09f59b826520f65d7174b9285977caa3af7ae34",
+    "apps\\web\\src\\delivery\\schedule\\schedule-milestone.test.ts": "6d4f342af4dccbfb96ae935855011ec539f9a64e5fdd17cb3e68e81649c8110c",
+    "apps\\web\\src\\delivery\\schedule\\schedule-milestone.ts": "49a5e866e6513b25cdd13b404795f4c2cffb5ae5c3d4799a2f313435fe1fe065",
+    "apps\\web\\src\\delivery\\schedule\\schedule-navigation-guard.test.tsx": "2c7bd5c433dfdea760fe36c836f029fced413e5b6d09e37ebadfeb5fcb442dfd",
+    "apps\\web\\src\\delivery\\schedule\\schedule-permission-worker09.test.tsx": "6b9ba0e53a0aa1886fa304fc042a532350073f701b1219878b2c724350d20ec3",
+    "apps\\web\\src\\delivery\\schedule\\schedule-productivity-ui.test.tsx": "91e9363d3b8a9fba02cf441a928b73c31e9b5af94c5509f078b6e8ddd858aba1",
+    "apps\\web\\src\\delivery\\schedule\\schedule-productivity.test.ts": "db66358af41f93fe599e4a3ffe387b1f89741a87c844f98d9bf146e05cb15f0b",
+    "apps\\web\\src\\delivery\\schedule\\schedule-productivity.ts": "d54b49137bb31a9cd44b70d5500b9d8d63cc571c2f796d4c3f1423f1c39ecc78",
+    "apps\\web\\src\\delivery\\schedule\\schedule-rows.test.ts": "b50a0a8ad2a912b6cca87a4165582c77a3ba6749c83d8284bd28e708afa34831",
+    "apps\\web\\src\\delivery\\schedule\\schedule-rows.ts": "4b64fa43cd95ee9d813eede0353d5d405d6e56ece8b08b5250519b11b3097100",
+    "apps\\web\\src\\delivery\\schedule\\schedule-saved-views.test.ts": "92230258e42f88df2c1977922bd467b332b6c67ac3d9078d7c85cc474b38c788",
+    "apps\\web\\src\\delivery\\schedule\\schedule-saved-views.tsx": "3c6106b6662b54a8fb43815ac6d47f18f67c66e9a7da551f40e45b8f5f6f7599",
+    "apps\\web\\src\\delivery\\schedule\\schedule-surface.tsx": "010c7408d87861be2ceedbe849047d6d32af131f446474a5a1539f35d3a7a935",
+    "apps\\web\\src\\delivery\\schedule\\schedule-working-time.ts": "810eff72ff9f491d8baad473f0c9ddf6be301e20dc90454220d44b3fedad1478",
+    "apps\\web\\src\\delivery\\schedule\\schedule.stories.tsx": "93e70a18c3fb467238789f372c4e4df3800d9beeeb3450b89fc4fb547150005f",
+    "e2e\\full-eval\\projects-schedule-closeout.spec.ts": "046947b73485d994961835855722fccecfadee8995019955b6de5656479850df",
+    "packages\\persistence\\migrations\\0027_planning_saved_view_name_uniqueness.sql": "1bb68b2b04890430458480d071288fa98489a5853015a8598e9c436bc3e0ea2d",
+    "packages\\persistence\\src\\planningSavedViewsRepository.ts": "fd5e459ab19033102dbdf11994b250bd31d4f614cea8a975223020411b301edd",
+    "packages\\persistence\\src\\schema\\planning.ts": "033dec0d3407d4e61743d1eaf471c1186ad1f199612a62024ed33ab9eb42ee69",
+    "packages\\planning-client\\src\\api\\planningApiClient.ts": "84503656549c6dd651d6c3e6725e4473be7dbe64ce16061cd5997cf5e90ee1e2",
+    "packages\\planning-client\\src\\api\\types.ts": "b8d8e8975482368deae396e6bc088cd85c494d1a20f535d118f8af01683e0ff3"
+  }
+}

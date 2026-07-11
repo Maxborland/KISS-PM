@@ -1,5 +1,6 @@
 import {
   canManageWorkspaceConfig,
+  canReadProjectPlan,
   canReadWorkspaceConfig,
   type AccessProfile,
   type PolicyDecision
@@ -44,6 +45,7 @@ type WorkspaceConfigRouteDataSource = Pick<
   ApiTenantDataSource,
   | "appendAuditEvent"
   | "createCustomFieldDefinition"
+  | "deleteCustomFieldDefinition"
   | "createProjectTemplate"
   | "getTenantSecurityPolicy"
   | "listCustomFieldDefinitions"
@@ -58,12 +60,26 @@ type WorkspaceConfigMutationDataSource = Pick<
   ApiTenantDataSource,
   | "appendAuditEvent"
   | "createCustomFieldDefinition"
+  | "deleteCustomFieldDefinition"
   | "createProjectTemplate"
   | "updateCustomFieldDefinition"
   | "updateProjectTemplate"
   | "upsertTenantSecurityPolicy"
 >;
 
+export function canReadProjectCustomFields(input: Parameters<typeof canReadWorkspaceConfig>[0]): PolicyDecision {
+  const workspaceDecision = canReadWorkspaceConfig(input);
+  return workspaceDecision.allowed ? workspaceDecision : canReadProjectPlan(input);
+}
+
+export function customFieldsVisibleToProjectReader<T extends { targetEntity: string }>(
+  input: Parameters<typeof canReadWorkspaceConfig>[0],
+  definitions: T[]
+): T[] {
+  return canReadWorkspaceConfig(input).allowed
+    ? definitions
+    : definitions.filter((field) => field.targetEntity === "project");
+}
 export function registerWorkspaceConfigRoutes(
   app: Hono,
   deps: WorkspaceConfigRouteDeps
@@ -79,7 +95,7 @@ export function registerWorkspaceConfigRoutes(
 
   app.get("/api/workspace/config/custom-fields", async (context) => {
     const auth = await authorizeRoute(context, routeAuthDeps, {
-      permission: canReadWorkspaceConfig,
+      permission: canReadProjectCustomFields,
       capabilities: ["listCustomFieldDefinitions"],
       onDenied: ({ actor, decision }) =>
         appendWorkspaceConfigDeniedAudit(deps, actor, {
@@ -93,8 +109,13 @@ export function registerWorkspaceConfigRoutes(
     if (!auth.ok) return auth.response;
     const { actor, dataSource } = auth.value;
 
+    const profile = await getActorProfile(actor);
+    const definitions = await dataSource.listCustomFieldDefinitions(actor.tenantId);
     return context.json({
-      customFields: await dataSource.listCustomFieldDefinitions(actor.tenantId)
+      customFields: customFieldsVisibleToProjectReader(
+        { actor, profile, targetTenantId: actor.tenantId },
+        definitions
+      )
     });
   });
 
@@ -250,6 +271,39 @@ export function registerWorkspaceConfigRoutes(
     });
 
     return context.json({ customField });
+  });
+
+  app.delete("/api/workspace/config/custom-fields/:fieldId", async (context) => {
+    const parsedFieldId = parseCustomFieldIdParam(context.req.param("fieldId"));
+    if (!parsedFieldId.ok) return context.json({ error: parsedFieldId.error }, 400);
+
+    const auth = await authorizeRoute(context, routeAuthDeps, {
+      permission: canManageWorkspaceConfig,
+      capabilities: ["deleteCustomFieldDefinition", "listCustomFieldDefinitions", "withTransaction", "appendAuditEvent"],
+      onDenied: ({ actor, decision }) => appendWorkspaceConfigDeniedAudit(deps, actor, {
+        actionType: "workspace.custom_field.delete_denied",
+        entityType: "CustomFieldDefinition",
+        entityId: parsedFieldId.value,
+        commandInput: { fieldId: parsedFieldId.value },
+        decision
+      })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision } = auth.value;
+    const deletedField = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.deleteCustomFieldDefinition) throw new Error("transactional_custom_field_delete_not_configured");
+      const deleted = await transactionDataSource.deleteCustomFieldDefinition(actor.tenantId, parsedFieldId.value);
+      if (!deleted) return null;
+      await appendManagementAuditEvent({
+        tenantId: actor.tenantId, actorUserId: actor.id,
+        actionType: "workspace.custom_field.deleted", sourceWorkflow: "single_workspace_config",
+        sourceEntity: { type: "CustomFieldDefinition", id: parsedFieldId.value },
+        commandInput: { fieldId: parsedFieldId.value }, beforeState: deleted, afterState: null, permissionResult: decision
+      }, transactionDataSource);
+      return deleted;
+    });
+    if (!deletedField) return context.json({ error: "custom_field_not_found" }, 404);
+    return context.json({ status: "deleted" });
   });
 
   app.get("/api/workspace/config/project-templates", async (context) => {

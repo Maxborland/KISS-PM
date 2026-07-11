@@ -1,0 +1,19 @@
+{
+  "generatedAt": "2026-07-11T01:18:27.4137881+07:00",
+  "browser": "Codex In-app Browser",
+  "role": "admin",
+  "checks": {
+    "projectsUrl": "http://localhost:3180/projects",
+    "projectsHeading": "Проекты",
+    "liveProjectRows": 5,
+    "nativeProjectLinks": 5,
+    "prototypeTextVisible": false,
+    "overviewUrl": "http://localhost:3180/projects/project-shell-1783706792986/overview",
+    "zeroProgressVisible": true,
+    "emptyMilestonesVisible": true,
+    "emptyKeyTasksVisible": true,
+    "nanVisible": false,
+    "consoleErrorsOrWarnings": []
+  },
+  "status": "pass"
+}

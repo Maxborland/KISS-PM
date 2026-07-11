@@ -1,0 +1,47 @@
+{
+  "scenarioId": "PROJ-106",
+  "role": "A",
+  "status": "pass",
+  "runId": "final29-commits-review-r1",
+  "generatedAt": "2026-07-11T05:35:18.257Z",
+  "assertions": [
+    "Selecting a row updated version transition and auditEventId",
+    "A current task resolved to WBS code plus title from the read-model",
+    "No deleted-task event existed in this fixture, so its optional fallback check was not applicable",
+    "Raw payload disclosure matched the selected live API event metadata"
+  ],
+  "details": {
+    "projectId": "project-vektor-portal",
+    "resolvedTask": {
+      "id": "task-vektor-phase-prep",
+      "label": "1 Этап 1. Подготовка"
+    },
+    "deletedTaskId": null,
+    "apiEvent": {
+      "id": "audit-cfcbaf5c-c953-4c64-b510-a3d8dfe2636d",
+      "actionType": "planning.task.updated",
+      "sourceWorkflow": "planning",
+      "commandType": "task.update_identity",
+      "planVersion": 3,
+      "changedTaskIds": [
+        "task-vektor-phase-prep"
+      ],
+      "executionStatus": "succeeded",
+      "createdAt": "2026-07-11T05:35:17.362Z"
+    },
+    "uiRawPayload": {
+      "version": 3,
+      "actionType": "planning.task.updated",
+      "auditEventId": "audit-cfcbaf5c-c953-4c64-b510-a3d8dfe2636d",
+      "changedTaskIds": [
+        "task-vektor-phase-prep"
+      ],
+      "revertible": true,
+      "at": "2026-07-11T05:35:17.362Z"
+    }
+  },
+  "screenshots": [
+    "screenshots/proj-106-admin-details-raw-task-resolution.png"
+  ],
+  "screenshotPathBase": "lane_root"
+}

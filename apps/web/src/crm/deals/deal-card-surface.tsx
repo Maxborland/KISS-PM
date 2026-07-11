@@ -16,7 +16,7 @@ import { CrmFrame } from "@/crm/ui/crm-frame";
 import { money } from "@/crm/ui/crm-bits";
 import { makeRuError } from "@/lib/error-messages";
 import { useCrm, useCrmUsers, type CrmUsersIndex } from "@/crm/lib/use-crm";
-import type { CrmActivity, FeasibilityAssessment, Opportunity } from "@/crm/lib/crm-client";
+import type { CrmActivity, DealStage, FeasibilityAssessment, Opportunity } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
@@ -71,6 +71,21 @@ const formOf = (o: Opportunity): FormState => ({
   probability: String(o.probability), contractValue: String(o.contractValue), plannedHourlyRate: String(o.plannedHourlyRate),
   plannedStart: dateOnly(o.plannedStart), plannedFinish: dateOnly(o.plannedFinish)
 });
+
+export function resolveOpportunityPipelineId(
+  opportunity: Pick<Opportunity, "pipelineId" | "stageId">,
+  dealStages: Array<Pick<DealStage, "id" | "pipelineId">>
+): string | null {
+  return opportunity.pipelineId ?? dealStages.find((stage) => stage.id === opportunity.stageId)?.pipelineId ?? null;
+}
+
+export function stagesForOpportunity(
+  opportunity: Pick<Opportunity, "pipelineId" | "stageId">,
+  dealStages: DealStage[]
+): DealStage[] {
+  const pipelineId = resolveOpportunityPipelineId(opportunity, dealStages);
+  return [...dealStages].filter((stage) => stage.pipelineId === pipelineId).sort((a, b) => a.sortOrder - b.sortOrder);
+}
 
 // initialId — стартовая сделка из URL (route app/crm/deals/[id]); по умолчанию пусто → fallback ниже
 // на opp-2207 (mock-сид), затем первая (live). Stories рендерят без initialId → прежнее поведение.
@@ -142,8 +157,9 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   const [busy, setBusy] = useState(false);
 
   const locked = isFinal(opp);
-  const stages = useMemo(() => [...data.dealStages].filter((s) => s.pipelineId === opp.pipelineId).sort((a, b) => a.sortOrder - b.sortOrder), [data.dealStages, opp.pipelineId]);
-  const pipelineName = data.pipelines.find((p) => p.id === opp.pipelineId)?.name ?? "—";
+  const effectivePipelineId = useMemo(() => resolveOpportunityPipelineId(opp, data.dealStages), [data.dealStages, opp]);
+  const stages = useMemo(() => stagesForOpportunity(opp, data.dealStages), [data.dealStages, opp]);
+  const pipelineName = data.pipelines.find((p) => p.id === effectivePipelineId)?.name ?? "—";
   const stageName = (id: string | null) => data.dealStages.find((s) => s.id === id)?.name ?? "— без стадии —";
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(formOf(opp)), [form, opp]);

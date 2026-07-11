@@ -1,0 +1,38 @@
+{
+  "id": "BUG-PROJ-21",
+  "linkedOldIds": ["BUG-PROJ-21"],
+  "status": "fixed-by-current-branch",
+  "coverageStatus": "targeted",
+  "date": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "surface": [
+    "/projects/[id]/baseline",
+    "POST /api/workspace/projects/:projectId/planning/apply-command baseline.capture",
+    "planning read-model authored.baselines"
+  ],
+  "expected": "A user-entered baseline label is persisted and visible after readback; the UI history shows that label instead of always rendering 'Снимок плана'.",
+  "redEvidence": [
+    "DB integration test 'shows zero deltas immediately after capturing a baseline' failed before implementation: freshBaseline?.label was undefined instead of 'Свежий'."
+  ],
+  "greenEvidence": [
+    "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55436/kiss_pm&& node_modules\\.bin\\vitest.exe run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"\"shows zero deltas immediately after capturing a baseline\"\"\" -> 1 file / 1 selected test passed.",
+    "cmd /c ..\\..\\node_modules\\.bin\\vitest.exe run --config vitest.config.ts src/delivery/lib/mock-planning-backend.test.ts -> 1 file / 31 tests passed.",
+    "corepack pnpm --filter @kiss-pm/domain typecheck -> passed.",
+    "corepack pnpm --filter @kiss-pm/persistence typecheck -> passed."
+  ],
+  "changedFiles": [
+    "packages/domain/src/planning/types.ts",
+    "packages/domain/src/planning/commandReducer.ts",
+    "packages/domain/src/retrospectives.test.ts",
+    "packages/persistence/src/planningRepository.ts",
+    "apps/api/src/planningRoutes.db.test.ts",
+    "apps/web/src/delivery/baseline/baseline-surface.tsx",
+    "apps/web/src/delivery/lib/mock-planning-backend.test.ts"
+  ],
+  "fixApplied": "PlanBaseline now carries label through the domain reducer and persistence read-model mapper. The baseline surface renders b.label with the existing fallback 'Снимок плана'. DB and mock tests assert label readback after baseline.capture.",
+  "limitations": [
+    "Full browser traversal of the baseline page was not run in this slice.",
+    "Full API/web typecheck was attempted, but current concurrent-agent edits caused unrelated failures in apps/api/src/agent/agentProviderDegraded.test.ts and apps/web/src/delivery/schedule/schedule-rows.ts; those are tracked in the active agent integration, not attributed to BUG-PROJ-21."
+  ],
+  "regressionRisk": "Low. The persistence schema already had project_baselines.label; this exposes an existing column in the typed read-model and UI. Existing fallback remains for any malformed legacy/mock baseline without label."
+}

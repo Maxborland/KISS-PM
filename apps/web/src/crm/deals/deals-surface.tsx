@@ -16,19 +16,26 @@ import { StatTile } from "@/delivery/ui/bento";
 import { cn } from "@/lib/cn";
 import { makeRuError } from "@/lib/error-messages";
 import { CrmFrame } from "@/crm/ui/crm-frame";
+import { money } from "@/crm/ui/crm-bits";
+import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { useCrm, useCrmUsers } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import type { DealStage, Opportunity, Pipeline, StageTransition } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
+import { useSessionUser } from "@/shell/use-session-user";
 
 type Mode = "kanban" | "list" | "forecast";
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
 const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean); return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—"; };
-const money = (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} млн ₽` : `${Math.round(v / 1000).toLocaleString("ru-RU")} тыс ₽`);
 // Дефолты дат формы «Новая сделка» (G4-15): старт = сегодня, финиш = +N месяцев (локальная дата).
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const isoToday = () => isoOf(new Date());
 const isoPlusMonths = (m: number) => { const d = new Date(); d.setMonth(d.getMonth() + m); return isoOf(d); };
+export const isValidOpportunityProbability = (value: string) => {
+  if (value.trim() === "") return false;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 100;
+};
 const STATUS_LABEL: Record<Opportunity["status"], string> = { new: "Новая", feasibility: "Проверка", ready_to_activate: "Готова", won_closed: "Выиграна", lost_rejected: "Проиграна" };
 const isFinal = (o: Opportunity) => o.status === "won_closed" || o.status === "lost_rejected";
 
@@ -58,6 +65,12 @@ const ruErr = makeRuError(ERR_RU);
 
 export function ProjectDeals() {
   const { live } = useCrmRuntime();
+  const sessionUser = useSessionUser();
+  const createDealCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.opportunities.manage" });
+  const createPipelineCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.crm_pipelines.manage" });
+  const createStageCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.deal_stages.manage" });
+  const canManageDeals = createDealCapability.allowed;
+  const createPipelineDisabledReason = createPipelineCapability.disabledReason ?? createStageCapability.disabledReason;
   const crm = useCrm();
   const { data, status, error, reload, moveStage, movePipeline, createOpportunity } = crm;
   const users = useCrmUsers();
@@ -142,6 +155,7 @@ export function ProjectDeals() {
 
   const dropOn = (stageId: string) => {
     const id = dragId; setDragId(null); setOverStage(null);
+    if (!canManageDeals) return;
     if (!id) return;
     const opp = model.opps.find((o) => o.id === id);
     if (opp && !isFinal(opp) && opp.stageId !== stageId) void doMove(id, stageId);
@@ -178,7 +192,7 @@ export function ProjectDeals() {
             title: "Воронка продаж ещё не настроена",
             description: "Создайте первую воронку — в ней появятся стадии, и сделки можно будет вести по канбану.",
             action: (
-              <Button variant="default" disabled={busy} onClick={() => void createDefaultPipeline()}>
+              <Button variant="default" disabled={busy || Boolean(createPipelineDisabledReason)} title={createPipelineDisabledReason ?? "Создать воронку"} onClick={() => void createDefaultPipeline()}>
                 <Plus className="size-3.5" aria-hidden />Создать воронку
               </Button>
             )
@@ -190,8 +204,10 @@ export function ProjectDeals() {
     );
   }
 
+  const createDealDialog = <CreateDealDialog stages={model.stages} data={data} busy={busy} setBusy={setBusy} create={createOpportunity} disabledReason={createDealCapability.disabledReason} />;
+
   return (
-    <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={<CreateDealDialog stages={model.stages} data={data} busy={busy} setBusy={setBusy} create={createOpportunity} />}>
+    <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={createDealDialog}>
       {/* мультиворонки: выбор воронки — фильтрует стадии/сделки/переходы */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Воронка:</span>
@@ -239,7 +255,7 @@ export function ProjectDeals() {
             return (
               <div
                 key={s.id}
-                onDragOver={(e) => { e.preventDefault(); if (overStage !== s.id) setOverStage(s.id); }}
+                onDragOver={(e) => { if (!canManageDeals) return; e.preventDefault(); if (overStage !== s.id) setOverStage(s.id); }}
                 onDrop={() => dropOn(s.id)}
                 className={cn("flex w-[260px] shrink-0 flex-col rounded-[var(--radius-card)] border bg-[var(--panel-subtle)]", overStage === s.id ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)]")}
               >
@@ -250,13 +266,14 @@ export function ProjectDeals() {
                 <div className="flex min-h-[120px] flex-col gap-2 p-2">
                   {items.map((o) => {
                     const final = isFinal(o);
+                    const draggable = canManageDeals && !final && !busy;
                     return (
                       <article
                         key={o.id}
-                        draggable={!final && !busy}
-                        onDragStart={() => setDragId(o.id)}
+                        draggable={draggable}
+                        onDragStart={() => { if (draggable) setDragId(o.id); }}
                         onDragEnd={() => { setDragId(null); setOverStage(null); }}
-                        className={cn("hover-lift rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]", !final && !busy ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50")}
+                        className={cn("hover-lift rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]", draggable ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50")}
                       >
                         <div className="mb-1 flex items-center justify-between gap-2">
                           {prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</span> : <span />}
@@ -304,7 +321,7 @@ export function ProjectDeals() {
                   <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{o.title}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</div> : null}</td>
                   <td className="px-3 py-2 text-[var(--muted-strong)]">{o.clientName}</td>
                   <td className="px-3 py-2">
-                    <select value={o.stageId ?? ""} disabled={busy || isFinal(o)} onChange={(e) => void doMove(o.id, e.target.value)} className="h-7 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-1.5 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60">
+                    <select value={o.stageId ?? ""} disabled={busy || isFinal(o) || !canManageDeals} onChange={(e) => void doMove(o.id, e.target.value)} title={canManageDeals ? "Изменить стадию" : createDealCapability.disabledReason ?? "Недостаточно прав для создания или изменения"} className="h-7 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-1.5 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60">
                       {model.stages.some((s) => s.id === o.stageId) ? null : <option value={o.stageId ?? ""}>— без стадии —</option>}
                       {model.stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
@@ -313,7 +330,7 @@ export function ProjectDeals() {
                   <td className="px-3 py-2 text-right"><span className="v4-num font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</span></td>
                   <td className="px-3 py-2 text-right"><span className="v4-num text-[var(--muted-strong)]">{o.probability}%</span></td>
                   <td className="px-3 py-2"><span className="flex items-center gap-1.5"><BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" /><span className="text-[length:var(--text-xs)] text-[var(--muted)]">{ownerName(o.ownerUserId)}</span></span></td>
-                  <td className="px-3 py-2 text-right"><Button variant="ghost" size="sm" disabled={busy || isFinal(o)} onClick={() => setMoveTarget(o)} title="Перенести в другую воронку"><ArrowLeftRight className="size-3.5" aria-hidden />Воронка</Button></td>
+                  <td className="px-3 py-2 text-right"><Button variant="ghost" size="sm" disabled={busy || isFinal(o) || !canManageDeals} onClick={() => setMoveTarget(o)} title={canManageDeals ? "Перенести в другую воронку" : createDealCapability.disabledReason ?? "Недостаточно прав для создания или изменения"}><ArrowLeftRight className="size-3.5" aria-hidden />Воронка</Button></td>
                 </tr>
               ))}
             </tbody>
@@ -453,12 +470,13 @@ function MovePipelineDialog({ target, pipelines, allStages, currentPipelineId, b
   );
 }
 
-function CreateDealDialog({ stages, data, busy, setBusy, create }: {
+function CreateDealDialog({ stages, data, busy, setBusy, create, disabledReason }: {
   stages: DealStage[];
   data: ReturnType<typeof useCrm>["data"];
   busy: boolean;
   setBusy: (v: boolean) => void;
   create: ReturnType<typeof useCrm>["createOpportunity"];
+  disabledReason?: string | null;
 }) {
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState("");
@@ -476,7 +494,7 @@ function CreateDealDialog({ stages, data, busy, setBusy, create }: {
   const clients = data.clients.filter((c) => c.status === "active");
   const contacts = data.contacts.filter((c) => c.clientId === clientId && c.status === "active");
   const projectTypeId = data.projectTypes[0]?.id ?? "";
-  const valid = title.trim() && clientId && contactId && stageId && Number(contractValue) > 0 && Number(rate) > 0 && finish >= start;
+  const valid = title.trim() && clientId && contactId && stageId && Number(contractValue) > 0 && Number(rate) > 0 && finish >= start && isValidOpportunityProbability(probability);
 
   // Онбординг пустого тенанта (G8-12): честно объясняем, чего не хватает для создания
   // сделки и где это создать, — вместо вечно неактивной кнопки «Создать» без причины.
@@ -490,7 +508,7 @@ function CreateDealDialog({ stages, data, busy, setBusy, create }: {
   return (
     <FormDialog
       title="Новая сделка"
-      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Сделка</Button>}
+      trigger={<Button variant="default" size="sm" disabled={busy || Boolean(disabledReason)} title={disabledReason ?? "Создать сделку"}><Plus className="size-3.5" aria-hidden />Сделка</Button>}
       submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
       submitDisabled={!valid || busy}
       successToast="Сделка создана"
@@ -515,13 +533,13 @@ function CreateDealDialog({ stages, data, busy, setBusy, create }: {
         <div className="grid grid-cols-2 gap-3">
           <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Внедрение портала" /></label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Клиент
-            <select value={clientId} onChange={(e) => { setClientId(e.target.value); setContactId(""); }} className={selCls}><option value="" disabled>Выберите…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+            <select data-testid="deal-client" value={clientId} onChange={(e) => { setClientId(e.target.value); setContactId(""); }} className={selCls}><option value="" disabled>Выберите…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
           </label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Контакт
-            <select value={contactId} onChange={(e) => setContactId(e.target.value)} disabled={!clientId} className={selCls}><option value="" disabled>{clientId ? "Выберите…" : "Сначала клиент"}</option>{contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+            <select data-testid="deal-contact" value={contactId} onChange={(e) => setContactId(e.target.value)} disabled={!clientId} className={selCls}><option value="" disabled>{clientId ? "Выберите…" : "Сначала клиент"}</option>{contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
           </label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Стадия
-            <select value={stageId} onChange={(e) => setStageId(e.target.value)} className={selCls}><option value="" disabled>Выберите…</option>{stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+            <select data-testid="deal-stage" value={stageId} onChange={(e) => setStageId(e.target.value)} className={selCls}><option value="" disabled>Выберите…</option>{stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
           </label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Вероятность, %<Input type="number" min={0} max={100} value={probability} onChange={(e) => setProbability(e.target.value)} className="text-right" /></label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Сумма, ₽<Input type="number" min={1} value={contractValue} onChange={(e) => setContractValue(e.target.value)} placeholder="1 000 000" className="text-right" /></label>

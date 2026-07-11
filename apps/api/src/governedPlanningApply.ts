@@ -11,6 +11,13 @@ import type {
   ManagementAuditEventInput
 } from "./apiTypes";
 
+export class PlanningPostWriteReadbackError extends Error {
+  constructor() {
+    super("planning_post_write_readback_failed");
+    this.name = "PlanningPostWriteReadbackError";
+  }
+}
+
 type PlanningApplyDataSource = {
   applyPlanningCommand(input: {
     tenantId: string;
@@ -134,7 +141,7 @@ export async function applyGovernedPlanningDelta(input: {
     input.auditDataSource
   );
   const appliedSnapshot = await input.dataSource.getPlanSnapshot(input.tenantId, input.projectId);
-  if (!appliedSnapshot) return { ok: false, status: 404, error: "project_not_found" };
+  if (!appliedSnapshot) throw new PlanningPostWriteReadbackError();
 
   return {
     ok: true,

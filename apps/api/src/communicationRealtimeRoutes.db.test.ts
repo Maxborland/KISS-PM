@@ -23,7 +23,7 @@ import {
   seedCommunicationRealtimeScenario,
   truncateCommunicationRealtimeState
 } from "./communicationRealtimeTestFixture";
-import type { VideoProvider } from "./videoProvider";
+import { createVideoProvider, type VideoProvider } from "./videoProvider";
 
 async function appendRecordingTestAuditEvent(
   input: ManagementAuditEventInput,
@@ -150,6 +150,85 @@ describe("communications realtime API", () => {
     expect(JSON.stringify(auditPayload.auditEvents)).not.toContain("livekit-secret");
   });
 
+  it("keeps duplicate participant state updates event-idempotent", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await createRoom(adminCookie);
+    const started = await startSession(adminCookie, room.callRoom.roomId);
+    const stateUrl = `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${started.session.id}/participant-state`;
+
+    const joined = await app.request(stateUrl, {
+      method: "POST",
+      headers: jsonHeaders(readerCookie),
+      body: JSON.stringify({ state: "joined" })
+    });
+    expect(joined.status).toBe(200);
+    await expect(joined.json()).resolves.toMatchObject({
+      event: { eventType: "participant_joined" },
+      participantState: { state: "joined", userId: "user-alpha-reader" }
+    });
+
+    const [duplicateA, duplicateB] = await Promise.all([
+      app.request(stateUrl, {
+        method: "POST",
+        headers: jsonHeaders(readerCookie),
+        body: JSON.stringify({ state: "joined" })
+      }),
+      app.request(stateUrl, {
+        method: "POST",
+        headers: jsonHeaders(readerCookie),
+        body: JSON.stringify({ state: "joined" })
+      })
+    ]);
+    expect([duplicateA.status, duplicateB.status].sort()).toEqual([200, 200]);
+    const duplicateBodies = await Promise.all([duplicateA.json(), duplicateB.json()]) as Array<{
+      event: unknown;
+      participantState: { state: string; userId: string };
+    }>;
+    expect(duplicateBodies).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        event: null,
+        participantState: expect.objectContaining({ state: "joined", userId: "user-alpha-reader" })
+      })
+    ]));
+
+    const left = await app.request(stateUrl, {
+      method: "POST",
+      headers: jsonHeaders(readerCookie),
+      body: JSON.stringify({ state: "left" })
+    });
+    expect(left.status).toBe(200);
+    await expect(left.json()).resolves.toMatchObject({
+      event: { eventType: "participant_left" },
+      participantState: { state: "left", userId: "user-alpha-reader" }
+    });
+
+    const states = await dataSource.listCallParticipantStates({
+      tenantId: "tenant-alpha",
+      roomId: room.callRoom.roomId,
+      sessionId: started.session.id
+    });
+    expect(states.filter((state) => state.userId === "user-alpha-reader")).toHaveLength(1);
+    expect(states.find((state) => state.userId === "user-alpha-reader")?.state).toBe("left");
+
+    const events = await dataSource.listCallEvents({
+      tenantId: "tenant-alpha",
+      roomId: room.callRoom.roomId,
+      limit: 50
+    });
+    expect(events.filter((event) => event.eventType === "participant_joined")).toHaveLength(1);
+    expect(events.filter((event) => event.eventType === "participant_left")).toHaveLength(1);
+
+    const auditEvents = await dataSource.listAuditEventsByTenantId("tenant-alpha");
+    expect(
+      auditEvents.filter(
+        (event) =>
+          event.actionType === "communications.call_participant_state_updated" &&
+          event.afterState?.userId === "user-alpha-reader"
+      )
+    ).toHaveLength(2);
+  });
   it("supports call rooms scoped to the workspace general communication channel", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
@@ -250,6 +329,68 @@ describe("communications realtime API", () => {
     });
   });
 
+  it("creates Jitsi rooms and issues URL-only join contracts with readback", async () => {
+    const jitsiApp = createCommunicationRealtimeTestApp(
+      client,
+      createVideoProvider({ kind: "jitsi", baseUrl: "https://meet.kiss.local/" })
+    );
+    const adminCookie = await loginCommunicationRealtimeUser(jitsiApp, "admin@kiss-pm.local", "admin12345");
+    const readerCookie = await loginCommunicationRealtimeUser(jitsiApp, "reader@kiss-pm.local", "reader12345");
+
+    const roomResponse = await jitsiApp.request("/api/workspace/call-rooms", {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({
+        entityType: "project",
+        entityId: "project-alpha",
+        title: "Jitsi проектный звонок",
+        mediaKind: "video",
+        provider: "jitsi",
+        providerRoomId: "jitsi-project-alpha"
+      })
+    });
+    expect(roomResponse.status).toBe(201);
+    const room = await roomResponse.json() as {
+      callRoom: { provider: string; roomId: string; status: string };
+    };
+    expect(room.callRoom).toMatchObject({ provider: "jitsi", status: "open" });
+
+    const started = await jitsiApp.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/start`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie)
+    });
+    expect(started.status).toBe(201);
+    const sessionBody = await started.json() as {
+      callRoom: { provider: string; status: string };
+      session: { id: string };
+    };
+    expect(sessionBody.callRoom).toMatchObject({ provider: "jitsi", status: "active" });
+
+    const detail = await jitsiApp.request(`/api/workspace/call-rooms/${room.callRoom.roomId}`, {
+      headers: jsonHeaders(readerCookie)
+    });
+    expect(detail.status).toBe(200);
+    await expect(detail.json()).resolves.toMatchObject({
+      callRoom: { provider: "jitsi", status: "active" },
+      activeSession: { id: sessionBody.session.id, status: "active" }
+    });
+
+    const join = await jitsiApp.request(
+      `/api/workspace/call-rooms/${room.callRoom.roomId}/sessions/${sessionBody.session.id}/join-token`,
+      { method: "POST", headers: jsonHeaders(readerCookie) }
+    );
+    expect(join.status).toBe(200);
+    await expect(join.json()).resolves.toMatchObject({
+      join: {
+        provider: "jitsi",
+        joinUrl: "https://meet.kiss.local/jitsi-project-alpha",
+        token: null,
+        expiresAt: null
+      },
+      event: { eventType: "join_token_issued" }
+    });
+  });
+
   it("rejects join tokens when the session ends after the route pre-check", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const readerCookie = await loginAs("reader@kiss-pm.local", "reader12345");
@@ -264,7 +405,7 @@ describe("communications realtime API", () => {
 
     expect(join.status).toBe(409);
     await expect(join.json()).resolves.toEqual({ error: "call_session_not_active" });
-    expect(race.joinTokenCalls()).toBe(1);
+    expect(race.joinTokenCalls()).toBe(0);
 
     const events = await app.request(`/api/workspace/call-rooms/${room.callRoom.roomId}/events`, {
       headers: { cookie: adminCookie }
@@ -1017,6 +1158,138 @@ describe("communications realtime API", () => {
 
     const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
     expect(events.some((event) => event.eventType === "recording_started")).toBe(true);
+  });
+
+  it("rejects duplicate recording start without starting a second egress", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-start-duplicate",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Запись дубль",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-start-duplicate",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-start-duplicate",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+
+    const startedTracks: string[] = [];
+    const fakeEgress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        return [{ trackId: "track-duplicate", kind: "video", participantIdentity: "user-alpha-admin" }];
+      },
+      async startTrackEgress(input) {
+        startedTracks.push(input.trackId);
+        return `egress-start-${startedTracks.length}`;
+      },
+      async stopEgress() {},
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, fakeEgress);
+    const adminCookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+    const startUrl = `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/recordings/start`;
+
+    const first = await recApp.request(startUrl, { method: "POST", headers: jsonHeaders(adminCookie) });
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as {
+      recordingGroupId: string;
+      recordings: { trackId: string; status: string }[];
+    };
+    expect(firstBody.recordings).toHaveLength(1);
+
+    const second = await recApp.request(startUrl, { method: "POST", headers: jsonHeaders(adminCookie) });
+    expect(second.status).toBe(409);
+    await expect(second.json()).resolves.toEqual({ error: "call_recording_already_active" });
+    expect(startedTracks).toEqual(["track-duplicate"]);
+
+    const recordings = await dataSource.listCallRecordings({ tenantId, roomId: room.id });
+    expect(recordings).toHaveLength(1);
+    expect(recordings[0]).toMatchObject({
+      sessionId: session.id,
+      status: "recording",
+      trackId: "track-duplicate",
+      egressId: "egress-start-1"
+    });
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    expect(events.filter((event) => event.eventType === "recording_started")).toHaveLength(1);
+    const auditEvents = await dataSource.listAuditEventsByTenantId(tenantId);
+    expect(
+      auditEvents.filter((event) => event.actionType === "communications.call_recording_started")
+    ).toHaveLength(1);
+  });
+
+  it("deduplicates simultaneous first recording starts for the same session", async () => {
+    const tenantId = "tenant-alpha";
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const room = await dataSource.createCallRoom({
+      id: "call-room-start-race",
+      tenantId,
+      entityType: "project",
+      entityId: "project-alpha",
+      meetingId: null,
+      title: "Запись race",
+      mediaKind: "video",
+      provider: "livekit",
+      providerRoomId: "provider-room-start-race",
+      status: "active",
+      createdByUserId: "user-alpha-admin"
+    });
+    const session = await dataSource.createCallSession({
+      id: "call-session-start-race",
+      tenantId,
+      roomId: room.id,
+      providerSessionId: null,
+      status: "active",
+      startedByUserId: "user-alpha-admin"
+    });
+
+    const startedTracks: string[] = [];
+    const fakeEgress: LiveKitEgressProvider = {
+      async listRoomTracks() {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        return [{ trackId: "track-race", kind: "video", participantIdentity: "user-alpha-admin" }];
+      },
+      async startTrackEgress(input) {
+        startedTracks.push(input.trackId);
+        return `egress-race-${startedTracks.length}`;
+      },
+      async stopEgress() {},
+      async receiveWebhook() {
+        return { kind: "other" };
+      }
+    };
+    const recApp = createCommunicationRealtimeTestApp(client, undefined, fakeEgress);
+    const adminCookie = await loginCommunicationRealtimeUser(recApp, "admin@kiss-pm.local", "admin12345");
+    const startUrl = `/api/workspace/call-rooms/${room.id}/sessions/${session.id}/recordings/start`;
+
+    const [first, second] = await Promise.all([
+      recApp.request(startUrl, { method: "POST", headers: jsonHeaders(adminCookie) }),
+      recApp.request(startUrl, { method: "POST", headers: jsonHeaders(adminCookie) })
+    ]);
+    const statuses = [first.status, second.status].sort();
+    expect(statuses).toEqual([201, 409]);
+    const bodies = [await first.json(), await second.json()];
+    expect(bodies).toEqual(expect.arrayContaining([expect.objectContaining({ error: "call_recording_already_active" })]));
+    expect(startedTracks).toEqual(["track-race"]);
+
+    const recordings = await dataSource.listCallRecordings({ tenantId, roomId: room.id });
+    expect(recordings).toHaveLength(1);
+    const events = await dataSource.listCallEvents({ tenantId, roomId: room.id, limit: 50 });
+    expect(events.filter((event) => event.eventType === "recording_started")).toHaveLength(1);
   });
 
   it("rejects recording start for non-LiveKit rooms", async () => {

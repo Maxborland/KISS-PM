@@ -160,10 +160,11 @@ export function reducePlanningCommand(
           task.id === command.payload.taskId
             ? {
                 ...task,
-                customFields: {
-                  ...(task.customFields ?? {}),
-                  [command.payload.fieldKey]: command.payload.value
-                }
+                customFields: updateCustomFields(
+                  task.customFields,
+                  command.payload.fieldKey,
+                  command.payload.value
+                )
               }
             : task
         )
@@ -339,6 +340,7 @@ function reduceBaselineCapture(
 ): CommandReductionResult {
   const baseline: PlanBaseline = {
     id: command.payload.baselineId,
+    label: command.payload.label.trim() || "Снимок плана",
     capturedAt: snapshot.capturedAt,
     tasks: snapshot.tasks.map((task) => ({
       taskId: task.id,
@@ -428,9 +430,10 @@ function validateCommandPreconditions(
       if (
         command.payload.durationMinutes !== undefined &&
         command.payload.durationMinutes !== null &&
-        command.payload.durationMinutes <= 0
+        (command.payload.durationMinutes < 0 ||
+          (command.payload.durationMinutes === 0 && command.payload.workMinutes > 0))
       ) {
-        return [invalid("planning_command_invalid", "Длительность задачи должна быть больше нуля")];
+        return [invalid("planning_command_invalid", "Нулевая длительность допустима только для вехи без трудоемкости")];
       }
       {
         const plannedStart = command.payload.plannedStart ?? snapshot.project.plannedStart;
@@ -512,6 +515,20 @@ function validateCommandPreconditions(
       if (command.payload.predecessorTaskId === command.payload.successorTaskId) {
         return [invalid("planning_command_invalid", "Задача не может зависеть сама от себя")];
       }
+      if (snapshot.tasks.some((task) =>
+        task.parentTaskId === command.payload.predecessorTaskId ||
+        task.parentTaskId === command.payload.successorTaskId
+      )) {
+        return [invalid("planning_command_invalid", "Зависимость можно создавать только между конечными задачами")];
+      }
+      if (snapshot.dependencies.some((dependency) =>
+        dependency.id !== command.payload.id &&
+        dependency.predecessorTaskId === command.payload.predecessorTaskId &&
+        dependency.successorTaskId === command.payload.successorTaskId &&
+        dependency.type === command.payload.dependencyType
+      )) {
+        return [invalid("planning_command_invalid", "Такая зависимость уже существует")];
+      }
       if (!Number.isFinite(command.payload.lagMinutes)) {
         return [invalid("planning_command_invalid", "Lag/lead должен быть числом рабочих минут")];
       }
@@ -578,11 +595,7 @@ function validateCommandPreconditions(
       }
       return [];
     }
-    case "assignment.delete":
-      if (!assignmentIds.has(command.payload.assignmentId)) {
-        return [invalid("planning_command_invalid", "Команда ссылается на неизвестное назначение")];
-      }
-      return [];
+
     case "baseline.capture":
       if (command.payload.baselineId.trim().length === 0) {
         return [invalid("planning_command_invalid", "Baseline должен иметь идентификатор")];
@@ -655,10 +668,24 @@ function validateWorkModelPayload(
   if (workMinutes < 0) {
     return [invalid("planning_command_invalid", "Трудоемкость задачи не может быть отрицательной")];
   }
-  if (durationMinutes !== null && durationMinutes <= 0) {
-    return [invalid("planning_command_invalid", "Длительность задачи должна быть больше нуля")];
+  if (
+    durationMinutes !== null &&
+    (durationMinutes < 0 || (durationMinutes === 0 && workMinutes > 0))
+  ) {
+    return [invalid("planning_command_invalid", "Нулевая длительность допустима только для вехи без трудоемкости")];
   }
   return [];
+}
+
+function updateCustomFields(
+  current: Record<string, unknown> | undefined,
+  fieldKey: string,
+  value: unknown
+): Record<string, unknown> {
+  const next = { ...(current ?? {}) };
+  if (value === null) delete next[fieldKey];
+  else next[fieldKey] = value;
+  return next;
 }
 
 function validateTaskScheduleUpdate(

@@ -17,6 +17,56 @@ import {
   stringIdSchema
 } from "./schemaPrimitives";
 
+const planningResourceLoadBucketRequired = [
+  "resourceId",
+  "positionId",
+  "teamId",
+  "projectId",
+  "date",
+  "granularity",
+  "assignedMinutes",
+  "reservedMinutes",
+  "occupiedMinutes",
+  "capacityMinutes",
+  "freeMinutes",
+  "taskIds",
+  "assignmentIds",
+  "assignmentContributions",
+  "reservationContributions",
+  "occupancyContributions",
+  "reservationIds",
+  "occupancyIds",
+  "calendarExceptionIds"
+];
+
+const planningResourceLoadBucketProperties = {
+  resourceId: stringIdSchema,
+  positionId: nullableStringSchema,
+  teamId: nullableStringSchema,
+  projectId: stringIdSchema,
+  date: dateSchema,
+  granularity: planningGranularitySchema,
+  assignedMinutes: { type: "integer", minimum: 0 },
+  reservedMinutes: { type: "integer", minimum: 0 },
+  occupiedMinutes: { type: "integer", minimum: 0 },
+  capacityMinutes: { type: "integer", minimum: 0 },
+  freeMinutes: { type: "integer" },
+  taskIds: { type: "array", items: stringIdSchema },
+  assignmentIds: { type: "array", items: stringIdSchema },
+  assignmentContributions: { type: "array", items: schemaRef("AnyJsonObject") },
+  reservationContributions: { type: "array", items: schemaRef("AnyJsonObject") },
+  occupancyContributions: { type: "array", items: schemaRef("AnyJsonObject") },
+  reservationIds: { type: "array", items: stringIdSchema },
+  occupancyIds: { type: "array", items: stringIdSchema },
+  calendarExceptionIds: { type: "array", items: stringIdSchema }
+};
+
+const acceptedOverloadIdSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^[^:]+:\\d{4}-\\d{2}-\\d{2}$"
+};
+
 export const planningSchemas = openApiSchemaFragment({
   PlanningWorkingInstant: {
     type: "object",
@@ -169,9 +219,10 @@ export const planningSchemas = openApiSchemaFragment({
   },
   PlanningBaseline: {
     type: "object",
-    required: ["id", "capturedAt", "tasks"],
+    required: ["id", "label", "capturedAt", "tasks"],
     properties: {
       id: stringIdSchema,
+      label: { type: "string", minLength: 1 },
       capturedAt: dateTimeSchema,
       tasks: {
         type: "array",
@@ -591,7 +642,7 @@ export const planningSchemas = openApiSchemaFragment({
         type: "object",
         required: ["overloadId", "acceptedRiskReason"],
         properties: {
-          overloadId: stringIdSchema,
+          overloadId: acceptedOverloadIdSchema,
           acceptedRiskReason: { type: "string", minLength: 1, maxLength: 500 }
         },
         additionalProperties: false
@@ -704,73 +755,43 @@ export const planningSchemas = openApiSchemaFragment({
   },
   PlanningResourceLoadBucket: {
     type: "object",
-    required: [
-      "resourceId",
-      "positionId",
-      "teamId",
-      "projectId",
-      "date",
-      "granularity",
-      "assignedMinutes",
-      "reservedMinutes",
-      "occupiedMinutes",
-      "capacityMinutes",
-      "freeMinutes",
-      "taskIds",
-      "assignmentIds",
-      "assignmentContributions",
-      "reservationContributions",
-      "occupancyContributions",
-      "reservationIds",
-      "occupancyIds",
-      "calendarExceptionIds"
-    ],
-    properties: {
-      resourceId: stringIdSchema,
-      positionId: nullableStringSchema,
-      teamId: nullableStringSchema,
-      projectId: stringIdSchema,
-      date: dateSchema,
-      granularity: planningGranularitySchema,
-      assignedMinutes: { type: "integer", minimum: 0 },
-      reservedMinutes: { type: "integer", minimum: 0 },
-      occupiedMinutes: { type: "integer", minimum: 0 },
-      capacityMinutes: { type: "integer", minimum: 0 },
-      freeMinutes: { type: "integer" },
-      taskIds: { type: "array", items: stringIdSchema },
-      assignmentIds: { type: "array", items: stringIdSchema },
-      assignmentContributions: { type: "array", items: schemaRef("AnyJsonObject") },
-      reservationContributions: { type: "array", items: schemaRef("AnyJsonObject") },
-      occupancyContributions: { type: "array", items: schemaRef("AnyJsonObject") },
-      reservationIds: { type: "array", items: stringIdSchema },
-      occupancyIds: { type: "array", items: stringIdSchema },
-      calendarExceptionIds: { type: "array", items: stringIdSchema }
-    },
+    required: planningResourceLoadBucketRequired,
+    properties: planningResourceLoadBucketProperties,
     additionalProperties: false
   },
   PlanningResourceOverload: {
     type: "object",
-    allOf: [schemaRef("PlanningResourceLoadBucket")],
+    required: [
+      ...planningResourceLoadBucketRequired,
+      "overloadMinutes",
+      "accepted",
+      "reasons"
+    ],
     properties: {
+      ...planningResourceLoadBucketProperties,
       overloadMinutes: { type: "integer", minimum: 1 },
+      accepted: { type: "boolean" },
       reasons: { type: "array", items: schemaRef("AnyJsonObject") }
-    }
+    },
+    additionalProperties: false
   },
   PlanningResourceLoadMatrix: {
     type: "object",
-    required: ["buckets", "overloads", "freeCapacityBuckets"],
+    required: ["buckets", "overloads", "freeCapacityBuckets", "acceptedOverloads"],
     properties: {
       buckets: { type: "array", items: schemaRef("PlanningResourceLoadBucket") },
       overloads: { type: "array", items: schemaRef("PlanningResourceOverload") },
-      freeCapacityBuckets: { type: "array", items: schemaRef("PlanningResourceLoadBucket") }
+      freeCapacityBuckets: { type: "array", items: schemaRef("PlanningResourceLoadBucket") },
+      acceptedOverloads: { type: "array", items: acceptedOverloadIdSchema }
     },
     additionalProperties: false
   },
   PlanningBaselineComparison: {
     type: "object",
-    required: ["baselineId", "capturedAt", "tasks"],
+    required: ["baselineId", "label", "capturedAt", "tasks"],
     properties: {
       baselineId: nullableStringSchema,
+      label: nullableStringSchema,
       capturedAt: { type: ["string", "null"], format: "date-time" },
       tasks: { type: "array", items: schemaRef("AnyJsonObject") }
     },
@@ -862,6 +883,66 @@ export const planningSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  PlanningRevertRequest: {
+    type: "object",
+    required: ["targetCommitId", "clientPlanVersion", "idempotencyKey"],
+    properties: {
+      targetCommitId: { type: "string", minLength: 1, maxLength: 500 },
+      clientPlanVersion: { type: "integer", minimum: 1 },
+      idempotencyKey: {
+        type: "string",
+        minLength: 1,
+        maxLength: 120,
+        pattern: "^[A-Za-z0-9._:-]+$"
+      }
+    },
+    additionalProperties: false
+  },
+  PlanningRevertResponse: {
+    type: "object",
+    required: ["reverted", "applied", "newPlanVersion", "auditEventId", "readModel"],
+    properties: {
+      reverted: stringIdSchema,
+      applied: schemaRef("PlanningPlanDelta"),
+      newPlanVersion: { type: "integer", minimum: 1 },
+      auditEventId: stringIdSchema,
+      readModel: schemaRef("PlanningReadModelResponse")
+    },
+    additionalProperties: false
+  },
+  PlanningRevertErrorResponse: {
+    type: "object",
+    required: ["error"],
+    properties: {
+      error: {
+        type: "string",
+        enum: [
+          "invalid_project_id",
+          "session_required",
+          "same_origin_action_required",
+          "persistence_not_configured",
+          "cross_tenant_denied",
+          "permission_missing",
+          "invalid_json",
+          "invalid_content_length",
+          "payload_too_large",
+          "unsupported_media_type",
+          "planning_revert_invalid",
+          "idempotency_key_conflict",
+          "project_not_found",
+          "planning_commit_not_found",
+          "planning_commit_already_reverted",
+          "planning_commit_not_revertible",
+          "planning_commit_not_current",
+          "planning_precondition_failed",
+          "plan_version_conflict"
+        ]
+      },
+      currentPlanVersion: { type: "integer", minimum: 1 },
+      validationIssues: { type: "array", items: schemaRef("PlanningValidationIssue") }
+    },
+    additionalProperties: false
+  },
   PlanningPlanVersionBumpResponse: {
     type: "object",
     required: ["newPlanVersion"],
@@ -911,11 +992,22 @@ export const planningSchemas = openApiSchemaFragment({
   },
   PlanningScenarioProposal: {
     type: "object",
-    required: ["id", "profile", "conflictEffect", "planDelta", "explainability"],
+    required: ["id", "profile", "conflictEffect", "availability", "unavailableReason", "planDelta", "explainability"],
     properties: {
       id: stringIdSchema,
       profile: planningScenarioProfileSchema,
       conflictEffect: { type: "string", enum: ["accepted", "reduced", "removed"] },
+      availability: { type: "string", enum: ["available", "unavailable"] },
+      unavailableReason: {
+        type: ["string", "null"],
+        enum: [
+          "target_bucket_not_found",
+          "target_assignment_not_found",
+          "no_eligible_alternate_resource",
+          "alternate_resource_has_insufficient_capacity",
+          null
+        ]
+      },
       planDelta: schemaRef("PlanningPlanDelta"),
       explainability: schemaRef("PlanningProposalExplainability")
     },
@@ -987,7 +1079,7 @@ export const planningSchemas = openApiSchemaFragment({
       projectId: stringIdSchema,
       ownerUserId: stringIdSchema,
       scope: { type: "string", enum: ["user", "project"] },
-      name: { type: "string", minLength: 1 },
+      name: { type: "string", minLength: 1, maxLength: 80 },
       payload: schemaRef("AnyJsonObject"),
       createdAt: dateTimeSchema
     },
@@ -995,11 +1087,39 @@ export const planningSchemas = openApiSchemaFragment({
   },
   PlanningSavedViewCreateRequest: {
     type: "object",
-    required: ["name", "payload"],
+    required: ["name", "payload", "clientRequestId"],
     properties: {
-      name: { type: "string", minLength: 1 },
+      name: { type: "string", minLength: 1, maxLength: 80 },
       scope: { type: "string", enum: ["user", "project"], default: "user" },
-      payload: schemaRef("AnyJsonObject")
+      payload: schemaRef("AnyJsonObject"),
+      clientRequestId: { type: "string", minLength: 8, maxLength: 128 }
+    },
+    additionalProperties: false
+  },
+  PlanningSavedViewRenameRequest: {
+    type: "object",
+    required: ["name", "clientRequestId"],
+    properties: {
+      name: { type: "string", minLength: 1, maxLength: 80 },
+      clientRequestId: {
+        type: "string",
+        minLength: 8,
+        maxLength: 128,
+        pattern: "^[A-Za-z0-9._:-]+$"
+      }
+    },
+    additionalProperties: false
+  },
+  PlanningSavedViewDeleteRequest: {
+    type: "object",
+    required: ["clientRequestId"],
+    properties: {
+      clientRequestId: {
+        type: "string",
+        minLength: 8,
+        maxLength: 128,
+        pattern: "^[A-Za-z0-9._:-]+$"
+      }
     },
     additionalProperties: false
   },
@@ -1066,6 +1186,45 @@ export const planningSchemas = openApiSchemaFragment({
       expiresAt: dateTimeSchema,
       appliedProposalId: nullableStringSchema,
       proposals: { type: "array", items: schemaRef("PlanningAutoSolverProposal") }
+    },
+    additionalProperties: false
+  },
+  PlanningCommitEvent: {
+    type: "object",
+    required: [
+      "id",
+      "actionType",
+      "sourceWorkflow",
+      "commandType",
+      "afterState",
+      "executionStatus",
+      "createdAt"
+    ],
+    properties: {
+      id: stringIdSchema,
+      actionType: { type: "string", minLength: 1 },
+      sourceWorkflow: { type: ["string", "null"] },
+      commandType: nullableStringSchema,
+      afterState: {
+        type: "object",
+        required: ["planVersion", "changedTaskIds", "hasCompensatingCommands"],
+        properties: {
+          planVersion: { type: ["integer", "null"], minimum: 0 },
+          changedTaskIds: { type: "array", items: stringIdSchema },
+          hasCompensatingCommands: { type: "boolean" }
+        },
+        additionalProperties: false
+      },
+      executionStatus: nullableStringSchema,
+      createdAt: dateTimeSchema
+    },
+    additionalProperties: false
+  },
+  PlanningCommitsResponse: {
+    type: "object",
+    required: ["auditEvents"],
+    properties: {
+      auditEvents: { type: "array", items: schemaRef("PlanningCommitEvent") }
     },
     additionalProperties: false
   },

@@ -1,0 +1,25 @@
+{
+  "id": "BUG-CRM-03",
+  "status": "fixed-by-current-branch",
+  "date": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "surface": [
+    "/crm/deals/[id]",
+    "DealCard stage select",
+    "apps/web/src/crm/deals/deal-card-surface.tsx"
+  ],
+  "expected": "For legacy opportunities with pipelineId=null but a known stageId, the deal card resolves the pipeline from the current stage and renders all stages in that pipeline with real labels.",
+  "redEvidence": [
+    "corepack pnpm --filter @kiss-pm/web test -- src/crm/deals/deal-card-surface.test.ts -> RED: resolveOpportunityPipelineId was not exported/implemented, so legacy pipeline fallback was absent."
+  ],
+  "greenEvidence": [
+    "corepack pnpm --filter @kiss-pm/web test -- src/crm/deals/deal-card-surface.test.ts -> 19 files / 259 tests passed; helper test verifies legacy pipeline fallback and explicit pipeline precedence.",
+    "corepack pnpm --filter @kiss-pm/web typecheck -> passed."
+  ],
+  "changedFiles": [
+    "apps/web/src/crm/deals/deal-card-surface.tsx",
+    "apps/web/src/crm/deals/deal-card-surface.test.ts"
+  ],
+  "fixApplied": "Added resolveOpportunityPipelineId/stagesForOpportunity and made DealCardBody use the effective pipeline derived from opportunity.pipelineId or, for legacy rows, from the current stage's pipelineId.",
+  "regressionRisk": "Low. Explicit opportunity.pipelineId remains authoritative; fallback only affects legacy null pipelineId rows with a stageId. Full browser route traversal remains tracked separately as RISK-FULL-BROWSER-TRAVERSAL."
+}

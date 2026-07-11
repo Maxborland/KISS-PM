@@ -1,5 +1,6 @@
-﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
+import { buildBaselineComparison, calculatePlan } from "@kiss-pm/domain";
 
 import {
   createDatabase,
@@ -13,6 +14,7 @@ import { createProjectIntakeRepository } from "./projectIntakeRepository";
 import { createProjectWorkRepository } from "./projectWorkRepository";
 import {
   calendarExceptions,
+  planAcceptedOverloads,
   resourceCalendarEvents,
   projectBaselineTasks,
   projectBaselines,
@@ -28,7 +30,14 @@ import {
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm_projects_test";
+const databaseName = new URL(databaseUrl).pathname.slice(1);
+
+if (!databaseName.endsWith("_test")) {
+  throw new Error(
+    `planning repository DB tests require an isolated test database, got: ${databaseName}`
+  );
+}
 
 const planningSeed: SeedTenantDataset = {
   tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],
@@ -358,9 +367,7 @@ describe("planning repository", () => {
     ).rejects.toThrow();
   });
 
-  // Регресс BUG-PROJ-19: risk.accept_overload теперь ПЕРСИСТЕНТЕН (был no-op) —
-  // принятие переживает перезагрузку снапшота.
-  it("persists an accepted overload across snapshot reloads", async () => {
+  it("deletes a task custom-field key when the command value is null", async () => {
     const db = createDatabase(client);
     const intakeRepository = createProjectIntakeRepository(db);
     const workRepository = createProjectWorkRepository(db);
@@ -372,17 +379,461 @@ describe("planning repository", () => {
       projectId,
       actorUserId: "user-alpha-admin",
       command: {
-        type: "risk.accept_overload",
-        payload: { overloadId: "user-alpha-executor:2026-06-02", acceptedRiskReason: "Подтверждено" }
+        type: "task.update_custom_field",
+        payload: { taskId: "task-alpha", fieldKey: "sprint", value: "S1" }
       }
     });
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "task.update_custom_field",
+        payload: { taskId: "task-alpha", fieldKey: "sprint", value: null }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    expect(snapshot?.tasks.find((task) => task.id === "task-alpha")?.customFields).toEqual({});
+  });
+
+  it("persists the first accepted overload unchanged across repeated and concurrent commands", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+    const command = {
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "risk.accept_overload" as const,
+        payload: { overloadId: "user-alpha-executor:2026-06-02", acceptedRiskReason: "First acceptance" }
+      }
+    };
+
+    await planningRepository.applyPlanningCommand(command);
+    const [firstAcceptance] = await db
+      .select()
+      .from(planAcceptedOverloads)
+      .where(and(
+        eq(planAcceptedOverloads.tenantId, "tenant-alpha"),
+        eq(planAcceptedOverloads.projectId, projectId)
+      ));
+    expect(firstAcceptance).toBeDefined();
+
+    const conflictingReplay = {
+      ...command,
+      actorUserId: "user-alpha-executor",
+      command: {
+        ...command.command,
+        payload: {
+          ...command.command.payload,
+          acceptedRiskReason: "Conflicting replay must not overwrite the first acceptance"
+        }
+      }
+    };
+    await planningRepository.applyPlanningCommand(conflictingReplay);
+    await Promise.all([
+      planningRepository.applyPlanningCommand(command),
+      planningRepository.applyPlanningCommand(conflictingReplay),
+      planningRepository.applyPlanningCommand(command)
+    ]);
 
     const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
     expect(snapshot?.acceptedOverloads).toEqual([
       { resourceId: "user-alpha-executor", date: "2026-06-02" }
     ]);
+    const [persistedAcceptance] = await db
+      .select()
+      .from(planAcceptedOverloads)
+      .where(and(
+        eq(planAcceptedOverloads.tenantId, "tenant-alpha"),
+        eq(planAcceptedOverloads.projectId, projectId)
+      ));
+    expect(persistedAcceptance).toEqual(firstAcceptance);
   });
 
+  it.each(["missing-date", "resource:", ":2026-06-02", "resource:2026-02-30"])(
+    "rejects malformed accepted overload id %s",
+    async (overloadId) => {
+      const db = createDatabase(client);
+      const intakeRepository = createProjectIntakeRepository(db);
+      const workRepository = createProjectWorkRepository(db);
+      const planningRepository = createPlanningRepository(db);
+      const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+      await expect(
+        planningRepository.applyPlanningCommand({
+          tenantId: "tenant-alpha",
+          projectId,
+          actorUserId: "user-alpha-admin",
+          command: {
+            type: "risk.accept_overload",
+            payload: { overloadId, acceptedRiskReason: "invalid" }
+          }
+        })
+      ).rejects.toThrow("planning_overload_id_invalid");
+
+      const accepted = await db
+        .select()
+        .from(planAcceptedOverloads)
+        .where(and(
+          eq(planAcceptedOverloads.tenantId, "tenant-alpha"),
+          eq(planAcceptedOverloads.projectId, projectId)
+        ));
+      expect(accepted).toHaveLength(0);
+    }
+  );
+  it("keeps one coherent accepted overload when conflicting first writers race", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+    const candidates = [
+      {
+        tenantId: "tenant-alpha",
+        projectId,
+        actorUserId: "user-alpha-admin",
+        command: {
+          type: "risk.accept_overload" as const,
+          payload: {
+            overloadId: "user-alpha-executor:2026-06-02",
+            acceptedRiskReason: "admin-writer"
+          }
+        }
+      },
+      {
+        tenantId: "tenant-alpha",
+        projectId,
+        actorUserId: "user-alpha-executor",
+        command: {
+          type: "risk.accept_overload" as const,
+          payload: {
+            overloadId: "user-alpha-executor:2026-06-02",
+            acceptedRiskReason: "executor-writer"
+          }
+        }
+      }
+    ];
+
+    await Promise.all(candidates.map((candidate) =>
+      planningRepository.applyPlanningCommand(candidate)
+    ));
+    const accepted = await db
+      .select()
+      .from(planAcceptedOverloads)
+      .where(and(
+        eq(planAcceptedOverloads.tenantId, "tenant-alpha"),
+        eq(planAcceptedOverloads.projectId, projectId)
+      ));
+    expect(accepted).toHaveLength(1);
+    expect([
+      ["admin-writer", "user-alpha-admin"],
+      ["executor-writer", "user-alpha-executor"]
+    ]).toContainEqual([accepted[0]!.reason, accepted[0]!.acceptedByUserId]);
+
+    const winner = accepted[0]!;
+    await Promise.all(candidates.reverse().map((candidate) =>
+      planningRepository.applyPlanningCommand(candidate)
+    ));
+    const [afterReplay] = await db
+      .select()
+      .from(planAcceptedOverloads)
+      .where(and(
+        eq(planAcceptedOverloads.tenantId, "tenant-alpha"),
+        eq(planAcceptedOverloads.projectId, projectId)
+      ));
+    expect(afterReplay).toEqual(winner);
+  });
+
+  it("keeps one complete immutable baseline when conflicting first writers race", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+    const candidates = ["writer-a", "writer-b"].map((label) => ({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "baseline.capture" as const,
+        payload: { baselineId: "baseline-initial-race", label }
+      }
+    }));
+
+    await Promise.all(candidates.map((candidate) =>
+      planningRepository.applyPlanningCommand(candidate)
+    ));
+    const [winner] = await db
+      .select()
+      .from(projectBaselines)
+      .where(and(
+        eq(projectBaselines.tenantId, "tenant-alpha"),
+        eq(projectBaselines.projectId, projectId),
+        eq(projectBaselines.id, "baseline-initial-race")
+      ));
+    const winnerTasks = await db
+      .select()
+      .from(projectBaselineTasks)
+      .where(and(
+        eq(projectBaselineTasks.tenantId, "tenant-alpha"),
+        eq(projectBaselineTasks.projectId, projectId),
+        eq(projectBaselineTasks.baselineId, "baseline-initial-race")
+      ));
+    expect(winner).toBeDefined();
+    expect(["writer-a", "writer-b"]).toContain(winner!.label);
+    expect(winnerTasks.length).toBeGreaterThan(0);
+
+    await Promise.all(candidates.reverse().map((candidate) =>
+      planningRepository.applyPlanningCommand(candidate)
+    ));
+    const [afterReplay] = await db
+      .select()
+      .from(projectBaselines)
+      .where(and(
+        eq(projectBaselines.tenantId, "tenant-alpha"),
+        eq(projectBaselines.projectId, projectId),
+        eq(projectBaselines.id, "baseline-initial-race")
+      ));
+    const afterReplayTasks = await db
+      .select()
+      .from(projectBaselineTasks)
+      .where(and(
+        eq(projectBaselineTasks.tenantId, "tenant-alpha"),
+        eq(projectBaselineTasks.projectId, projectId),
+        eq(projectBaselineTasks.baselineId, "baseline-initial-race")
+      ));
+    expect(afterReplay).toEqual(winner);
+    expect(afterReplayTasks).toEqual(winnerTasks);
+  });
+
+  it("rolls back the baseline header when snapshot row persistence fails", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await client.unsafe(
+      "CREATE OR REPLACE FUNCTION reject_baseline_task_insert() RETURNS trigger AS $$ " +
+      "BEGIN RAISE EXCEPTION 'forced_baseline_child_failure'; END; $$ LANGUAGE plpgsql"
+    );
+    await client.unsafe(
+      "CREATE TRIGGER reject_baseline_task_insert_trigger BEFORE INSERT ON project_baseline_tasks " +
+      "FOR EACH ROW EXECUTE FUNCTION reject_baseline_task_insert()"
+    );
+    try {
+      await expect(
+        planningRepository.applyPlanningCommand({
+          tenantId: "tenant-alpha",
+          projectId,
+          actorUserId: "user-alpha-admin",
+          command: {
+            type: "baseline.capture",
+            payload: { baselineId: "baseline-rollback", label: "Must roll back" }
+          }
+        })
+      ).rejects.toThrow();
+    } finally {
+      await client.unsafe(
+        "DROP TRIGGER IF EXISTS reject_baseline_task_insert_trigger ON project_baseline_tasks"
+      );
+      await client.unsafe("DROP FUNCTION IF EXISTS reject_baseline_task_insert()");
+    }
+
+    const baseline = await db
+      .select()
+      .from(projectBaselines)
+      .where(and(
+        eq(projectBaselines.tenantId, "tenant-alpha"),
+        eq(projectBaselines.projectId, projectId),
+        eq(projectBaselines.id, "baseline-rollback")
+      ));
+    const baselineTasks = await db
+      .select()
+      .from(projectBaselineTasks)
+      .where(and(
+        eq(projectBaselineTasks.tenantId, "tenant-alpha"),
+        eq(projectBaselineTasks.projectId, projectId),
+        eq(projectBaselineTasks.baselineId, "baseline-rollback")
+      ));
+    expect(baseline).toHaveLength(0);
+    expect(baselineTasks).toHaveLength(0);
+  });
+  it("returns the captured baseline label in the comparison read model", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "baseline.capture",
+        payload: { baselineId: "baseline-labeled", label: "Release candidate" }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    expect(snapshot).toBeDefined();
+    if (!snapshot) throw new Error("expected plan snapshot");
+    const calculatedPlan = calculatePlan(snapshot, {
+      calculatedAt: snapshot.capturedAt,
+      engineVersion: "planning-core-v1"
+    });
+    const comparison = buildBaselineComparison(snapshot, calculatedPlan);
+
+    expect(comparison).toMatchObject({
+      baselineId: "baseline-labeled",
+      label: "Release candidate"
+    });
+  });
+
+  it("captures calculated dates and work with zero immediate baseline deltas", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    const beforeSnapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    expect(beforeSnapshot).toBeDefined();
+    if (!beforeSnapshot) throw new Error("expected plan snapshot");
+    const beforeCalculated = calculatePlan(beforeSnapshot, {
+      calculatedAt: beforeSnapshot.capturedAt,
+      engineVersion: "planning-core-v1"
+    });
+    const authoredById = new Map(beforeSnapshot.tasks.map((task) => [task.id, task]));
+    const hasCalculatedShift = beforeCalculated.tasks.some(
+      (task) =>
+        task.calculatedStart !== authoredById.get(task.id)?.plannedStart ||
+        task.calculatedFinish !== authoredById.get(task.id)?.plannedFinish
+    );
+    expect(hasCalculatedShift).toBe(true);
+
+    await planningRepository.applyPlanningCommand({
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "baseline.capture",
+        payload: { baselineId: "baseline-fresh", label: "Fresh plan" }
+      }
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    expect(snapshot).toBeDefined();
+    if (!snapshot) throw new Error("expected plan snapshot");
+    const calculatedPlan = calculatePlan(snapshot, {
+      calculatedAt: snapshot.capturedAt,
+      engineVersion: "planning-core-v1"
+    });
+    const comparison = buildBaselineComparison(snapshot, calculatedPlan);
+
+    expect(comparison.baselineId).toBe("baseline-fresh");
+    expect(comparison.tasks.length).toBeGreaterThan(0);
+    for (const task of comparison.tasks) {
+      expect(task.startDeltaDays).toBe(0);
+      expect(task.finishDeltaDays).toBe(0);
+      expect(task.workDeltaMinutes).toBe(0);
+    }
+  });
+
+  it("keeps a captured baseline immutable under conflicting duplicate and concurrent commands", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+    const command = {
+      tenantId: "tenant-alpha",
+      projectId,
+      actorUserId: "user-alpha-admin",
+      command: {
+        type: "baseline.capture" as const,
+        payload: { baselineId: "baseline-idempotent", label: "Stable baseline" }
+      }
+    };
+
+    await planningRepository.applyPlanningCommand(command);
+    const [firstBaseline] = await db
+      .select()
+      .from(projectBaselines)
+      .where(and(
+        eq(projectBaselines.tenantId, "tenant-alpha"),
+        eq(projectBaselines.projectId, projectId),
+        eq(projectBaselines.id, "baseline-idempotent")
+      ));
+    const firstTasks = await db
+      .select()
+      .from(projectBaselineTasks)
+      .where(and(
+        eq(projectBaselineTasks.tenantId, "tenant-alpha"),
+        eq(projectBaselineTasks.projectId, projectId),
+        eq(projectBaselineTasks.baselineId, "baseline-idempotent")
+      ));
+    expect(firstBaseline).toBeDefined();
+    expect(firstTasks.length).toBeGreaterThan(0);
+
+    await db
+      .update(tasks)
+      .set({ workMinutes: 9999, updatedAt: new Date() })
+      .where(and(
+        eq(tasks.tenantId, "tenant-alpha"),
+        eq(tasks.projectId, projectId),
+        eq(tasks.id, firstTasks[0]!.taskId)
+      ));
+
+    const conflictingReplay = {
+      ...command,
+      command: {
+        ...command.command,
+        payload: { baselineId: "baseline-idempotent", label: "Must not overwrite" }
+      }
+    };
+    await planningRepository.applyPlanningCommand(conflictingReplay);
+    await Promise.all([
+      planningRepository.applyPlanningCommand(command),
+      planningRepository.applyPlanningCommand(conflictingReplay),
+      planningRepository.applyPlanningCommand(command)
+    ]);
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    expect(snapshot).toBeDefined();
+    if (!snapshot) throw new Error("expected plan snapshot");
+    const matchingBaselines = snapshot.baselines.filter(
+      (baseline) => baseline.id === "baseline-idempotent"
+    );
+    expect(matchingBaselines).toHaveLength(1);
+    expect(matchingBaselines[0]).toMatchObject({ label: "Stable baseline" });
+    expect(matchingBaselines[0]?.tasks).toHaveLength(firstTasks.length);
+
+    const [persistedBaseline] = await db
+      .select()
+      .from(projectBaselines)
+      .where(and(
+        eq(projectBaselines.tenantId, "tenant-alpha"),
+        eq(projectBaselines.projectId, projectId),
+        eq(projectBaselines.id, "baseline-idempotent")
+      ));
+    const persistedTasks = await db
+      .select()
+      .from(projectBaselineTasks)
+      .where(and(
+        eq(projectBaselineTasks.tenantId, "tenant-alpha"),
+        eq(projectBaselineTasks.projectId, projectId),
+        eq(projectBaselineTasks.baselineId, "baseline-idempotent")
+      ));
+    expect(persistedBaseline).toEqual(firstBaseline);
+    expect(persistedTasks).toEqual(firstTasks);
+  });
   it("cascades explicit allocations when their assignment is deleted", async () => {
     const db = createDatabase(client);
     const intakeRepository = createProjectIntakeRepository(db);

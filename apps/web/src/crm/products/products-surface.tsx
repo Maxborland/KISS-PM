@@ -12,15 +12,21 @@ import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr, rub } from "@/crm/ui/crm-bits";
+import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { useCrm } from "@/crm/lib/use-crm";
+import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import type { Product } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
+import { useSessionUser } from "@/shell/use-session-user";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 const TYPE_LABEL = { service: "Услуга", goods: "Товар" } as const;
 
 export function ProjectProducts() {
+  const { live } = useCrmRuntime();
   const { data, status, error, reload, createProduct, updateProduct } = useCrm();
+  const sessionUser = useSessionUser();
+  const createCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.products.manage" });
   const [busy, setBusy] = useState(false);
 
   // Верхнеуровневый статус поверхности: forbidden/error/loading из хука; пустой справочник → empty; иначе ready.
@@ -44,8 +50,10 @@ export function ProjectProducts() {
     else toast.error(`Отклонено: ${crmErr(res.code, res.message)}`);
   };
 
+  const createProductDialog = <CreateProductDialog busy={busy} setBusy={setBusy} create={createProduct} disabledReason={createCapability.disabledReason} />;
+
   return (
-    <CrmFrame activeTab="Продукты" subtitle="Справочник продуктов" actions={<CreateProductDialog busy={busy} setBusy={setBusy} create={createProduct} />}>
+    <CrmFrame activeTab="Продукты" subtitle="Справочник продуктов" actions={createProductDialog}>
       {prototypeNotesEnabled && (
         <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
@@ -62,7 +70,7 @@ export function ProjectProducts() {
         empty={{
           title: "Нет продуктов",
           description: "Справочник продуктов пуст — создайте первый продукт.",
-          action: <CreateProductDialog busy={busy} setBusy={setBusy} create={createProduct} />
+          action: createProductDialog
         }}
         forbidden={{ title: "Доступ к продуктам ограничен", description: "У вас нет прав на просмотр справочника продуктов." }}
       >
@@ -152,7 +160,7 @@ function EditProductDialog({ product, busy, setBusy, update }: { product: Produc
   );
 }
 
-function CreateProductDialog({ busy, setBusy, create }: { busy: boolean; setBusy: (v: boolean) => void; create: ReturnType<typeof useCrm>["createProduct"] }) {
+function CreateProductDialog({ busy, setBusy, create, disabledReason }: { busy: boolean; setBusy: (v: boolean) => void; create: ReturnType<typeof useCrm>["createProduct"]; disabledReason?: string | null }) {
   const [name, setName] = useState("");
   const [type, setType] = useState<"service" | "goods">("service");
   const [unit, setUnit] = useState("проект");
@@ -162,7 +170,7 @@ function CreateProductDialog({ busy, setBusy, create }: { busy: boolean; setBusy
   return (
     <FormDialog
       title="Новый продукт"
-      trigger={<Button variant="default" size="sm"><Plus className="size-3.5" aria-hidden />Продукт</Button>}
+      trigger={<Button variant="default" size="sm" disabled={busy || Boolean(disabledReason)} title={disabledReason ?? "Создать продукт"}><Plus className="size-3.5" aria-hidden />Продукт</Button>}
       submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
       submitDisabled={!valid || busy}
       successToast="Продукт создан"

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app";
+import {
+  canReadWorkspaceUserDirectory,
+  workspaceUserDirectoryEntry,
+  workspaceUserDirectoryResponse
+} from "./workspaceUserRoutes";
 import { verifyLoginPassword } from "./authRoutes";
 import type { ApiTenantDataSource, ProjectRecord, WorkspaceUserRecord } from "./apiTypes";
 import type { ControlSignal, KpiDefinition, PlanSnapshot, PlanningCommand } from "@kiss-pm/domain";
@@ -118,6 +123,33 @@ describe("KISS PM API Phase 1 shell", () => {
       document.paths["/api/workspace/projects/{projectId}/planning/baselines"].get.responses["200"]
         .content["application/json"].schema
     ).toEqual({ $ref: "#/components/schemas/PlanningBaselinesResponse" });
+    expect(document.components.schemas.PlanningBaseline.required).toContain("label");
+    expect(document.components.schemas.PlanningBaseline.properties.label).toEqual({
+      type: "string",
+      minLength: 1
+    });
+    expect(document.components.schemas.PlanningResourceLoadMatrix.required).toContain(
+      "acceptedOverloads"
+    );
+    expect(
+      document.components.schemas.PlanningResourceLoadMatrix.properties.acceptedOverloads
+    ).toEqual({
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+        pattern: "^[^:]+:\\d{4}-\\d{2}-\\d{2}$"
+      }
+    });
+    expect(document.components.schemas.PlanningResourceOverload.required).toContain(
+      "accepted"
+    );
+    expect(document.components.schemas.PlanningResourceOverload.properties.accepted).toEqual({
+      type: "boolean"
+    });
+    expect(document.components.schemas.PlanningResourceOverload.additionalProperties).toBe(
+      false
+    );
     expect(
       document.paths["/api/workspace/projects/{projectId}/planning/auto-solver-runs"].post
         .requestBody.content["application/json"].schema
@@ -3815,6 +3847,61 @@ describe("KISS PM API Phase 1 shell", () => {
     await expect(response.json()).resolves.toEqual({ error: "permission_missing" });
     expect(appliedCommand).toBeNull();
   });
+  it("allows project-plan readers, but not project-only readers, to resolve the resource directory", () => {
+    const actor = { id: "reader", tenantId: "tenant-alpha", name: "Reader", accessProfileId: "profile" };
+    expect(
+      canReadWorkspaceUserDirectory({
+        actor,
+        targetTenantId: "tenant-alpha",
+        profile: { id: "profile", permissions: ["tenant.project_plan.read"] }
+      })
+    ).toEqual({ allowed: true, reason: "same_tenant_permission_granted" });
+    expect(
+      canReadWorkspaceUserDirectory({
+        actor,
+        targetTenantId: "tenant-alpha",
+        profile: { id: "profile", permissions: ["tenant.projects.read"] }
+      })
+    ).toEqual({ allowed: false, reason: "permission_missing" });
+  });
+  it("projects the resource directory without private workspace-user fields", () => {
+    const user = {
+      id: "user-alpha",
+      tenantId: "tenant-alpha",
+      name: "Alpha",
+      accessProfileId: "profile-alpha",
+      email: "alpha@example.test",
+      positionId: "position-alpha",
+      positionName: "Engineer",
+      phone: "+70000000000",
+      telegram: "alpha",
+      status: "active",
+      theme: "light",
+      accentColor: "#0f766e"
+    };
+
+    expect(workspaceUserDirectoryEntry(user, false)).toEqual({
+      id: "user-alpha",
+      name: "Alpha",
+      positionId: "position-alpha",
+      positionName: "Engineer"
+    });
+    expect(workspaceUserDirectoryEntry(user, true)).toBe(user);
+    expect(workspaceUserDirectoryResponse([user], false)).toEqual({
+      privateFieldsIncluded: false,
+      users: [{
+        id: "user-alpha",
+        name: "Alpha",
+        positionId: "position-alpha",
+        positionName: "Engineer"
+      }]
+    });
+    expect(workspaceUserDirectoryResponse([user], true)).toEqual({
+      privateFieldsIncluded: true,
+      users: [user]
+    });
+  });
+
 });
 
 function createControlActionSnapshot(): PlanSnapshot {

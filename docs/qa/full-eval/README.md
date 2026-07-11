@@ -2,6 +2,15 @@
 
 Прогон Loop #010 «Full Product Evaluation Loop» (signals.forwardfuture.com/loop-library), 2026-07-04.
 
+## Актуальный checkpoint — 2026-07-11
+
+- Schedule closeout: projects-schedule-closeout-2026-07-10.md.
+- Shell/list/detail/Overview closeout: projects-shell-overview-closeout-2026-07-11.md.
+- Machine-readable project matrix: projects-coverage-matrix-2026-07-10.json.
+- Schedule: 40/40 свежих role × scenario строк пройдено, 11/11 browser bundles.
+- Shell/list/detail/Overview: 68/68 свежих role × scenario строк пройдено, 7/7 browser bundles.
+- Глобальная project-матрица: 169 pass, 54 non-pass. Эти строки не считаются закрытыми без собственного свежего evidence.
+
 ## Артефакты
 
 - `env-diff.md` — окружение, учётки, отличия от прода.

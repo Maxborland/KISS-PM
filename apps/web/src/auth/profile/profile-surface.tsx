@@ -57,6 +57,19 @@ const DEMO_PASSWORD = "kiss-pm-admin";
 
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
+export type ProfileEditCapabilities = {
+  canUpdateProfile: boolean;
+  canManageTheme: boolean;
+};
+
+export function getProfileEditCapabilities(permissions: string[]): ProfileEditCapabilities {
+  const permissionSet = new Set(permissions);
+  return {
+    canUpdateProfile: permissionSet.has("profile.update"),
+    canManageTheme: permissionSet.has("workspace.theme.manage")
+  };
+}
+
 export type ProfileSurfaceProps = {
   /** Демо-авто-вход админом на монтаже (мок стартует anonymous). По умолчанию true —
    *  сохраняет поведение Storybook. Боевой /profile передаёт false: профиль читается
@@ -211,7 +224,7 @@ export function ProfileContent({
   return (
     <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
       <ProfileCard user={user} permissions={permissions} />
-      <ProfileForm user={user} update={update} updateTheme={updateTheme} />
+      <ProfileForm user={user} permissions={permissions} update={update} updateTheme={updateTheme} />
     </div>
   );
 }
@@ -283,13 +296,16 @@ function PermissionsList({ permissions }: { permissions: string[] }) {
 // Шлём только изменённую группу; если менялись обе — зовём обе и объединяем результат.
 function ProfileForm({
   user,
+  permissions,
   update,
   updateTheme
 }: {
   user: WorkspaceUser;
+  permissions: string[];
   update: ReturnType<typeof useAuth>["updateProfile"];
   updateTheme: ReturnType<typeof useAuth>["updateTheme"];
 }) {
+  const editCapabilities = getProfileEditCapabilities(permissions);
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone ?? "");
   const [telegram, setTelegram] = useState(user.telegram ?? "");
@@ -343,7 +359,21 @@ function ProfileForm({
   const changedCount = Object.keys(profileDiff).length + Object.keys(themeDiff).length;
   const dirty = changedCount > 0;
   const accentValid = /^#[0-9a-fA-F]{6}$/.test(accentColor);
-  const canSave = dirty && !busy && name.trim().length > 0 && accentValid;
+  const canSubmitProfileDiff = !profileChanged || editCapabilities.canUpdateProfile;
+  const canSubmitThemeDiff = !themeChanged || editCapabilities.canManageTheme;
+  const profileEditDisabled = busy || !editCapabilities.canUpdateProfile;
+  const themeEditDisabled = busy || !editCapabilities.canManageTheme;
+  const canSave = dirty && !busy && name.trim().length > 0 && accentValid && canSubmitProfileDiff && canSubmitThemeDiff;
+
+  function reset() {
+    setName(user.name);
+    setPhone(user.phone ?? "");
+    setTelegram(user.telegram ?? "");
+    setTheme(user.theme);
+    setAccentColor(user.accentColor);
+    setErrorCode(null);
+    setSaved(false);
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -379,21 +409,26 @@ function ProfileForm({
       </div>
 
       <FormError code={errorCode} />
+      {!editCapabilities.canUpdateProfile && !editCapabilities.canManageTheme ? (
+        <p className="rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--warning-text)]">
+          Недостаточно прав для редактирования профиля.
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className={cn(labelCls, "sm:col-span-2")}>
           Имя
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя сотрудника" aria-invalid={name.trim().length === 0} />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя сотрудника" aria-invalid={name.trim().length === 0} disabled={profileEditDisabled} />
         </label>
 
         <label className={labelCls}>
           Телефон
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 999 000-00-00" inputMode="tel" />
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 999 000-00-00" inputMode="tel" disabled={profileEditDisabled} />
         </label>
 
         <label className={labelCls}>
           Telegram
-          <Input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@username" />
+          <Input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@username" disabled={profileEditDisabled} />
         </label>
 
         <label className={labelCls}>
@@ -403,6 +438,7 @@ function ProfileForm({
               type="color"
               value={accentValid ? accentColor : "#0f766e"}
               onChange={(e) => setAccentColor(e.target.value)}
+              disabled={themeEditDisabled}
               className="h-9 w-12 shrink-0 cursor-pointer rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-0.5"
               aria-label="Выбрать акцентный цвет"
             />
@@ -411,6 +447,7 @@ function ProfileForm({
               onChange={(e) => setAccentColor(e.target.value)}
               placeholder="#0f766e"
               aria-invalid={!accentValid}
+              disabled={themeEditDisabled}
               className="v4-mono"
             />
           </span>
@@ -426,6 +463,7 @@ function ProfileForm({
                 type="button"
                 onClick={() => setTheme(t)}
                 aria-pressed={theme === t}
+                disabled={themeEditDisabled}
                 className={cn(
                   "flex-1 rounded-[var(--radius-md)] border px-3 py-1.5 text-[length:var(--text-sm)] font-medium transition-colors",
                   theme === t
@@ -451,6 +489,9 @@ function ProfileForm({
               Сохранено
             </span>
           ) : null}
+          <Button type="button" variant="ghost" size="sm" disabled={!dirty || busy} onClick={reset}>
+            Отменить
+          </Button>
           <Button type="submit" variant="default" size="sm" disabled={!canSave}>
             {busy ? "Сохранение…" : "Сохранить"}
           </Button>

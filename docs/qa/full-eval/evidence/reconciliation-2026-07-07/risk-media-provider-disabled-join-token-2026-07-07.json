@@ -1,0 +1,26 @@
+{
+  "generatedAt": "2026-07-07T21:56:00+07:00",
+  "id": "RISK-MEDIA-PROVIDER-DISABLED-JOIN-TOKEN",
+  "status": "fixed-by-current-branch",
+  "linkedRiskZones": [
+    "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+  ],
+  "scope": "API-only degraded media provider contract when no video provider is configured",
+  "behavior": [
+    "A livekit call room can still be created and its session can be started as control-plane state.",
+    "Join-token issuance fails closed with HTTP 501 and error video_provider_disabled when the injected video provider is disabled.",
+    "The failed degraded join attempt does not create a join_token_issued call event or communications.call_join_token_issued audit event."
+  ],
+  "changedFiles": [
+    "apps/api/src/collaborationRoutes.db.test.ts"
+  ],
+  "verification": [
+    "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"\"video provider is disabled\"\"\" -> 1 file passed; 1 test passed, 17 skipped",
+    "corepack pnpm --filter @kiss-pm/api typecheck -> failed on existing src/projectIntakeService.test.ts WorkspaceUserRecord fixture fields, unrelated to this media slice"
+  ],
+  "limitations": [
+    "This is route-level degraded-provider coverage only.",
+    "It does not verify browser prejoin, media permissions, real LiveKit/Jitsi connectivity, remote participant behavior, reconnect, or leave/rejoin traversal."
+  ],
+  "matrixImpact": "Narrows RISK-MEDIA-LIVEKIT-JITSI-CALL for explicit no-provider/degraded join-token behavior; does not close the overall risk zone."
+}

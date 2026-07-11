@@ -94,6 +94,11 @@ export async function changeOpportunityStage(
     return { ok: false, status: 404, error: "deal_stage_not_found" };
   }
 
+  const targetPipelineId = stage.pipelineId ?? null;
+  if (opportunity.stageId === stage.id && opportunity.pipelineId === targetPipelineId) {
+    return { ok: true, status: 200, opportunity };
+  }
+
   // Мультиворонки: проверка правил перехода ВНУТРИ воронки сделки (общий хелпер).
   const transitionGuard = await evaluateOpportunityStageTransition(
     deps.dataSource,
@@ -114,7 +119,7 @@ export async function changeOpportunityStage(
         opportunityId: opportunity.id,
         stageId: stage.id,
         // Мультиворонки: синхронизируем воронку сделки с воронкой целевой стадии.
-        pipelineId: stage.pipelineId ?? null
+        pipelineId: targetPipelineId
       });
       if (!updated) {
         return undefined;

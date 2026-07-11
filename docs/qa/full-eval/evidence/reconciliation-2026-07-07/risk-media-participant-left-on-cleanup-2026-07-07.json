@@ -1,0 +1,43 @@
+{
+  "id": "RISK-MEDIA-PARTICIPANT-LEFT-ON-CLEANUP",
+  "linkedRiskZones": [
+    "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+  ],
+  "status": "fixed-by-current-branch",
+  "coverageStatus": "partial-risk-zone",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "generatedAt": "2026-07-07",
+  "surface": [
+    "/calls/[roomId]",
+    "apps/web/src/lib/call/call-engine.ts"
+  ],
+  "expected": [
+    "After a successful LiveKit join, unmount/refresh/navigation cleanup records participantState left exactly once.",
+    "Explicit leave followed by unmount does not duplicate left.",
+    "Cleanup before connect or after failed token does not send left."
+  ],
+  "actualBefore": [
+    "useCallEngine sent joined after connect but sent left only from the explicit leave handler; cleanup disconnected the room without backend left state."
+  ],
+  "fixApplied": [
+    "Added joinedSessionIdRef set only after successful connect before joined state is posted.",
+    "Added idempotent markParticipantLeft() used by both explicit leave and cleanup/unmount.",
+    "Added unit tests with mocked LiveKit Room and call-client APIs."
+  ],
+  "changedFiles": [
+    "apps/web/src/lib/call/call-engine.ts",
+    "apps/web/src/lib/call/call-engine.test.tsx"
+  ],
+  "redEvidence": [
+    "New cleanup test failed before implementation: expected postParticipantState to be called 2 times, but got 1."
+  ],
+  "greenEvidence": [
+    "cmd /c ..\\..\\node_modules\\.bin\\vitest.cmd run --config vitest.config.ts src/lib/call/call-engine.test.tsx -> 4 tests passed.",
+    "corepack pnpm --filter @kiss-pm/web typecheck -> passed."
+  ],
+  "limitations": [
+    "This fixes only the participant-state cleanup bug found during media audit.",
+    "Full LiveKit/Jitsi provider verification remains unverified: provider config, prejoin, permissions, real join, remote participant, reconnect, leave/rejoin, and media-denied browser behavior still need live traversal."
+  ],
+  "regressionRisk": "Medium-low. The change touches call teardown lifecycle; targeted tests cover explicit leave, cleanup after join, cleanup before connect, and failed provider token."
+}

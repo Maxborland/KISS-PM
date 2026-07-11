@@ -66,6 +66,26 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     expect(moved.wbsCode).toBe("1.1.1");
   });
 
+  it("previews a command batch without mutating the mock plan", async () => {
+    const c = client();
+    const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
+    const preview = await c.previewCommandBatch(MOCK_PROJECT_ID, {
+      commands: [
+        { type: "task.update_progress", payload: { taskId: "t-1.1", percentComplete: 10 } },
+        { type: "task.update_progress", payload: { taskId: "t-1.2", percentComplete: 20 } }
+      ] as PlanningCommand[],
+      clientPlanVersion: rm.planVersion
+    });
+
+    expect(preview.after.planVersion).toBe(rm.planVersion + 1);
+    expect(preview.planDelta.changedTaskIds).toEqual(
+      expect.arrayContaining(["t-1.1", "t-1.2"])
+    );
+    await expect(c.getPlanReadModel(MOCK_PROJECT_ID)).resolves.toMatchObject({
+      planVersion: rm.planVersion
+    });
+  });
+
   it("applies a batch of commands as a single plan-version bump", async () => {
     const c = client();
     const rm = await c.getPlanReadModel(MOCK_PROJECT_ID);
@@ -293,7 +313,8 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     expect(bc.baselineId).toBe("baseline-b3");
     expect(bc.tasks.length).toBeGreaterThan(0);
     expect(bc.tasks.every((t) => t.startDeltaDays === 0 && t.finishDeltaDays === 0)).toBe(true);
-    expect((res.readModel.authored as unknown as { baselines: Array<{ id: string }> }).baselines.some((b) => b.id === "baseline-b3")).toBe(true);
+    const baselines = (res.readModel.authored as unknown as { baselines: Array<{ id: string; label: string }> }).baselines;
+    expect(baselines.some((b) => b.id === "baseline-b3" && b.label === "Контроль")).toBe(true);
   });
 
   it("commit log seeds the session history with a revertible latest commit (commands + before)", async () => {

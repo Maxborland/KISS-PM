@@ -60,6 +60,36 @@ describe("planning parsers", () => {
     }
   });
 
+  it("accepts zero-duration task.create only for a zero-work milestone", () => {
+    const milestone = {
+      type: "task.create" as const,
+      payload: {
+        id: "milestone-new",
+        projectId: "project-alpha",
+        title: "Release",
+        statusId: "task-status-new",
+        plannedStart: "2026-06-01",
+        plannedFinish: "2026-06-01",
+        durationMinutes: 0,
+        workMinutes: 0,
+        assignments: []
+      }
+    };
+
+    expect(
+      parsePlanningCommandEnvelope({ command: milestone, clientPlanVersion: 1 })
+    ).toMatchObject({ ok: true, value: { command: milestone } });
+    expect(
+      parsePlanningCommandEnvelope({
+        command: {
+          ...milestone,
+          payload: { ...milestone.payload, workMinutes: 60 }
+        },
+        clientPlanVersion: 1
+      })
+    ).toEqual({ ok: false, error: "planning_command_invalid" });
+  });
+
   it("rejects unknown command payloads instead of accepting arbitrary JSON", () => {
     expect(
       parsePlanningCommandEnvelope({

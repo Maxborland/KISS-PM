@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "PROJ-064",
+  "role": "admin",
+  "key": "PROJ-064:admin",
+  "status": "pass",
+  "runId": "project-resources-20260711-final3",
+  "generatedAt": "2026-07-11T03:43:30.974Z",
+  "assertions": [
+    "Live Team and Role selects both offered non-All values",
+    "Changing Team reset Role to All",
+    "The selected live team remained active while Role reset to All"
+  ],
+  "details": {},
+  "screenshots": [
+    "screenshots/proj-064-admin-team-reset-role-kpi.png"
+  ],
+  "receipt": "receipts/proj-064-admin.json"
+}

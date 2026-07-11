@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "PROJ-072",
+  "role": "planReader",
+  "key": "PROJ-072:planReader",
+  "status": "pass",
+  "runId": "project-resources-20260711-final3",
+  "generatedAt": "2026-07-11T03:43:37.699Z",
+  "assertions": [
+    "SYNTHETIC ROUTE FIXTURE: deterministic normal, overload, absence, holiday and weekend buckets rendered through the production matrix",
+    "SYNTHETIC ROUTE FIXTURE: all five semantic classes produced distinct inline background values",
+    "SYNTHETIC ROUTE FIXTURE: accepted overload rendered a check mark and literal accepted-overload title while the semantic legend remained visible"
+  ],
+  "details": {},
+  "screenshots": [
+    "screenshots/proj-072-planReader-synthetic-five-cell-semantics.png"
+  ],
+  "receipt": "receipts/proj-072-planReader.json"
+}

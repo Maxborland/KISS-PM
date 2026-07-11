@@ -128,6 +128,7 @@ export type CollaborationRepository = {
     channelId: string;
     title?: string;
     description?: string;
+    clientUpdatedAt?: Date;
   }): Promise<CommunicationChannel | undefined>;
   archiveCommunicationChannel(input: {
     tenantId: TenantId;
@@ -445,8 +446,22 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
       return mapCommunicationChannel(row);
     },
     async updateCommunicationChannel(input) {
+      const [current] = await db
+        .select({ updatedAt: communicationChannels.updatedAt })
+        .from(communicationChannels)
+        .where(
+          and(
+            eq(communicationChannels.tenantId, input.tenantId),
+            eq(communicationChannels.id, input.channelId),
+            isNull(communicationChannels.archivedAt)
+          )
+        )
+        .limit(1);
+      if (!current) return undefined;
+
+      const nextUpdatedAt = new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1));
       const updates: Partial<typeof communicationChannels.$inferInsert> = {
-        updatedAt: new Date()
+        updatedAt: nextUpdatedAt
       };
       if (input.title !== undefined) updates.title = input.title;
       if (input.description !== undefined) updates.description = input.description;
@@ -457,7 +472,10 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
           and(
             eq(communicationChannels.tenantId, input.tenantId),
             eq(communicationChannels.id, input.channelId),
-            isNull(communicationChannels.archivedAt)
+            isNull(communicationChannels.archivedAt),
+            input.clientUpdatedAt
+              ? eq(communicationChannels.updatedAt, input.clientUpdatedAt)
+              : sql`true`
           )
         )
         .returning();
@@ -1186,9 +1204,24 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
       return rows.map(mapUserNotification);
     },
     async markUserNotificationRead(input) {
-      const [row] = await db
+      const [updated] = await db
         .update(userNotifications)
         .set({ readAt: new Date() })
+        .where(
+          and(
+            eq(userNotifications.tenantId, input.tenantId),
+            eq(userNotifications.id, input.notificationId),
+            eq(userNotifications.userId, input.userId),
+            isNull(userNotifications.archivedAt),
+            isNull(userNotifications.readAt)
+          )
+        )
+        .returning();
+      if (updated) return mapUserNotification(updated);
+
+      const [existing] = await db
+        .select()
+        .from(userNotifications)
         .where(
           and(
             eq(userNotifications.tenantId, input.tenantId),
@@ -1197,8 +1230,8 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
             isNull(userNotifications.archivedAt)
           )
         )
-        .returning();
-      return row ? mapUserNotification(row) : undefined;
+        .limit(1);
+      return existing ? mapUserNotification(existing) : undefined;
     },
     async listNotificationPreferences(tenantId, userId) {
       const rows = await db
@@ -1416,6 +1449,7 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
             eq(meetingActionItems.tenantId, input.tenantId),
             eq(meetingActionItems.meetingId, input.meetingId),
             eq(meetingActionItems.id, input.actionItemId),
+            ne(meetingActionItems.status, input.status),
             isNull(meetingActionItems.archivedAt)
           )
         )
@@ -1585,7 +1619,7 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
           set: {
             state: input.state,
             joinedAt: sql`coalesce(${callParticipantStates.joinedAt}, excluded.joined_at)`,
-            leftAt,
+            leftAt: leftAt ? sql`coalesce(${callParticipantStates.leftAt}, excluded.left_at)` : null,
             lastSeenAt: now
           }
         })

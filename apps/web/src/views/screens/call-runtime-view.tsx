@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { BannerInline } from "@/components/ui/banner-inline";
+import { Button } from "@/components/ui/button";
 import { fetchCallRoomEntity } from "@/lib/call/call-client";
 import { useCallEngine } from "@/lib/call/call-engine";
 import { useLobbyPreview } from "@/lib/call/use-lobby-preview";
@@ -80,7 +81,22 @@ const JOIN_ERROR_RU: Record<string, { title: string; hint: string }> = {
 };
 
 function ActiveStep({ roomId, selection }: { roomId: string; selection: LobbySelection }) {
-  const { stage, controls, handlers, error, chat, sendChat } = useCallEngine(roomId, selection);
+  const { stage, controls, handlers, error, externalJoin, chat, sendChat } = useCallEngine(roomId, selection);
+
+  if (externalJoin) {
+    const providerLabel = externalJoin.provider === "jitsi" ? "Jitsi" : "провайдера";
+    return (
+      <div className="call-screen">
+        <div className="mx-auto mt-[10vh] flex w-full max-w-[520px] flex-col gap-3">
+          <BannerInline variant="info">Звонок готов к открытию в {providerLabel}</BannerInline>
+          <Button asChild variant="primary">
+            <a href={externalJoin.joinUrl}>Открыть звонок</a>
+          </Button>
+          <a href="/communications/calls" className="text-[length:var(--text-sm)] text-[var(--accent-text,var(--accent))] underline underline-offset-4">← К списку звонков</a>
+        </div>
+      </div>
+    );
+  }
 
   // Подключение не удалось — честный отказ вместо мёртвой сцены с чатом,
   // имитирующим отправку (G5-04/05), и с рабочим путём назад (G5-06).

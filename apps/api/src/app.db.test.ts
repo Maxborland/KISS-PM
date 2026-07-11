@@ -1,4 +1,4 @@
-﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabase,
@@ -1398,6 +1398,9 @@ describe("API with PostgreSQL data source", () => {
     const fields = await app.request("/api/workspace/config/custom-fields", {
       headers: { cookie }
     });
+    const securityPolicy = await app.request("/api/tenant/current/security-policy", {
+      headers: { cookie }
+    });
     const templateCreate = await app.request("/api/workspace/config/project-templates", {
       method: "POST",
       headers: {
@@ -1412,11 +1415,33 @@ describe("API with PostgreSQL data source", () => {
         status: "draft"
       })
     });
+    const securityPolicyUpdate = await app.request("/api/tenant/current/security-policy", {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        securityPolicy: {
+          twoFactorRequired: true,
+          sessionTimeoutHours: 12,
+          ssoSamlEnabled: false,
+          domainAllowlist: ["example.test"]
+        }
+      })
+    });
 
     expect(fields.status).toBe(403);
     await expect(fields.json()).resolves.toEqual({ error: "permission_missing" });
+    expect(securityPolicy.status).toBe(403);
+    await expect(securityPolicy.json()).resolves.toEqual({ error: "permission_missing" });
     expect(templateCreate.status).toBe(403);
     await expect(templateCreate.json()).resolves.toEqual({
+      error: "permission_missing"
+    });
+    expect(securityPolicyUpdate.status).toBe(403);
+    await expect(securityPolicyUpdate.json()).resolves.toEqual({
       error: "permission_missing"
     });
   });
@@ -1533,6 +1558,80 @@ describe("API with PostgreSQL data source", () => {
         id: "user-alpha-admin",
         phone: null,
         telegram: null
+      }
+    });
+  });
+
+
+  it("keeps duplicate profile and theme updates stable with readback", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", ["admin", "12345"].join(""));
+    const profilePayload = {
+      name: "Анна Duplicate Stable",
+      phone: "+7 999 222-33-44",
+      telegram: "@anna_stable"
+    };
+    const themePayload = {
+      theme: "dark",
+      accentColor: "#123ABC"
+    };
+
+    const profileResponses = await Promise.all([
+      app.request("/api/profile", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify(profilePayload)
+      }),
+      app.request("/api/profile", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify(profilePayload)
+      })
+    ]);
+    const themeResponses = await Promise.all([
+      app.request("/api/profile/theme", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify(themePayload)
+      }),
+      app.request("/api/profile/theme", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify(themePayload)
+      })
+    ]);
+
+    expect(profileResponses.map((response) => response.status)).toEqual([200, 200]);
+    expect(themeResponses.map((response) => response.status)).toEqual([200, 200]);
+
+    const me = await app.request("/api/auth/me", {
+      headers: { cookie }
+    });
+
+    expect(me.status).toBe(200);
+    await expect(me.json()).resolves.toMatchObject({
+      user: {
+        id: "user-alpha-admin",
+        name: profilePayload.name,
+        phone: profilePayload.phone,
+        telegram: profilePayload.telegram,
+        theme: themePayload.theme,
+        accentColor: "#123abc"
       }
     });
   });
@@ -1817,6 +1916,525 @@ describe("API with PostgreSQL data source", () => {
     });
   });
 
+  it("returns user_id_taken when concurrent workspace user creates reuse an id", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+    const base = {
+      id: "user-id-race",
+      name: "Гонка ID",
+      accessProfileId: "access-profile-alpha-reader",
+      password: "race12345"
+    };
+
+    const [first, second] = await Promise.all([
+      app.request("/api/workspace/users", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...base, email: "id-race-a@kiss-pm.local" })
+      }),
+      app.request("/api/workspace/users", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...base, email: "id-race-b@kiss-pm.local" })
+      })
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+
+    expect(statuses).toEqual([201, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "user_id_taken"
+    });
+  });
+
+  it("returns a stable conflict when concurrent workspace user creates reuse an email", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+    const body = {
+      email: "race-user@kiss-pm.local",
+      name: "Гонка Пользователя",
+      accessProfileId: "access-profile-alpha-reader",
+      password: "race12345"
+    };
+
+    const [first, second] = await Promise.all([
+      app.request("/api/workspace/users", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...body, id: "user-race-a" })
+      }),
+      app.request("/api/workspace/users", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...body, id: "user-race-b" })
+      })
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+    const users = await app.request("/api/workspace/users", {
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      }
+    });
+    const usersBody = await users.json() as {
+      users: Array<{ email: string }>;
+    };
+
+    expect(statuses).toEqual([201, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "user_email_taken"
+    });
+    expect(
+      usersBody.users.filter((user) => user.email === "race-user@kiss-pm.local")
+    ).toHaveLength(1);
+  });
+
+  it("returns a stable conflict when concurrent workspace user updates reuse an email", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const createA = await app.request("/api/workspace/users", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "user-email-race-a",
+        email: "email-race-a@kiss-pm.local",
+        name: "Гонка Email A",
+        accessProfileId: "access-profile-alpha-reader",
+        password: "raceA12345"
+      })
+    });
+    const createB = await app.request("/api/workspace/users", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "user-email-race-b",
+        email: "email-race-b@kiss-pm.local",
+        name: "Гонка Email B",
+        accessProfileId: "access-profile-alpha-reader",
+        password: "raceB12345"
+      })
+    });
+    expect([createA.status, createB.status]).toEqual([201, 201]);
+
+    const [first, second] = await Promise.all([
+      app.request("/api/workspace/users/user-email-race-a", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          email: "email-race-shared@kiss-pm.local",
+          name: "Гонка Email A",
+          accessProfileId: "access-profile-alpha-reader",
+          status: "active"
+        })
+      }),
+      app.request("/api/workspace/users/user-email-race-b", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          email: "email-race-shared@kiss-pm.local",
+          name: "Гонка Email B",
+          accessProfileId: "access-profile-alpha-reader",
+          status: "active"
+        })
+      })
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+    const users = await app.request("/api/workspace/users", {
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      }
+    });
+    const usersBody = await users.json() as {
+      users: Array<{ email: string }>;
+    };
+
+    expect(statuses).toEqual([200, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "user_email_taken"
+    });
+    expect(
+      usersBody.users.filter(
+        (user) => user.email === "email-race-shared@kiss-pm.local"
+      )
+    ).toHaveLength(1);
+  });
+
+  it("returns a stable conflict when concurrent access role creates reuse an id", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const [first, second] = await Promise.all([
+      app.request("/api/tenant/current/access-profiles", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "access-profile-alpha-race",
+          name: "Роль Гонка A",
+          permissions: ["tenant.users.read"]
+        })
+      }),
+      app.request("/api/tenant/current/access-profiles", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "access-profile-alpha-race",
+          name: "Роль Гонка B",
+          permissions: ["tenant.users.read"]
+        })
+      })
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+    const profiles = await app.request("/api/tenant/current/access-profiles", {
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      }
+    });
+    const profilesBody = await profiles.json() as {
+      accessProfiles: Array<{ id: string }>;
+    };
+
+    expect(statuses).toEqual([201, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "access_role_id_taken"
+    });
+    expect(
+      profilesBody.accessProfiles.filter(
+        (profile) => profile.id === "access-profile-alpha-race"
+      )
+    ).toHaveLength(1);
+  });
+
+  it("returns a stable conflict when concurrent access role creates reuse a name", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const [first, second] = await Promise.all([
+      app.request("/api/tenant/current/access-profiles", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "access-profile-alpha-name-race-a",
+          name: "Роль Гонка Имени",
+          permissions: ["tenant.users.read"]
+        })
+      }),
+      app.request("/api/tenant/current/access-profiles", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "access-profile-alpha-name-race-b",
+          name: "Роль Гонка Имени",
+          permissions: ["tenant.users.read"]
+        })
+      })
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+    const profiles = await app.request("/api/tenant/current/access-profiles", {
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      }
+    });
+    const profilesBody = await profiles.json() as {
+      accessProfiles: Array<{ name: string }>;
+    };
+
+    expect(statuses).toEqual([201, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "access_role_name_taken"
+    });
+    expect(
+      profilesBody.accessProfiles.filter(
+        (profile) => profile.name === "Роль Гонка Имени"
+      )
+    ).toHaveLength(1);
+  });
+
+  it("returns a stable conflict when concurrent access role updates reuse a name", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const createA = await app.request("/api/tenant/current/access-profiles", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "access-profile-alpha-name-update-race-a",
+        name: "Роль Update Race A",
+        permissions: ["tenant.users.read"]
+      })
+    });
+    const createB = await app.request("/api/tenant/current/access-profiles", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "access-profile-alpha-name-update-race-b",
+        name: "Роль Update Race B",
+        permissions: ["tenant.users.read"]
+      })
+    });
+    expect([createA.status, createB.status]).toEqual([201, 201]);
+
+    const [first, second] = await Promise.all([
+      app.request(
+        "/api/workspace/access-roles/access-profile-alpha-name-update-race-a",
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({
+            name: "Роль Общая После Гонки",
+            permissions: ["tenant.users.read"]
+          })
+        }
+      ),
+      app.request(
+        "/api/workspace/access-roles/access-profile-alpha-name-update-race-b",
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({
+            name: "Роль Общая После Гонки",
+            permissions: ["tenant.users.read"]
+          })
+        }
+      )
+    ]);
+    const statuses = [first.status, second.status].sort();
+    const conflict = first.status === 409 ? first : second;
+    const profiles = await app.request("/api/tenant/current/access-profiles", {
+      headers: {
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      }
+    });
+    const profilesBody = await profiles.json() as {
+      accessProfiles: Array<{ name: string }>;
+    };
+
+    expect(statuses).toEqual([200, 409]);
+    await expect(conflict.json()).resolves.toEqual({
+      error: "access_role_name_taken"
+    });
+    expect(
+      profilesBody.accessProfiles.filter(
+        (profile) => profile.name === "Роль Общая После Гонки"
+      )
+    ).toHaveLength(1);
+  });
+
+  it("keeps tenant security policy save idempotent under duplicate concurrent writes", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+    const body = {
+      securityPolicy: {
+        twoFactorRequired: true,
+        sessionTimeoutHours: 12,
+        ssoSamlEnabled: false,
+        domainAllowlist: ["KISS-PM.LOCAL", " kiss-pm.local ", "Example.TEST"]
+      }
+    };
+
+    const [first, second] = await Promise.all([
+      app.request("/api/tenant/current/security-policy", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(body)
+      }),
+      app.request("/api/tenant/current/security-policy", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(body)
+      })
+    ]);
+    const readback = await app.request("/api/tenant/current/security-policy", {
+      headers: { cookie }
+    });
+    const policyRows =
+      await client`SELECT count(*)::text AS count FROM tenant_security_policies WHERE tenant_id = 'tenant-alpha'`;
+
+    expect([first.status, second.status]).toEqual([200, 200]);
+    await expect(first.json()).resolves.toEqual({
+      securityPolicy: {
+        twoFactorRequired: true,
+        sessionTimeoutHours: 12,
+        ssoSamlEnabled: false,
+        domainAllowlist: ["kiss-pm.local", "example.test"]
+      }
+    });
+    await expect(second.json()).resolves.toEqual({
+      securityPolicy: {
+        twoFactorRequired: true,
+        sessionTimeoutHours: 12,
+        ssoSamlEnabled: false,
+        domainAllowlist: ["kiss-pm.local", "example.test"]
+      }
+    });
+    await expect(readback.json()).resolves.toEqual({
+      securityPolicy: {
+        twoFactorRequired: true,
+        sessionTimeoutHours: 12,
+        ssoSamlEnabled: false,
+        domainAllowlist: ["kiss-pm.local", "example.test"]
+      }
+    });
+    expect(policyRows[0]?.count).toBe("1");
+  });
+
+  it("keeps repeated user deactivate and reactivate writes stable with readback", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+    const createUser = await app.request("/api/workspace/users", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "user-repeat-status",
+        email: "repeat-status@kiss-pm.local",
+        name: "Повтор Статуса",
+        accessProfileId: "access-profile-alpha-reader",
+        password: "repeat12345"
+      })
+    });
+    expect(createUser.status).toBe(201);
+
+    const userLogin = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "repeat-status@kiss-pm.local",
+        password: "repeat12345"
+      })
+    });
+    expect(userLogin.status).toBe(200);
+    const userSessionToken = sessionTokenFromCookie(
+      userLogin.headers.get("set-cookie") ?? ""
+    );
+    const sessionRepository = createPostgresTenantDataSource(createDatabase(client));
+    await expect(
+      sessionRepository.findSessionByTokenHash(hashSessionToken(userSessionToken))
+    ).resolves.toMatchObject({
+      tenantId: "tenant-alpha",
+      userId: "user-repeat-status"
+    });
+
+    const inactiveBody = {
+      email: "repeat-status@kiss-pm.local",
+      name: "Повтор Статуса",
+      accessProfileId: "access-profile-alpha-reader",
+      status: "inactive"
+    };
+    const [firstDisable, secondDisable] = await Promise.all([
+      app.request("/api/workspace/users/user-repeat-status", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(inactiveBody)
+      }),
+      app.request("/api/workspace/users/user-repeat-status", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(inactiveBody)
+      })
+    ]);
+    const inactiveUsers = await app.request("/api/workspace/users", {
+      headers: { cookie }
+    });
+    const inactiveLogin = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "repeat-status@kiss-pm.local",
+        password: "repeat12345"
+      })
+    });
+
+    expect([firstDisable.status, secondDisable.status]).toEqual([200, 200]);
+    await expect(
+      sessionRepository.findSessionByTokenHash(hashSessionToken(userSessionToken))
+    ).resolves.toBeUndefined();
+    await expect(inactiveUsers.json()).resolves.toMatchObject({
+      users: expect.arrayContaining([
+        expect.objectContaining({
+          id: "user-repeat-status",
+          status: "inactive"
+        })
+      ])
+    });
+    expect(inactiveLogin.status).toBe(403);
+    await expect(inactiveLogin.json()).resolves.toEqual({ error: "user_inactive" });
+
+    const activeBody = { ...inactiveBody, status: "active" };
+    const [firstReactivate, secondReactivate] = await Promise.all([
+      app.request("/api/workspace/users/user-repeat-status", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(activeBody)
+      }),
+      app.request("/api/workspace/users/user-repeat-status", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(activeBody)
+      })
+    ]);
+    const activeUsers = await app.request("/api/workspace/users", {
+      headers: { cookie }
+    });
+    const activeLogin = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "repeat-status@kiss-pm.local",
+        password: "repeat12345"
+      })
+    });
+
+    expect([firstReactivate.status, secondReactivate.status]).toEqual([200, 200]);
+    await expect(activeUsers.json()).resolves.toMatchObject({
+      users: expect.arrayContaining([
+        expect.objectContaining({
+          id: "user-repeat-status",
+          status: "active"
+        })
+      ])
+    });
+    expect(activeLogin.status).toBe(200);
+  });
   it("logs in with password, reads session user and manages workspace users and positions", async () => {
     const login = await app.request("/api/auth/login", {
       method: "POST",

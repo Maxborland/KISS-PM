@@ -1,0 +1,47 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-CALL-PARTICIPANT-STATE-IDEMPOTENCY",
+  "generatedAt": "2026-07-08T10:29:00+07:00",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "status": "pass",
+  "scope": "Call participant-state duplicate-submit and concurrent same-state idempotency.",
+  "surfaces": [
+    "POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/participant-state",
+    "GET /api/workspace/call-rooms/:roomId/events",
+    "call_participant_states persistence readback",
+    "management audit events"
+  ],
+  "expected": "Repeating the same participant state is a heartbeat/noop success: it may refresh participant presence, but must not emit another participant transition event or another participant-state audit. A real state transition must still emit the matching event and audit once.",
+  "redEvidence": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \"keeps duplicate participant state updates\"",
+      "observed": "Failed before fix: after an initial joined transition, two duplicate joined requests both returned fresh participant_joined events instead of event=null; each duplicate would also create duplicate transition side effects.",
+      "result": "fail-before-fix"
+    }
+  ],
+  "actual": "Pass: initial joined emits participant_joined, duplicate concurrent joined requests return 200 with event=null and joined readback, final left emits participant_left, persisted state has one reader row in left state, events contain one participant_joined and one participant_left, and audit contains two transition entries total.",
+  "codeChanges": [
+    "apps/api/src/communications/callDataSource.ts includes listCallParticipantStates in the call workspace datasource contract.",
+    "apps/api/src/communications/callWorkspace.ts reads the current participant state inside the existing active-session transaction lock, updates lastSeenAt through upsert, and emits call event/audit only when the state actually changes.",
+    "apps/api/src/communicationRealtimeRoutes.ts serializes noop participant-state responses as event: null instead of a fake transition event.",
+    "packages/persistence/src/collaborationRepository.ts preserves first leftAt timestamp for repeated left/removed states while still clearing leftAt on rejoin.",
+    "apps/api/src/communicationRealtimeRoutes.db.test.ts adds DB/API coverage for duplicate joined, final left transition, persisted state readback, event counts, and audit counts."
+  ],
+  "verification": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \"keeps duplicate participant state updates\"",
+      "observed": "1 selected test passed, 26 skipped",
+      "notes": "Vitest emitted the existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts, unrelated to this slice.",
+      "result": "pass"
+    }
+  ],
+  "changedFiles": [
+    "apps/api/src/communicationRealtimeRoutes.ts",
+    "apps/api/src/communicationRealtimeRoutes.db.test.ts",
+    "apps/api/src/communications/callDataSource.ts",
+    "apps/api/src/communications/callWorkspace.ts",
+    "packages/persistence/src/collaborationRepository.ts",
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-call-participant-state-idempotency-2026-07-08.json",
+    "docs/qa/full-eval/reconciliation-matrix-2026-07-07.json"
+  ],
+  "coverageImpact": "Fixes and covers call participant-state duplicate/noop side effects at DB/API level. This narrows the media/write-flow risk but does not replace real LiveKit/Jitsi browser/provider traversal."
+}

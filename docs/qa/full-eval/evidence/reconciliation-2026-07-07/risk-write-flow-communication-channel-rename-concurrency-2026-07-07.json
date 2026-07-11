@@ -1,0 +1,36 @@
+{
+  "generatedAt": "2026-07-07T20:56:00+07:00",
+  "id": "RISK-WRITE-FLOW-COMMUNICATION-CHANNEL-RENAME-CONCURRENCY",
+  "status": "fixed-by-current-branch",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "scope": "PATCH /api/workspace/communication-channels/:channelId rename/description update with clientUpdatedAt optimistic version and audit behavior",
+  "fix": {
+    "files": [
+      "apps/api/src/apiDocs/schemas/collaboration.ts",
+      "apps/api/src/collaborationRoutes.db.test.ts",
+      "apps/api/src/communicationUpgradeRoutes.ts",
+      "apps/web/src/communications/channels/channels-surface.tsx",
+      "apps/web/src/communications/lib/comms-client.ts",
+      "apps/web/src/communications/lib/use-comms.ts",
+      "packages/persistence/src/collaborationRepository.ts"
+    ],
+    "behavior": [
+      "CommunicationChannel responses now expose updatedAt so the web client can send a version token with PATCH requests.",
+      "PATCH accepts clientUpdatedAt and repository updates only when the stored updatedAt matches that version.",
+      "Retrying the same desired channel state from an older clientUpdatedAt returns the current channel as idempotent success without moving updatedAt or writing a duplicate audit event.",
+      "Divergent concurrent rename/description updates from the same base version produce exactly one 200 and one 409 communication_channel_version_conflict, with readback matching the winner and only one update audit event."
+    ]
+  },
+  "green": {
+    "tests": [
+      "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \\\"communication channel rename\\\"\" -> 1 file passed; 2 tests passed, 13 skipped",
+      "corepack pnpm --filter @kiss-pm/api typecheck -> passed",
+      "corepack pnpm --filter @kiss-pm/web typecheck -> passed",
+      "git diff --check on comms files -> no whitespace errors; CRLF-to-LF warning only for channels-surface.tsx"
+    ],
+    "warning": "Existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts remains unrelated."
+  },
+  "remainingRisk": "This narrows communication channel rename duplicate/race/idempotency only. CRM contact/opportunity and remaining write flows still need their own exhaustive duplicate/race/idempotency evidence."
+}

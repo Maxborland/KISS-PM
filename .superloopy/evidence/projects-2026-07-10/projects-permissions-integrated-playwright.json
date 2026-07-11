@@ -1,0 +1,672 @@
+{
+  "config": {
+    "configFile": "E:\\KISS-PM\\playwright.config.ts",
+    "rootDir": "E:/KISS-PM/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "E:/KISS-PM/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "E:/KISS-PM/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "full-eval\\projects-assignments-write.spec.ts",
+      "file": "full-eval/projects-assignments-write.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Projects assignments write flows",
+          "file": "full-eval/projects-assignments-write.spec.ts",
+          "line": 45,
+          "column": 6,
+          "specs": [
+            {
+              "title": "ADMIN adds and removes an assignment with API readback and reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4573,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:24.310Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "af28d93f1d636b84381a-89cc81fd549d04d410cc",
+              "file": "full-eval/projects-assignments-write.spec.ts",
+              "line": 46,
+              "column": 3
+            },
+            {
+              "title": "PLAN reader sees read-only assignments and direct preview is denied without apply",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1904,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:28.993Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "af28d93f1d636b84381a-266bac0cfc1fc13a5b4c",
+              "file": "full-eval/projects-assignments-write.spec.ts",
+              "line": 184,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "full-eval\\projects-baseline-commits-write.spec.ts",
+      "file": "full-eval/projects-baseline-commits-write.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Projects baseline and commits write flows",
+          "file": "full-eval/projects-baseline-commits-write.spec.ts",
+          "line": 44,
+          "column": 6,
+          "specs": [
+            {
+              "title": "ADMIN captures a baseline with API readback, reload, and commit history",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "baseline.capture has no inverse or delete API; set KISS_PM_E2E_DISPOSABLE_DATABASE=1 only for a disposable database",
+                      "location": {
+                        "file": "E:\\KISS-PM\\e2e\\full-eval\\projects-baseline-commits-write.spec.ts",
+                        "line": 49,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 53,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:30.928Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "baseline.capture has no inverse or delete API; set KISS_PM_E2E_DISPOSABLE_DATABASE=1 only for a disposable database",
+                          "location": {
+                            "file": "E:\\KISS-PM\\e2e\\full-eval\\projects-baseline-commits-write.spec.ts",
+                            "line": 49,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "ba6004137eff0406ae72-eb8e99101450830816b8",
+              "file": "full-eval/projects-baseline-commits-write.spec.ts",
+              "line": 46,
+              "column": 3
+            },
+            {
+              "title": "ADMIN reverts a reversible commit and restores the task after reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4169,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:30.989Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ba6004137eff0406ae72-67ad769f83686af3897a",
+              "file": "full-eval/projects-baseline-commits-write.spec.ts",
+              "line": 103,
+              "column": 3
+            },
+            {
+              "title": "PLAN reader sees baseline history but cannot capture through UI or API",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2389,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:35.167Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ba6004137eff0406ae72-04025983f7e5ad49917c",
+              "file": "full-eval/projects-baseline-commits-write.spec.ts",
+              "line": 168,
+              "column": 3
+            },
+            {
+              "title": "PLAN reader sees commit history but cannot revert through UI or API",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2077,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:37.569Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ba6004137eff0406ae72-8539346c47b1aa017264",
+              "file": "full-eval/projects-baseline-commits-write.spec.ts",
+              "line": 223,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "full-eval\\projects-calendars-write.spec.ts",
+      "file": "full-eval/projects-calendars-write.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Projects calendars write flows",
+          "file": "full-eval/projects-calendars-write.spec.ts",
+          "line": 44,
+          "column": 6,
+          "specs": [
+            {
+              "title": "ADMIN creates and removes a project calendar exception with API readback and reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3308,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:39.680Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "982b9b31ac07b2960ae5-997d7c27ba90755af9af",
+              "file": "full-eval/projects-calendars-write.spec.ts",
+              "line": 45,
+              "column": 3
+            },
+            {
+              "title": "PLAN reader sees a read-only calendar and direct preview is denied",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1796,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:42.995Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "982b9b31ac07b2960ae5-baad6155993390e1491b",
+              "file": "full-eval/projects-calendars-write.spec.ts",
+              "line": 149,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "full-eval\\projects-resources-write.spec.ts",
+      "file": "full-eval/projects-resources-write.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Projects resources absence write flows",
+          "file": "full-eval/projects-resources-write.spec.ts",
+          "line": 61,
+          "column": 6,
+          "specs": [
+            {
+              "title": "ADMIN creates and removes a resource absence with API readback and reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4822,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:44.820Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d12fd96212964daa8916-71d0dd5f221ffe10023d",
+              "file": "full-eval/projects-resources-write.spec.ts",
+              "line": 62,
+              "column": 3
+            },
+            {
+              "title": "PLAN reader without resource permission sees no absence write control and gets 403",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1550,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:49.649Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d12fd96212964daa8916-019d6954bb9e77b9fdd4",
+              "file": "full-eval/projects-resources-write.spec.ts",
+              "line": 184,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "full-eval\\projects-scenarios-write.spec.ts",
+      "file": "full-eval/projects-scenarios-write.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Projects scenarios write flow",
+          "file": "full-eval/projects-scenarios-write.spec.ts",
+          "line": 69,
+          "column": 6,
+          "specs": [
+            {
+              "title": "ADMIN previews and compares before apply, persists after reload, then restores assignments",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "cleanup-gap",
+                      "description": "Compensation restores scenario-touched assignments and overload state; plan version, audit events, and the applied scenario-run remain as append-only history."
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3213,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:51.235Z",
+                      "annotations": [
+                        {
+                          "type": "cleanup-gap",
+                          "description": "Compensation restores scenario-touched assignments and overload state; plan version, audit events, and the applied scenario-run remain as append-only history."
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a9fc210926988ebaf33b-fd69247ddeff2f73fedc",
+              "file": "full-eval/projects-scenarios-write.spec.ts",
+              "line": 70,
+              "column": 3
+            },
+            {
+              "title": "PLAN reader has no scenario controls and both direct capabilities are denied unchanged",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1965,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:54.458Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a9fc210926988ebaf33b-125053be75837f4ef2d1",
+              "file": "full-eval/projects-scenarios-write.spec.ts",
+              "line": 228,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "full-eval\\projects-settings-write.spec.ts",
+      "file": "full-eval/projects-settings-write.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Projects settings write flows",
+          "file": "full-eval/projects-settings-write.spec.ts",
+          "line": 38,
+          "column": 6,
+          "specs": [
+            {
+              "title": "ADMIN moves and restores project deadline through preview and apply",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4309,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:02:56.459Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a79bce6411671310ccd1-e079212ec6ace7ad84dc",
+              "file": "full-eval/projects-settings-write.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "PLAN reader has no deadline controls and direct preview is denied without mutation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1751,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-10T00:03:00.776Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a79bce6411671310ccd1-88d7a68372810032b3c8",
+              "file": "full-eval/projects-settings-write.spec.ts",
+              "line": 146,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-10T00:02:23.088Z",
+    "duration": 39806.868,
+    "expected": 13,
+    "skipped": 1,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

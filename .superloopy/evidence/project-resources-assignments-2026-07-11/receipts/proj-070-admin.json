@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "PROJ-070",
+  "role": "admin",
+  "key": "PROJ-070:admin",
+  "status": "pass",
+  "runId": "project-resources-20260711-final3",
+  "generatedAt": "2026-07-11T03:43:46.329Z",
+  "assertions": [
+    "Selected a live person/day cell and proved TaskModal preset the exact resourceId",
+    "UI create emitted matching batch preview/apply commands and API readback contained task plus assignment",
+    "Reload preserved the task; cleanup preview/apply removed it and cleanup reload confirmed absence"
+  ],
+  "details": {
+    "previewEnvelope": {
+      "commands": [
+        {
+          "type": "task.create",
+          "payload": {
+            "id": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+            "projectId": "project-gorset-migration",
+            "parentTaskId": null,
+            "title": "PROJ-070 preset project-resources-20260711-final3",
+            "statusId": "todo",
+            "plannedStart": "2026-05-25",
+            "plannedFinish": "2026-05-26",
+            "durationMinutes": 480,
+            "workMinutes": 60,
+            "assignments": []
+          }
+        },
+        {
+          "type": "task.update_schedule",
+          "payload": {
+            "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+            "plannedStart": "2026-05-25",
+            "plannedFinish": "2026-05-26"
+          }
+        },
+        {
+          "type": "assignment.upsert",
+          "payload": {
+            "id": "a-816050fc-e648-4dc9-98dc-4c810a896b5c",
+            "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+            "resourceId": "user-alpha-admin",
+            "role": "executor",
+            "unitsPermille": 1000,
+            "workMinutes": 60
+          }
+        }
+      ],
+      "clientPlanVersion": 9
+    },
+    "applyEnvelope": {
+      "commands": [
+        {
+          "type": "task.create",
+          "payload": {
+            "id": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+            "projectId": "project-gorset-migration",
+            "parentTaskId": null,
+            "title": "PROJ-070 preset project-resources-20260711-final3",
+            "statusId": "todo",
+            "plannedStart": "2026-05-25",
+            "plannedFinish": "2026-05-26",
+            "durationMinutes": 480,
+            "workMinutes": 60,
+            "assignments": []
+          }
+        },
+        {
+          "type": "task.update_schedule",
+          "payload": {
+            "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+            "plannedStart": "2026-05-25",
+            "plannedFinish": "2026-05-26"
+          }
+        },
+        {
+          "type": "assignment.upsert",
+          "payload": {
+            "id": "a-816050fc-e648-4dc9-98dc-4c810a896b5c",
+            "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+            "resourceId": "user-alpha-admin",
+            "role": "executor",
+            "unitsPermille": 1000,
+            "workMinutes": 60
+          }
+        }
+      ],
+      "clientPlanVersion": 9,
+      "idempotencyKey": "planning-batch-0e05f755-8604-4c20-a61a-a8ff36664381"
+    },
+    "reloadReadback": {
+      "reloaded": true,
+      "planVersion": 10,
+      "taskId": "",
+      "resourceId": "user-alpha-admin"
+    },
+    "cleanup": {
+      "previewEnvelope": {
+        "command": {
+          "type": "task.delete_or_archive",
+          "payload": {
+            "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+            "mode": "delete"
+          }
+        },
+        "clientPlanVersion": 10
+      },
+      "previewStatus": 200,
+      "applyEnvelope": {
+        "command": {
+          "type": "task.delete_or_archive",
+          "payload": {
+            "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+            "mode": "delete"
+          }
+        },
+        "clientPlanVersion": 10
+      },
+      "applyStatus": 200,
+      "planVersion": 11,
+      "finalPlanVersion": 11,
+      "taskAbsent": true,
+      "assignmentAbsent": true
+    }
+  },
+  "screenshots": [
+    "screenshots/proj-070-admin-preset-created-reload.png"
+  ],
+  "receipt": "receipts/proj-070-admin.json"
+}

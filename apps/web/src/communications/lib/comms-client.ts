@@ -370,7 +370,7 @@ export type ChannelCreateInput = {
   scopeEntityType?: "project" | "org_unit" | null;
   scopeEntityId?: string | null;
 };
-export type ChannelPatchInput = { title?: string; description?: string };
+export type ChannelPatchInput = { title?: string; description?: string; clientUpdatedAt?: string };
 export type CallRoomCreateInput = {
   entityType: EntityType;
   entityId: string;
@@ -577,7 +577,7 @@ export function createCommsClient(options: CommsApiClientOptions) {
     },
     // 22) Обновить состояние участника (свой=read, чужой=manage).
     participantState(roomId: string, sessionId: string, input: { state: CallParticipantStateValue; userId?: string }) {
-      return requestJson<{ participantState: CallParticipantState; event: CallEvent }>(
+      return requestJson<{ participantState: CallParticipantState; event: CallEvent | null }>(
         `/api/workspace/call-rooms/${enc(roomId)}/sessions/${enc(sessionId)}/participant-state`,
         { method: "POST", body: JSON.stringify(input) }
       );

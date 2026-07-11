@@ -1,0 +1,38 @@
+{
+  "id": "RISK-WRITE-FLOW-PLANNING-IDEMPOTENCY-COVERAGE",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "status": "targeted-coverage-added",
+  "coverageStatus": "partial-risk-zone",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "generatedAt": "2026-07-07",
+  "surface": [
+    "POST /api/workspace/projects/:projectId/planning/apply-command"
+  ],
+  "writeFlowsCovered": [
+    "baseline.capture",
+    "task.update_schedule"
+  ],
+  "expected": [
+    "Concurrent identical requests with the same idempotency key deduplicate to the same successful response and bump planVersion once.",
+    "Reusing the same idempotency key with a different payload returns 409 idempotency_key_conflict."
+  ],
+  "fixApplied": [
+    "Added DB integration coverage for concurrent baseline.capture with the same idempotency key.",
+    "Added DB integration coverage for concurrent task.update_schedule with the same idempotency key.",
+    "No production code change was required; current idempotency/advisory-lock behavior passed the new targeted coverage."
+  ],
+  "changedFiles": [
+    "apps/api/src/planningRoutes.db.test.ts"
+  ],
+  "greenEvidence": [
+    "$env:DATABASE_URL='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm'; .\\node_modules\\.bin\\vitest.CMD run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"deduplicates concurrent\" -> 2 selected tests passed, 20 skipped.",
+    "Vitest emitted the pre-existing duplicate assignment.delete case warning in packages/domain/src/planning/commandReducer.ts; unrelated to this coverage slice."
+  ],
+  "limitations": [
+    "This closes only the planning apply-command idempotency slice of RISK-WRITE-FLOW-RACE-IDEMPOTENCY.",
+    "Admin user/role concurrent writes, communication channel rename races, auth reset concurrent confirm, CRM contact concurrent uniqueness, and notification read concurrent idempotency remain separate risk-zone slices."
+  ],
+  "regressionRisk": "Low. Test-only coverage added for existing behavior; production code was not changed."
+}

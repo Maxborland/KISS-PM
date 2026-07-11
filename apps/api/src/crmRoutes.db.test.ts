@@ -1,4 +1,4 @@
-﻿import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabase,
@@ -377,6 +377,455 @@ describe("Phase 3.1 CRM API", () => {
     );
   });
 
+  it("returns one created opportunity and one 409 conflict for concurrent duplicate opportunity ids", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-opportunity-race", name: "Клиент race opportunity" })
+    });
+    await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "contact-opportunity-race",
+        clientId: "client-opportunity-race",
+        name: "Контакт race opportunity"
+      })
+    });
+    await app.request("/api/workspace/project-types", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "project-type-opportunity-race", name: "Race implementation" })
+    });
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-opportunity-race", name: "Race stage", sortOrder: 10 })
+    });
+
+    const opportunityBody = {
+      id: "opportunity-race-duplicate",
+      clientId: "client-opportunity-race",
+      primaryContactId: "contact-opportunity-race",
+      projectTypeId: "project-type-opportunity-race",
+      stageId: "deal-stage-opportunity-race",
+      title: "Race opportunity",
+      description: null,
+      plannedStart: "2026-06-01",
+      plannedFinish: "2026-06-12",
+      contractValue: 960000,
+      plannedHourlyRate: 6000,
+      probability: 80,
+      templateId: null,
+      demand: [{ positionId: "position-engineer", requiredHours: 120 }]
+    };
+
+    const responses = await Promise.all([
+      app.request("/api/workspace/opportunities", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(opportunityBody)
+      }),
+      app.request("/api/workspace/opportunities", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(opportunityBody)
+      })
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const conflict = responses.find((response) => response.status === 409);
+    expect(conflict).toBeDefined();
+    await expect(conflict!.json()).resolves.toEqual({ error: "opportunity_id_taken" });
+    const opportunityRows = await client`
+      SELECT count(*)::int AS count
+      FROM opportunities
+      WHERE tenant_id = 'tenant-alpha'
+        AND id = 'opportunity-race-duplicate'
+    `;
+    expect(Number(opportunityRows[0]?.count ?? 0)).toBe(1);
+  });
+  it("keeps opportunity stage and pipeline writes idempotent and race-safe", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-opportunity-write-risk", name: "Клиент write risk" })
+    });
+    await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "contact-opportunity-write-risk",
+        clientId: "client-opportunity-write-risk",
+        name: "Контакт write risk"
+      })
+    });
+    await app.request("/api/workspace/project-types", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "project-type-opportunity-write-risk", name: "Write risk" })
+    });
+
+    const firstStageResponse = await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-risk-a", name: "Risk A", sortOrder: 10 })
+    });
+    const firstStageBody = (await firstStageResponse.json()) as {
+      dealStage: { pipelineId: string };
+    };
+    const defaultPipelineId = firstStageBody.dealStage.pipelineId;
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-risk-b", name: "Risk B", sortOrder: 20 })
+    });
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-risk-c", name: "Risk C", sortOrder: 30 })
+    });
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-risk-d", name: "Risk D", sortOrder: 40 })
+    });
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "deal-stage-risk-archived", name: "Risk archived", sortOrder: 50 })
+    });
+    await app.request("/api/workspace/deal-stages/deal-stage-risk-archived", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        name: "Risk archived",
+        sortOrder: 50,
+        status: "archived"
+      })
+    });
+    await app.request("/api/workspace/pipelines", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "pipeline-opportunity-write-risk-target",
+        name: "Write risk target",
+        sortOrder: 20
+      })
+    });
+    await app.request("/api/workspace/deal-stages", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "deal-stage-risk-target",
+        pipelineId: "pipeline-opportunity-write-risk-target",
+        name: "Risk target",
+        sortOrder: 10
+      })
+    });
+
+    const opportunityBody = {
+      clientId: "client-opportunity-write-risk",
+      primaryContactId: "contact-opportunity-write-risk",
+      projectTypeId: "project-type-opportunity-write-risk",
+      description: null,
+      plannedStart: "2026-06-01",
+      plannedFinish: "2026-06-12",
+      contractValue: 960000,
+      plannedHourlyRate: 6000,
+      probability: 80,
+      templateId: null,
+      demand: [{ positionId: "position-engineer", requiredHours: 120 }]
+    };
+
+    const missingStageCreate = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        ...opportunityBody,
+        id: "opportunity-risk-missing-stage",
+        stageId: "deal-stage-risk-missing",
+        title: "Missing stage"
+      })
+    });
+    expect(missingStageCreate.status).toBe(404);
+    await expect(missingStageCreate.json()).resolves.toEqual({
+      error: "deal_stage_not_found"
+    });
+    const archivedStageCreate = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        ...opportunityBody,
+        id: "opportunity-risk-archived-stage",
+        stageId: "deal-stage-risk-archived",
+        title: "Archived stage"
+      })
+    });
+    expect(archivedStageCreate.status).toBe(404);
+    await expect(archivedStageCreate.json()).resolves.toEqual({
+      error: "deal_stage_not_found"
+    });
+
+    const duplicateTitleResponses = await Promise.all([
+      app.request("/api/workspace/opportunities", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          ...opportunityBody,
+          id: "opportunity-risk-title-a",
+          stageId: "deal-stage-risk-a",
+          title: "Duplicate title allowed"
+        })
+      }),
+      app.request("/api/workspace/opportunities", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          ...opportunityBody,
+          id: "opportunity-risk-title-b",
+          stageId: "deal-stage-risk-a",
+          title: "Duplicate title allowed"
+        })
+      })
+    ]);
+    expect(duplicateTitleResponses.map((response) => response.status).sort()).toEqual([
+      201,
+      201
+    ]);
+    const duplicateTitleRows = await client`
+      SELECT count(*)::int AS count
+      FROM opportunities
+      WHERE tenant_id = 'tenant-alpha'
+        AND title = 'Duplicate title allowed'
+    `;
+    expect(Number(duplicateTitleRows[0]?.count ?? 0)).toBe(2);
+
+    const opportunityResponse = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        ...opportunityBody,
+        id: "opportunity-risk-stage-pipeline",
+        stageId: "deal-stage-risk-a",
+        title: "Stage pipeline race"
+      })
+    });
+    expect(opportunityResponse.status).toBe(201);
+    await expect(opportunityResponse.json()).resolves.toMatchObject({
+      opportunity: {
+        id: "opportunity-risk-stage-pipeline",
+        stageId: "deal-stage-risk-a",
+        pipelineId: defaultPipelineId
+      }
+    });
+
+    const missingStageMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/stage",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ stageId: "deal-stage-risk-missing" })
+      }
+    );
+    const archivedStageMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/stage",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ stageId: "deal-stage-risk-archived" })
+      }
+    );
+    expect(missingStageMove.status).toBe(404);
+    await expect(missingStageMove.json()).resolves.toEqual({
+      error: "deal_stage_not_found"
+    });
+    expect(archivedStageMove.status).toBe(404);
+    await expect(archivedStageMove.json()).resolves.toEqual({
+      error: "deal_stage_not_found"
+    });
+
+    const firstStageMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/stage",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ stageId: "deal-stage-risk-b" })
+      }
+    );
+    expect(firstStageMove.status).toBe(200);
+    await expect(firstStageMove.json()).resolves.toMatchObject({
+      opportunity: { stageId: "deal-stage-risk-b", pipelineId: defaultPipelineId }
+    });
+    expect(await countOpportunityAuditEvents("opportunity.stage_updated")).toBe(1);
+
+    const duplicateStageMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/stage",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ stageId: "deal-stage-risk-b" })
+      }
+    );
+    expect(duplicateStageMove.status).toBe(200);
+    await expect(duplicateStageMove.json()).resolves.toMatchObject({
+      opportunity: { stageId: "deal-stage-risk-b", pipelineId: defaultPipelineId }
+    });
+    expect(await countOpportunityAuditEvents("opportunity.stage_updated")).toBe(1);
+
+    const concurrentStageMoves = await Promise.all(
+      ["deal-stage-risk-c", "deal-stage-risk-d"].map(async (stageId) => {
+        const response = await app.request(
+          "/api/workspace/opportunities/opportunity-risk-stage-pipeline/stage",
+          {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ stageId })
+          }
+        );
+        return { status: response.status, body: await response.json() };
+      })
+    );
+    expect(concurrentStageMoves.map((result) => result.status).sort()).toEqual([
+      200,
+      200
+    ]);
+    expect(
+      concurrentStageMoves.map((result) => result.body.opportunity.stageId).sort()
+    ).toEqual(["deal-stage-risk-c", "deal-stage-risk-d"]);
+    const stageReadback = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline",
+      { headers: { "x-kiss-pm-action": "same-origin", cookie } }
+    );
+    expect(stageReadback.status).toBe(200);
+    const stageReadbackBody = await stageReadback.json();
+    expect(["deal-stage-risk-c", "deal-stage-risk-d"]).toContain(
+      stageReadbackBody.opportunity.stageId
+    );
+    expect(stageReadbackBody.opportunity.pipelineId).toBe(defaultPipelineId);
+    expect(await countOpportunityAuditEvents("opportunity.stage_updated")).toBe(3);
+
+    const missingPipelineMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/pipeline",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          pipelineId: "pipeline-opportunity-write-risk-missing",
+          stageId: "deal-stage-risk-target"
+        })
+      }
+    );
+    expect(missingPipelineMove.status).toBe(404);
+    await expect(missingPipelineMove.json()).resolves.toEqual({
+      error: "pipeline_not_found"
+    });
+    const wrongStagePipelineMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/pipeline",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          pipelineId: "pipeline-opportunity-write-risk-target",
+          stageId: "deal-stage-risk-a"
+        })
+      }
+    );
+    expect(wrongStagePipelineMove.status).toBe(409);
+    await expect(wrongStagePipelineMove.json()).resolves.toEqual({
+      error: "stage_not_in_pipeline"
+    });
+    expect(await countOpportunityAuditEvents("opportunity.pipeline_changed")).toBe(0);
+
+    const pipelineMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/pipeline",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          pipelineId: "pipeline-opportunity-write-risk-target",
+          stageId: "deal-stage-risk-target"
+        })
+      }
+    );
+    expect(pipelineMove.status).toBe(200);
+    await expect(pipelineMove.json()).resolves.toMatchObject({
+      opportunity: {
+        stageId: "deal-stage-risk-target",
+        pipelineId: "pipeline-opportunity-write-risk-target"
+      }
+    });
+    expect(await countOpportunityAuditEvents("opportunity.pipeline_changed")).toBe(1);
+
+    const duplicatePipelineMove = await app.request(
+      "/api/workspace/opportunities/opportunity-risk-stage-pipeline/pipeline",
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          pipelineId: "pipeline-opportunity-write-risk-target",
+          stageId: "deal-stage-risk-target"
+        })
+      }
+    );
+    expect(duplicatePipelineMove.status).toBe(200);
+    await expect(duplicatePipelineMove.json()).resolves.toMatchObject({
+      opportunity: {
+        stageId: "deal-stage-risk-target",
+        pipelineId: "pipeline-opportunity-write-risk-target"
+      }
+    });
+    expect(await countOpportunityAuditEvents("opportunity.pipeline_changed")).toBe(1);
+
+    const invalidOpportunityRows = await client`
+      SELECT count(*)::int AS count
+      FROM opportunities
+      WHERE tenant_id = 'tenant-alpha'
+        AND id IN ('opportunity-risk-missing-stage', 'opportunity-risk-archived-stage')
+    `;
+    expect(Number(invalidOpportunityRows[0]?.count ?? 0)).toBe(0);
+    expect(
+      await countOpportunityAuditEvents(
+        "opportunity.created",
+        "opportunity-risk-missing-stage"
+      )
+    ).toBe(0);
+    expect(
+      await countOpportunityAuditEvents(
+        "opportunity.created",
+        "opportunity-risk-archived-stage"
+      )
+    ).toBe(0);
+
+    async function countOpportunityAuditEvents(
+      actionType: string,
+      opportunityId = "opportunity-risk-stage-pipeline"
+    ) {
+      const rows = await client`
+        SELECT count(*)::int AS count
+        FROM audit_events
+        WHERE tenant_id = 'tenant-alpha'
+          AND action_type = ${actionType}
+          AND source_entity ->> 'type' = 'Opportunity'
+          AND source_entity ->> 'id' = ${opportunityId}
+      `;
+      return Number(rows[0]?.count ?? 0);
+    }
+  });
   // Регресс BUG-CRM-01: дубликат SKU/имени продукта должен давать 409, а не 500.
   it("returns 409 (not 500) when creating a product with a duplicate SKU or name", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
@@ -431,6 +880,360 @@ describe("Phase 3.1 CRM API", () => {
     await expect(dupName.json()).resolves.toEqual({ error: "product_name_taken" });
   });
 
+  it("returns 409 when creating or updating clients with a duplicate name", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const first = await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-name-a", name: "Клиент дубль" })
+    });
+    const duplicateCreate = await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-name-b", name: "Клиент дубль" })
+    });
+    const second = await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-name-c", name: "Клиент уникальный" })
+    });
+    const duplicateUpdate = await app.request("/api/workspace/clients/client-name-c", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ name: "Клиент дубль", status: "active" })
+    });
+
+    expect(first.status).toBe(201);
+    expect(duplicateCreate.status).toBe(409);
+    await expect(duplicateCreate.json()).resolves.toEqual({ error: "client_name_taken" });
+    expect(second.status).toBe(201);
+    expect(duplicateUpdate.status).toBe(409);
+    await expect(duplicateUpdate.json()).resolves.toEqual({ error: "client_name_taken" });
+  });
+
+  it("returns 409 when updating a product to a duplicate SKU or name", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const first = await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-update-a",
+        name: "Продукт А",
+        sku: "SKU-A",
+        type: "service",
+        unit: "час",
+        price: 1000
+      })
+    });
+    const second = await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-update-b",
+        name: "Продукт Б",
+        sku: "SKU-B",
+        type: "service",
+        unit: "час",
+        price: 2000
+      })
+    });
+    const duplicateSku = await app.request("/api/workspace/products/product-update-b", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        name: "Продукт Б обновленный",
+        sku: "SKU-A",
+        type: "service",
+        unit: "час",
+        price: 2500,
+        status: "active"
+      })
+    });
+    const duplicateName = await app.request("/api/workspace/products/product-update-b", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        name: "Продукт А",
+        sku: "SKU-B-UPDATED",
+        type: "service",
+        unit: "час",
+        price: 2500,
+        status: "active"
+      })
+    });
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(duplicateSku.status).toBe(409);
+    await expect(duplicateSku.json()).resolves.toEqual({ error: "product_sku_taken" });
+    expect(duplicateName.status).toBe(409);
+    await expect(duplicateName.json()).resolves.toEqual({ error: "product_name_taken" });
+  });
+  it("keeps client name writes conflict-safe under concurrent create and update", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const concurrentCreates = await Promise.all([
+      app.request("/api/workspace/clients", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ id: "client-race-create-a", name: "Клиент race name" })
+      }),
+      app.request("/api/workspace/clients", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ id: "client-race-create-b", name: "Клиент race name" })
+      })
+    ]);
+    expect(concurrentCreates.map((response) => response.status).sort()).toEqual([201, 409]);
+    const createConflict = concurrentCreates.find((response) => response.status === 409);
+    expect(createConflict).toBeDefined();
+    await expect(createConflict!.json()).resolves.toEqual({ error: "client_name_taken" });
+    const createRows = await client`
+      SELECT count(*)::int AS count
+      FROM clients
+      WHERE tenant_id = 'tenant-alpha'
+        AND name = 'Клиент race name'
+    `;
+    expect(Number(createRows[0]?.count ?? 0)).toBe(1);
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-race-update-a", name: "Клиент race update A" })
+    });
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-race-update-b", name: "Клиент race update B" })
+    });
+
+    const concurrentUpdates = await Promise.all([
+      app.request("/api/workspace/clients/client-race-update-a", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ name: "Клиент shared update", status: "active" })
+      }),
+      app.request("/api/workspace/clients/client-race-update-b", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ name: "Клиент shared update", status: "active" })
+      })
+    ]);
+    expect(concurrentUpdates.map((response) => response.status).sort()).toEqual([200, 409]);
+    const updateConflict = concurrentUpdates.find((response) => response.status === 409);
+    expect(updateConflict).toBeDefined();
+    await expect(updateConflict!.json()).resolves.toEqual({ error: "client_name_taken" });
+    const updateRows = await client`
+      SELECT count(*)::int AS count
+      FROM clients
+      WHERE tenant_id = 'tenant-alpha'
+        AND name = 'Клиент shared update'
+    `;
+    expect(Number(updateRows[0]?.count ?? 0)).toBe(1);
+  });
+
+  it("keeps product SKU and name writes conflict-safe under concurrent create and update", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    const concurrentSkuCreates = await Promise.all([
+      app.request("/api/workspace/products", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "product-race-sku-create-a",
+          name: "Продукт race SKU A",
+          sku: "RACE-SKU",
+          type: "service",
+          unit: "час",
+          price: 1000
+        })
+      }),
+      app.request("/api/workspace/products", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "product-race-sku-create-b",
+          name: "Продукт race SKU B",
+          sku: "RACE-SKU",
+          type: "service",
+          unit: "час",
+          price: 2000
+        })
+      })
+    ]);
+    expect(concurrentSkuCreates.map((response) => response.status).sort()).toEqual([201, 409]);
+    const skuCreateConflict = concurrentSkuCreates.find((response) => response.status === 409);
+    expect(skuCreateConflict).toBeDefined();
+    await expect(skuCreateConflict!.json()).resolves.toEqual({ error: "product_sku_taken" });
+    const skuCreateRows = await client`
+      SELECT count(*)::int AS count
+      FROM products
+      WHERE tenant_id = 'tenant-alpha'
+        AND sku = 'RACE-SKU'
+    `;
+    expect(Number(skuCreateRows[0]?.count ?? 0)).toBe(1);
+
+    const concurrentNameCreates = await Promise.all([
+      app.request("/api/workspace/products", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "product-race-name-create-a",
+          name: "Продукт race name",
+          sku: "RACE-NAME-A",
+          type: "service",
+          unit: "час",
+          price: 1000
+        })
+      }),
+      app.request("/api/workspace/products", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "product-race-name-create-b",
+          name: "Продукт race name",
+          sku: "RACE-NAME-B",
+          type: "service",
+          unit: "час",
+          price: 2000
+        })
+      })
+    ]);
+    expect(concurrentNameCreates.map((response) => response.status).sort()).toEqual([201, 409]);
+    const nameCreateConflict = concurrentNameCreates.find((response) => response.status === 409);
+    expect(nameCreateConflict).toBeDefined();
+    await expect(nameCreateConflict!.json()).resolves.toEqual({ error: "product_name_taken" });
+    const nameCreateRows = await client`
+      SELECT count(*)::int AS count
+      FROM products
+      WHERE tenant_id = 'tenant-alpha'
+        AND name = 'Продукт race name'
+    `;
+    expect(Number(nameCreateRows[0]?.count ?? 0)).toBe(1);
+
+    await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-race-update-a",
+        name: "Продукт race update A",
+        sku: "RACE-UPDATE-A",
+        type: "service",
+        unit: "час",
+        price: 1000
+      })
+    });
+    await app.request("/api/workspace/products", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "product-race-update-b",
+        name: "Продукт race update B",
+        sku: "RACE-UPDATE-B",
+        type: "service",
+        unit: "час",
+        price: 2000
+      })
+    });
+
+    const concurrentSkuUpdates = await Promise.all([
+      app.request("/api/workspace/products/product-race-update-a", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          name: "Продукт race update A",
+          sku: "RACE-UPDATE-SHARED",
+          type: "service",
+          unit: "час",
+          price: 1000,
+          status: "active"
+        })
+      }),
+      app.request("/api/workspace/products/product-race-update-b", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          name: "Продукт race update B",
+          sku: "RACE-UPDATE-SHARED",
+          type: "service",
+          unit: "час",
+          price: 2000,
+          status: "active"
+        })
+      })
+    ]);
+    expect(concurrentSkuUpdates.map((response) => response.status).sort()).toEqual([200, 409]);
+    const skuUpdateConflict = concurrentSkuUpdates.find((response) => response.status === 409);
+    expect(skuUpdateConflict).toBeDefined();
+    await expect(skuUpdateConflict!.json()).resolves.toEqual({ error: "product_sku_taken" });
+    const skuUpdateRows = await client`
+      SELECT count(*)::int AS count
+      FROM products
+      WHERE tenant_id = 'tenant-alpha'
+        AND sku = 'RACE-UPDATE-SHARED'
+    `;
+    expect(Number(skuUpdateRows[0]?.count ?? 0)).toBe(1);
+
+    const concurrentNameUpdates = await Promise.all([
+      app.request("/api/workspace/products/product-race-update-a", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          name: "Продукт shared update",
+          sku: "RACE-UPDATE-A-NAME",
+          type: "service",
+          unit: "час",
+          price: 1000,
+          status: "active"
+        })
+      }),
+      app.request("/api/workspace/products/product-race-update-b", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          name: "Продукт shared update",
+          sku: "RACE-UPDATE-B-NAME",
+          type: "service",
+          unit: "час",
+          price: 2000,
+          status: "active"
+        })
+      })
+    ]);
+    expect(concurrentNameUpdates.map((response) => response.status).sort()).toEqual([200, 409]);
+    const nameUpdateConflict = concurrentNameUpdates.find((response) => response.status === 409);
+    expect(nameUpdateConflict).toBeDefined();
+    await expect(nameUpdateConflict!.json()).resolves.toEqual({ error: "product_name_taken" });
+    const nameUpdateRows = await client`
+      SELECT count(*)::int AS count
+      FROM products
+      WHERE tenant_id = 'tenant-alpha'
+        AND name = 'Продукт shared update'
+    `;
+    expect(Number(nameUpdateRows[0]?.count ?? 0)).toBe(1);
+  });
   it("updates CRM foundation entities with tenant-scoped audit trail", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {
@@ -627,6 +1430,151 @@ describe("Phase 3.1 CRM API", () => {
     });
   });
 
+  it("rejects duplicate contact emails on create and update with 409", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-dup-email", name: "Клиент дублей" })
+    });
+    const first = await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "contact-email-first", clientId: "client-dup-email", name: "Первый", email: "Dup@Example.test" })
+    });
+    const second = await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "contact-email-second", clientId: "client-dup-email", name: "Второй", email: "other@example.test" })
+    });
+    const duplicateCreate = await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "contact-email-duplicate", clientId: "client-dup-email", name: "Дубль", email: "dup@example.test" })
+    });
+    const duplicateUpdate = await app.request("/api/workspace/contacts/contact-email-second", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ clientId: "client-dup-email", name: "Второй", email: "dup@example.test", status: "active" })
+    });
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(duplicateCreate.status).toBe(409);
+    await expect(duplicateCreate.json()).resolves.toEqual({ error: "contact_email_taken" });
+    expect(duplicateUpdate.status).toBe(409);
+    await expect(duplicateUpdate.json()).resolves.toEqual({ error: "contact_email_taken" });
+  });
+
+  it("keeps contact email writes conflict-safe under concurrent create and update", async () => {
+    const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = {
+      "content-type": "application/json",
+      "x-kiss-pm-action": "same-origin",
+      cookie
+    };
+
+    await app.request("/api/workspace/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: "client-contact-race", name: "Клиент race contacts" })
+    });
+
+    const concurrentCreates = await Promise.all([
+      app.request("/api/workspace/contacts", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "contact-race-create-a",
+          clientId: "client-contact-race",
+          name: "Race create A",
+          email: "race@example.test"
+        })
+      }),
+      app.request("/api/workspace/contacts", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          id: "contact-race-create-b",
+          clientId: "client-contact-race",
+          name: "Race create B",
+          email: "race@example.test"
+        })
+      })
+    ]);
+    expect(concurrentCreates.map((response) => response.status).sort()).toEqual([201, 409]);
+    const createConflict = concurrentCreates.find((response) => response.status === 409);
+    expect(createConflict).toBeDefined();
+    await expect(createConflict!.json()).resolves.toEqual({ error: "contact_email_taken" });
+    const createRows = await client`
+      SELECT count(*)::int AS count
+      FROM contacts
+      WHERE tenant_id = 'tenant-alpha'
+        AND lower(email) = 'race@example.test'
+    `;
+    expect(Number(createRows[0]?.count ?? 0)).toBe(1);
+
+    await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "contact-race-update-a",
+        clientId: "client-contact-race",
+        name: "Race update A",
+        email: "update-a@example.test"
+      })
+    });
+    await app.request("/api/workspace/contacts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        id: "contact-race-update-b",
+        clientId: "client-contact-race",
+        name: "Race update B",
+        email: "update-b@example.test"
+      })
+    });
+
+    const concurrentUpdates = await Promise.all([
+      app.request("/api/workspace/contacts/contact-race-update-a", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          clientId: "client-contact-race",
+          name: "Race update A",
+          email: "shared-update@example.test",
+          status: "active"
+        })
+      }),
+      app.request("/api/workspace/contacts/contact-race-update-b", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          clientId: "client-contact-race",
+          name: "Race update B",
+          email: "shared-update@example.test",
+          status: "active"
+        })
+      })
+    ]);
+    expect(concurrentUpdates.map((response) => response.status).sort()).toEqual([200, 409]);
+    const updateConflict = concurrentUpdates.find((response) => response.status === 409);
+    expect(updateConflict).toBeDefined();
+    await expect(updateConflict!.json()).resolves.toEqual({ error: "contact_email_taken" });
+    const updateRows = await client`
+      SELECT count(*)::int AS count
+      FROM contacts
+      WHERE tenant_id = 'tenant-alpha'
+        AND lower(email) = 'shared-update@example.test'
+    `;
+    expect(Number(updateRows[0]?.count ?? 0)).toBe(1);
+  });
   it("allows editing a contact on its archived current client but rejects reassignment to archived clients", async () => {
     const cookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const headers = {

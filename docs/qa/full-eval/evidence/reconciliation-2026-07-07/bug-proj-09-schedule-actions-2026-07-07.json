@@ -1,0 +1,46 @@
+{
+  "id": "BUG-PROJ-09-SCHEDULE-ACTIONS",
+  "linkedOldIds": [
+    "BUG-PROJ-09"
+  ],
+  "status": "fixed-by-current-branch",
+  "coverageStatus": "targeted",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "generatedAt": "2026-07-07",
+  "surface": [
+    "/projects/[id]/schedule"
+  ],
+  "expected": [
+    "Schedule toolbar controls must either perform real navigation/actions or not be exposed as enabled fake controls.",
+    "Baseline opens the existing project baseline route.",
+    "Unsupported filter/column toolbar controls are not rendered as clickable fake actions."
+  ],
+  "actualBefore": [
+    "Baseline used demoAction(\"снимок baseline\") and did not navigate.",
+    "Фильтры used demoAction(\"фильтры\") with no implemented filter panel.",
+    "Колонки used demoAction(\"настройка колонок\") with no implemented column settings flow."
+  ],
+  "fixApplied": [
+    "Converted Baseline to a real Next Link: /projects/${projectId}/baseline.",
+    "Removed unsupported Фильтры and Колонки toolbar buttons from the schedule UI.",
+    "Added a project-action-links static contract test for the schedule toolbar."
+  ],
+  "changedFiles": [
+    "apps/web/src/delivery/schedule/schedule-surface.tsx",
+    "apps/web/src/delivery/project-action-links.test.ts"
+  ],
+  "redEvidence": [
+    "./node_modules/.bin/vitest.cmd run apps/web/src/delivery/project-action-links.test.ts -> 4 tests, 1 failed before implementation; new schedule contract could not find the baseline Link."
+  ],
+  "greenEvidence": [
+    "./node_modules/.bin/vitest.cmd run apps/web/src/delivery/project-action-links.test.ts -> 4 tests passed.",
+    "From apps/web: ../../node_modules/.bin/next.cmd typegen -> passed.",
+    "From apps/web: ../../node_modules/.bin/tsc.cmd -p tsconfig.json --pretty false -> passed.",
+    "Spot check: apps/web/src/delivery/schedule/schedule-surface.tsx line 760 renders <Link href={`/projects/${projectId}/baseline`}>Baseline</Link> and no longer contains the schedule demoAction calls."
+  ],
+  "limitations": [
+    "This is targeted source/test/typecheck evidence for the historical BUG-PROJ-09 schedule fake-controls scope.",
+    "Full browser traversal for every role, route, and action remains tracked separately as RISK-FULL-BROWSER-TRAVERSAL."
+  ],
+  "regressionRisk": "Low. The change removes unsupported fake toolbar controls and maps Baseline to an existing route; no scheduling data mutation behavior changes."
+}

@@ -72,7 +72,7 @@ function ChannelTypeChip({ type }: { type: CommunicationChannelType }) {
 }
 
 export function ChannelsSurface() {
-  const { data, status, error, reload, createChannel, archiveChannel } = useChannels();
+  const { data, status, error, reload, createChannel, replaceChannel, archiveChannel } = useChannels();
   // Справочник людей тенанта (выбор/имена участников): mock=COMMS_USERS, live=GET /api/workspace/users.
   const users = useCommsUsers();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -183,6 +183,7 @@ export function ChannelsSurface() {
             channelId={selected.id}
             fallback={selected}
             users={users}
+            onChannelChange={replaceChannel}
             onArchive={async () => {
               const res = await archiveChannel(selected.id);
               if (res.ok) { toast.success(`Канал «${selected.title}» архивирован`); setSelectedId(null); }
@@ -203,7 +204,7 @@ export function ChannelsSurface() {
    Детальная панель канала (useChannel): инфо + участники + беседа.
    fallback — запись из листинга на время загрузки детали (без мерцания).
    ============================================================ */
-function ChannelDetail({ channelId, fallback, users, onArchive }: { channelId: string; fallback: Channel; users: CommsUsersDir; onArchive: () => Promise<void> }) {
+function ChannelDetail({ channelId, fallback, users, onArchive, onChannelChange }: { channelId: string; fallback: Channel; users: CommsUsersDir; onArchive: () => Promise<void>; onChannelChange: (channel: Channel) => void }) {
   const { client, data, status, error, reload, patchChannel, addMember, removeMember } = useChannel(channelId);
   const [busy, setBusy] = useState(false);
 
@@ -279,7 +280,7 @@ function ChannelDetail({ channelId, fallback, users, onArchive }: { channelId: s
                 setBusy(true);
                 const res = await patchChannel(input);
                 setBusy(false);
-                if (res.ok) toast.success("Канал обновлён");
+                if (res.ok) { onChannelChange(res.data); toast.success("Канал обновлён"); }
                 return res;
               }} />
               {/* Архив канала (G5-08): мягкое удаление — канал уходит из списка, история сохраняется. */}
@@ -624,7 +625,7 @@ function EditChannelDialog({
 }: {
   channel: Channel;
   busy: boolean;
-  onSave: (input: { title?: string; description?: string }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
+  onSave: (input: { title?: string; description?: string; clientUpdatedAt?: string }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(channel.title);
@@ -654,7 +655,7 @@ function EditChannelDialog({
       onSubmit={async () => {
         if (!valid) return null;
         // Шлём только изменённые поля (PATCH требует ≥1 поле).
-        const input: { title?: string; description?: string } = {};
+        const input: { title?: string; description?: string; clientUpdatedAt?: string } = { clientUpdatedAt: channel.updatedAt };
         if (title.trim() !== channel.title) input.title = title.trim();
         if (description !== channel.description) input.description = description;
         const res = await onSave(input);

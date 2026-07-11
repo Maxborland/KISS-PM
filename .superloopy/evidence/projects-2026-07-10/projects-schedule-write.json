@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-07-09T23:12:58.014Z",
+  "baseURL": "http://127.0.0.1:3180",
+  "admin": {
+    "projectId": "project-vektor-portal",
+    "marker": "FullEval schedule 1783638773549",
+    "taskId": "t-ab9e0da2-de67-4736-9673-eb7903823a32",
+    "createStatus": 200,
+    "deleteStatus": 200,
+    "createdPlanVersion": 22,
+    "finalPlanVersion": 23,
+    "reloadCreateReadback": true,
+    "reloadDeleteReadback": true,
+    "cleanup": "deleted_via_ui",
+    "status": "PASS"
+  },
+  "planReader": {
+    "projectId": "project-vektor-portal",
+    "marker": "FullEval denied 1783638778112",
+    "writeControlsHidden": true,
+    "previewMutationStatus": 403,
+    "planVersionBefore": 23,
+    "planVersionAfter": 23,
+    "unchanged": true,
+    "status": "PASS_PERMISSION_GATED"
+  }
+}

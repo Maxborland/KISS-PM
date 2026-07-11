@@ -1,0 +1,34 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-CRM-PIPELINE-STAGE-DUPLICATE-SUBMIT",
+  "generatedAt": "2026-07-08",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "surface": "POST /api/workspace/crm/pipelines and POST /api/workspace/crm/pipelines/:pipelineId/stages",
+  "scope": [
+    "concurrent duplicate CRM pipeline create with same tenant/id",
+    "concurrent duplicate CRM pipeline stage create with same tenant/pipeline/id",
+    "single-row DB readback and single success audit assertion added"
+  ],
+  "codeChanges": [
+    "apps/api/src/crmPipelineRoutes.ts maps Postgres 23505 constraints for first-class CRM pipeline/stage create routes to stable 409 errors.",
+    "apps/api/src/crmPipelineRoutes.db.test.ts adds targeted concurrent duplicate-submit DB coverage for pipeline and stage creates."
+  ],
+  "expectedConflictErrors": {
+    "pipelineDuplicateId": "crm_pipeline_id_taken",
+    "stageDuplicateId": "crm_pipeline_stage_id_taken"
+  },
+  "verification": [
+    {
+      "command": "node_modules\\.bin\\tsc.CMD -p apps\\api\\tsconfig.json --pretty false",
+      "status": "passed",
+      "notes": "API TypeScript project typecheck completed successfully."
+    },
+    {
+      "command": "node_modules\\.bin\\vitest.cmd run apps\\api\\src\\crmPipelineRoutes.db.test.ts -t \"keeps pipeline and stage duplicate submits\"",
+      "status": "passed",
+      "notes": "Fresh integration rerun from orchestrator worktree passed: 1 file passed, 1 test passed, 3 skipped; duplicate pipeline/stage submits returned stable success/conflict pairs with one-row and one-audit readback assertions."
+    }
+  ],
+  "coverageStatus": "partial-risk-zone",
+  "remainingEvidence": "Broader first-class CRM transition-rule/automation duplicate/race coverage, audit side-effect de-duplication, CRM opportunity stage/pipeline writes, and the full write-flow matrix remain open.",
+  "integrationVerifiedAt": "2026-07-08T01:10:57+07:00"
+}

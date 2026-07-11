@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 
-import { createCommsClient } from "./comms-client";
+import { createCommsClient, type CallEvent } from "./comms-client";
 import { createMockCommsFetch } from "./mock-comms-backend";
 
 function client() {
@@ -390,9 +390,10 @@ describe("contract-mock Comms backend — звонки", () => {
   it("POST participant-state: свой ok; невалидный state → 400", async () => {
     const c = client();
     const { participantState, event } = await c.participantState("call-room-live", "call-session-live", { state: "joined" });
+    expectTypeOf(event).toEqualTypeOf<CallEvent | null>();
     expect(participantState.state).toBe("joined");
     expect(participantState.userId).toBe("u-anna");
-    expect(event.eventType).toBe("participant_joined");
+    expect(event?.eventType).toBe("participant_joined");
     await expect(
       c.participantState("call-room-live", "call-session-live", { state: "dancing" as never })
     ).rejects.toMatchObject({ status: 400, code: "call_participant_state_invalid" });

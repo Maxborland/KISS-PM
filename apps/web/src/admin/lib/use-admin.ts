@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { guardMutation, type MutationResult } from "../../lib/domain-client";
+import { DomainApiError, guardMutation, type MutationResult } from "../../lib/domain-client";
 import { useDomainClient } from "../../lib/use-domain-client";
 import { useResource, type LoadStatus } from "../../lib/use-resource";
 import {
   createAdminClient,
+  workspaceUserCountsAreKnown,
   type AccessProfile, type AccessRoleCreateInput, type AccessRoleUpdateInput,
   type Permission, type Position, type UserCreateInput, type UserUpdateInput, type WorkspaceUser
 } from "./admin-client";
@@ -20,8 +21,22 @@ export type AdminData = {
   users: WorkspaceUser[];
   positions: Position[];
   permissions: Permission[];
+  // false when the users list is unreadable to this role (403 on the roles surface). Consumers must
+  // NOT treat users:[] as "0 assigned" — the assigned count is UNKNOWN, so destructive role actions
+  // that depend on it (delete) must be disabled rather than falsely enabled.
+  usersReadable: boolean;
 };
 export type AdminMutationResult = MutationResult;
+export type AdminLoadScope = "all" | "roles" | "users";
+
+async function optionalForbidden<T>(request: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await request;
+  } catch (e) {
+    if (e instanceof DomainApiError && e.status === 403) return fallback;
+    throw e;
+  }
+}
 
 /**
  * Работает через настоящий createAdminClient. Транспорт выбирается по
@@ -34,19 +49,58 @@ export type AdminMutationResult = MutationResult;
  * guard-обёртка мутаций (AdminApiError.code → {ok:false,code,message}),
  * точечное обновление локального кэша по затронутой сущности.
  */
-export function useAdmin() {
+export function useAdmin(scope: AdminLoadScope = "all") {
   const { live } = useAdminRuntime();
   const client = useDomainClient(live, createAdminClient, createMockAdminFetch);
 
   const loader = useCallback(async (): Promise<AdminData> => {
+    if (scope === "users") {
+      const [users, roles, positions] = await Promise.all([
+        client.listUsers(),
+        optionalForbidden(client.listAccessRoles(), { accessRoles: [] }),
+        optionalForbidden(client.listPositions(), { positions: [] })
+      ]);
+      return {
+        roles: roles.accessRoles,
+        users: users.users,
+        positions: positions.positions,
+        permissions: [],
+        usersReadable: true
+      };
+    }
+
+    if (scope === "roles") {
+      // listUsers powers the per-role "assigned" count. If the role-manager lacks
+      // tenant.users.read it 403s: fall back to an EMPTY list but flag usersReadable=false so the
+      // surface shows the count as unknown and disables delete (a 403 must not read as "0 assigned").
+      const [roles, users, catalog] = await Promise.all([
+        client.listAccessRoles(),
+        optionalForbidden(
+          client.listUsers().then((r) => {
+            const usersReadable = workspaceUserCountsAreKnown(r);
+            return { users: usersReadable ? r.users : [], usersReadable };
+          }),
+          { users: [], usersReadable: false }
+        ),
+        client.listPermissionCatalog()
+      ]);
+      return {
+        roles: roles.accessRoles,
+        users: users.users,
+        positions: [],
+        permissions: catalog.permissions,
+        usersReadable: users.usersReadable
+      };
+    }
+
     const [roles, users, positions, catalog] = await Promise.all([
       client.listAccessRoles(),
       client.listUsers(),
       client.listPositions(),
       client.listPermissionCatalog()
     ]);
-    return { roles: roles.accessRoles, users: users.users, positions: positions.positions, permissions: catalog.permissions };
-  }, [client]);
+    return { roles: roles.accessRoles, users: users.users, positions: positions.positions, permissions: catalog.permissions, usersReadable: true };
+  }, [client, scope]);
   const { data, status, error, setData, reload: load } = useResource(loader);
 
   const guard = guardMutation;

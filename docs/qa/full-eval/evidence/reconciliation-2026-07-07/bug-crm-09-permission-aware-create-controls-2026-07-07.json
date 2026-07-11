@@ -1,0 +1,39 @@
+{
+  "id": "BUG-CRM-09",
+  "generatedAt": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "status": "fixed-by-current-branch",
+  "surface": "CRM create controls for clients, contacts, products, deals, and default pipeline setup",
+  "expected": [
+    "Live users without the required manage permission do not get an enabled create trigger that opens a doomed modal.",
+    "Storybook/mock mode remains usable without a live session.",
+    "Create controls are gated by the same permission family as backend mutations: clients, contacts, products, opportunities, crm pipelines, deal stages."
+  ],
+  "redEvidence": {
+    "command": "corepack pnpm --filter @kiss-pm/web test -- src/crm/ui/permissions.test.ts",
+    "result": "failed before implementation because ./permissions did not exist; CRM create triggers were not capability-aware"
+  },
+  "greenEvidence": [
+    {
+      "command": "corepack pnpm --filter @kiss-pm/web test -- src/crm/ui/permissions.test.ts src/crm/ui/money.test.ts",
+      "result": "passed: 18 files, 256 tests; permissions.test passed 3 tests and money.test passed 2 tests"
+    },
+    {
+      "command": "corepack pnpm --filter @kiss-pm/web typecheck",
+      "result": "passed: next typegen and tsc -p tsconfig.json --pretty false"
+    }
+  ],
+  "changedFiles": [
+    "apps/web/src/crm/ui/permissions.ts",
+    "apps/web/src/crm/ui/permissions.test.ts",
+    "apps/web/src/crm/clients/clients-surface.tsx",
+    "apps/web/src/crm/contacts/contacts-surface.tsx",
+    "apps/web/src/crm/products/products-surface.tsx",
+    "apps/web/src/crm/deals/deals-surface.tsx"
+  ],
+  "notes": [
+    "Vitest inside the restricted sandbox fails with esbuild spawn EPERM; commands were rerun with approved escalation for fresh evidence.",
+    "This slice gates create triggers. Existing edit/archive controls remain a separate write-permission UX hardening candidate if traversal finds them exposed to read-only CRM users.",
+    "The test run still emits the pre-existing duplicate assignment.delete warning from packages/domain/src/planning/commandReducer.ts."
+  ]
+}

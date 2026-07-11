@@ -61,6 +61,87 @@ export function buildCompensatingCommands(
         }
       ];
     }
+    case "task.update_custom_field": {
+      const task = taskById(command.payload.taskId);
+      if (!task) return [];
+      const customFields = task.customFields ?? {};
+      const value = Object.prototype.hasOwnProperty.call(customFields, command.payload.fieldKey)
+        ? customFields[command.payload.fieldKey]
+        : null;
+      return [
+        {
+          type: "task.update_custom_field",
+          payload: {
+            taskId: command.payload.taskId,
+            fieldKey: command.payload.fieldKey,
+            value
+          }
+        }
+      ];
+    }
+    case "assignment.upsert": {
+      const existing = before.assignments.find(
+        (assignment) => assignment.id === command.payload.id
+      );
+      if (!existing) {
+        return [
+          {
+            type: "assignment.delete",
+            payload: { assignmentId: command.payload.id }
+          }
+        ];
+      }
+      const allocations = (before.assignmentAllocations ?? [])
+        .filter((allocation) => allocation.assignmentId === existing.id)
+        .map(({ date, workMinutes }) => ({ date, workMinutes }));
+      return [
+        {
+          type: "assignment.upsert",
+          payload: {
+            id: existing.id,
+            taskId: existing.taskId,
+            resourceId: existing.resourceId,
+            role: existing.role,
+            unitsPermille: existing.unitsPermille,
+            workMinutes: existing.workMinutes
+          }
+        },
+        ...(allocations.length > 0
+          ? [{
+              type: "assignment.allocations.replace" as const,
+              payload: { assignmentId: existing.id, allocations }
+            }]
+          : [])
+      ];
+    }
+    case "assignment.delete": {
+      const existing = before.assignments.find(
+        (assignment) => assignment.id === command.payload.assignmentId
+      );
+      if (!existing) return [];
+      const allocations = (before.assignmentAllocations ?? [])
+        .filter((allocation) => allocation.assignmentId === existing.id)
+        .map(({ date, workMinutes }) => ({ date, workMinutes }));
+      return [
+        {
+          type: "assignment.upsert",
+          payload: {
+            id: existing.id,
+            taskId: existing.taskId,
+            resourceId: existing.resourceId,
+            role: existing.role,
+            unitsPermille: existing.unitsPermille,
+            workMinutes: existing.workMinutes
+          }
+        },
+        ...(allocations.length > 0
+          ? [{
+              type: "assignment.allocations.replace" as const,
+              payload: { assignmentId: existing.id, allocations }
+            }]
+          : [])
+      ];
+    }
     case "dependency.upsert": {
       const existing = before.dependencies.find((dep) => dep.id === command.payload.id);
       if (existing) {
@@ -98,4 +179,13 @@ export function buildCompensatingCommands(
     default:
       return [];
   }
+}
+
+export function buildCompensatingCommandBatch(
+  commands: readonly PlanningCommand[],
+  before: PlanSnapshot
+): PlanningCommand[] {
+  const groups = commands.map((command) => buildCompensatingCommands(command, before));
+  if (groups.some((group) => group.length === 0)) return [];
+  return groups.reverse().flat();
 }

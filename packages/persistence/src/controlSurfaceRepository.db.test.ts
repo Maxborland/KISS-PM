@@ -187,6 +187,96 @@ describe("control surface repository", () => {
 
     expect(await repository.listControlSurfaceVersions("tenant-alpha", draft.id)).toHaveLength(1);
   });
+  it("rejects duplicate publish attempts without creating another version", async () => {
+    const repository = createControlSurfaceRepository(createDatabase(client));
+    const draft = await repository.upsertControlSurfaceDraft({
+      tenantId: "tenant-alpha",
+      actorUserId: "user-alpha-admin",
+      definition: createDefinition("tenant-alpha", "surface-alpha", "delivery")
+    });
+
+    const publish = await repository.publishControlSurface({
+      tenantId: "tenant-alpha",
+      surfaceId: draft.id,
+      actorUserId: "user-alpha-admin",
+      auditEventId: "audit-publish-1",
+      expectedDraftVersion: draft.draftVersion
+    });
+
+    expect(publish.surface.currentVersion).toBe(1);
+    await expect(
+      repository.publishControlSurface({
+        tenantId: "tenant-alpha",
+        surfaceId: draft.id,
+        actorUserId: "user-alpha-admin",
+        auditEventId: "audit-publish-duplicate",
+        expectedDraftVersion: draft.draftVersion
+      })
+    ).rejects.toThrow("control_surface_version_conflict");
+
+    const versions = await repository.listControlSurfaceVersions("tenant-alpha", draft.id);
+    expect(versions).toHaveLength(1);
+    expect(versions.map((version) => version.auditEventId)).toEqual(["audit-publish-1"]);
+  });
+
+  it("rejects duplicate rollback attempts without creating another version", async () => {
+    const repository = createControlSurfaceRepository(createDatabase(client));
+    const draft = await repository.upsertControlSurfaceDraft({
+      tenantId: "tenant-alpha",
+      actorUserId: "user-alpha-admin",
+      definition: createDefinition("tenant-alpha", "surface-alpha", "delivery")
+    });
+    await repository.publishControlSurface({
+      tenantId: "tenant-alpha",
+      surfaceId: draft.id,
+      actorUserId: "user-alpha-admin",
+      auditEventId: "audit-publish-1",
+      expectedDraftVersion: draft.draftVersion
+    });
+    await repository.upsertControlSurfaceDraft({
+      tenantId: "tenant-alpha",
+      actorUserId: "user-alpha-admin",
+      definition: {
+        ...createDefinition("tenant-alpha", "surface-alpha", "delivery"),
+        name: "Project Delivery v2"
+      }
+    });
+    const secondPublish = await repository.publishControlSurface({
+      tenantId: "tenant-alpha",
+      surfaceId: draft.id,
+      actorUserId: "user-alpha-admin",
+      auditEventId: "audit-publish-2",
+      expectedDraftVersion: 2
+    });
+
+    await repository.rollbackControlSurfaceToVersion({
+      tenantId: "tenant-alpha",
+      surfaceId: draft.id,
+      version: 1,
+      actorUserId: "user-alpha-admin",
+      auditEventId: "audit-rollback",
+      expectedCurrentVersion: secondPublish.surface.currentVersion
+    });
+
+    await expect(
+      repository.rollbackControlSurfaceToVersion({
+        tenantId: "tenant-alpha",
+        surfaceId: draft.id,
+        version: 1,
+        actorUserId: "user-alpha-admin",
+        auditEventId: "audit-rollback-duplicate",
+        expectedCurrentVersion: secondPublish.surface.currentVersion
+      })
+    ).rejects.toThrow("control_surface_version_conflict");
+
+    const versions = await repository.listControlSurfaceVersions("tenant-alpha", draft.id);
+    expect(versions).toHaveLength(3);
+    expect(versions.map((version) => version.auditEventId).sort()).toEqual([
+      "audit-publish-1",
+      "audit-publish-2",
+      "audit-rollback"
+    ]);
+  });
 });
 
 async function truncateControlSurfacesDb(client: PostgresClient) {

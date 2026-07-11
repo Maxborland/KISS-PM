@@ -25,7 +25,9 @@ const AGENT_SYSTEM_PROMPT = [
   "его уровню доступа: ты не можешь делать то, что сотруднику не разрешено.",
   "Сначала используй analyze-инструменты (только чтение), чтобы понять ситуацию.",
   "Затем ПРЕДЛОЖИ конкретные действия через mutation-инструменты — они НЕ применяются сразу,",
-  "сотрудник подтвердит каждое действие. Не выдумывай идентификаторы — бери их из результатов",
+  "сотрудник подтвердит каждое действие. Если предлагаешь создать/изменить/применить что-либо,",
+  "обязательно вызови mutation-инструмент; нельзя просить подтверждение только текстом.",
+  "Не выдумывай идентификаторы — бери их из результатов",
   "analyze. Объясняй кратко и по-русски."
 ].join(" ");
 
@@ -130,6 +132,22 @@ function agentSourceEntity(input: Record<string, unknown>): { type: string; id: 
 }
 
 const HISTORY_MAX_TURNS = 12; // память чата: последние N реплик (защита от раздувания контекста)
+type AgentProviderStatus = { model: string; live: boolean; configured: boolean };
+
+function agentProviderStatus(provider: { model: string }): AgentProviderStatus {
+  const live = provider.model !== "mock-llm" && provider.model !== "demo-llm";
+  return { model: provider.model, live, configured: provider.model !== "mock-llm" };
+}
+
+const isoDate = (date = new Date()): string => date.toISOString().slice(0, 10);
+const numberInput = (value: unknown, fallback: number): number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+
+function createAgentProviderRuntime() {
+  const provider = createAgentLlmProviderFromEnv();
+  return { provider, status: agentProviderStatus(provider) };
+}
+
 // История треда из тела: [{role|author, text}] → реплики LLM. henry/assistant → assistant.
 function parseHistory(value: unknown): Array<{ role: "user" | "assistant"; content: string }> {
   if (!Array.isArray(value)) return [];
@@ -298,9 +316,8 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     // provider — честный статус LLM-канала инсталляции: demo/mock-модель означает,
     // что агент отвечает заглушкой, и UI обязан показать деградацию (G7-01).
-    const model = createAgentLlmProviderFromEnv().model;
-    const live = model !== "mock-llm" && model !== "demo-llm";
-    return context.json({ tools: listToolAvailability(actor, profile), provider: { model, live } });
+    const { status } = createAgentProviderRuntime();
+    return context.json({ tools: listToolAvailability(actor, profile), provider: status });
   });
 
   // Общая преамбула /propose и /propose/stream (auth + разбор тела) — единый источник правды,
@@ -323,6 +340,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   // Ядро предложения — общее для /propose (JSON) и /propose/stream (SSE).
   async function runProposeLoop(
     request: ProposeRequest,
+    provider: ReturnType<typeof createAgentLlmProviderFromEnv>,
     onEvent?: (event: AgentLoopEvent) => void | Promise<void>
   ) {
     const { cookie, actor, profile, goal, attachmentIds, history } = request;
@@ -336,7 +354,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     );
     const attachments = attachmentIds.length > 0 ? await resolveAttachments(app, cookie, attachmentIds) : [];
     const result = await runAgentLoop({
-      provider: createAgentLlmProviderFromEnv(),
+      provider,
       system: AGENT_SYSTEM_PROMPT,
       goal,
       tools: offered,
@@ -367,11 +385,13 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/workspace/agent/propose", async (context) => {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
+    const runtime = createAgentProviderRuntime();
+    if (!runtime.status.configured) return context.json({ error: "agent_provider_not_configured", provider: runtime.status }, 503);
     const { actor } = parsed.value;
     const slot = agentLlmConcurrency.tryAcquire(`${actor.tenantId}:${actor.id}`);
     if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
     try {
-      return context.json(await runProposeLoop(parsed.value));
+      return context.json(await runProposeLoop(parsed.value, runtime.provider));
     } finally {
       slot.release();
     }
@@ -382,12 +402,14 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.post("/api/workspace/agent/propose/stream", async (context) => {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
+    const runtime = createAgentProviderRuntime();
+    if (!runtime.status.configured) return context.json({ error: "agent_provider_not_configured", provider: runtime.status }, 503);
     const { actor } = parsed.value;
     const slot = agentLlmConcurrency.tryAcquire(`${actor.tenantId}:${actor.id}`);
     if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
     return streamSSE(context, async (stream) => {
       try {
-        const result = await runProposeLoop(parsed.value, async (event) => {
+        const result = await runProposeLoop(parsed.value, runtime.provider, async (event) => {
           await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
         });
         await stream.writeSSE({ event: "done", data: JSON.stringify(result) });
@@ -509,8 +531,25 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
           continue;
         }
+        const plannedStart = typeof input.plannedStart === "string" ? input.plannedStart : isoDate();
+        const plannedFinish = typeof input.plannedFinish === "string" ? input.plannedFinish : plannedStart;
+        const participants = Array.isArray(input.participants) && input.participants.length > 0
+          ? input.participants
+          : [{ userId: actor.id, role: "executor" }];
         const path = projectId ? `/api/workspace/projects/${projectId}/tasks` : "/api/workspace/tasks";
-        const res = await dispatchInternal(app, cookie, path, { title, priority: "normal", ...(description ? { description } : {}) });
+        const res = await dispatchInternal(app, cookie, path, {
+          title,
+          priority: typeof input.priority === "string" ? input.priority : "normal",
+          plannedStart,
+          plannedFinish,
+          durationWorkingDays: numberInput(input.durationWorkingDays, 1),
+          // plannedWork здесь В ЧАСАХ: buildCreateTaskPlanningCommand умножает его на 60
+          // (workMinutes = plannedWork * 60). Дефолт одного рабочего дня = 8 ч, а не 480
+          // (480 попадало в план как 480 ч = 28 800 мин, раздувая ресурсную загрузку).
+          plannedWork: numberInput(input.plannedWork, 8),
+          participants,
+          ...(description ? { description } : {})
+        });
         if (res.status === 200 || res.status === 201) results.push({ tool: tool.name, ok: true, result: res.body });
         else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "create_failed" });
         continue;
@@ -531,28 +570,33 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       results.push({ tool: tool.name, ok: false, status: 501, error: "tool_not_executable_yet" });
     }
 
-    // Провенанс агента: на каждое применённое действие — ОТДЕЛЬНОЕ audit-событие
-    // sourceWorkflow:"agent" (сверх штатного аудита governed-команды, который тегает свой workflow),
-    // чтобы действие агента было отличимо от ручного. results[i] выровнен с actions[i].
+    // Провенанс агента: на каждое применённое или отклонённое правами действие — ОТДЕЛЬНОЕ
+    // audit-событие sourceWorkflow:"agent". Успешные события идут сверх штатного аудита
+    // governed-команды; denied-события не дают попыткам агента исчезнуть из governance trail.
     if (deps.dataSource.appendAuditEvent) {
       const correlationId = `agent-execute-${randomUUID()}`;
       for (let i = 0; i < results.length; i += 1) {
         const item = results[i]!;
-        if (!item.ok) continue;
+        if (!item.ok && item.status !== 403) continue;
         const action = (actions[i] ?? {}) as { input?: unknown };
         const input = (action.input && typeof action.input === "object" ? action.input : {}) as Record<string, unknown>;
+        const deniedReason = item.error ?? "permission_missing";
         await deps.dataSource.appendAuditEvent({
           id: `agent-action-${randomUUID()}`,
           tenantId: actor.tenantId,
           actorUserId: actor.id,
-          actionType: `agent.${item.tool}.applied`,
+          actionType: `agent.${item.tool}.${item.ok ? "applied" : "denied"}`,
           sourceWorkflow: "agent",
           sourceEntity: agentSourceEntity(input),
           input: { tool: item.tool, input },
           beforeState: null,
-          afterState: (item.result ?? null) as Record<string, unknown> | null,
-          permissionResult: { allowed: true, via: "agent" },
-          executionResult: { status: "succeeded" },
+          afterState: item.ok ? ((item.result ?? null) as Record<string, unknown> | null) : null,
+          permissionResult: item.ok
+            ? { allowed: true, via: "agent" }
+            : { allowed: false, reason: deniedReason, via: "agent" },
+          executionResult: item.ok
+            ? { status: "succeeded" }
+            : { status: "denied", reason: deniedReason },
           correlationId,
           createdAt: new Date()
         });

@@ -154,6 +154,22 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       const project = await findProject(transactionDataSource, actor.tenantId, projectId);
       if (!project) return { ok: false as const, status: 404, error: "project_not_found" };
       if (project.status !== "active" && project.status !== "paused") {
+        if (project.status === "closed") {
+          const existingReadModel = await transactionDataSource.getRetrospectiveReadModel(
+            actor.tenantId,
+            projectId
+          );
+          if (existingReadModel.snapshot) {
+            return {
+              ok: true as const,
+              body: {
+                projectId,
+                ...existingReadModel,
+                auditEventId: existingReadModel.snapshot.auditEventId
+              }
+            };
+          }
+        }
         await appendClosureFailureAudit(deps, transactionDataSource, {
           actor,
           projectId,
@@ -224,6 +240,22 @@ export function registerRetrospectiveRoutes(app: ApiApp, deps: ApiRouteDeps) {
       } catch (error) {
         const mappedError = closurePersistenceErrorResult(error);
         if (mappedError) {
+          if (mappedError.error === "project_not_closable") {
+            const existingReadModel = await transactionDataSource.getRetrospectiveReadModel(
+              actor.tenantId,
+              projectId
+            );
+            if (existingReadModel.snapshot) {
+              return {
+                ok: true as const,
+                body: {
+                  projectId,
+                  ...existingReadModel,
+                  auditEventId: existingReadModel.snapshot.auditEventId
+                }
+              };
+            }
+          }
           await appendClosureFailureAudit(deps, transactionDataSource, {
             actor,
             projectId,

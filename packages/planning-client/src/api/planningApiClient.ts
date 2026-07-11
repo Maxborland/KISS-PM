@@ -4,6 +4,7 @@ import type {
   PlanningCommandBatchRequest,
   PlanningCommandRequest,
   PlanningPreviewResponse,
+  PlanningRevertRequest,
   PlanningReadModel
 } from "./types";
 
@@ -78,6 +79,12 @@ export function createPlanningApiClient(options: PlanningApiClientOptions) {
         }
       );
     },
+    previewCommandBatch(projectId: string, input: PlanningCommandBatchRequest) {
+      return requestJson<PlanningPreviewResponse>(
+        `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/preview-command-batch`,
+        { method: "POST", body: JSON.stringify(input) }
+      );
+    },
     applyCommand(projectId: string, input: PlanningCommandRequest) {
       return requestJson<PlanningApplyResponse>(
         `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/apply-command`,
@@ -91,10 +98,10 @@ export function createPlanningApiClient(options: PlanningApiClientOptions) {
       );
     },
     // BUG-PROJ-24: откат последнего обратимого коммита плана (серверные компенсирующие команды).
-    revertLast(projectId: string) {
+    revertLast(projectId: string, input: PlanningRevertRequest) {
       return requestJson<PlanningApplyResponse & { reverted: string }>(
         `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/revert-last`,
-        { method: "POST", body: JSON.stringify({}) }
+        { method: "POST", body: JSON.stringify(input) }
       );
     },
     bumpPlanVersionForTests(projectId: string) {

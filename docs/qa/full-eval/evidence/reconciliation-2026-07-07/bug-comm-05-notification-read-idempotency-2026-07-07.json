@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-07-07T11:31:19.6849619Z",
+  "id": "BUG-COMM-05",
+  "status": "fixed-by-current-branch",
+  "scope": "POST /api/workspace/notifications/:notificationId/read idempotency",
+  "red": {
+    "command": "='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55436/kiss_pm'; corepack pnpm exec vitest run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts",
+    "result": "failed as expected",
+    "failure": "expected second readAt to equal first readAt; received a later timestamp (readAt was overwritten on repeated read)"
+  },
+  "fix": {
+    "files": [
+      "packages/persistence/src/collaborationRepository.ts",
+      "apps/api/src/collaborationRoutes.db.test.ts"
+    ],
+    "behavior": "Update only unread notification rows; repeated read returns existing notification without mutating readAt."
+  },
+  "green": {
+    "dbTest": "apps/api/src/collaborationRoutes.db.test.ts: 12 tests passed",
+    "typecheck": "@kiss-pm/api typecheck passed",
+    "warning": "Existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts remains unrelated."
+  }
+}

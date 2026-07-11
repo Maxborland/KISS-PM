@@ -1,0 +1,61 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-CLOSURE-RETRY-IDEMPOTENCY",
+  "generatedAt": "2026-07-08T11:44:00+07:00",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "status": "pass",
+  "scope": "Retrospective project close duplicate/retry and audit cleanliness.",
+  "surfaces": [
+    "POST /api/workspace/projects/:projectId/closure/close",
+    "GET /api/workspace/projects/:projectId/closure",
+    "GET /api/tenant/current/audit-events",
+    "project_closure_snapshots",
+    "retrospective_lessons",
+    "template_improvement_actions"
+  ],
+  "expected": "After a successful close, a duplicate/retry close for the same already-closed project should return the existing closure read model with the original auditEventId, should not create another snapshot/lesson/action set, and should not append a project.close_conflict failure audit.",
+  "redEvidence": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/backendManagementLoop.db.test.ts -t \"keeps duplicate project closure retry\"",
+      "observed": "Failed before fix: the retry close response returned 409 instead of 200 and was routed through the project_not_closable conflict path.",
+      "result": "fail-before-fix"
+    }
+  ],
+  "actual": "Pass: first close returns 200; retry close returns 200 with the same snapshot id and same top-level auditEventId; audit readback contains exactly one project.closed and no project.close_conflict.",
+  "codeChanges": [
+    "apps/api/src/retrospectiveRoutes.ts now requires getRetrospectiveReadModel for close, reads existing closure when the project is already closed, and returns the existing read model before appending failure audit.",
+    "apps/api/src/retrospectiveRoutes.ts also maps repository project_not_closable races to existing closure readback when a snapshot already exists.",
+    "apps/api/src/backendManagementLoop.db.test.ts adds DB/API coverage for duplicate project close retry with audit readback."
+  ],
+  "verification": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/backendManagementLoop.db.test.ts -t \"keeps duplicate project closure retry\"",
+      "observed": "1 selected test passed, 2 skipped",
+      "notes": "Vitest emitted the existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts, unrelated to this slice.",
+      "result": "pass"
+    },
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/backendManagementLoop.db.test.ts",
+      "observed": "3 tests passed",
+      "notes": "Same pre-existing planning commandReducer warning.",
+      "result": "pass"
+    },
+    {
+      "command": "node_modules\\.bin\\vitest.cmd run apps/api/src/retrospectiveRoutes.test.ts",
+      "observed": "13 tests passed",
+      "notes": "First sandboxed attempt hit esbuild spawn EPERM; rerun outside sandbox passed. Same pre-existing planning commandReducer warning.",
+      "result": "pass"
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.cmd -p apps/api/tsconfig.json --pretty false",
+      "observed": "passed with no output",
+      "result": "pass"
+    }
+  ],
+  "changedFiles": [
+    "apps/api/src/retrospectiveRoutes.ts",
+    "apps/api/src/backendManagementLoop.db.test.ts",
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-closure-retry-idempotency-2026-07-08.json",
+    "docs/qa/full-eval/reconciliation-matrix-2026-07-07.json"
+  ],
+  "coverageImpact": "Covers the retrospective project close retry/race atom inside RISK-WRITE-FLOW-RACE-IDEMPOTENCY at DB/API level. It does not close unrelated meeting create/link/note or task comment atoms."
+}

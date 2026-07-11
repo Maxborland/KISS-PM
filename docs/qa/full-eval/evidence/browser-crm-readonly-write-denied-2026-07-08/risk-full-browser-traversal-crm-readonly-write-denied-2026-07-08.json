@@ -1,0 +1,319 @@
+{
+  "scenarioId": "CURRENT-RISK-FULL-BROWSER-TRAVERSAL-CRM-READONLY-WRITE-DENIED",
+  "timestamp": "2026-07-07T19:49:17.097Z",
+  "browser": "in-app browser via browser plugin",
+  "route": "/crm/deals",
+  "user": {
+    "roleId": "access-profile-crm-readonly-browser",
+    "userId": "user-crm-readonly-browser",
+    "email": "crm-readonly-browser@kiss-pm.local",
+    "permissions": [
+      "tenant.users.read",
+      "tenant.access_profiles.read",
+      "tenant.positions.read",
+      "tenant.clients.read",
+      "tenant.contacts.read",
+      "tenant.products.read",
+      "tenant.project_types.read",
+      "tenant.deal_stages.read",
+      "tenant.crm_pipelines.read",
+      "tenant.opportunities.read",
+      "tenant.projects.read",
+      "tenant.project_plan.read",
+      "tenant.project_resources.read",
+      "tenant.resource_feasibility.read"
+    ]
+  },
+  "apiEvidence": {
+    "apiBase": "http://127.0.0.1:4130",
+    "webBase": "http://127.0.0.1:3130",
+    "preparedUser": {
+      "roleId": "access-profile-crm-readonly-browser",
+      "userId": "user-crm-readonly-browser",
+      "email": "crm-readonly-browser@kiss-pm.local",
+      "permissions": [
+        "tenant.users.read",
+        "tenant.access_profiles.read",
+        "tenant.positions.read",
+        "tenant.clients.read",
+        "tenant.contacts.read",
+        "tenant.products.read",
+        "tenant.project_types.read",
+        "tenant.deal_stages.read",
+        "tenant.crm_pipelines.read",
+        "tenant.opportunities.read",
+        "tenant.projects.read",
+        "tenant.project_plan.read",
+        "tenant.project_resources.read",
+        "tenant.resource_feasibility.read"
+      ]
+    },
+    "setup": {
+      "adminLoginStatus": 200,
+      "roleCreateStatus": 201,
+      "roleCreateBody": {
+        "accessProfile": {
+          "id": "access-profile-crm-readonly-browser",
+          "tenantId": "tenant-alpha",
+          "name": "CRM readonly browser",
+          "permissions": [
+            "tenant.users.read",
+            "tenant.access_profiles.read",
+            "tenant.positions.read",
+            "tenant.clients.read",
+            "tenant.contacts.read",
+            "tenant.products.read",
+            "tenant.project_types.read",
+            "tenant.deal_stages.read",
+            "tenant.crm_pipelines.read",
+            "tenant.opportunities.read",
+            "tenant.projects.read",
+            "tenant.project_plan.read",
+            "tenant.project_resources.read",
+            "tenant.resource_feasibility.read"
+          ]
+        }
+      },
+      "userCreateStatus": 201,
+      "userCreateBody": {
+        "user": {
+          "id": "user-crm-readonly-browser",
+          "tenantId": "tenant-alpha",
+          "accessProfileId": "access-profile-crm-readonly-browser",
+          "positionId": "position-engineer",
+          "positionName": "Инженер",
+          "email": "crm-readonly-browser@kiss-pm.local",
+          "name": "CRM Readonly Browser",
+          "phone": null,
+          "telegram": null,
+          "status": "active",
+          "theme": "light",
+          "accentColor": "#0f766e"
+        }
+      },
+      "readonlyLoginStatus": 200
+    },
+    "reads": {
+      "opportunitiesStatus": 200,
+      "opportunityCountBefore": 6,
+      "sampleOpportunityBefore": {
+        "id": "opportunity-vektor-portal",
+        "title": "Портал подрядчиков Вектор",
+        "stageId": "deal-stage-ready",
+        "status": "project_created"
+      },
+      "stagesStatus": 200,
+      "stageCount": 4
+    },
+    "writes": {
+      "createOpportunity": {
+        "status": 403,
+        "body": {
+          "error": "permission_missing"
+        }
+      },
+      "updateOpportunityStage": {
+        "status": 403,
+        "body": {
+          "error": "permission_missing"
+        },
+        "attemptedStageId": "deal-stage-new"
+      }
+    },
+    "readback": {
+      "opportunitiesStatusAfter": 200,
+      "opportunityCountAfter": 6,
+      "sampleOpportunityAfter": {
+        "id": "opportunity-vektor-portal",
+        "title": "Портал подрядчиков Вектор",
+        "stageId": "deal-stage-ready",
+        "status": "project_created"
+      },
+      "unchangedCount": true,
+      "unchangedSampleStage": true
+    }
+  },
+  "uiEvidence": {
+    "login": {
+      "urlAfterLogin": "http://127.0.0.1:3130/dashboard",
+      "loginSubmitEnabledAfterCredentials": true
+    },
+    "kanbanBeforeFix": {
+      "draggable": [
+        {
+          "ariaGrabbed": null,
+          "draggable": "true",
+          "tag": "article",
+          "text": "ААПоддержка после внедренияООО Ромашка360 тыс ₽40%"
+        },
+        {
+          "ariaGrabbed": null,
+          "draggable": "true",
+          "tag": "article",
+          "text": "АААудит процессов ВекторООО Вектор180 тыс ₽55%"
+        },
+        {
+          "ariaGrabbed": null,
+          "draggable": "true",
+          "tag": "article",
+          "text": "ААРасширение интеграций ГорсетьАО Горсеть540 тыс ₽70%"
+        },
+        {
+          "ariaGrabbed": null,
+          "draggable": "true",
+          "tag": "article",
+          "text": "ААПортал подрядчиков ВекторООО Вектор1,2 млн ₽100%"
+        },
+        {
+          "ariaGrabbed": null,
+          "draggable": "true",
+          "tag": "article",
+          "text": "ААМиграция данных ГорсетьАО Горсеть840 тыс ₽100%"
+        },
+        {
+          "ariaGrabbed": null,
+          "draggable": "true",
+          "tag": "article",
+          "text": "ААCRM intakeООО Ромашка960 тыс ₽70%"
+        }
+      ],
+      "labels": [
+        {
+          "forAttr": null,
+          "hasRadio": true,
+          "text": "Канбан"
+        },
+        {
+          "forAttr": null,
+          "hasRadio": true,
+          "text": "Список"
+        },
+        {
+          "forAttr": null,
+          "hasRadio": true,
+          "text": "Прогноз"
+        }
+      ],
+      "suspiciousControls": [
+        {
+          "disabled": true,
+          "href": null,
+          "tag": "button",
+          "text": "Сделка",
+          "title": "Недостаточно прав для создания или изменения",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "href": null,
+          "tag": "button",
+          "text": "Основная воронкапо умолч.",
+          "title": null,
+          "type": "button"
+        }
+      ]
+    },
+    "kanbanAfterFix": {
+      "bodyHasDeals": true,
+      "createButton": {
+        "disabled": true,
+        "text": "Сделка",
+        "title": "Недостаточно прав для создания или изменения"
+      },
+      "draggable": []
+    },
+    "listAndForecast": {
+      "listAudit": {
+        "hasListRows": true,
+        "pipelineButtons": [
+          {
+            "disabled": true,
+            "text": "Воронка",
+            "title": "Недостаточно прав для создания или изменения"
+          },
+          {
+            "disabled": true,
+            "text": "Воронка",
+            "title": "Недостаточно прав для создания или изменения"
+          },
+          {
+            "disabled": true,
+            "text": "Воронка",
+            "title": "Недостаточно прав для создания или изменения"
+          },
+          {
+            "disabled": true,
+            "text": "Воронка",
+            "title": "Недостаточно прав для создания или изменения"
+          },
+          {
+            "disabled": true,
+            "text": "Воронка",
+            "title": "Недостаточно прав для создания или изменения"
+          },
+          {
+            "disabled": true,
+            "text": "Воронка",
+            "title": "Недостаточно прав для создания или изменения"
+          }
+        ],
+        "selects": [
+          {
+            "disabled": true,
+            "optionCount": 4,
+            "title": "Недостаточно прав для создания или изменения",
+            "value": "deal-stage-ready"
+          },
+          {
+            "disabled": true,
+            "optionCount": 4,
+            "title": "Недостаточно прав для создания или изменения",
+            "value": "deal-stage-qualified"
+          },
+          {
+            "disabled": true,
+            "optionCount": 4,
+            "title": "Недостаточно прав для создания или изменения",
+            "value": "deal-stage-new"
+          },
+          {
+            "disabled": true,
+            "optionCount": 4,
+            "title": "Недостаточно прав для создания или изменения",
+            "value": "deal-stage-ready"
+          },
+          {
+            "disabled": true,
+            "optionCount": 4,
+            "title": "Недостаточно прав для создания или изменения",
+            "value": "deal-stage-negotiation"
+          },
+          {
+            "disabled": true,
+            "optionCount": 4,
+            "title": "Недостаточно прав для создания или изменения",
+            "value": "deal-stage-ready"
+          }
+        ]
+      },
+      "forecastAudit": {
+        "controls": [
+          {
+            "disabled": false,
+            "href": null,
+            "tag": "button",
+            "text": "Основная воронкапо умолч.",
+            "type": "button"
+          }
+        ],
+        "hasForecastStats": true
+      }
+    },
+    "screenshot": "crm-readonly-deals-forecast.png"
+  },
+  "defectFoundAndFixed": {
+    "summary": "CRM read-only cards were still draggable before this fix even though API writes were denied.",
+    "before": "article cards exposed draggable=true for all non-final deals",
+    "after": "read-only cards are not draggable; list stage selects and pipeline buttons are disabled with permission title"
+  }
+}

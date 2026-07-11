@@ -1,0 +1,162 @@
+{
+  "generatedAt": "2026-07-10T00:38:46.9598677Z",
+  "disposable": {
+    "mainDbTouched": false,
+    "api": "http://127.0.0.1:4192",
+    "database": "kiss_pm_projects_test",
+    "web": "http://127.0.0.1:3182"
+  },
+  "fullRun": {
+    "total": 18,
+    "evidence": ".superloopy/evidence/projects-2026-07-10/projects-old-planning-suite.json",
+    "passed": 0,
+    "flaky": 0,
+    "note": "Twelve results were contaminated by web exit and were rerun.",
+    "durationMs": 341992.124,
+    "failed": 17,
+    "skipped": 1
+  },
+  "batch2": {
+    "total": 12,
+    "skipped": 0,
+    "evidence": ".superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
+    "passed": 0,
+    "flaky": 0,
+    "durationMs": 176894.846,
+    "failed": 12,
+    "timeoutPerTestMs": 15000
+  },
+  "summary": {
+    "incomplete_functionality": 4,
+    "partial_current_contract": 3,
+    "superseded_test": 11
+  },
+  "rows": [
+    {
+      "file": "assignments.spec.ts",
+      "scenario": "assignments matrix inline edit triggers preview bar",
+      "result": "skipped",
+      "classification": "superseded_test",
+      "reason": "Test selected the sidebar Projects link and built /projects/undefined/assignments; current assignment preview/apply is covered by projects-assignments-write.spec.ts."
+    },
+    {
+      "file": "calendars.spec.ts",
+      "scenario": "calendar exception dialog opens preview",
+      "result": "timeout",
+      "classification": "superseded_test",
+      "reason": "Uses undefined project id and removed labels/testid; current calendar preview/apply is covered by projects-calendars-write.spec.ts."
+    },
+    {
+      "file": "compensating-undo.spec.ts",
+      "scenario": "undoes applied edit with Ctrl+Shift+Z",
+      "result": "timeout",
+      "classification": "partial_current_contract",
+      "reason": "Current schedule has compensating Undo button, but no Ctrl+Shift+Z binding and no old planning-workspace testid."
+    },
+    {
+      "file": "cross-project-drilldown.spec.ts",
+      "scenario": "resource matrix cell opens day drawer",
+      "result": "failed",
+      "classification": "superseded_test",
+      "reason": "Hardcodes missing project-alpha and removed testids; current resource drilldown exists on live project."
+    },
+    {
+      "file": "custom-fields.spec.ts",
+      "scenario": "project settings shows custom field definitions",
+      "result": "failed",
+      "classification": "incomplete_functionality",
+      "reason": "Current Settings has no custom-field definitions or explicit empty state."
+    },
+    {
+      "file": "drag-fill-dates.spec.ts",
+      "scenario": "fills finish dates downward",
+      "result": "timeout",
+      "classification": "incomplete_functionality",
+      "reason": "Current schedule has no drag-fill handle or equivalent multi-row date fill."
+    },
+    {
+      "file": "excel-paste-10x6.spec.ts",
+      "scenario": "pastes 10x6 TSV block",
+      "result": "timeout",
+      "classification": "incomplete_functionality",
+      "reason": "Current schedule has no clipboard or TSV paste handler."
+    },
+    {
+      "file": "keyboard-only-10-tasks.spec.ts",
+      "scenario": "creates 10 tasks using keyboard only",
+      "result": "timeout",
+      "classification": "partial_current_contract",
+      "reason": "Current quick-create supports Enter and Tab, but Insert/F2/ArrowDown grid workflow is absent."
+    },
+    {
+      "file": "planning-a11y.spec.ts",
+      "scenario": "schedule workspace has no critical axe violations",
+      "result": "timeout",
+      "classification": "superseded_test",
+      "reason": "Axe target is removed planning-workspace testid; current schedule needs a migrated a11y check."
+    },
+    {
+      "file": "planning-a11y.spec.ts",
+      "scenario": "gantt pane has no critical axe violations",
+      "result": "timeout",
+      "classification": "superseded_test",
+      "reason": "Axe target is removed planning-gantt-pane testid; current Gantt needs a migrated a11y check."
+    },
+    {
+      "file": "planning-grid.spec.ts",
+      "scenario": "opens schedule workspace with WBS and Gantt panes",
+      "result": "timeout",
+      "classification": "superseded_test",
+      "reason": "Current live traversal confirms both WBS table and Gantt; only old testids are gone."
+    },
+    {
+      "file": "planning-grid.spec.ts",
+      "scenario": "gantt bar position responds to zoom scale",
+      "result": "timeout",
+      "classification": "superseded_test",
+      "reason": "Current schedule exposes Day, Week and Month plus bars; test helper blocks on removed workspace testid."
+    },
+    {
+      "file": "planning-grid.spec.ts",
+      "scenario": "renders dependency connectors when plan has links",
+      "result": "timeout",
+      "classification": "superseded_test",
+      "reason": "Current live Gantt renders dependencies; test helper blocks on removed workspace testid."
+    },
+    {
+      "file": "planning-grid.spec.ts",
+      "scenario": "shows conflict banner after remote plan version bump",
+      "result": "timeout",
+      "classification": "partial_current_contract",
+      "reason": "Backend version conflict handling exists, but old explicit conflict-banner contract is not covered on current UI."
+    },
+    {
+      "file": "resource-matrix.spec.ts",
+      "scenario": "planning resources tab shows monthly matrix",
+      "result": "failed",
+      "classification": "superseded_test",
+      "reason": "Current resource matrix exists and has fresh E2E; planning-resource-matrix testid was removed."
+    },
+    {
+      "file": "resources.spec.ts",
+      "scenario": "resources pane opens from project tab",
+      "result": "failed",
+      "classification": "superseded_test",
+      "reason": "Current Resources route is covered by route matrix; planning-resources-pane testid was removed."
+    },
+    {
+      "file": "saved-views.spec.ts",
+      "scenario": "wbs grid exposes saved views dropdown",
+      "result": "failed",
+      "classification": "incomplete_functionality",
+      "reason": "No saved-views control or persistence exists on current schedule."
+    },
+    {
+      "file": "settings.spec.ts",
+      "scenario": "pm previews calendar change",
+      "result": "failed",
+      "classification": "superseded_test",
+      "reason": "Calendar exceptions moved to Calendars and use the global preview gate; old settings pane contract was removed."
+    }
+  ]
+}

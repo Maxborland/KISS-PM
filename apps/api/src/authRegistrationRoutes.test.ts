@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { hashPassword, hashResetToken, verifyPassword } from "@kiss-pm/persistence";
 import { createApp } from "./app";
-import { createInMemoryEmailProvider } from "./emailProvider";
+import { createInMemoryEmailProvider, type SmtpEmailProvider, type PasswordResetEmailInput } from "./emailProvider";
 import type {
   ApiTenantDataSource,
   PasswordResetTokenRecord,
@@ -9,6 +9,7 @@ import type {
   UserSessionRecord
 } from "./apiTypes";
 import type { AccessProfileRecord, WorkspaceUserRecord } from "./apiTypes";
+import type { AuthRateLimiter } from "./authRateLimit";
 
 const sameOriginHeaders = {
   "content-type": "application/json",
@@ -109,6 +110,13 @@ function createAuthFakeDataSource() {
         }
       }
     },
+    async deleteOtherPasswordResetTokensByUserId(tenantId, userId, preservedTokenId) {
+      for (const [id, token] of resetTokens) {
+        if (token.tenantId === tenantId && token.userId === userId && id !== preservedTokenId) {
+          resetTokens.delete(id);
+        }
+      }
+    },
     async appendAuditEvent() {
       return;
     },
@@ -121,6 +129,17 @@ function createAuthFakeDataSource() {
     dataSource: dataSource as ApiTenantDataSource,
     state: { tenants, accessProfiles, users, credentials, sessions, resetTokens }
   };
+}
+
+function createRecordingAuthRateLimiter() {
+  const limiter: AuthRateLimiter = {
+    reserveAttempt: vi.fn(async () => ({ allowed: true as const })),
+    check: vi.fn(async () => ({ allowed: true as const })),
+    recordFailure: vi.fn(async () => undefined),
+    recordSuccess: vi.fn(async () => undefined),
+    releaseReservedAttempt: vi.fn(async () => undefined)
+  };
+  return limiter;
 }
 
 describe("POST /api/auth/register", () => {
@@ -261,6 +280,114 @@ describe("POST /api/auth/password-reset/request", () => {
     expect(emailProvider.lastPasswordReset?.rawToken).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("проходит полный password reset happy path через доставленный rawToken и логин новым паролем", async () => {
+    const { dataSource, state } = createAuthFakeDataSource();
+    state.tenants.set("tenant-1", { id: "tenant-1", name: "Tenant One" });
+    state.accessProfiles.set("access-profile-1", {
+      id: "access-profile-1",
+      tenantId: "tenant-1",
+      name: "Владелец",
+      permissions: ["tenant.users.manage"]
+    });
+    state.users.set("user-1", {
+      id: "user-1",
+      tenantId: "tenant-1",
+      name: "Owner User",
+      accessProfileId: "access-profile-1",
+      email: "owner@example.com",
+      positionId: null,
+      positionName: null,
+      phone: null,
+      telegram: null,
+      status: "active",
+      theme: "system",
+      accentColor: "blue"
+    });
+    state.credentials.set("owner@example.com", {
+      userId: "user-1",
+      tenantId: "tenant-1",
+      email: "owner@example.com",
+      ...hashPassword("oldpassword")
+    });
+    const emailProvider = createInMemoryEmailProvider();
+    const app = createApp({ dataSource, emailProvider });
+
+    const request = await app.request("/api/auth/password-reset/request", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({ email: "owner@example.com" })
+    });
+    expect(request.status).toBe(202);
+    expect(emailProvider.lastPasswordReset?.rawToken).toMatch(/^[a-f0-9]{64}$/);
+
+    const confirm = await app.request("/api/auth/password-reset/confirm", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({
+        token: emailProvider.lastPasswordReset!.rawToken,
+        password: "brandnewpass"
+      })
+    });
+    expect(confirm.status).toBe(200);
+    await expect(confirm.json()).resolves.toEqual({ status: "ok" });
+
+    const oldPasswordLogin = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({ email: "owner@example.com", password: "oldpassword" })
+    });
+    expect(oldPasswordLogin.status).toBe(401);
+    await expect(oldPasswordLogin.json()).resolves.toEqual({ error: "invalid_credentials" });
+
+    const login = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({ email: "owner@example.com", password: "brandnewpass" })
+    });
+    expect(login.status).toBe(200);
+    expect(login.headers.get("set-cookie")).toContain("kiss_pm_session=");
+  });
+  it("возвращает 202 delivery email и resetUrl через smtp-like provider для существующего email", async () => {
+    const { dataSource, state } = createAuthFakeDataSource();
+    state.credentials.set("owner@example.com", {
+      userId: "user-1",
+      tenantId: "tenant-1",
+      email: "owner@example.com",
+      ...hashPassword("supersecret")
+    });
+    const sendPasswordReset = vi.fn(async (_input: PasswordResetEmailInput) => undefined);
+    const emailProvider: SmtpEmailProvider = { provider: "smtp", sendPasswordReset };
+    const publicAppOrigin = "https://app.kiss-pm.test";
+    const app = createApp({
+      dataSource,
+      emailProvider,
+      trustedMutationOrigins: [publicAppOrigin]
+    });
+
+    const response = await app.request(
+      "https://api.kiss-pm.test/api/auth/password-reset/request",
+      {
+        method: "POST",
+        headers: { ...sameOriginHeaders, origin: `${publicAppOrigin}/ignored/path` },
+        body: JSON.stringify({ email: "owner@example.com" })
+      }
+    );
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toEqual({ status: "ok", delivery: "email" });
+    expect(sendPasswordReset).toHaveBeenCalledTimes(1);
+    const payload = sendPasswordReset.mock.calls[0]?.[0];
+    expect(payload).toBeDefined();
+    expect(payload!.email).toBe("owner@example.com");
+    expect(payload!.rawToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(payload!.resetUrl).toContain("/password-reset/confirm?token=");
+    const resetUrl = new URL(payload!.resetUrl);
+    expect(resetUrl.origin).toBe(publicAppOrigin);
+    expect(resetUrl.pathname).toBe("/password-reset/confirm");
+    expect(resetUrl.searchParams.get("token")).toBe(payload!.rawToken);
+    expect(state.resetTokens.size).toBe(1);
+  });
+
   it("возвращает 202 без создания токена для несуществующего email", async () => {
     const { dataSource, state } = createAuthFakeDataSource();
     const emailProvider = createInMemoryEmailProvider();
@@ -329,6 +456,16 @@ describe("POST /api/auth/password-reset/confirm", () => {
   it("меняет пароль, гасит сессии и помечает токен использованным (200)", async () => {
     const { dataSource, state } = createAuthFakeDataSource();
     const rawToken = seedResetToken(state);
+    state.resetTokens.set("token-2", {
+      id: "token-2",
+      tenantId: "tenant-1",
+      userId: "user-1",
+      tokenHash: hashResetToken("b".repeat(64)),
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+      requestedIp: null,
+      createdAt: new Date()
+    });
     const app = createApp({ dataSource });
 
     const response = await app.request("/api/auth/password-reset/confirm", {
@@ -349,8 +486,8 @@ describe("POST /api/auth/password-reset/confirm", () => {
       })
     ).toBe(true);
     expect(state.sessions.size).toBe(0);
-    // Токены сброса пользователя удалены (инвалидация прочих).
-    expect(state.resetTokens.size).toBe(0);
+    expect([...state.resetTokens.keys()]).toEqual(["token-1"]);
+    expect(state.resetTokens.get("token-1")?.consumedAt).toBeInstanceOf(Date);
   });
 
   it("возвращает 400 invalid_reset_token для неизвестного токена", async () => {
@@ -399,9 +536,112 @@ describe("POST /api/auth/password-reset/confirm", () => {
     await expect(response.json()).resolves.toEqual({ error: "reset_token_used" });
   });
 
+  it("возвращает 400 reset_token_used при повторном confirm того же токена после успешной смены пароля", async () => {
+    const { dataSource, state } = createAuthFakeDataSource();
+    const rawToken = seedResetToken(state);
+    state.resetTokens.set("token-2", {
+      id: "token-2",
+      tenantId: "tenant-1",
+      userId: "user-1",
+      tokenHash: hashResetToken("b".repeat(64)),
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+      requestedIp: null,
+      createdAt: new Date()
+    });
+    const app = createApp({ dataSource });
+
+    const firstResponse = await app.request("/api/auth/password-reset/confirm", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({ token: rawToken, password: "brandnewpass" })
+    });
+    expect(firstResponse.status).toBe(200);
+
+    const secondResponse = await app.request("/api/auth/password-reset/confirm", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({ token: rawToken, password: "anothernewpass" })
+    });
+
+    expect(secondResponse.status).toBe(400);
+    await expect(secondResponse.json()).resolves.toEqual({ error: "reset_token_used" });
+  });
+
+  it("конкурентно принимает один valid token ровно один раз, второй confirm получает reset_token_used", async () => {
+    const { dataSource, state } = createAuthFakeDataSource();
+    const rawToken = seedResetToken(state);
+    const originalFindPasswordResetTokenByHash =
+      dataSource.findPasswordResetTokenByHash.bind(dataSource);
+    let findCalls = 0;
+    let releaseFindBarrier: () => void = () => undefined;
+    const findBarrier = new Promise<void>((resolve) => {
+      releaseFindBarrier = resolve;
+    });
+    dataSource.findPasswordResetTokenByHash = async (tokenHash) => {
+      const record = await originalFindPasswordResetTokenByHash(tokenHash);
+      findCalls += 1;
+      if (findCalls === 2) releaseFindBarrier();
+      await findBarrier;
+      return record ? { ...record } : undefined;
+    };
+    const authRateLimiter = createRecordingAuthRateLimiter();
+    const app = createApp({ dataSource, authRateLimiter });
+    const attempts = [
+      { password: "brandnewpass-one" },
+      { password: "brandnewpass-two" }
+    ];
+
+    const responses = await Promise.all(
+      attempts.map((attempt) =>
+        app.request("/api/auth/password-reset/confirm", {
+          method: "POST",
+          headers: sameOriginHeaders,
+          body: JSON.stringify({ token: rawToken, password: attempt.password })
+        })
+      )
+    );
+    const results = await Promise.all(
+      responses.map(async (response, index) => ({
+        status: response.status,
+        body: await response.json(),
+        password: attempts[index]!.password
+      }))
+    );
+
+    expect(findCalls).toBe(2);
+    expect(results.map((result) => result.status).sort()).toEqual([200, 400]);
+    const winner = results.find((result) => result.status === 200);
+    const loser = results.find((result) => result.status === 400);
+    expect(winner?.body).toEqual({ status: "ok" });
+    expect(loser?.body).toEqual({ error: "reset_token_used" });
+
+    const credential = state.credentials.get("owner@example.com");
+    expect(credential).toBeDefined();
+    expect(
+      verifyPassword({
+        password: winner!.password,
+        passwordHash: credential!.passwordHash,
+        passwordSalt: credential!.passwordSalt
+      })
+    ).toBe(true);
+    expect(
+      verifyPassword({
+        password: loser!.password,
+        passwordHash: credential!.passwordHash,
+        passwordSalt: credential!.passwordSalt
+      })
+    ).toBe(false);
+    expect(state.sessions.size).toBe(0);
+    expect(state.resetTokens.get("token-1")?.consumedAt).toBeInstanceOf(Date);
+    expect(authRateLimiter.recordSuccess).toHaveBeenCalledTimes(1);
+    expect(authRateLimiter.recordFailure).toHaveBeenCalledTimes(1);
+  });
+
   it("возвращает 400 weak_password при слабом новом пароле", async () => {
     const { dataSource, state } = createAuthFakeDataSource();
     const rawToken = seedResetToken(state);
+
     const app = createApp({ dataSource });
 
     const response = await app.request("/api/auth/password-reset/confirm", {

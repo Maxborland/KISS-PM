@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -8,6 +8,7 @@ import { Diamond, IndentDecrease, IndentIncrease, Plus, Trash2, X } from "lucide
 
 import { cn } from "@/lib/cn";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
+import type { Resource } from "@/delivery/lib/planning-demo-data";
 
 const POP = "z-50 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--panel)] p-2 shadow-[var(--shadow-pop)] text-[length:var(--text-sm)] text-[var(--text)]";
 const MENU = "z-50 min-w-[200px] rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--panel)] p-1 shadow-[var(--shadow-pop)] text-[length:var(--text-sm)]";
@@ -20,6 +21,7 @@ const DEP_ORDER = ["FS", "SS", "FF", "SF"] as const;
 /* ---- Date editor (popover + date input + быстрые сдвиги) ---- */
 export function DateEditor({ valueIso, onPick, title = "Начало задачи", children }: { valueIso: string; onPick: (iso: string) => void; title?: string; children: ReactNode }) {
   const [draft, setDraft] = useState(valueIso);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   return (
     <Popover.Root onOpenChange={(o) => o && setDraft(valueIso)}>
       <Popover.Trigger asChild>{children}</Popover.Trigger>
@@ -28,6 +30,7 @@ export function DateEditor({ valueIso, onPick, title = "Начало задач�
           <div className="flex w-[210px] flex-col gap-2">
             <div className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">{title}</div>
             <input
+              ref={inputRef}
               type="date"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -35,7 +38,7 @@ export function DateEditor({ valueIso, onPick, title = "Начало задач�
             />
             <div className="flex items-center justify-end gap-1.5">
               <Popover.Close className="rounded-[var(--radius-sm)] px-2 py-1 text-[var(--muted)] hover:bg-[var(--panel-strong)]">Отмена</Popover.Close>
-              <Popover.Close onClick={() => draft && onPick(draft)} className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2.5 py-1 font-medium text-white hover:bg-[var(--accent-hover)]">
+              <Popover.Close onClick={() => { const value = inputRef.current?.value ?? draft; if (value) onPick(value); }} className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2.5 py-1 font-medium text-white hover:bg-[var(--accent-hover)]">
                 Применить
               </Popover.Close>
             </div>
@@ -48,8 +51,8 @@ export function DateEditor({ valueIso, onPick, title = "Начало задач�
 }
 
 /* ---- Resource editor (выпадающий список сотрудников) ---- */
-export function ResourceEditor({ onPick, children }: { onPick: (resourceId: string) => void; children: ReactNode }) {
-  const resources = useResourceDirectory().list; // live: /api/workspace/users; mock: статичный RESOURCES
+export function ResourceEditor({ resources: resourceOverride, onPick, children }: { resources?: readonly Resource[]; onPick: (resourceId: string) => void; children: ReactNode }) {
+  const resources = useResourceDirectory(resourceOverride).list;
   return (
     <Popover.Root>
       <Popover.Trigger asChild>{children}</Popover.Trigger>
@@ -94,6 +97,9 @@ export function DependencyEditor({
   const [predId, setPredId] = useState("");
   const [type, setType] = useState("FS");
   const [lag, setLag] = useState("0");
+  const predRef = useRef<HTMLSelectElement>(null);
+  const typeRef = useRef<HTMLSelectElement>(null);
+  const lagRef = useRef<HTMLInputElement>(null);
   return (
     <Popover.Root onOpenChange={(o) => { if (o) { setPredId(""); setType("FS"); setLag("0"); } }}>
       <Popover.Trigger asChild>{children}</Popover.Trigger>
@@ -106,7 +112,7 @@ export function DependencyEditor({
                 {preds.map((p) => (
                   <li key={p.depId} className="flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1">
                     <span className="mono text-[var(--muted)]">{p.predLabel}</span>
-                    <span className="rounded bg-[var(--panel-strong)] px-1 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{DEP_RU[p.type] ?? p.type}{p.lagDays ? ` +${p.lagDays}д` : ""}</span>
+                    <span className="rounded bg-[var(--panel-strong)] px-1 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{DEP_RU[p.type] ?? p.type}{p.lagDays ? ` ${p.lagDays > 0 ? "+" : ""}${p.lagDays}д` : ""}</span>
                     <button type="button" onClick={() => onRemove(p.depId)} className="ml-auto grid size-5 place-items-center rounded text-[var(--muted)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger-text)]" aria-label="Убрать зависимость"><X className="size-3.5" aria-hidden /></button>
                   </li>
                 ))}
@@ -115,20 +121,23 @@ export function DependencyEditor({
               <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Пока нет зависимостей.</p>
             )}
             <div className="mt-1 flex flex-col gap-1.5 border-t border-[var(--border)] pt-2">
-              <select value={predId} onChange={(e) => setPredId(e.target.value)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
+              <select ref={predRef} value={predId} onChange={(e) => setPredId(e.target.value)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
                 <option value="">Выберите предшественника…</option>
                 {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
               <div className="flex items-center gap-1.5">
-                <select value={type} onChange={(e) => setType(e.target.value)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
+                <select ref={typeRef} value={type} onChange={(e) => setType(e.target.value)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
                   {DEP_ORDER.map((t) => <option key={t} value={t}>{DEP_RU[t]} ({t})</option>)}
                 </select>
-                <input type="number" value={lag} onChange={(e) => setLag(e.target.value)} className="w-16 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1 text-right text-[length:var(--text-sm)] tabular-nums outline-none focus:border-[var(--accent)]" aria-label="Лаг, дней" />
+                <input ref={lagRef} type="number" value={lag} onChange={(e) => setLag(e.target.value)} className="w-16 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1 text-right text-[length:var(--text-sm)] tabular-nums outline-none focus:border-[var(--accent)]" aria-label="Лаг, дней" />
                 <span className="text-[length:var(--text-xs)] text-[var(--muted)]">дн</span>
                 <button
                   type="button"
                   disabled={!predId}
-                  onClick={() => { if (predId) onAdd(predId, type, Number(lag) || 0); }}
+                  onClick={() => {
+                    const nextPredId = predRef.current?.value ?? predId;
+                    if (nextPredId) onAdd(nextPredId, typeRef.current?.value ?? type, Number(lagRef.current?.value ?? lag) || 0);
+                  }}
                   className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-1 font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
                 >
                   <Plus className="size-3.5" aria-hidden />Связь
@@ -146,6 +155,13 @@ export function DependencyEditor({
 export function LinkLagEditor({ type, lagDays, onSave, onDelete, children }: { type: string; lagDays: number; onSave: (type: string, lagDays: number) => void; onDelete: () => void; children: ReactNode }) {
   const [t, setT] = useState(type);
   const [lag, setLag] = useState(String(lagDays));
+  const typeRef = useRef<HTMLSelectElement>(null);
+  const lagRef = useRef<HTMLInputElement>(null);
+  const save = () => {
+    const nextType = typeRef.current?.value ?? t;
+    const nextLagDays = Number(lagRef.current?.value ?? lag) || 0;
+    if (nextType !== type || nextLagDays !== lagDays) onSave(nextType, nextLagDays);
+  };
   return (
     <Popover.Root onOpenChange={(o) => { if (o) { setT(type); setLag(String(lagDays)); } }}>
       <Popover.Trigger asChild>{children}</Popover.Trigger>
@@ -154,15 +170,15 @@ export function LinkLagEditor({ type, lagDays, onSave, onDelete, children }: { t
           <div className="flex w-[230px] flex-col gap-2">
             <div className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Связь — тип и лаг</div>
             <div className="flex items-center gap-1.5">
-              <select value={t} onChange={(e) => setT(e.target.value)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
+              <select ref={typeRef} value={t} onChange={(e) => setT(e.target.value)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]">
                 {DEP_ORDER.map((x) => <option key={x} value={x}>{DEP_RU[x]} ({x})</option>)}
               </select>
-              <input type="number" value={lag} onChange={(e) => setLag(e.target.value)} className="w-16 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1 text-right text-[length:var(--text-sm)] tabular-nums outline-none focus:border-[var(--accent)]" aria-label="Лаг, дней" />
+              <input ref={lagRef} type="number" value={lag} onChange={(e) => setLag(e.target.value)} className="w-16 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1 text-right text-[length:var(--text-sm)] tabular-nums outline-none focus:border-[var(--accent)]" aria-label="Лаг, дней" />
               <span className="text-[length:var(--text-xs)] text-[var(--muted)]">дн</span>
             </div>
             <div className="flex items-center justify-between">
               <Popover.Close onClick={onDelete} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] px-2 py-1 text-[var(--danger-text)] hover:bg-[var(--danger-soft)]"><Trash2 className="size-3.5" aria-hidden />Удалить</Popover.Close>
-              <Popover.Close onClick={() => onSave(t, Number(lag) || 0)} className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2.5 py-1 font-medium text-white hover:bg-[var(--accent-hover)]">Сохранить</Popover.Close>
+              <button type="button" onClick={(event) => { event.stopPropagation(); save(); }} className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2.5 py-1 font-medium text-white hover:bg-[var(--accent-hover)]">Сохранить</button>
             </div>
           </div>
         </Popover.Content>
@@ -176,6 +192,7 @@ export function RowMenu({
   isLeaf,
   canIndent,
   canOutdent,
+  canMakeMilestone,
   onOpen,
   onEdit,
   onAddSub,
@@ -189,6 +206,7 @@ export function RowMenu({
   isLeaf: boolean;
   canIndent: boolean;
   canOutdent: boolean;
+  canMakeMilestone: boolean;
   onOpen: () => void;
   onEdit: () => void;
   onAddSub: () => void;
@@ -208,14 +226,14 @@ export function RowMenu({
             инлайн-строки создания (ПКМ → подзадача/задача рядом). */}
         <ContextMenu.Content className={MENU} onCloseAutoFocus={(e) => e.preventDefault()}>
           <ContextMenu.Item className={ITEM} onSelect={onOpen}>Открыть инспектор</ContextMenu.Item>
-          <ContextMenu.Item className={ITEM} onSelect={onEdit}>Редактировать…</ContextMenu.Item>
+          <ContextMenu.Item className={isLeaf ? ITEM : itemDisabled} disabled={!isLeaf} onSelect={onEdit}>Редактировать…</ContextMenu.Item>
           <ContextMenu.Separator className="my-1 h-px bg-[var(--border)]" />
           <ContextMenu.Item className={ITEM} onSelect={onAddSub}><Plus className="size-3.5" aria-hidden />Создать подзадачу</ContextMenu.Item>
           <ContextMenu.Item className={ITEM} onSelect={onAddBelow}><Plus className="size-3.5" aria-hidden />Создать задачу рядом</ContextMenu.Item>
           <ContextMenu.Separator className="my-1 h-px bg-[var(--border)]" />
           <ContextMenu.Item className={canIndent ? ITEM : itemDisabled} disabled={!canIndent} onSelect={onIndent}><IndentIncrease className="size-3.5" aria-hidden />На уровень глубже</ContextMenu.Item>
           <ContextMenu.Item className={canOutdent ? ITEM : itemDisabled} disabled={!canOutdent} onSelect={onOutdent}><IndentDecrease className="size-3.5" aria-hidden />На уровень выше</ContextMenu.Item>
-          {isLeaf ? <ContextMenu.Item className={ITEM} onSelect={onMakeMilestone}><Diamond className="size-3.5" aria-hidden />Сделать вехой</ContextMenu.Item> : null}
+          {isLeaf ? <ContextMenu.Item className={canMakeMilestone ? ITEM : itemDisabled} disabled={!canMakeMilestone} onSelect={onMakeMilestone}><Diamond className="size-3.5" aria-hidden />Сделать вехой</ContextMenu.Item> : null}
           <ContextMenu.Separator className="my-1 h-px bg-[var(--border)]" />
           <ContextMenu.Item className={ITEM_DANGER} onSelect={onDelete}><Trash2 className="size-3.5" aria-hidden />Удалить</ContextMenu.Item>
         </ContextMenu.Content>
@@ -226,14 +244,27 @@ export function RowMenu({
 
 /* ---- Модалка создания/редактирования задачи ---- */
 export type TaskModalValues = { title: string; assigneeId: string; startIso: string; durDays: number; workH: number; pct: number };
-export function TaskModal({ open, mode, initial, onOpenChange, onSubmit }: { open: boolean; mode: "create" | "edit"; initial: TaskModalValues; onOpenChange: (o: boolean) => void; onSubmit: (v: TaskModalValues) => void }) {
+export type TaskModalSubmitResult = { accepted: boolean };
+export type TaskModalProps = {
+  open: boolean;
+  mode: "create" | "edit";
+  initial: TaskModalValues;
+  resources?: readonly Resource[];
+  canAssign?: boolean;
+  workingMinutesPerDay?: number;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (values: TaskModalValues) => void | TaskModalSubmitResult | Promise<void | TaskModalSubmitResult>;
+};
+
+export function TaskModal({ open, mode, initial, resources: resourceOverride, canAssign = true, workingMinutesPerDay = 8 * 60, onOpenChange, onSubmit }: TaskModalProps) {
   const [title, setTitle] = useState(initial.title);
   const [assigneeId, setAssigneeId] = useState(initial.assigneeId);
   const [startIso, setStartIso] = useState(initial.startIso);
   const [durDays, setDurDays] = useState(String(initial.durDays));
   const [workH, setWorkH] = useState(String(initial.workH));
   const [pct, setPct] = useState(String(initial.pct));
-  const resources = useResourceDirectory().list; // live: /api/workspace/users; mock: статичный RESOURCES
+  const [submitting, setSubmitting] = useState(false);
+  const resources = useResourceDirectory(resourceOverride).list;
   useEffect(() => {
     if (open) { setTitle(initial.title); setAssigneeId(initial.assigneeId); setStartIso(initial.startIso); setDurDays(String(initial.durDays)); setWorkH(String(initial.workH)); setPct(String(initial.pct)); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -241,8 +272,22 @@ export function TaskModal({ open, mode, initial, onOpenChange, onSubmit }: { ope
   // длительность ≥ 1: домен отклоняет durationMinutes <= 0 (task.create/update_work_model),
   // поэтому модалка никогда не отправляет 0 дн. Веха задаётся отдельным действием.
   const d = Math.max(1, Number(durDays) || 0);
-  const units = d > 0 ? Math.round(((Number(workH) || 0) / (d * 8)) * 100) : 100;
-  const submit = () => { if (!title.trim()) return; onSubmit({ title: title.trim(), assigneeId, startIso, durDays: d, workH: Math.max(0, Number(workH) || 0), pct: Math.max(0, Math.min(100, Number(pct) || 0)) }); onOpenChange(false); };
+  const workingHoursPerDay = workingMinutesPerDay / 60;
+  const units = workingMinutesPerDay > 0
+    ? Math.round((((Number(workH) || 0) * 60) / (d * workingMinutesPerDay)) * 100)
+    : 0;
+  const submit = async () => {
+    if (!title.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      const result = await onSubmit({ title: title.trim(), assigneeId, startIso, durDays: d, workH: Math.max(0, Number(workH) || 0), pct: Math.max(0, Math.min(100, Number(pct) || 0)) });
+      if (result?.accepted === true) onOpenChange(false);
+    } catch {
+      // The parent owns submit error feedback; rejected submits keep this draft open.
+    } finally {
+      setSubmitting(false);
+    }
+  };
   const FIELD = "rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1.5 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)]";
   const LBL = "text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]";
   return (
@@ -252,12 +297,13 @@ export function TaskModal({ open, mode, initial, onOpenChange, onSubmit }: { ope
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[460px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-card)] border border-[var(--border-strong)] bg-[var(--panel)] p-4 shadow-[var(--shadow-pop)]">
           <div className="mb-3 flex items-start justify-between">
             <Dialog.Title className="flex items-center gap-2 text-[length:var(--text-base)] font-bold text-[var(--text-strong)]"><Plus className="size-4 text-[var(--accent)]" aria-hidden />{mode === "create" ? "Новая задача" : "Редактировать задачу"}</Dialog.Title>
+            <Dialog.Description className="sr-only">Параметры задачи и назначения ресурса.</Dialog.Description>
             <Dialog.Close className="grid size-7 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)]" aria-label="Закрыть"><X className="size-4" aria-hidden /></Dialog.Close>
           </div>
           <div className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1"><span className={LBL}>Название</span><input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} className={FIELD} /></label>
+            <label className="flex flex-col gap-1"><span className={LBL}>Название</span><input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void submit(); }} className={FIELD} /></label>
             <label className="flex flex-col gap-1"><span className={LBL}>Исполнитель</span>
-              <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className={FIELD}>
+              <select value={assigneeId} disabled={!canAssign} onChange={(e) => setAssigneeId(e.target.value)} className={FIELD}>
                 <option value="">— не назначен —</option>
                 {resources.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
@@ -269,12 +315,12 @@ export function TaskModal({ open, mode, initial, onOpenChange, onSubmit }: { ope
             </div>
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2"><span className={LBL}>Прогресс, %</span><input type="number" value={pct} onChange={(e) => setPct(e.target.value)} className={`${FIELD} w-20 text-right tabular-nums`} /></label>
-              <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Единицы ≈ {units}% (Труд = Длит × 8ч × Ед.)</span>
+              <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Единицы ≈ {units}% (Труд = Длит × {workingHoursPerDay}ч × Ед.)</span>
             </div>
           </div>
           <div className="mt-4 flex items-center justify-end gap-2">
             <Dialog.Close className="rounded-[var(--radius-sm)] px-3 py-1.5 text-[length:var(--text-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)]">Отмена</Dialog.Close>
-            <button type="button" onClick={submit} className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-3 py-1.5 text-[length:var(--text-sm)] font-medium text-white hover:bg-[var(--accent-hover)]">{mode === "create" ? "Создать" : "Сохранить"}</button>
+            <button type="button" disabled={submitting} onClick={() => void submit()} className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-3 py-1.5 text-[length:var(--text-sm)] font-medium text-white hover:bg-[var(--accent-hover)] disabled:cursor-wait disabled:opacity-60">{mode === "create" ? "Создать" : "Сохранить"}</button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

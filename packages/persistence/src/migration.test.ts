@@ -214,6 +214,21 @@ const crmPipelineSchemaContractMigration = readFileSync(
   ),
   "utf8"
 );
+const planningSavedViewNameUniqueMigration = readFileSync(
+  new URL(
+    "../migrations/0027_planning_saved_view_name_uniqueness.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const contactEmailUniqueMigration = readFileSync(
+  new URL("../migrations/0049_contact_email_unique.sql", import.meta.url),
+  "utf8"
+);
+const accessProfileNameUniqueMigration = readFileSync(
+  new URL("../migrations/0050_access_profiles_name_unique.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Phase 1.2 SQL migration", () => {
   it("prevents tenant users from referencing access profiles from another tenant", () => {
@@ -809,6 +824,74 @@ describe("CRM pipeline schema contract SQL migration", () => {
     expect(crmPipelineSchemaContractMigration).toContain(
       'CONSTRAINT "crm_pipeline_stages_final_lifecycle_state_chk"'
     );
+  });
+});
+
+describe("CRM contact email SQL migration", () => {
+  it("keeps contact email unique per tenant when present", () => {
+    expect(contactEmailUniqueMigration).toContain(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "contacts_tenant_id_email_uidx"'
+    );
+    expect(contactEmailUniqueMigration).toContain(
+      'ON "contacts" USING btree ("tenant_id","email")'
+    );
+    expect(contactEmailUniqueMigration).toContain(
+      'LOCK TABLE "contacts" IN SHARE ROW EXCLUSIVE MODE'
+    );
+    expect(contactEmailUniqueMigration).toContain("EXIT WHEN NOT EXISTS");
+    expect(
+      contactEmailUniqueMigration.indexOf("EXIT WHEN NOT EXISTS")
+    ).toBeLessThan(
+      contactEmailUniqueMigration.indexOf(
+        'CREATE UNIQUE INDEX IF NOT EXISTS "contacts_tenant_id_email_uidx"'
+      )
+    );
+  });
+});
+
+describe("Access profile name SQL migration", () => {
+  it("keeps access profile names unique per tenant", () => {
+    expect(accessProfileNameUniqueMigration).toContain(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "access_profiles_tenant_id_name_uidx"'
+    );
+    expect(accessProfileNameUniqueMigration).toContain(
+      'ON "access_profiles" USING btree ("tenant_id","name")'
+    );
+    expect(accessProfileNameUniqueMigration).toContain(
+      'LOCK TABLE "access_profiles" IN SHARE ROW EXCLUSIVE MODE'
+    );
+    expect(accessProfileNameUniqueMigration).toContain("EXIT WHEN NOT EXISTS");
+    expect(
+      accessProfileNameUniqueMigration.indexOf("EXIT WHEN NOT EXISTS")
+    ).toBeLessThan(
+      accessProfileNameUniqueMigration.indexOf(
+        'CREATE UNIQUE INDEX IF NOT EXISTS "access_profiles_tenant_id_name_uidx"'
+      )
+    );
+  });
+});
+
+describe("Planning saved-view name SQL migration", () => {
+  it("deduplicates case-insensitive project and user names before indexing", () => {
+    const cleanupPosition = planningSavedViewNameUniqueMigration.indexOf(
+      "row_number() OVER"
+    );
+    const projectIndexPosition = planningSavedViewNameUniqueMigration.indexOf(
+      "CREATE UNIQUE INDEX IF NOT EXISTS planning_saved_views_project_name_uidx"
+    );
+
+    expect(planningSavedViewNameUniqueMigration).toContain(
+      'LOCK TABLE "planning_saved_views" IN SHARE ROW EXCLUSIVE MODE'
+    );
+    expect(planningSavedViewNameUniqueMigration).toContain('lower("name")');
+    expect(planningSavedViewNameUniqueMigration).toContain(
+      "CASE WHEN \"scope\" = 'user' THEN \"owner_user_id\" ELSE '' END"
+    );
+    expect(planningSavedViewNameUniqueMigration).toContain(
+      'lower(existing."name") = lower(candidate)'
+    );
+    expect(cleanupPosition).toBeGreaterThanOrEqual(0);
+    expect(projectIndexPosition).toBeGreaterThan(cleanupPosition);
   });
 });
 

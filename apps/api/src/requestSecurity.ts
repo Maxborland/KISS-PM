@@ -25,10 +25,13 @@ export function isTrustedBrowserMutationRequest(
   if (!origin) return true;
 
   try {
-    const normalizedOrigin = new URL(origin).origin;
+    const originUrl = new URL(origin);
+    const requestUrl = new URL(request.url);
+    const normalizedOrigin = originUrl.origin;
     return (
-      normalizedOrigin === new URL(request.url).origin ||
-      trustedOrigins.includes(normalizedOrigin)
+      normalizedOrigin === requestUrl.origin ||
+      trustedOrigins.includes(normalizedOrigin) ||
+      isTrustedLoopbackWildcard(originUrl, trustedOrigins)
     );
   } catch {
     return false;
@@ -44,7 +47,26 @@ export function trustedMutationOriginsFromEnv(
     .filter((origin): origin is string => origin !== null);
   if (configuredOrigins && configuredOrigins.length > 0) return configuredOrigins;
   if (env.NODE_ENV === "production") return [];
-  return ["http://127.0.0.1:3000", "http://localhost:3000"];
+  return ["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"];
+}
+
+// Dev-only convenience: trust a loopback browser origin (e.g. http://localhost:3000) even when the
+// API request Host is a non-loopback compose service name (http://api:4000). Previously this also
+// required the REQUEST url to be loopback, so browser POST/PATCH through the web container (which
+// rewrites /api → http://api:4000) got same_origin_action_required. The loopback wildcard entries
+// (http://localhost:*, http://127.0.0.1:*, …) exist ONLY in the non-production defaults — env-
+// configured origins are concrete and reject wildcards — so dropping the request-host check cannot
+// widen trust in production.
+function isTrustedLoopbackWildcard(originUrl: URL, trustedOrigins: string[]): boolean {
+  const originWildcard = loopbackWildcardFor(originUrl);
+  return originWildcard !== null && trustedOrigins.includes(originWildcard);
+}
+
+function loopbackWildcardFor(url: URL): string | null {
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  const host = url.hostname;
+  if (host !== "localhost" && host !== "127.0.0.1" && host !== "[::1]" && host !== "::1") return null;
+  return `${url.protocol}//${host}:*`;
 }
 
 function normalizeTrustedOrigin(rawOrigin: string): string | null {

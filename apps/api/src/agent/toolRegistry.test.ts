@@ -31,6 +31,15 @@ const ALL = [
 ];
 
 describe("agent tool registry RBAC filtering", () => {
+  it("описывает plannedWork создания задачи в часах с default 8", () => {
+    const createTask = AGENT_TOOLS.find((tool) => tool.name === "create_task");
+
+    expect(createTask?.inputSchema.properties?.plannedWork).toEqual({
+      type: "number",
+      description: "Плановые часы; по умолчанию 8",
+      default: 8
+    });
+  });
   it("полный набор прав → доступны все инструменты", () => {
     const allowed = allowedToolsForActor(actor, profile(ALL));
     expect(allowed.length).toBe(AGENT_TOOLS.length);

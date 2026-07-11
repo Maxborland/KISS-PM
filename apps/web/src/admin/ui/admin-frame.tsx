@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
@@ -70,7 +71,9 @@ export function AdminFrame({
     <WorkspaceShell activeNav="Администрирование">
       {/* Заголовок области */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--border)] bg-[var(--panel)] px-4 pt-3 pb-3 md:px-6">
-        <span className="grid size-8 place-items-center rounded-[var(--radius-md)] bg-[var(--panel-strong)] text-[length:var(--text-xs)] font-bold uppercase tracking-[0.04em] text-[var(--muted-strong)]">Admin</span>
+        <span className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-md)] bg-[var(--panel-strong)] text-[var(--muted-strong)]">
+          <ShieldCheck className="size-4" aria-hidden />
+        </span>
         <div className="mr-auto min-w-0">
           <h1 className="truncate font-[family-name:var(--font-display)] text-[length:var(--text-22)] font-extrabold leading-tight tracking-[-0.025em] text-[var(--text-strong)]">{title ?? "Администрирование"}</h1>
           {subtitle ? <p className="truncate text-[length:var(--text-sm)] text-[var(--muted)]">{subtitle}</p> : null}

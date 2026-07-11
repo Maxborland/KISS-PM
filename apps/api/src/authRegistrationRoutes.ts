@@ -286,7 +286,7 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
       !dataSource.findPasswordResetTokenByHash ||
       !dataSource.updateCredentialPassword ||
       !dataSource.markPasswordResetTokenConsumed ||
-      !dataSource.deletePasswordResetTokensByUserId ||
+      !dataSource.deleteOtherPasswordResetTokensByUserId ||
       !dataSource.deleteSessionsByUserId ||
       !dataSource.withTransaction ||
       !dataSource.appendAuditEvent
@@ -349,7 +349,7 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
         if (
           !tx.updateCredentialPassword ||
           !tx.markPasswordResetTokenConsumed ||
-          !tx.deletePasswordResetTokensByUserId ||
+          !tx.deleteOtherPasswordResetTokensByUserId ||
           !tx.deleteSessionsByUserId
         ) {
           throw new Error("transactional_password_reset_not_configured");
@@ -370,8 +370,8 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
           record.userId,
           hashPassword(password)
         );
-        // Инвалидируем прочие токены сброса и разлогиниваем все сессии пользователя.
-        await tx.deletePasswordResetTokensByUserId(record.tenantId, record.userId);
+        // Инвалидируем прочие токены сброса, сохраняя consumed-токен как evidence для стабильного reset_token_used.
+        await tx.deleteOtherPasswordResetTokensByUserId(record.tenantId, record.userId, record.id);
         await tx.deleteSessionsByUserId(record.tenantId, record.userId);
 
         await appendManagementAuditEvent(
@@ -431,11 +431,14 @@ function deriveTenantName(ownerName: string, email: string): string {
   return domain && domain.length > 0 ? domain : email;
 }
 
-// Ссылка на форму подтверждения сброса на фронте, относительно текущего origin запроса.
-// Реальный роут — /password-reset/confirm (группа (auth) в URL не участвует), токен читается
-// из ?token= на confirm-странице. Прежний /auth/reset-password 404-ил каждое письмо сброса.
+// Ссылка на форму подтверждения сброса на фронте. При web -> API rewrite URL запроса
+// содержит внутренний origin API, поэтому используем browser Origin, уже проверенный
+// same-origin middleware. Для server-to-server вызовов без Origin оставляем request origin.
 function buildResetUrl(context: Context, rawToken: string): string {
-  const origin = new URL(context.req.url).origin;
+  const originHeader = context.req.header("origin");
+  const origin = originHeader
+    ? new URL(originHeader).origin
+    : new URL(context.req.url).origin;
   return `${origin}/password-reset/confirm?token=${encodeURIComponent(rawToken)}`;
 }
 

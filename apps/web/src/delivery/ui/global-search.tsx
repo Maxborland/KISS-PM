@@ -104,7 +104,7 @@ export function GlobalSearch() {
 
   return (
     <div ref={rootRef} className="relative max-w-md flex-1">
-      <label className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 text-[var(--muted)] focus-within:border-[var(--accent)]">
+      <label className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 text-[var(--muted)] focus-within:border-[var(--accent)] [@media(pointer:coarse)]:min-h-[var(--touch-target)]">
         <Search className="size-4 shrink-0" aria-hidden />
         <input
           className="min-w-0 flex-1 bg-transparent text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--muted-soft)]"
@@ -140,7 +140,7 @@ export function GlobalSearch() {
                 onMouseEnter={() => setActiveIndex(i)}
                 onClick={() => go(r)}
                 className={cn(
-                  "flex w-full items-baseline gap-2 px-3 py-2 text-left",
+                  "flex w-full items-baseline gap-2 px-3 py-2 text-left [@media(pointer:coarse)]:min-h-[var(--touch-target)]",
                   i === activeIndex ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--panel-subtle)]"
                 )}
               >

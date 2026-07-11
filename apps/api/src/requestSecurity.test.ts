@@ -65,6 +65,76 @@ describe("request security helpers", () => {
     );
   });
 
+  it("accepts loopback web origins on non-default dev ports", () => {
+    const request = new Request("http://127.0.0.1:4000/api/auth/logout", {
+      method: "POST",
+      headers: {
+        origin: "http://localhost:3011",
+        "sec-fetch-site": "same-site"
+      }
+    });
+
+    expect(
+      isTrustedBrowserMutationRequest(
+        request,
+        trustedMutationOriginsFromEnv({ NODE_ENV: "development" })
+      )
+    ).toBe(true);
+  });
+
+  it("trusts a loopback browser origin through a non-loopback compose API host in dev", () => {
+    // Docker compose: browser origin stays http://localhost:3000 while the web container rewrites
+    // /api → http://api:4000 (a non-loopback service name). The dev wildcard must still trust it.
+    const request = new Request("http://api:4000/api/workspace/meetings", {
+      method: "POST",
+      headers: {
+        origin: "http://localhost:3000",
+        "sec-fetch-site": "same-site"
+      }
+    });
+
+    expect(
+      isTrustedBrowserMutationRequest(
+        request,
+        trustedMutationOriginsFromEnv({ NODE_ENV: "development" })
+      )
+    ).toBe(true);
+  });
+
+  it("still rejects a loopback browser origin through a compose API host in production", () => {
+    const request = new Request("http://api:4000/api/workspace/meetings", {
+      method: "POST",
+      headers: {
+        origin: "http://localhost:3000",
+        "sec-fetch-site": "same-site"
+      }
+    });
+
+    expect(
+      isTrustedBrowserMutationRequest(
+        request,
+        trustedMutationOriginsFromEnv({ NODE_ENV: "production" })
+      )
+    ).toBe(false);
+  });
+
+  it("does not trust loopback dev ports by default in production", () => {
+    const request = new Request("http://127.0.0.1:4000/api/auth/logout", {
+      method: "POST",
+      headers: {
+        origin: "http://localhost:3011",
+        "sec-fetch-site": "same-site"
+      }
+    });
+
+    expect(
+      isTrustedBrowserMutationRequest(
+        request,
+        trustedMutationOriginsFromEnv({ NODE_ENV: "production" })
+      )
+    ).toBe(false);
+  });
+
   it("requires explicit trusted origins in production", () => {
     expect(trustedMutationOriginsFromEnv({ NODE_ENV: "production" })).toEqual([]);
     expect(

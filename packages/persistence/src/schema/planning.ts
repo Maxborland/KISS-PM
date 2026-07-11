@@ -227,6 +227,12 @@ export const planningSavedViews = pgTable(
       table.projectId,
       table.ownerUserId
     ),
+    uniqueIndex("planning_saved_views_project_name_uidx")
+      .on(table.tenantId, table.projectId, sql`lower(${table.name})`)
+      .where(sql`${table.scope} = 'project'`),
+    uniqueIndex("planning_saved_views_user_name_uidx")
+      .on(table.tenantId, table.projectId, table.ownerUserId, sql`lower(${table.name})`)
+      .where(sql`${table.scope} = 'user'`),
     check("planning_saved_views_scope_chk", sql`${table.scope} in ('user', 'project')`)
   ]
 );

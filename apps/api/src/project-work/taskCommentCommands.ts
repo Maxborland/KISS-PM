@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { hashJson } from "../planningProposalCodec";
 import {
   canEditTaskFields,
   canParticipateInTaskActivity,
@@ -42,8 +43,29 @@ export async function createTaskComment(
       return { ok: false, status: 403, error: "task_participant_required" };
     }
 
+    const proposedActivityId = `task-activity-${randomUUID()}`;
+    const claim = input.body.clientRequestId
+      ? await transactionDataSource.claimWriteFlowIdempotencyKey({
+          tenantId: input.actor.tenantId,
+          actorUserId: input.actor.id,
+          surface: `project_work.task.comment.create:${task.id}`,
+          clientRequestId: input.body.clientRequestId,
+          resourceId: proposedActivityId,
+          requestHash: hashJson({ body: input.body.body })
+        })
+      : { claimed: true, resourceId: proposedActivityId, conflict: false };
+    // Same clientRequestId reused with a different comment body → reject instead of returning the
+    // previous comment as a success and dropping the new content.
+    if (claim.conflict) return { ok: false, status: 409, error: "idempotency_key_conflict" };
+    if (!claim.claimed) {
+      const activities = await transactionDataSource.listTaskActivities(input.actor.tenantId, task.id);
+      const existingActivity = activities.find((activity) => activity.id === claim.resourceId);
+      if (!existingActivity) throw new Error("write_flow_idempotent_resource_missing");
+      return { ok: true, activity: existingActivity };
+    }
+
     const activity = await transactionDataSource.createTaskActivity({
-      id: `task-activity-${randomUUID()}`,
+      id: claim.resourceId,
       tenantId: input.actor.tenantId,
       taskId: task.id,
       type: "comment",
@@ -61,7 +83,10 @@ export async function createTaskComment(
         actionType: "task.comment_created",
         sourceWorkflow: "project_work",
         sourceEntity: { type: "Task", id: task.id },
-        commandInput: { activityId: activity.id },
+        commandInput: {
+          activityId: activity.id,
+          ...(input.body.clientRequestId ? { clientRequestId: input.body.clientRequestId } : {})
+        },
         beforeState: null,
         afterState: { id: activity.id, type: activity.type },
         permissionResult: {

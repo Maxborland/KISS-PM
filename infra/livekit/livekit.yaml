@@ -26,7 +26,7 @@ keys:
   # <api_key>: <api_secret>
   # These two values MUST equal KISS_PM_VIDEO_LIVEKIT_API_KEY / _API_SECRET that
   # the API signs join tokens with. Dev placeholder — rotate for any real deploy.
-  devkey: devsecret_change_me_min_32_chars_0123456789
+  kisspmdevkey: devsecret_change_me_min_32_chars_0123456789
 
 redis:
   address: redis:6379 # reuse the existing compose redis service

@@ -1,0 +1,68 @@
+{
+  "id": "CURRENT-RISK-WRITE-FLOW-MEETING-ACTION-ITEM-STATUS-IDEMPOTENCY",
+  "generatedAt": "2026-07-08T10:10:00+07:00",
+  "riskZone": "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+  "status": "pass",
+  "scope": "Meeting action item status duplicate-submit and concurrent duplicate idempotency.",
+  "surfaces": [
+    "PATCH /api/workspace/meetings/:meetingId/action-items/:actionItemId",
+    "GET /api/workspace/meetings/:meetingId",
+    "GET /api/tenant/current/audit-events"
+  ],
+  "expected": "Setting a meeting action item to its current status should be an idempotent success with no duplicate status-change audit. Concurrent duplicate status updates should return successful readback for both requests, persist one final action item state, and emit exactly one status-change audit for the transition.",
+  "redEvidence": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"treats duplicate meeting action item status updates\"",
+      "observed": "Failed before fix: sequential duplicate PATCH returned 200 but produced two collaboration.meeting_action_item_updated audit events for a single transition.",
+      "result": "fail-before-fix"
+    }
+  ],
+  "actual": "Pass: duplicate same-status PATCH returns 200 with done readback and one status-change audit; concurrent duplicate PATCH requests both return 200, read back one done action item, and keep audit count to one event for the concurrent transition.",
+  "verification": [
+    {
+      "command": "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"treats duplicate meeting action item status updates\"",
+      "observed": "1 selected test passed, 18 skipped",
+      "notes": "Vitest emitted the existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts, unrelated to this slice.",
+      "result": "pass"
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.cmd -p apps\\api\\tsconfig.json --pretty false",
+      "observed": "No TypeScript errors.",
+      "result": "pass"
+    },
+    {
+      "command": "node_modules\\.bin\\tsc.cmd -p packages\\persistence\\tsconfig.json --pretty false",
+      "observed": "No TypeScript errors.",
+      "result": "pass"
+    },
+    {
+      "command": "DATABASE_URL=<local-dev-db> node_modules\\.bin\\tsx.cmd scripts\\seed-dev.ts",
+      "observed": "Seeded dev tenants, users, org structure, CRM, projects and communications data.",
+      "notes": "Restored local dev/browser database after the DB test harness truncated collaboration state.",
+      "result": "pass"
+    },
+    {
+      "command": "ConvertFrom-Json for reconciliation matrix and this evidence JSON",
+      "observed": "Both JSON files parsed successfully.",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check -- <touched files>",
+      "observed": "No whitespace errors; Git reported only CRLF-to-LF normalization warnings for existing files.",
+      "result": "pass"
+    },
+    {
+      "command": "codegraph sync",
+      "observed": "Already up to date.",
+      "result": "pass"
+    }
+  ],
+  "changedFiles": [
+    "apps/api/src/collaborationRoutes.ts",
+    "apps/api/src/collaborationRoutes.db.test.ts",
+    "packages/persistence/src/collaborationRepository.ts",
+    "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-meeting-action-item-status-idempotency-2026-07-08.json",
+    "docs/qa/full-eval/reconciliation-matrix-2026-07-07.json"
+  ],
+  "coverageImpact": "Adds fresh DB/API evidence and a backend fix for the meetings action-item status write-flow. Broader RISK-WRITE-FLOW-RACE-IDEMPOTENCY remains open for other write surfaces such as call participant-state, meeting create, task update, control-surface publish/rollback, and retrospective close."
+}

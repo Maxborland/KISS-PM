@@ -1,0 +1,26 @@
+{
+  "id": "BUG-COMM-01",
+  "status": "fixed-by-current-branch",
+  "date": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "surface": [
+    "/communications/channels",
+    "ChannelsSurface sidebar list",
+    "useChannels/useChannel patchChannel state flow"
+  ],
+  "expected": "After a successful PATCH /communication-channels/:id, both the detail heading and sidebar list show the updated channel title without a manual page reload.",
+  "redEvidence": [
+    "corepack pnpm --filter @kiss-pm/web test -- src/communications/lib/use-comms.test.ts -> RED: replaceChannelInList was not exported/implemented, so list replacement after patch had no state primitive."
+  ],
+  "greenEvidence": [
+    "corepack pnpm --filter @kiss-pm/web test -- src/communications/lib/use-comms.test.ts -> 20 files / 261 tests passed; replace helper preserves other channels and replaces the renamed one.",
+    "corepack pnpm --filter @kiss-pm/web typecheck -> passed."
+  ],
+  "changedFiles": [
+    "apps/web/src/communications/lib/use-comms.ts",
+    "apps/web/src/communications/lib/use-comms.test.ts",
+    "apps/web/src/communications/channels/channels-surface.tsx"
+  ],
+  "fixApplied": "patchChannel now returns the updated Channel payload via guardData; ChannelsSurface passes a replaceChannel callback into ChannelDetail; after successful save, the sidebar list state replaces the patched channel immediately.",
+  "regressionRisk": "Low. Create/archive list behavior remains unchanged; patch detail still updates its own local state. Full browser traversal remains tracked separately as RISK-FULL-BROWSER-TRAVERSAL."
+}

@@ -1,0 +1,21 @@
+{
+  "id": "BUG-SHELL-12-13-NO-PROVIDER-DEGRADED",
+  "linkedOldIds": ["BUG-SHELL-12", "BUG-SHELL-13"],
+  "status": "partial-fixed-by-current-branch",
+  "coverageStatus": "partial",
+  "date": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "surface": ["/api/workspace/agent/tools", "/api/workspace/agent/propose", "/api/workspace/agent/propose/stream", "/agent UI"],
+  "expected": "When no live LLM provider is configured, API/UI fail closed with explicit degraded/not-configured state instead of mock/fake proposal success or fake SSE.",
+  "redEvidence": ["agentProviderDegraded.test.ts initially expected 503 but received 200 from /agent/propose without provider."],
+  "greenEvidence": [
+    "cmd /c node_modules\\.bin\\vitest.exe run --config vitest.config.ts apps/api/src/agent/agentProviderDegraded.test.ts apps/api/src/agent/agentLoop.test.ts apps/api/src/agent/openRouterProvider.test.ts apps/web/src/workspace/agent/agent-stream.test.ts -> 4 files / 17 tests passed.",
+    "corepack pnpm --filter @kiss-pm/api typecheck -> passed.",
+    "corepack pnpm --filter @kiss-pm/web typecheck -> passed."
+  ],
+  "changedFiles": ["apps/api/src/agent/agentRoutes.ts", "apps/api/src/agent/agentProviderDegraded.test.ts", "apps/web/src/workspace/agent/agent-surface.tsx", "apps/web/src/workspace/agent/agent-client.ts", "apps/web/src/workspace/agent/use-agent.ts"],
+  "fixApplied": "Agent routes now expose provider.configured and return 503 agent_provider_not_configured for propose/propose/stream when running mock-llm; UI refuses to start a fake thinking/proposal flow and displays an explicit provider setup message.",
+  "remainingScope": ["Real OpenRouter/Anthropic provider proposal and live SSE browser traversal were not run because OPENROUTER_API_KEY/ANTHROPIC_API_KEY are absent locally."],
+  "limitations": ["Partial no-provider degraded fix only; real provider behavior remains unverified."],
+  "regressionRisk": "Medium-low. No-provider behavior becomes fail-closed; live provider code path remains covered by existing loop/provider tests but not by live browser traversal."
+}

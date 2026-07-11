@@ -1,0 +1,345 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-11T05:39:27.156Z",
+  "status": "pass",
+  "matrix": {
+    "path": "docs/qa/full-eval/projects-coverage-matrix-2026-07-10.json",
+    "sha256": "72cab55709e681a5c43d82c42fcb3ebeadca68718e434a2fada1f584c3c59bff",
+    "generatedAt": "2026-07-11T05:37:17.718Z",
+    "totalRows": 223,
+    "pass": 223,
+    "nonPass": 0,
+    "summary": [
+      {
+        "status": "pass",
+        "count": 223
+      }
+    ],
+    "finalBlockRows": 29,
+    "finalBlockPass": 29,
+    "missingEvidenceRefs": 0
+  },
+  "closeout": {
+    "path": "docs/qa/full-eval/projects-final-29-closeout-2026-07-11.md",
+    "sha256": "f3106041d45840fc6d5287af928e2e4e4a77146db0c314d8afb8150347b2f10e"
+  },
+  "evidence": {
+    "root": ".superloopy/evidence/project-final-29-2026-07-11",
+    "fileCount": 62,
+    "jsonCount": 26,
+    "screenshotCount": 36,
+    "badStatusCount": 0,
+    "files": [
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/calendars-closeout-run.json",
+        "size": 3743289,
+        "sha256": "1660bbd538f922e7bfefa0fe5532a58a874e39053c56e821609ff33b6dffc00c"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/receipts/proj-089-a.json",
+        "size": 2994,
+        "sha256": "4a80b4e86d84fe8e0368aefa35d333171551235afbd37bee79cb656e4c147a4a"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/receipts/proj-089-pr.json",
+        "size": 1837,
+        "sha256": "79ef9d19b6eec47be85d98e06bddf2e30d2262e30867994e4eaa59d9af19b606"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/receipts/proj-091-a.json",
+        "size": 3562834,
+        "sha256": "d7d6a7765f09cc3c95d89ba2dfa8ee7156cc3dcea28c9146d6432c04492d266f"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/receipts/proj-093-a.json",
+        "size": 980,
+        "sha256": "be8a508ff3bb0151a1215330057a63b8d1b3b2822b62aa54af90a6bc3ce84b8a"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/receipts/proj-093-pr.json",
+        "size": 983,
+        "sha256": "955c78ac6f8c4766d6bd2856e165857c0e0703ea14bc615afad2e653e59fcd77"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/screenshots/proj-089-a-live-directory.png",
+        "size": 136612,
+        "sha256": "7bac8d8a3000033c22c20ef99213b0c9eba685e0056b84326dec00389ce06309"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/screenshots/proj-089-pr-live-directory.png",
+        "size": 124739,
+        "sha256": "1e435acf4a6427b177d08160a64809e5d748385304309315ed4e29cd4413b38a"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/screenshots/proj-091-a-cleanup-reload.png",
+        "size": 136943,
+        "sha256": "7bf7da054ed19fea934531f8ecb5d724cc49ed6ce5d0ee511bdca4d003bd7f3b"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/screenshots/proj-091-a-reactivated-same-id.png",
+        "size": 151802,
+        "sha256": "6f965392e2952d0a1a410570d4b0fe57ab1ba7965a83aee9d4922ff6d0e70430"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/screenshots/proj-093-a-live-horizon-last-month.png",
+        "size": 134737,
+        "sha256": "fed444512487945503a0153348c281cffed469f1824825a8d69e4aa3e1108712"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/calendars/screenshots/proj-093-pr-live-horizon-last-month.png",
+        "size": 123076,
+        "sha256": "c6528f35a696dadb0f9e3ec744c09ce6d44a041fc3fa1f0318a41307b0e57709"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/commits-closeout-run.json",
+        "size": 509,
+        "sha256": "c9c88e0915c47d8f7abe12d437974ac3575a9ba0994923a6f0f75bdb8743390d"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-105-admin.json",
+        "size": 1544,
+        "sha256": "50f753d7f01f8a7b222900f42f54859ee7a90d9e8a919ec479828ab93d0f7236"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-105-planReader.json",
+        "size": 1558,
+        "sha256": "b6d725eb4a58358b35709a31c6c285d4e93b12b6afbf310aca3466b288ed4715"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-106-admin.json",
+        "size": 1506,
+        "sha256": "1a22d1582f892143ea4fec3e0bbc1cf34e813fe917640f7eefb63348a2941ba8"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-106-planReader.json",
+        "size": 1512,
+        "sha256": "9697b19480e9dbd1a59cf239dd1ac5839c89b161c791f7a67791f9b695e6f6e3"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-108-admin.json",
+        "size": 1864,
+        "sha256": "471cde1c2cc54d0babe74812346b7bc0043aeda31ccc0f5baae34481fa1f0f2f"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-108-planReader.json",
+        "size": 714,
+        "sha256": "b1e3da298fbcfcf35a6a98e23b98c7a0db16a09ebe79942a044019f0a8894617"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/screenshots/proj-105-admin-populated-sorted-history.png",
+        "size": 99797,
+        "sha256": "956a9901ef5b4627b67f182ec9f06b7ae5912c53fb74ba3903d6cf7bcba45ecc"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/screenshots/proj-105-planReader-populated-sorted-history.png",
+        "size": 87412,
+        "sha256": "bdb2a918e7adb6d5740cf65638286d6e9444d8f838345d74e79b4be725e4636d"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/screenshots/proj-106-admin-details-raw-task-resolution.png",
+        "size": 113712,
+        "sha256": "491d41a05c154449275a8bab14a1525319ff98f09bad755f671ce21ad9973f62"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/screenshots/proj-106-planReader-details-raw-task-resolution.png",
+        "size": 100835,
+        "sha256": "b594cf29da67a2949b7e5b5ccf48090aa50be959c8805867c8532e275caa2ce9"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/screenshots/proj-108-admin-actual-empty-history-reload.png",
+        "size": 66744,
+        "sha256": "6757e3e37549142ef3d21b748e3af772396cff4cb2bbddef92b0d7a5d1eaf762"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/commits/screenshots/proj-108-planReader-actual-empty-history-reload.png",
+        "size": 55611,
+        "sha256": "eed0587194e3250a31c15c779ce1cb16fb104b0e70da110802f484fcac3b01a3"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/creation/01-project-list-create-entry.png",
+        "size": 79636,
+        "sha256": "b54f82b112c4b0b5174486731771bbc78d21697f8e91d87330400fae9eed4f74"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/creation/02-required-fields-disabled.png",
+        "size": 223431,
+        "sha256": "ccc44b111eb38a2d787ed05bbe3735de4deb0e4b41c8a0fc5d5a6279775e3fca"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/creation/03-invalid-values-disabled.png",
+        "size": 151859,
+        "sha256": "cee39b5906f5d25255532de7e756d744ed8d56cb464d22f5fa29f2f9d58a5478"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/creation/04-opportunity-created.png",
+        "size": 200743,
+        "sha256": "295c129efaaa3db50cce42ae917945e080d7c79cc2c559145061634909b5e8eb"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/creation/05-feasibility-readback.png",
+        "size": 143581,
+        "sha256": "c3ba8350fb3c996dee46266f163c022a2d156c168033919b9d0788c35cf15304"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/creation/06-project-navigation-reload.png",
+        "size": 82856,
+        "sha256": "446edd597bda6bf13cd07881c6eae28f3aa006b468d34b4f8054c02ac9016607"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/creation/proj-116-a-receipt.json",
+        "size": 18019,
+        "sha256": "fb3db5300975a6aba2b5f0b790bb3056d9193412351cc50f220148a9c0cf6153"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/scenarios-closeout-run.json",
+        "size": 602865,
+        "sha256": "745bf299f5cd209515897918aa16cfe70e45806f802c6a803662568af757c041"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/screenshots/proj-097-a-target.png",
+        "size": 150728,
+        "sha256": "25716c58cdd58e09626ab6480eeb38b8ecf78e7d5ad867ddb1f2ce25f041a96e"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/screenshots/proj-099-a-three-profiles.png",
+        "size": 150728,
+        "sha256": "25716c58cdd58e09626ab6480eeb38b8ecf78e7d5ad867ddb1f2ce25f041a96e"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/screenshots/proj-099-pr-three-profiles.png",
+        "size": 124883,
+        "sha256": "087de7e0353fc3ca553b5c0986ab5d5c88a0dca3c545808be5c391f0a51f4e62"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/screenshots/proj-102-a-reload.png",
+        "size": 82603,
+        "sha256": "fd8f9bd7a6321aa1a1599a6c8716aa3215959c20915e24dc0c6a7a901fb03ba9"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/screenshots/proj-103-a-empty.png",
+        "size": 66685,
+        "sha256": "ad217fd3705756b9ad9d21ab7ed3558e34064332deec3872bf374e5cc72c3bb4"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/screenshots/proj-103-pr-empty.png",
+        "size": 57973,
+        "sha256": "3a4032ddeb83cbc6e67556cdb787d40f5ebc55726f6bd9af01594fb4d8d54793"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/screenshots/proj-121-a-assignments.png",
+        "size": 67780,
+        "sha256": "67fbfbe859a10d715e455b103c3dab9b11db6e8639b334f005d2aef5a1bae5c4"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/screenshots/proj-121-a-commits.png",
+        "size": 92161,
+        "sha256": "5b517d704ef8ba329043c516f2c63587c89c5a0da732d91bc4d3d8c1968b8cbd"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-111-admin.json",
+        "size": 413,
+        "sha256": "62ea13177febf8037ed433f4880249ca8d923c13c702599ad3f44ce6406d2e60"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-111-planReader.json",
+        "size": 428,
+        "sha256": "6bf641b0ad6a96e048304f1983335c6e99938d381a9d7b9b5a1650b44968a11f"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-113-admin.json",
+        "size": 425,
+        "sha256": "95baceb6e66a0a3c944065c193abf6dcb6ed5a9a965da783ca62c111b4995eb7"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-113-planReader.json",
+        "size": 440,
+        "sha256": "48368abc531a4c5e8c90c92c184738bc43dc0c1c0e2793f44b756c8497754074"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-114-admin.json",
+        "size": 418,
+        "sha256": "d1635238542fd6b1d302c69af82700ed6582fd8577fb1dd70a73966504c317bc"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-114-planReader.json",
+        "size": 433,
+        "sha256": "5d7cc463a3052f8b7266aca165a0c8dbe0d26ba26896ebf1c5bfcd16dd0e46b0"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-115-admin.json",
+        "size": 408,
+        "sha256": "db64492071e8fcb857e593bcfae575dcb9d584dbfa7ab708bb13bc5e378285c7"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-115-planReader.json",
+        "size": 423,
+        "sha256": "d82bab6a12480376a6e68e6e0e4f55a99ace943ccb5d210e5cd3371a2356859e"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-128-admin.json",
+        "size": 1539,
+        "sha256": "52c63083f69b1e6a23c594f4064de78bfd111e65947b70d91ffe222a87f2b780"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-128-planReader.json",
+        "size": 946,
+        "sha256": "7f469f9a35262aba17afc2f60d5716deb241183b62ae1ed4095ea2df972138fe"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/screenshots/proj-111-admin.png",
+        "size": 204731,
+        "sha256": "3ab4e4cb1fcb4bcae2c01d11fbeb8ea190e9d206cff1dd40d98736d7bf2c2abd"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/screenshots/proj-111-planReader.png",
+        "size": 199748,
+        "sha256": "092941fe0352273d6380c534a9d1bb695b1d1773d19ee029d4b83135d4139526"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/screenshots/proj-113-admin.png",
+        "size": 204731,
+        "sha256": "3ab4e4cb1fcb4bcae2c01d11fbeb8ea190e9d206cff1dd40d98736d7bf2c2abd"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/screenshots/proj-113-planReader.png",
+        "size": 199748,
+        "sha256": "092941fe0352273d6380c534a9d1bb695b1d1773d19ee029d4b83135d4139526"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/screenshots/proj-114-admin.png",
+        "size": 204731,
+        "sha256": "3ab4e4cb1fcb4bcae2c01d11fbeb8ea190e9d206cff1dd40d98736d7bf2c2abd"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/screenshots/proj-114-planReader.png",
+        "size": 199748,
+        "sha256": "092941fe0352273d6380c534a9d1bb695b1d1773d19ee029d4b83135d4139526"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/screenshots/proj-115-admin.png",
+        "size": 204731,
+        "sha256": "3ab4e4cb1fcb4bcae2c01d11fbeb8ea190e9d206cff1dd40d98736d7bf2c2abd"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/screenshots/proj-115-planReader.png",
+        "size": 199748,
+        "sha256": "092941fe0352273d6380c534a9d1bb695b1d1773d19ee029d4b83135d4139526"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/screenshots/proj-128-admin.png",
+        "size": 207194,
+        "sha256": "c7b074618ede950cea0f6ad9931d344278f1199ef6866a0187c900e8181dac9c"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/screenshots/proj-128-plan-reader.png",
+        "size": 199748,
+        "sha256": "092941fe0352273d6380c534a9d1bb695b1d1773d19ee029d4b83135d4139526"
+      },
+      {
+        "path": ".superloopy/evidence/project-final-29-2026-07-11/settings/settings-closeout-run.json",
+        "size": 494,
+        "sha256": "7799a936cb23d748c2ef97feaa9f29513264caae1c58a2a2ae67894ad3569c9c"
+      }
+    ]
+  }
+}

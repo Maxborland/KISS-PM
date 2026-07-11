@@ -1,0 +1,68 @@
+{
+  "generatedAt": "2026-07-09T19:52:05.903Z",
+  "screenshots": [
+    {
+      "file": "1280x800-desktop-compact-shell.png",
+      "width": 1280,
+      "height": 800,
+      "channels": 3,
+      "bytes": 123983,
+      "sha256": "ebae378a6599a4409b374f33b6adfd2ffd2f90e156c0f2001ea9f161d948d9de",
+      "blackPixels": 0
+    },
+    {
+      "file": "390x844-mobile-navigation-closed.png",
+      "width": 390,
+      "height": 844,
+      "channels": 3,
+      "bytes": 71380,
+      "sha256": "67ba58fe28724c5778eb07ce6499ed7b170d5e22987ef80e03b2cff0264228ff",
+      "blackPixels": 0
+    },
+    {
+      "file": "390x844-mobile-navigation-open.png",
+      "width": 390,
+      "height": 844,
+      "channels": 3,
+      "bytes": 43773,
+      "sha256": "76b96cb6da4e6e7dbb6063a55f03b280fdb29026aeba6191a83cc6fe8726eecd",
+      "blackPixels": 0
+    },
+    {
+      "file": "390x844-plan-reader-navigation.png",
+      "width": 390,
+      "height": 844,
+      "channels": 3,
+      "bytes": 31167,
+      "sha256": "a0f6cf90510dc22333c5244e184b26fa1ecc7b7dc111a4d7bc190276bc6e77a8",
+      "blackPixels": 0
+    },
+    {
+      "file": "768x1024-admin-touch-targets.png",
+      "width": 768,
+      "height": 1024,
+      "channels": 3,
+      "bytes": 80946,
+      "sha256": "857c851127970d43635972a7b369099fb217f181f6c7d230ceff73da5d6e5225",
+      "blackPixels": 0
+    },
+    {
+      "file": "768x1024-communications-sidebar.png",
+      "width": 768,
+      "height": 1024,
+      "channels": 3,
+      "bytes": 78290,
+      "sha256": "8ba7711f62cad369c6883879b82eb580b8a2c27143d80a828317836fbfed25f2",
+      "blackPixels": 0
+    },
+    {
+      "file": "900x800-fine-pointer-compact.png",
+      "width": 900,
+      "height": 800,
+      "channels": 3,
+      "bytes": 86114,
+      "sha256": "02f9e748138582f5a48daa5b5bdb36f71e52ccd3dc2a92f8a5c04c13a42d0abb",
+      "blackPixels": 0
+    }
+  ]
+}

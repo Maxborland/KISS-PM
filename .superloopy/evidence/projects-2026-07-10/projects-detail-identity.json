@@ -1,0 +1,172 @@
+{
+  "generatedAt": "2026-07-10T08:42:15.921Z",
+  "baseURL": "http://127.0.0.1:3180",
+  "rows": [
+    {
+      "check": "admin-canonical-selector-reload-back-forward",
+      "role": "admin",
+      "route": "/projects/project-vektor-portal",
+      "finalPath": "/projects/project-gorset-migration",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/admin-canonical-selector-reload-back-forward.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "admin-invalid-id-not-found",
+      "role": "admin",
+      "route": "/projects/project-does-not-exist",
+      "finalPath": "/projects/project-does-not-exist",
+      "apiStatus": 404,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/admin-invalid-id-not-found.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "admin-header-overview",
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/overview",
+      "finalPath": "/projects/project-vektor-portal/overview",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/admin-header-overview.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "admin-header-schedule",
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/schedule",
+      "finalPath": "/projects/project-vektor-portal/schedule",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/admin-header-schedule.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "admin-header-resources",
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/resources",
+      "finalPath": "/projects/project-vektor-portal/resources",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/admin-header-resources.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "admin-header-assignments",
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/assignments",
+      "finalPath": "/projects/project-vektor-portal/assignments",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/admin-header-assignments.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "admin-header-calendars",
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/calendars",
+      "finalPath": "/projects/project-vektor-portal/calendars",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/admin-header-calendars.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "admin-header-scenarios",
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/scenarios",
+      "finalPath": "/projects/project-vektor-portal/scenarios",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/admin-header-scenarios.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "admin-header-baseline",
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/baseline",
+      "finalPath": "/projects/project-vektor-portal/baseline",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/admin-header-baseline.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "admin-header-commits",
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/commits",
+      "finalPath": "/projects/project-vektor-portal/commits",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/admin-header-commits.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "admin-header-settings",
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/settings",
+      "finalPath": "/projects/project-vektor-portal/settings",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/admin-header-settings.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "plan-reader-canonical-selector-reload-back-forward",
+      "role": "planReader",
+      "route": "/projects/project-vektor-portal",
+      "finalPath": "/projects/project-gorset-migration",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/plan-reader-canonical-selector-reload-back-forward.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "plan-reader-invalid-id-not-found",
+      "role": "planReader",
+      "route": "/projects/project-does-not-exist",
+      "finalPath": "/projects/project-does-not-exist",
+      "apiStatus": 404,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/plan-reader-invalid-id-not-found.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "resource-reader-detail-forbidden",
+      "role": "resourceReader",
+      "route": "/projects/project-vektor-portal",
+      "finalPath": "/projects/project-vektor-portal",
+      "apiStatus": 403,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/resource-reader-detail-forbidden.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "beta-project-list-empty",
+      "role": "beta",
+      "route": "/projects",
+      "finalPath": "/projects",
+      "apiStatus": null,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/beta-project-list-empty.png",
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "check": "beta-invalid-id-not-found",
+      "role": "beta",
+      "route": "/projects/project-does-not-exist",
+      "finalPath": "/projects/project-does-not-exist",
+      "apiStatus": 404,
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/project-detail-identity/screenshots/beta-invalid-id-not-found.png",
+      "status": "PASS",
+      "error": ""
+    }
+  ],
+  "summary": {
+    "total": 16,
+    "pass": 16,
+    "fail": 0
+  },
+  "failures": []
+}

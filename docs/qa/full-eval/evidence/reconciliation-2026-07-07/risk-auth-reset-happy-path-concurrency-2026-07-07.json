@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-07-07T20:42:20+07:00",
+  "id": "RISK-AUTH-RESET-HAPPY-PATH-CONCURRENCY",
+  "status": "fixed-by-current-branch",
+  "linkedRiskZones": [
+    "RISK-AUTH-EMAIL-RESET-HAPPY-PATH",
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "scope": "POST /api/auth/password-reset/request and POST /api/auth/password-reset/confirm route-level happy path, SMTP-like delivery payload, and concurrent token consume",
+  "fix": {
+    "files": [
+      "apps/api/src/authRegistrationRoutes.test.ts"
+    ],
+    "behavior": [
+      "Full route happy path requests a reset token, confirms it, then logs in with the new password.",
+      "SMTP-like provider route path returns delivery=email and sends resetUrl containing /password-reset/confirm?token=rawToken.",
+      "Concurrent confirm of one valid token returns exactly one 200 and one reset_token_used, with one limiter success and one limiter failure."
+    ]
+  },
+  "green": {
+    "tests": [
+      "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/authRegistrationRoutes.test.ts -t \\\"password-reset\\\"\" -> 12 passed, 5 skipped",
+      "corepack pnpm --filter @kiss-pm/api typecheck -> passed"
+    ],
+    "warning": "Existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts remains unrelated."
+  },
+  "remainingRisk": "This is route-level fake/in-memory provider evidence, not live external SMTP/browser email-client evidence. Full browser traversal remains tracked separately."
+}

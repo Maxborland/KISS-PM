@@ -4,7 +4,7 @@ import {
   canPreviewPlanningScenarios,
   canReadProjectResources
 } from "@kiss-pm/access-control";
-import { buildCompensatingCommands, isBlockingValidationIssue, proposePlanningScenarios, type PlanningCommand } from "@kiss-pm/domain";
+import { buildCompensatingCommandBatch, buildCompensatingCommands, isBlockingValidationIssue, proposePlanningScenarios, type PlanningCommand } from "@kiss-pm/domain";
 import type { Handler, Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
@@ -13,7 +13,9 @@ import { persistPlanningNotifications } from "../collaborationNotificationServic
 import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRoutes";
 import { notifyPlanVersionChanged } from "../planningEventBus";
 import { registerPlanningEventsRoute } from "../planningEventsRoute";
+import { PlanningPostWriteReadbackError } from "../governedPlanningApply";
 import { registerPlanningAutoSolverRoutes } from "./planningAutoSolverRoutes";
+import { registerPlanningBatchPreviewRoute } from "./planningBatchPreviewRoute";
 import { registerPlanningRevertRoute } from "./planningRevertRoute";
 import { registerPlanningSavedViewRoutes } from "./planningSavedViewRoutes";
 import {
@@ -44,6 +46,7 @@ import {
 import { normalizeTaskCreateStatus } from "./taskCreateNormalization";
 import {
   parseScenarioProposal,
+  scenarioIsAvailable,
   scenarioRequiresAcceptedRiskReason,
   validateScenarioRunIntegrity,
   withAcceptedRiskReason
@@ -62,8 +65,23 @@ function emitPlanVersionFromBody(
   }
 }
 
+async function runPlanningWriteTransaction<T extends { ok: boolean }>(
+  deps: PlanningRouteDeps,
+  operation: (transactionDataSource: PlanningRouteDeps["dataSource"]) => Promise<T>
+): Promise<T | { ok: false; status: 404; error: "project_not_found" }> {
+  try {
+    return await deps.runDataSourceTransaction(operation) as T;
+  } catch (error) {
+    if (error instanceof PlanningPostWriteReadbackError) {
+      return { ok: false, status: 404, error: "project_not_found" };
+    }
+    throw error;
+  }
+}
+
 export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
   registerPlanningRevertRoute(app, deps);
+  registerPlanningBatchPreviewRoute(app, deps);
   registerPlanningEventsRoute(app, {
     getSessionActorFromHeaders: deps.getSessionActorFromHeaders,
     getActorProfile: deps.getActorProfile,
@@ -104,6 +122,55 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     return context.json(createPlanningReadModel(snapshot, { includeResourceExceptions }));
   });
 
+  app.get("/api/workspace/projects/:projectId/planning/commits", async (context) => {
+    const parsedProjectId = parseProjectRouteParam(context);
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!deps.dataSource.getPlanSnapshot || !deps.dataSource.listAuditEventsByTenantId) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const profile = await deps.getActorProfile(actor);
+    const decision = canReadPlanningReadModel({ actor, profile });
+    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+
+    const projectId = parsedProjectId.value;
+    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
+    if (!snapshot) return context.json({ error: "project_not_found" }, 404);
+
+    const events = await deps.dataSource.listAuditEventsByTenantId(actor.tenantId, {
+      limit: 100,
+      projectId
+    });
+    return context.json({
+      auditEvents: events
+        .filter((event) => event.sourceWorkflow === "planning")
+        .map((event) => {
+          const command = event.input["command"] as Record<string, unknown> | undefined;
+          const changedTaskIds = event.afterState?.["changedTaskIds"];
+          const compensatingCommands = event.afterState?.["compensatingCommands"];
+          return {
+            id: event.id,
+            actionType: event.actionType,
+            sourceWorkflow: event.sourceWorkflow,
+            commandType: typeof command?.["type"] === "string" ? command["type"] : null,
+            afterState: {
+              planVersion: event.afterState?.["planVersion"] ?? null,
+              changedTaskIds: Array.isArray(changedTaskIds) ? changedTaskIds : [],
+              hasCompensatingCommands:
+                Array.isArray(compensatingCommands) && compensatingCommands.length > 0
+            },
+            executionStatus:
+              typeof event.executionResult["status"] === "string"
+                ? event.executionResult["status"]
+                : null,
+            createdAt: event.createdAt.toISOString()
+          };
+        })
+    });
+  });
   app.post("/api/workspace/projects/:projectId/planning/preview-command", async (context) => {
     const parsedProjectId = parseProjectRouteParam(context);
     if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
@@ -207,7 +274,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       });
     }
 
-    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+    const result = await runPlanningWriteTransaction(deps, async (rawStore) => {
       // Один вызов вместо цепочки `!ds.a || !ds.b`; возвращает store с этими методами как обязательными,
       // downstream больше не нуждается в non-null-ассершенах.
       const transactionDataSource = requireCapabilities(rawStore, [
@@ -323,7 +390,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         executionResult: { status: "succeeded", validationIssues }
       }, transactionDataSource);
       const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
-      if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      if (!appliedSnapshot) throw new PlanningPostWriteReadbackError();
       await persistPlanningNotifications({
         dataSource: transactionDataSource,
         tenantId: actor.tenantId,
@@ -405,7 +472,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       });
     }
 
-    const result = await deps.runDataSourceTransaction(async (rawStore) => {
+    const result = await runPlanningWriteTransaction(deps, async (rawStore) => {
       const transactionDataSource = requireCapabilities(rawStore, [
         "getPlanSnapshot",
         "applyPlanningCommand",
@@ -520,13 +587,14 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
           planVersion: newPlanVersion,
           changedTaskIds: batchPreview.planDelta.changedTaskIds,
           changedAssignmentIds: batchPreview.planDelta.changedAssignmentIds,
-          changedDependencyIds: batchPreview.planDelta.changedDependencyIds
+          changedDependencyIds: batchPreview.planDelta.changedDependencyIds,
+          compensatingCommands: buildCompensatingCommandBatch(commands, snapshot)
         },
         permissionResult: { allowed: true, reason: "same_tenant_permission_granted" },
         executionResult: { status: "succeeded", validationIssues: batchPreview.validationIssues }
       }, transactionDataSource);
       const appliedSnapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
-      if (!appliedSnapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+      if (!appliedSnapshot) throw new PlanningPostWriteReadbackError();
       await persistPlanningNotifications({
         dataSource: transactionDataSource,
         tenantId: actor.tenantId,
@@ -806,6 +874,14 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
 
       const proposal = parseScenarioProposal(scenarioRun.proposalPayload);
       if (!proposal) return { ok: false as const, status: 409, error: "planning_scenario_invalid" };
+      if (!scenarioIsAvailable(proposal)) {
+        return {
+          ok: false as const,
+          status: 409,
+          error: "scenario_unavailable",
+          unavailableReason: proposal.unavailableReason
+        };
+      }
       const integrityError = validateScenarioRunIntegrity(scenarioRun, snapshot);
       if (integrityError) {
         return { ok: false as const, status: 409, error: integrityError };

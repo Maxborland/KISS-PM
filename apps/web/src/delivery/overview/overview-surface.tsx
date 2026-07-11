@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowUpRight, Flag, GitCommit, TrendingUp, Zap } from "lucide-react";
 
@@ -11,10 +12,11 @@ import { Bento, BentoCard, StatTile } from "@/delivery/ui/bento";
 import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
+import { currentPlanDate, isPlanItemOverdue } from "@/delivery/lib/date-origin";
 import { usePlanning, type CommitMetaView } from "@/delivery/lib/use-planning";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
-import { demoAction } from "@/views/lib/demo";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
+import { isOverviewDoneStatus, isOverviewInProgressStatus } from "@/delivery/overview/overview-status";
 import type { PlanTask } from "@kiss-pm/domain";
 
 // customFields — типизированный открытый мешок (Record<string,unknown>) в домене; на этой поверхности
@@ -22,12 +24,25 @@ import type { PlanTask } from "@kiss-pm/domain";
 const cfOf = (t: PlanTask) => (t.customFields ?? {}) as { kind?: string; resLabel?: string };
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
-const TODAY = "2026-06-23"; // фиксированная «сегодня» прототипа (для просрочек/резерва — детерминированно)
 const AV: Array<"c1" | "c2" | "c3" | "c4" | "c5"> = ["c1", "c2", "c3", "c4", "c5"];
 const initials = (label: string) => { const parts = label.replace(/·.*/, "").trim().split(/\s+/).filter(Boolean); return parts.length ? (parts[0]![0] ?? "") + (parts[1]?.[0] ?? "") : "—"; };
 const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
 const ddmmyyyy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
+
+const taskNoun = (count: number) => count % 10 === 1 && count % 100 !== 11 ? "задача" : count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14) ? "задачи" : "задач";
+
+type CommitsState =
+  | { status: "loading"; commits: CommitMetaView[] }
+  | { status: "ready"; commits: CommitMetaView[] }
+  | { status: "forbidden"; commits: CommitMetaView[] }
+  | { status: "error"; commits: CommitMetaView[] };
+
+function isForbiddenCommitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const apiError = error as Error & { status?: number; code?: string };
+  return apiError.status === 403 || apiError.code === "forbidden";
+}
 
 function toneIcon(tone: "danger" | "warning" | "info") { return { danger: "bg-[var(--danger)] text-white", warning: "bg-[var(--warning)] text-white", info: "bg-[var(--accent)] text-white" }[tone]; }
 function toneBorder(tone: "danger" | "warning" | "info") { return { danger: "border-[var(--danger)]", warning: "border-[var(--warning)]", info: "border-[var(--accent)]" }[tone]; }
@@ -42,11 +57,27 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // Фолбэк имени: под ограниченной ролью справочник людей может отдать 403 — резолвер вернёт сырой id.
   // Показываем «Участник xxxx» вместо user-/r-идентификатора (G8-08).
   const resName = (id: string) => { const n = resDir.name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
-  const [commits, setCommits] = useState<CommitMetaView[]>([]);
+  const [commitsState, setCommitsState] = useState<CommitsState>({ status: "loading", commits: [] });
 
   useEffect(() => {
     if (!readModel) return;
-    void loadCommits().then((c) => setCommits(c.commits.slice(0, 4)));
+    let cancelled = false;
+    setCommitsState({ status: "loading", commits: [] });
+    void loadCommits()
+      .then((result) => {
+        if (!cancelled) setCommitsState({ status: "ready", commits: result.commits.slice(0, 4) });
+      })
+      .catch((commitError: unknown) => {
+        if (!cancelled) {
+          setCommitsState({
+            status: isForbiddenCommitError(commitError) ? "forbidden" : "error",
+            commits: []
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [readModel, loadCommits]);
 
   const model = useMemo(() => {
@@ -72,7 +103,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   if (status !== "ready" || !model || !readModel) {
     const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : "error";
     return (
-      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} activeTab="Обзор">
+      <DeliveryFrame project={{ ...PROJECT_FALLBACK, name: projectBase.name, code: projectBase.code }} projectId={projectId} activeTab="Обзор">
         <SurfaceState status={surfaceStatus} error={error} onRetry={() => void reload()} errorFormat={planningErr} loadingLabel="Загрузка…">
           <span />
         </SurfaceState>
@@ -83,8 +114,8 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // ===== KPI и сигналы из РЕАЛЬНОГО read-model =====
   const totalWork = model.leaves.reduce((s, t) => s + t.workMinutes, 0);
   const progress = totalWork > 0 ? Math.round(model.leaves.reduce((s, t) => s + t.workMinutes * t.percentComplete, 0) / totalWork) : 0;
-  const doneCount = model.leaves.filter((t) => t.statusId === "done").length;
-  const inProgress = model.leaves.filter((t) => t.statusId === "in_progress").length;
+  const doneCount = model.leaves.filter((t) => isOverviewDoneStatus(t.statusId)).length;
+  const inProgress = model.leaves.filter((t) => isOverviewInProgressStatus(t.statusId)).length;
   // projectFinish/plannedFinish/calculatedFinish в домене nullable (live: проект/задачи без расчётной даты) —
   // guard'им, иначе isoToDay(null)=NaN каскадит в резерв/сорт/сетку.
   const finishDay = model.projectFinish ? isoToDay(model.projectFinish) : null;
@@ -94,21 +125,22 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const baseFinishDay = model.bc.filter((t) => t.baselineFinish).length ? Math.max(...model.bc.filter((t) => t.baselineFinish).map((t) => isoToDay(t.baselineFinish!))) : 0;
   const projDelta = baseFinishDay && finishDay != null ? finishDay - baseFinishDay : 0;
   const overloadResources = [...new Set(model.overloads.map((o) => o.resourceId))];
+  const todayIso = currentPlanDate();
   const overdue = model.leaves.filter((t) => {
-    if (t.statusId === "done") return false;
+    if (isOverviewDoneStatus(t.statusId)) return false;
     // effective finish: расчётная дата (auto-задачи) или авторская (manual); обе nullable — guard от NaN.
     const fin = model.calcById.get(t.id)?.calculatedFinish ?? t.plannedFinish;
-    return fin != null && isoToDay(fin) < isoToDay(TODAY);
+    return isPlanItemOverdue(fin, todayIso);
   });
-  const critNoSlack = model.leaves.filter((t) => { const c = model.calcById.get(t.id); return c?.isCritical && (c.totalSlackMinutes ?? 0) <= 0; });
+  const critNoSlack = model.leaves.filter((t) => { const c = model.calcById.get(t.id); return !isOverviewDoneStatus(t.statusId) && c?.isCritical && (c.totalSlackMinutes ?? 0) <= 0; });
 
-  const signals: Array<{ tone: "danger" | "warning" | "info"; icon: typeof Zap; title: string; detail: string; action: string }> = [];
+  const signals: Array<{ tone: "danger" | "warning" | "info"; icon: typeof Zap; title: string; detail: string; action: string; href: string }> = [];
   // срыв дедлайна — самый критичный выводимый из плана факт, ведёт список
-  if (reserveDays != null && reserveDays < 0) signals.push({ tone: "danger", icon: AlertTriangle, title: `Финиш за дедлайном: +${-reserveDays} дн.`, detail: `расчётный ${ddmmyyyy(model.projectFinish)} · дедлайн ${ddmmyyyy(model.deadline ?? "")}`, action: "Открыть График" });
-  if (overloadResources.length > 0) signals.push({ tone: "danger", icon: Zap, title: `Перегруз ресурсов: ${overloadResources.length}`, detail: `${overloadResources.map(resName).join(", ")} · ${model.overloads.length} дн с превышением`, action: "Открыть Сценарии" });
-  if (projDelta > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Финиш сдвинут +${projDelta} дн от базового плана`, detail: `текущий ${ddmm(model.projectFinish)} · базовый ${ddmm(baseFinishDay ? model.bc.find((t) => t.baselineFinish && isoToDay(t.baselineFinish) === baseFinishDay)?.baselineFinish ?? null : null)}`, action: "Открыть Baseline" });
-  if (overdue.length > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Просрочено задач: ${overdue.length}`, detail: `срок раньше ${ddmmyyyy(TODAY)}, не закрыты`, action: "Открыть График" });
-  if (critNoSlack.length > 0) signals.push({ tone: "info", icon: TrendingUp, title: `На критическом пути: ${critNoSlack.length} задач`, detail: "резерв 0 дн — сдвиг тянет дедлайн", action: "Показать путь" });
+  if (reserveDays != null && reserveDays < 0) signals.push({ tone: "danger", icon: AlertTriangle, title: `Финиш за дедлайном: +${-reserveDays} дн.`, detail: `расчётный ${ddmmyyyy(model.projectFinish)} · дедлайн ${ddmmyyyy(model.deadline ?? "")}`, action: "Открыть График", href: `/projects/${projectId}/schedule` });
+  if (overloadResources.length > 0) signals.push({ tone: "danger", icon: Zap, title: `Перегруз ресурсов: ${overloadResources.length}`, detail: `${overloadResources.map(resName).join(", ")} · ${model.overloads.length} дн с превышением`, action: "Открыть Сценарии", href: `/projects/${projectId}/scenarios` });
+  if (projDelta > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Финиш сдвинут +${projDelta} дн от базового плана`, detail: `текущий ${ddmm(model.projectFinish)} · базовый ${ddmm(baseFinishDay ? model.bc.find((t) => t.baselineFinish && isoToDay(t.baselineFinish) === baseFinishDay)?.baselineFinish ?? null : null)}`, action: "Открыть Baseline", href: `/projects/${projectId}/baseline` });
+  if (overdue.length > 0) signals.push({ tone: "warning", icon: AlertTriangle, title: `Просрочено задач: ${overdue.length}`, detail: `срок раньше ${ddmmyyyy(todayIso)}, не закрыты`, action: "Открыть График", href: `/projects/${projectId}/schedule` });
+  if (critNoSlack.length > 0) signals.push({ tone: "info", icon: TrendingUp, title: `На критическом пути: ${critNoSlack.length} ${taskNoun(critNoSlack.length)}`, detail: "резерв 0 дн — сдвиг тянет дедлайн", action: "Показать путь", href: `/projects/${projectId}/schedule` });
 
   // вехи: milestone-задачи + внешний дедлайн, по дате
   const milestoneRows = [
@@ -119,7 +151,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // ключевые задачи: критпуть и ближайшие сроки (критические вперёд, затем по финишу), top-5;
   // закрытые исключаем — иначе наверх всплывают рано завершённые критические задачи
   const keyTasks = model.leaves
-    .filter((t) => t.statusId !== "done")
+    .filter((t) => !isOverviewDoneStatus(t.statusId))
     .map((t) => { const c = model.calcById.get(t.id); const iso = c?.calculatedFinish ?? t.plannedFinish; return { t, c, crit: model.criticalIds.has(t.id), fin: iso ? isoToDay(iso) : Number.MAX_SAFE_INTEGER }; })
     .sort((a, b) => (a.crit === b.crit ? a.fin - b.fin : a.crit ? -1 : 1))
     .slice(0, 5);
@@ -132,7 +164,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   };
 
   return (
-    <DeliveryFrame project={projectMeta} activeTab="Обзор">
+    <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Обзор">
       <div className="mb-3 flex items-baseline justify-between gap-2">
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Обзор проекта</h2>
@@ -164,7 +196,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                     <div className="truncate text-[length:var(--text-md)] font-semibold text-[var(--text-strong)]">{s.title}</div>
                     <div className="truncate text-[length:var(--text-sm)] text-[var(--muted)]">{s.detail}</div>
                   </div>
-                  <Button variant="ghost" size="sm" className="shrink-0 font-semibold text-[var(--accent)]" {...demoAction(s.action.toLowerCase())}>{s.action}<ArrowUpRight className="v4-arrow size-3.5" aria-hidden /></Button>
+                  <Button asChild variant="ghost" size="sm" className="shrink-0 font-semibold text-[var(--accent)]"><Link href={s.href}>{s.action}<ArrowUpRight className="v4-arrow size-3.5" aria-hidden /></Link></Button>
                 </li>
               ))}
             </ul>
@@ -174,6 +206,11 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         {/* Контрольные точки */}
         <BentoCard span={4} title="Контрольные точки" subtitle="Вехи и дедлайн проекта" flush>
           <ul className="py-1">
+            {milestoneRows.length === 0 ? (
+              <li className="px-4 py-8 text-center text-[length:var(--text-sm)] text-[var(--muted)]">
+                Контрольных точек пока нет.
+              </li>
+            ) : null}
             {milestoneRows.map((m) => (
               <li key={m.key} className="v4-row flex items-center gap-3 px-4 py-2.5">
                 <Flag className={cn("size-4 shrink-0", m.done ? "text-[var(--success)]" : "text-[var(--muted-soft)]")} aria-hidden />
@@ -191,6 +228,13 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         <BentoCard span={7} title="Ключевые задачи" subtitle="Критический путь и ближайшие сроки" flush>
           <table className="w-full border-collapse text-[length:var(--text-sm)]">
             <tbody>
+              {keyTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-[length:var(--text-sm)] text-[var(--muted)]">
+                    Открытых ключевых задач нет.
+                  </td>
+                </tr>
+              ) : null}
               {keyTasks.map((row, i) => (
                 <tr key={row.t.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
                   <td className="v4-mono py-2.5 pl-4 pr-2 align-middle text-[length:var(--text-xs)] text-[var(--muted)]">{row.t.wbsCode}</td>
@@ -204,7 +248,7 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                     <div className="flex items-center gap-2"><ProgressBar value={row.t.percentComplete} critical={row.crit} /><span className="v4-num w-8 shrink-0 text-right text-[length:var(--text-xs)] text-[var(--muted)]">{row.t.percentComplete}%</span></div>
                   </td>
                   <td className="py-2.5 pr-2 align-middle"><BemAvatar initials={initials(cfOf(row.t).resLabel ?? "—")} color={AV[i % AV.length]!} size="sm" /></td>
-                  <td className="v4-num py-2.5 pr-4 align-middle text-right text-[length:var(--text-sm)] text-[var(--muted-strong)]">{ddmm(row.c?.calculatedFinish ?? null)}</td>
+                  <td className="v4-num py-2.5 pr-4 align-middle text-right text-[length:var(--text-sm)] text-[var(--muted-strong)]">{ddmm(row.c?.calculatedFinish ?? row.t.plannedFinish)}</td>
                 </tr>
               ))}
             </tbody>
@@ -213,9 +257,9 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
         {/* Последние коммиты — из реального журнала */}
         <BentoCard span={5} title="Последние коммиты" subtitle="История изменений плана (PM-as-code)" actions={<GitCommit className="size-4 text-[var(--muted)]" aria-hidden />} flush
-          footer={<span className="flex items-center justify-between"><span>Полная история и откат — на вкладке «Коммиты»</span><Button variant="link" size="sm" className="h-auto p-0 text-[var(--accent)]" {...demoAction("открыть коммиты")}>Все</Button></span>}>
+          footer={<span className="flex items-center justify-between"><span>Полная история и откат — на вкладке «Коммиты»</span><Button asChild variant="link" size="sm" className="h-auto p-0 text-[var(--accent)]"><Link href={`/projects/${projectId}/commits`}>Все</Link></Button></span>}>
           <ul className="py-1">
-            {commits.map((c) => (
+            {commitsState.commits.map((c) => (
               <li key={c.auditEventId} className="v4-row group flex items-start gap-2.5 px-4 py-2.5">
                 <span className="mt-[5px] size-2 shrink-0 rounded-full bg-[var(--accent)] ring-2 ring-[var(--accent-soft)]" />
                 <span className="v4-num mt-0.5 w-[78px] shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{hhmm(c.at)}</span>
@@ -225,7 +269,10 @@ export function ProjectOverview({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 </div>
               </li>
             ))}
-            {commits.length === 0 ? <li className="px-4 py-3 text-[length:var(--text-sm)] text-[var(--muted)]">История пуста.</li> : null}
+            {commitsState.status === "loading" ? <li className="px-4 py-3 text-[length:var(--text-sm)] text-[var(--muted)]">Загрузка истории…</li> : null}
+            {commitsState.status === "forbidden" ? <li className="px-4 py-3 text-[length:var(--text-sm)] text-[var(--muted)]">История изменений недоступна: недостаточно прав.</li> : null}
+            {commitsState.status === "error" ? <li role="alert" className="px-4 py-3 text-[length:var(--text-sm)] text-[var(--danger)]">Не удалось загрузить историю изменений.</li> : null}
+            {commitsState.status === "ready" && commitsState.commits.length === 0 ? <li className="px-4 py-3 text-[length:var(--text-sm)] text-[var(--muted)]">История пуста.</li> : null}
           </ul>
         </BentoCard>
       </Bento>

@@ -1,0 +1,17 @@
+{
+  "runId": "final29-commits-review-r1",
+  "generatedAt": "2026-07-11T05:35:22.959Z",
+  "status": "pass",
+  "targetCount": 6,
+  "receiptCount": 6,
+  "populatedProjectId": "project-vektor-portal",
+  "emptyProjectId": "project-commits-1783748120344-b50d0d",
+  "receipts": [
+    "receipts/proj-105-admin.json",
+    "receipts/proj-105-planReader.json",
+    "receipts/proj-106-admin.json",
+    "receipts/proj-106-planReader.json",
+    "receipts/proj-108-admin.json",
+    "receipts/proj-108-planReader.json"
+  ]
+}

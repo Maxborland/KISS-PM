@@ -1,0 +1,1293 @@
+{
+  "generatedAt": "2026-07-10T05:25:08.353Z",
+  "baseURL": "http://127.0.0.1:3180",
+  "roles": [
+    {
+      "role": "admin",
+      "email": "admin@kiss-pm.local"
+    },
+    {
+      "role": "engineer",
+      "email": "engineer@kiss-pm.local"
+    },
+    {
+      "role": "planReader",
+      "email": "plan-reader-no-resources@kiss-pm.local"
+    },
+    {
+      "role": "resourceReader",
+      "email": "resource-reader@kiss-pm.local"
+    },
+    {
+      "role": "beta",
+      "email": "beta@kiss-pm.local"
+    }
+  ],
+  "rows": [
+    {
+      "role": "admin",
+      "route": "/projects",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/admin-projects.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "admin",
+      "route": "/projects/project-vektor-portal",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/admin-projects-project-vektor-portal.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/overview",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/admin-projects-project-vektor-portal-overview.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/schedule",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/admin-projects-project-vektor-portal-schedule.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/resources",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/admin-projects-project-vektor-portal-resources.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/assignments",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/admin-projects-project-vektor-portal-assignments.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/calendars",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/admin-projects-project-vektor-portal-calendars.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/scenarios",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/admin-projects-project-vektor-portal-scenarios.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/baseline",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/admin-projects-project-vektor-portal-baseline.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/commits",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/admin-projects-project-vektor-portal-commits.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "admin",
+      "route": "/projects/project-vektor-portal/settings",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/admin-projects-project-vektor-portal-settings.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "engineer",
+      "route": "/projects",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/engineer-projects.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "engineer",
+      "route": "/projects/project-vektor-portal",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/engineer-projects-project-vektor-portal.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "engineer",
+      "route": "/projects/project-vektor-portal/overview",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/engineer-projects-project-vektor-portal-overview.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "engineer",
+      "route": "/projects/project-vektor-portal/schedule",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/engineer-projects-project-vektor-portal-schedule.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "engineer",
+      "route": "/projects/project-vektor-portal/resources",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/engineer-projects-project-vektor-portal-resources.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "engineer",
+      "route": "/projects/project-vektor-portal/assignments",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/engineer-projects-project-vektor-portal-assignments.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "engineer",
+      "route": "/projects/project-vektor-portal/calendars",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/engineer-projects-project-vektor-portal-calendars.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "engineer",
+      "route": "/projects/project-vektor-portal/scenarios",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/engineer-projects-project-vektor-portal-scenarios.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "engineer",
+      "route": "/projects/project-vektor-portal/baseline",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/engineer-projects-project-vektor-portal-baseline.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "engineer",
+      "route": "/projects/project-vektor-portal/commits",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/engineer-projects-project-vektor-portal-commits.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "engineer",
+      "route": "/projects/project-vektor-portal/settings",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/engineer-projects-project-vektor-portal-settings.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "planReader",
+      "route": "/projects",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "planReader",
+      "route": "/projects/project-vektor-portal",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects-project-vektor-portal.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "planReader",
+      "route": "/projects/project-vektor-portal/overview",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects-project-vektor-portal-overview.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "planReader",
+      "route": "/projects/project-vektor-portal/schedule",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects-project-vektor-portal-schedule.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "planReader",
+      "route": "/projects/project-vektor-portal/resources",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects-project-vektor-portal-resources.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "planReader",
+      "route": "/projects/project-vektor-portal/assignments",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects-project-vektor-portal-assignments.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "planReader",
+      "route": "/projects/project-vektor-portal/calendars",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects-project-vektor-portal-calendars.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "planReader",
+      "route": "/projects/project-vektor-portal/scenarios",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects-project-vektor-portal-scenarios.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "planReader",
+      "route": "/projects/project-vektor-portal/baseline",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects-project-vektor-portal-baseline.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "planReader",
+      "route": "/projects/project-vektor-portal/commits",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects-project-vektor-portal-commits.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "planReader",
+      "route": "/projects/project-vektor-portal/settings",
+      "projectsApiStatus": 200,
+      "projectsCount": 3,
+      "expectedUiState": "ready",
+      "uiState": "ready",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 200,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/planReader-projects-project-vektor-portal-settings.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "resourceReader",
+      "route": "/projects",
+      "projectsApiStatus": 403,
+      "projectsCount": 0,
+      "expectedUiState": "forbidden",
+      "uiState": "forbidden",
+      "finalUrl": "http://127.0.0.1:3180/projects",
+      "apiResponses": [
+        {
+          "status": 403,
+          "path": "/api/workspace/projects"
+        },
+        {
+          "status": 403,
+          "path": "/api/workspace/projects"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "resourceReader",
+      "route": "/projects/project-vektor-portal",
+      "projectsApiStatus": 403,
+      "projectsCount": 0,
+      "expectedUiState": "forbidden",
+      "uiState": "forbidden",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal",
+      "apiResponses": [
+        {
+          "status": 403,
+          "path": "/api/workspace/projects"
+        },
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "resourceReader",
+      "route": "/projects/project-vektor-portal/overview",
+      "projectsApiStatus": 403,
+      "projectsCount": 0,
+      "expectedUiState": "forbidden",
+      "uiState": "forbidden",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "apiResponses": [
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal-overview.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "resourceReader",
+      "route": "/projects/project-vektor-portal/schedule",
+      "projectsApiStatus": 403,
+      "projectsCount": 0,
+      "expectedUiState": "forbidden",
+      "uiState": "forbidden",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "apiResponses": [
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal-schedule.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "resourceReader",
+      "route": "/projects/project-vektor-portal/resources",
+      "projectsApiStatus": 403,
+      "projectsCount": 0,
+      "expectedUiState": "forbidden",
+      "uiState": "forbidden",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
+      "apiResponses": [
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal-resources.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "resourceReader",
+      "route": "/projects/project-vektor-portal/assignments",
+      "projectsApiStatus": 403,
+      "projectsCount": 0,
+      "expectedUiState": "forbidden",
+      "uiState": "forbidden",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
+      "apiResponses": [
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal-assignments.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "resourceReader",
+      "route": "/projects/project-vektor-portal/calendars",
+      "projectsApiStatus": 403,
+      "projectsCount": 0,
+      "expectedUiState": "forbidden",
+      "uiState": "forbidden",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
+      "apiResponses": [
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal-calendars.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "resourceReader",
+      "route": "/projects/project-vektor-portal/scenarios",
+      "projectsApiStatus": 403,
+      "projectsCount": 0,
+      "expectedUiState": "forbidden",
+      "uiState": "forbidden",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
+      "apiResponses": [
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal-scenarios.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "resourceReader",
+      "route": "/projects/project-vektor-portal/baseline",
+      "projectsApiStatus": 403,
+      "projectsCount": 0,
+      "expectedUiState": "forbidden",
+      "uiState": "forbidden",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
+      "apiResponses": [
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal-baseline.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "resourceReader",
+      "route": "/projects/project-vektor-portal/commits",
+      "projectsApiStatus": 403,
+      "projectsCount": 0,
+      "expectedUiState": "forbidden",
+      "uiState": "forbidden",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
+      "apiResponses": [
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal-commits.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "resourceReader",
+      "route": "/projects/project-vektor-portal/settings",
+      "projectsApiStatus": 403,
+      "projectsCount": 0,
+      "expectedUiState": "forbidden",
+      "uiState": "forbidden",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
+      "apiResponses": [
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 403,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/resourceReader-projects-project-vektor-portal-settings.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "beta",
+      "route": "/projects",
+      "projectsApiStatus": 200,
+      "projectsCount": 0,
+      "expectedUiState": "empty",
+      "uiState": "empty",
+      "finalUrl": "http://127.0.0.1:3180/projects",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "beta",
+      "route": "/projects/project-vektor-portal",
+      "projectsApiStatus": 200,
+      "projectsCount": 0,
+      "expectedUiState": "empty",
+      "uiState": "empty",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal",
+      "apiResponses": [
+        {
+          "status": 200,
+          "path": "/api/workspace/projects"
+        },
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "beta",
+      "route": "/projects/project-vektor-portal/overview",
+      "projectsApiStatus": 200,
+      "projectsCount": 0,
+      "expectedUiState": "error",
+      "uiState": "error",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/overview",
+      "apiResponses": [
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal-overview.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "beta",
+      "route": "/projects/project-vektor-portal/schedule",
+      "projectsApiStatus": 200,
+      "projectsCount": 0,
+      "expectedUiState": "error",
+      "uiState": "error",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/schedule",
+      "apiResponses": [
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal-schedule.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "beta",
+      "route": "/projects/project-vektor-portal/resources",
+      "projectsApiStatus": 200,
+      "projectsCount": 0,
+      "expectedUiState": "error",
+      "uiState": "error",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/resources",
+      "apiResponses": [
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal-resources.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "beta",
+      "route": "/projects/project-vektor-portal/assignments",
+      "projectsApiStatus": 200,
+      "projectsCount": 0,
+      "expectedUiState": "error",
+      "uiState": "error",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/assignments",
+      "apiResponses": [
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal-assignments.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "beta",
+      "route": "/projects/project-vektor-portal/calendars",
+      "projectsApiStatus": 200,
+      "projectsCount": 0,
+      "expectedUiState": "error",
+      "uiState": "error",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/calendars",
+      "apiResponses": [
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal-calendars.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "beta",
+      "route": "/projects/project-vektor-portal/scenarios",
+      "projectsApiStatus": 200,
+      "projectsCount": 0,
+      "expectedUiState": "error",
+      "uiState": "error",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/scenarios",
+      "apiResponses": [
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal-scenarios.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "beta",
+      "route": "/projects/project-vektor-portal/baseline",
+      "projectsApiStatus": 200,
+      "projectsCount": 0,
+      "expectedUiState": "error",
+      "uiState": "error",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/baseline",
+      "apiResponses": [
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal-baseline.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "beta",
+      "route": "/projects/project-vektor-portal/commits",
+      "projectsApiStatus": 200,
+      "projectsCount": 0,
+      "expectedUiState": "error",
+      "uiState": "error",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/commits",
+      "apiResponses": [
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        },
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal-commits.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    },
+    {
+      "role": "beta",
+      "route": "/projects/project-vektor-portal/settings",
+      "projectsApiStatus": 200,
+      "projectsCount": 0,
+      "expectedUiState": "error",
+      "uiState": "error",
+      "finalUrl": "http://127.0.0.1:3180/projects/project-vektor-portal/settings",
+      "apiResponses": [
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal"
+        },
+        {
+          "status": 404,
+          "path": "/api/workspace/projects/project-vektor-portal/planning/read-model"
+        }
+      ],
+      "screenshot": ".superloopy/evidence/projects-2026-07-10/role-routes/screenshots/beta-projects-project-vektor-portal-settings.png",
+      "alphaLeak": false,
+      "status": "PASS",
+      "error": ""
+    }
+  ],
+  "summary": {
+    "total": 55,
+    "pass": 55,
+    "fail": 0,
+    "states": {
+      "ready": 33,
+      "empty": 2,
+      "forbidden": 11,
+      "error": 9
+    }
+  },
+  "failures": []
+}

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "row": {
+    "scenarioId": "PROJ-093",
+    "role": "PR",
+    "key": "PROJ-093:PR",
+    "status": "pass",
+    "runId": "final29-calendars-20260711-r4",
+    "generatedAt": "2026-07-11T05:08:43.375Z",
+    "assertions": [
+      "Initial month equalled the earliest live project/calculated horizon month",
+      "Next/previous navigation visited every horizon month without wrapping",
+      "Both boundary controls were disabled at their respective limits"
+    ],
+    "details": {
+      "projectId": "project-demo-crm-intake",
+      "projectStart": "2026-05-18",
+      "projectFinish": "2026-06-12",
+      "expectedMonths": [
+        "2026-05",
+        "2026-06"
+      ],
+      "visitedMonths": [
+        "2026-05",
+        "2026-06"
+      ],
+      "initialMonth": "2026-05",
+      "finalMonth": "2026-06"
+    },
+    "screenshots": [
+      "screenshots/proj-093-pr-live-horizon-last-month.png"
+    ],
+    "error": null
+  },
+  "screenshotPathBase": "lane_root"
+}

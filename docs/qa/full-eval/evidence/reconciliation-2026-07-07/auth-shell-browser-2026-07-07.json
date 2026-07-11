@@ -1,0 +1,1370 @@
+{
+  "generatedAt": "2026-07-07T11:08:05.526Z",
+  "web": "http://127.0.0.1:3012",
+  "api": "http://127.0.0.1:4021",
+  "results": [
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "ensure-login-page",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "BUG-008-login-page",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login"
+    },
+    {
+      "label": "BUG-008-link-counts",
+      "registerLinkCount": 1,
+      "resetLinkCount": 1,
+      "status": "pass"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/login",
+          "text": "Войти"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Создать аккаунт",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Регистрация"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Иван Иванов",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "you@example.com",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Минимум 8 символов",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "BUG-008-after-register-click",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Регистрация — KISS PM",
+      "url": "http://127.0.0.1:3012/register"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "BUG-008-back-login",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/password-reset/confirm",
+          "text": "Уже есть токен? Перейти к подтверждению"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": false,
+          "text": "Отправить инструкции",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Сброс пароля"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        }
+      ],
+      "label": "BUG-008-after-reset-click",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Сброс пароля — KISS PM",
+      "url": "http://127.0.0.1:3012/password-reset"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "BUG-SHELL-01-root-anonymous",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "BUG-SHELL-01-root-anonymous",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "BUG-SHELL-01-404-page",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login?from=%2Fabracadabra-reconciliation-20260707"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "BUG-SHELL-01-404-page",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login?from=%2Fabracadabra-reconciliation-20260707"
+    },
+    {
+      "label": "BUG-SHELL-01-home-control",
+      "homeLinks": []
+    },
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "BUG-SHELL-14-agent-anonymous",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login?from=%2Fagent"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "BUG-SHELL-14-agent-anonymous",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login?from=%2Fagent"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "login-before-admin@kiss-pm.local",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/my-work",
+          "text": "Мои задачи"
+        },
+        {
+          "href": "/projects",
+          "text": "Проекты"
+        },
+        {
+          "href": "/crm/deals",
+          "text": "Сделки"
+        },
+        {
+          "href": "/dashboard",
+          "text": "Дашборд"
+        },
+        {
+          "href": "/communications/chat",
+          "text": "Коммуникации"
+        },
+        {
+          "href": "/admin",
+          "text": "Администрирование"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": false,
+          "text": "АА",
+          "type": "button"
+        }
+      ],
+      "h1": [
+        "Дашборд"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Поиск: проекты, задачи, сделки, клиенты…",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        }
+      ],
+      "label": "login-after-admin@kiss-pm.local",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Дашборд — KISS PM",
+      "url": "http://127.0.0.1:3012/dashboard"
+    },
+    {
+      "label": "admin-login-result",
+      "adminLogin": {
+        "ok": true,
+        "state": {
+          "anchors": [
+            {
+              "href": "/my-work",
+              "text": "Мои задачи"
+            },
+            {
+              "href": "/projects",
+              "text": "Проекты"
+            },
+            {
+              "href": "/crm/deals",
+              "text": "Сделки"
+            },
+            {
+              "href": "/dashboard",
+              "text": "Дашборд"
+            },
+            {
+              "href": "/communications/chat",
+              "text": "Коммуникации"
+            },
+            {
+              "href": "/admin",
+              "text": "Администрирование"
+            }
+          ],
+          "buttons": [
+            {
+              "disabled": false,
+              "text": "АА",
+              "type": "button"
+            }
+          ],
+          "h1": [
+            "Дашборд"
+          ],
+          "h2": [],
+          "inputs": [
+            {
+              "disabled": false,
+              "name": null,
+              "placeholder": "Поиск: проекты, задачи, сделки, клиенты…",
+              "tag": "INPUT",
+              "type": null,
+              "value": ""
+            }
+          ],
+          "label": "login-after-admin@kiss-pm.local",
+          "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+          "title": "Дашборд — KISS PM",
+          "url": "http://127.0.0.1:3012/dashboard"
+        }
+      }
+    },
+    {
+      "anchors": [
+        {
+          "href": "/my-work",
+          "text": "Мои задачи"
+        },
+        {
+          "href": "/projects",
+          "text": "Проекты"
+        },
+        {
+          "href": "/crm/deals",
+          "text": "Сделки"
+        },
+        {
+          "href": "/dashboard",
+          "text": "Дашборд"
+        },
+        {
+          "href": "/communications/chat",
+          "text": "Коммуникации"
+        },
+        {
+          "href": "/admin",
+          "text": "Администрирование"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": false,
+          "text": "АА",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "text": "Выйти",
+          "type": null
+        },
+        {
+          "disabled": false,
+          "text": "Светлая",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "text": "Тёмная",
+          "type": "button"
+        },
+        {
+          "disabled": true,
+          "text": "Сохранить",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Личный кабинет"
+      ],
+      "h2": [
+        "Редактирование профиля"
+      ],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Поиск: проекты, задачи, сделки, клиенты…",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Имя сотрудника",
+          "tag": "INPUT",
+          "type": null,
+          "value": "Анна Администратор"
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "+7 999 000-00-00",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "@username",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": null,
+          "tag": "INPUT",
+          "type": "color",
+          "value": "#0f766e"
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "#0f766e",
+          "tag": "INPUT",
+          "type": null,
+          "value": "#0f766e"
+        }
+      ],
+      "label": "BUG-AUTH-11-profile-authenticated",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Профиль — KISS PM",
+      "url": "http://127.0.0.1:3012/profile"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/my-work",
+          "text": "Мои задачи"
+        },
+        {
+          "href": "/projects",
+          "text": "Проекты"
+        },
+        {
+          "href": "/crm/deals",
+          "text": "Сделки"
+        },
+        {
+          "href": "/dashboard",
+          "text": "Дашборд"
+        },
+        {
+          "href": "/communications/chat",
+          "text": "Коммуникации"
+        },
+        {
+          "href": "/admin",
+          "text": "Администрирование"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": false,
+          "text": "АА",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "text": "Выйти",
+          "type": null
+        },
+        {
+          "disabled": false,
+          "text": "Светлая",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "text": "Тёмная",
+          "type": "button"
+        },
+        {
+          "disabled": true,
+          "text": "Сохранить",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Личный кабинет"
+      ],
+      "h2": [
+        "Редактирование профиля"
+      ],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Поиск: проекты, задачи, сделки, клиенты…",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Имя сотрудника",
+          "tag": "INPUT",
+          "type": null,
+          "value": "Анна Администратор"
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "+7 999 000-00-00",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "@username",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": null,
+          "tag": "INPUT",
+          "type": "color",
+          "value": "#0f766e"
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "#0f766e",
+          "tag": "INPUT",
+          "type": null,
+          "value": "#0f766e"
+        }
+      ],
+      "label": "BUG-AUTH-11-profile-authenticated",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Профиль — KISS PM",
+      "url": "http://127.0.0.1:3012/profile"
+    },
+    {
+      "label": "BUG-AUTH-11-profile-logout-buttons",
+      "profileLogoutButtons": [
+        {
+          "disabled": false,
+          "text": "Выйти"
+        }
+      ]
+    },
+    {
+      "anchors": [
+        {
+          "href": "/my-work",
+          "text": "Мои задачи"
+        },
+        {
+          "href": "/projects",
+          "text": "Проекты"
+        },
+        {
+          "href": "/crm/deals",
+          "text": "Сделки"
+        },
+        {
+          "href": "/dashboard",
+          "text": "Дашборд"
+        },
+        {
+          "href": "/communications/chat",
+          "text": "Коммуникации"
+        },
+        {
+          "href": "/admin",
+          "text": "Администрирование"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": false,
+          "text": "АА",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "text": "Войти снова",
+          "type": null
+        }
+      ],
+      "h1": [],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Поиск: проекты, задачи, сделки, клиенты…",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        }
+      ],
+      "label": "BUG-AUTH-11-after-profile-logout",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Профиль — KISS PM",
+      "url": "http://127.0.0.1:3012/profile"
+    },
+    {
+      "label": "BUG-AUTH-11-login-again-control-counts",
+      "loginAgain": 1,
+      "loginAgainLink": 0
+    },
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "BUG-AUTH-11-after-login-again-click",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login?from=%2Fprofile"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/register",
+          "text": "Создать аккаунт"
+        },
+        {
+          "href": "/password-reset",
+          "text": "Забыли пароль?"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": true,
+          "text": "Войти",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Вход в KISS PM"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": "email",
+          "placeholder": "you@kiss-pm.local",
+          "tag": "INPUT",
+          "type": "email",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": "password",
+          "placeholder": "Пароль",
+          "tag": "INPUT",
+          "type": "password",
+          "value": ""
+        }
+      ],
+      "label": "login-before-plan-reader-no-resources@kiss-pm.local",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Вход — KISS PM",
+      "url": "http://127.0.0.1:3012/login"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/my-work",
+          "text": "Мои задачи"
+        },
+        {
+          "href": "/projects",
+          "text": "Проекты"
+        },
+        {
+          "href": "/dashboard",
+          "text": "Дашборд"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": false,
+          "text": "НБ",
+          "type": "button"
+        }
+      ],
+      "h1": [
+        "Дашборд"
+      ],
+      "h2": [],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Поиск: проекты, задачи, сделки, клиенты…",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        }
+      ],
+      "label": "login-after-plan-reader-no-resources@kiss-pm.local",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Дашборд — KISS PM",
+      "url": "http://127.0.0.1:3012/dashboard"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/my-work",
+          "text": "Мои задачи"
+        },
+        {
+          "href": "/projects",
+          "text": "Проекты"
+        },
+        {
+          "href": "/dashboard",
+          "text": "Дашборд"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": false,
+          "text": "НБ",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "text": "Выйти",
+          "type": null
+        },
+        {
+          "disabled": false,
+          "text": "Светлая",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "text": "Тёмная",
+          "type": "button"
+        },
+        {
+          "disabled": true,
+          "text": "Сохранить",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Личный кабинет"
+      ],
+      "h2": [
+        "Редактирование профиля"
+      ],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Поиск: проекты, задачи, сделки, клиенты…",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Имя сотрудника",
+          "tag": "INPUT",
+          "type": null,
+          "value": "Никита Без Ресурсов"
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "+7 999 000-00-00",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "@username",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": null,
+          "tag": "INPUT",
+          "type": "color",
+          "value": "#0f766e"
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "#0f766e",
+          "tag": "INPUT",
+          "type": null,
+          "value": "#0f766e"
+        }
+      ],
+      "label": "BUG-SHELL-11-profile-plan-reader",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Профиль — KISS PM",
+      "url": "http://127.0.0.1:3012/profile"
+    },
+    {
+      "anchors": [
+        {
+          "href": "/my-work",
+          "text": "Мои задачи"
+        },
+        {
+          "href": "/projects",
+          "text": "Проекты"
+        },
+        {
+          "href": "/dashboard",
+          "text": "Дашборд"
+        }
+      ],
+      "buttons": [
+        {
+          "disabled": false,
+          "text": "НБ",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "text": "Выйти",
+          "type": null
+        },
+        {
+          "disabled": false,
+          "text": "Светлая",
+          "type": "button"
+        },
+        {
+          "disabled": false,
+          "text": "Тёмная",
+          "type": "button"
+        },
+        {
+          "disabled": true,
+          "text": "Сохранить",
+          "type": "submit"
+        }
+      ],
+      "h1": [
+        "Личный кабинет"
+      ],
+      "h2": [
+        "Редактирование профиля"
+      ],
+      "inputs": [
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Поиск: проекты, задачи, сделки, клиенты…",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "Имя сотрудника",
+          "tag": "INPUT",
+          "type": null,
+          "value": "Никита Без Ресурсов"
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "+7 999 000-00-00",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "@username",
+          "tag": "INPUT",
+          "type": null,
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": null,
+          "tag": "INPUT",
+          "type": "color",
+          "value": "#0f766e"
+        },
+        {
+          "disabled": false,
+          "name": null,
+          "placeholder": "#0f766e",
+          "tag": "INPUT",
+          "type": null,
+          "value": "#0f766e"
+        }
+      ],
+      "label": "BUG-SHELL-11-profile-plan-reader",
+      "textSample": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (",
+      "title": "Профиль — KISS PM",
+      "url": "http://127.0.0.1:3012/profile"
+    },
+    {
+      "label": "BUG-SHELL-11-profile-plan-reader-controls",
+      "profileControls": {
+        "buttons": [
+          {
+            "disabled": false,
+            "text": "НБ"
+          },
+          {
+            "disabled": false,
+            "text": "Выйти"
+          },
+          {
+            "disabled": false,
+            "text": "Светлая"
+          },
+          {
+            "disabled": false,
+            "text": "Тёмная"
+          },
+          {
+            "disabled": true,
+            "text": "Сохранить"
+          }
+        ],
+        "inputs": [
+          {
+            "disabled": false,
+            "name": null,
+            "readOnly": false,
+            "type": null,
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "name": null,
+            "readOnly": false,
+            "type": null,
+            "value": "Никита Без Ресурсов"
+          },
+          {
+            "disabled": false,
+            "name": null,
+            "readOnly": false,
+            "type": null,
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "name": null,
+            "readOnly": false,
+            "type": null,
+            "value": ""
+          },
+          {
+            "disabled": false,
+            "name": null,
+            "readOnly": false,
+            "type": "color",
+            "value": "#0f766e"
+          },
+          {
+            "disabled": false,
+            "name": null,
+            "readOnly": false,
+            "type": null,
+            "value": "#0f766e"
+          }
+        ],
+        "text": "((e, i, s, u, m, a, l, h)=>{ let d = document.documentElement, w = [ \"light\", \"dark\" ]; function p(n) { (Array.isArray(e) ? e : [ e ]).forEach((y)=>{ let k = y === \"class\", S = k && a ? m.map((f)=>a[f] || f) : m; k ? (d.classList.remove(...S), d.classList.add(a && a[n] ? a[n] : n)) : d.setAttribute(y, n); }), R(n); } function R(n) { h && w.includes(n) && (d.style.colorScheme = n); } function c() { return window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"; } if (u) p(u); else try { let n = localStorage.getItem(i) || s, y = l && n === \"system\" ? c() : n; p(y); } catch (n) {} })(\"class\",\"theme\",\"light\",null,[\"light\",\"dark\"],null,false,true)КKISS PMРаботаМои задачиПроектыАналитикаДашбордНБЛичный кабинетПрофиль и настройки рабочего пространстваВыйтиНБНикита Без Ресурсо"
+      }
+    }
+  ]
+}

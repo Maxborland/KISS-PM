@@ -1,0 +1,1634 @@
+{
+  "generatedAt": "2026-07-09T21:14:16.066Z",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "purpose": "Current-truth reconciliation after origin/master merge and the current hardening batch. Old bug docs are historical inputs, not current-open truth unless fresh evidence confirms failure.",
+  "statusVocabulary": [
+    "fixed-by-master",
+    "fixed-by-current-branch",
+    "confirmed-open",
+    "unverified",
+    "not-a-bug",
+    "superseded"
+  ],
+  "sourceDocuments": [
+    "docs/qa/full-eval/bugs.md",
+    "docs/qa/full-eval/bugs/auth.md",
+    "docs/qa/full-eval/bugs/shell-dashboard.md",
+    "docs/qa/full-eval/bugs/projects.md",
+    "docs/qa/full-eval/bugs/crm.md",
+    "docs/qa/full-eval/bugs/communications.md",
+    "docs/qa/full-eval/bugs/admin.md",
+    "docs/qa/full-eval/phase5-outcome.md",
+    "docs/qa/full-eval/uiux-loop-2026-07-05/report.md",
+    "docs/qa/full-eval/reconciliation-2026-07-07.md"
+  ],
+  "summary": {
+    "oldBugIdsReviewed": 84,
+    "fixedByMasterOldBugIds": 64,
+    "fixedByCurrentBranchItems": 86,
+    "confirmedOpen": 0,
+    "unverifiedOldBugIds": 0,
+    "notABugOrSupersededOldBugIds": 5,
+    "unverifiedRiskZones": 2
+  },
+  "fixedByMaster": [
+    {
+      "ids": [
+        "BUG-001",
+        "BUG-002",
+        "BUG-003",
+        "BUG-004",
+        "BUG-005",
+        "BUG-006",
+        "BUG-007",
+        "BUG-008",
+        "BUG-009",
+        "BUG-011",
+        "BUG-012",
+        "BUG-013",
+        "BUG-014"
+      ],
+      "source": "docs/qa/full-eval/bugs.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:24-28 cluster A fixed prototype blocks",
+        "docs/qa/full-eval/phase5-outcome.md:36-48 clusters B/E fixed navigation and auth redirects",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:79-84 P0 fixed comms scope, real headers, search, providers, security policies",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:101-111 P2/P3 fixed prototype gates, display names, favicon/title polish"
+      ],
+      "nextAction": "Do not reopen without fresh post-merge browser/API evidence."
+    },
+    {
+      "ids": [
+        "BUG-AUTH-02",
+        "BUG-AUTH-03",
+        "BUG-AUTH-04",
+        "BUG-AUTH-05",
+        "BUG-AUTH-06",
+        "BUG-AUTH-07",
+        "BUG-AUTH-08",
+        "BUG-AUTH-09"
+      ],
+      "source": "docs/qa/full-eval/bugs/auth.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:43-48 route protection, login redirect, internal from validation",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:79-84 P0 provider/auth UX fixes",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:105 P2 prototype notes gated"
+      ],
+      "nextAction": "Fresh auth traversal still required before clean-pass, but these are not current confirmed-open items."
+    },
+    {
+      "ids": [
+        "BUG-SHELL-01",
+        "BUG-SHELL-02",
+        "BUG-SHELL-03",
+        "BUG-SHELL-04",
+        "BUG-SHELL-05",
+        "BUG-SHELL-06",
+        "BUG-SHELL-07",
+        "BUG-SHELL-08",
+        "BUG-SHELL-09",
+        "BUG-SHELL-10",
+        "BUG-SHELL-14",
+        "BUG-SHELL-15"
+      ],
+      "source": "docs/qa/full-eval/bugs/shell-dashboard.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:36-48 navigation, admin visibility, redirects",
+        "docs/qa/full-eval/phase5-outcome.md:56-60 dashboard mock leakage and resource directory fixed",
+        "docs/qa/full-eval/phase5-outcome.md:76-85 profile null clearing and login/Gantt polish",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:94-97 permission-aware nav, dashboard, my-work, settings, global theme",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:105-111 prototype/display-name/nits fixed"
+      ],
+      "nextAction": "Fresh role traversal required; no old shell item here should be treated as open without new evidence."
+    },
+    {
+      "ids": [
+        "BUG-PROJ-01",
+        "BUG-PROJ-02",
+        "BUG-PROJ-03",
+        "BUG-PROJ-04",
+        "BUG-PROJ-06",
+        "BUG-PROJ-07",
+        "BUG-PROJ-08",
+        "BUG-PROJ-10",
+        "BUG-PROJ-12",
+        "BUG-PROJ-14",
+        "BUG-PROJ-15",
+        "BUG-PROJ-17",
+        "BUG-PROJ-18",
+        "BUG-PROJ-19",
+        "BUG-PROJ-20",
+        "BUG-PROJ-22",
+        "BUG-PROJ-23",
+        "BUG-PROJ-24",
+        "BUG-PROJ-25",
+        "BUG-PROJ-26"
+      ],
+      "source": "docs/qa/full-eval/bugs/projects.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:50-60 task/status/resource hardcodes and mock leakage fixed",
+        "docs/qa/full-eval/phase5-outcome.md:62-74 planning domain M/H fixes, baseline, overloads, scenarios, revert",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:79-83 real project header, not-found, comms scope, provider UX",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:94-111 feedback, permissions, display names, prototype gates"
+      ],
+      "nextAction": "Do not reopen from the historical projects.md file alone."
+    },
+    {
+      "ids": [
+        "BUG-CRM-01",
+        "BUG-CRM-02",
+        "BUG-CRM-04",
+        "BUG-CRM-05",
+        "BUG-CRM-07",
+        "BUG-CRM-09"
+      ],
+      "source": "docs/qa/full-eval/bugs/crm.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:19-23 CRM duplicate product conflict fixed",
+        "docs/qa/full-eval/phase5-outcome.md:50-54 opportunity demand position normalization fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:80-81 CRM dates and not-found fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:94-108 feedback, permission-aware nav, CRUD, display names fixed"
+      ],
+      "nextAction": "Fresh CRM write-flow checks still needed for clean-pass."
+    },
+    {
+      "ids": [
+        "BUG-COMM-02",
+        "BUG-COMM-03",
+        "BUG-COMM-04",
+        "BUG-COMM-06"
+      ],
+      "source": "docs/qa/full-eval/bugs/communications.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:36-42 live tab navigation fixed",
+        "docs/qa/full-eval/phase5-outcome.md:76-81 notification link and unpin route fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:79 P0 comms scope fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:94-96 feedback/CRUD fixes"
+      ],
+      "nextAction": "Fresh media/provider traversal remains separate."
+    },
+    {
+      "ids": [
+        "BUG-ADM-01",
+        "BUG-ADM-02",
+        "BUG-ADM-03",
+        "BUG-ADM-04",
+        "BUG-ADM-05"
+      ],
+      "source": "docs/qa/full-eval/bugs/admin.md",
+      "evidence": [
+        "docs/qa/full-eval/phase5-outcome.md:30-33 admin RU errors and audit labels fixed",
+        "docs/qa/full-eval/phase5-outcome.md:76-78 ADM-02 and ADM-04 destructive guards fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:84 P0-6 honest security policies fixed",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:94-108 permission-aware UX, role labels and audit UX fixed"
+      ],
+      "nextAction": "ADM-02 and ADM-03 are not current open bugs unless fresh checks fail."
+    },
+    {
+      "ids": [
+        "G5-01",
+        "G5-02",
+        "G5-03",
+        "G8-07",
+        "G4-01",
+        "G3-01",
+        "G3-02",
+        "G4-02",
+        "G6-01",
+        "G2-01",
+        "G3-12",
+        "G4-16",
+        "G1-AUTH-02",
+        "G7-01"
+      ],
+      "source": "docs/qa/full-eval/uiux-loop-2026-07-05/report.md",
+      "evidence": [
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:79-84 all P0 items fixed with live checks",
+        "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:86 regression sweep 17/17; video live join not exercised"
+      ],
+      "nextAction": "P0 product/UI degraded states are fixed by master; real provider happy paths remain unverified zones."
+    },
+    {
+      "ids": [
+        "BUG-008",
+        "BUG-AUTH-11",
+        "BUG-SHELL-01",
+        "BUG-SHELL-14"
+      ],
+      "source": "fresh browser evidence on current branch",
+      "evidence": [
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/auth-shell-browser-2026-07-07.json: BUG-008 links navigate to /register and /password-reset",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/auth-shell-browser-2026-07-07.json: BUG-AUTH-11 profile logout then 'Р’РѕР№С‚Рё СЃРЅРѕРІР°' navigates to /login?from=%2Fprofile",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/auth-shell-browser-2026-07-07.json and auth-shell-extra-browser-2026-07-07.json: / redirects to /login anonymous and /dashboard logged-in; no dead design-v3 root",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/auth-shell-browser-2026-07-07.json: anonymous /agent redirects to /login?from=%2Fagent"
+      ],
+      "nextAction": "No fix needed; keep in regression traversal."
+    }
+  ],
+  "fixedByCurrentBranch": [
+    {
+      "id": "CURRENT-ADMIN-RBAC-LIMITED-USER",
+      "source": "current branch browser verification",
+      "surface": "/admin/users, /admin/roles",
+      "evidence": "Limited role with tenant.users.read/manage + tenant.access_profiles.read saw admin users/roles without forbidden and without create/edit/delete role actions.",
+      "linkedOldIds": [
+        "BUG-ADM-01"
+      ]
+    },
+    {
+      "id": "CURRENT-DEV-LOOPBACK-LOGOUT",
+      "source": "current branch API test and browser verification",
+      "surface": "/login, logout menu",
+      "evidence": "POST /api/auth/logout from web localhost:3012 through API 127.0.0.1:4021 returned 200; subsequent /api/auth/me returned 401; UI returned to login.",
+      "linkedOldIds": [
+        "BUG-AUTH-01",
+        "BUG-AUTH-10"
+      ]
+    },
+    {
+      "id": "CURRENT-PROJ-11-OVERVIEW-STATUS",
+      "source": "current branch test and browser verification",
+      "surface": "/projects/project-vektor-portal/overview",
+      "evidence": "overview status helper counts live ids like task-status-done/task-status-in-progress; browser showed '25% 1 Р·Р°РєСЂС‹С‚Рѕ В· 2 РІ СЂР°Р±РѕС‚Рµ'.",
+      "linkedOldIds": [
+        "BUG-PROJ-11"
+      ]
+    },
+    {
+      "id": "CURRENT-PROJ-09-OVERVIEW-LINKS",
+      "source": "current branch browser verification",
+      "surface": "/projects/project-vektor-portal/overview",
+      "evidence": "Overview actions are anchors to schedule/scenarios/baseline/commits instead of disabled demoAction buttons.",
+      "linkedOldIds": [
+        "BUG-PROJ-09"
+      ],
+      "note": "Overview actions were verified separately; remaining non-schedule and schedule action scopes are covered by CURRENT-PROJ-09-NON-SCHEDULE-ACTIONS-PARTIAL and CURRENT-PROJ-09-SCHEDULE-ACTIONS."
+    },
+    {
+      "id": "CURRENT-REQUEST-SECURITY-TESTS",
+      "source": "current branch targeted tests",
+      "surface": "apps/api/src/requestSecurity.ts",
+      "evidence": "requestSecurity tests pass for non-production loopback wildcard defaults while production default remains empty.",
+      "linkedOldIds": [
+        "BUG-AUTH-01"
+      ]
+    },
+    {
+      "id": "CURRENT-SHELL-11-PROFILE-PERMISSION-AWARE",
+      "source": "current branch unit tests and fresh in-app browser verification",
+      "surface": "/profile",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-shell-11-profile-after-fix-browser-2026-07-07.json: plan-reader inputs/theme buttons/save disabled and permission warning visible; admin inputs enabled and save enables after dirty edit.",
+      "linkedOldIds": [
+        "BUG-SHELL-11"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/auth/profile/profile-surface.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ]
+    },
+    {
+      "id": "CURRENT-COMM-05-NOTIFICATION-READ-IDEMPOTENCY",
+      "source": "current branch DB integration test",
+      "surface": "POST /api/workspace/notifications/:notificationId/read, GET /api/workspace/unread-summary",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-comm-05-notification-read-idempotency-2026-07-07.json: RED showed readAt overwrite; GREEN shows repeated read keeps readAt stable and unread summary stays 0.",
+      "linkedOldIds": [
+        "BUG-COMM-05"
+      ],
+      "tests": [
+        "$env:DATABASE_URL='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55436/kiss_pm'; corepack pnpm exec vitest run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts",
+        "corepack pnpm --filter @kiss-pm/api typecheck"
+      ]
+    },
+    {
+      "id": "CURRENT-CRM-08-MONEY-FORMATTER",
+      "source": "current branch formatter unit test and typecheck",
+      "surface": "CRM deals money formatting",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-crm-08-money-formatting-2026-07-07.json: RED covered missing shared formatter; GREEN shows sub-thousand values render as rubles and compact thousands/millions remain stable.",
+      "linkedOldIds": [
+        "BUG-CRM-08"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/crm/ui/money.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ]
+    },
+    {
+      "id": "CURRENT-CRM-09-PERMISSION-AWARE-CREATE-CONTROLS",
+      "source": "current branch capability unit test and typecheck",
+      "surface": "CRM create controls: clients, contacts, products, deals, pipeline setup",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-crm-09-permission-aware-create-controls-2026-07-07.json: RED covered missing capability helper; GREEN shows live users without required manage permission get disabled write controls while mock mode remains allowed.",
+      "linkedOldIds": [
+        "BUG-CRM-09"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/crm/ui/permissions.test.ts src/crm/ui/money.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ]
+    },
+    {
+      "id": "CURRENT-CRM-06-CONTACT-EMAIL-UNIQUE",
+      "source": "current branch API DB integration, web mock contract, migration test and typechecks",
+      "surface": "CRM contacts create/update duplicate email policy",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-crm-06-contact-email-unique-2026-07-07.json: RED covered duplicate create/update succeeding; GREEN shows API and mock return 409 contact_email_taken and persistence adds contacts_tenant_id_email_uidx.",
+      "linkedOldIds": [
+        "BUG-CRM-06"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/crm/lib/mock-crm-backend.test.ts",
+        "$env:DATABASE_URL='postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55436/kiss_pm'; corepack pnpm exec vitest run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts",
+        "corepack pnpm --filter @kiss-pm/persistence test -- src/migration.test.ts",
+        "corepack pnpm --filter @kiss-pm/api typecheck",
+        "corepack pnpm --filter @kiss-pm/web typecheck",
+        "corepack pnpm --filter @kiss-pm/persistence typecheck"
+      ],
+      "note": "Before applying migration to a non-empty production database, run a duplicate non-null contact email precheck per tenant."
+    },
+    {
+      "id": "CURRENT-CRM-03-LEGACY-STAGE-SELECT",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/crm/deals/[id] stage select for legacy opportunity.pipelineId=null rows",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-crm-03-legacy-stage-select-2026-07-07.json: RED covered missing legacy fallback; GREEN verifies stage select options resolve through current stage pipeline and explicit pipelineId remains authoritative.",
+      "linkedOldIds": [
+        "BUG-CRM-03"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/crm/deals/deal-card-surface.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "note": "Full browser traversal for every route/action remains a separate unverified risk zone; this closes the known stage-option calculation bug."
+    },
+    {
+      "id": "CURRENT-COMM-01-CHANNEL-RENAME-SIDEBAR",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/communications/channels sidebar list after channel PATCH rename",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-comm-01-channel-rename-sidebar-2026-07-07.json: RED covered missing list replacement primitive; GREEN verifies renamed channel replaces the existing sidebar list item without dropping others.",
+      "linkedOldIds": [
+        "BUG-COMM-01"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/web test -- src/communications/lib/use-comms.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "note": "Full browser traversal for every route/action remains a separate unverified risk zone; this closes the known stale sidebar state bug."
+    },
+    {
+      "id": "CURRENT-AUTH-13-RESET-TOKEN-REPEAT",
+      "source": "current branch targeted API test and typechecks",
+      "surface": "POST /api/auth/password-reset/confirm repeated token policy",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-auth-13-reset-token-repeat-2026-07-07.json: RED covered repeated confirm returning invalid_reset_token after success; GREEN verifies first confirm succeeds, second confirm returns reset_token_used, other reset tokens are removed, and API/persistence typechecks pass.",
+      "linkedOldIds": [
+        "BUG-AUTH-13"
+      ],
+      "tests": [
+        "corepack pnpm exec vitest run --config vitest.config.ts apps/api/src/authRegistrationRoutes.test.ts",
+        "corepack pnpm --filter @kiss-pm/api typecheck",
+        "corepack pnpm --filter @kiss-pm/persistence typecheck"
+      ],
+      "note": "Full email-provider delivery happy path remains tracked separately as RISK-AUTH-EMAIL-RESET-HAPPY-PATH; this closes the known repeat-token error classification bug."
+    },
+    {
+      "id": "CURRENT-PROJ-21-BASELINE-LABEL",
+      "source": "current branch DB integration, web mock test, domain/persistence typechecks",
+      "surface": "/projects/[id]/baseline baseline.capture label readback",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-21-baseline-label-2026-07-07.json: RED showed authored.baselines label missing after capture; GREEN verifies DB readback label, web mock baseline capture, and domain/persistence typechecks.",
+      "linkedOldIds": [
+        "BUG-PROJ-21"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55436/kiss_pm&& node_modules\\\\.bin\\\\vitest.exe run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"\"shows zero deltas immediately after capturing a baseline\"\"\"",
+        "cmd /c ..\\\\..\\\\node_modules\\\\.bin\\\\vitest.exe run --config vitest.config.ts src/delivery/lib/mock-planning-backend.test.ts",
+        "corepack pnpm --filter @kiss-pm/domain typecheck",
+        "corepack pnpm --filter @kiss-pm/persistence typecheck"
+      ],
+      "coverageStatus": "targeted",
+      "note": "Full browser traversal remains tracked under RISK-FULL-BROWSER-TRAVERSAL. Full API/web typecheck currently has concurrent-agent blockers unrelated to this baseline-label slice."
+    },
+    {
+      "id": "CURRENT-PROJ-05-DATE-ORIGIN",
+      "source": "current branch targeted web tests and typecheck",
+      "surface": "/projects/[id]/schedule, /overview, /calendars date origin",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-05-date-origin-2026-07-07.json: schedule today/timeline, overview overdue, and calendars month origin now use project/current date helpers instead of hardcoded 2026 mock epoch.",
+      "linkedOldIds": [
+        "BUG-PROJ-05"
+      ],
+      "tests": [
+        "cmd /c ..\\\\..\\\\node_modules\\\\.bin\\\\vitest.exe run --config vitest.config.ts src/delivery/lib/date-origin.test.ts src/delivery/overview/overview-status.test.ts src/delivery/project-action-links.test.ts src/delivery/schedule/schedule-rows.test.ts src/workspace/projects/projects-list-surface.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "targeted"
+    },
+    {
+      "id": "CURRENT-PROJ-13-SUMMARY-PARENT-CHAIN",
+      "source": "current branch targeted web tests and typecheck",
+      "surface": "/projects/[id]/schedule summary/non-leaf rows",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-13-summary-parent-chain-2026-07-07.json: rows with parentTaskId children are summary/non-leaf without mock kind/WBS heuristics; edit/drag guards updated.",
+      "linkedOldIds": [
+        "BUG-PROJ-13"
+      ],
+      "tests": [
+        "bun test apps/web/src/delivery/lib/mock-planning-backend.test.ts apps/web/src/delivery/schedule/schedule-rows.test.ts apps/web/src/workspace/projects/projects-list-surface.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "targeted"
+    },
+    {
+      "id": "CURRENT-PROJ-16-PROJECTS-LIST-HONEST-SCOPE",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/projects list filters/search/sort promise",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-16-projects-list-honest-scope-2026-07-07.json: unsupported all/active fake filter removed; active-only helper and story copy match API contract.",
+      "linkedOldIds": [
+        "BUG-PROJ-16"
+      ],
+      "tests": [
+        "bun test apps/web/src/workspace/projects/projects-list-surface.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "targeted"
+    },
+    {
+      "id": "CURRENT-PROJ-09-NON-SCHEDULE-ACTIONS-PARTIAL",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/baseline, /calendars, /settings project action links",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-09-non-schedule-actions-partial-2026-07-07.json: non-schedule project actions now link to existing routes; schedule scope was closed separately by CURRENT-PROJ-09-SCHEDULE-ACTIONS.",
+      "linkedOldIds": [
+        "BUG-PROJ-09"
+      ],
+      "tests": [
+        "cmd /c ..\\\\..\\\\node_modules\\\\.bin\\\\vitest.exe run --config vitest.config.ts src/delivery/project-action-links.test.ts",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "partial",
+      "remainingScope": [
+        "No non-schedule BUG-PROJ-09 scope remains; full browser traversal remains tracked under RISK-FULL-BROWSER-TRAVERSAL."
+      ]
+    },
+    {
+      "id": "CURRENT-SHELL-12-13-AGENT-NO-PROVIDER-DEGRADED-PARTIAL",
+      "source": "current branch targeted API/web tests and typechecks",
+      "surface": "/agent provider degraded state, /agent/propose, /agent/propose/stream",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-shell-12-13-agent-provider-degraded-partial-2026-07-07.json: no-provider mode exposes provider.configured=false and returns 503 instead of fake proposal/SSE success; production demo chrome was closed separately by CURRENT-SHELL-13-AGENT-PRODUCTION-CHROME.",
+      "linkedOldIds": [
+        "BUG-SHELL-12",
+        "BUG-SHELL-13"
+      ],
+      "tests": [
+        "cmd /c node_modules\\\\.bin\\\\vitest.exe run --config vitest.config.ts apps/api/src/agent/agentProviderDegraded.test.ts apps/api/src/agent/agentLoop.test.ts apps/api/src/agent/openRouterProvider.test.ts apps/web/src/workspace/agent/agent-stream.test.ts",
+        "corepack pnpm --filter @kiss-pm/api typecheck",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "partial",
+      "remainingScope": [
+        "Real OpenRouter/Anthropic provider proposal and live SSE browser traversal with configured keys"
+      ]
+    },
+    {
+      "id": "CURRENT-PROJ-09-SCHEDULE-ACTIONS",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/projects/[id]/schedule",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-proj-09-schedule-actions-2026-07-07.json: schedule Baseline is a real route link and unsupported filter/column fake controls were removed.",
+      "linkedOldIds": [
+        "BUG-PROJ-09"
+      ],
+      "tests": [
+        "./node_modules/.bin/vitest.cmd run apps/web/src/delivery/project-action-links.test.ts",
+        "from apps/web: ../../node_modules/.bin/next.cmd typegen",
+        "from apps/web: ../../node_modules/.bin/tsc.cmd -p tsconfig.json --pretty false"
+      ],
+      "coverageStatus": "targeted",
+      "note": "Together with overview and non-schedule project action fixes, this closes the known BUG-PROJ-09 fake-action scope. Full role x route x action traversal remains tracked under RISK-FULL-BROWSER-TRAVERSAL."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PLANNING-IDEMPOTENCY",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "POST /api/workspace/projects/:projectId/planning/apply-command baseline.capture and task.update_schedule",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-idempotency-coverage-2026-07-07.json: concurrent same-key baseline.capture and task.update_schedule deduplicate; same-key different payload returns 409 idempotency_key_conflict.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "$env:DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm; .\\node_modules\\.bin\\vitest.CMD run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"deduplicates concurrent\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for planning apply-command only; admin, comms, auth, CRM and notification race/idempotency slices remain."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-ADMIN-DUPLICATE-CONFLICTS",
+      "source": "current branch targeted DB integration coverage and route error mapping",
+      "surface": "POST /api/workspace/users, PATCH /api/workspace/users/:userId, POST /api/tenant/current/access-profiles, PATCH /api/workspace/access-roles/:roleId",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-admin-duplicate-conflicts-2026-07-07.json: user create/update duplicate email races return stable 409 and readback shows one target email; access-role duplicate id create returns stable conflict; access-role DB unique/not-found races map to public 409/404 contracts.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \\\"concurrent workspace user creates\\\"\"",
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \\\"concurrent workspace user updates\\\"\"",
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \\\"concurrent\\\"\"",
+        "corepack pnpm --filter @kiss-pm/api typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for admin user/access-role duplicate conflicts. Access role name race is closed separately by CURRENT-RISK-WRITE-FLOW-ACCESS-ROLE-NAME-UNIQUE."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-NOTIFICATION-READ-CONCURRENCY",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "POST /api/workspace/notifications/:notificationId/read, GET /api/workspace/unread-summary, GET /api/workspace/notifications?status=read",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-notification-read-concurrency-2026-07-07.json: concurrent duplicate notification read requests both return 200, preserve one readAt timestamp, clear unread summary, and read back one read notification.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \\\"concurrent read\\\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for notification read duplicate/concurrent requests. No production code change was needed because repository read marking was already idempotent under concurrent API calls."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-CRM-CONFLICT-MAPPING",
+      "source": "current branch targeted RED/GREEN DB integration coverage and route conflict mapping",
+      "surface": "POST /api/workspace/clients, PATCH /api/workspace/clients/:clientId, PATCH /api/workspace/products/:productId",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-conflict-mapping-2026-07-07.json: client duplicate-name create/update and product update duplicate SKU/name return stable 409 instead of internal_error.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts -t \\\"duplicate\\\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows CRM write-flow conflict handling for client duplicate names and product update duplicate SKU/name. Contact/opportunity true concurrent duplicate evidence remains separate."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-CRM-PIPELINE-STAGE-DUPLICATE-SUBMIT",
+      "source": "current branch targeted DB integration coverage and route conflict mapping",
+      "surface": "POST /api/workspace/crm/pipelines, POST /api/workspace/crm/pipelines/:pipelineId/stages",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-pipeline-stage-duplicate-submit-2026-07-08.json: concurrent duplicate CRM pipeline and stage creates return stable 201/409 pairs with one-row DB readback and one success audit per operation.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "node_modules\\.bin\\vitest.cmd run apps/api/src/crmPipelineRoutes.db.test.ts -t \"keeps pipeline and stage duplicate submits conflict-safe\"",
+        "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows first-class CRM pipeline/stage duplicate-submit behavior. CRM transition-rule/automation races, audit side-effect de-duplication, opportunity stage/pipeline writes, and the full write-flow matrix remain open."
+    },
+    {
+      "id": "CURRENT-RISK-AUTH-RESET-HAPPY-PATH-CONCURRENCY",
+      "source": "current branch targeted route tests and typecheck",
+      "surface": "POST /api/auth/password-reset/request, POST /api/auth/password-reset/confirm, POST /api/auth/login",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-happy-path-concurrency-2026-07-07.json: reset request delivers rawToken/resetUrl, confirm changes password, login succeeds with new password, and concurrent confirm consumes token once.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-AUTH-EMAIL-RESET-HAPPY-PATH",
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/authRegistrationRoutes.test.ts -t \\\"password-reset\\\"\"",
+        "corepack pnpm --filter @kiss-pm/api typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows auth reset happy path and write-flow concurrency at route level. It does not replace full browser traversal or a live external SMTP provider check."
+    },
+    {
+      "id": "CURRENT-SHELL-13-AGENT-PRODUCTION-CHROME",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/agent production history/nav/message timestamps",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/bug-shell-13-agent-production-chrome-2026-07-07.json: production /agent no longer renders landing-demo history, nav uses real route links, and message timestamps use current Date.",
+      "linkedOldIds": [
+        "BUG-SHELL-13"
+      ],
+      "tests": [
+        "cmd /c ..\\..\\node_modules\\.bin\\vitest.cmd run --config vitest.config.ts src/workspace/agent/agent-surface.test.tsx",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "targeted",
+      "note": "This closes the known BUG-SHELL-13 demo chrome/timestamp scope. Real provider proposal/SSE remains tracked under BUG-SHELL-12 and RISK-AGENT-REAL-LLM-SSE."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-PARTICIPANT-LEFT-ON-CLEANUP",
+      "source": "current branch targeted web test and typecheck",
+      "surface": "/calls/[roomId] LiveKit participant state cleanup",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-participant-left-on-cleanup-2026-07-07.json: cleanup/unmount after successful join posts participantState left exactly once; explicit leave remains idempotent.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+      ],
+      "tests": [
+        "cmd /c ..\\..\\node_modules\\.bin\\vitest.cmd run --config vitest.config.ts src/lib/call/call-engine.test.tsx",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes only the participant cleanup bug found during media audit; full LiveKit/Jitsi provider browser traversal remains unverified."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-ACCESS-ROLE-NAME-UNIQUE",
+      "source": "current branch targeted DB integration, migration and schema coverage",
+      "surface": "POST /api/tenant/current/access-profiles, PATCH /api/workspace/access-roles/:roleId, access_profiles unique index",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-access-role-name-unique-2026-07-07.json: access_profiles_tenant_id_name_uidx added on (tenant_id, name); concurrent create/update same-name races return stable access_role_name_taken conflicts and read back one target role name.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "corepack pnpm --filter @kiss-pm/persistence test -- packages/persistence/src/migration.test.ts packages/persistence/src/schema.test.ts",
+        "corepack pnpm db:migrate with DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm; pg_indexes verified access_profiles_tenant_id_name_uidx exists",
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \\\"access role\\\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "Before applying to a non-empty environment, precheck duplicate access_profiles rows grouped by tenant_id/name; the unique index migration will fail if duplicates exist."
+    },
+    {
+      "id": "CURRENT-RISK-AUTH-EMAIL-RESET-HAPPY-PATH-ROUTE",
+      "source": "current branch targeted route-level coverage",
+      "surface": "POST /api/auth/password-reset/request and POST /api/auth/password-reset/confirm",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-happy-path-route-2026-07-07.json: smtp-like reset request returns 202 delivery=email with resetUrl /password-reset/confirm?token=...; true concurrent same-token confirm returns exactly one 200 and one 400 reset_token_used, final password is the 200 winner, sessions are cleared, token is consumed, and injectable auth limiter records one success and one failure.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-AUTH-EMAIL-RESET-HAPPY-PATH",
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "node_modules\\.bin\\vitest.cmd run apps/api/src/authRegistrationRoutes.test.ts -t \"password-reset\" -> 1 file passed; 11 tests passed, 5 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows the auth reset happy-path and write-flow race risk at route level only. Browser UI traversal and real/configured provider delivery remain unverified."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-COMMUNICATION-CHANNEL-RENAME",
+      "source": "current branch targeted DB integration coverage, API version conflict handling, and web client version token wiring",
+      "surface": "PATCH /api/workspace/communication-channels/:channelId, communication channel edit dialog/client, communication channel repository updatedAt guard",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-communication-channel-rename-concurrency-2026-07-07.json: retrying the same rename from an older clientUpdatedAt returns idempotent 200 without moving updatedAt or adding a second audit event; divergent concurrent renames from one version return exactly one 200 and one 409 communication_channel_version_conflict with one audit event.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \\\"communication channel rename\\\"\"",
+        "corepack pnpm --filter @kiss-pm/api typecheck",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for communication channel rename/description updates only; it is not full write-flow matrix completion."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-CRM-CONTACT-OPPORTUNITY-CONCURRENCY",
+      "source": "current branch targeted DB integration coverage and opportunity unique-conflict hardening",
+      "surface": "POST /api/workspace/contacts, PATCH /api/workspace/contacts/:contactId, POST /api/workspace/opportunities, createOpportunity duplicate-id catch path",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-contact-opportunity-concurrency-2026-07-07.json: concurrent contact duplicate create/update and concurrent opportunity duplicate-id create return stable success/conflict pairs with DB readback proving exactly one target row.",
+      "linkedOldIds": [
+        "BUG-CRM-06"
+      ],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts -t \\\"concurrent duplicate|conflict-safe\\\"\"",
+        "corepack pnpm --filter @kiss-pm/api typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for CRM contact email and opportunity duplicate-id writes only; remaining CRM write actions and non-CRM writes still require their own duplicate/race/idempotency checks."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-JITSI-CONTRACT-JOIN-RACE",
+      "source": "current branch targeted API DB tests, video provider unit tests, and OpenAPI schema alignment",
+      "surface": "POST /api/workspace/call-rooms, POST /api/workspace/call-rooms/:roomId/sessions/start, POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/join-token, call schema primitives",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-contract-join-race-2026-07-07.json: Jitsi room create/readback/start/join URL-only contract is covered; late session-end race returns 409 without calling videoProvider.issueJoinToken; API docs provider/status/event enums align with runtime values.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+      ],
+      "tests": [
+        "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/videoProvider.test.ts\"",
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\\\.bin\\\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \\\"Jitsi|session ends\\\"\"",
+        "corepack pnpm --filter @kiss-pm/api typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-MEDIA-LIVEKIT-JITSI-CALL for API provider contracts and a join-token race only; live browser/provider traversal remains open."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-PROVIDER-DISABLED-JOIN-TOKEN",
+      "source": "current branch targeted API DB test",
+      "surface": "POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/join-token with disabled video provider",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-provider-disabled-join-token-2026-07-07.json: disabled video provider returns explicit 501 video_provider_disabled and does not create join_token_issued event/audit.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\\\.bin\\\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \\\"video provider is disabled\\\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-MEDIA-LIVEKIT-JITSI-CALL for explicit API degraded/no-provider join-token behavior only; live browser/provider traversal remains open."
+    },
+    {
+      "id": "CURRENT-RISK-AGENT-LLM-SSE-CONFIGURED-PROVIDER",
+      "source": "current branch targeted API/web tests and provider env check",
+      "surface": "GET/POST /api/workspace/agent provider/propose/stream behavior, OpenRouter adapter, agent loop events, web SSE parser, AgentSurface apply/reject UX",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-llm-sse-configured-provider-2026-07-07.json: degraded no-provider behavior, OpenRouter adapter mapping, agent loop/SSE events, web stream parsing, and rejected-action filtering are covered by targeted tests; this older evidence predated the supplied live provider keys.",
+      "linkedOldIds": [
+        "BUG-SHELL-12"
+      ],
+      "linkedRiskZones": [
+        "RISK-AGENT-REAL-LLM-SSE"
+      ],
+      "tests": [
+        "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/agent/agentProviderDegraded.test.ts apps/api/src/agent/openRouterProvider.test.ts apps/api/src/agent/agentLoop.test.ts\"",
+        "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/web/src/workspace/agent/agent-stream.test.ts apps/web/src/workspace/agent/agent-surface.test.tsx\"",
+        "corepack pnpm --filter @kiss-pm/web typecheck"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-AGENT-REAL-LLM-SSE for degraded/provider-adapter/local SSE/parser/apply UX only; real provider network smoke was later covered by the live API SSE smoke, while browser traversal remains open."
+    },
+    {
+      "id": "CURRENT-RISK-AGENT-LIVE-OPENROUTER-API-SSE",
+      "source": "current branch live API/SSE smoke with supplied OpenRouter env",
+      "surface": "GET /api/workspace/agent/tools and POST /api/workspace/agent/propose/stream",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-openrouter-api-sse-2026-07-07.json: authenticated local API runtime on PORT=4108 reports OpenRouter live/configured, opens text/event-stream, emits reasoning and done, and returns model anthropic/claude-sonnet-4.6 with no error event.",
+      "linkedOldIds": [
+        "BUG-SHELL-12"
+      ],
+      "linkedRiskZones": [
+        "RISK-AGENT-REAL-LLM-SSE"
+      ],
+      "tests": [
+        "inline node smoke: GET /health, POST /api/auth/login, GET /api/workspace/agent/tools, POST /api/workspace/agent/propose/stream -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-AGENT-REAL-LLM-SSE for live authenticated API SSE only. Browser UI rendering/apply/reject/reload traversal under live provider remains open."
+    },
+    {
+      "id": "CURRENT-RISK-AGENT-LIVE-BROWSER-SSE-APPLY",
+      "source": "current branch live Chrome/Playwright browser traversal with OpenRouter",
+      "surface": "/agent, GET /api/workspace/agent/tools, POST /api/workspace/agent/propose/stream, POST /api/workspace/agent/execute, GET /api/workspace/my-work",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-live-browser-sse-apply-2026-07-07.json: Chrome browser traversal covers live provider tools, SSE stream rendering, structured create_task proposal review, rejecting one action, applying one selected action, /execute 200, API readback showing only the applied task, and /my-work UI reload/readback rendering the applied task.",
+      "linkedOldIds": [
+        "BUG-SHELL-12"
+      ],
+      "linkedRiskZones": [
+        "RISK-AGENT-REAL-LLM-SSE"
+      ],
+      "tests": [
+        "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false -> pass",
+        "node_modules\\.bin\\vitest.cmd run apps/api/src/agent/agentLoop.test.ts -> pass; 10 tests",
+        "live Chrome/Playwright browser smoke on /agent -> pass",
+        "live Chrome/Playwright /my-work UI readback -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes the core live browser SSE/apply path for OpenRouter/create_task. Full risk-zone remains open for every role, every agent tool, and provider variants."
+    },
+    {
+      "id": "CURRENT-RISK-AUTH-RESET-BROWSER-MAIL-GAP",
+      "source": "current branch targeted Playwright browser test and auth reset route tests",
+      "surface": "/login, /password-reset, /password-reset/confirm, POST /api/auth/password-reset/request, POST /api/auth/password-reset/confirm",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-reset-browser-mail-gap-2026-07-07.json: browser traverses forgot-password request, verifies explicit delivery=none no-mail UI without token leak, verifies confirm route token prefill, and route-level reset tests remain green.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-AUTH-EMAIL-RESET-HAPPY-PATH"
+      ],
+      "tests": [
+        "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/authRegistrationRoutes.test.ts -t \\\"password-reset\\\"\"",
+        "cmd /c \"set E2E_WEB_PORT=3000&& node_modules\\\\.bin\\\\playwright.cmd test --config playwright.config.ts e2e/smoke/auth-password-reset-mail-gap.spec.ts --no-deps\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-AUTH-EMAIL-RESET-HAPPY-PATH for browser traversal and explicit no-mail degraded state only; live mailbox delivery/extraction remains blocked."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PLANNING-SCENARIO-RACE",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "POST /api/workspace/projects/:projectId/planning/scenario-proposals/:proposalId/apply, planning_scenario_runs readback",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-scenario-race-2026-07-07.json: concurrent duplicate scenario apply returns exactly one 200 and one 409; read-model planVersion increments once; DB readback shows one applied planning_scenario_runs row.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"\"deduplicates concurrent|keeps scenario apply single-use\"\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-WRITE-FLOW-RACE-IDEMPOTENCY for planning scenario apply only; remaining planning preview/create and non-planning write flows still need their own race/idempotency evidence."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-ADMIN-EXTRA-RACE",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "PUT /api/tenant/current/security-policy, PATCH /api/workspace/users/:userId, auth session readback",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-admin-extra-race-2026-07-07.json: concurrent duplicate security-policy saves return 200/200 with one normalized tenant_security_policies row; repeated concurrent user deactivate/reactivate returns stable readback, revokes inactive sessions, blocks inactive login, and allows login after reactivate.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"\"security policy save|deactivate and reactivate\"\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows admin/security/user-status write-flow race coverage; audit side-effect counts and other admin settings remain separate atoms if required."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-COMMUNICATIONS-EXTRA-RACE",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "POST /api/workspace/communication-channels/:channelId/members, PUT /api/workspace/notification-preferences",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-communications-extra-race-2026-07-07.json: concurrent duplicate channel member add leaves one active communication_channel_members row with API readback; concurrent notification preference PUT leaves one notification_preferences row with API readback.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"\"channel member add|notification preferences\"\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows communications write-flow row-level idempotency/readback coverage; audit side-effect de-duplication remains outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-CRM-EXTRA-RACE",
+      "source": "current branch targeted DB integration coverage",
+      "surface": "POST/PATCH /api/workspace/clients, POST/PATCH /api/workspace/products",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-extra-race-2026-07-07.json: concurrent client duplicate-name create/update and product duplicate SKU/name create/update return stable success/conflict pairs with one-row DB readback.",
+      "linkedOldIds": [
+        "BUG-CRM-06"
+      ],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts -t \"\"client name writes|product SKU and name\"\"\""
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows CRM write-flow race coverage for client/product uniqueness; opportunity stage move/pipeline writes and audit side-effect idempotency remain separate atoms if required."
+    },
+    {
+      "id": "CURRENT-RISK-FULL-BROWSER-CORE-TRAVERSAL",
+      "source": "current branch targeted Playwright browser smoke",
+      "surface": "/login, /dashboard, /crm/deals, /crm/clients, /crm/contacts, /crm/products, /admin/users, selected workspace APIs",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-full-browser-core-traversal-2026-07-07.json: admin and limited profile.read browser traversal passed; CRM deal stage write/readback/reload and permission-denied API checks passed.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "cmd /c playwright test --config playwright.config.ts e2e/smoke/deals-kanban.spec.ts e2e/smoke/single-workspace-auth-rbac.spec.ts --no-deps with DATABASE_URL=55433 E2E_API_PORT=4102 E2E_WEB_PORT=3102"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-FULL-BROWSER-TRAVERSAL for core admin/limited CRM/admin/auth flows only; literal every role x route x action traversal remains open."
+    },
+    {
+      "id": "CURRENT-RISK-AGENT-REAL-LLM-SSE-PARSER-TAIL",
+      "source": "current branch targeted web unit tests and provider env probe",
+      "surface": "apps/web/src/workspace/agent/agent-stream.test.ts SSE parser",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-real-llm-sse-parser-tail-2026-07-07.json: CRLF SSE frames parse correctly and streams closed without done fail as stream_incomplete; provider keys remain absent.",
+      "linkedOldIds": [
+        "BUG-SHELL-12"
+      ],
+      "linkedRiskZones": [
+        "RISK-AGENT-REAL-LLM-SSE"
+      ],
+      "tests": [
+        "node_modules/.bin/vitest.cmd run apps/web/src/workspace/agent/agent-stream.test.ts apps/api/src/agent/agentProviderDegraded.test.ts"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows local SSE parser tail behavior only; later live API SSE evidence covers provider/network, while browser SSE remains open."
+    },
+    {
+      "id": "CURRENT-RISK-AUTH-RESET-LOCAL-PROVIDER-EXTRACTION",
+      "source": "current branch targeted auth route test",
+      "surface": "POST /api/auth/password-reset/request and /confirm with in-memory email provider",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-auth-email-reset-local-provider-extraction-2026-07-07.json: local provider raw token extraction confirms old password is rejected and new password login sets session cookie.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-AUTH-EMAIL-RESET-HAPPY-PATH"
+      ],
+      "tests": [
+        "node_modules/.bin/vitest.cmd run apps/api/src/authRegistrationRoutes.test.ts -t password-reset"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows route-level local provider extraction; live mailbox delivery/extraction remains blocked."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-INTAKE-ACTIVATION-DUPLICATE-SUBMIT",
+      "source": "current branch targeted service unit test",
+      "surface": "project intake activateProjectFromOpportunity duplicate submit",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-intake-activation-duplicate-submit-2026-07-07.json: first activation creates one active project/audit; duplicate submit returns 409 without second draft/project/audit.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "node_modules/.bin/vitest.CMD run apps/api/src/projectIntakeService.test.ts",
+        "node_modules/.bin/tsc.CMD -b --pretty false"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows project-intake service duplicate-submit behavior only; full route/browser write-flow matrix remains open."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-JITSI-BROWSER-HANDOFF",
+      "source": "current branch runtime fix, targeted web unit test, and Chromium browser smoke",
+      "surface": "/calls/[roomId] Jitsi/manual external provider handoff",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-browser-handoff-2026-07-07.json: /calls runtime no longer treats Jitsi URL-only join contracts as video_provider_unavailable; browser smoke verifies start-session, join-token, and visible external meet.jit.si handoff link.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+      ],
+      "tests": [
+        "node_modules\\.bin\\vitest.cmd run apps/web/src/lib/call/call-engine.test.tsx -> 1 file passed; 5 tests passed",
+        "node_modules\\.bin\\tsc.CMD -p apps/web/tsconfig.json --pretty false -> pass",
+        "node .tmp\\jitsi-handoff-smoke.mjs -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows Jitsi provider browser behavior for product handoff only. Actual Chrome/OBS permission prompt, device selection, media presence, leave/rejoin, and remote participant behavior remain unverified."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-DEVICE-DENIED-LOBBY-DEGRADED",
+      "source": "current branch targeted web hook test and typecheck",
+      "surface": "/calls/[roomId] prejoin lobby camera permission denied/degraded UI",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-device-denied-lobby-degraded-2026-07-08.json: NotAllowedError from LiveKit camera preview now shows the denied-camera warning, turns lobby camera state off, preserves micOn, and leaves the user with a joinable no-camera selection.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+      ],
+      "tests": [
+        "node_modules\\.bin\\vitest.cmd run apps/web/src/lib/call/use-lobby-preview.test.tsx -> 1 file passed; 1 test passed",
+        "node_modules\\.bin\\vitest.cmd run apps/web/src/lib/call/call-engine.test.tsx -> 1 file passed; 5 tests passed",
+        "node_modules\\.bin\\tsc.CMD -p apps/web/tsconfig.json --pretty false -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows local browser prejoin media denied/degraded UI without external LiveKit/Jitsi credentials. Real Chrome permission prompt, provider join, leave/rejoin, reconnect, and remote participant behavior remain unverified."
+    },
+    {
+      "id": "CURRENT-RISK-AGENT-NON-CREATE-TASK-EXECUTE-TAIL",
+      "source": "current branch targeted agent execute/provider/parser tests",
+      "surface": "/api/workspace/agent/execute non-create_task actions, provider degraded responses, web SSE parser/apply filtering",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-non-create-task-execute-tail-2026-07-08.json: non-create_task execute paths route through governed handlers without fake success; stale plan version returns plan_version_conflict; degraded provider remains fail-closed; web SSE reject/apply filtering stays covered. Test harness session expiry was fixed for current-date runs.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-AGENT-REAL-LLM-SSE"
+      ],
+      "tests": [
+        "node_modules\\.bin\\vitest.cmd run apps/api/src/agent/agentExecute.test.ts apps/api/src/agent/agentProviderDegraded.test.ts apps/api/src/agent/agentLoop.test.ts apps/web/src/workspace/agent/agent-stream.test.ts apps/web/src/workspace/agent/agent-surface.test.tsx -> 5 files passed; 22 tests passed"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows agent execute behavior beyond create_task. Live provider/browser traversal for every role/action/tool and true permission-denied apply remain open."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-BROWSER-PROVIDER-DISABLED-CONNECT",
+      "source": "current branch in-app Browser traversal",
+      "surface": "/communications/calls Jitsi video room create/start/connect with no configured live provider",
+      "evidence": "docs/qa/full-eval/evidence/browser-media-provider-disabled-connect-2026-07-08/risk-media-browser-provider-disabled-connect-2026-07-08.json: admin browser traversal created a Jitsi video call room, started the session, attempted connect, and verified persistent provider-disabled denial instead of fake join success.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL",
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "browser:control-in-app-browser traversal on http://127.0.0.1:3108/communications/calls with screenshot evidence",
+        "node packages/persistence/scripts/migrate.mjs -> No pending migrations",
+        "node_modules\\.bin\\tsx.CMD scripts\\seed-dev.ts -> seeded dev data"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows no-provider/degraded browser behavior only. Real Chrome camera/microphone permission prompt, OBS virtual camera, microphone, external Jitsi/LiveKit media, remote participant, reconnect, and leave/rejoin remain unverified."
+    },
+    {
+      "id": "CURRENT-RISK-FULL-BROWSER-ADMIN-COMMS-READONLY",
+      "source": "current branch Playwright Chromium traversal evidence",
+      "surface": "/communications/channels, /communications/chat, /communications/meetings, /communications/calls, /communications/notifications",
+      "evidence": "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/admin-communications-readonly-traversal-2026-07-08.json: admin read-only traversal rendered all five communications routes non-blank with route-specific 200 API evidence, screenshots, network log, and only expected pre-login auth/me 401.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "Playwright Chromium headless traversal against http://127.0.0.1:3108 -> pass-with-gaps; screenshots and network-statuses.log recorded"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows admin read-only communications route coverage only. Mutating actions, mobile, other roles, /calls/[roomId], and direct API mutation contracts remain open."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-CRM-PIPELINE-RULES-AUTOMATION",
+      "source": "current branch targeted DB integration coverage and route conflict mapping",
+      "surface": "POST /api/workspace/crm/pipelines/:pipelineId/transition-rules and /automations",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-race-crm-pipeline-rules-automation-2026-07-08.json: concurrent duplicate transition-rule edge and automation id creates return stable 201/409 pairs with one-row readback, lifecycle graph readback, and one success audit per operation.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmPipelineRoutes.db.test.ts -t \"transition rule and automation duplicate submits\" -> 1 file passed; 1 test passed; 4 skipped",
+        "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes the first-class CRM pipeline transition-rule/automation duplicate-submit atom. Broader write-flow matrix remains open outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-CRM-OPPORTUNITY-STAGE-PIPELINE-IDEMPOTENCY",
+      "source": "current branch targeted DB integration coverage and project intake service idempotency fix",
+      "surface": "PATCH /api/workspace/opportunities/:id/stage and /pipeline",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-crm-opportunity-stage-pipeline-idempotency-2026-07-08.json: duplicate same-stage and same-pipeline writes now return idempotent 200 readback without duplicate audit; concurrent divergent stage moves preserve exactly one final readback and expected audit count; invalid/missing/archived stage/pipeline attempts do not create rows or audit.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts -t opportunity stage and pipeline writes -> 1 file passed; 1 test passed; 14 skipped",
+        "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes the CRM opportunity stage/pipeline duplicate-submit/idempotency atom. Broader write-flow matrix remains open outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-WORK-TASK-STATUS-DUPLICATE-ARCHIVE",
+      "source": "current branch targeted DB integration coverage and route conflict/idempotency fix",
+      "surface": "POST /api/workspace/task-statuses and DELETE /api/workspace/task-statuses/:statusId",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-status-duplicate-archive-2026-07-08.json: concurrent duplicate task status create returns stable 201/409 with one-row readback and one create audit; duplicate archive returns idempotent 200 archived readback with one archive audit.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"task status duplicate writes\" -> pass",
+        "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"manages tenant task statuses\" -> pass",
+        "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes the Project Work task status duplicate-create/archive-idempotency atom. Broader write-flow matrix remains open outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-WORK-TASK-CREATE-ARCHIVE-IDEMPOTENCY",
+      "source": "current branch targeted DB integration coverage and project task conflict/idempotency fix",
+      "surface": "POST /api/workspace/projects/:projectId/tasks and DELETE /api/workspace/tasks/:taskId",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-create-archive-idempotency-2026-07-08.json: concurrent duplicate project task create returns stable 201/409 with one active task readback, one create audit and one created system activity; duplicate archive returns idempotent 200/200 with archived readback hidden from project detail and one archive audit.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"project task duplicate create\" -> pass",
+        "DATABASE_URL=postgres://kiss_pm:***@127.0.0.1:55433/kiss_pm node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"creates a project task|requires resource management permission|blocks task field edits and archive|project task duplicate create\" -> 1 file passed; 4 tests passed; 19 skipped",
+        "node_modules\\.bin\\tsc.cmd -p apps/api/tsconfig.json --pretty false -> pass",
+        "node_modules\\.bin\\tsc.cmd -p packages/persistence/tsconfig.json --pretty false -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes the Project Work project task duplicate-create/archive-idempotency atom. Broader write-flow matrix remains open outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-AGENT-DENIED-APPLY-AUDIT",
+      "source": "current branch targeted API unit/integration harness coverage and agent provenance fix",
+      "surface": "POST /api/workspace/agent/execute apply_resource_resolution denied by RBAC",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-agent-denied-apply-audit-2026-07-08.json: denied apply_resource_resolution now returns 403 result without plan mutation and writes sourceWorkflow=agent denied audit provenance.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-AGENT-REAL-LLM-SSE"
+      ],
+      "tests": [
+        "node_modules\\.bin\\vitest.cmd run apps/api/src/agent/agentExecute.test.ts -t \"audits denied scenario apply\" -> pass",
+        "node_modules\\.bin\\vitest.cmd run apps/api/src/agent/agentExecute.test.ts -> 1 file passed; 4 tests passed",
+        "node_modules\\.bin\\tsc.CMD -p apps/api/tsconfig.json --pretty false -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes the agent denied confirmed-action provenance atom only. Broader live provider/SSE/browser agent matrix remains open."
+    },
+    {
+      "id": "CURRENT-RISK-FULL-BROWSER-TRAVERSAL-CRM-READONLY-WRITE-DENIED",
+      "source": "current branch in-app Browser traversal and UI permission fix",
+      "surface": "/login, /dashboard redirect, /crm/deals kanban/list/forecast, direct opportunity write APIs",
+      "evidence": "docs/qa/full-eval/evidence/browser-crm-readonly-write-denied-2026-07-08/risk-full-browser-traversal-crm-readonly-write-denied-2026-07-08.json: CRM read-only user logs in, reads deals, create/stage writes return 403 with unchanged readback; kanban cards no longer expose draggable=true; list stage selects and pipeline buttons are disabled; forecast remains read-only.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "browser:control-in-app-browser traversal on http://127.0.0.1:3130/login and /crm/deals with screenshot evidence -> pass after fix",
+        "node_modules\\.bin\\tsc.cmd -p apps/web/tsconfig.json --pretty false -> pass",
+        "git diff --check -> pass with CRLF warnings only",
+        "pnpm --filter @kiss-pm/web typecheck -> blocked before TS by ERR_PNPM_IGNORED_BUILDS; direct tsc used instead"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes the CRM read-only browser write-denied traversal atom. Broader full-browser matrix remains open for other roles/routes/actions."
+    },
+    {
+      "id": "CURRENT-RISK-AGENT-REAL-LLM-SSE-LIVE-BROWSER-DEGRADED",
+      "source": "current branch live API, in-app Browser traversal, and per-role tools matrix evidence",
+      "surface": "/agent UI, GET /api/workspace/agent/tools, POST /api/workspace/agent/propose/stream, POST /api/workspace/agent/execute, generic CRM/comms redispatch, no-provider degraded UI",
+      "evidence": "docs/qa/full-eval/evidence/browser-agent-no-provider-degraded-2026-07-08/risk-agent-no-provider-degraded-browser-2026-07-08.json plus live OpenRouter/API/browser evidence: configured provider SSE, review/apply/readback, non-create comment_task, generic communications create_channel, generic CRM create_client, and per-role /agent/tools matrix are covered; Anthropic variant remains explicitly unverified because no Anthropic provider key was provided.",
+      "linkedOldIds": [
+        "BUG-SHELL-12"
+      ],
+      "linkedRiskZones": [
+        "RISK-AGENT-REAL-LLM-SSE"
+      ],
+      "tests": [
+        "in-app Browser traversal on http://127.0.0.1:3160/agent with OpenRouter API 4160 -> live proposal/apply/readback evidence passed",
+        "in-app Browser traversal on http://127.0.0.1:3160/agent with no-provider API 4170 -> degraded banner/response shown, no review/apply fake controls",
+        "authenticated API GET /api/workspace/agent/tools for alpha admin, engineer admin-profile, plan-reader-no-resources, resource-reader, beta admin -> provider live/configured and permission-specific allowed/denied matrix captured",
+        "API readbacks: task activity, communication channel, and CRM client persisted after browser-applied agent actions"
+      ],
+      "coverageStatus": "covered-for-available-providers",
+      "note": "This closes RISK-AGENT-REAL-LLM-SSE and BUG-SHELL-12 for the available provider set: OpenRouter configured/live and no-provider degraded. Anthropic-specific provider variant is listed inside evidence as unverified due missing key, not as a blocker for this risk closure."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-KNOWLEDGE-VERSION-CONFLICT",
+      "source": "current branch targeted route-level write-flow verification",
+      "surface": "POST /api/workspace/projects/:projectId/knowledge/documents/:documentId/versions",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-knowledge-version-conflict-2026-07-08.json: document version numbering collision returns stable 409 knowledge_version_conflict and leaves zero partial version rows/audit side effects.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "node_modules\\.bin\\vitest.cmd run apps/api/src/knowledgeRoutes.test.ts -t \"concurrent document version numbering\" -> pass; 1 selected test passed, 9 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows the write-flow matrix for knowledge document-version stale/conflict handling only; broader write-flow duplicate/race/idempotency coverage remains open outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PROFILE-THEME-DUPLICATE-UPDATES",
+      "source": "current branch targeted DB/API write-flow regression coverage",
+      "surface": "PATCH /api/profile, PATCH /api/profile/theme, GET /api/auth/me",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-profile-theme-duplicate-updates-2026-07-08.json: duplicate identical profile/theme PATCH calls return stable 200/200 pairs and session readback reflects the submitted profile fields plus normalized theme accent color.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"duplicate profile and theme\" -> pass; 1 selected test passed, 30 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows the write-flow matrix for profile contact and theme preference duplicate-submit stability only; broader write-flow duplicate/race/idempotency coverage remains open outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-FULL-BROWSER-ADMIN-DIRECT-DENIED-READABLE",
+      "source": "current branch in-app Browser traversal after dev seed restore",
+      "surface": "/dashboard plus direct /admin, /admin/users, /admin/roles, /admin/security, /admin/audit for plan-reader-no-resources, resource-reader, tenant-admin-control",
+      "evidence": "docs/qa/full-eval/evidence/browser-admin-direct-denied-readable-2026-07-08/risk-full-browser-admin-direct-denied-readable-2026-07-08.json: restricted roles have no dashboard admin links; direct admin routes settle to readable denial with no raw crash; tenant admin control can render admin routes. Screenshots and raw state JSON are stored in the same folder.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "scripts/seed-dev.ts restored local PostgreSQL 55433 before browser run -> seed success",
+        "API login health-check for admin/plan-reader/resource-reader/beta -> 200 each after seed",
+        "browser:control-in-app-browser traversal on http://127.0.0.1:3160 with UI login/logout and direct admin route screenshots -> pass for this slice"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows RISK-FULL-BROWSER-TRAVERSAL for admin direct-denied route behavior only. Full every-role/every-route/every-action traversal remains open; security-readonly variant was not covered because no seeded login exists. One UX inconsistency remains documented: resource-reader /admin redirect denied page can show admin tabs, although deeper direct denied pages hide them."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-SECURITY-POLICY-DUPLICATE-UPDATES",
+      "source": "current branch targeted DB/API write-flow regression coverage",
+      "surface": "PUT /api/tenant/current/security-policy, GET /api/tenant/current/security-policy, tenant_security_policies persistence",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-security-policy-duplicate-upsert-2026-07-08.json: duplicate concurrent security-policy saves return stable 200/200, readback matches, and tenant_security_policies preserves one row for tenant-alpha.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"tenant security policy save idempotent\" -> pass; 1 selected test passed, 30 skipped",
+        "scripts/seed-dev.ts rerun after DB test to restore local dev seed"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows the write-flow duplicate/race/idempotency matrix for tenant security-policy upsert only; broader write-flow coverage remains open outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-SECURITY-POLICY-PERMISSION-DENIED",
+      "source": "current branch targeted DB/API permission regression coverage",
+      "surface": "GET /api/tenant/current/security-policy, PUT /api/tenant/current/security-policy",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-security-policy-permission-denied-2026-07-08.json: reader without workspace config permissions receives 403 permission_missing for security-policy GET and PUT.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/app.db.test.ts -t \"denies workspace config read and mutation\" -> pass; 1 selected test passed, 30 skipped",
+        "scripts/seed-dev.ts rerun after DB test to restore local dev seed",
+        "codegraph sync -> Already up to date"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows the write-flow/permission matrix for tenant security-policy read/write denied behavior only; broader write-flow duplicate/race/idempotency coverage remains open outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PLANNING-BATCH-CONCURRENT-IDEMPOTENCY",
+      "source": "current branch targeted DB/API write-flow regression coverage",
+      "surface": "POST /api/workspace/projects/:projectId/planning/apply-command-batch, GET /api/workspace/projects/:projectId/planning/read-model",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-planning-batch-concurrent-idempotency-2026-07-08.json: concurrent identical apply-command-batch calls with the same idempotency key return stable 200/200 equal responses, apply once, bump planVersion once, and read back both task identity updates after refresh.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/planningRoutes.db.test.ts -t \"deduplicates concurrent apply-command-batch\" -> pass; 1 selected test passed, 23 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows the write-flow matrix for planning apply-command-batch concurrent duplicate idempotency only; broader write-flow duplicate/race/idempotency coverage remains open outside this atom."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-MEDIA-RECORDING-DUPLICATE-START",
+      "source": "current branch targeted DB/API write-flow regression coverage",
+      "surface": "POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/recordings/start plus recording/event/audit readback",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-duplicate-start-2026-07-08.json: first recording start returns 201; duplicate start returns 409 call_recording_already_active; readback confirms one LiveKit egress start, one recording row, one recording_started event, and one recording-start audit event.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \"rejects duplicate recording start\" -> pass; 1 selected test passed, 24 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This narrows the write-flow/media matrix for duplicate recording start after an active recording exists. It does not close full LiveKit/Jitsi browser/media provider traversal or a simultaneous first-start race lock."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-MEDIA-RECORDING-CONCURRENT-START-LOCK",
+      "source": "current branch backend fix plus targeted DB/API write-flow regression coverage",
+      "surface": "POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/recordings/start simultaneous first-start race",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-concurrent-start-lock-2026-07-08.json: pre-fix simultaneous first-start returned [201,201]; after adding per-session advisory transaction lock, recording-start cluster passes with one 201/one 409, one egress, one recording row, and one recording_started event.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \"startRecording starts|rejects duplicate recording start|deduplicates simultaneous first recording starts\" -> pass; 3 selected tests passed, 23 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This fixes and covers the media recording simultaneous first-start race. It is still DB/API/injected-egress coverage, not full real browser/provider LiveKit/Jitsi media traversal."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-MEETING-ACTION-ITEM-STATUS-IDEMPOTENCY",
+      "source": "current branch backend fix plus targeted DB/API write-flow regression coverage",
+      "surface": "PATCH /api/workspace/meetings/:meetingId/action-items/:actionItemId, GET /api/workspace/meetings/:meetingId, GET /api/tenant/current/audit-events",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-meeting-action-item-status-idempotency-2026-07-08.json: pre-fix duplicate same-status PATCH produced duplicate meeting_action_item_updated audit events; after the fix, sequential and concurrent duplicate status updates return 200 readback with one persisted final state and one audit per real transition.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"treats duplicate meeting action item status updates\" -> pass; 1 selected test passed, 18 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This fixes and covers meetings action-item status duplicate/noop and concurrent duplicate idempotency. It does not close other meeting write flows such as meeting create duplicate submit, notes, external links, or broader full browser traversal."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-WORK-TASK-PATCH-CONCURRENCY",
+      "source": "current branch targeted DB/API write-flow regression coverage",
+      "surface": "PATCH /api/workspace/tasks/:taskId, GET /api/workspace/tasks/:taskId, GET /api/workspace/projects/:projectId/planning/read-model, GET /api/tenant/current/audit-events",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-work-task-patch-concurrent-idempotency-2026-07-08.json: concurrent duplicate task PATCH calls with the same clientUpdatedAt return one 200 and one 409 task_version_conflict, read back one final title, one task.updated audit, one system activity, and one planVersion bump.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"keeps concurrent duplicate task PATCH updates\" -> pass; 1 selected test passed, 23 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This covers Project Work task PATCH duplicate/concurrent optimistic-concurrency behavior. It does not close other Project Work write flows such as task comments, nor broader full browser traversal."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-CALL-PARTICIPANT-STATE-IDEMPOTENCY",
+      "source": "current branch backend fix plus targeted DB/API write-flow regression coverage",
+      "surface": "POST /api/workspace/call-rooms/:roomId/sessions/:sessionId/participant-state, call events, call participant states, management audit events",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-call-participant-state-idempotency-2026-07-08.json: duplicate same-state participant updates now return 200 with event=null, keep one participant state row, preserve one participant_joined and one participant_left event for real transitions, and avoid duplicate communications.call_participant_state_updated audit entries.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY",
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \"keeps duplicate participant state updates\" -> pass; 1 selected test passed, 26 skipped"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This fixes call participant-state duplicate/noop transition side effects. It is DB/API coverage and does not close real LiveKit/Jitsi browser/provider traversal."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-CONTROL-SURFACE-PUBLISH-ROLLBACK-CONCURRENCY",
+      "source": "current branch backend fix plus targeted DB/API write-flow regression coverage",
+      "surface": "POST /api/tenant/current/control-surfaces/:surfaceId/publish, POST /api/tenant/current/control-surfaces/:surfaceId/rollback, control_surface_versions",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-control-surface-publish-rollback-concurrency-2026-07-08.json: duplicate publish/rollback attempts now return control_surface_version_conflict without creating another immutable version row or duplicate success auditEventId; API routes map the conflict to stable 409 before success audit append.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts packages/persistence/src/controlSurfaceRepository.db.test.ts -t \"rejects duplicate\" -> pass; 2 selected tests passed, 2 skipped",
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts packages/persistence/src/controlSurfaceRepository.db.test.ts -> pass; 4 tests passed",
+        "node_modules\\.bin\\vitest.cmd run apps/api/src/controlSurfaceRoutes.test.ts -> pass; 12 tests passed",
+        "node_modules\\.bin\\tsc.cmd -p apps/api/tsconfig.json --pretty false -> pass",
+        "node_modules\\.bin\\tsc.cmd -p packages/persistence/tsconfig.json --pretty false -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This covers the control-surface publish/rollback duplicate/stale-version atom. It does not close unrelated meeting create/link/note, task comment, or retrospective close atoms."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-PROJECT-CLOSURE-RETRY-IDEMPOTENCY",
+      "source": "current branch backend fix plus targeted DB/API write-flow regression coverage",
+      "surface": "POST /api/workspace/projects/:projectId/closure/close, closure readback, audit events",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-project-closure-retry-idempotency-2026-07-08.json: duplicate project close retry now returns the existing closure read model with the original auditEventId, does not create another closure side effect, and avoids project.close_conflict audit noise.",
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\\\.bin\\\\vitest.cmd run --config vitest.db.config.ts apps/api/src/backendManagementLoop.db.test.ts -t keeps duplicate project closure retry -> pass; 1 selected test passed, 2 skipped",
+        "DATABASE_URL=<local-test-db> node_modules\\\\.bin\\\\vitest.cmd run --config vitest.db.config.ts apps/api/src/backendManagementLoop.db.test.ts -> pass; 3 tests passed",
+        "node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/retrospectiveRoutes.test.ts -> pass; 13 tests passed",
+        "node_modules\\\\.bin\\\\tsc.cmd -p apps/api/tsconfig.json --pretty false -> pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This covers the retrospective project close duplicate/retry atom. It does not close unrelated meeting create/link/note or task comment atoms."
+    },
+    {
+      "id": "CURRENT-RISK-WRITE-FLOW-RACE-IDEMPOTENCY-CLOSED",
+      "source": "current branch consolidated DB/API race-idempotency closure",
+      "status": "fixed-by-current-branch",
+      "surface": "All known write-flow duplicate/race/idempotency surfaces from reconciliation inventory; final new coverage for meeting create, meeting external link, meeting note, and task comment",
+      "evidence": "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-race-idempotency-closed-2026-07-08.json: consolidated closure; meeting create/link/note and task comment now use clientRequestId idempotency with readback and bounded audit side effects; previously partial slices are consolidated under this fixed item.",
+      "linkedOldIds": [],
+      "linkedRiskZones": [
+        "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+      ],
+      "tests": [
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -t \"keeps duplicate meeting create\" -> pass; 1 selected test passed, 19 skipped",
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -t \"keeps duplicate task comment\" -> pass; 1 selected test passed, 24 skipped",
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd --config vitest.db.config.ts apps/api/src/collaborationRoutes.db.test.ts -> pass; 20 tests passed",
+        "DATABASE_URL=<local-test-db> node_modules\\.bin\\vitest.cmd --config vitest.db.config.ts apps/api/src/projectWorkRoutes.db.test.ts -> pass; 25 tests passed",
+        "node_modules\\.bin\\tsc.cmd -p packages/persistence/tsconfig.json --pretty false -> pass",
+        "node_modules\\.bin\\tsc.cmd -p apps/api/tsconfig.json --pretty false -> pass",
+        "node_modules\\.bin\\vitest.cmd run --root . apps/api/src/projectWorkParsers.test.ts -> pass; 9 tests passed"
+      ],
+      "coverageStatus": "risk-zone-closed",
+      "note": "This closes RISK-WRITE-FLOW-RACE-IDEMPOTENCY as a large block in the current matrix. Remaining work is outside this risk zone: full browser traversal, live media/provider behavior, and live email reset readback."
+    },
+    {
+      "id": "CURRENT-RISK-AUTH-EMAIL-RESET-LIVE-DELIVERY",
+      "source": "current branch live SMTP/Gmail verification after DNS SPF/DKIM fix",
+      "status": "fixed-by-current-branch",
+      "surface": "/api/auth/register, /api/auth/password-reset/request, delivered Gmail reset email, /api/auth/password-reset/confirm, /api/auth/login",
+      "evidence": "docs/qa/full-eval/evidence/auth-email-reset-live-delivery-2026-07-08/risk-auth-email-reset-live-delivery-2026-07-08.json: fresh unique @kisspm.app user registered, reset request returned 202 delivery=email, Gmail delivered KISS PM password reset email, 64-char token extracted from delivered body, confirm returned 200, old password login returned 401, new password login returned 200 with Set-Cookie, repeated token returned 400 reset_token_used, reset email original showed SPF/DKIM/DMARC PASS.",
+      "linkedRiskZones": [
+        "RISK-AUTH-EMAIL-RESET-HAPPY-PATH"
+      ],
+      "tests": [
+        "Resolve-DnsName kisspm.app -Type TXT -Server 1.1.1.1 -> SPF includes ip4:31.31.197.67",
+        "Resolve-DnsName dkim._domainkey.kisspm.app -Type TXT -Server 1.1.1.1 -> REG.RU DKIM public key present",
+        "Gmail original for KISS PM password reset reset-20260708-165952@kisspm.app -> SPF PASS, DKIM PASS, DMARC PASS",
+        "POST http://127.0.0.1:4188/__qa/register-and-request -> register 201, reset 202 delivery=email",
+        "POST http://127.0.0.1:4188/__qa/confirm-readback with token extracted from Gmail -> confirm 200, old login 401, new login 200 Set-Cookie, repeat 400 reset_token_used"
+      ],
+      "coverageStatus": "risk-zone-closed",
+      "note": "Uses an isolated auth-capable createApp harness because the local no-Postgres API returns auth_not_configured for registration. The product auth routes and real SMTP provider are exercised; previous browser mechanics evidence remains valid and this run closes the external delivery/readback gap."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-LIVEKIT-SELF-HOSTED-BROWSER",
+      "source": "current branch Chrome traversal, Docker media profile, API/LiveKit readback",
+      "surface": "/calls/[roomId] self-hosted LiveKit provider with Chrome camera/microphone permissions (call-room-77983080-b53a-40e5-9f1d-1f4b343db968)",
+      "evidence": "docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/risk-media-livekit-self-hosted-browser-2026-07-08.json: Chrome with localhost camera/microphone permissions reached active call UI for marker kisspm-livekit-qa-20260708-174243; API readback shows active session, issued join tokens, and participant_joined; LiveKit v1.9.12 logs show participant active and audio mediaTrack published from MICROPHONE; OBS camera source returned unavailable, so UI degraded to cameraOff without dropping the call. Screenshot: docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/livekit-call-active-mic-on-camera-off.png.",
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL",
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        ".\\node_modules\\.bin\\vitest.CMD run apps/web/src/lib/call/call-engine.test.tsx -> pass; 1 file / 6 tests passed",
+        "docker compose --profile media up -d postgres redis livekit -> LiveKit v1.9.12 running on 127.0.0.1:7880",
+        "node packages/persistence/scripts/migrate.mjs -> local Postgres migrations applied through 0051_write_flow_idempotency_keys.sql",
+        ".\\node_modules\\.bin\\tsx.CMD scripts/seed-dev.ts -> seeded dev tenant/users/communications data",
+        "Chrome traversal on http://127.0.0.1:3180/calls/call-room-77983080-b53a-40e5-9f1d-1f4b343db968 -> active call stage with micOn=true, cameraOn=false degraded state"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "This closes the self-hosted LiveKit browser/audio path and fixes dev stack/provider compatibility plus camera-publish failure handling. It does not close Jitsi external media, video publishing with a working camera source, remote participant, leave/rejoin, or reconnect coverage."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-LIVEKIT-MULTIUSER-LIFECYCLE",
+      "source": "current branch Playwright Chromium multi-context traversal, API readback, LiveKit log readback",
+      "surface": "/calls/[roomId] self-hosted LiveKit provider with admin + engineer isolated browser contexts",
+      "evidence": "docs/qa/full-eval/evidence/browser-media-livekit-multiuser-2026-07-08/risk-media-livekit-multiuser-lifecycle-2026-07-08.json: admin@kiss-pm.local and engineer@kiss-pm.local joined the same self-hosted LiveKit room; each saw the other participant in UI; LiveKit logs show active participants plus audio/video CAMERA/MICROPHONE tracks for both; engineer leave removed the remote tile while admin stayed in active session; engineer rejoin and reload-join restored the remote tile; API events show one token per real join after the StrictMode disposed guard.",
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL",
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        ".\\node_modules\\.bin\\vitest.CMD run apps/web/src/lib/call/call-engine.test.tsx -> pass; 1 file / 6 tests passed",
+        ".\\apps\\web\\node_modules\\.bin\\tsc.CMD -p apps/web/tsconfig.json --pretty false -> pass",
+        "Playwright Chromium two isolated contexts on http://127.0.0.1:3180/calls/call-room-5500f732-8a2b-46f8-9054-e66ad473f2aa -> UI/API/LiveKit log pass"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "Closes self-hosted LiveKit multi-user lifecycle with synthetic fake-media browser devices and fixes duplicate join-token side effects from disposed StrictMode effects. Does not close physical OBS/real camera source validation, actual Jitsi media, or network reconnection under transport failure."
+    },
+    {
+      "id": "CURRENT-RISK-MEDIA-LIVEKIT-TRANSPORT-RECONNECT",
+      "source": "current branch Playwright Chromium transport-failure traversal, API readback, and sanitized LiveKit server logs",
+      "surface": "/calls/[roomId] self-hosted LiveKit provider with admin + engineer isolated browser contexts under client offline/online and LiveKit container pause/unpause",
+      "evidence": "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/risk-media-livekit-reconnect-2026-07-10.json: admin and engineer joined the same room with synthetic CAMERA/MICROPHONE tracks; engineer context offline visibly entered reconnecting and recovered; pausing LiveKit made both clients visibly reconnect and unpausing restored both remote participant tiles; API readback preserved the active session with exactly one join token and one participant_joined event per actor, no participant_left, and no session_ended; 8 screenshots and allowlisted LiveKit server entries are stored without SDP/ICE/tokens.",
+      "linkedRiskZones": [
+        "RISK-MEDIA-LIVEKIT-JITSI-CALL",
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "pnpm vitest run apps/web/src/lib/call/call-engine.test.tsx -> pass; 1 file / 7 tests passed",
+        ".\\apps\\web\\node_modules\\.bin\\tsc.CMD -p apps/web/tsconfig.json --pretty false -> pass",
+        "node docs/qa/full-eval/tools/livekit-reconnect-e2e.mjs -> repeated full browser pass; latest run covers client offline/online and docker compose pause/unpause livekit",
+        "sensitive scan for SDP, ICE credentials/candidates, join tokens, and JWTs -> clean",
+        "docker compose ps livekit after traversal -> Up"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "Closes the self-hosted LiveKit network reconnect variant and fixes SignalReconnecting being misreported as idle/Ожидание. It does not close actual Jitsi external media or successful physical OBS CAMERA publication."
+    },
+    {
+      "id": "CURRENT-RESP-01-MOBILE-NAVIGATION-MISSING",
+      "source": "current branch authenticated responsive Playwright traversal",
+      "surface": "WorkspaceShell at 390x844 for admin and plan-reader roles",
+      "evidence": ".superloopy/evidence/frontend/2026-07-10-responsive/screenshots/390x844-mobile-navigation-open.png and 390x844-plan-reader-navigation.png: focus-managed permission-aware drawer opens, closes by Escape, restores focus, and navigates the limited reader to /projects while hiding unauthorized CRM, communications, and administration links.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "responsive-shell.spec.ts admin mobile drawer open/close/Escape/focus -> pass",
+        "responsive-shell.spec.ts plan-reader permission filtering and /projects navigation -> pass"
+      ],
+      "coverageStatus": "closed",
+      "note": "Adds a real mobile application navigation trigger and reuses the existing permission-filtered route model."
+    },
+    {
+      "id": "CURRENT-RESP-03-TOUCH-TARGETS-BELOW-44",
+      "source": "current branch measured responsive Playwright traversal",
+      "surface": "shared Button/Input/menu/dialog primitives, avatar menu, search, sidebar links, and audited native admin selects when pointer: coarse",
+      "evidence": ".superloopy/evidence/frontend/2026-07-10-responsive/screenshots/768x1024-admin-touch-targets.png proves representative coarse-pointer controls meet 44x44. 900x800-fine-pointer-compact.png and 1280x800-desktop-compact-shell.png prove compact mouse controls are preserved at narrow and wide desktop widths.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "responsive-shell.spec.ts coarse-pointer representative touch controls >=44x44 at 768x1024 -> pass",
+        "responsive-shell.spec.ts fine-pointer compact controls at 900x800 and 1280x800 -> pass",
+        "red-before proof: 900x800 fine-pointer avatar was 44x44 under width-only policy; green after pointer: coarse scoping"
+      ],
+      "coverageStatus": "closed",
+      "note": "Introduces --touch-target: 44px and applies it only when the primary pointer is coarse; fine-pointer density remains unchanged across responsive widths."
+    },
+    {
+      "id": "CURRENT-RESP-04-AREA-BADGE-HEADING-OVERLAP",
+      "source": "current branch visual QA discovered during responsive closure",
+      "surface": "communications and administration area headers at 768x1024",
+      "evidence": ".superloopy/evidence/frontend/2026-07-10-responsive/screenshots/768x1024-communications-sidebar.png and 768x1024-admin-touch-targets.png: fixed-width text badges were replaced by bounded lucide icons; Playwright bounding-box assertions prove no horizontal overlap with H1.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "responsive-shell.spec.ts communications header badge/H1 geometry -> pass",
+        "responsive-shell.spec.ts admin header badge/H1 geometry -> pass"
+      ],
+      "coverageStatus": "closed",
+      "note": "Discovered and fixed within the same responsive block; no open backlog item remains."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-01-PROFILE-CANCEL",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "Profile and settings edit forms",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "profile-settings-role.spec.ts -> 11/11 passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "Added a real cancel/reset action that restores persisted values."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-02-SAVE-FEEDBACK",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "Profile/settings save and auth refresh",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "profile-settings-role.spec.ts -> 11/11 passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "Quiet auth refresh preserves the mounted form and visible saved confirmation."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-03-LOGOUT-BACK-CACHE",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "Workspace shell logout for AADM/EADM/PLAN/RES/BADM",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "shell-role-nav.spec.ts -> 5/5 roles passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "Hard location replacement prevents browser Back from restoring a cached protected profile."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-04-MYWORK-PROJECT-LABELS",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "My Work Kanban and List",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "mywork-role-actions.spec.ts -> 11/11 passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "Project ids resolve to project titles from the project read model."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-05-MYWORK-CURRENT-USER",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "My Work PLAN identity fallback",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "mywork-role-actions.spec.ts PLAN rows/readback -> passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "The authenticated user name is used when the users directory is forbidden."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-06-MYWORK-SEARCH",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "My Work Kanban/List filter",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; machine coverage has 154 pass and one unrelated live-provider rereadback partial.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "mywork-role-actions.spec.ts filter parity -> passed"
+      ],
+      "coverageStatus": "closed",
+      "note": "Added one real task search shared by both views with a no-results state."
+    },
+    {
+      "id": "CURRENT-AUTH-SHELL-07-RESET-PUBLIC-ORIGIN",
+      "source": "current branch Auth + Shell full-evaluation remediation",
+      "surface": "SMTP password-reset link behind the Next.js API rewrite",
+      "evidence": ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md; code-level origin regression and browser route pass, post-fix delivered-message content rereadback pending.",
+      "linkedRiskZones": [
+        "RISK-FULL-BROWSER-TRAVERSAL"
+      ],
+      "tests": [
+        "authRegistrationRoutes.test.ts -> 17/17 passed",
+        "live reset browser/mailbox traversal -> passed"
+      ],
+      "coverageStatus": "partial-risk-zone",
+      "note": "Implementation is fixed and normalized; do not count live provider-content closure until a fresh Gmail message is reread after the fix."
+    }
+  ],
+  "confirmedOpen": [],
+  "unverified": [],
+  "notABugOrSuperseded": [
+    {
+      "ids": [
+        "BUG-010",
+        "BUG-AUTH-01",
+        "BUG-AUTH-10",
+        "BUG-AUTH-12"
+      ],
+      "source": "docs/qa/full-eval/bugs.md and docs/qa/full-eval/bugs/auth.md",
+      "reason": "Historical environment artifacts or superseded observations. Current branch still hardens loopback dev origins for the same class of environment issue."
+    },
+    {
+      "ids": [
+        "CURRENT-RESP-02-TABLET-COMMS-SIDEBAR-PAINT"
+      ],
+      "source": ".superloopy/evidence/frontend/2026-07-10-responsive/tablet-sidebar-root-cause.md and screenshot-integrity.json",
+      "reason": "Not a product paint defect. Fresh 768x1024 browser traversal, computed styles, hit testing, screenshot hashes, and decoded PNG scans all pass; every committed source PNG has zero black pixels. The black bands reproduce only in the downstream evidence image renderer."
+    }
+  ],
+  "unverifiedRiskZones": [
+    {
+      "id": "RISK-MEDIA-LIVEKIT-JITSI-CALL",
+      "status": "unverified",
+      "evidence": "docs/qa/full-eval/uiux-loop-2026-07-05/report.md:68 says video provider was disabled and real media plan was not tested.",
+      "requiredEvidence": "Provider config, prejoin, join, permissions, media failure/degraded UI, leave/rejoin, participant state.",
+      "partialEvidence": [
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-participant-left-on-cleanup-2026-07-07.json: participantState left on cleanup/unmount fixed and tested without real provider.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-contract-join-race-2026-07-07.json: Jitsi API create/readback/start/join URL-only contract covered, schema enums aligned with runtime, and late session-end join-token race no longer calls provider issuance.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-provider-disabled-join-token-2026-07-07.json: API degraded no-provider join-token path returns 501 video_provider_disabled and does not emit join_token_issued event/audit.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-jitsi-browser-handoff-2026-07-07.json: /calls/[roomId] now handles URL-only Jitsi provider contracts as an external handoff; Chromium smoke verifies start-session, join-token, and visible meet.jit.si link.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-media-device-denied-lobby-degraded-2026-07-08.json: NotAllowedError from camera preview now surfaces the denied-camera warning, turns lobby camera state off, preserves micOn, and keeps a joinable no-camera prejoin selection.",
+        "docs/qa/full-eval/evidence/browser-media-provider-disabled-connect-2026-07-08/risk-media-browser-provider-disabled-connect-2026-07-08.json: admin browser traversal creates a Jitsi video room, starts a session, attempts connect, and shows persistent provider-disabled denial instead of fake join success.",
+        "docs/qa/full-eval/evidence/browser-media-jitsi-obs-mic-blocked-2026-07-08/risk-media-jitsi-obs-mic-blocked-2026-07-08.json: KISS PM Jitsi provider path reaches active session, join-token URL, external meet.jit.si lobby, and Chrome waiting room, but OBS/mic media pass is blocked by camera/microphone no-access plus meet.jit.si moderator/auth gate; not counted as pass.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-duplicate-start-2026-07-08.json: recording start duplicate-submit suppression is covered at DB/API level with injected LiveKit egress; not a real browser/provider media pass.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-media-recording-concurrent-start-lock-2026-07-08.json: injected LiveKit egress recording-start race is backend-locked and covered; not a real browser/provider media pass.",
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-write-flow-call-participant-state-idempotency-2026-07-08.json: duplicate same-state participant updates now return 200 with event=null, keep one participant state row, preserve one participant_joined and one participant_left event for real transitions, and avoid duplicate communications.call_participant_state_updated audit entries.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/risk-media-livekit-self-hosted-browser-2026-07-08.json: self-hosted LiveKit browser traversal with Chrome localhost camera/microphone permissions reached /calls active stage; API readback has active session/join token/participant_joined; LiveKit logs show participant active and audio mediaTrack published from MICROPHONE; OBS camera source was unavailable so video stayed off by degraded fallback, not a clean video publish pass.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-multiuser-2026-07-08/risk-media-livekit-multiuser-lifecycle-2026-07-08.json: self-hosted LiveKit multi-user lifecycle passed with admin and engineer isolated browser contexts; remote participant tiles appeared in both UIs; engineer leave/rejoin/reload-join preserved active session; API events show participant_joined/left without session_ended and no duplicate join_token_issued after the disposed-effect guard; LiveKit logs show audio and video CAMERA tracks for both users.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-physical-camera-2026-07-09/risk-media-livekit-physical-camera-obs-2026-07-09.json: user Chrome physical/OBS camera-source traversal completed with granted camera/microphone permissions and OBS Virtual Camera enumerated; direct getUserMedia({video:true}) failed NotReadableError Could not start video source, so KISS PM correctly degraded to camera-off while LiveKit joined active with microphone audio track; video CAMERA publication remains externally blocked, not counted as pass.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/risk-media-livekit-reconnect-2026-07-10.json: two-role self-hosted LiveKit transport traversal passed for engineer client offline/online and LiveKit container pause/unpause; reconnecting UI and recovered remote participants were verified with screenshots, API invariants, and sanitized server logs."
+      ],
+      "remainingEvidence": "Remaining live-provider evidence: actual Jitsi external media beyond the meet.jit.si moderator/auth gate and successful physical/OBS CAMERA track publication after OS/Chrome camera source is working. Physical OBS source has been traversed in user Chrome and is blocked by Chrome NotReadableError rather than a KISS PM product failure; self-hosted LiveKit audio/degraded-camera, synthetic-camera multi-user lifecycle, and network reconnect under client/server transport interruption are covered."
+    },
+    {
+      "id": "RISK-FULL-BROWSER-TRAVERSAL",
+      "status": "unverified",
+      "evidence": "docs/qa/full-eval/reconciliation-2026-07-07.md:36 says a fresh role Г— route Г— action matrix was not re-run after all master fixes.",
+      "requiredEvidence": "Per-role route/action JSON with screenshot/network logs and pass/fail/expected-forbidden status.",
+      "partialEvidence": [
+        "docs/qa/full-eval/evidence/reconciliation-2026-07-07/risk-full-browser-core-traversal-2026-07-07.json: admin and limited profile.read core browser traversal passed for login, shell, CRM, admin users, deal stage write/readback/reload, and permission-denied API checks.",
+        "docs/qa/full-eval/evidence/browser-limited-crm-write-denied-2026-07-08/risk-full-browser-limited-crm-write-denied-2026-07-08.json: limited profile.read Chromium traversal passed for settled sidebar hiding, direct /crm/deals restricted surface, no CRM action UI, and 403 read/create opportunity API checks with screenshots and network log.",
+        "docs/qa/full-eval/evidence/browser-comms-admin-readonly-q3m9-2026-07-08/admin-communications-readonly-traversal-2026-07-08.json: admin read-only communications traversal passed for channels, chat, meetings, calls, and notifications with route-specific 200 API evidence, screenshots, and network logs.",
+        "docs/qa/full-eval/evidence/browser-media-provider-disabled-connect-2026-07-08/risk-media-browser-provider-disabled-connect-2026-07-08.json: admin /communications/calls browser traversal covers empty state, create room modal, session start, connect denial, stable controls, and screenshot evidence.",
+        "docs/qa/full-eval/evidence/browser-crm-readonly-write-denied-2026-07-08/risk-full-browser-traversal-crm-readonly-write-denied-2026-07-08.json: CRM read-only in-app Browser traversal covers login, /crm/deals kanban/list/forecast, disabled/no-drag write controls, direct 403 create/stage writes, and unchanged readback.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-self-hosted-2026-07-08/risk-media-livekit-self-hosted-browser-2026-07-08.json: admin Chrome traversal covers /calls/[roomId] self-hosted LiveKit lobby/join/active-call path with real localhost media permission grant, API readback, screenshot, and LiveKit audio publication logs.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-multiuser-2026-07-08/risk-media-livekit-multiuser-lifecycle-2026-07-08.json: full-browser traversal partial now includes two-role /calls/[roomId] self-hosted LiveKit admin+engineer join/leave/rejoin/reload path with screenshots and backend/server readback.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-physical-camera-2026-07-09/risk-media-livekit-physical-camera-obs-2026-07-09.json: admin user Chrome route/action traversal covers /communications/calls create LiveKit room/start session/connect token modal and /calls/[roomId] lobby/join active stage with real localhost permissions, OBS device enumeration, degraded camera state, API readback, screenshot, and LiveKit server logs.",
+        "docs/qa/full-eval/evidence/browser-media-livekit-reconnect-2026-07-10/risk-media-livekit-reconnect-2026-07-10.json: admin + engineer browser traversal covers connected synthetic audio/video, visible client and server reconnecting states, recovery without reload, remote participant readback, active-session invariants, and sanitized LiveKit server evidence.",
+        ".superloopy/evidence/auth-shell-2026-07-10/AUTH_SHELL_FINAL.md: Auth + Shell has 154 passed atoms; the reset-origin implementation passes split code/browser proof but remains partial until a post-fix Gmail content rereadback."
+      ],
+      "remainingEvidence": "Remaining full-browser traversal is limited to the large domains not closed by the Auth + Shell and responsive batches: Projects, CRM write breadth, Communications/Admin write breadth, live/browser OpenRouter variants, actual Jitsi media beyond the external moderator/auth gate, and successful physical/OBS CAMERA publication after the OS/Chrome source works."
+    }
+  ],
+  "nextAction": "First reread one fresh post-fix Gmail reset message and verify its link targets the web origin. Then execute the Projects domain as the next complete role × route × action × state batch, followed by CRM and Communications/Admin."
+}

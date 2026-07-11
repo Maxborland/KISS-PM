@@ -1,0 +1,37 @@
+{
+  "id": "BUG-CRM-08",
+  "generatedAt": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "status": "fixed-by-current-branch",
+  "surface": "CRM deals money formatting: apps/web/src/crm/deals/deals-surface.tsx via apps/web/src/crm/ui/money.ts",
+  "expected": [
+    "Values below 1000 are rendered as exact rubles, e.g. 100 ₽, 500 ₽, 999 ₽.",
+    "Values from 1000 keep compact thousand labels.",
+    "Values from 1000000 keep compact million labels.",
+    "Deals surface uses the shared CRM formatter instead of a local duplicate."
+  ],
+  "redEvidence": {
+    "command": "corepack pnpm --filter @kiss-pm/web test -- src/crm/ui/money.test.ts",
+    "result": "failed before implementation because ./money did not exist; historical deals-surface local formatter mapped 100 to 0 тыс ₽ and 500 to 1 тыс ₽"
+  },
+  "greenEvidence": [
+    {
+      "command": "corepack pnpm --filter @kiss-pm/web test -- src/crm/ui/money.test.ts",
+      "result": "passed: 17 files, 253 tests; src/crm/ui/money.test.ts passed 2 tests"
+    },
+    {
+      "command": "corepack pnpm --filter @kiss-pm/web typecheck",
+      "result": "passed: next typegen and tsc -p tsconfig.json --pretty false"
+    }
+  ],
+  "changedFiles": [
+    "apps/web/src/crm/ui/money.ts",
+    "apps/web/src/crm/ui/money.test.ts",
+    "apps/web/src/crm/ui/crm-bits.tsx",
+    "apps/web/src/crm/deals/deals-surface.tsx"
+  ],
+  "notes": [
+    "Vitest inside the restricted sandbox failed with esbuild spawn EPERM; the same command was rerun with approved escalation for fresh evidence.",
+    "The test run still emits the pre-existing duplicate assignment.delete warning from packages/domain/src/planning/commandReducer.ts."
+  ]
+}

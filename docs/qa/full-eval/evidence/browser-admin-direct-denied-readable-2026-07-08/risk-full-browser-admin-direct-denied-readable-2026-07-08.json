@@ -1,0 +1,193 @@
+{
+  "id": "CURRENT-RISK-FULL-BROWSER-ADMIN-DIRECT-DENIED-READABLE",
+  "generatedAt": "2026-07-07T20:58:08.382Z",
+  "linkedRiskZones": [
+    "RISK-FULL-BROWSER-TRAVERSAL"
+  ],
+  "status": "pass-for-slice",
+  "surface": "/dashboard, /admin, /admin/users, /admin/roles, /admin/security, /admin/audit",
+  "roles": [
+    "plan-reader-no-resources",
+    "resource-reader",
+    "tenant-admin-control"
+  ],
+  "environment": "web 127.0.0.1:3160 -> api 127.0.0.1:4160, local PostgreSQL 55433, dev seed restored via scripts/seed-dev.ts before traversal",
+  "method": "in-app Browser traversal with UI login/logout, direct route navigation, settled DOM state, and screenshots",
+  "expected": "Restricted roles must not see admin entry points on dashboard/shell and direct admin routes must show readable denial without raw crash; tenant admin must see admin navigation and route content.",
+  "actual": {
+    "restrictedRoles": [
+      {
+        "role": "plan-reader-no-resources",
+        "dashboardAdminLinks": [],
+        "routes": [
+          {
+            "route": "/admin",
+            "finalUrl": "http://127.0.0.1:3160/admin/users",
+            "readableDeny": true,
+            "rawError": false,
+            "adminLinkCount": 0,
+            "screenshot": "plan-reader-no-resources-recheck-admin.png"
+          },
+          {
+            "route": "/admin/users",
+            "finalUrl": "http://127.0.0.1:3160/admin/users",
+            "readableDeny": true,
+            "rawError": false,
+            "adminLinkCount": 0,
+            "screenshot": "plan-reader-no-resources-recheck-admin_users.png"
+          },
+          {
+            "route": "/admin/roles",
+            "finalUrl": "http://127.0.0.1:3160/admin/roles",
+            "readableDeny": true,
+            "rawError": false,
+            "adminLinkCount": 0,
+            "screenshot": "plan-reader-no-resources-recheck-admin_roles.png"
+          },
+          {
+            "route": "/admin/security",
+            "finalUrl": "http://127.0.0.1:3160/admin/security",
+            "readableDeny": true,
+            "rawError": false,
+            "adminLinkCount": 0,
+            "screenshot": "plan-reader-no-resources-recheck-admin_security.png"
+          },
+          {
+            "route": "/admin/audit",
+            "finalUrl": "http://127.0.0.1:3160/admin/audit",
+            "readableDeny": true,
+            "rawError": false,
+            "adminLinkCount": 0,
+            "screenshot": "plan-reader-no-resources-recheck-admin_audit.png"
+          }
+        ]
+      },
+      {
+        "role": "resource-reader",
+        "dashboardAdminLinks": [],
+        "routes": [
+          {
+            "route": "/admin",
+            "finalUrl": "http://127.0.0.1:3160/admin/users",
+            "readableDeny": true,
+            "rawError": false,
+            "adminLinkCount": 4,
+            "screenshot": "resource-reader-recheck-admin.png"
+          },
+          {
+            "route": "/admin/users",
+            "finalUrl": "http://127.0.0.1:3160/admin/users",
+            "readableDeny": true,
+            "rawError": false,
+            "adminLinkCount": 0,
+            "screenshot": "resource-reader-recheck-admin_users.png"
+          },
+          {
+            "route": "/admin/roles",
+            "finalUrl": "http://127.0.0.1:3160/admin/roles",
+            "readableDeny": true,
+            "rawError": false,
+            "adminLinkCount": 0,
+            "screenshot": "resource-reader-recheck-admin_roles.png"
+          },
+          {
+            "route": "/admin/security",
+            "finalUrl": "http://127.0.0.1:3160/admin/security",
+            "readableDeny": true,
+            "rawError": false,
+            "adminLinkCount": 0,
+            "screenshot": "resource-reader-recheck-admin_security.png"
+          },
+          {
+            "route": "/admin/audit",
+            "finalUrl": "http://127.0.0.1:3160/admin/audit",
+            "readableDeny": true,
+            "rawError": false,
+            "adminLinkCount": 0,
+            "screenshot": "resource-reader-recheck-admin_audit.png"
+          }
+        ]
+      }
+    ],
+    "adminControl": {
+      "dashboardAdminLinks": [
+        {
+          "href": "/admin",
+          "text": "Администрирование"
+        }
+      ],
+      "routes": [
+        {
+          "route": "/admin",
+          "finalUrl": "http://127.0.0.1:3160/admin/users",
+          "rawError": false,
+          "adminLinkCount": 5,
+          "screenshot": "tenant-admin-control-recheck-admin.png"
+        },
+        {
+          "route": "/admin/users",
+          "finalUrl": "http://127.0.0.1:3160/admin/users",
+          "rawError": false,
+          "adminLinkCount": 5,
+          "screenshot": "tenant-admin-control-recheck-admin_users.png"
+        },
+        {
+          "route": "/admin/roles",
+          "finalUrl": "http://127.0.0.1:3160/admin/roles",
+          "rawError": false,
+          "adminLinkCount": 5,
+          "screenshot": "tenant-admin-control-recheck-admin_roles.png"
+        },
+        {
+          "route": "/admin/security",
+          "finalUrl": "http://127.0.0.1:3160/admin/security",
+          "rawError": false,
+          "adminLinkCount": 5,
+          "screenshot": "tenant-admin-control-recheck-admin_security.png",
+          "note": "Page contains explicit incomplete-feature copy for 2FA/SSO; not a permission denial."
+        },
+        {
+          "route": "/admin/audit",
+          "finalUrl": "http://127.0.0.1:3160/admin/audit",
+          "rawError": false,
+          "adminLinkCount": 5,
+          "screenshot": "tenant-admin-control-recheck-admin_audit.png"
+        }
+      ]
+    }
+  },
+  "verdict": {
+    "pass": [
+      "plan-reader dashboard has no admin links; direct /admin* routes settle to readable denial with no raw error",
+      "resource-reader dashboard has no admin links; direct /admin/users|roles|security|audit settle to readable denial with no raw error",
+      "tenant admin dashboard exposes admin link and admin users/roles/security/audit routes render without raw error"
+    ],
+    "partialNotes": [
+      "resource-reader /admin redirects to /admin/users and the denied page includes admin section/tab links before deeper direct routes hide them; logged as UX inconsistency, not blocker for permission enforcement in this slice",
+      "security-readonly role variant not covered because no seeded security-readonly login exists; keep broader RISK-FULL-BROWSER-TRAVERSAL open"
+    ]
+  },
+  "evidenceFiles": [
+    "browser-admin-direct-denied-recheck-results.json",
+    "browser-admin-direct-denied-admin-control-results.json",
+    "plan-reader-no-resources-recheck-00-dashboard.png",
+    "plan-reader-no-resources-recheck-admin.png",
+    "plan-reader-no-resources-recheck-admin_audit.png",
+    "plan-reader-no-resources-recheck-admin_roles.png",
+    "plan-reader-no-resources-recheck-admin_security.png",
+    "plan-reader-no-resources-recheck-admin_users.png",
+    "resource-reader-recheck-00-dashboard.png",
+    "resource-reader-recheck-admin.png",
+    "resource-reader-recheck-admin_audit.png",
+    "resource-reader-recheck-admin_roles.png",
+    "resource-reader-recheck-admin_security.png",
+    "resource-reader-recheck-admin_users.png",
+    "tenant-admin-control-recheck-00-dashboard.png",
+    "tenant-admin-control-recheck-admin.png",
+    "tenant-admin-control-recheck-admin_audit.png",
+    "tenant-admin-control-recheck-admin_roles.png",
+    "tenant-admin-control-recheck-admin_security.png",
+    "tenant-admin-control-recheck-admin_users.png"
+  ],
+  "followUpRecommendation": "Normalize /admin redirect denied shell so restricted users do not see admin tab links on the redirected denied page; add a seeded security-readonly user if that permission split is product-relevant."
+}

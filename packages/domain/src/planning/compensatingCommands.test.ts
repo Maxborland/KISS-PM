@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlanSnapshot, PlanTask } from "./types";
-import { buildCompensatingCommands } from "./compensatingCommands";
+import { buildCompensatingCommandBatch, buildCompensatingCommands } from "./compensatingCommands";
 
 // BUG-PROJ-24: инверсия команды по снапшоту «до» возвращает прежние значения.
 function snapshot(task: Partial<PlanTask>): PlanSnapshot {
@@ -59,6 +59,143 @@ describe("buildCompensatingCommands", () => {
     expect(inverse).toEqual([{ type: "task.update_identity", payload: { taskId: "task-a", title: "Старое имя" } }]);
   });
 
+  it("reverses a milestone batch in reverse order and restores assignment and custom field", () => {
+    const before = snapshot({ customFields: { kind: "task" } });
+    before.assignments = [
+      {
+        id: "assignment-a",
+        taskId: "task-a",
+        resourceId: "resource-a",
+        role: "executor",
+        unitsPermille: 1000,
+        workMinutes: 480,
+        calendarId: null
+      }
+    ];
+
+    const inverse = buildCompensatingCommandBatch(
+      [
+        {
+          type: "assignment.delete",
+          payload: { assignmentId: "assignment-a" }
+        },
+        {
+          type: "task.update_work_model",
+          payload: {
+            taskId: "task-a",
+            taskType: "fixed_duration",
+            effortDriven: false,
+            durationMinutes: 0,
+            workMinutes: 0
+          }
+        },
+        {
+          type: "task.update_custom_field",
+          payload: { taskId: "task-a", fieldKey: "kind", value: "milestone" }
+        }
+      ],
+      before
+    );
+
+    expect(inverse.map((command) => command.type)).toEqual([
+      "task.update_custom_field",
+      "task.update_work_model",
+      "assignment.upsert"
+    ]);
+    expect(inverse[0]).toMatchObject({
+      payload: { taskId: "task-a", fieldKey: "kind", value: "task" }
+    });
+    expect(inverse[2]).toMatchObject({
+      payload: { id: "assignment-a", resourceId: "resource-a", workMinutes: 480 }
+    });
+  });
+
+  it.each(["assignment.upsert", "assignment.delete"] as const)(
+    "restores allocation curves when reverting %s",
+    (type) => {
+      const before = snapshot({});
+      before.assignments = [
+        {
+          id: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-a",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: 480,
+          calendarId: null
+        }
+      ];
+      before.assignmentAllocations = [
+        {
+          assignmentId: "assignment-a",
+          taskId: "task-a",
+          resourceId: "resource-a",
+          date: "2026-06-02",
+          workMinutes: 480
+        }
+      ];
+
+      const command = type === "assignment.upsert"
+        ? {
+            type,
+            payload: {
+              id: "assignment-a",
+              taskId: "task-a",
+              resourceId: "resource-b",
+              role: "executor" as const,
+              unitsPermille: 500,
+              workMinutes: 240
+            }
+          }
+        : { type, payload: { assignmentId: "assignment-a" } };
+
+      expect(buildCompensatingCommands(command, before)).toEqual([
+        {
+          type: "assignment.upsert",
+          payload: {
+            id: "assignment-a",
+            taskId: "task-a",
+            resourceId: "resource-a",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: 480
+          }
+        },
+        {
+          type: "assignment.allocations.replace",
+          payload: {
+            assignmentId: "assignment-a",
+            allocations: [{ date: "2026-06-02", workMinutes: 480 }]
+          }
+        }
+      ]);
+    }
+  );
+
+  it("does not publish a partially reversible compensation batch", () => {
+    expect(
+      buildCompensatingCommandBatch(
+        [
+          { type: "task.update_progress", payload: { taskId: "task-a", percentComplete: 80 } },
+          {
+            type: "task.create",
+            payload: {
+              id: "task-new",
+              projectId: "p",
+              parentTaskId: null,
+              title: "New",
+              statusId: "s",
+              plannedStart: null,
+              plannedFinish: null,
+              workMinutes: 0,
+              assignments: []
+            }
+          }
+        ],
+        snapshot({})
+      )
+    ).toEqual([]);
+  });
   it("returns no inverse for irreversible commands (create)", () => {
     const inverse = buildCompensatingCommands(
       {

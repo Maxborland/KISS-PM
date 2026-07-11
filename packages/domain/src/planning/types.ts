@@ -128,6 +128,7 @@ export type PlanReservation = {
 
 export type PlanBaseline = {
   id: string;
+  label: string;
   capturedAt: PlanDateTime;
   tasks: Array<{
     taskId: string;

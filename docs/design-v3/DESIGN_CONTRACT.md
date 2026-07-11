@@ -61,6 +61,7 @@
 |-------|----------|-----|
 | `--space-1…6` | 4–24px | Отступы блоков (шаг 4px) |
 | `--row-h` | 30px | Компактные строки, `switch-row`, `table--compact` |
+| `--touch-target` | 44px | Минимальная интерактивная область при `pointer: coarse` |
 | `.app-content` padding | `--space-6` × `--space-5` | Основная область |
 | `.card__body` | `--space-4` / `--space-5` | Карточки |
 

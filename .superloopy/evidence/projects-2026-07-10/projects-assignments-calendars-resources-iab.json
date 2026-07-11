@@ -1,0 +1,64 @@
+{
+  "capturedAt": "2026-07-09T23:52:15.0409142Z",
+  "block": "projects-assignments-calendars-resources",
+  "servers": {
+    "api": "http://127.0.0.1:4191",
+    "web": "http://127.0.0.1:3180"
+  },
+  "playwright": {
+    "expected": 6,
+    "durationMs": 18508.623,
+    "coverage": [
+      "ADMIN assignment add/remove preview-apply-readback-reload-cleanup",
+      "PLAN assignment controls absent-direct preview 403-no apply-unchanged-reload",
+      "ADMIN project calendar create/remove preview-apply-readback-reload-cleanup",
+      "PLAN calendar controls disabled-direct preview 403-no apply-unchanged-reload",
+      "ADMIN resource absence create/remove batch preview-apply-readback-reload-cleanup",
+      "PLAN resource controls absent-direct batch preview 403-no apply-unchanged-reload"
+    ],
+    "report": ".superloopy/evidence/projects-2026-07-10/projects-assignments-calendars-resources-playwright.json",
+    "unexpected": 0
+  },
+  "inAppBrowser": {
+    "finalSession": "admin@kiss-pm.local",
+    "planReader": {
+      "resources": {
+        "absenceControls": 0,
+        "acceptRiskControls": 0,
+        "createTaskControls": 0
+      },
+      "assignments": {
+        "editableUnitsInputs": 0,
+        "addAssigneeControls": 0,
+        "readOnlyCurveHeading": 1,
+        "removeAssigneeControls": 0
+      },
+      "calendars": {
+        "workingDays": 30,
+        "enabledWorkingDays": 0,
+        "removeExceptionControls": 0
+      }
+    },
+    "adminAssignmentsReload": {
+      "truncated": false,
+      "totalNetworkEvents": 42,
+      "planningReadModelCount": 1,
+      "workspaceUsersRequestCount": 1
+    }
+  },
+  "focused": {
+    "testsPassed": 5,
+    "webTypecheck": "pass",
+    "testFiles": 5
+  },
+  "flakyOrFailedAttempts": [
+    {
+      "detail": "First Playwright invocation targeted default 3100/4100 and failed before tests because a second webServer could not start.",
+      "kind": "infrastructure"
+    },
+    {
+      "detail": "First combined run: 5 passed, resources PLAN test failed on undefined mutationHeaders; helper reference corrected to sameOriginMutationHeaders; isolated retry passed; final combined retry 6/6.",
+      "kind": "test_harness"
+    }
+  ]
+}

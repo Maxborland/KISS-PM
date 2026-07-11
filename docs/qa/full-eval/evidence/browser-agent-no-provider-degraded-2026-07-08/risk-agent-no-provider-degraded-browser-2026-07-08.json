@@ -1,0 +1,41 @@
+{
+  "id": "RISK-AGENT-NO-PROVIDER-DEGRADED-BROWSER-2026-07-08",
+  "generatedAt": "2026-07-07T20:29:12.2929050Z",
+  "linkedRiskZones": [
+    "RISK-AGENT-REAL-LLM-SSE",
+    "BUG-SHELL-12"
+  ],
+  "status": "pass",
+  "scope": "In-app browser traversal of /agent against no-provider API 4170 and Web 3160, with live LLM provider credentials unset for the server process.",
+  "secretsPolicy": "No provider keys were supplied to this server process. No cookies or credentials are stored in this evidence.",
+  "environment": {
+    "apiOrigin": "http://127.0.0.1:4170",
+    "webOrigin": "http://127.0.0.1:3160",
+    "provider": {
+      "model": "mock-llm",
+      "live": false,
+      "configured": false
+    }
+  },
+  "steps": [
+    "Started API 4170 with live LLM provider credentials unset and web 3160 pointed at that API.",
+    "Opened /agent in the in-app browser.",
+    "Observed visible degraded banner: Демо-режим / LLM-ключ не настроен / provider mock-llm.",
+    "Submitted a prompt that asked the agent to create a task.",
+    "Observed degraded assistant response telling that LLM provider is not configured.",
+    "Verified no review drawer and no Применить выбранное control appeared after submit."
+  ],
+  "expected": "Without a configured provider, the browser UI must clearly show degraded/no-provider state and must not present fake review/apply controls.",
+  "actual": "Pass: warning banner and no-provider assistant response were visible; reviewTextPresent=false and applyPresent=false after submit.",
+  "evidence": [
+    "docs/qa/full-eval/evidence/browser-agent-no-provider-degraded-2026-07-08/agent-no-provider-degraded.png",
+    "Browser text contained Демо-режим and LLM-ключ не настроен (провайдер mock-llm).",
+    "Post-submit browser state had reviewTextPresent=false and applyPresent=false."
+  ],
+  "coverageImpact": {
+    "RISK-AGENT-REAL-LLM-SSE": "Completes the degraded no-provider browser side of the agent risk. Combined with live OpenRouter SSE/browser apply/readback, non-create mutation, generic CRM/comms redispatch, and per-role tools evidence, the core risk is covered for available providers."
+  },
+  "unverifiedProviderMatrix": [
+    "Anthropic provider browser/live variant not checked because no Anthropic provider key was provided in this run."
+  ]
+}

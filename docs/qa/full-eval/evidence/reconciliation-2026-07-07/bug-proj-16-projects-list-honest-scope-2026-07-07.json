@@ -1,0 +1,19 @@
+{
+  "id": "BUG-PROJ-16",
+  "linkedOldIds": ["BUG-PROJ-16"],
+  "status": "fixed-by-current-branch",
+  "coverageStatus": "targeted",
+  "date": "2026-07-07",
+  "branch": "codex/pre-prod-hardening-on-master",
+  "surface": ["/projects", "ProjectsListSurface"],
+  "expected": "The projects list does not imply unsupported all/search/sort behavior when the API only returns active projects.",
+  "redEvidence": ["Pre-fix test contract failed because PROJECTS_LIST_AVAILABLE_FILTERS/getVisibleProjects were not exported and the UI still exposed unsupported all/active switching."],
+  "greenEvidence": [
+    "bun test apps/web/src/workspace/projects/projects-list-surface.test.ts -> 2 tests passed.",
+    "corepack pnpm --filter @kiss-pm/web typecheck -> passed."
+  ],
+  "changedFiles": ["apps/web/src/workspace/projects/projects-list-surface.tsx", "apps/web/src/workspace/projects/projects-list-surface.test.ts", "apps/web/src/workspace/projects/projects-list.stories.tsx"],
+  "fixApplied": "Removed the unsupported 'Все/Активные' segmented control and story copy; added a tiny active-only helper/guard test so the UI matches the active-projects API contract.",
+  "limitations": ["Browser traversal was not run in this slice."],
+  "regressionRisk": "Low. This removes a fake control and preserves the active projects list."
+}

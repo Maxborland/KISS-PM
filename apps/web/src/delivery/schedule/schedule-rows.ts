@@ -1,21 +1,28 @@
-import { dayToIso, isoToDay, MIN_PER_DAY } from "@/delivery/lib/mock-planning-backend";
-import { DEP_RU } from "@/delivery/schedule/schedule-editors";
+import { dayToIso, isoToDay } from "@/delivery/lib/mock-planning-backend";
 import type { PlanningReadModel } from "@kiss-pm/planning-client";
+
+import {
+  resolveScheduleWorkingTime,
+  scheduleWorkingDays
+} from "./schedule-working-time";
 
 // Чистое отображение канонического read-model в строки Гантта (WBS + summary-rollup + предшественники).
 // Вынесено из schedule-surface (god-компонент) в самостоятельный модуль без React — тестируемо и локально.
 export type Kind = "summary" | "task" | "milestone";
 export type Mode = "auto" | "manual";
 export type Pred = { depId: string; predId: string; type: string; lagDays: number };
+const DEP_RU: Record<string, string> = { FS: "ОН", SS: "НН", FF: "ОО", SF: "НО" };
 export type Row = {
   id: string;
   wbs: string;
   name: string;
   level: number;
   kind: Kind;
+  hasChildren: boolean;
   mode: Mode;
   parentId: string | null;
   durDays: number;
+  durationMinutes: number | null;
   pct: number;
   startIso: string;
   finishIso: string;
@@ -31,6 +38,8 @@ export type Row = {
   warnMsg?: string;
   baseDay?: number;
   baseDur?: number;
+  effectiveCalendarId: string;
+  workingMinutesPerDay: number;
 };
 
 export function mapRows(
@@ -46,6 +55,29 @@ export function mapRows(
 
   const calcById = new Map(calc.map((c) => [c.id, c]));
   const wbsById = new Map(authored.tasks.map((t) => [t.id, t.wbsCode]));
+  const taskById = new Map(authored.tasks.map((t) => [t.id, t]));
+  const childrenByParent = new Map<string, typeof authored.tasks>();
+  for (const t of authored.tasks) {
+    if (!t.parentTaskId) continue;
+    const arr = childrenByParent.get(t.parentTaskId) ?? [];
+    arr.push(t);
+    childrenByParent.set(t.parentTaskId, arr);
+  }
+  const levelCache = new Map<string, number>();
+  const levelOfTask = (taskId: string, seen = new Set<string>()): number => {
+    const cached = levelCache.get(taskId);
+    if (cached != null) return cached;
+    const t = taskById.get(taskId);
+    if (!t?.parentTaskId || seen.has(taskId)) {
+      const fallback = Math.max(0, (t?.wbsCode ?? "").split(".").filter(Boolean).length - 1);
+      levelCache.set(taskId, fallback);
+      return fallback;
+    }
+    seen.add(taskId);
+    const level = levelOfTask(t.parentTaskId, seen) + 1;
+    levelCache.set(taskId, level);
+    return level;
+  };
   const baseById = new Map(baseCmp.map((b) => [b.taskId, b]));
   const warned = issues.filter((i) => i.severity !== "info" && i.entity);
   const warnSet = new Set(warned.map((i) => i.entity!.id));
@@ -53,7 +85,14 @@ export function mapRows(
   const predsBySucc = new Map<string, Pred[]>();
   for (const d of authored.dependencies) {
     const arr = predsBySucc.get(d.successorTaskId) ?? [];
-    arr.push({ depId: d.id, predId: d.predecessorTaskId, type: d.type, lagDays: Math.round(d.lagMinutes / MIN_PER_DAY) });
+    const successor = taskById.get(d.successorTaskId);
+    const workingTime = resolveScheduleWorkingTime(rm, successor?.calendarId);
+    arr.push({
+      depId: d.id,
+      predId: d.predecessorTaskId,
+      type: d.type,
+      lagDays: Math.round(scheduleWorkingDays(d.lagMinutes, workingTime))
+    });
     predsBySucc.set(d.successorTaskId, arr);
   }
   // Имена ресурсов для колонки «Ресурсы»: read-model не отдаёт customFields.resLabel,
@@ -67,6 +106,7 @@ export function mapRows(
   const assigneeLabel = (taskId: string) => (assigneesByTask.get(taskId) ?? []).join(", ");
 
   const rows: Row[] = authored.tasks.map((t) => {
+    const workingTime = resolveScheduleWorkingTime(rm, t.calendarId);
     const c = calcById.get(t.id);
     const start = c?.calculatedStart ?? "";
     const finish = c?.calculatedFinish ?? "";
@@ -74,11 +114,13 @@ export function mapRows(
     const dayDur = start && finish ? isoToDay(finish) - dayStart : 0;
     // customFields в домене — намеренно открытый Record<string,unknown>; типизируем ожидаемые ключи.
     const cf = (t.customFields ?? {}) as { resLabel?: string; kind?: Kind };
-    // веха: пользовательское поле kind=milestone (как в overview/inspector/settings) ИЛИ нулевая длительность
-    const kind: Kind = cf.kind === "summary" ? "summary" : cf.kind === "milestone" || t.durationMinutes === 0 ? "milestone" : "task";
+    const hasChildren = (childrenByParent.get(t.id)?.length ?? 0) > 0;
+    // summary определяется структурой live read-model (parentTaskId), а не только mock customFields/WBS.
+    // Веха остаётся листом: если у строки есть дети, summary выигрывает над нулевой длительностью.
+    const kind: Kind = hasChildren || cf.kind === "summary" ? "summary" : cf.kind === "milestone" || t.durationMinutes === 0 ? "milestone" : "task";
     const predList = predsBySucc.get(t.id) ?? [];
     const predDisplay = predList.length
-      ? predList.map((p) => `${wbsById.get(p.predId) ?? "?"} ${DEP_RU[p.type] ?? p.type}${p.lagDays ? ` +${p.lagDays}д` : ""}`).join(", ")
+      ? predList.map((p) => `${wbsById.get(p.predId) ?? "?"} ${DEP_RU[p.type] ?? p.type}${p.lagDays ? ` ${p.lagDays > 0 ? "+" : ""}${p.lagDays}д` : ""}`).join(", ")
       : "—";
     const base = baseById.get(t.id);
     const baseDay = base?.baselineStart ? isoToDay(base.baselineStart) : undefined;
@@ -88,11 +130,15 @@ export function mapRows(
       id: t.id,
       wbs: t.wbsCode,
       name: t.title,
-      level: t.wbsCode.split(".").length - 1,
+      level: levelOfTask(t.id),
       kind,
+      hasChildren,
       mode: t.schedulingMode,
       parentId: t.parentTaskId,
-      durDays: t.durationMinutes != null ? Math.round(t.durationMinutes / MIN_PER_DAY) : dayDur,
+      durDays: t.durationMinutes != null
+        ? Math.round(scheduleWorkingDays(t.durationMinutes, workingTime))
+        : dayDur,
+      durationMinutes: t.durationMinutes,
       pct: t.percentComplete,
       startIso: start,
       finishIso: finish,
@@ -100,24 +146,47 @@ export function mapRows(
       predList,
       res: cf.resLabel ?? (assigneeLabel(t.id) || "—"),
       workH: Math.round(t.workMinutes / 60),
-      slackDays: c?.totalSlackMinutes != null ? Math.round(c.totalSlackMinutes / MIN_PER_DAY) : null,
+      slackDays: c?.totalSlackMinutes != null
+        ? Math.round(scheduleWorkingDays(c.totalSlackMinutes, workingTime))
+        : null,
       dayStart,
       dayDur,
       critical: c?.isCritical ?? false,
       warning: warnSet.has(t.id),
+      effectiveCalendarId: workingTime.calendar.id,
+      workingMinutesPerDay: workingTime.workingMinutesPerDay,
       ...(wm ? { warnMsg: wm } : {}),
       ...(baseDay != null ? { baseDay } : {}),
       ...(baseDur != null ? { baseDur } : {})
     };
   });
 
+  const rowsByParent = new Map<string, Row[]>();
+  for (const row of rows) {
+    if (!row.parentId) continue;
+    const arr = rowsByParent.get(row.parentId) ?? [];
+    arr.push(row);
+    rowsByParent.set(row.parentId, arr);
+  }
+  const descendantsOf = (id: string): Row[] => {
+    const out: Row[] = [];
+    const visit = (parentId: string) => {
+      for (const child of rowsByParent.get(parentId) ?? []) {
+        out.push(child);
+        visit(child.id);
+      }
+    };
+    visit(id);
+    return out;
+  };
+
   // полный rollup суммарных задач НА ФРОНТЕ: труд = Σ листьев, % — взвешенно по труду,
-  // старт/финиш/длительность = span подзадач. По убыванию уровня — вложенные summary сворачиваются раньше.
+  // старт/финиш/длительность = span подзадач. Дерево берём из parentTaskId; WBS — только метка.
   const summariesDesc = rows.filter((r) => r.kind === "summary").sort((a, b) => b.level - a.level);
   for (const s of summariesDesc) {
-    const directKids = rows.filter((r) => r.level === s.level + 1 && r.wbs.startsWith(s.wbs + "."));
+    const directKids = rowsByParent.get(s.id) ?? [];
     if (directKids.length === 0) continue;
-    const leaves = rows.filter((r) => r.kind !== "summary" && r.wbs.startsWith(s.wbs + "."));
+    const leaves = descendantsOf(s.id).filter((r) => r.kind !== "summary");
     const work = leaves.reduce((a, k) => a + k.workH, 0);
     const minStart = Math.min(...directKids.map((k) => k.dayStart));
     const maxEnd = Math.max(...directKids.map((k) => k.dayStart + k.dayDur));

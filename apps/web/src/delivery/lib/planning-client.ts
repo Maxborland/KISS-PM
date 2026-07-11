@@ -7,21 +7,21 @@ import { createMockPlanningFetch, RESOURCES, type Resource } from "./mock-planni
 
 // ── Журнал коммитов (PM-as-code) ──────────────────────────────────────────────
 export type CommitMetaView = { version: number; actionType: string; summary: string; changedTaskIds: string[]; auditEventId: string; at: string; revertible: boolean };
-export type CommitsView = { commits: CommitMetaView[]; latestRevert: { auditEventId: string; commands: PlanningCommand[]; before: PlanningReadModel } | null };
+export type CommitsView = { commits: CommitMetaView[]; latestRevert: { auditEventId: string } | null };
 
 // Последний применённый этой сессией apply: команды + read-model ДО него + версия ПОСЛЕ.
 // Держим в памяти хука (audit.beforeState — только счётчики, для отката недостаточен), передаём
 // в getCommits, чтобы live-адаптер знал, какой из исторических коммитов ещё обратим.
 export type LastApply = { afterVersion: number; commands: PlanningCommand[]; before: PlanningReadModel } | null;
 
-// Боевой журнал = GET /api/tenant/current/audit-events. afterState даёт версию/изменённые задачи;
-// beforeState — только счётчики (не полный read-model), поэтому откат в live недоступен (revertible=false).
+// Боевой журнал возвращает только безопасный project-scoped DTO без полного audit payload.
 type PlanningAuditEvent = {
   id: string;
   actionType: string;
   sourceWorkflow: string | null;
-  input?: { command?: { type?: string } };
-  afterState: { planVersion: number; changedTaskIds?: string[] };
+  commandType: string | null;
+  afterState: { planVersion: number; changedTaskIds: string[]; hasCompensatingCommands: boolean };
+  executionStatus: string | null;
   createdAt: string;
 };
 const PLAN_COMMAND_SUMMARY: Record<string, string> = {
@@ -38,7 +38,8 @@ const PLAN_COMMAND_SUMMARY: Record<string, string> = {
   "assignment.upsert": "Назначен ресурс",
   "assignment.delete": "Снято назначение",
   "baseline.capture": "Зафиксирован базовый план",
-  "risk.accept_overload": "Принят перегруз"
+  "risk.accept_overload": "Принят перегруз",
+  "planning.commit.reverted": "Откат коммита"
 };
 
 // Боевой справочник пользователей рабочего пространства (GET /api/workspace/users).
@@ -70,32 +71,36 @@ export function createDeliveryPlanningClient(live: boolean) {
     const res = await mockFetch!("/planning/commits");
     return (await res.json()) as CommitsView;
   };
-  const getCommitsLive = async (projectId: string, lastApply: LastApply): Promise<CommitsView> => {
-    // live: GET /api/tenant/current/audit-events — planning-события проекта. Откат доступен ТОЛЬКО
-    // для последнего применённого этой сессией коммита (before read-model держим в памяти хука —
-    // audit.beforeState недостаточен). Произвольный исторический откат — будущая серверная задача.
+  const getCommitsLive = async (projectId: string, _lastApply: LastApply): Promise<CommitsView> => {
+    // Серверный revert-last принимает только текущий коммит. Поэтому обратимым
+    // помечаем исключительно первый успешный planning-event с компенсацией.
     const body = await requestJson<{ auditEvents: PlanningAuditEvent[] }>(
-      `/api/tenant/current/audit-events?projectId=${encodeURIComponent(projectId)}`
-    ).catch(() => {
-      throw new Error("audit_events_failed");
-    });
-    const last = lastApply;
-    const commits: CommitMetaView[] = body.auditEvents
+      `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/commits`
+    );
+    const planningEvents = body.auditEvents
       .filter((event) => event.sourceWorkflow === "planning" && event.afterState?.planVersion != null)
-      .map((event) => ({
-        version: event.afterState.planVersion,
-        actionType: event.actionType,
-        summary: (event.input?.command?.type && PLAN_COMMAND_SUMMARY[event.input.command.type]) || event.actionType,
-        changedTaskIds: event.afterState.changedTaskIds ?? [],
-        auditEventId: event.id,
-        at: event.createdAt,
-        revertible: last != null && event.afterState.planVersion === last.afterVersion
-      }))
-      .sort((left, right) => right.version - left.version);
-    const latestRevert =
-      last != null && commits[0] != null && commits[0].version === last.afterVersion
-        ? { auditEventId: commits[0].auditEventId, commands: last.commands, before: last.before }
-        : null;
+      .sort((left, right) => right.afterState.planVersion - left.afterState.planVersion);
+    const latestEvent = planningEvents[0] ?? null;
+    const canRevertLatest = Boolean(
+      latestEvent &&
+      latestEvent.executionStatus === "succeeded" &&
+      latestEvent.afterState.hasCompensatingCommands
+    );
+    const commits: CommitMetaView[] = planningEvents.map((event) => ({
+      version: event.afterState.planVersion,
+      actionType: event.actionType,
+      summary:
+        (event.commandType && PLAN_COMMAND_SUMMARY[event.commandType]) ||
+        PLAN_COMMAND_SUMMARY[event.actionType] ||
+        event.actionType,
+      changedTaskIds: event.afterState.changedTaskIds ?? [],
+      auditEventId: event.id,
+      at: event.createdAt,
+      revertible: canRevertLatest && event.id === latestEvent?.id
+    }));
+    const latestRevert = canRevertLatest && latestEvent
+      ? { auditEventId: latestEvent.id }
+      : null;
     return { commits, latestRevert };
   };
 

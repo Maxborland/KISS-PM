@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-07-07T21:15:00+07:00",
+  "id": "RISK-AUTH-RESET-BROWSER-MAIL-GAP",
+  "status": "fixed-by-current-branch",
+  "linkedRiskZones": [
+    "RISK-AUTH-EMAIL-RESET-HAPPY-PATH"
+  ],
+  "scope": "Browser traversal of login forgot-password link, reset request degraded/no-mail state, confirm route token prefill, and route-level reset contract",
+  "fix": {
+    "files": [
+      "e2e/smoke/auth-password-reset-mail-gap.spec.ts",
+      "docs/qa/full-eval/agent-reports/auth-reset-browser-mail-2026-07-07.md"
+    ],
+    "behavior": [
+      "Browser test traverses /login -> forgot password link -> /password-reset.",
+      "Submitting admin@kiss-pm.local observes POST /api/auth/password-reset/request returning 202 with delivery none and an explicit no-mail UI state.",
+      "Browser DOM does not expose devToken or a 64-hex reset token in the no-mail runtime path.",
+      "Confirm route /password-reset/confirm loads, token query parameter pre-fills the token input, and the footer link returns to reset request.",
+      "Existing route-level tests still cover SMTP-like resetUrl, confirm, login with new password, and concurrent token consume."
+    ]
+  },
+  "green": {
+    "tests": [
+      "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/authRegistrationRoutes.test.ts -t \\\"password-reset\\\"\" -> 1 file passed; 12 tests passed, 5 skipped",
+      "cmd /c \"set E2E_WEB_PORT=3000&& node_modules\\\\.bin\\\\playwright.cmd test --config playwright.config.ts e2e/smoke/auth-password-reset-mail-gap.spec.ts --no-deps\" -> 1 Chromium test passed"
+    ],
+    "warning": "Existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts remains unrelated."
+  },
+  "remainingRisk": "Full live mail extraction remains blocked: no MailHog/Mailpit/mailcatcher or guarded e2e reset-token extraction hook exists, and DB stores only token hashes."
+}

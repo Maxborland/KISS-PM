@@ -1,0 +1,31 @@
+{
+  "generatedAt": "2026-07-07T20:59:30+07:00",
+  "id": "RISK-WRITE-FLOW-CRM-CONTACT-OPPORTUNITY-CONCURRENCY",
+  "status": "fixed-by-current-branch",
+  "linkedRiskZones": [
+    "RISK-WRITE-FLOW-RACE-IDEMPOTENCY"
+  ],
+  "scope": "CRM contact email create/update duplicate races and opportunity duplicate id create race",
+  "fix": {
+    "files": [
+      "apps/api/src/crmRoutes.db.test.ts",
+      "apps/api/src/projectIntakeService/createOpportunityCommand.ts",
+      "docs/qa/full-eval/agent-reports/crm-contact-opportunity-race-2026-07-07.md"
+    ],
+    "behavior": [
+      "Concurrent duplicate opportunity id POST requests return exactly one 201 and one 409 opportunity_id_taken, then read back exactly one opportunity row for the id.",
+      "Concurrent duplicate contact email POST requests return exactly one 201 and one 409 contact_email_taken, then read back exactly one contact row for the email.",
+      "Concurrent contact email PATCH requests to the same target email return exactly one 200 and one 409 contact_email_taken, then read back exactly one contact row with the target email.",
+      "Opportunity create now treats nested Postgres 23505 unique violations in error.cause as opportunity_id_taken instead of leaking an internal error."
+    ]
+  },
+  "green": {
+    "tests": [
+      "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\.bin\\vitest.cmd run --config vitest.db.config.ts apps/api/src/crmRoutes.db.test.ts -t \\\"concurrent duplicate|conflict-safe\\\"\" -> 1 file passed; 2 tests passed, 10 skipped",
+      "corepack pnpm --filter @kiss-pm/api typecheck -> passed",
+      "git diff --check on CRM files/report -> passed"
+    ],
+    "warning": "Existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts remains unrelated."
+  },
+  "remainingRisk": "This narrows CRM contact/opportunity duplicate race coverage only. It does not complete every CRM write flow or the full product write-flow idempotency matrix."
+}

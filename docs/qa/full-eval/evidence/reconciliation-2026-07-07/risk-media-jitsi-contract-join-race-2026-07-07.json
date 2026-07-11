@@ -1,0 +1,31 @@
+{
+  "generatedAt": "2026-07-07T21:01:30+07:00",
+  "id": "RISK-MEDIA-JITSI-CONTRACT-JOIN-RACE",
+  "status": "fixed-by-current-branch",
+  "linkedRiskZones": [
+    "RISK-MEDIA-LIVEKIT-JITSI-CALL"
+  ],
+  "scope": "Call room provider contract drift, Jitsi URL-only join contract, and join-token issuance after late session-end race",
+  "fix": {
+    "files": [
+      "apps/api/src/apiDocs/schemas/schemaPrimitives.ts",
+      "apps/api/src/communicationRealtimeRoutes.db.test.ts",
+      "apps/api/src/communications/callWorkspace.ts",
+      "docs/qa/full-eval/agent-reports/media-provider-behavior-2026-07-07.md"
+    ],
+    "behavior": [
+      "OpenAPI primitives now match runtime/domain call provider/status/event values: manual/jitsi/livekit, open room status, current participant states and call event types.",
+      "Route-level DB test creates a Jitsi room, reads back provider/status, starts a session, reads activeSession, and issues a URL-only join contract with token/expiresAt null.",
+      "issueJoinToken now calls the video provider only after the transactional active-session check succeeds; a late-ended session returns 409 without provider token issuance."
+    ]
+  },
+  "green": {
+    "tests": [
+      "cmd /c \"node_modules\\\\.bin\\\\vitest.cmd run apps/api/src/videoProvider.test.ts\" -> 1 file passed; 14 tests passed",
+      "cmd /c \"set DATABASE_URL=postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55433/kiss_pm&& node_modules\\\\.bin\\\\vitest.cmd run --config vitest.db.config.ts apps/api/src/communicationRealtimeRoutes.db.test.ts -t \\\"Jitsi|session ends\\\"\" -> 1 file passed; 4 tests passed, 20 skipped",
+      "corepack pnpm --filter @kiss-pm/api typecheck -> passed"
+    ],
+    "warning": "Existing duplicate assignment.delete warning in packages/domain/src/planning/commandReducer.ts remains unrelated."
+  },
+  "remainingRisk": "This is API/contract/race coverage only. It does not verify a real browser media join, remote participant, reconnect, permissions prompt, or live LiveKit/Jitsi infrastructure."
+}

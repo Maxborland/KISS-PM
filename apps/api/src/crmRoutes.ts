@@ -41,10 +41,9 @@ import {
   executeUpdateClientCommand
 } from "./crm/clientCommandHandlers";
 
-// Дубликат SKU/имени продукта нарушает уникальный индекс (products_tenant_id_sku_uidx /
-// products_tenant_id_name_uidx, Postgres 23505). Распознаём, чтобы вернуть 409 вместо 500
+// Дубликаты CRM-уникальных полей нарушают Postgres 23505. Распознаём, чтобы вернуть 409 вместо 500
 // (house-паттерн, как isCredentialEmailConflict в authRegistrationRoutes). Обходим error.cause.
-function productUniqueConflict(error: unknown): "product_sku_taken" | "product_name_taken" | null {
+function crmUniqueConflict(error: unknown): "product_sku_taken" | "product_name_taken" | "contact_email_taken" | null {
   let current: unknown = error;
   for (let depth = 0; current != null && depth < 8; depth += 1) {
     const rec = current as { code?: unknown; constraint?: unknown; constraint_name?: unknown; message?: unknown; cause?: unknown };
@@ -52,6 +51,7 @@ function productUniqueConflict(error: unknown): "product_sku_taken" | "product_n
       const marker = String(rec.constraint ?? rec.constraint_name ?? rec.message ?? "");
       if (marker.includes("products_tenant_id_sku_uidx")) return "product_sku_taken";
       if (marker.includes("products_tenant_id_name_uidx")) return "product_name_taken";
+      if (marker.includes("contacts_tenant_id_email_uidx")) return "contact_email_taken";
     }
     current = rec.cause;
   }
@@ -157,7 +157,7 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
   app.post("/api/workspace/contacts", async (context) => {
     const auth = await authorizeRoute(context, deps, {
       permission: canManageContacts,
-      capabilities: ["createContact", "findClientById", "appendAuditEvent", "withTransaction"],
+      capabilities: ["createContact", "findClientById", "listContacts", "appendAuditEvent", "withTransaction"],
       onDenied: ({ actor, decision }) =>
         appendDeniedAudit({
           actor,
@@ -179,26 +179,39 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     if (!client || client.status !== "active") {
       return context.json({ error: "client_not_found" }, 404);
     }
-
-    const contact = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.createContact) {
-        throw new Error("transactional_contact_create_not_configured");
+    if (parsed.value.email) {
+      const existingContacts = await dataSource.listContacts(actor.tenantId);
+      if (existingContacts.some((contact) => contact.email === parsed.value.email)) {
+        return context.json({ error: "contact_email_taken" }, 409);
       }
-      const created = await transactionDataSource.createContact(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "contact.created",
-          sourceEntity: { type: "Contact", id: created.id },
-          commandInput: parsed.value,
-          beforeState: null,
-          afterState: created,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return created;
-    });
+    }
+
+    let contact;
+    try {
+      contact = await runDataSourceTransaction(async (transactionDataSource) => {
+        if (!transactionDataSource.createContact) {
+          throw new Error("transactional_contact_create_not_configured");
+        }
+        const created = await transactionDataSource.createContact(parsed.value);
+        await appendManagementAuditEvent(
+          auditInput({
+            actor,
+            actionType: "contact.created",
+            sourceEntity: { type: "Contact", id: created.id },
+            commandInput: parsed.value,
+            beforeState: null,
+            afterState: created,
+            permissionResult: decision
+          }),
+          transactionDataSource
+        );
+        return created;
+      });
+    } catch (error) {
+      const conflict = crmUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     return context.json({ contact }, 201);
   });
@@ -215,6 +228,7 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       capabilities: [
         "findContactById",
         "findClientById",
+        "listContacts",
         "updateContact",
         "appendAuditEvent",
         "withTransaction"
@@ -244,26 +258,39 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     if (!client || (isReassigningClient && client.status !== "active")) {
       return context.json({ error: "client_not_found" }, 404);
     }
-
-    const contact = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateContact) {
-        throw new Error("transactional_contact_update_not_configured");
+    if (parsed.value.email) {
+      const existingContacts = await dataSource.listContacts(actor.tenantId);
+      if (existingContacts.some((contact) => contact.id !== contactId && contact.email === parsed.value.email)) {
+        return context.json({ error: "contact_email_taken" }, 409);
       }
-      const updated = await transactionDataSource.updateContact(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "contact.updated",
-          sourceEntity: { type: "Contact", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
-    });
+    }
+
+    let contact;
+    try {
+      contact = await runDataSourceTransaction(async (transactionDataSource) => {
+        if (!transactionDataSource.updateContact) {
+          throw new Error("transactional_contact_update_not_configured");
+        }
+        const updated = await transactionDataSource.updateContact(parsed.value);
+        await appendManagementAuditEvent(
+          auditInput({
+            actor,
+            actionType: "contact.updated",
+            sourceEntity: { type: "Contact", id: updated.id },
+            commandInput: parsed.value,
+            beforeState,
+            afterState: updated,
+            permissionResult: decision
+          }),
+          transactionDataSource
+        );
+        return updated;
+      });
+    } catch (error) {
+      const conflict = crmUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     return context.json({ contact });
   });
@@ -323,7 +350,7 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
         return created;
       });
     } catch (error) {
-      const conflict = productUniqueConflict(error);
+      const conflict = crmUniqueConflict(error);
       if (conflict) return context.json({ error: conflict }, 409);
       throw error;
     }
@@ -362,25 +389,32 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     const parsed = parseProductBody({ ...body.value, id: productId }, actor.tenantId);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const product = await runDataSourceTransaction(async (transactionDataSource) => {
-      if (!transactionDataSource.updateProduct) {
-        throw new Error("transactional_product_update_not_configured");
-      }
-      const updated = await transactionDataSource.updateProduct(parsed.value);
-      await appendManagementAuditEvent(
-        auditInput({
-          actor,
-          actionType: "product.updated",
-          sourceEntity: { type: "Product", id: updated.id },
-          commandInput: parsed.value,
-          beforeState,
-          afterState: updated,
-          permissionResult: decision
-        }),
-        transactionDataSource
-      );
-      return updated;
-    });
+    let product;
+    try {
+      product = await runDataSourceTransaction(async (transactionDataSource) => {
+        if (!transactionDataSource.updateProduct) {
+          throw new Error("transactional_product_update_not_configured");
+        }
+        const updated = await transactionDataSource.updateProduct(parsed.value);
+        await appendManagementAuditEvent(
+          auditInput({
+            actor,
+            actionType: "product.updated",
+            sourceEntity: { type: "Product", id: updated.id },
+            commandInput: parsed.value,
+            beforeState,
+            afterState: updated,
+            permissionResult: decision
+          }),
+          transactionDataSource
+        );
+        return updated;
+      });
+    } catch (error) {
+      const conflict = crmUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     return context.json({ product });
   });
