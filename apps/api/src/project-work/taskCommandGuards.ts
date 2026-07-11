@@ -7,7 +7,7 @@ import {
   type AccessProfile,
   type PolicyDecision
 } from "@kiss-pm/access-control";
-import type { TenantUser } from "@kiss-pm/domain";
+import type { PlanningCommand, TenantUser } from "@kiss-pm/domain";
 import type {
   TaskRecord,
   TaskStatusCategory,
@@ -15,7 +15,6 @@ import type {
 } from "@kiss-pm/persistence";
 
 import type { ApiTenantDataSource, ProjectRecord } from "../apiTypes";
-import type { buildUpdateTaskPlanningCommands } from "../planningTaskCompatibility";
 
 export async function findActiveProject(
   dataSource: ApiTenantDataSource,
@@ -129,11 +128,14 @@ export function canEditTaskFields(
 export function canApplyTaskCompatibilityPlanningCommands(
   actor: TenantUser,
   profile: AccessProfile,
-  commands: ReturnType<typeof buildUpdateTaskPlanningCommands>
+  commands: PlanningCommand[],
+  planningParticipantsChanged: boolean
 ): PolicyDecision {
-  const touchesResourceAssignments = commands.some(
-    (command) => command.type === "assignment.upsert" || command.type === "assignment.delete"
-  );
+  const touchesResourceAssignments =
+    planningParticipantsChanged ||
+    commands.some(
+      (command) => command.type === "assignment.upsert" || command.type === "assignment.delete"
+    );
   if (!touchesResourceAssignments) {
     return { allowed: true, reason: "same_tenant_permission_granted" };
   }
