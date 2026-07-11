@@ -161,7 +161,8 @@ describe("OpenAPI route inventory", () => {
     expect(calendarPayload.properties?.resourceId).toEqual(nullablePersistedId);
     expect(overloadPayload.properties?.overloadId).toEqual({
       ...persistedId,
-      pattern: "^[A-Za-z0-9._-]+:\\d{4}-\\d{2}-\\d{2}$"
+      maxLength: 511,
+      pattern: "^[A-Za-z0-9._:-]+:\\d{4}-\\d{2}-\\d{2}$"
     });
     expect(schemas.PlanningScenarioTarget?.properties?.resourceId).toEqual(persistedId);
     expect(schemas.PlanningScenarioTarget?.properties?.taskIds).toEqual({

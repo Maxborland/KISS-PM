@@ -55,6 +55,7 @@ const constraintTypes = [
   "must_finish_on"
 ] as const;
 const maxPlanningStringLength = 500;
+const maxAcceptedOverloadIdLength = maxPlanningStringLength + 11;
 const maxTaskCustomFieldKeyLength = 120;
 const maxTaskCustomFieldValueLength = 500;
 const unsafeObjectKeys = new Set(["__proto__", "prototype", "constructor"]);
@@ -345,7 +346,7 @@ export function parsePlanningCommand(input: unknown):
       return { ok: true, value: { type, payload: { id, resourceId, start, finish, workMinutes, reason: getOptionalString(payload, "reason") } } };
     }
     case "risk.accept_overload": {
-      const overloadId = getPersistedId(payload, "overloadId");
+      const overloadId = parseAcceptedOverloadId(payload.overloadId);
       const acceptedRiskReason = getString(payload, "acceptedRiskReason");
       if (!overloadId || !acceptedRiskReason) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { overloadId, acceptedRiskReason } } };
@@ -466,8 +467,28 @@ function getString(input: Record<string, unknown>, key: string): string | null {
   return parseBoundedString(input[key]);
 }
 function parsePersistedId(value: unknown): string | null {
-  const id = parseBoundedString(value);
-  return id !== null && /^[A-Za-z0-9._:-]+$/.test(id) ? id : null;
+  return typeof value === "string" &&
+    value.length >= 1 &&
+    value.length <= maxPlanningStringLength &&
+    /^[A-Za-z0-9._:-]+$/.test(value)
+    ? value
+    : null;
+}
+
+function parseAcceptedOverloadId(value: unknown): string | null {
+  if (
+    typeof value !== "string" ||
+    value.length < 12 ||
+    value.length > maxAcceptedOverloadIdLength ||
+    !/^[A-Za-z0-9._:-]+$/.test(value)
+  ) {
+    return null;
+  }
+  const separator = value.lastIndexOf(":");
+  if (separator <= 0) return null;
+  const resourceId = value.slice(0, separator);
+  const date = value.slice(separator + 1);
+  return parsePersistedId(resourceId) !== null && isPlanDate(date) ? value : null;
 }
 
 function getPersistedId(input: Record<string, unknown>, key: string): string | null {
@@ -522,11 +543,16 @@ function parseCommandEnvelopeFields(input: Record<string, unknown>):
 
 function parseIdempotencyKey(input: Record<string, unknown>): string | undefined | false {
   const value = input.idempotencyKey;
-  if (value === null || value === undefined) return undefined;
-  if (typeof value !== "string") return false;
-  const trimmed = value.trim();
-  if (trimmed.length === 0 || trimmed.length > 120) return false;
-  return /^[A-Za-z0-9._:-]+$/.test(trimmed) ? trimmed : false;
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 120 ||
+    !/^[A-Za-z0-9._:-]+$/.test(value)
+  ) {
+    return false;
+  }
+  return value;
 }
 
 function getInteger(input: Record<string, unknown>, key: string): number | null {

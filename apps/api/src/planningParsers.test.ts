@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  parsePlanningCommandBatchEnvelope,
   parsePlanningCommandEnvelope,
   parsePlanningRevertEnvelope,
   parseScenarioApplyEnvelope,
@@ -140,6 +141,41 @@ describe("planning parsers", () => {
         idempotencyKey: "bad key with spaces"
       })
     ).toEqual({ ok: false, error: "planning_command_invalid" });
+    expect(
+      parsePlanningCommandEnvelope({
+        command,
+        clientPlanVersion: 1,
+        idempotencyKey: " plan-command "
+      })
+    ).toEqual({ ok: false, error: "planning_command_invalid" });
+    expect(
+      parsePlanningCommandBatchEnvelope({
+        commands: [command],
+        clientPlanVersion: 1,
+        idempotencyKey: "\tplan-batch"
+      })
+    ).toEqual({ ok: false, error: "planning_command_invalid" });
+    expect(
+      parsePlanningRevertEnvelope({
+        targetCommitId: "commit-safe",
+        clientPlanVersion: 1,
+        idempotencyKey: "revert-safe "
+      })
+    ).toEqual({ ok: false, error: "planning_revert_invalid" });
+    expect(
+      parsePlanningCommandEnvelope({
+        command,
+        clientPlanVersion: 1,
+        idempotencyKey: null
+      })
+    ).toEqual({ ok: false, error: "planning_command_invalid" });
+    expect(
+      parsePlanningCommandBatchEnvelope({
+        commands: [command],
+        clientPlanVersion: 1,
+        idempotencyKey: null
+      })
+    ).toEqual({ ok: false, error: "planning_command_invalid" });
   });
 
   it("rejects unsafe planning command strings before reducer/audit use", () => {
@@ -171,7 +207,7 @@ describe("planning parsers", () => {
     ).toEqual({ ok: false, error: "planning_scenario_invalid" });
   });
 
-  it.each(["\ud800", "\ufffd", "задача"])(
+  it.each(["\ud800", "\ufffd", "задача", " task-safe ", "\ttask-safe"])(
     "rejects non-ASCII persisted planning IDs %j before apply",
     (unsafeId) => {
       const commands = [
@@ -242,7 +278,7 @@ describe("planning parsers", () => {
       }
     }
   );
-  it.each(["\ud800", "\ufffd", "коммит-один"])(
+  it.each(["\ud800", "\ufffd", "коммит-один", " commit-safe "])(
     "rejects unsafe planning revert target ID %j",
     (targetCommitId) => {
       expect(
@@ -254,6 +290,74 @@ describe("planning parsers", () => {
       ).toEqual({ ok: false, error: "planning_revert_invalid" });
     }
   );
+
+  it.each([
+    "resource-alpha",
+    "resource-alpha:",
+    ":2026-06-10",
+    "resource-alpha:2026-02-30",
+    "resource-alpha:2026-13-01",
+    " resource-alpha:2026-06-10 "
+  ])("rejects malformed accepted overload ID %j", (overloadId) => {
+    expect(
+      parsePlanningCommandEnvelope({
+        command: {
+          type: "risk.accept_overload",
+          payload: { overloadId, acceptedRiskReason: "approved" }
+        },
+        clientPlanVersion: 1
+      })
+    ).toEqual({ ok: false, error: "planning_command_invalid" });
+  });
+  it("accepts an overload key whose resource ID contains a colon", () => {
+    expect(
+      parsePlanningCommandEnvelope({
+        command: {
+          type: "risk.accept_overload",
+          payload: {
+            overloadId: "resource:alpha:2026-06-10",
+            acceptedRiskReason: "approved"
+          }
+        },
+        clientPlanVersion: 1
+      })
+    ).toEqual({
+      ok: true,
+      value: {
+        command: {
+          type: "risk.accept_overload",
+          payload: {
+            overloadId: "resource:alpha:2026-06-10",
+            acceptedRiskReason: "approved"
+          }
+        },
+        clientPlanVersion: 1
+      }
+    });
+  });
+  it("accepts an overload key for a maximum-length resource ID", () => {
+    const resourceId = "r".repeat(500);
+    const overloadId = `${resourceId}:2026-06-10`;
+    expect(
+      parsePlanningCommandEnvelope({
+        command: {
+          type: "risk.accept_overload",
+          payload: { overloadId, acceptedRiskReason: "approved" }
+        },
+        clientPlanVersion: 1
+      })
+    ).toMatchObject({
+      ok: true,
+      value: {
+        command: {
+          type: "risk.accept_overload",
+          payload: { overloadId }
+        }
+      }
+    });
+  });
+
+
 
 
   it("rejects unsafe task custom-field commands", () => {

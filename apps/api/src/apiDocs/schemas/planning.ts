@@ -77,7 +77,8 @@ const planningNullablePersistedIdSchema = {
 
 const acceptedOverloadIdSchema = {
   ...planningPersistedIdSchema,
-  pattern: "^[A-Za-z0-9._-]+:\\d{4}-\\d{2}-\\d{2}$"
+  maxLength: 511,
+  pattern: "^[A-Za-z0-9._:-]+:\\d{4}-\\d{2}-\\d{2}$"
 };
 
 export const planningSchemas = openApiSchemaFragment({

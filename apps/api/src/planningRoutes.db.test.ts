@@ -365,38 +365,53 @@ describe("planning API routes", () => {
         (SELECT count(*)::int FROM tasks
           WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS task_count,
         (SELECT count(*)::int FROM task_assignments
-          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS assignment_count
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS assignment_count,
+        (SELECT count(*)::int FROM plan_accepted_overloads
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS accepted_overload_count,
+        (SELECT count(*)::int FROM audit_events
+          WHERE tenant_id = 'tenant-alpha' AND source_entity ->> 'id' = 'project-alpha') AS audit_count,
+        (SELECT count(*)::int FROM planning_command_idempotency_keys
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS idempotency_count
     `;
     const clientPlanVersion = Number(before[0]?.version);
-    const commands = ["\ud800", "\ufffd"].flatMap((unsafeId) => [
-      {
-        type: "task.create",
-        payload: {
-          id: unsafeId,
-          projectId: "project-alpha",
-          title: "Unsafe direct task",
-          statusId: "task-status-new",
-          plannedStart: "2026-06-01",
-          plannedFinish: "2026-06-02",
-          durationMinutes: 480,
-          workMinutes: 480,
-          assignments: []
+    const commands = [
+      ...["\ud800", "\ufffd", " task-safe "].flatMap((unsafeId) => [
+        {
+          type: "task.create",
+          payload: {
+            id: unsafeId,
+            projectId: "project-alpha",
+            title: "Unsafe direct task",
+            statusId: "task-status-new",
+            plannedStart: "2026-06-01",
+            plannedFinish: "2026-06-02",
+            durationMinutes: 480,
+            workMinutes: 480,
+            assignments: []
+          }
+        },
+        {
+          type: "assignment.upsert",
+          payload: {
+            id: unsafeId,
+            taskId: "task-alpha",
+            resourceId: "user-alpha-executor",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: null
+          }
         }
-      },
+      ]),
       {
-        type: "assignment.upsert",
+        type: "risk.accept_overload",
         payload: {
-          id: unsafeId,
-          taskId: "task-alpha",
-          resourceId: "user-alpha-executor",
-          role: "executor",
-          unitsPermille: 1000,
-          workMinutes: null
+          overloadId: "user-alpha-executor:2026-02-30",
+          acceptedRiskReason: "impossible date"
         }
       }
-    ]);
+    ];
 
-    for (const command of commands) {
+    for (const [index, command] of commands.entries()) {
       const response = await app.request(
         "/api/workspace/projects/project-alpha/planning/apply-command",
         {
@@ -406,7 +421,11 @@ describe("planning API routes", () => {
             "x-kiss-pm-action": "same-origin",
             cookie: adminCookie
           },
-          body: JSON.stringify({ command, clientPlanVersion })
+          body: JSON.stringify({
+            command,
+            clientPlanVersion,
+            idempotencyKey: `unsafe-boundary-${index}`
+          })
         }
       );
       expect(response.status).toBe(400);
@@ -422,7 +441,13 @@ describe("planning API routes", () => {
         (SELECT count(*)::int FROM tasks
           WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS task_count,
         (SELECT count(*)::int FROM task_assignments
-          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS assignment_count
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS assignment_count,
+        (SELECT count(*)::int FROM plan_accepted_overloads
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS accepted_overload_count,
+        (SELECT count(*)::int FROM audit_events
+          WHERE tenant_id = 'tenant-alpha' AND source_entity ->> 'id' = 'project-alpha') AS audit_count,
+        (SELECT count(*)::int FROM planning_command_idempotency_keys
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS idempotency_count
     `;
     expect(after[0]).toEqual(before[0]);
   });
