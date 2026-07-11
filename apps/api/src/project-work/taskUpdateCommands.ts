@@ -1,4 +1,7 @@
-import { buildUpdateTaskPlanningCommands } from "../planningTaskCompatibility";
+import {
+  buildUpdateTaskPlanningCommands,
+  planningParticipantsSemanticallyEqual
+} from "../planningTaskCompatibility";
 import { createTaskSystemActivity, summarizeTask } from "./taskCommandActivities";
 import {
   canApplyTaskCompatibilityPlanningCommands,
@@ -108,7 +111,8 @@ export async function updateTask(
     const planningCompatibilityDecision = canApplyTaskCompatibilityPlanningCommands(
       input.actor,
       input.profile,
-      planningCommands
+      planningCommands,
+      !planningParticipantsSemanticallyEqual(currentTask.participants, participants)
     );
     if (!planningCompatibilityDecision.allowed) {
       return { ok: false as const, status: 403, error: planningCompatibilityDecision.reason };

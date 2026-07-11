@@ -86,10 +86,11 @@ export function buildUpdateTaskPlanningCommands(input: {
     });
   }
 
-  if (
-    desiredWorkMinutes !== (snapshotTask?.workMinutes ?? input.task.plannedWork * 60) ||
-    desiredDurationMinutes !== (snapshotTask?.durationMinutes ?? input.task.durationWorkingDays * 480)
-  ) {
+  const workModelChanged =
+    input.body.plannedWork !== input.task.plannedWork ||
+    input.body.durationWorkingDays !== input.task.durationWorkingDays;
+
+  if (workModelChanged) {
     commands.push({
       type: "task.update_work_model",
       payload: {
@@ -109,18 +110,29 @@ export function buildUpdateTaskPlanningCommands(input: {
     });
   }
 
-  commands.push(
-    ...buildAssignmentSyncCommands({
-      taskId: input.task.id,
-      currentAssignments: input.snapshot.assignments.filter(
-        (assignment) => assignment.taskId === input.task.id
-      ),
-      desiredAssignments: taskParticipantsToAssignments(input.task.id, input.participants, {
+  if (
+    workModelChanged ||
+    !planningParticipantsSemanticallyEqual(input.task.participants, input.participants)
+  ) {
+    const currentAssignments = input.snapshot.assignments.filter(
+      (assignment) => assignment.taskId === input.task.id
+    );
+    const desiredAssignments = preserveExistingAssignmentIds(
+      currentAssignments,
+      taskParticipantsToAssignments(input.task.id, input.participants, {
         durationMinutes: desiredDurationMinutes,
         workMinutes: desiredWorkMinutes
       })
-    })
-  );
+    );
+
+    commands.push(
+      ...buildAssignmentSyncCommands({
+        taskId: input.task.id,
+        currentAssignments,
+        desiredAssignments
+      })
+    );
+  }
 
   return commands;
 }
@@ -212,9 +224,53 @@ function isPlanningParticipantRole(role: string): role is PlanAssignmentRole {
   return planningParticipantRoles.has(role as PlanAssignmentRole);
 }
 
+function participantSemanticKey(participant: TaskParticipantRecord): string {
+  return `${participant.userId}\u0000${participant.role}`;
+}
+
+export function planningParticipantsSemanticallyEqual(
+  currentParticipants: TaskParticipantRecord[],
+  desiredParticipants: TaskParticipantRecord[]
+): boolean {
+  const currentKeys = currentParticipants
+    .filter(isPlanningParticipant)
+    .map(participantSemanticKey)
+    .sort();
+  const desiredKeys = desiredParticipants
+    .filter(isPlanningParticipant)
+    .map(participantSemanticKey)
+    .sort();
+  return (
+    currentKeys.length === desiredKeys.length &&
+    desiredKeys.every((key, index) => key === currentKeys[index])
+  );
+}
+
 function taskAssignmentId(taskId: string, userId: string, role: PlanAssignmentRole): string {
   return `${taskId}-${userId}-${role}`;
 }
+
+function assignmentSemanticKey(assignment: {
+  resourceId: string;
+  role: PlanAssignmentRole;
+}): string {
+  return `${assignment.resourceId}\u0000${assignment.role}`;
+}
+
+function preserveExistingAssignmentIds(
+  currentAssignments: PlanAssignment[],
+  desiredAssignments: TaskPlanningAssignment[]
+): TaskPlanningAssignment[] {
+  const currentByParticipant = new Map(
+    currentAssignments.map((assignment) => [assignmentSemanticKey(assignment), assignment])
+  );
+
+  return desiredAssignments.map((desired) => ({
+    ...desired,
+    id: currentByParticipant.get(assignmentSemanticKey(desired))?.id ?? desired.id
+  }));
+}
+
 
 function buildAssignmentSyncCommands(input: {
   taskId: string;

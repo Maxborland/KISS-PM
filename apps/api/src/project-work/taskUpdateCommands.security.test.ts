@@ -4,6 +4,7 @@ import type { TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
 import { describe, expect, it } from "vitest";
 
 import type { ApiTenantDataSource } from "../apiTypes";
+import { canApplyTaskCompatibilityPlanningCommands } from "./taskCommandGuards";
 import { createTaskCommandWorkspace } from "./taskCommandWorkspace";
 
 const actor: TenantUser = {
@@ -21,6 +22,10 @@ const requesterProfile: AccessProfile = {
 const taskEditorProfile: AccessProfile = {
   id: "profile-task-editor",
   permissions: ["tenant.tasks.edit", "tenant.project_resources.manage"]
+};
+const taskOnlyEditorProfile: AccessProfile = {
+  id: "profile-task-only-editor",
+  permissions: ["tenant.tasks.edit"]
 };
 
 const now = new Date("2026-07-10T08:00:00.000Z");
@@ -88,24 +93,43 @@ function createTask(overrides: Partial<TaskRecord> = {}): TaskRecord {
 
 function createHarness(
   initialTask = createTask(),
-  taskAtTransactionStart?: TaskRecord
+  taskAtTransactionStart?: TaskRecord,
+  assignment: {
+    id?: string;
+    resourceId?: string;
+    unitsPermille?: number;
+    workMinutes?: number | null;
+  } = {},
+  snapshotWorkModel?: {
+    workMinutes: number;
+    durationMinutes: number;
+  }
 ) {
   let currentTask = initialTask;
   let transactionCalls = 0;
+  let metadataCalls = 0;
   const appliedCommands: PlanningCommand[] = [];
   const snapshot = {
     tenantId: actor.tenantId,
     projectId: initialTask.projectId,
     planVersion: 1,
-    tasks: [],
+    tasks: snapshotWorkModel
+      ? [
+          {
+            id: initialTask.id,
+            workMinutes: snapshotWorkModel.workMinutes,
+            durationMinutes: snapshotWorkModel.durationMinutes
+          }
+        ]
+      : [],
     assignments: [
       {
-        id: `${initialTask.id}-user-executor-executor`,
+        id: assignment.id ?? `${initialTask.id}-user-executor-executor`,
         taskId: initialTask.id,
-        resourceId: "user-executor",
+        resourceId: assignment.resourceId ?? "user-executor",
         role: "executor",
-        unitsPermille: 1000,
-        workMinutes: null
+        unitsPermille: assignment.unitsPermille ?? 1000,
+        workMinutes: assignment.workMinutes ?? null
       }
     ]
   } as unknown as PlanSnapshot;
@@ -115,6 +139,12 @@ function createHarness(
     getPlanSnapshot: async () => snapshot,
     applyPlanningCommand: async (input: { command: PlanningCommand }) => {
       appliedCommands.push(input.command);
+      if (input.command.type === "task.update_identity") {
+        currentTask = {
+          ...currentTask,
+          title: input.command.payload.title
+        };
+      }
       if (input.command.type === "task.update_status") {
         const statusId = (input.command.payload as { statusId: string }).statusId;
         const targetStatus = statuses.find((status) => status.id === statusId);
@@ -137,6 +167,7 @@ function createHarness(
       requiresAcceptance: boolean;
       participants: TaskRecord["participants"];
     }) => {
+      metadataCalls += 1;
       currentTask = {
         ...currentTask,
         description: input.description,
@@ -181,6 +212,9 @@ function createHarness(
     appliedCommands,
     get transactionCalls() {
       return transactionCalls;
+    },
+    get metadataCalls() {
+      return metadataCalls;
     }
   };
 }
@@ -283,5 +317,104 @@ describe("updateTask status boundary", () => {
     expect(harness.appliedCommands).not.toContainEqual(
       expect.objectContaining({ type: "task.update_status" })
     );
+  });
+
+  it("does not require resource management for a title-only edit with an imported assignment id", async () => {
+    const task = createTask({ plannedWork: 2 });
+    const harness = createHarness(
+      task,
+      undefined,
+      {
+        id: "assignment-imported-executor",
+        unitsPermille: 1000,
+        workMinutes: 300
+      },
+      {
+        workMinutes: 90,
+        durationMinutes: 480
+      }
+    );
+
+    const result = await harness.workspace.updateTask({
+      actor,
+      profile: taskOnlyEditorProfile,
+      taskId: task.id,
+      body: updateBody(task, { title: "Updated security review" })
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      task: {
+        title: "Updated security review",
+        ownerUserId: "user-executor"
+      }
+    });
+    expect(harness.appliedCommands.map((command) => command.type)).toEqual([
+      "task.update_identity"
+    ]);
+    expect(harness.appliedCommands).not.toContainEqual(
+      expect.objectContaining({
+        type: expect.stringMatching(/^assignment\./)
+      })
+    );
+  });
+
+  it("preserves an imported assignment id when work-model changes require a sync", async () => {
+    const task = createTask();
+    const harness = createHarness(task, undefined, { id: "assignment-imported-executor" });
+
+    const result = await harness.workspace.updateTask({
+      actor,
+      profile: taskEditorProfile,
+      taskId: task.id,
+      body: updateBody(task, { plannedWork: 4 })
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(harness.appliedCommands).toContainEqual(
+      expect.objectContaining({
+        type: "assignment.upsert",
+        payload: expect.objectContaining({
+          id: "assignment-imported-executor",
+          resourceId: "user-executor",
+          role: "executor",
+          unitsPermille: 500
+        })
+      })
+    );
+    expect(harness.appliedCommands).not.toContainEqual({
+      type: "assignment.delete",
+      payload: { assignmentId: "assignment-imported-executor" }
+    });
+  });
+
+  it("requires resource management for participant changes even when assignment sync is empty", async () => {
+    const task = createTask();
+    const harness = createHarness(task, undefined, {
+      id: "assignment-imported-next-executor",
+      resourceId: "user-next-executor",
+      unitsPermille: 1000,
+      workMinutes: null
+    });
+
+    expect(
+      canApplyTaskCompatibilityPlanningCommands(actor, taskOnlyEditorProfile, [], true)
+    ).toMatchObject({ allowed: false });
+
+    const result = await harness.workspace.updateTask({
+      actor,
+      profile: taskOnlyEditorProfile,
+      taskId: task.id,
+      body: updateBody(task, {
+        participants: [
+          { userId: actor.id, role: "requester" },
+          { userId: "user-next-executor", role: "executor" }
+        ]
+      })
+    });
+
+    expect(result).toMatchObject({ ok: false, status: 403 });
+    expect(harness.appliedCommands).toEqual([]);
+    expect(harness.metadataCalls).toBe(0);
   });
 });
