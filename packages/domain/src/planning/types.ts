@@ -66,6 +66,28 @@ export type PlanAssignmentRole =
   | "approver"
   | "observer";
 
+export function planningAssignmentId(
+  taskId: string,
+  resourceId: string,
+  role: PlanAssignmentRole
+): string {
+  return `assignment:${taskId.length}:${taskId}:${resourceId.length}:${resourceId}:${role.length}:${role}`;
+}
+
+export function allocatePlanningAssignmentId(
+  preferredId: string,
+  reservedIds: Set<string>
+): string {
+  let id = preferredId;
+  let suffix = 2;
+  while (reservedIds.has(id)) {
+    id = `${preferredId}-${suffix}`;
+    suffix += 1;
+  }
+  reservedIds.add(id);
+  return id;
+}
+
 export type PlanAssignment = {
   id: string;
   taskId: string;

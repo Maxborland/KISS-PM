@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { planningAssignmentId } from "@kiss-pm/domain";
 
 import {
   createDatabase,
@@ -377,7 +378,7 @@ describe("project work API routes", () => {
         ]),
         assignments: expect.arrayContaining([
           expect.objectContaining({
-            id: "task-alpha-user-alpha-executor-executor",
+            id: planningAssignmentId("task-alpha", "user-alpha-executor", "executor"),
             taskId: "task-alpha",
             resourceId: "user-alpha-executor",
             role: "executor"

@@ -1,3 +1,4 @@
+import { allocatePlanningAssignmentId, planningAssignmentId } from "@kiss-pm/domain";
 import type {
   PlanAssignment,
   PlanAssignmentRole,
@@ -32,6 +33,7 @@ export function buildCreateTaskPlanningCommand(input: {
   statusId: string;
   body: CreateTaskBody;
   participants: TaskParticipantRecord[];
+  projectAssignments: readonly PlanAssignment[];
 }): PlanningCommand {
   return {
     type: "task.create",
@@ -44,10 +46,14 @@ export function buildCreateTaskPlanningCommand(input: {
       plannedFinish: dateToPlanDate(input.body.plannedFinish),
       durationMinutes: input.body.durationWorkingDays * 480,
       workMinutes: input.body.plannedWork * 60,
-      assignments: taskParticipantsToAssignments(input.taskId, input.participants, {
-        durationMinutes: input.body.durationWorkingDays * 480,
-        workMinutes: input.body.plannedWork * 60
-      })
+      assignments: preserveExistingAssignmentIds(
+        [],
+        taskParticipantsToAssignments(input.taskId, input.participants, {
+          durationMinutes: input.body.durationWorkingDays * 480,
+          workMinutes: input.body.plannedWork * 60
+        }),
+        new Set(input.projectAssignments.map((assignment) => assignment.id))
+      )
     }
   };
 }
@@ -57,6 +63,7 @@ export function buildUpdateTaskPlanningCommands(input: {
   body: UpdateTaskBody;
   participants: TaskParticipantRecord[];
   snapshot: PlanSnapshot;
+  projectAssignments: readonly PlanAssignment[];
 }): PlanningCommand[] {
   const commands: PlanningCommand[] = [];
   const snapshotTask = input.snapshot.tasks.find((task) => task.id === input.task.id);
@@ -114,7 +121,7 @@ export function buildUpdateTaskPlanningCommands(input: {
     workModelChanged ||
     !planningParticipantsSemanticallyEqual(input.task.participants, input.participants)
   ) {
-    const currentAssignments = input.snapshot.assignments.filter(
+    const currentAssignments = input.projectAssignments.filter(
       (assignment) => assignment.taskId === input.task.id
     );
     const assignmentWorkModel = workModelChanged
@@ -130,7 +137,7 @@ export function buildUpdateTaskPlanningCommands(input: {
     const desiredAssignments = preserveExistingAssignmentIds(
       currentAssignments,
       taskParticipantsToAssignments(input.task.id, input.participants, assignmentWorkModel),
-      new Set(input.snapshot.assignments.map((assignment) => assignment.id))
+      new Set(input.projectAssignments.map((assignment) => assignment.id))
     );
 
     commands.push(
@@ -188,7 +195,7 @@ export function taskParticipantsToAssignments(
       : 1000;
 
     return {
-      id: taskAssignmentId(taskId, participant.userId, participant.role),
+      id: planningAssignmentId(taskId, participant.userId, participant.role),
       resourceId: participant.userId,
       role: participant.role,
       unitsPermille,
@@ -254,9 +261,6 @@ export function planningParticipantsSemanticallyEqual(
   );
 }
 
-function taskAssignmentId(taskId: string, userId: string, role: PlanAssignmentRole): string {
-  return `${taskId}-${userId}-${role}`;
-}
 
 function assignmentSemanticKey(assignment: {
   resourceId: string;
@@ -266,14 +270,14 @@ function assignmentSemanticKey(assignment: {
 }
 
 function preserveExistingAssignmentIds(
-  currentAssignments: PlanAssignment[],
+  currentAssignments: readonly PlanAssignment[],
   desiredAssignments: TaskPlanningAssignment[],
   reservedIds: ReadonlySet<string>
 ): TaskPlanningAssignment[] {
   const currentByParticipant = new Map(
     currentAssignments.map((assignment) => [assignmentSemanticKey(assignment), assignment])
   );
-  const allocatedIds = new Set<string>();
+  const allocatedIds = new Set(reservedIds);
 
   return desiredAssignments.map((desired) => {
     const current = currentByParticipant.get(assignmentSemanticKey(desired));
@@ -282,13 +286,7 @@ function preserveExistingAssignmentIds(
       return { ...desired, id: current.id };
     }
 
-    let id = desired.id;
-    let suffix = 2;
-    while (reservedIds.has(id) || allocatedIds.has(id)) {
-      id = `${desired.id}-${suffix}`;
-      suffix += 1;
-    }
-    allocatedIds.add(id);
+    const id = allocatePlanningAssignmentId(desired.id, allocatedIds);
     return { ...desired, id };
   });
 }

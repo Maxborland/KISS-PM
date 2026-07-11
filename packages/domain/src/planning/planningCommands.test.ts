@@ -7,8 +7,18 @@ import {
   type PlanSnapshot
 } from "./planningCommands";
 import { reducePlanningCommand } from "./commandReducer";
+import { allocatePlanningAssignmentId, planningAssignmentId } from "./types";
 
 describe("planning command contract", () => {
+  it("builds total unambiguous assignment ids and allocates collision suffixes", () => {
+    const left = planningAssignmentId("abc-def", "ghi", "executor");
+    const right = planningAssignmentId("abc", "def-ghi", "executor");
+
+    expect(left).not.toBe(right);
+    expect(() => planningAssignmentId("\ud800", "resource", "executor")).not.toThrow();
+    expect(allocatePlanningAssignmentId(left, new Set([left]))).toBe(`${left}-2`);
+  });
+
   it("creates a task.create planning command for task CRUD wrappers", () => {
     const command = createPlanningCommand({
       type: "task.create",

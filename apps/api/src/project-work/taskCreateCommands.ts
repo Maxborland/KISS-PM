@@ -68,6 +68,8 @@ export async function createWorkspaceInboxTask(
     if (
       !transactionDataSource.ensureWorkspaceInboxProject ||
       !transactionDataSource.listWorkspaceUsers ||
+      !transactionDataSource.listProjectTaskAssignments ||
+      !transactionDataSource.lockTenantResourcePlanning ||
       !transactionDataSource.listTaskStatuses ||
       !transactionDataSource.applyPlanningCommand ||
       !transactionDataSource.updateTaskMetadata ||
@@ -78,7 +80,7 @@ export async function createWorkspaceInboxTask(
       throw new Error("persistence_not_configured");
     }
 
-    await transactionDataSource.lockTenantResourcePlanning?.(input.actor.tenantId);
+    await transactionDataSource.lockTenantResourcePlanning(input.actor.tenantId);
     const users = await transactionDataSource.listWorkspaceUsers(input.actor.tenantId);
     if (!validateCreateTaskParticipants(participants, users)) {
       return { ok: false as const, status: 400, error: "invalid_task_participant" };
@@ -95,12 +97,17 @@ export async function createWorkspaceInboxTask(
       plannedStart: input.body.plannedStart,
       plannedFinish: input.body.plannedFinish
     });
+    const projectAssignments = await transactionDataSource.listProjectTaskAssignments(
+      input.actor.tenantId,
+      inboxProject.id
+    );
     const planningCommand = buildCreateTaskPlanningCommand({
       taskId,
       projectId: inboxProject.id,
       statusId: currentTaskStatus.id,
       body: input.body,
-      participants
+      participants,
+      projectAssignments
     });
     const planningPermission = permissionForCommand(planningCommand, input.actor, input.profile);
     if (!planningPermission.allowed) {
@@ -210,6 +217,8 @@ export async function createProjectTask(
       if (
         !transactionDataSource.listProjects ||
         !transactionDataSource.listWorkspaceUsers ||
+        !transactionDataSource.listProjectTaskAssignments ||
+        !transactionDataSource.lockTenantResourcePlanning ||
         !transactionDataSource.listTaskStatuses ||
         !transactionDataSource.applyPlanningCommand ||
         !transactionDataSource.updateTaskMetadata ||
@@ -220,7 +229,7 @@ export async function createProjectTask(
         throw new Error("persistence_not_configured");
       }
 
-      await transactionDataSource.lockTenantResourcePlanning?.(input.actor.tenantId);
+      await transactionDataSource.lockTenantResourcePlanning(input.actor.tenantId);
       const currentProject = await findActiveProject(
         transactionDataSource,
         input.actor.tenantId,
@@ -241,12 +250,17 @@ export async function createProjectTask(
         return { ok: false as const, status: 400, error: "task_status_not_found" };
       }
 
+      const projectAssignments = await transactionDataSource.listProjectTaskAssignments(
+        input.actor.tenantId,
+        currentProject.id
+      );
       const currentPlanningCommand = buildCreateTaskPlanningCommand({
         taskId,
         projectId: currentProject.id,
         statusId: currentTaskStatus.id,
         body: input.body,
-        participants
+        participants,
+        projectAssignments
       });
       const planningPermission = permissionForCommand(
         currentPlanningCommand,

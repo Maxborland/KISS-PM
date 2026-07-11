@@ -1,5 +1,7 @@
+import { planningAssignmentId } from "@kiss-pm/domain";
 import { describe, expect, it, vi } from "vitest";
 
+import { buildCreateTaskPlanningCommand } from "../planningTaskCompatibility";
 import { createWorkspaceInboxTask } from "./taskCreateCommands";
 import type {
   CreateWorkspaceInboxTaskInput,
@@ -76,5 +78,54 @@ describe("createWorkspaceInboxTask duplicate handling", () => {
     await expect(
       createWorkspaceInboxTask(createDepsRejecting(error), createInput("task-explicit"))
     ).rejects.toBe(error);
+  });
+});
+
+describe("create task planning assignment ids", () => {
+  it("allocates a new id when another project assignment owns the deterministic id", () => {
+    const occupiedId = planningAssignmentId("task-new", "user-executor", "executor");
+    const participants = [{ userId: "user-executor", role: "executor" as const }];
+    const command = buildCreateTaskPlanningCommand({
+      taskId: "task-new",
+      projectId: "project-alpha",
+      statusId: "task-status-new",
+      body: {
+        id: "task-new",
+        title: "New task",
+        description: null,
+        priority: "normal",
+        statusId: "task-status-new",
+        plannedStart: new Date("2026-07-13T00:00:00.000Z"),
+        plannedFinish: new Date("2026-07-13T00:00:00.000Z"),
+        durationWorkingDays: 1,
+        plannedWork: 1,
+        requiresAcceptance: false,
+        participants
+      },
+      participants,
+      projectAssignments: [
+        {
+          id: occupiedId,
+          taskId: "task-imported",
+          resourceId: "user-imported",
+          role: "executor",
+          unitsPermille: 1000,
+          workMinutes: null,
+          calendarId: null
+        }
+      ]
+    });
+
+    expect(command).toMatchObject({
+      type: "task.create",
+      payload: {
+        assignments: [
+          {
+            id: `${occupiedId}-2`,
+            resourceId: "user-executor"
+          }
+        ]
+      }
+    });
   });
 });

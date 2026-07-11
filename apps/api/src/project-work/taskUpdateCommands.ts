@@ -18,6 +18,8 @@ export async function updateTask(
   if (
     !deps.dataSource.findTaskById ||
     !deps.dataSource.getPlanSnapshot ||
+    !deps.dataSource.listProjectTaskAssignments ||
+    !deps.dataSource.lockTenantResourcePlanning ||
     !deps.dataSource.applyPlanningCommand ||
     !deps.dataSource.updateTaskMetadata ||
     !deps.dataSource.incrementPlanVersion ||
@@ -47,6 +49,8 @@ export async function updateTask(
   return deps.runDataSourceTransaction(async (transactionDataSource) => {
     if (
       !transactionDataSource.getPlanSnapshot ||
+      !transactionDataSource.listProjectTaskAssignments ||
+      !transactionDataSource.lockTenantResourcePlanning ||
       !transactionDataSource.applyPlanningCommand ||
       !transactionDataSource.updateTaskMetadata ||
       !transactionDataSource.findTaskById ||
@@ -57,7 +61,7 @@ export async function updateTask(
     ) {
       throw new Error("persistence_not_configured");
     }
-    await transactionDataSource.lockTenantResourcePlanning?.(input.actor.tenantId);
+    await transactionDataSource.lockTenantResourcePlanning(input.actor.tenantId);
     const currentTask = await transactionDataSource.findTaskById(
       input.actor.tenantId,
       task.id
@@ -99,11 +103,15 @@ export async function updateTask(
       currentTask.projectId
     );
     if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
+    const projectAssignments = await transactionDataSource.listProjectTaskAssignments(
+      input.actor.tenantId, currentTask.projectId
+    );
     const planningCommands = buildUpdateTaskPlanningCommands({
       task: currentTask,
       body: input.body,
       participants,
-      snapshot
+      snapshot,
+      projectAssignments
     });
     if (currentTask.updatedAt.getTime() !== input.body.clientUpdatedAt.getTime()) {
       return { ok: false as const, status: 409, error: "task_version_conflict" };

@@ -1045,6 +1045,9 @@ describe("KISS PM API Phase 1 shell", () => {
       async getPlanSnapshot() {
         throw new Error("stale task should fail before planning preview");
       },
+      async listProjectTaskAssignments() {
+        throw new Error("stale task should fail before assignment read");
+      },
       async applyPlanningCommand() {
         applyPlanningCommandCalled = true;
       },

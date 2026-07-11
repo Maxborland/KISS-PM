@@ -27,6 +27,8 @@ export function hasWorkspaceInboxCreateTaskDeps(deps: TaskCommandWorkspaceDeps):
   return Boolean(
     "ensureWorkspaceInboxProject" in deps.dataSource &&
       "listWorkspaceUsers" in deps.dataSource &&
+      "listProjectTaskAssignments" in deps.dataSource &&
+      "lockTenantResourcePlanning" in deps.dataSource &&
       "listTaskStatuses" in deps.dataSource &&
       "applyPlanningCommand" in deps.dataSource &&
       "updateTaskMetadata" in deps.dataSource &&
@@ -41,7 +43,9 @@ export function hasProjectCreateTaskDeps(deps: TaskCommandWorkspaceDeps): boolea
   return Boolean(
     "listProjects" in deps.dataSource &&
       "listWorkspaceUsers" in deps.dataSource &&
+      "listProjectTaskAssignments" in deps.dataSource &&
       "listTaskStatuses" in deps.dataSource &&
+      "lockTenantResourcePlanning" in deps.dataSource &&
       "applyPlanningCommand" in deps.dataSource &&
       "updateTaskMetadata" in deps.dataSource &&
       "findTaskById" in deps.dataSource &&
