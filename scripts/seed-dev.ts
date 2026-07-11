@@ -1,3 +1,4 @@
+import { and, eq, isNull } from "drizzle-orm";
 import { createDemoTenantDataset } from "@kiss-pm/test-fixtures";
 import {
   calendarExceptions,
@@ -211,6 +212,18 @@ const dataset: SeedTenantDataset = {
       tenantId: "tenant-alpha",
       name: "Внедрение",
       description: "Проект внедрения продукта или системы"
+    },
+    {
+      id: "project-type-support",
+      tenantId: "tenant-alpha",
+      name: "Сопровождение",
+      description: "Поддержка и развитие действующего решения"
+    },
+    {
+      id: "project-type-audit",
+      tenantId: "tenant-alpha",
+      name: "Аудит",
+      description: "Оценка процессов и подготовка рекомендаций"
     }
   ],
   dealStages: [
@@ -978,6 +991,7 @@ type StandaloneOpportunitySpec = {
   pipelineId: string | null;
   stageId: string | null;
   title: string;
+  projectTypeId: string;
   projectType: string;
   description: string;
   plannedStart: Date;
@@ -987,6 +1001,7 @@ type StandaloneOpportunitySpec = {
   plannedHours: number;
   probability: number;
   status: string;
+  demand?: { positionId: string; requiredHours: number };
   resetOnSeed?: boolean;
 };
 
@@ -1541,6 +1556,7 @@ function standaloneOpportunitySpecs(): StandaloneOpportunitySpec[] {
       pipelineId: `${TENANT_ID}-pipeline-default`,
       title: "Поддержка после внедрения",
       projectType: "Сопровождение",
+      projectTypeId: "project-type-support",
       description: "Запрос на сопровождение управленческого контура после внедрения.",
       plannedStart: utc("2026-07-01"),
       plannedFinish: utc("2026-09-30"),
@@ -1560,6 +1576,7 @@ function standaloneOpportunitySpecs(): StandaloneOpportunitySpec[] {
       stageId: null,
       title: "Запрос без стадии",
       projectType: "Сопровождение",
+      projectTypeId: "project-type-support",
       description: "Новый запрос до первичного распределения по воронке.",
       plannedStart: utc("2026-07-08"),
       plannedFinish: utc("2026-08-31"),
@@ -1580,14 +1597,38 @@ function standaloneOpportunitySpecs(): StandaloneOpportunitySpec[] {
       pipelineId: `${TENANT_ID}-pipeline-default`,
       title: "Аудит процессов Вектор",
       projectType: "Аудит",
+      projectTypeId: "project-type-audit",
       description: "Оценка зрелости проектного контура и подготовка рекомендаций.",
-      plannedStart: utc("2026-06-20"),
-      plannedFinish: utc("2026-07-15"),
+      plannedStart: utc("2026-06-22"),
+      plannedFinish: utc("2026-06-22"),
       contractValue: 180_000,
       plannedHourlyRate: 6_000,
       plannedHours: 30,
+      demand: { positionId: "position-project-manager", requiredHours: 30 },
       probability: 55,
-      status: "feasibility"
+      status: "feasibility",
+      resetOnSeed: true
+    },
+    {
+      id: "opportunity-reader-e2e",
+      clientId: "client-vektor",
+      clientName: "ООО Вектор",
+      primaryContactId: "contact-vektor-cto",
+      contactName: "Виктор Технический",
+      stageId: "deal-stage-qualified",
+      pipelineId: `${TENANT_ID}-pipeline-default`,
+      title: "Проверка прав CRM E2E",
+      projectType: "Аудит",
+      projectTypeId: "project-type-audit",
+      description: "Резервная сделка для проверки CRM в режиме только чтения.",
+      plannedStart: utc("2026-07-01"),
+      plannedFinish: utc("2026-07-03"),
+      contractValue: 120_000,
+      plannedHourlyRate: 6_000,
+      plannedHours: 20,
+      probability: 30,
+      status: "new",
+      resetOnSeed: true
     },
     {
       id: "opportunity-gorset-expansion",
@@ -1599,6 +1640,7 @@ function standaloneOpportunitySpecs(): StandaloneOpportunitySpec[] {
       pipelineId: `${TENANT_ID}-pipeline-default`,
       title: "Расширение интеграций Горсеть",
       projectType: "Внедрение",
+      projectTypeId: "project-type-implementation",
       description: "Дополнительные интеграции после успешной миграции данных.",
       plannedStart: utc("2026-07-01"),
       plannedFinish: utc("2026-08-30"),
@@ -1614,6 +1656,16 @@ function standaloneOpportunitySpecs(): StandaloneOpportunitySpec[] {
 async function seedExtraCrmAndProjects(db: KissPmDatabase, createdAt: Date): Promise<void> {
   await db.transaction(async (transaction) => {
     for (const opportunity of standaloneOpportunitySpecs()) {
+      if (opportunity.resetOnSeed) {
+        // A prior activation creates a project with a unique sourceOpportunityId.
+        // Remove that disposable bundle before restoring the reserved E2E deal.
+        await transaction
+          .delete(projects)
+          .where(and(
+            eq(projects.tenantId, TENANT_ID),
+            eq(projects.sourceOpportunityId, opportunity.id)
+          ));
+      }
       const insert = transaction
         .insert(opportunities)
         .values({
@@ -1622,7 +1674,7 @@ async function seedExtraCrmAndProjects(db: KissPmDatabase, createdAt: Date): Pro
           clientId: opportunity.clientId,
           primaryContactId: opportunity.primaryContactId,
           ownerUserId: "user-alpha-admin",
-          projectTypeId: null,
+          projectTypeId: opportunity.projectTypeId,
           stageId: opportunity.stageId,
           pipelineId: opportunity.pipelineId,
           clientName: opportunity.clientName,
@@ -1653,7 +1705,7 @@ async function seedExtraCrmAndProjects(db: KissPmDatabase, createdAt: Date): Pro
             clientId: opportunity.clientId,
             primaryContactId: opportunity.primaryContactId,
             ownerUserId: "user-alpha-admin",
-            projectTypeId: null,
+            projectTypeId: opportunity.projectTypeId,
             stageId: opportunity.stageId,
             pipelineId: opportunity.pipelineId,
             clientName: opportunity.clientName,
@@ -1678,6 +1730,35 @@ async function seedExtraCrmAndProjects(db: KissPmDatabase, createdAt: Date): Pro
         });
       } else {
         await insert.onConflictDoNothing();
+        // Upgrade databases seeded before projectTypeId became required. Preserve every
+        // developer-edited field, including an explicitly selected non-null project type.
+        await transaction
+          .update(opportunities)
+          .set({ projectTypeId: opportunity.projectTypeId })
+          .where(and(
+            eq(opportunities.tenantId, TENANT_ID),
+            eq(opportunities.id, opportunity.id),
+            isNull(opportunities.projectTypeId)
+          ));
+      }
+      if (opportunity.demand) {
+        if (opportunity.resetOnSeed) {
+          await transaction
+            .delete(opportunityDemands)
+            .where(and(
+              eq(opportunityDemands.tenantId, TENANT_ID),
+              eq(opportunityDemands.opportunityId, opportunity.id)
+            ));
+        }
+        await transaction
+          .insert(opportunityDemands)
+          .values({
+            tenantId: TENANT_ID,
+            opportunityId: opportunity.id,
+            positionId: opportunity.demand.positionId,
+            requiredHours: opportunity.demand.requiredHours
+          })
+          .onConflictDoNothing();
       }
     }
 

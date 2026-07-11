@@ -7,6 +7,10 @@ const STAGED_DEAL = {
   title: "Аудит процессов Вектор",
   stageId: "deal-stage-qualified"
 };
+const READER_DEAL = {
+  id: "opportunity-reader-e2e",
+  title: "Проверка прав CRM E2E"
+};
 const UNSTAGED_DEAL = {
   id: "opportunity-without-stage",
   title: "Запрос без стадии",
@@ -56,6 +60,55 @@ test("current CRM routes open deals and assign an unstaged deal", async ({ page 
   await expect(stageSelect.getByRole("option", { name: "Квалификация", exact: true })).toHaveCount(1);
   await expect(stageSelect.getByRole("option", { name: "Согласование", exact: true })).toHaveCount(1);
   await expect(stageSelect.getByRole("option", { name: "Готова к оценке", exact: true })).toHaveCount(1);
+  const activationButton = page.getByRole("button", { name: "Активировать в проект", exact: true });
+  await expect(activationButton).toBeDisabled();
+  await expect(activationButton).toHaveAttribute("title", "Сначала проверьте осуществимость");
+  const checkButton = page.getByRole("button", { name: "Проверить", exact: true });
+  const saveButton = page.getByRole("button", { name: "Сохранить", exact: true });
+  const descriptionField = page.getByRole("textbox", { name: "Описание", exact: true });
+  await descriptionField.fill("E2E: черновик аудита.");
+  await expect(checkButton).toBeDisabled();
+  await expect(checkButton).toHaveAttribute("title", "Сначала сохраните изменения");
+  await expect(activationButton).toHaveAttribute("title", "Сохраните изменения и повторите проверку");
+  await saveButton.click();
+  await expect(page.getByText("Сделка сохранена", { exact: true })).toBeVisible();
+  await expect(checkButton).toBeEnabled();
+  await expect(activationButton).toHaveAttribute("title", "Сначала проверьте осуществимость");
+  await checkButton.click();
+  await expect(page.getByText("Конфликт ресурсов", { exact: true })).toBeVisible();
+  await expect(activationButton).toBeDisabled();
+  await expect(activationButton).toHaveAttribute("title", "Укажите обоснование принятого риска");
+  await page.getByRole("textbox", { name: "Обоснование риска (для активации при конфликте)", exact: true }).fill("Риск принят владельцем");
+  await expect(activationButton).toBeEnabled();
+  const persistedDescription = "E2E: аудит процессов и рекомендации подтверждены.";
+  await descriptionField.fill(`${persistedDescription}  `);
+  await expect(checkButton).toBeDisabled();
+  await expect(checkButton).toHaveAttribute("title", "Сначала сохраните изменения");
+  await expect(activationButton).toBeDisabled();
+  await expect(activationButton).toHaveAttribute("title", "Сохраните изменения и повторите проверку");
+  const savedResponse = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" &&
+    response.url().includes(`/api/workspace/opportunities/${STAGED_DEAL.id}`) &&
+    response.status() === 200
+  );
+  await saveButton.click();
+  await savedResponse;
+  await expect(descriptionField).toHaveValue(persistedDescription);
+  await expect(checkButton).toBeEnabled();
+  await expect(activationButton).toBeDisabled();
+  await expect(activationButton).toHaveAttribute("title", "Сначала проверьте осуществимость");
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Описание", exact: true })).toHaveValue(persistedDescription);
+  const savedOpportunitiesResponse = await page.request.get("/api/workspace/opportunities");
+  expect(savedOpportunitiesResponse.status()).toBe(200);
+  const savedOpportunitiesPayload = await savedOpportunitiesResponse.json();
+  expect(
+    savedOpportunitiesPayload.opportunities.find((opportunity: { id: string }) => opportunity.id === STAGED_DEAL.id)
+  ).toMatchObject({
+    description: persistedDescription,
+    projectTypeId: "project-type-audit",
+    feasibilityStatus: null
+  });
 
   await page.goto("/crm/deals");
   const listMode = page.getByRole("radio", { name: "Список", exact: true });
@@ -111,6 +164,47 @@ test("current CRM routes open deals and assign an unstaged deal", async ({ page 
     pipelineId: "tenant-alpha-pipeline-default"
   });
   await page.unroute(opportunitiesUrl);
+
+  await page.goto(`/crm/deals/${STAGED_DEAL.id}`);
+  await checkButton.click();
+  await expect(page.getByText("Конфликт ресурсов", { exact: true })).toBeVisible();
+  const acceptedRiskReason = "E2E: риск нехватки ёмкости принят владельцем";
+  await page
+    .getByRole("textbox", { name: "Обоснование риска (для активации при конфликте)", exact: true })
+    .fill(acceptedRiskReason);
+  await expect(activationButton).toBeEnabled();
+  const activationResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().includes(`/api/workspace/opportunities/${STAGED_DEAL.id}/activate`) &&
+    response.status() === 201
+  );
+  await activationButton.click();
+  const activatedPayload = (await (await activationResponse).json()) as {
+    project: { id: string; sourceOpportunityId: string; status: string };
+  };
+  expect(activatedPayload.project).toMatchObject({
+    sourceOpportunityId: STAGED_DEAL.id,
+    status: "active"
+  });
+  await expect(page.getByText(/Создан проект .* — сделка выиграна/)).toBeVisible();
+
+  const activatedOpportunitiesResponse = await page.request.get("/api/workspace/opportunities");
+  expect(activatedOpportunitiesResponse.status()).toBe(200);
+  const activatedOpportunitiesPayload = await activatedOpportunitiesResponse.json();
+  expect(
+    activatedOpportunitiesPayload.opportunities.find(
+      (opportunity: { id: string }) => opportunity.id === STAGED_DEAL.id
+    )
+  ).toMatchObject({ status: "won_closed", feasibilityStatus: "conflict" });
+  const projectsResponse = await page.request.get("/api/workspace/projects");
+  expect(projectsResponse.status()).toBe(200);
+  const projectsPayload = await projectsResponse.json();
+  expect(
+    projectsPayload.projects.find(
+      (project: { sourceOpportunityId: string | null }) =>
+        project.sourceOpportunityId === STAGED_DEAL.id
+    )
+  ).toMatchObject({ id: activatedPayload.project.id, status: "active" });
 });
 
 test("CRM reader can inspect deals without any stage mutation affordance", async ({ page }) => {
@@ -160,7 +254,7 @@ test("CRM reader can inspect deals without any stage mutation affordance", async
   });
 
   await page.goto("/crm/deals");
-  const stagedCard = page.locator(`[data-deal-id="${STAGED_DEAL.id}"]`);
+  const stagedCard = page.locator(`[data-deal-id="${READER_DEAL.id}"]`);
   await expect(stagedCard).toBeVisible();
   await expect.poll(() => stagedCard.evaluate((card) => card.draggable)).toBe(false);
   await expect(page.getByRole("link", { name: dealLinkName(UNSTAGED_DEAL.title), exact: true })).toBeVisible();
@@ -174,13 +268,13 @@ test("CRM reader can inspect deals without any stage mutation affordance", async
   const listMode = page.getByRole("radio", { name: "Список", exact: true });
   await listMode.focus();
   await page.keyboard.press("Space");
-  await expect(page.getByRole("combobox", { name: `Стадия сделки «${STAGED_DEAL.title}»` })).toBeDisabled();
-  const stagedRow = page.getByRole("row").filter({ hasText: STAGED_DEAL.title });
+  await expect(page.getByRole("combobox", { name: `Стадия сделки «${READER_DEAL.title}»` })).toBeDisabled();
+  const stagedRow = page.getByRole("row").filter({ hasText: READER_DEAL.title });
   await expect(stagedRow.getByRole("button", { name: "Воронка", exact: true })).toBeDisabled();
 
-  await stagedRow.getByRole("link", { name: dealLinkName(STAGED_DEAL.title), exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/crm/deals/${STAGED_DEAL.id}$`));
-  await expect(page.getByRole("heading", { name: STAGED_DEAL.title, exact: true })).toBeVisible();
+  await stagedRow.getByRole("link", { name: dealLinkName(READER_DEAL.title), exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/crm/deals/${READER_DEAL.id}$`));
+  await expect(page.getByRole("heading", { name: READER_DEAL.title, exact: true })).toBeVisible();
   await expect(page.getByLabel("Название", { exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Сохранить", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Проверить", exact: true })).toBeDisabled();

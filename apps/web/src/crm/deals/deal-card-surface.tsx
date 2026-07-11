@@ -62,6 +62,24 @@ const ERR_RU: Record<string, string> = {
 };
 const ruErr = makeRuError(ERR_RU);
 
+export function getActivationBlockReason(
+  canActivate: boolean,
+  feasibilityStatus: string | null,
+  riskReason: string,
+  hasUnsavedChanges: boolean,
+  permissionReason: string
+): string | null {
+  if (!canActivate) return permissionReason;
+  if (hasUnsavedChanges) return "Сохраните изменения и повторите проверку";
+  if (feasibilityStatus === null) return "Сначала проверьте осуществимость";
+  if (feasibilityStatus === "blocked") return "Сделка заблокирована по результатам проверки";
+  if (feasibilityStatus === "conflict" && !riskReason.trim()) return "Укажите обоснование принятого риска";
+  if (feasibilityStatus !== "ok" && feasibilityStatus !== "warning" && feasibilityStatus !== "conflict") {
+    return "Результат проверки не позволяет активировать проект";
+  }
+  return null;
+}
+
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60";
 const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]";
 
@@ -202,10 +220,18 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   const editDisabledReason = requiresStageAssignment
     ? "Сначала назначьте сделке стадию в списке"
     : readOnlyReason;
+  const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(formOf(opp)), [form, opp]);
+  const currentFeasibilityStatus = opp.feasibilityStatus;
+  const activationBlockReason = getActivationBlockReason(
+    canActivate,
+    currentFeasibilityStatus,
+    riskReason,
+    dirty,
+    activationDisabledReason
+  );
   const pipelineName = data.pipelines.find((p) => p.id === effectivePipelineId)?.name ?? "—";
   const stageName = (id: string | null) => data.dealStages.find((s) => s.id === id)?.name ?? "— без стадии —";
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
-  const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(formOf(opp)), [form, opp]);
   const projects = data.projects.filter((p) => p.sourceOpportunityId === opp.id);
 
   // лента активностей сделки — грузим при монтаже/смене сделки
@@ -220,23 +246,44 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
   async function save() {
     setBusy(true);
     const res = await crm.updateOpportunity(opp.id, {
-      clientId: opp.clientId ?? "", primaryContactId: opp.primaryContactId ?? "", projectTypeId: opp.projectTypeId ?? "",
-      stageId: form.stageId, title: form.title.trim(), description: form.description.trim() || null,
-      plannedStart: form.plannedStart, plannedFinish: form.plannedFinish,
-      contractValue: Math.round(Number(form.contractValue)), plannedHourlyRate: Math.round(Number(form.plannedHourlyRate)),
-      probability: Math.round(Number(form.probability)), demand: opp.demand, ownerUserId: form.ownerUserId || null
+      clientId: opp.clientId ?? "",
+      primaryContactId: opp.primaryContactId ?? "",
+      projectTypeId: opp.projectTypeId ?? "",
+      stageId: form.stageId,
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      plannedStart: form.plannedStart,
+      plannedFinish: form.plannedFinish,
+      contractValue: Math.round(Number(form.contractValue)),
+      plannedHourlyRate: Math.round(Number(form.plannedHourlyRate)),
+      probability: Math.round(Number(form.probability)),
+      demand: opp.demand,
+      ownerUserId: form.ownerUserId || null,
+      templateId: opp.templateId,
+      customFieldValues: opp.customFieldValues
     });
     setBusy(false);
-    if (res.ok) toast.success("Сделка сохранена");
-    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) {
+      setForm(formOf(res.data));
+      setFeasibility(null);
+      setRiskReason("");
+      toast.success("Сделка сохранена");
+    } else {
+      toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
+    }
   }
 
   async function check() {
     setBusy(true);
     const res = await crm.checkFeasibility(opp.id);
     setBusy(false);
-    if (res.ok) { setFeasibility(res.data); toast.success(`Осуществимость: ${FEAS_LABEL[res.data.status] ?? res.data.status}`); }
-    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) {
+      setFeasibility(res.data);
+      setRiskReason("");
+      toast.success(`Осуществимость: ${FEAS_LABEL[res.data.status] ?? res.data.status}`);
+    } else {
+      toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
+    }
   }
 
   async function activate() {
@@ -362,7 +409,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
           <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Осуществимость</h3>
-              <Button variant="secondary" size="sm" disabled={busy || locked || !canCheckFeasibility} onClick={() => void check()} title={canCheckFeasibility ? undefined : feasibilityDisabledReason}><FlaskConical className="size-3.5" aria-hidden />Проверить</Button>
+              <Button variant="secondary" size="sm" disabled={busy || locked || !canCheckFeasibility || dirty} onClick={() => void check()} title={!canCheckFeasibility ? feasibilityDisabledReason : dirty ? "Сначала сохраните изменения" : undefined}><FlaskConical className="size-3.5" aria-hidden />Проверить</Button>
             </div>
             {feasibility ? <FeasibilityWidget a={feasibility} checkedAt={opp.feasibilityCheckedAt} /> : (
               <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Проверка осуществимости ещё не запускалась. Нажмите «Проверить» — сервер оценит ресурсы по плановым часам, спросу и активным проектам.</p>
@@ -378,10 +425,10 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
               </div>
             ) : (
               <div className="flex flex-col gap-2.5">
-                {feasibility?.status === "conflict" ? (
+                {currentFeasibilityStatus === "conflict" ? (
                   <label className={labelCls}>Обоснование риска (для активации при конфликте)<Input value={riskReason} onChange={(e) => setRiskReason(e.target.value)} disabled={!canActivate} placeholder="Почему запускаем несмотря на конфликт…" /></label>
                 ) : null}
-                <Button variant="default" disabled={busy || !canActivate || opp.feasibilityStatus == null} onClick={() => void activate()} title={!canActivate ? activationDisabledReason : opp.feasibilityStatus == null ? "Сначала проверьте осуществимость" : undefined}><Rocket className="size-3.5" aria-hidden />Активировать в проект</Button>
+                <Button variant="default" disabled={busy || activationBlockReason !== null} onClick={() => void activate()} title={activationBlockReason ?? undefined}><Rocket className="size-3.5" aria-hidden />Активировать в проект</Button>
                 <div className="flex gap-2">
                   {/* Необратимое закрытие сделки — только через подтверждение (G4-06). */}
                   <ConfirmDialog

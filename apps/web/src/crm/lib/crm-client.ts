@@ -92,8 +92,11 @@ export type OpportunityCreateInput = {
 };
 
 // Форма ПОЛНОГО обновления сделки (PATCH /:id — full-replace, как боевой parseOpportunityUpdateBody).
-// = тело create + опциональный templateId. Статус/воронка/feasibility — server-managed (тело их не несёт).
-export type OpportunityUpdateInput = OpportunityCreateInput & { templateId?: string | null };
+// Статус/воронка/feasibility — server-managed; templateId/customFieldValues обязаны сохраняться клиентом.
+export type OpportunityUpdateInput = OpportunityCreateInput & {
+  templateId: string | null;
+  customFieldValues: Record<string, string>;
+};
 
 // Тело активации проекта из сделки (POST /:id/activate). Оба поля опциональны.
 export type ProjectActivationInput = { id?: string; acceptedRiskReason?: string | null };

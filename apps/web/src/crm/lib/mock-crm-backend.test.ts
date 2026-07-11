@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { CrmApiError, createCrmClient, type OpportunityCreateInput } from "./crm-client";
+import { CrmApiError, createCrmClient, type OpportunityCreateInput, type OpportunityUpdateInput } from "./crm-client";
 import { createMockCrmFetch } from "./mock-crm-backend";
 
 function client() {
@@ -265,7 +265,12 @@ describe("contract-mock CRM backend", () => {
   });
 
   // ===== Карточка сделки: full-replace update =====
-  const updateInput = (over: Partial<OpportunityCreateInput> = {}) => ({ ...baseInput(over) });
+  const updateInput = (over: Partial<OpportunityUpdateInput> = {}): OpportunityUpdateInput => ({
+    ...baseInput(over),
+    templateId: null,
+    customFieldValues: {},
+    ...over
+  });
 
   it("updates an opportunity (full-replace): recomputes plannedHours, preserves status, derives pipelineId, resets feasibility", async () => {
     const c = client();
@@ -274,7 +279,8 @@ describe("contract-mock CRM backend", () => {
     const { opportunity } = await c.updateOpportunity("opp-2207", updateInput({
       clientId: "client-romashka", primaryContactId: "ctc-romashka", projectTypeId: "pt-impl", stageId: "stage-contract",
       title: "Производственный портал · Релиз 2 (обновлён)", contractValue: 6_000_000, plannedHourlyRate: 5000,
-      plannedStart: "2026-03-02", plannedFinish: "2026-07-12", probability: 70, demand: [{ positionId: "backend", requiredHours: 900 }]
+      plannedStart: "2026-03-02", plannedFinish: "2026-07-12", probability: 70, demand: [{ positionId: "backend", requiredHours: 900 }],
+      templateId: "template-enterprise", customFieldValues: { priority_model: "  Высокий  ", empty_note: "   " }
     }));
     expect(opportunity.plannedHours).toBe(Math.floor(6_000_000 / 5000)); // 1200, пересчитан доменом
     expect(opportunity.status).toBe(before.status); // статус СОХРАНЁН (PATCH не меняет статус)
@@ -282,6 +288,23 @@ describe("contract-mock CRM backend", () => {
     expect(opportunity.stageId).toBe("stage-contract");
     expect(opportunity.feasibilityStatus).toBeNull(); // feasibility сброшен (как боевой repo.updateOpportunity)
     expect(opportunity.title).toBe("Производственный портал · Релиз 2 (обновлён)");
+    expect(opportunity.templateId).toBe("template-enterprise");
+    expect(opportunity.customFieldValues).toEqual({ priority_model: "Высокий" });
+  });
+
+  it.each([
+    ["array", [], "invalid_custom_field_values"],
+    ["too many fields", Object.fromEntries(Array.from({ length: 51 }, (_, index) => [`field_${index}`, "x"])), "invalid_custom_field_values"],
+    ["unsafe key", { constructor: "pollution" }, "invalid_custom_field_key"],
+    ["object value", { priority_model: {} }, "invalid_custom_field_value"],
+    ["multiline value", { priority_model: "Высокий\nскрытая строка" }, "invalid_custom_field_value"]
+  ])("rejects %s in full-replace custom fields", async (_case, customFieldValues, code) => {
+    const c = client();
+    await expect(
+      c.updateOpportunity("opp-2207", updateInput({
+        customFieldValues: customFieldValues as Record<string, string>
+      }))
+    ).rejects.toMatchObject({ status: 400, code });
   });
 
   it("full-replace update enforces stage transition guards (как боевой updateOpportunityCommand)", async () => {
@@ -326,11 +349,12 @@ describe("contract-mock CRM backend", () => {
     const c = client();
     const ok = (await c.checkFeasibility("opp-gamma-contract")).assessment.status;
     const warning = (await c.checkFeasibility("opp-2207")).assessment.status; // req 1100 < plannedHours 1200 → warning
-    const conflict = (await c.checkFeasibility("opp-conflict-demo")).assessment; // req 900 > plannedHours 200 → conflict
+    const conflict = (await c.checkFeasibility("opp-conflict-demo")).assessment; // 100ч спроса > 48ч доступной ёмкости
     expect(ok).toBe("ok");
     expect(warning).toBe("warning");
     expect(conflict.status).toBe("conflict");
-    expect(conflict.blockers).toContain("demand_exceeds_planned_hours");
+    expect(conflict).toMatchObject({ blockers: [], rows: [{ status: "conflict" }] });
+    expect(conflict.rows[0]?.shortageHours).toBeGreaterThan(0);
     // conflict-сделка переводится в status "feasibility", не ready_to_activate
     expect((await c.getOpportunity("opp-conflict-demo")).opportunity.status).toBe("feasibility");
   });

@@ -220,7 +220,8 @@ function resolveAssessmentStatus(input: {
   hasShortage: boolean;
   hasWarnings: boolean;
 }): OpportunityFeasibilityStatus {
-  if (input.hasBlockers || input.hasShortage) return "conflict";
+  if (input.hasBlockers) return "blocked";
+  if (input.hasShortage) return "conflict";
   if (input.hasWarnings) return "warning";
   return "ok";
 }
