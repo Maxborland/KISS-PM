@@ -3,14 +3,17 @@ import { randomUUID } from "node:crypto";
 import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
 
-import type { AccessProfile } from "@kiss-pm/access-control";
+import { canManageProjects, type AccessProfile } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 
 import type { ApiApp, ApiRouteDeps } from "../routeTypes";
+import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRoutes";
 import { createUploadConcurrencyLimiter } from "../attachmentUploadRequest";
 import { readLimitedJsonBody } from "../jsonBody";
 import { createPlanningReadModel } from "../planning/planningReadModel";
+import { canReadPlanningReadModel } from "../planning/planningRouteAuth";
 import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
+import { canEditTaskFields, canParticipateInTaskActivity, canParticipantTransitionTask } from "../project-work/taskCommandGuards";
 import { runAgentLoop, type AgentLoopEvent, type AnalyzeExecutor } from "./agentLoop";
 import { createAgentLlmProviderFromEnv } from "./llmProvider";
 import { AGENT_TOOLS, allowedToolsForActor, findAgentTool, listToolAvailability, type AgentTool } from "./toolRegistry";
@@ -35,9 +38,16 @@ const AGENT_SYSTEM_PROMPT = [
 // исполняется вживую через governed-эндпоинт scenarios/preview (он стейджит сценарные run'ы,
 // плана не меняет) — агент получает их id, чтобы предложить применение.
 const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_resource_overloads", "preview_resource_resolution"]);
-// mutation-инструменты, которые /execute РЕАЛЬНО применяет. LLM предлагают только их — иначе
-// агент мог бы предложить действие, которое при подтверждении вернёт 501 (сломанное обещание).
+// Mutation-инструменты с ручным /execute. OFFERABLE_MUTATIONS — более узкий набор: только
+// действия, для которых review-карточка уже показывает полный честный before/after.
 const EXECUTABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "create_task", "apply_resource_resolution", "apply_plan_commands"]);
+const OFFERABLE_MUTATIONS = new Set(["change_task_status", "comment_task"]);
+
+export function isAgentToolOfferable(tool: AgentTool): boolean {
+  return (Boolean(tool.binding) && tool.kind === "analyze")
+    || (tool.kind === "mutation" && OFFERABLE_MUTATIONS.has(tool.name))
+    || WIRED_ANALYZE.has(tool.name);
+}
 
 const OVERLOAD_CAP = 30; // ponytail: режем payload до топ-N перегрузок (по минутам), upgrade — пагинация если мало
 
@@ -47,6 +57,149 @@ const ATTACH_MAX_TOTAL_CHARS = 50_000; // ponytail: inline-контекст дл
 // прочитать и отбраковываем по эвристике бинарности (null-байт), а не по одному Content-Type.
 const TEXT_MIME_RE = /^(text\/|application\/(json|ld\+json|xml|csv|x-yaml|yaml|markdown|x-ndjson))/i;
 const MAYBE_TEXT_MIME_RE = /^(application\/octet-stream|$)/i;
+
+type PreviewableAction = { tool: string; input: Record<string, unknown> };
+export type AgentActionPreview = { before: string; after: string };
+export type AgentActionPreconditionVersions = { taskUpdatedAt?: string };
+
+export async function buildProposalActionMetadata(
+  dataSource: ApiRouteDeps["dataSource"],
+  actor: TenantUser,
+  profile: AccessProfile,
+  action: PreviewableAction
+): Promise<{
+  title?: string;
+  preview: AgentActionPreview;
+  preconditionVersions: AgentActionPreconditionVersions;
+  capability?: { allowed: boolean; reason: string };
+}> {
+  if (action.tool === "comment_task") {
+    const taskId = typeof action.input.taskId === "string" ? action.input.taskId : "";
+    const task = taskId ? await dataSource.findTaskById?.(actor.tenantId, taskId) : undefined;
+    const canReadTaskMetadata = task && (
+      canParticipateInTaskActivity(actor.id, task) ||
+      canEditTaskFields(actor, profile, task).allowed
+    );
+    return {
+      ...(canReadTaskMetadata && task
+        ? { title: `Прокомментировать задачу: «${task.title}» · проект ${task.projectId}, задача ${task.id}` }
+        : {}),
+      preview: canReadTaskMetadata
+        ? await buildActionPreview(dataSource, actor.tenantId, action)
+        : {
+            before: "Количество комментариев недоступно",
+            after: typeof action.input.body === "string" ? action.input.body : ""
+          },
+      preconditionVersions: {},
+      ...(!canReadTaskMetadata
+        ? { capability: { allowed: false, reason: "task_participant_required" } }
+        : {})
+    };
+  }
+  if (action.tool === "apply_plan_commands" || action.tool === "apply_resource_resolution") {
+    const planRead = canReadPlanningReadModel({ actor, profile });
+    if (!planRead.allowed) {
+      const commandCount = Array.isArray(action.input.commands) ? action.input.commands.length : 1;
+      return {
+        preview: {
+          before: "Версия плана недоступна",
+          after: action.tool === "apply_plan_commands"
+            ? `Команд плана: ${commandCount}`
+            : "Применить проверенный сценарий"
+        },
+        preconditionVersions: {},
+        capability: { allowed: false, reason: planRead.reason }
+      };
+    }
+  }
+  if (action.tool !== "change_task_status") {
+    return { preview: await buildActionPreview(dataSource, actor.tenantId, action), preconditionVersions: {} };
+  }
+  const taskId = typeof action.input.taskId === "string" ? action.input.taskId : "";
+  const statusId = typeof action.input.statusId === "string" ? action.input.statusId : "";
+  const [task, statuses] = await Promise.all([
+    taskId ? dataSource.findTaskById?.(actor.tenantId, taskId) : undefined,
+    dataSource.listTaskStatuses?.(actor.tenantId) ?? []
+  ]);
+  const canReadTaskMetadata = task && (
+    canManageProjects({ actor, profile, targetTenantId: actor.tenantId }).allowed ||
+    canParticipantTransitionTask(actor.id, task)
+  );
+  return {
+    ...(canReadTaskMetadata && task
+      ? { title: `Сменить статус задачи: «${task.title}» · проект ${task.projectId}, задача ${task.id}` }
+      : {}),
+    preview: {
+      before: canReadTaskMetadata ? (task.statusName ?? task.statusId) : taskId,
+      after: statuses.find((status) => status.id === statusId)?.name ?? statusId
+    },
+    preconditionVersions: canReadTaskMetadata ? { taskUpdatedAt: task.updatedAt.toISOString() } : {},
+    ...(!canReadTaskMetadata
+      ? { capability: { allowed: false, reason: "task_participant_role_required" } }
+      : {})
+  };
+}
+
+/**
+ * Payload-backed preview used by both JSON/SSE proposals and execution audit.
+ * Missing optional repositories degrade to explicit identifiers, never invented labels.
+ */
+export async function buildActionPreview(
+  dataSource: ApiRouteDeps["dataSource"],
+  tenantId: string,
+  action: PreviewableAction
+): Promise<AgentActionPreview> {
+  const { input } = action;
+  if (action.tool === "change_task_status") {
+    const taskId = typeof input.taskId === "string" ? input.taskId : "";
+    const statusId = typeof input.statusId === "string" ? input.statusId : "";
+    const [task, statuses] = await Promise.all([
+      taskId ? dataSource.findTaskById?.(tenantId, taskId) : undefined,
+      dataSource.listTaskStatuses?.(tenantId) ?? []
+    ]);
+    return {
+      before: task?.statusName ?? task?.statusId ?? taskId,
+      after: statuses.find((status) => status.id === statusId)?.name ?? statusId
+    };
+  }
+  if (action.tool === "comment_task") {
+    const taskId = typeof input.taskId === "string" ? input.taskId : "";
+    const activities = taskId
+      ? await dataSource.listTaskActivities?.(tenantId, taskId)
+      : undefined;
+    const comments = activities?.filter((activity) => activity.type === "comment").length;
+    return {
+      before: comments === undefined ? "Количество комментариев недоступно" : `Комментариев: ${comments}`,
+      after: typeof input.body === "string" ? input.body : ""
+    };
+  }
+  if (action.tool === "create_task") {
+    return {
+      before: "Задача отсутствует",
+      after: typeof input.title === "string" ? input.title : ""
+    };
+  }
+  if (action.tool === "apply_plan_commands" || action.tool === "apply_resource_resolution") {
+    const projectId = typeof input.projectId === "string" ? input.projectId : "";
+    const snapshot = projectId
+      ? await dataSource.getPlanSnapshot?.(tenantId, projectId)
+      : undefined;
+    const commandCount = Array.isArray(input.commands) ? input.commands.length : 1;
+    return {
+      before: snapshot ? `Версия плана ${snapshot.planVersion}` : "Версия плана недоступна",
+      after: action.tool === "apply_plan_commands"
+        ? `Команд плана: ${commandCount}`
+        : "Применить проверенный сценарий"
+    };
+  }
+  return {
+    before: "Текущее значение определяется целевым маршрутом",
+    after: Object.entries(input)
+      .filter(([, value]) => typeof value === "string" || typeof value === "number")
+      .map(([key, value]) => `${key}: ${String(value)}`)
+      .join(" · ")
+  };
+}
 
 // Имя файла из content-disposition. filename*=UTF-8''… percent-декодируем (безопасно, с
 // откатом на сырое при невалидном %); plain filename="…" берём как есть (литеральный %).
@@ -345,13 +498,9 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   ) {
     const { cookie, actor, profile, goal, attachmentIds, history } = request;
     const allowed = allowedToolsForActor(actor, profile);
-    // LLM получает только реально исполнимое: декларативные (binding) + ручные исполнимые
-    // mutation + подключённые ручные analyze. Не-исполнимое (напр. update_task) не предлагается.
-    const offered = allowed.filter((tool) =>
-      Boolean(tool.binding) ||
-      (tool.kind === "mutation" && EXECUTABLE_MUTATIONS.has(tool.name)) ||
-      WIRED_ANALYZE.has(tool.name)
-    );
+    // LLM получает read-only binding-и и только mutation с честным preview + реальным execute.
+    // Остальные binding-mutation не предлагаем, пока review-карточка не умеет показать их payload.
+    const offered = allowed.filter(isAgentToolOfferable);
     const attachments = attachmentIds.length > 0 ? await resolveAttachments(app, cookie, attachmentIds) : [];
     const result = await runAgentLoop({
       provider,
@@ -366,9 +515,13 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     });
     // Аннотируем предложения грубым capability (точная проверка — при /execute).
     const capabilityByTool = new Map(AGENT_TOOLS.map((tool) => [tool.name, tool.capability({ actor, profile })]));
-    const proposedActions = result.proposedActions.map((action) => ({
-      ...action,
-      capability: capabilityByTool.get(action.tool) ?? { allowed: false, reason: "permission_missing" }
+    const proposedActions = await Promise.all(result.proposedActions.map(async (action) => {
+      const metadata = await buildProposalActionMetadata(deps.dataSource, actor, profile, action);
+      return {
+        ...action,
+        capability: capabilityByTool.get(action.tool) ?? { allowed: false, reason: "permission_missing" },
+        ...metadata
+      };
     }));
     return {
       goal,
@@ -436,12 +589,23 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     const profile = await deps.getActorProfile(actor);
     const taskWorkspace = createTaskCommandWorkspace(deps);
-    const results: Array<{ tool: string; ok: boolean; status?: number; error?: string; result?: unknown }> = [];
+    const results: Array<{
+      tool: string;
+      ok: boolean;
+      status?: number;
+      error?: string;
+      result?: unknown;
+      currentVersions?: AgentActionPreconditionVersions;
+    }> = [];
+    const previews: Array<AgentActionPreview | undefined> = [];
 
-    for (const raw of actions) {
-      const action = raw as { tool?: unknown; input?: unknown };
+    for (let actionIndex = 0; actionIndex < actions.length; actionIndex += 1) {
+      const action = (actions[actionIndex] ?? {}) as { tool?: unknown; input?: unknown; preconditionVersions?: unknown };
       const toolName = typeof action.tool === "string" ? action.tool : "";
       const input = (action.input && typeof action.input === "object" ? action.input : {}) as Record<string, unknown>;
+      const preconditionVersions = (action.preconditionVersions && typeof action.preconditionVersions === "object"
+        ? action.preconditionVersions
+        : {}) as AgentActionPreconditionVersions;
       const tool = findAgentTool(toolName);
 
       if (!tool || tool.kind !== "mutation") {
@@ -463,16 +627,47 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
           continue;
         }
+        const task = await deps.dataSource.findTaskById?.(actor.tenantId, taskId);
+        const canTransition = task && (
+          canManageProjects({ actor, profile, targetTenantId: actor.tenantId }).allowed ||
+          canParticipantTransitionTask(actor.id, task)
+        );
+        if (task && !canTransition) {
+          results.push({ tool: tool.name, ok: false, status: 403, error: "task_participant_role_required" });
+          continue;
+        }
+        const clientUpdatedAt = typeof preconditionVersions.taskUpdatedAt === "string"
+          ? new Date(preconditionVersions.taskUpdatedAt)
+          : null;
+        if (!clientUpdatedAt || Number.isNaN(clientUpdatedAt.getTime())) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "missing_precondition_versions" });
+          continue;
+        }
         const preflight = await taskWorkspace.preflightTransitionTaskStatus({ actor, profile, projectId });
         if (!preflight.ok) {
           results.push({ tool: tool.name, ok: false, status: preflight.status, error: preflight.error });
           continue;
         }
-        const transition = await taskWorkspace.transitionTaskStatus({ actor, profile, projectId, taskId, body: { statusId } });
+        previews[actionIndex] = await buildActionPreview(deps.dataSource, actor.tenantId, { tool: tool.name, input });
+        const transition = await taskWorkspace.transitionTaskStatus({
+          actor,
+          profile,
+          projectId,
+          taskId,
+          body: { statusId },
+          clientUpdatedAt
+        });
         if (!transition.ok) {
-          results.push({ tool: tool.name, ok: false, status: transition.status, error: transition.error });
+          results.push({
+            tool: tool.name,
+            ok: false,
+            status: transition.status,
+            error: transition.error,
+            ...(transition.currentVersions ? { currentVersions: transition.currentVersions } : {})
+          });
           continue;
         }
+        invalidateCapacityCacheForTenant(actor.tenantId);
         results.push({ tool: tool.name, ok: true, result: { task: transition.task } });
         continue;
       }
@@ -487,6 +682,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           continue;
         }
         const acceptedRiskReason = typeof input.acceptedRiskReason === "string" ? input.acceptedRiskReason : undefined;
+        previews[actionIndex] = await buildActionPreview(deps.dataSource, actor.tenantId, { tool: tool.name, input });
         const res = await dispatchInternal(app, cookie, `/api/workspace/projects/${projectId}/planning/scenarios/${scenarioId}/apply`, { clientPlanVersion, acceptedRiskReason });
         if (res.status === 200) results.push({ tool: tool.name, ok: true, result: res.body });
         else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "apply_failed" });
@@ -502,6 +698,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
           continue;
         }
+        previews[actionIndex] = await buildActionPreview(deps.dataSource, actor.tenantId, { tool: tool.name, input });
         const res = await dispatchInternal(app, cookie, `/api/workspace/projects/${projectId}/planning/apply-command-batch`, { commands, clientPlanVersion });
         if (res.status === 200) results.push({ tool: tool.name, ok: true, result: res.body });
         else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "apply_failed" });
@@ -516,6 +713,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
           continue;
         }
+        previews[actionIndex] = await buildActionPreview(deps.dataSource, actor.tenantId, { tool: tool.name, input });
         const res = await dispatchInternal(app, cookie, `/api/workspace/tasks/${taskId}/comments`, { body: commentBody });
         if (res.status === 200 || res.status === 201) results.push({ tool: tool.name, ok: true, result: res.body });
         else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "comment_failed" });
@@ -537,6 +735,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           ? input.participants
           : [{ userId: actor.id, role: "executor" }];
         const path = projectId ? `/api/workspace/projects/${projectId}/tasks` : "/api/workspace/tasks";
+        previews[actionIndex] = await buildActionPreview(deps.dataSource, actor.tenantId, { tool: tool.name, input });
         const res = await dispatchInternal(app, cookie, path, {
           title,
           priority: typeof input.priority === "string" ? input.priority : "normal",
@@ -558,6 +757,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       // Декларативные mutation-инструменты (CRM/comms/admin/projects) — generic-редиспатч в
       // governed-роут. Точный RBAC/валидация — на самом роуте; грубый capability уже проверен выше.
       if (tool.binding) {
+        previews[actionIndex] = await buildActionPreview(deps.dataSource, actor.tenantId, { tool: tool.name, input });
         const res = await dispatchBinding(app, cookie, tool.binding, input);
         if (res.status >= 200 && res.status < 300) results.push({ tool: tool.name, ok: true, result: res.body });
         else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "action_failed" });
@@ -566,18 +766,29 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
       // update_task пока НЕ исполняем: PATCH требует полное тело + clientUpdatedAt (риск затирания
       // участников при сборке из частичных fields). До безопасного частичного апдейта он не
-      // предлагается LLM (см. EXECUTABLE_MUTATIONS), так что сюда штатно не попадаем.
+      // предлагается LLM (см. OFFERABLE_MUTATIONS), так что сюда штатно не попадаем.
       results.push({ tool: tool.name, ok: false, status: 501, error: "tool_not_executable_yet" });
     }
+
+    const classifiedResults = results.map((item) => ({
+      ...item,
+      status: item.ok
+        ? "applied" as const
+        : item.status === 403
+          ? "denied" as const
+          : item.status === 409 || item.error?.endsWith("_conflict")
+            ? "conflict" as const
+            : "failed" as const
+    }));
 
     // Провенанс агента: на каждое применённое или отклонённое правами действие — ОТДЕЛЬНОЕ
     // audit-событие sourceWorkflow:"agent". Успешные события идут сверх штатного аудита
     // governed-команды; denied-события не дают попыткам агента исчезнуть из governance trail.
     if (deps.dataSource.appendAuditEvent) {
       const correlationId = `agent-execute-${randomUUID()}`;
-      for (let i = 0; i < results.length; i += 1) {
-        const item = results[i]!;
-        if (!item.ok && item.status !== 403) continue;
+      for (let i = 0; i < classifiedResults.length; i += 1) {
+        const item = classifiedResults[i]!;
+        if (!item.ok && item.status !== "denied") continue;
         const action = (actions[i] ?? {}) as { input?: unknown };
         const input = (action.input && typeof action.input === "object" ? action.input : {}) as Record<string, unknown>;
         const deniedReason = item.error ?? "permission_missing";
@@ -589,7 +800,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           sourceWorkflow: "agent",
           sourceEntity: agentSourceEntity(input),
           input: { tool: item.tool, input },
-          beforeState: null,
+          beforeState: item.ok ? { value: previews[i]?.before ?? "Недоступно" } : null,
           afterState: item.ok ? ((item.result ?? null) as Record<string, unknown> | null) : null,
           permissionResult: item.ok
             ? { allowed: true, via: "agent" }
@@ -603,7 +814,10 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }
     }
 
-    const anyApplied = results.some((r) => r.ok);
-    return context.json({ results, applied: anyApplied }, anyApplied ? 200 : 422);
+    const summary = classifiedResults.reduce(
+      (counts, item) => ({ ...counts, [item.status]: counts[item.status] + 1 }),
+      { applied: 0, skipped: 0, denied: 0, conflict: 0, failed: 0 }
+    );
+    return context.json({ results: classifiedResults, applied: summary.applied > 0, summary });
   });
 }

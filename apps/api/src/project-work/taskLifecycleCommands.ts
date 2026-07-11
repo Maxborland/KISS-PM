@@ -172,6 +172,15 @@ export async function transitionTaskStatus(
       };
     }
 
+    if (input.clientUpdatedAt && task.updatedAt.getTime() !== input.clientUpdatedAt.getTime()) {
+      return {
+        ok: false as const,
+        status: 409,
+        error: "task_version_conflict",
+        currentVersions: { taskUpdatedAt: task.updatedAt.toISOString() }
+      };
+    }
+
     if (!isTaskStatusTransitionAllowed(task.status, targetStatus.category)) {
       return {
         ok: false as const,

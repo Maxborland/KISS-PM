@@ -20,7 +20,14 @@ export type AgentToolKind = "analyze" | "mutation";
 export type AgentToolAvailability = { name: string; title: string; description: string; kind: AgentToolKind; allowed: boolean; reason: string };
 
 export type AgentCapability = { allowed: boolean; reason: string };
-export type ProposedAction = { tool: string; title: string; input: Record<string, unknown>; capability: AgentCapability };
+export type ProposedAction = {
+  tool: string;
+  title: string;
+  input: Record<string, unknown>;
+  capability: AgentCapability;
+  preview: { before: string; after: string };
+  preconditionVersions?: { taskUpdatedAt?: string };
+};
 export type AnalyzeResult = { tool: string; input: Record<string, unknown>; result: unknown };
 
 export type AgentProposeResponse = {
@@ -43,10 +50,60 @@ export type AgentStreamEvent =
   | { type: "analyze"; tool: string; title: string; ok: boolean }
   | { type: "proposal"; tool: string; title: string };
 
-export type AgentExecuteResultItem = { tool: string; ok: boolean; status?: number; error?: string; result?: unknown };
-export type AgentExecuteResponse = { results: AgentExecuteResultItem[]; applied: boolean };
+export type AgentExecuteStatus = "applied" | "skipped" | "denied" | "conflict" | "failed";
+export type AgentExecuteResultItem = {
+  tool: string;
+  ok: boolean;
+  status: AgentExecuteStatus;
+  error?: string;
+  result?: unknown;
+  currentVersions?: { taskUpdatedAt?: string };
+};
+export type AgentExecuteSummary = Record<AgentExecuteStatus, number>;
+export type AgentExecuteResponse = {
+  results: AgentExecuteResultItem[];
+  applied: boolean;
+  summary: AgentExecuteSummary;
+};
 
-export type AgentActionInput = { tool: string; input: Record<string, unknown> };
+const EXECUTE_STATUS_VALUES = ["applied", "skipped", "denied", "conflict", "failed"] as const;
+const EXECUTE_STATUSES = new Set<AgentExecuteStatus>(EXECUTE_STATUS_VALUES);
+
+function decodeExecuteResponse(value: unknown, actions: AgentActionInput[]): AgentExecuteResponse {
+  if (!value || typeof value !== "object") throw new DomainApiError(502, "invalid_execute_response", { error: "invalid_execute_response" });
+  const response = value as Partial<AgentExecuteResponse>;
+  const resultsValid = Array.isArray(response.results)
+    && response.results.length === actions.length
+    && response.results.every((item, index) =>
+      item
+      && item.tool === actions[index]?.tool
+      && typeof item.ok === "boolean"
+      && EXECUTE_STATUSES.has(item.status)
+      && item.ok === (item.status === "applied")
+    );
+  const summary = response.summary;
+  const summaryValid = summary && EXECUTE_STATUS_VALUES.every((status) =>
+    Number.isInteger(summary[status]) && summary[status] >= 0
+  );
+  if (!resultsValid || !summaryValid || typeof response.applied !== "boolean") {
+    throw new DomainApiError(502, "invalid_execute_response", { error: "invalid_execute_response" });
+  }
+  const counts: AgentExecuteSummary = { applied: 0, skipped: 0, denied: 0, conflict: 0, failed: 0 };
+  for (const result of response.results!) counts[result.status] += 1;
+  if (
+    EXECUTE_STATUS_VALUES.some((status) => summary[status] !== counts[status])
+    || response.applied !== (counts.applied > 0)
+  ) {
+    throw new DomainApiError(502, "invalid_execute_response", { error: "invalid_execute_response" });
+  }
+  return response as AgentExecuteResponse;
+}
+
+export type AgentActionInput = {
+  tool: string;
+  input: Record<string, unknown>;
+  preconditionVersions?: { taskUpdatedAt?: string };
+};
 
 export function createAgentClient(options: AgentApiClientOptions) {
   // fetchImpl/credentials остаются нужны напрямую: uploadAttachment (multipart без
@@ -120,7 +177,7 @@ export function createAgentClient(options: AgentApiClientOptions) {
         for (;;) {
           const { value, done: streamDone } = await reader.read();
           if (streamDone) break;
-          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+          buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
           let sep: number;
           while ((sep = buffer.indexOf("\n\n")) >= 0) {
             const frame = buffer.slice(0, sep);
@@ -141,8 +198,9 @@ export function createAgentClient(options: AgentApiClientOptions) {
       if (!done) throw new DomainApiError(500, "stream_incomplete", { error: "stream_incomplete" });
       return done;
     },
-    execute(actions: AgentActionInput[]) {
-      return requestJson<AgentExecuteResponse>("/api/workspace/agent/execute", { method: "POST", body: JSON.stringify({ actions }) });
+    async execute(actions: AgentActionInput[]) {
+      const response = await requestJson<unknown>("/api/workspace/agent/execute", { method: "POST", body: JSON.stringify({ actions }) });
+      return decodeExecuteResponse(response, actions);
     }
   };
 }

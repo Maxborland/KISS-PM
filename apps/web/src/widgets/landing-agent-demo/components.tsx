@@ -153,6 +153,7 @@ type AgentChatPanelProps = {
   phase: string;
   agentMenuOpen: boolean;
   reviewVisible: boolean;
+  disabled?: boolean;
   liveSteps?: string[]; // реальные шаги CoT (live SSE); нет → демо-шаги
   attachSlot?: React.ReactNode; // панель вложений (якорь + чипы файлов) над композером
   onInputChange: (value: string) => void;
@@ -170,6 +171,7 @@ export function AgentChatPanel({
   phase,
   agentMenuOpen,
   reviewVisible,
+  disabled = false,
   liveSteps,
   attachSlot,
   onInputChange,
@@ -237,11 +239,12 @@ export function AgentChatPanel({
           onChange={(event) => onInputChange(event.target.value)}
           placeholder="Сообщение Генри Гантту..."
           aria-label="Сообщение Генри Гантту"
+          disabled={disabled}
         />
-        <button className="lad-icon-button lad-attach-button" type="button" aria-label="Прикрепить файл" onClick={onAttachClick}>
+        <button className="lad-icon-button lad-attach-button" type="button" aria-label="Прикрепить файл" onClick={onAttachClick} disabled={disabled}>
           <Paperclip aria-hidden />
         </button>
-        <button className="lad-send-button" type="submit" disabled={!inputValue.trim()}>
+        <button className="lad-send-button" type="submit" disabled={disabled || !inputValue.trim()}>
           <Send aria-hidden />
           <span className="lad-sr">Отправить</span>
         </button>
@@ -328,6 +331,7 @@ type ChangeReviewPanelProps = {
   visible: boolean;
   opening: boolean;
   applied: boolean;
+  busy?: boolean;
   activeChangeId: string;
   editingChangeId?: string | undefined;
   mobileOpen?: boolean | undefined;
@@ -345,8 +349,8 @@ export function ChangeReviewPanel({
   changes,
   visible,
   opening,
-  applied,
   activeChangeId,
+  busy = false,
   editingChangeId,
   mobileOpen,
   onCloseMobile,
@@ -359,6 +363,13 @@ export function ChangeReviewPanel({
   onReset
 }: ChangeReviewPanelProps) {
   const selectedCount = changes.filter((change) => change.selected).length;
+  const appliedCount = changes.filter((change) => change.status === "применено").length;
+  const unresolvedCount = changes.filter((change) =>
+    ["требует прав", "ошибка", "конфликт", "отказано", "неизвестно"].includes(change.status)
+  ).length;
+  const hasExecutionOutcome = changes.some((change) =>
+    ["применено", "пропущено", "отказано", "конфликт", "ошибка", "неизвестно"].includes(change.status)
+  );
 
   if (!visible && !mobileOpen) {
     return null;
@@ -376,7 +387,7 @@ export function ChangeReviewPanel({
       <header className="lad-review__header">
         <div>
           <span>Сверка</span>
-          <strong>5 изменений</strong>
+          <strong>Всего: {changes.length}</strong>
         </div>
         <button className="lad-icon-button lad-mobile-only" type="button" onClick={onCloseMobile}>
           <X aria-hidden />
@@ -385,7 +396,7 @@ export function ChangeReviewPanel({
       </header>
       <div className="lad-review__summary">
         <span className="is-active">{selectedCount} выбрано</span>
-        <span>Готово к проверке</span>
+        <span>{appliedCount > 0 && unresolvedCount > 0 ? "Частично применено" : unresolvedCount > 0 ? "Требуют внимания" : "Готово к проверке"}</span>
         <button type="button">
           Выбрано
           <ChevronDown aria-hidden />
@@ -395,6 +406,7 @@ export function ChangeReviewPanel({
         {changes.map((change) => (
           <ChangeHunkCard
             key={change.id}
+            busy={busy}
             change={change}
             active={change.id === activeChangeId}
             editing={change.id === editingChangeId}
@@ -406,21 +418,21 @@ export function ChangeReviewPanel({
           />
         ))}
       </div>
-      {applied ? (
-        <div className="lad-apply-result">
+      {hasExecutionOutcome ? (
+        <div className="lad-apply-result" role="status">
           <ShieldCheck aria-hidden />
           <div>
-            <strong>Выбранные изменения применены</strong>
-            <span>4 изменения записаны в журнал проекта</span>
+            <strong>Применено {appliedCount} из {changes.length}</strong>
+            <span>{unresolvedCount > 0 ? `Требуют внимания: ${unresolvedCount}` : "Все выбранные изменения обработаны"}</span>
           </div>
         </div>
       ) : null}
       <div className="lad-review__actions">
-        <Button type="button" size="sm" onClick={onApply} disabled={applied}>
+        <Button type="button" size="sm" onClick={onApply} disabled={busy || selectedCount === 0}>
           <Check aria-hidden />
-          Применить выбранное
+          {busy ? "Применяем…" : hasExecutionOutcome ? "Применить оставшиеся" : "Применить выбранное"}
         </Button>
-        <Button type="button" variant="secondary" size="sm" onClick={onReset}>
+        <Button type="button" variant="secondary" size="sm" onClick={onReset} disabled={busy}>
           <RotateCcw aria-hidden />
           Сбросить
         </Button>
@@ -431,6 +443,7 @@ export function ChangeReviewPanel({
 
 type ChangeHunkCardProps = {
   change: DemoChange;
+  busy: boolean;
   active: boolean;
   editing: boolean;
   onSelect: () => void;
@@ -442,6 +455,7 @@ type ChangeHunkCardProps = {
 
 export function ChangeHunkCard({
   change,
+  busy,
   active,
   editing,
   onSelect,
@@ -450,6 +464,7 @@ export function ChangeHunkCard({
   onEdit,
   onUpdate
 }: ChangeHunkCardProps) {
+  const terminal = ["требует прав", "применено", "пропущено", "отказано", "конфликт", "неизвестно"].includes(change.status);
   return (
     <article
       className={cn("lad-change", `lad-change--${statusClass(change.status)}`, active && "is-active")}
@@ -461,6 +476,7 @@ export function ChangeHunkCard({
         <button
           className={cn("lad-status", `lad-status--${statusClass(change.status)}`)}
           type="button"
+          disabled={busy || terminal}
           onClick={(event) => {
             event.stopPropagation();
             onSelect();
@@ -478,7 +494,7 @@ export function ChangeHunkCard({
         <div className="lad-change__arrow">→</div>
         <div>
           <span>Стало</span>
-          {editing ? (
+          {editing && !busy && !terminal ? (
             <EditableAfterValue change={change} onUpdate={onUpdate} />
           ) : (
             <p className="lad-change__after">{change.after}</p>
@@ -486,10 +502,10 @@ export function ChangeHunkCard({
         </div>
       </div>
       <div className="lad-change__actions">
-        <button type="button" onClick={onEdit}>
+        <button type="button" onClick={onEdit} disabled={busy || terminal}>
           Изменить
         </button>
-        <button type="button" onClick={onReject}>
+        <button type="button" onClick={onReject} disabled={busy || terminal}>
           Отклонить
         </button>
       </div>
@@ -553,8 +569,9 @@ function EditableAfterValue({ change, onUpdate }: { change: DemoChange; onUpdate
 function statusClass(status: string) {
   if (status === "изменено") return "edited";
   if (status === "отклонено") return "rejected";
-  if (status === "требует прав") return "permission";
+  if (status === "требует прав" || status === "отказано") return "permission";
   if (status === "применено") return "applied";
+  if (status === "конфликт" || status === "ошибка" || status === "пропущено" || status === "неизвестно") return "rejected";
   return "selected";
 }
 
