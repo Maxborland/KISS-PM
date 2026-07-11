@@ -85,6 +85,9 @@ export type TaskCommentParseResult =
 
 export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
   const id = getOptionalString(input, "id") ?? undefined;
+  if (id !== undefined && !isSafeIdentifier(id)) {
+    return { ok: false, error: "invalid_task_id" };
+  }
   const title = getStringField(input, "title") ?? "";
   if (title.length < 3 || title.length > 160 || !isSafeSingleLineText(title)) {
     return { ok: false, error: "invalid_task_title" };

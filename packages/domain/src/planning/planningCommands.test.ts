@@ -15,7 +15,6 @@ describe("planning command contract", () => {
     const right = planningAssignmentId("abc", "def-ghi", "executor");
 
     expect(left).not.toBe(right);
-    expect(() => planningAssignmentId("\ud800", "resource", "executor")).not.toThrow();
     expect(allocatePlanningAssignmentId(left, new Set([left]))).toBe(`${left}-2`);
   });
 

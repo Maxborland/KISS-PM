@@ -547,7 +547,8 @@ describe("updateTask status boundary", () => {
       [
         {
           ...snapshotAssignment(task.id),
-          id: planningAssignmentId(task.id, "user-executor", "executor")
+          id: planningAssignmentId(task.id, "user-executor", "executor"),
+          resourceId: "user-executor"
         },
         {
           ...snapshotAssignment(task.id),
