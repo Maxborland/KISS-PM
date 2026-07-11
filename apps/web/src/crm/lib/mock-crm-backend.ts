@@ -159,9 +159,9 @@ function seed(): Store {
     opp({ id: "opp-sever-portal", clientId: "client-sever", contactId: "ctc-sever", ownerUserId: "u-ivan", stageId: "stage-won", title: "Портал самообслуживания", contractValue: 3_300_000, rate: 4000, probability: 100, status: "won_closed", start: "2026-01-15", finish: "2026-04-30", positionId: "frontend", hours: 800 }),
     // Партнёрская воронка: сделка на её первой стадии — для демо back-compat-переходов и кросс-пайплайн.
     opp({ id: "opp-partner-acme", clientId: "client-delta", contactId: "ctc-delta", ownerUserId: "u-sergey", stageId: "stage-partner-lead", title: "Партнёрская интеграция · ACME", contractValue: 1_200_000, rate: 4000, probability: 35, status: "new", start: "2026-05-01", finish: "2026-08-01", positionId: "backend", hours: 300 }),
-    // Демо-сделка с гарантированным feasibility=conflict: required(900) > plannedHours(200) →
-    // блокер demand_exceeds_planned_hours. Нужна для демо активации с риском (risk_acceptance_required).
-    opp({ id: "opp-conflict-demo", clientId: "client-delta", contactId: "ctc-delta", ownerUserId: "u-ivan", stageId: "stage-proposal", title: "Срочный аврал · перегруз спроса", contractValue: 1_000_000, rate: 5000, probability: 50, status: "new", start: "2026-06-01", finish: "2026-10-30", positionId: "backend", hours: 900 })
+    // Демо-сделка с гарантированным feasibility=conflict: спрос 100ч не превышает
+    // plannedHours=200, но за один рабочий день доступно только 48ч backend.
+    opp({ id: "opp-conflict-demo", clientId: "client-delta", contactId: "ctc-delta", ownerUserId: "u-ivan", stageId: "stage-proposal", title: "Срочный аврал · перегруз спроса", contractValue: 1_000_000, rate: 5000, probability: 50, status: "new", start: "2026-06-01", finish: "2026-06-01", positionId: "backend", hours: 100 })
   ];
 
   // Активные проекты: пусто на старте (listProjects вернёт [] до первой активации).
@@ -321,9 +321,9 @@ function parseStageTransitionBody(body: Record<string, unknown>): StageTransitio
 }
 
 type OppUpdateParse =
-  | { ok: true; clientId: string; primaryContactId: string; projectTypeId: string; stageId: string; title: string; description: string | null; plannedStart: string; plannedFinish: string; contractValue: number; plannedHourlyRate: number; probability: number; ownerProvided: boolean; ownerUserId: string | null; templateId: string | null; demand: PositionDemand[] }
+  | { ok: true; clientId: string; primaryContactId: string; projectTypeId: string; stageId: string; title: string; description: string | null; plannedStart: string; plannedFinish: string; contractValue: number; plannedHourlyRate: number; probability: number; ownerProvided: boolean; ownerUserId: string | null; templateId: string | null; demand: PositionDemand[]; customFieldValues: Record<string, string> }
   | { ok: false; error: string };
-// Тело PATCH /opportunities/:id — full-replace (зеркало parseOpportunityUpdateBody): порядок и коды как create + templateId.
+// Тело PATCH /opportunities/:id — full-replace (зеркало parseOpportunityUpdateBody).
 function parseOpportunityUpdateBody(body: Record<string, unknown>): OppUpdateParse {
   // Порядок проверок полей — как боевой parseOpportunityFields: client → contact → owner →
   // projectType → stage → title → description → templateId → dates → value → rate → probability → demand.
@@ -359,7 +359,25 @@ function parseOpportunityUpdateBody(body: Record<string, unknown>): OppUpdatePar
     seenPos.add(positionId);
     demand.push({ positionId, requiredHours: d.requiredHours as number });
   }
-  return { ok: true, clientId, primaryContactId, projectTypeId, stageId, title, description, plannedStart, plannedFinish, contractValue, plannedHourlyRate, probability, ownerProvided, ownerUserId, templateId, demand };
+  const customFieldValues: Record<string, string> = {};
+  const customFieldsRaw = body.customFieldValues;
+  if (customFieldsRaw !== undefined && customFieldsRaw !== null) {
+    if (typeof customFieldsRaw !== "object" || Array.isArray(customFieldsRaw)) return { ok: false, error: "invalid_custom_field_values" };
+    const entries = Object.entries(customFieldsRaw as Record<string, unknown>);
+    if (entries.length > 50) return { ok: false, error: "invalid_custom_field_values" };
+    for (const [key, rawValue] of entries) {
+      if (!key || key.length > 120 || !/^[a-zA-Z0-9_-]+$/.test(key) || ["__proto__", "prototype", "constructor"].includes(key)) {
+        return { ok: false, error: "invalid_custom_field_key" };
+      }
+      if (typeof rawValue !== "string" && typeof rawValue !== "number" && typeof rawValue !== "boolean") {
+        return { ok: false, error: "invalid_custom_field_value" };
+      }
+      const value = String(rawValue).trim();
+      if ((value && !safeSingleLine(value, 500))) return { ok: false, error: "invalid_custom_field_value" };
+      if (value) customFieldValues[key] = value;
+    }
+  }
+  return { ok: true, clientId, primaryContactId, projectTypeId, stageId, title, description, plannedStart, plannedFinish, contractValue, plannedHourlyRate, probability, ownerProvided, ownerUserId, templateId, demand, customFieldValues };
 }
 
 export function createMockCrmFetch(): typeof fetch {
@@ -718,14 +736,14 @@ export function createMockCrmFetch(): typeof fetch {
         }
       }
       // server-managed: статус СОХРАНЯЕТСЯ; pipelineId выводится из целевой стадии; feasibility сбрасывается;
-      // plannedHours пересчитывается доменом; customFieldValues всегда {} (вход сознательно игнорируем).
+      // plannedHours пересчитывается доменом; full-replace поля сохраняются из валидированного payload.
       o.clientId = parsed.clientId; o.primaryContactId = parsed.primaryContactId; o.projectTypeId = parsed.projectTypeId;
       o.stageId = parsed.stageId; o.pipelineId = stage.pipelineId; o.ownerUserId = ownerUserId; o.title = parsed.title; o.description = parsed.description;
       o.clientName = client.name; o.contactName = contact.name; o.projectType = ptype.name;
       o.plannedStart = parsed.plannedStart; o.plannedFinish = parsed.plannedFinish;
       o.contractValue = parsed.contractValue; o.plannedHourlyRate = parsed.plannedHourlyRate;
       o.plannedHours = calculatePlannedHours(parsed.contractValue, parsed.plannedHourlyRate);
-      o.probability = parsed.probability; o.templateId = parsed.templateId; o.customFieldValues = {};
+      o.probability = parsed.probability; o.templateId = parsed.templateId; o.customFieldValues = parsed.customFieldValues;
       o.feasibilityStatus = null; o.feasibilityResult = null; o.feasibilityCheckedAt = null;
       o.updatedAt = nowIso();
       return json({ opportunity: o });

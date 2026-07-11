@@ -1,3 +1,4 @@
+import { and, eq, isNull } from "drizzle-orm";
 import { createDemoTenantDataset } from "@kiss-pm/test-fixtures";
 import {
   calendarExceptions,
@@ -58,6 +59,21 @@ const dataset: SeedTenantDataset = {
         tenantId: "tenant-alpha",
         name: "Наблюдатель ресурсов",
         permissions: ["tenant.project_resources.read"]
+      },
+      {
+        id: "access-profile-crm-reader",
+        tenantId: "tenant-alpha",
+        name: "Наблюдатель CRM",
+        permissions: [
+          "tenant.clients.read",
+          "tenant.contacts.read",
+          "tenant.products.read",
+          "tenant.project_types.read",
+          "tenant.deal_stages.read",
+          "tenant.crm_pipelines.read",
+          "tenant.opportunities.read",
+          "tenant.users.read"
+        ]
       },
       {
         id: "access-profile-plan-reader-no-resources",
@@ -196,6 +212,18 @@ const dataset: SeedTenantDataset = {
       tenantId: "tenant-alpha",
       name: "Внедрение",
       description: "Проект внедрения продукта или системы"
+    },
+    {
+      id: "project-type-support",
+      tenantId: "tenant-alpha",
+      name: "Сопровождение",
+      description: "Поддержка и развитие действующего решения"
+    },
+    {
+      id: "project-type-audit",
+      tenantId: "tenant-alpha",
+      name: "Аудит",
+      description: "Оценка процессов и подготовка рекомендаций"
     }
   ],
   dealStages: [
@@ -253,6 +281,15 @@ const dataset: SeedTenantDataset = {
       password: "reader12345"
     },
     {
+      id: "user-alpha-crm-reader",
+      tenantId: "tenant-alpha",
+      name: "Марина CRM",
+      accessProfileId: "access-profile-crm-reader",
+      email: "crm-reader@kiss-pm.local",
+      positionId: "position-analyst",
+      password: "crmreader12345"
+    },
+    {
       id: "user-alpha-resource-reader",
       tenantId: "tenant-alpha",
       name: "Роман Ресурсный",
@@ -274,6 +311,7 @@ try {
   );
   await seedDemoProjectWork(db, new Date("2026-05-20T09:00:00.000Z"));
   await seedExtraCrmAndProjects(db, new Date("2026-05-20T09:00:00.000Z"));
+  await backfillOpportunityPipelines();
   await seedOrgStructure(db);
   await seedCommunications(db, new Date("2026-05-22T09:00:00.000Z"));
   console.log(
@@ -281,6 +319,18 @@ try {
   );
 } finally {
   await client.end();
+}
+
+async function backfillOpportunityPipelines(): Promise<void> {
+  await client`
+    UPDATE opportunities AS opportunity
+    SET pipeline_id = stage.pipeline_id
+    FROM crm_pipeline_stages AS stage
+    WHERE opportunity.tenant_id = ${TENANT_ID}
+      AND opportunity.pipeline_id IS NULL
+      AND opportunity.stage_id = stage.id
+      AND stage.tenant_id = opportunity.tenant_id
+  `;
 }
 
 async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise<void> {
@@ -295,6 +345,7 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
         ownerUserId: "user-alpha-admin",
         projectTypeId: "project-type-implementation",
         stageId: "deal-stage-ready",
+        pipelineId: "tenant-alpha-pipeline-default",
         clientName: "ООО Ромашка",
         contactName: "Ирина Клиент",
         title: "CRM intake",
@@ -937,8 +988,10 @@ type StandaloneOpportunitySpec = {
   clientName: string;
   primaryContactId: string;
   contactName: string;
-  stageId: string;
+  pipelineId: string | null;
+  stageId: string | null;
   title: string;
+  projectTypeId: string;
   projectType: string;
   description: string;
   plannedStart: Date;
@@ -948,6 +1001,8 @@ type StandaloneOpportunitySpec = {
   plannedHours: number;
   probability: number;
   status: string;
+  demand?: { positionId: string; requiredHours: number };
+  resetOnSeed?: boolean;
 };
 
 function toIsoDate(value: Date): string {
@@ -1498,8 +1553,10 @@ function standaloneOpportunitySpecs(): StandaloneOpportunitySpec[] {
       primaryContactId: "contact-irina",
       contactName: "Ирина Клиент",
       stageId: "deal-stage-new",
+      pipelineId: `${TENANT_ID}-pipeline-default`,
       title: "Поддержка после внедрения",
       projectType: "Сопровождение",
+      projectTypeId: "project-type-support",
       description: "Запрос на сопровождение управленческого контура после внедрения.",
       plannedStart: utc("2026-07-01"),
       plannedFinish: utc("2026-09-30"),
@@ -1510,22 +1567,68 @@ function standaloneOpportunitySpecs(): StandaloneOpportunitySpec[] {
       status: "new"
     },
     {
+      id: "opportunity-without-stage",
+      clientId: "client-romashka",
+      clientName: "ООО Ромашка",
+      primaryContactId: "contact-irina",
+      contactName: "Ирина Клиент",
+      pipelineId: null,
+      stageId: null,
+      title: "Запрос без стадии",
+      projectType: "Сопровождение",
+      projectTypeId: "project-type-support",
+      description: "Новый запрос до первичного распределения по воронке.",
+      plannedStart: utc("2026-07-08"),
+      plannedFinish: utc("2026-08-31"),
+      contractValue: 120_000,
+      plannedHourlyRate: 6_000,
+      plannedHours: 20,
+      probability: 20,
+      status: "new",
+      resetOnSeed: true
+    },
+    {
       id: "opportunity-vektor-audit",
       clientId: "client-vektor",
       clientName: "ООО Вектор",
       primaryContactId: "contact-vektor-cto",
       contactName: "Виктор Технический",
       stageId: "deal-stage-qualified",
+      pipelineId: `${TENANT_ID}-pipeline-default`,
       title: "Аудит процессов Вектор",
       projectType: "Аудит",
+      projectTypeId: "project-type-audit",
       description: "Оценка зрелости проектного контура и подготовка рекомендаций.",
-      plannedStart: utc("2026-06-20"),
-      plannedFinish: utc("2026-07-15"),
+      plannedStart: utc("2026-06-22"),
+      plannedFinish: utc("2026-06-22"),
       contractValue: 180_000,
       plannedHourlyRate: 6_000,
       plannedHours: 30,
+      demand: { positionId: "position-project-manager", requiredHours: 30 },
       probability: 55,
-      status: "feasibility"
+      status: "feasibility",
+      resetOnSeed: true
+    },
+    {
+      id: "opportunity-reader-e2e",
+      clientId: "client-vektor",
+      clientName: "ООО Вектор",
+      primaryContactId: "contact-vektor-cto",
+      contactName: "Виктор Технический",
+      stageId: "deal-stage-qualified",
+      pipelineId: `${TENANT_ID}-pipeline-default`,
+      title: "Проверка прав CRM E2E",
+      projectType: "Аудит",
+      projectTypeId: "project-type-audit",
+      description: "Резервная сделка для проверки CRM в режиме только чтения.",
+      plannedStart: utc("2026-07-01"),
+      plannedFinish: utc("2026-07-03"),
+      contractValue: 120_000,
+      plannedHourlyRate: 6_000,
+      plannedHours: 20,
+      probability: 30,
+      status: "new",
+      resetOnSeed: true
     },
     {
       id: "opportunity-gorset-expansion",
@@ -1534,8 +1637,10 @@ function standaloneOpportunitySpecs(): StandaloneOpportunitySpec[] {
       primaryContactId: "contact-gorset-it",
       contactName: "Галина ИТ",
       stageId: "deal-stage-negotiation",
+      pipelineId: `${TENANT_ID}-pipeline-default`,
       title: "Расширение интеграций Горсеть",
       projectType: "Внедрение",
+      projectTypeId: "project-type-implementation",
       description: "Дополнительные интеграции после успешной миграции данных.",
       plannedStart: utc("2026-07-01"),
       plannedFinish: utc("2026-08-30"),
@@ -1551,7 +1656,17 @@ function standaloneOpportunitySpecs(): StandaloneOpportunitySpec[] {
 async function seedExtraCrmAndProjects(db: KissPmDatabase, createdAt: Date): Promise<void> {
   await db.transaction(async (transaction) => {
     for (const opportunity of standaloneOpportunitySpecs()) {
-      await transaction
+      if (opportunity.resetOnSeed) {
+        // A prior activation creates a project with a unique sourceOpportunityId.
+        // Remove that disposable bundle before restoring the reserved E2E deal.
+        await transaction
+          .delete(projects)
+          .where(and(
+            eq(projects.tenantId, TENANT_ID),
+            eq(projects.sourceOpportunityId, opportunity.id)
+          ));
+      }
+      const insert = transaction
         .insert(opportunities)
         .values({
           id: opportunity.id,
@@ -1559,8 +1674,9 @@ async function seedExtraCrmAndProjects(db: KissPmDatabase, createdAt: Date): Pro
           clientId: opportunity.clientId,
           primaryContactId: opportunity.primaryContactId,
           ownerUserId: "user-alpha-admin",
-          projectTypeId: null,
+          projectTypeId: opportunity.projectTypeId,
           stageId: opportunity.stageId,
+          pipelineId: opportunity.pipelineId,
           clientName: opportunity.clientName,
           contactName: opportunity.contactName,
           title: opportunity.title,
@@ -1580,8 +1696,70 @@ async function seedExtraCrmAndProjects(db: KissPmDatabase, createdAt: Date): Pro
           customFieldValues: {},
           createdAt,
           updatedAt: createdAt
-        })
-        .onConflictDoNothing();
+        });
+      if (opportunity.resetOnSeed) {
+        // Reserved E2E data is reset; ordinary seeded deals retain developer changes.
+        await insert.onConflictDoUpdate({
+          target: [opportunities.tenantId, opportunities.id],
+          set: {
+            clientId: opportunity.clientId,
+            primaryContactId: opportunity.primaryContactId,
+            ownerUserId: "user-alpha-admin",
+            projectTypeId: opportunity.projectTypeId,
+            stageId: opportunity.stageId,
+            pipelineId: opportunity.pipelineId,
+            clientName: opportunity.clientName,
+            contactName: opportunity.contactName,
+            title: opportunity.title,
+            projectType: opportunity.projectType,
+            description: opportunity.description,
+            plannedStart: opportunity.plannedStart,
+            plannedFinish: opportunity.plannedFinish,
+            contractValue: opportunity.contractValue,
+            plannedHourlyRate: opportunity.plannedHourlyRate,
+            plannedHours: opportunity.plannedHours,
+            probability: opportunity.probability,
+            status: opportunity.status,
+            templateId: null,
+            feasibilityStatus: null,
+            feasibilityResult: null,
+            feasibilityCheckedAt: null,
+            customFieldValues: {},
+            updatedAt: createdAt
+          }
+        });
+      } else {
+        await insert.onConflictDoNothing();
+        // Upgrade databases seeded before projectTypeId became required. Preserve every
+        // developer-edited field, including an explicitly selected non-null project type.
+        await transaction
+          .update(opportunities)
+          .set({ projectTypeId: opportunity.projectTypeId })
+          .where(and(
+            eq(opportunities.tenantId, TENANT_ID),
+            eq(opportunities.id, opportunity.id),
+            isNull(opportunities.projectTypeId)
+          ));
+      }
+      if (opportunity.demand) {
+        if (opportunity.resetOnSeed) {
+          await transaction
+            .delete(opportunityDemands)
+            .where(and(
+              eq(opportunityDemands.tenantId, TENANT_ID),
+              eq(opportunityDemands.opportunityId, opportunity.id)
+            ));
+        }
+        await transaction
+          .insert(opportunityDemands)
+          .values({
+            tenantId: TENANT_ID,
+            opportunityId: opportunity.id,
+            positionId: opportunity.demand.positionId,
+            requiredHours: opportunity.demand.requiredHours
+          })
+          .onConflictDoNothing();
+      }
     }
 
     for (const spec of extraProjectSpecs()) {
@@ -1605,6 +1783,7 @@ async function seedProjectBundle(
       ownerUserId: "user-alpha-admin",
       projectTypeId: "project-type-implementation",
       stageId: spec.stageId,
+      pipelineId: `${TENANT_ID}-pipeline-default`,
       clientName: spec.clientName,
       contactName: spec.contactName,
       title: spec.title,

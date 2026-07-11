@@ -1126,6 +1126,48 @@ describe("API with PostgreSQL data source", () => {
         })
       }
     );
+    const blockedOpportunity = await app.request("/api/workspace/opportunities", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie
+      },
+      body: JSON.stringify({
+        ...baseOpportunity,
+        id: "opportunity-hard-blocked",
+        title: "Проект с недопустимым ресурсным спросом",
+        demand: [{ positionId: "position-engineer", requiredHours: 200 }]
+      })
+    });
+    const blockedFeasibility = await app.request(
+      "/api/workspace/opportunities/opportunity-hard-blocked/feasibility",
+      {
+        method: "POST",
+        headers: {
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        }
+      }
+    );
+    const blockedActivation = await app.request(
+      "/api/workspace/opportunities/opportunity-hard-blocked/activate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie
+        },
+        body: JSON.stringify({
+          id: "project-hard-blocked",
+          acceptedRiskReason: "Принимаем риск отсутствующего ресурсного спроса"
+        })
+      }
+    );
+    const projectsAfterBlockedActivation = await app.request("/api/workspace/projects", {
+      headers: { cookie }
+    });
 
     expect(firstOpportunity.status).toBe(201);
     expect(firstFeasibility.status).toBe(200);
@@ -1140,6 +1182,26 @@ describe("API with PostgreSQL data source", () => {
       error: "risk_acceptance_required"
     });
     expect(acceptedRiskActivation.status).toBe(201);
+    expect(blockedOpportunity.status).toBe(201);
+    expect(blockedFeasibility.status).toBe(200);
+    await expect(blockedFeasibility.json()).resolves.toMatchObject({
+      assessment: {
+        status: "blocked",
+        blockers: expect.arrayContaining(["demand_exceeds_planned_hours"])
+      }
+    });
+    expect(blockedActivation.status).toBe(409);
+    await expect(blockedActivation.json()).resolves.toEqual({
+      error: "opportunity_not_activatable"
+    });
+    expect(projectsAfterBlockedActivation.status).toBe(200);
+    const projectsAfterBlockedActivationBody = await projectsAfterBlockedActivation.json();
+    expect(
+      projectsAfterBlockedActivationBody.projects.some(
+        (project: { sourceOpportunityId?: string | null }) =>
+          project.sourceOpportunityId === "opportunity-hard-blocked"
+      )
+    ).toBe(false);
   });
 
   it("serializes concurrent activations that compete for the same position capacity", async () => {

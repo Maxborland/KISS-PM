@@ -51,7 +51,7 @@ describe("Phase 3 project intake domain", () => {
 
     expect(assessment.plannedHours).toBe(160);
     expect(assessment.totalRequiredHours).toBe(200);
-    expect(assessment.status).toBe("conflict");
+    expect(assessment.status).toBe("blocked");
     expect(assessment.blockers).toContain("demand_exceeds_planned_hours");
     expect(assessment.rows).toEqual([
       {
@@ -148,7 +148,7 @@ describe("Phase 3 project intake domain", () => {
       activeProjectReservations: []
     });
 
-    expect(assessment.status).toBe("conflict");
+    expect(assessment.status).toBe("blocked");
     expect(assessment.blockers).toContain("missing_position_capacity");
     expect(assessment.rows[0]).toMatchObject({
       positionId: "position-designer",
@@ -156,5 +156,23 @@ describe("Phase 3 project intake domain", () => {
       shortageHours: 40,
       status: "conflict"
     });
+  });
+
+  it("blocks activation when the opportunity has no resource demand", () => {
+    const assessment = assessOpportunityFeasibility({
+      opportunity: {
+        id: "opportunity-without-demand",
+        plannedStart: new Date("2026-06-01T00:00:00.000Z"),
+        plannedFinish: new Date("2026-06-05T00:00:00.000Z"),
+        contractValue: 320_000,
+        plannedHourlyRate: 4_000
+      },
+      demand: [],
+      positions: [],
+      activeProjectReservations: []
+    });
+
+    expect(assessment.status).toBe("blocked");
+    expect(assessment.blockers).toContain("demand_required");
   });
 });

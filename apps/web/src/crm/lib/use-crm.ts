@@ -97,8 +97,13 @@ export function useCrm() {
   const updateProduct = useCallback((id: string, input: Record<string, unknown>) => guard(async () => { const r = await client.updateProduct(id, input); setData((d) => (d ? { ...d, products: d.products.map((x) => (x.id === id ? r.product : x)) } : d)); }), [client, guard]);
 
   // ---- Карточка сделки ----
-  // Полное обновление сделки (через guard — данные UI не нужны, обновляем кэш).
-  const updateOpportunity = useCallback((id: string, input: OpportunityUpdateInput) => guard(async () => { const r = await client.updateOpportunity(id, input); patchOpp(r.opportunity); }), [client, guard]);
+  // Полное обновление сделки возвращает каноническую серверную запись, чтобы форма
+  // синхронизировалась с trim/rounding и не оставалась ложно dirty после успешного Save.
+  const updateOpportunity = useCallback((id: string, input: OpportunityUpdateInput): Promise<CrmDataResult<Opportunity>> => guardData(async () => {
+    const r = await client.updateOpportunity(id, input);
+    patchOpp(r.opportunity);
+    return r.opportunity;
+  }), [client, guardData]);
   // Проверка реализуемости: возвращает оценку для UI + обновляет сделку в кэше (status/feasibility*).
   const checkFeasibility = useCallback((id: string): Promise<CrmDataResult<FeasibilityAssessment>> => guardData(async () => { const r = await client.checkFeasibility(id); patchOpp(r.opportunity); return r.assessment; }), [client, guardData]);
   // Активация: возвращает проект для UI + переводит сделку в won_closed + добавляет проект в кэш.

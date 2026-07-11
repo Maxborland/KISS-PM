@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveOpportunityPipelineId, stagesForOpportunity } from "./deal-card-surface";
+import { getActivationBlockReason, resolveOpportunityPipelineId, stagesForOpportunity } from "./deal-card-surface";
 import type { DealStage, Opportunity } from "../lib/crm-client";
 
 const stage = (id: string, pipelineId: string | null, sortOrder: number): DealStage => ({
@@ -46,5 +46,21 @@ describe("deal-card stage pipeline resolution", () => {
     expect(stagesForOpportunity(opportunity({ pipelineId: "pipeline-partner" }), stages).map((s) => s.id)).toEqual([
       "stage-partner-lead"
     ]);
+  });
+});
+
+describe("deal activation eligibility", () => {
+  it.each([
+    [false, "ok", "", false, "Прямого доступа нет"],
+    [true, "conflict", "Риск принят владельцем", true, "Сохраните изменения и повторите проверку"],
+    [true, null, "", false, "Сначала проверьте осуществимость"],
+    [true, "blocked", "", false, "Сделка заблокирована по результатам проверки"],
+    [true, "conflict", "   ", false, "Укажите обоснование принятого риска"],
+    [true, "unknown", "", false, "Результат проверки не позволяет активировать проект"],
+    [true, "ok", "", false, null],
+    [true, "warning", "", false, null],
+    [true, "conflict", "Риск принят владельцем", false, null]
+  ] as const)("resolves permission, dirty-state and feasibility guards", (canActivate, status, riskReason, dirty, expected) => {
+    expect(getActivationBlockReason(canActivate, status, riskReason, dirty, "Прямого доступа нет")).toBe(expected);
   });
 });
