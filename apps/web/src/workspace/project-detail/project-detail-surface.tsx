@@ -13,6 +13,7 @@ import { cn } from "@/lib/cn";
 import { useProjectDetail, useProjects, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
 import { MOCK_PROJECT_ID } from "@/workspace/lib/mock-workspace-backend";
 import type { ProjectRecord, TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
+import { TaskPeek, taskPeekRecordFromWorkspace } from "@/workspace/task-peek/task-peek";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
@@ -301,7 +302,15 @@ function ProjectTasks({ tasks }: { tasks: TaskRecord[] }) {
           {sorted.map((t) => (
             <tr key={t.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
               <td className="px-3 py-2">
-                <div className="font-medium text-[var(--text-strong)]">{t.title}</div>
+                <TaskPeek task={taskPeekRecordFromWorkspace(t)}>
+                  <button
+                    type="button"
+                    aria-label={`Открыть задачу «${t.title}»`}
+                    className="cursor-pointer border-0 bg-transparent p-0 text-left font-medium text-[var(--text-strong)] outline-none focus-visible:rounded-[var(--radius-sm)] focus-visible:shadow-[var(--ring-focus)]"
+                  >
+                    {t.title}
+                  </button>
+                </TaskPeek>
                 {prototypeNotesEnabled || t.requiresAcceptance ? (
                   <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">
                     {prototypeNotesEnabled ? t.id : null}

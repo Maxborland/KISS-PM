@@ -65,6 +65,40 @@ export type TaskRecord = {
   participants: TaskParticipant[];
 };
 
+export type TaskActivityRecord = {
+  id: string;
+  taskId: string;
+  type: "comment" | "file" | "system";
+  body: string | null;
+  title: string | null;
+  fileUrl: string | null;
+  fileSizeBytes: number | null;
+  mimeType: string | null;
+  authorUserId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TaskDetailResponse = {
+  task: TaskRecord;
+  activities: TaskActivityRecord[];
+  attachmentItems: unknown[];
+};
+
+export type UpdateTaskInput = {
+  title: string;
+  description: string | null;
+  priority: TaskPriority;
+  statusId: string;
+  plannedStart: string;
+  plannedFinish: string;
+  durationWorkingDays: number;
+  plannedWork: number;
+  requiresAcceptance: boolean;
+  participants: TaskParticipant[];
+  clientUpdatedAt: string;
+};
+
 // Спрос по позиции (apiTypes.PositionDemandRecord).
 export type PositionDemand = { positionId: string; requiredHours: number };
 
@@ -101,6 +135,22 @@ export function createWorkspaceClient(options: WorkspaceApiClientOptions) {
     getProjectDetail(projectId: string) { return requestJson<{ project: ProjectRecord; tasks: TaskRecord[] }>(`/api/workspace/projects/${enc(projectId)}`); },
     // Задачи текущего пользователя по всем проектам (GET /api/workspace/my-work).
     listMyWork() { return requestJson<{ tasks: TaskRecord[] }>("/api/workspace/my-work"); },
+    // Полная карточка задачи (GET /api/workspace/tasks/:taskId).
+    getTaskDetail(taskId: string) {
+      return requestJson<TaskDetailResponse>(`/api/workspace/tasks/${enc(taskId)}`);
+    },
+    updateTask(taskId: string, input: UpdateTaskInput) {
+      return requestJson<{ task: TaskRecord }>(`/api/workspace/tasks/${enc(taskId)}`, {
+        method: "PATCH",
+        body: JSON.stringify(input)
+      });
+    },
+    createTaskComment(taskId: string, body: string) {
+      return requestJson<{ activity: TaskActivityRecord }>(`/api/workspace/tasks/${enc(taskId)}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ body })
+      });
+    },
     // Смена статуса задачи (PATCH /api/workspace/projects/:projectId/tasks/:taskId/status, тело {statusId}).
     updateTaskStatus(projectId: string, taskId: string, statusId: string) {
       return requestJson<{ task: TaskRecord }>(`/api/workspace/projects/${enc(projectId)}/tasks/${enc(taskId)}/status`, { method: "PATCH", body: JSON.stringify({ statusId }) });

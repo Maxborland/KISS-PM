@@ -10,6 +10,7 @@ import {
   createWorkspaceClient,
   type ProjectRecord,
   type TaskRecord,
+  type UpdateTaskInput,
   type WorkspaceClient,
   type WorkspaceTaskStatus,
   type WorkspaceUser
@@ -47,6 +48,52 @@ export function useProjectDetail(projectId: string) {
   }, [client, projectId]);
   const { data, status, error, reload: load } = useResource(loader);
   return { data, status, error, reload: load };
+}
+
+// ---- useTaskDetail: каноническая полная карточка одной задачи ----
+export function useTaskDetail(taskId: string) {
+  const client = useWorkspaceClient();
+  const loader = useCallback(() => client.getTaskDetail(taskId), [client, taskId]);
+  const resource = useResource(loader);
+
+  const updateTask = useCallback(async (input: UpdateTaskInput): Promise<WorkspaceMutationResult> => {
+    try {
+      await client.updateTask(taskId, input);
+      await resource.reload();
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof WorkspaceApiError) {
+        return { ok: false, code: error.code, message: error.code };
+      }
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : "request_failed"
+      };
+    }
+  }, [client, resource.reload, taskId]);
+
+  const createComment = useCallback(async (body: string): Promise<WorkspaceMutationResult> => {
+    try {
+      await client.createTaskComment(taskId, body);
+      await resource.reload();
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof WorkspaceApiError) {
+        return { ok: false, code: error.code, message: error.code };
+      }
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : "request_failed"
+      };
+    }
+  }, [client, resource.reload, taskId]);
+
+  return {
+    ...resource,
+    notFound: resource.status === "error" && resource.error === "task_not_found",
+    updateTask,
+    createComment
+  };
 }
 
 // ---- useMyWork: задачи текущего пользователя + смена статуса ----

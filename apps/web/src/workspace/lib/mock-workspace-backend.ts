@@ -34,6 +34,7 @@
 
 import type {
   ProjectRecord,
+  TaskActivityRecord,
   TaskParticipant,
   TaskPriority,
   TaskRecord,
@@ -77,13 +78,14 @@ export const WORKSPACE_USERS: WorkspaceUser[] = [
   { id: "u-kuznetsov", name: "Кузнецов Н." }
 ];
 
-const nowIso = () => new Date().toISOString();
+const nextUpdatedAt = (previous: string) => new Date(Math.max(Date.now(), Date.parse(previous) + 1)).toISOString();
 let SEQ = 0;
 const genId = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(SEQ += 1).toString(36)}`;
 
 type Store = {
   projects: ProjectRecord[];
   tasks: TaskRecord[]; // все задачи всех проектов (фильтруются по проекту / по исполнителю)
+  activities: TaskActivityRecord[];
 };
 
 // Переход разрешён (зеркало isTaskStatusTransitionAllowed из taskCommandGuards).
@@ -188,7 +190,7 @@ function seed(): Store {
     task({ id: "task-bi-etl", projectId: "proj-bi-sales", title: "ETL-конвейер продаж", statusId: "status-new", ownerUserId: "u-sergeev", priority: "normal", plannedStart: "2026-05-11", plannedFinish: "2026-06-19", durationWorkingDays: 30, plannedWork: 200, actualWork: 0, progress: 0 })
   ];
 
-  return { projects, tasks };
+  return { projects, tasks, activities: [] };
 }
 
 /* ---- Транспорт: fetchImpl, совместимый с createWorkspaceClient ---- */
@@ -215,6 +217,76 @@ export function createMockWorkspaceFetch(): typeof fetch {
     if (method === "GET" && path === "/api/workspace/my-work") {
       const tasks = db.tasks.filter((t) => t.archivedAt === null && t.ownerUserId === CURRENT_USER_ID);
       return json({ tasks });
+    }
+
+    /* ---- GET /api/workspace/tasks/:taskId: canonical detail; 404 mirrors live taskReadWorkspace ---- */
+    const taskDetail = method === "GET" ? path.match(/^\/api\/workspace\/tasks\/([^/]+)$/) : null;
+    if (taskDetail) {
+      const taskId = decodeURIComponent(taskDetail[1]!);
+      if (!ROUTE_ID_RE.test(taskId)) return err("invalid_task_id", 400);
+      const task = db.tasks.find((t) => t.id === taskId && t.archivedAt === null);
+      if (!task) return err("task_not_found", 404);
+      return json({
+        task,
+        activities: db.activities.filter((activity) => activity.taskId === task.id),
+        attachmentItems: []
+      });
+    }
+    const taskUpdate = method === "PATCH" ? path.match(/^\/api\/workspace\/tasks\/([^/]+)$/) : null;
+    if (taskUpdate) {
+      const taskId = decodeURIComponent(taskUpdate[1]!);
+      if (!ROUTE_ID_RE.test(taskId)) return err("invalid_task_id", 400);
+      const task = db.tasks.find((item) => item.id === taskId && item.archivedAt === null);
+      if (!task) return err("task_not_found", 404);
+      const title = str(body.title);
+      const plannedWork = Number(body.plannedWork);
+      if (title.length < 3 || title.length > 160) return err("invalid_task_title", 400);
+      if (!Number.isFinite(plannedWork) || plannedWork < 0) return err("invalid_task_work", 400);
+      if (str(body.clientUpdatedAt) !== task.updatedAt) return err("task_version_conflict", 409);
+      const beforeTitle = task.title;
+      task.title = title;
+      task.plannedWork = plannedWork;
+      task.updatedAt = nextUpdatedAt(task.updatedAt);
+      db.activities.unshift({
+        id: genId("task-activity"),
+        taskId: task.id,
+        type: "system",
+        title: "Задача обновлена",
+        body: beforeTitle === title ? "Обновлены параметры задачи." : `Название изменено: «${beforeTitle}» → «${title}».`,
+        fileUrl: null,
+        fileSizeBytes: null,
+        mimeType: null,
+        authorUserId: CURRENT_USER_ID,
+        createdAt: task.updatedAt,
+        updatedAt: task.updatedAt
+      });
+      return json({ task });
+    }
+
+    const taskComment = method === "POST" ? path.match(/^\/api\/workspace\/tasks\/([^/]+)\/comments$/) : null;
+    if (taskComment) {
+      const taskId = decodeURIComponent(taskComment[1]!);
+      if (!ROUTE_ID_RE.test(taskId)) return err("invalid_task_id", 400);
+      const task = db.tasks.find((item) => item.id === taskId && item.archivedAt === null);
+      if (!task) return err("task_not_found", 404);
+      const commentBody = str(body.body);
+      if (!commentBody) return err("invalid_task_comment", 400);
+      const createdAt = new Date().toISOString();
+      const activity: TaskActivityRecord = {
+        id: genId("task-activity"),
+        taskId: task.id,
+        type: "comment",
+        title: null,
+        body: commentBody,
+        fileUrl: null,
+        fileSizeBytes: null,
+        mimeType: null,
+        authorUserId: CURRENT_USER_ID,
+        createdAt,
+        updatedAt: createdAt
+      };
+      db.activities.unshift(activity);
+      return json({ activity }, 201);
     }
 
     /* ---- GET /api/workspace/users: справочник пользователей (боевой эквивалент — тот же путь) ---- */
@@ -266,7 +338,7 @@ export function createMockWorkspaceFetch(): typeof fetch {
       task.status = target.category; task.statusId = target.id; task.statusName = target.name; task.statusCategory = target.category;
       if (target.category === "done") task.progress = 100;
       else if (target.category === "new") task.progress = 0;
-      task.updatedAt = nowIso();
+      task.updatedAt = nextUpdatedAt(task.updatedAt);
       return json({ task });
     }
 

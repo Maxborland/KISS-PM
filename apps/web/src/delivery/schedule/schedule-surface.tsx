@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, type ClipboardEvent as ReactClipboardEvent, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Plus, TriangleAlert, Undo2, X } from "lucide-react";
+import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, Columns3, Filter, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Layers, Plus, TriangleAlert, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import {
   scheduleWorkingMinutesThroughDate,
   type ScheduleCalendarSource
 } from "@/delivery/schedule/schedule-working-time";
+import { TaskPeek, type TaskPeekRecord } from "@/workspace/task-peek/task-peek";
 
 const genId = createClientId;
 const PLAN_MANAGE_PERMISSION = "tenant.project_plan.manage";
@@ -305,6 +306,7 @@ function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}.${m}.${y}`;
 }
+
 const ZOOM_DAY_W = { day: 36, week: 20, month: 8 } as const;
 type Zoom = ScheduleZoom;
 type DragMode = "move" | "resize" | "resizeLeft" | "progress";
@@ -339,6 +341,19 @@ const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 const numInput = "w-full rounded-[var(--radius-xs)] border border-[var(--accent)] bg-[var(--panel)] px-1 text-right text-[length:var(--text-sm)] tabular-nums outline-none";
 const cellBtn = "block w-full cursor-pointer truncate rounded-[var(--radius-xs)] px-1 text-left hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]";
 
+function taskPeekRecordFromScheduleRow(row: Row, projectId: string, projectName: string): TaskPeekRecord {
+  return {
+    id: row.id,
+    title: row.name,
+    project: { id: projectId, name: projectName },
+    ...(row.startIso ? { plannedStart: row.startIso } : {}),
+    ...(row.finishIso ? { plannedFinish: row.finishIso } : {}),
+    durationWorkingDays: row.durDays,
+    plannedWork: row.workH,
+    progress: row.pct
+  };
+}
+
 export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { live } = usePlanningRuntime();
   const sessionUser = useSessionUser();
@@ -361,9 +376,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }, [planningResources]);
   const [zoom, setZoom] = useState<Zoom>("week");
   const [sel, setSel] = useState<string | null>("t-3.2.1");
-  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  const [edit, setEdit] = useState<{ id: string; field: "name" | "dur" | "work" | "pct" | "units" } | null>(null);
+  const [edit, setEdit] = useState<{ id: string; field: EditField } | null>(null);
   const [draft, setDraft] = useState("");
   // Excel-подобная инлайн-строка создания внизу WBS: имя → Enter создаёт + очищает для следующей.
   const [newTask, setNewTask] = useState("");
@@ -425,6 +439,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const rowElementsRef = useRef<Map<string, HTMLTableRowElement>>(new Map()).current;
   const fillDragTargetRef = useRef<string | null>(null);
   const ganttRef = useRef<HTMLDivElement>(null);
+  const taskPeekTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
   // Актуальный read-model для window-обработчиков drag/resize (без устаревшего замыкания эффекта):
   // нужен, чтобы в момент отпускания резолвить текущее назначение задачи и синхронить его труд.
   const readModelRef = useRef(readModel);
@@ -883,7 +898,11 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const ganttH = visibleRows.length * ROW_H;
   const selected = rows.find((r) => r.id === sel) ?? null;
 
-  const openRow = (id: string) => { setSel(id); setInspectorOpen(true); };
+  const openTaskPeek = (id: string) => {
+    setSel(id);
+    taskPeekTriggerRefs.current.get(id)?.click();
+  };
+  const openRow = openTaskPeek;
   const cancelEditableClick = () => {
     if (editableClickTimerRef.current !== null) window.clearTimeout(editableClickTimerRef.current);
     editableClickTimerRef.current = null;
@@ -921,11 +940,6 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     workEdit(r, days, scaledWorkMinutes(r, durationMinutes) / 60);
   };
   const editWork = (r: Row, workH: number) => workEdit(r, r.durDays, workH);
-  const editUnits = (r: Row, pct: number) => workEdit(
-    r,
-    r.durDays,
-    Math.max(0, Math.round(rowDurationMinutes(r) * pct / 100)) / 60
-  );
   const editName = (r: Row, title: string) => void applyCmd(createPlanningCommand({ type: "task.update_identity", payload: { taskId: r.id, title } }));
   const editPct = (r: Row, pct: number) => void applyCmd(createPlanningCommand({ type: "task.update_progress", payload: { taskId: r.id, percentComplete: Math.max(0, Math.min(100, pct)) } }));
   const editDate = (r: Row, iso: string) =>
@@ -1157,9 +1171,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     if (f === "dur") { if (n > 0 && n !== r.durDays) editDuration(r, n); else if (n <= 0) setErrors((prev) => new Map(prev).set(r.id, ["Длительность задачи должна быть больше 0 (для вехи — пункт меню «Сделать вехой»)"])); }
     else if (f === "work" && n >= 0 && n !== r.workH) editWork(r, n);
     else if (f === "pct" && n !== r.pct) editPct(r, n);
-    else if (f === "units" && n > 0) editUnits(r, n);
   }
-  const beginEdit = (r: Row, field: "name" | "dur" | "work" | "pct" | "units", cur: string | number) => { setEdit({ id: r.id, field }); setDraft(String(cur)); };
+  const beginEdit = (r: Row, field: EditField, cur: string | number) => { setEdit({ id: r.id, field }); setDraft(String(cur)); };
 
   // Excel-навигация по редактируемым ячейкам существующих строк.
   // Поля строки: name всегда; dur/work/pct — только у task (summary/milestone их пропускают).
@@ -1523,7 +1536,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       canIndent={canIndent(r)}
                       canOutdent={canOutdent(r)}
                       canMakeMilestone={r.kind === "task"}
-                      onOpen={() => openRow(r.id)}
+                      onOpen={() => openTaskPeek(r.id)}
                       onEdit={() => openEdit(r)}
                       onAddSub={() => setInlineNew({ parentId: r.id, afterId: r.id, draft: "" })}
                       onAddBelow={() => setInlineNew({ parentId: r.parentId, afterId: r.id, draft: "" })}
@@ -1560,7 +1573,26 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                             {r.warning ? <span className="inline-flex shrink-0" title={r.warnMsg ?? "Предупреждение планировщика"}><TriangleAlert className="size-3 text-[var(--warning)]" aria-hidden /></span> : null}
                             {canManagePlan && edit?.id === r.id && edit.field === "name" ? (
                               <input autoFocus value={draft} onClick={stop} onChange={(e) => setDraft(e.target.value)} onBlur={() => cellBlur(r)} onKeyDown={(e) => cellKeyDown(e, r, "name")} className="w-full rounded-[var(--radius-xs)] border border-[var(--accent)] bg-[var(--panel)] px-1 text-[length:var(--text-sm)] outline-none" />
-                            ) : <span className={cn("truncate", r.kind === "summary" ? "font-bold text-[var(--text-strong)]" : "font-medium text-[var(--text)]")}>{r.name}</span>}
+                            ) : (
+                              <>
+                                <span className={cn("min-w-0 flex-1 truncate", r.kind === "summary" ? "font-bold text-[var(--text-strong)]" : "font-medium text-[var(--text)]")}>{r.name}</span>
+                                <TaskPeek task={taskPeekRecordFromScheduleRow(r, projectId, projectMeta.name)}>
+                                  <button
+                                    ref={(node) => {
+                                      if (node) taskPeekTriggerRefs.current.set(r.id, node);
+                                      else taskPeekTriggerRefs.current.delete(r.id);
+                                    }}
+                                    type="button"
+                                    onClick={(e) => { stop(e); setSel(r.id); }}
+                                    className="grid size-4 shrink-0 place-items-center rounded-[var(--radius-xs)] text-[var(--muted)] outline-none transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1"
+                                    aria-label={`Открыть задачу «${r.name}»`}
+                                    title="Открыть задачу"
+                                  >
+                                    <ChevronRight className="size-3.5" aria-hidden />
+                                  </button>
+                                </TaskPeek>
+                              </>
+                            )}
                           </span>
                         </td>
                         <td className="num muted" onClick={canManagePlan ? (e) => selectEditableCell(e, r) : undefined} onDoubleClick={canManagePlan ? (e) => { if (r.kind === "task") { stop(e); cancelEditableClick(); beginEdit(r, "dur", r.durDays); } } : undefined}>
@@ -1669,7 +1701,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 const barRight = left + width;
                 const fillPct = dragging && drag.mode === "progress" ? drag.curPct : r.pct;
                 return (
-                  <div key={r.id} data-task-id={r.id} onClick={() => openRow(r.id)} className={cn("group relative h-[var(--row-h)] cursor-pointer border-b border-[var(--border-subtle)] last:border-0", errors.has(r.id) ? "bg-[var(--danger-soft)]" : sel === r.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--panel-subtle)]")} style={{ backgroundImage: sel === r.id || errors.has(r.id) ? undefined : `repeating-linear-gradient(to right, transparent, transparent ${weekW - 1}px, var(--border-subtle) ${weekW - 1}px, var(--border-subtle) ${weekW}px)` }}>
+                  <div key={r.id} data-task-id={r.id} onClick={() => setSel(r.id)} className={cn("group relative h-[var(--row-h)] cursor-pointer border-b border-[var(--border-subtle)] last:border-0", errors.has(r.id) ? "bg-[var(--danger-soft)]" : sel === r.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--panel-subtle)]")} style={{ backgroundImage: sel === r.id || errors.has(r.id) ? undefined : `repeating-linear-gradient(to right, transparent, transparent ${weekW - 1}px, var(--border-subtle) ${weekW - 1}px, var(--border-subtle) ${weekW}px)` }}>
                     {r.kind === "milestone" ? (
                       <>
                         {r.baseDay != null ? <span className="gantt-baseline-milestone absolute bottom-1 size-2.5 -translate-x-1/2 rotate-45 rounded-[2px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" style={{ left: toTimelineX(r.baseDay) }} title={readModel.baselineComparison?.label ?? "Базовый план"} /> : null}
@@ -1730,43 +1762,6 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           </div>
         </div>
 
-        {/* Side-peek инспектор */}
-        {inspectorOpen && selected ? (
-          <aside className="absolute right-0 top-0 z-30 flex h-full w-[340px] flex-col border-l border-[var(--border-strong)] bg-[var(--panel)] shadow-[var(--shadow-pop)]">
-            <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--muted)]"><span className="mono">WBS {selected.wbs}</span>{selected.critical ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--danger-text)]">критпуть</span> : null}</div>
-                <h3 className="mt-0.5 truncate text-[length:var(--text-base)] font-bold text-[var(--text-strong)]">{selected.name}</h3>
-              </div>
-              <button type="button" onClick={() => setInspectorOpen(false)} className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)] hover:text-[var(--text)]" aria-label="Закрыть"><X className="size-4" aria-hidden /></button>
-            </div>
-            <div className="flex-1 overflow-auto px-4 py-3 text-[length:var(--text-sm)]">
-              <div className="mb-3">
-                <div className="mb-1 flex items-center justify-between text-[var(--muted)]"><span>Прогресс</span><span className="font-semibold text-[var(--text)]">{selected.pct}%</span></div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-[var(--panel-strong)]"><span className="block h-full rounded-full bg-[var(--success)]" style={{ width: `${selected.pct}%` }} /></div>
-              </div>
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
-                <Fact label="Режим" value={selected.mode === "auto" ? "Авто" : "Ручной"} />
-                <Fact label="Длительность" value={`${selected.durDays} дн`} />
-                <Fact label="Трудозатраты" value={`${selected.workH} ч`} />
-                {canManagePlan ? <FactNum label="Единицы" value={scheduleUnitsPercent(selected)} suffix="%" disabled={selected.kind !== "task"} onCommit={(n) => editUnits(selected, n)} /> : <Fact label="Единицы" value={`${scheduleUnitsPercent(selected)}%`} />}
-                <Fact label="Начало" value={fmtDate(selected.startIso)} mono />
-                <Fact label="Окончание" value={fmtDate(selected.finishIso)} mono />
-                <Fact label="Слак" value={selected.slackDays != null ? `${selected.slackDays} дн` : "—"} />
-                <Fact label="Ресурсы" value={selected.res} span />
-              </dl>
-              <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">Треугольник планирования: Труд = Длительность × {selected.workingMinutesPerDay / 60} ч × Единицы. Изменишь длительность — пересчитается труд; изменишь труд — изменятся единицы.</p>
-              <div className="mt-3 border-t border-[var(--border)] pt-3">
-                <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Зависимости</div>
-                {selected.predList.length ? (
-                  <ul className="space-y-1">
-                    {selected.predList.map((p) => { const pr = rows.find((x) => x.id === p.predId); return <li key={p.depId} className="flex items-center gap-2 text-[var(--text)]"><span className="mono text-[var(--muted)]">{pr?.wbs}</span><span className="truncate">{pr?.name}</span><span className="ml-auto rounded bg-[var(--panel-strong)] px-1 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{DEP_RU[p.type]}{p.lagDays ? ` ${p.lagDays > 0 ? "+" : ""}${p.lagDays}д` : ""}</span></li>; })}
-                  </ul>
-                ) : <span className="text-[var(--muted)]">нет</span>}
-              </div>
-            </div>
-          </aside>
-        ) : null}
       </div>
 
       {canManagePlan && staged.length > 0 ? (
@@ -1886,29 +1881,5 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       ) : null}
       </div>
     </DeliveryFrame>
-  );
-}
-
-function Fact({ label, value, mono, span }: { label: string; value: string; mono?: boolean; span?: boolean }) {
-  return (
-    <div className={cn(span && "col-span-2")}>
-      <dt className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">{label}</dt>
-      <dd className={cn("text-[var(--text)]", mono && "mono")}>{value}</dd>
-    </div>
-  );
-}
-
-function FactNum({ label, value, suffix, disabled, onCommit }: { label: string; value: number; suffix?: string; disabled?: boolean; onCommit: (n: number) => void }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(value));
-  return (
-    <div>
-      <dt className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">{label}</dt>
-      {editing && !disabled ? (
-        <input autoFocus type="number" value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => { setEditing(false); const n = Number(draft); if (!Number.isNaN(n) && n !== value) onCommit(n); }} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditing(false); }} className="w-16 rounded-[var(--radius-xs)] border border-[var(--accent)] bg-[var(--panel)] px-1 text-[length:var(--text-sm)] tabular-nums outline-none" />
-      ) : (
-        <dd className={cn("text-[var(--text)]", !disabled && "cursor-pointer rounded px-0.5 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]")} onClick={() => { if (!disabled) { setDraft(String(value)); setEditing(true); } }}>{value}{suffix}</dd>
-      )}
-    </div>
   );
 }

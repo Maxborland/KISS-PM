@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -38,6 +39,7 @@ export function DialogError({ text }: { text: string | null }) {
 
 export type FormDialogProps = {
   title: string;
+  description?: ReactNode;
   /** Кнопка-триггер (неуправляемый режим). */
   trigger?: ReactNode;
   /** Управляемый режим (диалог «по target»). */
@@ -63,6 +65,7 @@ export type FormDialogProps = {
 
 export function FormDialog({
   title,
+  description = "Заполните поля и подтвердите действие.",
   trigger,
   open,
   onOpenChange,
@@ -109,6 +112,7 @@ export function FormDialog({
       <DialogContent className={contentClassName}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="sr-only">{description}</DialogDescription>
         </DialogHeader>
         {children}
         <DialogError text={formError} />

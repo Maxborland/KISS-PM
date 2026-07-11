@@ -629,7 +629,7 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
           taskId: task.id,
           type: "system",
           title: "Задача создана",
-          body: `Статус: ${task.statusId}. Ответственный: Анна Администратор.`,
+          body: "Ответственный: Анна Администратор.",
           fileUrl: null,
           fileSizeBytes: null,
           mimeType: null,
@@ -637,7 +637,14 @@ async function seedDemoProjectWork(db: KissPmDatabase, createdAt: Date): Promise
           createdAt,
           updatedAt: createdAt
         })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: [taskActivities.tenantId, taskActivities.id],
+          set: {
+            title: "Задача создана",
+            body: "Ответственный: Анна Администратор.",
+            updatedAt: createdAt
+          }
+        });
     }
 
     await seedDemoPlanningData(transaction, createdAt);
@@ -1984,7 +1991,7 @@ async function seedProjectBundle(
         taskId: task.id,
         type: "system",
         title: "Задача создана",
-        body: `Статус: ${task.statusId}.`,
+        body: "Задача добавлена в проект.",
         fileUrl: null,
         fileSizeBytes: null,
         mimeType: null,
@@ -1992,7 +1999,14 @@ async function seedProjectBundle(
         createdAt,
         updatedAt: createdAt
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: [taskActivities.tenantId, taskActivities.id],
+        set: {
+          title: "Задача создана",
+          body: "Задача добавлена в проект.",
+          updatedAt: createdAt
+        }
+      });
   }
 
   await db
