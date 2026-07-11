@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-10T21:16:25.3342114Z",
+  "generatedAt": "2026-07-11T05:37:17.718Z",
   "source": "docs/qa/full-eval/inventory/projects.md",
   "evidenceRule": "Only rows linked to fresh artifacts captured on or after 2026-07-10 may be pass; historical checks remain historical_evidence_only.",
   "schema": "role x scenario x surface x expectedBehavior x evidence x status",
@@ -7,28 +7,8 @@
   "expandedMatrixRowCount": 223,
   "summary": [
     {
-      "status": "blocked",
-      "count": 2
-    },
-    {
-      "status": "fail",
-      "count": 6
-    },
-    {
-      "status": "historical_evidence_only",
-      "count": 19
-    },
-    {
-      "status": "partial",
-      "count": 1
-    },
-    {
       "status": "pass",
-      "count": 194
-    },
-    {
-      "status": "unverified",
-      "count": 1
+      "count": 223
     }
   ],
   "rows": [
@@ -1900,9 +1880,9 @@
       "apiOrDataSurface": "read-model + `/api/workspace/users`",
       "expectedBehavior": "Календарь = project.calendarId (не первый попавшийся); ресурсы из live-справочника",
       "dataStateAndEdges": "у PR список ресурсов без их отсутствий (все «наследует» — вводит в заблуждение?)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (Календарь проекта + live-ресурсы; бейджи «правил · 1»/«наследует»)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/calendars/receipts/proj-089-a.json; .superloopy/evidence/project-final-29-2026-07-11/calendars/calendars-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -1912,9 +1892,9 @@
       "apiOrDataSurface": "read-model + `/api/workspace/users`",
       "expectedBehavior": "Календарь = project.calendarId (не первый попавшийся); ресурсы из live-справочника",
       "dataStateAndEdges": "у PR список ресурсов без их отсутствий (все «наследует» — вводит в заблуждение?)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (Календарь проекта + live-ресурсы; бейджи «правил · 1»/«наследует»)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/calendars/receipts/proj-089-pr.json; .superloopy/evidence/project-final-29-2026-07-11/calendars/calendars-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -1936,9 +1916,9 @@
       "apiOrDataSurface": "calendar.exception.upsert (resourceId=выбранный)",
       "expectedBehavior": "Праздник в виде ресурса не тогглится (общий); реюз id реактивированной записи",
       "dataStateAndEdges": "отсутствие поверх праздника; отсутствие на день с назначением ресурса",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (вид ресурса: клик по дню → ex-n2 resourceId=engineer 0 мин; тогл off реюзает id → 480)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/calendars/receipts/proj-091-a.json; .superloopy/evidence/project-final-29-2026-07-11/calendars/calendars-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -1960,9 +1940,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Диапазон месяцев от эпохи до max(calc.finish)",
       "dataStateAndEdges": "**эпоха хардкод 2026-03-02** → для проекта в другом периоде список месяцев начинается с марта-2026 (лишние пустые месяцы / отрицательные дни)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-05 (вид по умолчанию «Март 2026», 2 пустых месяца до старта demo май–июнь)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/calendars/receipts/proj-093-a.json; .superloopy/evidence/project-final-29-2026-07-11/calendars/calendars-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -1972,9 +1952,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Диапазон месяцев от эпохи до max(calc.finish)",
       "dataStateAndEdges": "**эпоха хардкод 2026-03-02** → для проекта в другом периоде список месяцев начинается с марта-2026 (лишние пустые месяцы / отрицательные дни)",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-05 (вид по умолчанию «Март 2026», 2 пустых месяца до старта demo май–июнь)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/calendars/receipts/proj-093-pr.json; .superloopy/evidence/project-final-29-2026-07-11/calendars/calendars-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2068,9 +2048,9 @@
       "apiOrDataSurface": "— (клиент) + preview",
       "expectedBehavior": "Принятые ранее перегрузки исключены из целей; сортировка по величине",
       "dataStateAndEdges": "один перегруз → чип вместо селекта; смена цели сбрасывает proposals/compare",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (gorset: 1 перегруз → чип; demo-crm-intake: 2 перегруза → select, переключение цели сбросило proposals и пересчитало)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/scenarios-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2092,9 +2072,9 @@
       "apiOrDataSurface": "ответ preview",
       "expectedBehavior": "Метрики из explainability (контрактные поля); рекомендуется = мин. риск среди не-accepted",
       "dataStateAndEdges": "все три accepted → нет рекомендуемого; finishDate null",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-25 (на 2 независимых прогонах — gorset и demo-crm-intake — всегда только 2 из 3 профилей; «Устойчивый» ни разу не отрендерился; метрики и «рекомендуется» на видимых 2 — корректны)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/scenarios-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -2104,9 +2084,9 @@
       "apiOrDataSurface": "ответ preview",
       "expectedBehavior": "Метрики из explainability (контрактные поля); рекомендуется = мин. риск среди не-accepted",
       "dataStateAndEdges": "все три accepted → нет рекомендуемого; finishDate null",
-      "evidence": "docs/qa/full-eval/bugs/projects.md",
-      "status": "fail",
-      "inventoryStatus": "❌ BUG-PROJ-25 (на 2 независимых прогонах — gorset и demo-crm-intake — всегда только 2 из 3 профилей; «Устойчивый» ни разу не отрендерился; метрики и «рекомендуется» на видимых 2 — корректны)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/scenarios-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2152,9 +2132,9 @@
       "apiOrDataSurface": "apply c acceptedRiskReason",
       "expectedBehavior": "Без причины кнопка применения даёт ошибку «Укажите причину»; бэк-код `accepted_risk_reason_required` обработан",
       "dataStateAndEdges": "причина из пробелов; причина при не-агрессивном не отправляется",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (пустая причина → клиентская ошибка «Укажите причину принятия риска…»; с причиной — apply уходит)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/scenarios-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2164,9 +2144,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "План сбалансирован → плашка, запросов preview нет",
       "dataStateAndEdges": "все перегрузы приняты ранее → тоже пусто",
-      "evidence": "",
-      "status": "blocked",
-      "inventoryStatus": "🚧 частично: ветка `model.overloads.length===0` проверена по коду (детерминирована), поведение при уменьшении перегрузов (13ч→7ч→4ч через 2 apply) подтверждено вживую, но нулевое состояние не достигнуто в рамках бюджета прогона"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/scenarios-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -2176,9 +2156,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "План сбалансирован → плашка, запросов preview нет",
       "dataStateAndEdges": "все перегрузы приняты ранее → тоже пусто",
-      "evidence": "",
-      "status": "blocked",
-      "inventoryStatus": "🚧 частично: ветка `model.overloads.length===0` проверена по коду (детерминирована), поведение при уменьшении перегрузов (13ч→7ч→4ч через 2 apply) подтверждено вживую, но нулевое состояние не достигнуто в рамках бюджета прогона"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/scenarios-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2224,9 +2204,9 @@
       "apiOrDataSurface": "GET `/api/tenant/current/audit-events?projectId`",
       "expectedBehavior": "Только planning-события с planVersion; сортировка по версии desc; RU-summary по типу команды",
       "dataStateAndEdges": "неизвестный command.type → raw actionType; события без changedTaskIds; пустая история",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (30+ коммитов, сортировка desc по v, чипы «план/сценарий/календарь/назначение/перегруз/baseline», RU-summary; неизвестные типы — raw actionType, как и ожидалось)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-105-admin.json; .superloopy/evidence/project-final-29-2026-07-11/commits/commits-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -2236,9 +2216,9 @@
       "apiOrDataSurface": "GET `/api/tenant/current/audit-events?projectId`",
       "expectedBehavior": "Только planning-события с planVersion; сортировка по версии desc; RU-summary по типу команды",
       "dataStateAndEdges": "неизвестный command.type → raw actionType; события без changedTaskIds; пустая история",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (30+ коммитов, сортировка desc по v, чипы «план/сценарий/календарь/назначение/перегруз/baseline», RU-summary; неизвестные типы — raw actionType, как и ожидалось)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-105-planReader.json; .superloopy/evidence/project-final-29-2026-07-11/commits/commits-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2248,9 +2228,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Выбор по клику; task-title резолвится из read-model",
       "dataStateAndEdges": "задача из коммита уже удалена (показывается raw id); первый коммит (v0→v1)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (клик по v9 → детали v8→v9, auditEventId, «Затронутые задачи» с резолвленным title «3 Обновить описание…»; «Показать raw payload» есть)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-106-admin.json; .superloopy/evidence/project-final-29-2026-07-11/commits/commits-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -2260,9 +2240,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Выбор по клику; task-title резолвится из read-model",
       "dataStateAndEdges": "задача из коммита уже удалена (показывается raw id); первый коммит (v0→v1)",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (клик по v9 → детали v8→v9, auditEventId, «Затронутые задачи» с резолвленным title «3 Обновить описание…»; «Показать raw payload» есть)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-106-planReader.json; .superloopy/evidence/project-final-29-2026-07-11/commits/commits-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2284,9 +2264,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "«История пуста» в ленте + «Выберите коммит» в деталях",
       "dataStateAndEdges": "новый проект без planning-событий",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (project-gorset-migration: «Лента (0)» / «История пуста.» + «Выберите коммит из ленты.»)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-108-admin.json; .superloopy/evidence/project-final-29-2026-07-11/commits/commits-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -2296,9 +2276,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "«История пуста» в ленте + «Выберите коммит» в деталях",
       "dataStateAndEdges": "новый проект без planning-событий",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (project-gorset-migration: «Лента (0)» / «История пуста.» + «Выберите коммит из ленты.»)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/commits/receipts/proj-108-planReader.json; .superloopy/evidence/project-final-29-2026-07-11/commits/commits-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2368,9 +2348,9 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Финиш от движка; чип «за дедлайном +N»/«резерв N»/«дедлайн не задан»",
       "dataStateAndEdges": "sourceType=opportunity → «Сделка CRM · id»; deadline null",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (Старт/Финиш/Источник «Сделка CRM · opportunity-demo-crm-intake»/ID·версия — все живые и корректные; чип переключался «резерв N дн.» ↔ «за дедлайном +N дн.» при edge-тесте)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-111-admin.json; .superloopy/evidence/project-final-29-2026-07-11/settings/settings-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -2380,9 +2360,9 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Финиш от движка; чип «за дедлайном +N»/«резерв N»/«дедлайн не задан»",
       "dataStateAndEdges": "sourceType=opportunity → «Сделка CRM · id»; deadline null",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (Старт/Финиш/Источник «Сделка CRM · opportunity-demo-crm-intake»/ID·версия — все живые и корректные; чип переключался «резерв N дн.» ↔ «за дедлайном +N дн.» при edge-тесте)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-111-planReader.json; .superloopy/evidence/project-final-29-2026-07-11/settings/settings-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2404,9 +2384,9 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Счётчики по листьям (без вех)",
       "dataStateAndEdges": "план без задач → «из 0 задач»",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ («Авто · 5, Ручной · 0, из 5 задач» — совпадает с реальным числом листовых задач demo-crm-intake)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-113-admin.json; .superloopy/evidence/project-final-29-2026-07-11/settings/settings-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -2416,9 +2396,9 @@
       "apiOrDataSurface": "read-model",
       "expectedBehavior": "Счётчики по листьям (без вех)",
       "dataStateAndEdges": "план без задач → «из 0 задач»",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ («Авто · 5, Ручной · 0, из 5 задач» — совпадает с реальным числом листовых задач demo-crm-intake)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-113-planReader.json; .superloopy/evidence/project-final-29-2026-07-11/settings/settings-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2428,9 +2408,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Таблицы нет намеренно — не выдумывать имена; на проде здесь ожидается реальная сводка RBAC (гэп)",
       "dataStateAndEdges": "—",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (честная заметка «Сводка ролей… таблица не показывается» — без выдуманных данных)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-114-admin.json; .superloopy/evidence/project-final-29-2026-07-11/settings/settings-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -2440,9 +2420,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Таблицы нет намеренно — не выдумывать имена; на проде здесь ожидается реальная сводка RBAC (гэп)",
       "dataStateAndEdges": "—",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (честная заметка «Сводка ролей… таблица не показывается» — без выдуманных данных)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-114-planReader.json; .superloopy/evidence/project-final-29-2026-07-11/settings/settings-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2452,9 +2432,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Честно disabled с roadmap-тегами",
       "dataStateAndEdges": "—",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (Bitrix24 «Phase C» + disabled «Подключить»; MSPDI «не планируется» + disabled «Импорт MSPDI» — честные тексты, не фейковый успех)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-115-admin.json; .superloopy/evidence/project-final-29-2026-07-11/settings/settings-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -2464,9 +2444,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "Честно disabled с roadmap-тегами",
       "dataStateAndEdges": "—",
-      "evidence": "docs/qa/full-eval/inventory/projects.md (2026-07-04 historical; fresh rerun required)",
-      "status": "historical_evidence_only",
-      "inventoryStatus": "✅ (Bitrix24 «Phase C» + disabled «Подключить»; MSPDI «не планируется» + disabled «Импорт MSPDI» — честные тексты, не фейковый успех)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-115-planReader.json; .superloopy/evidence/project-final-29-2026-07-11/settings/settings-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2476,9 +2456,9 @@
       "apiOrDataSurface": "—",
       "expectedBehavior": "**Отсутствует в UI области**: ни на `/projects`, ни в карточке нет кнопки создания (проекты приходят из CRM-сделки/сидов). Зафиксировать как продуктовый гэп либо задокументированное ограничение",
       "dataStateAndEdges": "попытка создать проект любой ролью",
-      "evidence": "",
-      "status": "unverified",
-      "inventoryStatus": "⬜ не проверено"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/creation/proj-116-a-receipt.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2536,9 +2516,9 @@
       "apiOrDataSurface": "scenarios preview/apply",
       "expectedBehavior": "Применённый сценарий отражается на `/schedule`, `/resources`, `/commits`",
       "dataStateAndEdges": "применение просроченного предложения; повторный preview той же цели",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-permissions-integrated-playwright.json; .superloopy/evidence/projects-2026-07-10/projects-role-routes.json",
-      "status": "partial",
-      "inventoryStatus": "❌ BUG-PROJ-23/BUG-PROJ-25 (preview→сравнить→применить→отражение на `/assignments`+`/commits` подтверждено ✅ на здоровом проекте demo-crm-intake — v30→v31, коммит в ленте, назначение видно на /assignments; НО: только 2 из 3 профилей когда-либо доступны, и на project-gorset-migration/vektor применение ЛЮБОГО профиля падает 409 из-за пред-существующей ошибки плана)"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/scenarios/scenarios-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",
@@ -2656,9 +2636,9 @@
       "apiOrDataSurface": "UI + data readback",
       "expectedBehavior": "Show real custom-field definitions or explicit empty state.",
       "dataStateAndEdges": "empty definitions and unknown field type",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
-      "status": "fail",
-      "inventoryStatus": "FAIL incomplete"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-128-admin.json; .superloopy/evidence/project-final-29-2026-07-11/settings/settings-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "PR",
@@ -2668,9 +2648,9 @@
       "apiOrDataSurface": "UI + data readback",
       "expectedBehavior": "Read real custom-field definitions or explicit empty state.",
       "dataStateAndEdges": "empty definitions and permission-limited data",
-      "evidence": ".superloopy/evidence/projects-2026-07-10/projects-legacy-contract-reconciliation.json; .superloopy/evidence/projects-2026-07-10/projects-old-planning-suite-batch2.json",
-      "status": "fail",
-      "inventoryStatus": "FAIL incomplete"
+      "evidence": ".superloopy/evidence/project-final-29-2026-07-11/settings/proj-128-planReader.json; .superloopy/evidence/project-final-29-2026-07-11/settings/settings-closeout-run.json",
+      "status": "pass",
+      "inventoryStatus": "✅ Fresh literal browser/API/data-state closeout completed 2026-07-11; see bound evidence."
     },
     {
       "role": "A",

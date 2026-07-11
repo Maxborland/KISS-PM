@@ -1,0 +1,20 @@
+{
+  "runId": "final29-settings-review-r1",
+  "generatedAt": "2026-07-11T05:35:27.509Z",
+  "status": "pass",
+  "expectedRows": 10,
+  "passedRows": 10,
+  "cleanupCompleted": true,
+  "receipts": [
+    "proj-111-admin.json",
+    "proj-113-admin.json",
+    "proj-114-admin.json",
+    "proj-115-admin.json",
+    "proj-128-admin.json",
+    "proj-111-planReader.json",
+    "proj-113-planReader.json",
+    "proj-114-planReader.json",
+    "proj-115-planReader.json",
+    "proj-128-planReader.json"
+  ]
+}

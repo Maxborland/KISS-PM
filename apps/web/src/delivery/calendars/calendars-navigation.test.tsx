@@ -100,10 +100,12 @@ function conflictReadModel(calculatedDates: Array<{ start: string | null; finish
 
 let root: Root | null = null;
 
-async function renderCalendars() {
-  const container = document.body.appendChild(document.createElement("div"));
-  root = createRoot(container);
-  await act(async () => root!.render(<ProjectCalendars projectId="project-alpha" />));
+async function renderCalendars(projectId = "project-alpha") {
+  if (!root) {
+    const container = document.body.appendChild(document.createElement("div"));
+    root = createRoot(container);
+  }
+  await act(async () => root!.render(<ProjectCalendars projectId={projectId} />));
 }
 
 beforeEach(() => {
@@ -135,6 +137,35 @@ describe.each([
     const scheduleLink = [...document.querySelectorAll<HTMLAnchorElement>("a")]
       .find((link) => link.textContent === "Открыть График");
     expect(scheduleLink?.getAttribute("href")).toBe("/projects/project-alpha/schedule");
+  });
+
+  it("starts at the live horizon and resets only when the project horizon changes", async () => {
+    harness.permissions = permissions;
+    const first = conflictReadModel([{ start: "2026-05-12", finish: "2026-08-02" }]);
+    first.project.plannedStart = "2026-06-01";
+    first.project.plannedFinish = "2026-07-31";
+    harness.readModel = first;
+
+    await renderCalendars();
+
+    const monthLabel = document.querySelector<HTMLElement>('[data-testid="calendar-month-label"]');
+    const previous = document.querySelector<HTMLButtonElement>('button[aria-label="Предыдущий месяц"]');
+    const next = document.querySelector<HTMLButtonElement>('button[aria-label="Следующий месяц"]');
+    expect(monthLabel?.dataset.monthKey).toBe("2026-05");
+    expect(previous?.disabled).toBe(true);
+    expect(next?.disabled).toBe(false);
+
+    await act(async () => next!.click());
+    expect(monthLabel?.dataset.monthKey).toBe("2026-06");
+
+    const second = conflictReadModel([{ start: "2026-09-10", finish: "2026-11-03" }]);
+    second.project.plannedStart = "2026-10-01";
+    second.project.plannedFinish = "2026-10-31";
+    harness.readModel = second;
+    await renderCalendars("project-beta");
+
+    expect(monthLabel?.dataset.monthKey).toBe("2026-09");
+    expect(previous?.disabled).toBe(true);
   });
 });
 

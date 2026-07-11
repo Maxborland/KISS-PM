@@ -23,7 +23,7 @@ export const planningRouteTestDataset: SeedTenantDataset = createTenantScenarioD
       id: "access-profile-plan-reader-no-resources",
       tenantId: "tenant-alpha",
       name: "Наблюдатель плана без ресурсов",
-      permissions: ["tenant.projects.read", "tenant.project_plan.read"]
+      permissions: ["tenant.projects.read", "tenant.project_plan.read", "tenant.planning_scenarios.preview"]
     },
     {
       id: "access-profile-plan-manager-no-read",

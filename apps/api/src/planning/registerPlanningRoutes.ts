@@ -46,6 +46,7 @@ import {
 import { normalizeTaskCreateStatus } from "./taskCreateNormalization";
 import {
   parseScenarioProposal,
+  scenarioIsAvailable,
   scenarioRequiresAcceptedRiskReason,
   validateScenarioRunIntegrity,
   withAcceptedRiskReason
@@ -121,6 +122,55 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     return context.json(createPlanningReadModel(snapshot, { includeResourceExceptions }));
   });
 
+  app.get("/api/workspace/projects/:projectId/planning/commits", async (context) => {
+    const parsedProjectId = parseProjectRouteParam(context);
+    if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+
+    const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!deps.dataSource.getPlanSnapshot || !deps.dataSource.listAuditEventsByTenantId) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const profile = await deps.getActorProfile(actor);
+    const decision = canReadPlanningReadModel({ actor, profile });
+    if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+
+    const projectId = parsedProjectId.value;
+    const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
+    if (!snapshot) return context.json({ error: "project_not_found" }, 404);
+
+    const events = await deps.dataSource.listAuditEventsByTenantId(actor.tenantId, {
+      limit: 100,
+      projectId
+    });
+    return context.json({
+      auditEvents: events
+        .filter((event) => event.sourceWorkflow === "planning")
+        .map((event) => {
+          const command = event.input["command"] as Record<string, unknown> | undefined;
+          const changedTaskIds = event.afterState?.["changedTaskIds"];
+          const compensatingCommands = event.afterState?.["compensatingCommands"];
+          return {
+            id: event.id,
+            actionType: event.actionType,
+            sourceWorkflow: event.sourceWorkflow,
+            commandType: typeof command?.["type"] === "string" ? command["type"] : null,
+            afterState: {
+              planVersion: event.afterState?.["planVersion"] ?? null,
+              changedTaskIds: Array.isArray(changedTaskIds) ? changedTaskIds : [],
+              hasCompensatingCommands:
+                Array.isArray(compensatingCommands) && compensatingCommands.length > 0
+            },
+            executionStatus:
+              typeof event.executionResult["status"] === "string"
+                ? event.executionResult["status"]
+                : null,
+            createdAt: event.createdAt.toISOString()
+          };
+        })
+    });
+  });
   app.post("/api/workspace/projects/:projectId/planning/preview-command", async (context) => {
     const parsedProjectId = parseProjectRouteParam(context);
     if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
@@ -824,6 +874,14 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
 
       const proposal = parseScenarioProposal(scenarioRun.proposalPayload);
       if (!proposal) return { ok: false as const, status: 409, error: "planning_scenario_invalid" };
+      if (!scenarioIsAvailable(proposal)) {
+        return {
+          ok: false as const,
+          status: 409,
+          error: "scenario_unavailable",
+          unavailableReason: proposal.unavailableReason
+        };
+      }
       const integrityError = validateScenarioRunIntegrity(scenarioRun, snapshot);
       if (integrityError) {
         return { ok: false as const, status: 409, error: integrityError };

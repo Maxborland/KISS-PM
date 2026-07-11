@@ -1,0 +1,35 @@
+{
+  "scenarioId": "PROJ-128",
+  "role": "planReader",
+  "status": "pass",
+  "runId": "final29-settings-review-r1",
+  "generatedAt": "2026-07-11T05:35:27.131Z",
+  "assertions": [
+    "Plan Reader loaded the same persisted WBS definition",
+    "No create/edit/delete controls were rendered and direct POST was denied with 403"
+  ],
+  "details": {
+    "readback": [
+      {
+        "id": "field-f58cbc11-72ff-4100-a0e4-146adbbfdefa",
+        "tenantId": "tenant-alpha",
+        "systemKey": "wbs_eval_1783748124122",
+        "tenantLabel": "Контроль WBS",
+        "targetEntity": "project",
+        "fieldType": "number",
+        "required": true,
+        "status": "active",
+        "createdAt": "2026-07-11T05:35:25.529Z",
+        "updatedAt": "2026-07-11T05:35:25.529Z"
+      }
+    ],
+    "deniedStatus": 403,
+    "deleteRaceStatuses": [
+      200,
+      404
+    ]
+  },
+  "screenshots": [
+    "screenshots/proj-128-plan-reader.png"
+  ]
+}

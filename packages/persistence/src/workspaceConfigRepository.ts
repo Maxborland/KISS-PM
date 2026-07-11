@@ -21,6 +21,10 @@ export type WorkspaceConfigRepository = {
   createCustomFieldDefinition(
     input: CustomFieldDefinitionInput
   ): Promise<CustomFieldDefinitionRecord>;
+  deleteCustomFieldDefinition(
+    tenantId: TenantId,
+    fieldId: string
+  ): Promise<CustomFieldDefinitionRecord | undefined>;
   updateCustomFieldDefinition(
     input: CustomFieldDefinitionInput
   ): Promise<CustomFieldDefinitionRecord>;
@@ -58,6 +62,19 @@ export function createWorkspaceConfigRepository(
       }
 
       return mapCustomFieldDefinitionRecord(row);
+    },
+    async deleteCustomFieldDefinition(tenantId, fieldId) {
+      const [row] = await db
+        .delete(customFieldDefinitions)
+        .where(
+          and(
+            eq(customFieldDefinitions.tenantId, tenantId),
+            eq(customFieldDefinitions.id, fieldId)
+          )
+        )
+        .returning();
+
+      return row ? mapCustomFieldDefinitionRecord(row) : undefined;
     },
     async updateCustomFieldDefinition(input) {
       const [row] = await db

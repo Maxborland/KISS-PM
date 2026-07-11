@@ -23,6 +23,8 @@ type Proposal = {
   id: string;
   profile: Profile;
   conflictEffect: "accepted" | "reduced" | "removed";
+  availability: "available" | "unavailable";
+  unavailableReason: "target_bucket_not_found" | "target_assignment_not_found" | "no_eligible_alternate_resource" | "alternate_resource_has_insufficient_capacity" | null;
   planDelta: { commands: Array<{ type: string; payload?: Record<string, unknown> }> };
   explainability: { finishDate: string | null; overloadMinutes: number; changedTaskIds: string[]; riskScore: number; requiredApprovals: string[] };
 };
@@ -31,6 +33,12 @@ type Overload = { resourceId: string; date: string; overloadMinutes: number; tas
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const SCENARIO_PREVIEW_PERMISSION = "tenant.planning_scenarios.preview";
 const SCENARIO_APPLY_PERMISSION = "tenant.planning_scenarios.apply";
+const UNAVAILABLE_REASON: Record<Exclude<Proposal["unavailableReason"], null>, string> = {
+  target_bucket_not_found: "Целевой день перегруза больше не найден.",
+  target_assignment_not_found: "Назначение, создающее перегруз, больше не найдено.",
+  no_eligible_alternate_resource: "В команде нет ресурса подходящей позиции.",
+  alternate_resource_has_insufficient_capacity: "У подходящих ресурсов недостаточно свободной ёмкости."
+};
 const PROFILE_META: Record<Profile, { label: string; desc: string }> = {
   aggressive: { label: "Агрессивный", desc: "Принять перегруз, сохранить дату финиша" },
   balanced: { label: "Балансированный", desc: "Снять половину перегруза на альт-исполнителя, минимальный сдвиг" },
@@ -117,7 +125,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
 
   const projectMeta = deriveProjectMeta(readModel, projectBase);
   const list = proposals ?? [];
-  const recommendedId = list.filter((p) => p.conflictEffect !== "accepted").sort((a, b) => a.explainability.riskScore - b.explainability.riskScore)[0]?.id ?? null;
+  const recommendedId = list.filter((p) => p.availability === "available" && p.conflictEffect !== "accepted").sort((a, b) => a.explainability.riskScore - b.explainability.riskScore)[0]?.id ?? null;
   const compareP = compareId ? list.find((p) => p.id === compareId) ?? null : null;
 
   // ВСЁ для сравнения/дельт считаем из КОНТРАКТНЫХ полей (live read-model + explainability + planDelta.commands),
@@ -173,7 +181,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       )}
 
       {model.overloads.length === 0 ? (
-        <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-10 text-center text-[length:var(--text-sm)] text-[var(--muted)] shadow-[var(--shadow-card)]">
+        <div data-testid="scenario-empty-state" className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-10 text-center text-[length:var(--text-sm)] text-[var(--muted)] shadow-[var(--shadow-card)]">
           Перегрузов не найдено — ресурсный план сбалансирован. Сценарии разрешения не требуются.
         </div>
       ) : (
@@ -206,9 +214,10 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
               {list.map((p) => {
                 const meta = PROFILE_META[p.profile];
                 const risk = riskOf(p.explainability.riskScore);
-                const recommended = p.id === recommendedId;
+                const available = p.availability === "available";
+                const recommended = available && p.id === recommendedId;
                 return (
-                  <div key={p.id} className={cn("rounded-[var(--radius-card)] border bg-[var(--panel)] p-3 shadow-[var(--shadow-card)]", recommended ? "border-[var(--info)] shadow-[0_0_0_1px_var(--info)]" : "border-[var(--border)]")}>
+                  <div key={p.id} data-testid={`scenario-card-${p.profile}`} data-availability={p.availability} className={cn("rounded-[var(--radius-card)] border bg-[var(--panel)] p-3 shadow-[var(--shadow-card)]", recommended ? "border-[var(--info)] shadow-[0_0_0_1px_var(--info)]" : "border-[var(--border)]")}>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                       <div className="min-w-[200px] flex-1">
                         <div className="flex items-center gap-1.5">
@@ -216,6 +225,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                           {recommended ? <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--info-soft)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold text-[var(--info)]"><Sparkles className="size-3" aria-hidden />рекомендуется</span> : null}
                         </div>
                         <div className="mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{meta.desc}</div>
+                        {!available && p.unavailableReason ? <div data-testid={`scenario-unavailable-${p.profile}`} className="mt-1 text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Недоступен: {UNAVAILABLE_REASON[p.unavailableReason]}</div> : null}
                       </div>
                       <div className="w-[120px]">
                         <div className="text-[length:var(--text-2xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Финиш</div>
@@ -230,8 +240,8 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                         <div className="mt-0.5 flex items-center gap-1"><span className="mono text-[length:var(--text-sm)] text-[var(--text)]">{p.explainability.changedTaskIds.length}</span><span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", risk.cls)}>{risk.label}</span></div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
-                        <Button variant="secondary" size="sm" onClick={() => setCompareId(compareId === p.id ? null : p.id)}>{compareId === p.id ? "Скрыть" : "Сравнить"}</Button>
-                        {canApplyScenarios ? <Button variant="default" size="sm" disabled={applyBusy} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button> : null}
+                        <Button variant="secondary" size="sm" disabled={!available} onClick={() => setCompareId(compareId === p.id ? null : p.id)}>{compareId === p.id ? "Скрыть" : "Сравнить"}</Button>
+                        {canApplyScenarios ? <Button variant="default" size="sm" disabled={applyBusy || !available} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button> : null}
                       </div>
                     </div>
 

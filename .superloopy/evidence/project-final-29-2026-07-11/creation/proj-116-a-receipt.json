@@ -1,0 +1,491 @@
+{
+  "scenarioId": "PROJ-116",
+  "role": "A",
+  "runId": "final29-creation-20260711-r6",
+  "status": "pass",
+  "generatedAt": "2026-07-11T05:11:03.663Z",
+  "assertions": [
+    "Admin reached CRM-backed creation from a non-empty project list",
+    "Required, probability, and date validation blocked invalid UI submission",
+    "UI create, feasibility, activation, project navigation, and reload succeeded",
+    "Duplicate activation replay and concurrent create/activate converged to 409",
+    "API and PostgreSQL readback matched two active projects",
+    "Disposable harness cleanup removed only generated rows and audit events"
+  ],
+  "screenshots": [
+    "01-project-list-create-entry.png",
+    "02-required-fields-disabled.png",
+    "03-invalid-values-disabled.png",
+    "04-opportunity-created.png",
+    "05-feasibility-readback.png",
+    "06-project-navigation-reload.png"
+  ],
+  "details": {
+    "ui": {
+      "createOpportunityRequest": {
+        "clientId": "client-gorset",
+        "primaryContactId": "contact-gorset-it",
+        "projectTypeId": "project-type-implementation",
+        "stageId": "deal-stage-new",
+        "title": "PROJ-116 final29-creation-20260711-r6",
+        "plannedStart": "2028-01-10",
+        "plannedFinish": "2028-02-10",
+        "contractValue": 100000,
+        "plannedHourlyRate": 2500,
+        "probability": 80,
+        "demand": [
+          {
+            "positionId": "backend",
+            "requiredHours": 40
+          }
+        ]
+      },
+      "createOpportunityResponse": {
+        "opportunity": {
+          "id": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+          "tenantId": "tenant-alpha",
+          "clientId": "client-gorset",
+          "primaryContactId": "contact-gorset-it",
+          "ownerUserId": "user-alpha-admin",
+          "projectTypeId": "project-type-implementation",
+          "stageId": "deal-stage-new",
+          "pipelineId": "tenant-alpha-pipeline-default",
+          "clientName": "АО Горсеть",
+          "contactName": "Галина ИТ",
+          "title": "PROJ-116 final29-creation-20260711-r6",
+          "projectType": "Внедрение",
+          "description": null,
+          "plannedStart": "2028-01-10T00:00:00.000Z",
+          "plannedFinish": "2028-02-10T00:00:00.000Z",
+          "contractValue": 100000,
+          "plannedHourlyRate": 2500,
+          "plannedHours": 40,
+          "probability": 80,
+          "status": "new",
+          "templateId": null,
+          "feasibilityStatus": null,
+          "feasibilityResult": null,
+          "feasibilityCheckedAt": null,
+          "createdAt": "2026-07-11T05:10:59.655Z",
+          "updatedAt": "2026-07-11T05:10:59.655Z",
+          "demand": [
+            {
+              "positionId": "position-analyst",
+              "requiredHours": 40
+            }
+          ],
+          "customFieldValues": {}
+        }
+      },
+      "feasibilityResponse": {
+        "opportunity": {
+          "id": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+          "tenantId": "tenant-alpha",
+          "clientId": "client-gorset",
+          "primaryContactId": "contact-gorset-it",
+          "ownerUserId": "user-alpha-admin",
+          "projectTypeId": "project-type-implementation",
+          "stageId": "deal-stage-new",
+          "pipelineId": "tenant-alpha-pipeline-default",
+          "clientName": "АО Горсеть",
+          "contactName": "Галина ИТ",
+          "title": "PROJ-116 final29-creation-20260711-r6",
+          "projectType": "Внедрение",
+          "description": null,
+          "plannedStart": "2028-01-10T00:00:00.000Z",
+          "plannedFinish": "2028-02-10T00:00:00.000Z",
+          "contractValue": 100000,
+          "plannedHourlyRate": 2500,
+          "plannedHours": 40,
+          "probability": 80,
+          "status": "feasibility",
+          "templateId": null,
+          "feasibilityStatus": "conflict",
+          "feasibilityResult": {
+            "rows": [
+              {
+                "status": "conflict",
+                "positionId": "position-analyst",
+                "positionName": "Аналитик",
+                "requiredHours": 40,
+                "reservedHours": 0,
+                "shortageHours": 40,
+                "availableHours": 0
+              }
+            ],
+            "status": "conflict",
+            "blockers": [
+              "missing_position_capacity"
+            ],
+            "warnings": [],
+            "workingDays": 24,
+            "plannedHours": 40,
+            "opportunityId": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+            "totalRequiredHours": 40
+          },
+          "feasibilityCheckedAt": "2026-07-11T05:11:01.560Z",
+          "createdAt": "2026-07-11T05:10:59.655Z",
+          "updatedAt": "2026-07-11T05:11:01.560Z",
+          "demand": [
+            {
+              "positionId": "position-analyst",
+              "requiredHours": 40
+            }
+          ],
+          "customFieldValues": {}
+        },
+        "assessment": {
+          "opportunityId": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+          "plannedHours": 40,
+          "totalRequiredHours": 40,
+          "workingDays": 24,
+          "status": "conflict",
+          "blockers": [
+            "missing_position_capacity"
+          ],
+          "warnings": [],
+          "rows": [
+            {
+              "positionId": "position-analyst",
+              "positionName": "Аналитик",
+              "requiredHours": 40,
+              "availableHours": 0,
+              "reservedHours": 0,
+              "shortageHours": 40,
+              "status": "conflict"
+            }
+          ]
+        }
+      },
+      "activationResponse": {
+        "project": {
+          "id": "project-794152af-51e0-4147-87e1-131a9c374c69",
+          "tenantId": "tenant-alpha",
+          "sourceType": "opportunity",
+          "sourceOpportunityId": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+          "clientId": "client-gorset",
+          "projectTypeId": "project-type-implementation",
+          "title": "PROJ-116 final29-creation-20260711-r6",
+          "clientName": "АО Горсеть",
+          "status": "active",
+          "plannedStart": "2028-01-10T00:00:00.000Z",
+          "plannedFinish": "2028-02-10T00:00:00.000Z",
+          "contractValue": 100000,
+          "plannedHours": 40,
+          "templateId": null,
+          "createdAt": "2026-07-11T05:11:01.932Z",
+          "activatedAt": "2026-07-11T05:11:01.939Z",
+          "closedAt": null,
+          "demand": [
+            {
+              "positionId": "position-analyst",
+              "requiredHours": 40
+            }
+          ]
+        }
+      }
+    },
+    "validation": {
+      "requiredSubmitDisabled": true,
+      "probability101Disabled": true,
+      "finishBeforeStartDisabled": true,
+      "invalidApiResponse": {
+        "status": 400,
+        "body": {
+          "error": "invalid_planned_dates"
+        }
+      }
+    },
+    "duplicateAndRace": {
+      "activationReplay": {
+        "status": 409,
+        "body": {
+          "error": "opportunity_not_activatable"
+        }
+      },
+      "opportunityCreateStatuses": [
+        201,
+        409
+      ],
+      "opportunityCreateBodies": [
+        {
+          "opportunity": {
+            "id": "opportunity-proj116-race-final29-creation-20260711-r6",
+            "tenantId": "tenant-alpha",
+            "clientId": "client-gorset",
+            "primaryContactId": "contact-gorset-it",
+            "ownerUserId": "user-alpha-admin",
+            "projectTypeId": "project-type-implementation",
+            "stageId": "deal-stage-new",
+            "pipelineId": "tenant-alpha-pipeline-default",
+            "clientName": "АО Горсеть",
+            "contactName": "Галина ИТ",
+            "title": "PROJ-116 final29-creation-20260711-r6 race",
+            "projectType": "Внедрение",
+            "description": null,
+            "plannedStart": "2028-04-10T00:00:00.000Z",
+            "plannedFinish": "2028-05-10T00:00:00.000Z",
+            "contractValue": 100000,
+            "plannedHourlyRate": 2500,
+            "plannedHours": 40,
+            "probability": 80,
+            "status": "new",
+            "templateId": null,
+            "feasibilityStatus": null,
+            "feasibilityResult": null,
+            "feasibilityCheckedAt": null,
+            "createdAt": "2026-07-11T05:11:02.068Z",
+            "updatedAt": "2026-07-11T05:11:02.068Z",
+            "demand": [
+              {
+                "positionId": "position-analyst",
+                "requiredHours": 40
+              }
+            ],
+            "customFieldValues": {}
+          }
+        },
+        {
+          "error": "opportunity_id_taken"
+        }
+      ],
+      "activationStatuses": [
+        201,
+        409
+      ],
+      "activationBodies": [
+        {
+          "project": {
+            "id": "project-proj116-race-a-final29-creation-20260711-r6",
+            "tenantId": "tenant-alpha",
+            "sourceType": "opportunity",
+            "sourceOpportunityId": "opportunity-proj116-race-final29-creation-20260711-r6",
+            "clientId": "client-gorset",
+            "projectTypeId": "project-type-implementation",
+            "title": "PROJ-116 final29-creation-20260711-r6 race",
+            "clientName": "АО Горсеть",
+            "status": "active",
+            "plannedStart": "2028-04-10T00:00:00.000Z",
+            "plannedFinish": "2028-05-10T00:00:00.000Z",
+            "contractValue": 100000,
+            "plannedHours": 40,
+            "templateId": null,
+            "createdAt": "2026-07-11T05:11:02.165Z",
+            "activatedAt": "2026-07-11T05:11:02.172Z",
+            "closedAt": null,
+            "demand": [
+              {
+                "positionId": "position-analyst",
+                "requiredHours": 40
+              }
+            ]
+          }
+        },
+        {
+          "error": "opportunity_not_activatable"
+        }
+      ]
+    },
+    "readback": {
+      "projectApi": {
+        "project": {
+          "id": "project-794152af-51e0-4147-87e1-131a9c374c69",
+          "tenantId": "tenant-alpha",
+          "sourceType": "opportunity",
+          "sourceOpportunityId": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+          "clientId": "client-gorset",
+          "projectTypeId": "project-type-implementation",
+          "title": "PROJ-116 final29-creation-20260711-r6",
+          "clientName": "АО Горсеть",
+          "status": "active",
+          "plannedStart": "2028-01-10T00:00:00.000Z",
+          "plannedFinish": "2028-02-10T00:00:00.000Z",
+          "contractValue": 100000,
+          "plannedHours": 40,
+          "templateId": null,
+          "createdAt": "2026-07-11T05:11:01.932Z",
+          "activatedAt": "2026-07-11T05:11:01.939Z",
+          "closedAt": null,
+          "demand": [
+            {
+              "positionId": "position-analyst",
+              "requiredHours": 40
+            }
+          ]
+        },
+        "tasks": []
+      },
+      "postgres": {
+        "opportunities": [
+          {
+            "id": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+            "tenant_id": "tenant-alpha",
+            "title": "PROJ-116 final29-creation-20260711-r6",
+            "status": "won_closed",
+            "feasibility_status": "conflict"
+          },
+          {
+            "id": "opportunity-proj116-race-final29-creation-20260711-r6",
+            "tenant_id": "tenant-alpha",
+            "title": "PROJ-116 final29-creation-20260711-r6 race",
+            "status": "won_closed",
+            "feasibility_status": "conflict"
+          }
+        ],
+        "projects": [
+          {
+            "id": "project-794152af-51e0-4147-87e1-131a9c374c69",
+            "tenant_id": "tenant-alpha",
+            "source_opportunity_id": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+            "title": "PROJ-116 final29-creation-20260711-r6",
+            "status": "active",
+            "activated_at": "2026-07-11T05:11:01.939Z"
+          },
+          {
+            "id": "project-proj116-race-a-final29-creation-20260711-r6",
+            "tenant_id": "tenant-alpha",
+            "source_opportunity_id": "opportunity-proj116-race-final29-creation-20260711-r6",
+            "title": "PROJ-116 final29-creation-20260711-r6 race",
+            "status": "active",
+            "activated_at": "2026-07-11T05:11:02.172Z"
+          }
+        ],
+        "auditEvents": [
+          {
+            "id": "audit-a45ee2b3-e575-436c-a6da-55fac011f501",
+            "action_type": "opportunity.created",
+            "source_entity": {
+              "id": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+              "type": "Opportunity"
+            },
+            "input": {
+              "id": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+              "title": "PROJ-116 final29-creation-20260711-r6",
+              "demand": [
+                {
+                  "positionId": "position-analyst",
+                  "requiredHours": 40
+                }
+              ],
+              "status": "new",
+              "stageId": "deal-stage-new",
+              "clientId": "client-gorset",
+              "tenantId": "tenant-alpha",
+              "clientName": "АО Горсеть",
+              "templateId": null,
+              "contactName": "Галина ИТ",
+              "description": null,
+              "ownerUserId": "user-alpha-admin",
+              "probability": 80,
+              "projectType": "Внедрение",
+              "plannedHours": 40,
+              "plannedStart": "2028-01-10T00:00:00.000Z",
+              "contractValue": 100000,
+              "plannedFinish": "2028-02-10T00:00:00.000Z",
+              "projectTypeId": "project-type-implementation",
+              "primaryContactId": "contact-gorset-it",
+              "customFieldValues": {},
+              "plannedHourlyRate": 2500
+            }
+          },
+          {
+            "id": "audit-9a5471c1-b5ac-45c8-bc1d-f533e9cf4fa8",
+            "action_type": "opportunity.feasibility_checked",
+            "source_entity": {
+              "id": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+              "type": "Opportunity"
+            },
+            "input": {
+              "opportunityId": "opportunity-9a425552-a479-43f0-83f5-55b52da87615"
+            }
+          },
+          {
+            "id": "audit-d5bf0b61-1a67-4e1f-af00-60bbe8119f9c",
+            "action_type": "opportunity.created",
+            "source_entity": {
+              "id": "opportunity-proj116-race-final29-creation-20260711-r6",
+              "type": "Opportunity"
+            },
+            "input": {
+              "id": "opportunity-proj116-race-final29-creation-20260711-r6",
+              "title": "PROJ-116 final29-creation-20260711-r6 race",
+              "demand": [
+                {
+                  "positionId": "position-analyst",
+                  "requiredHours": 40
+                }
+              ],
+              "status": "new",
+              "stageId": "deal-stage-new",
+              "clientId": "client-gorset",
+              "tenantId": "tenant-alpha",
+              "clientName": "АО Горсеть",
+              "templateId": null,
+              "contactName": "Галина ИТ",
+              "description": null,
+              "ownerUserId": "user-alpha-admin",
+              "probability": 80,
+              "projectType": "Внедрение",
+              "plannedHours": 40,
+              "plannedStart": "2028-04-10T00:00:00.000Z",
+              "contractValue": 100000,
+              "plannedFinish": "2028-05-10T00:00:00.000Z",
+              "projectTypeId": "project-type-implementation",
+              "primaryContactId": "contact-gorset-it",
+              "customFieldValues": {},
+              "plannedHourlyRate": 2500
+            }
+          },
+          {
+            "id": "audit-3f951b1a-dc1f-4b1b-853c-842f1e910b1d",
+            "action_type": "opportunity.feasibility_checked",
+            "source_entity": {
+              "id": "opportunity-proj116-race-final29-creation-20260711-r6",
+              "type": "Opportunity"
+            },
+            "input": {
+              "opportunityId": "opportunity-proj116-race-final29-creation-20260711-r6"
+            }
+          },
+          {
+            "id": "audit-fb5d37b9-d9bf-4352-be22-15fdf4c233f2",
+            "action_type": "project.activated",
+            "source_entity": {
+              "id": "project-794152af-51e0-4147-87e1-131a9c374c69",
+              "type": "Project"
+            },
+            "input": {
+              "projectId": "project-794152af-51e0-4147-87e1-131a9c374c69",
+              "opportunityId": "opportunity-9a425552-a479-43f0-83f5-55b52da87615",
+              "draftProjectId": "project-794152af-51e0-4147-87e1-131a9c374c69",
+              "acceptedRiskReason": "Disposable PROJ-116 full-evaluation race closeout",
+              "currentFeasibilityStatus": "conflict"
+            }
+          },
+          {
+            "id": "audit-b363a71f-b07f-439d-90de-02f1ccc24eb4",
+            "action_type": "project.activated",
+            "source_entity": {
+              "id": "project-proj116-race-a-final29-creation-20260711-r6",
+              "type": "Project"
+            },
+            "input": {
+              "projectId": "project-proj116-race-a-final29-creation-20260711-r6",
+              "opportunityId": "opportunity-proj116-race-final29-creation-20260711-r6",
+              "draftProjectId": "project-proj116-race-a-final29-creation-20260711-r6",
+              "acceptedRiskReason": "Disposable PROJ-116 concurrent activation",
+              "currentFeasibilityStatus": "conflict"
+            }
+          }
+        ]
+      }
+    },
+    "cleanup": {
+      "remainingOpportunities": 0,
+      "remainingProjects": 0,
+      "remainingAuditEvents": 0,
+      "contract": "disposable database harness cleanup; product project archive/delete route does not exist"
+    }
+  },
+  "blocker": null
+}

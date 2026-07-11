@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "row": {
+    "scenarioId": "PROJ-089",
+    "role": "A",
+    "key": "PROJ-089:A",
+    "status": "pass",
+    "runId": "final29-calendars-20260711-r4",
+    "generatedAt": "2026-07-11T05:08:41.767Z",
+    "assertions": [
+      "Project selector and every live workspace resource were rendered",
+      "The selected project calendar matched project.calendarId",
+      "ADMIN badges matched active live resource exceptions"
+    ],
+    "details": {
+      "projectId": "project-demo-crm-intake",
+      "projectCalendarId": "calendar-demo-project",
+      "workspaceUsers": [
+        {
+          "id": "user-alpha-admin",
+          "tenantId": "tenant-alpha",
+          "accessProfileId": "access-profile-alpha-admin",
+          "positionId": "position-project-manager",
+          "positionName": "Руководитель проекта",
+          "email": "admin@kiss-pm.local",
+          "name": "Анна Администратор",
+          "phone": null,
+          "telegram": null,
+          "status": "active",
+          "theme": "light",
+          "accentColor": "#0f766e"
+        },
+        {
+          "id": "user-alpha-engineer",
+          "tenantId": "tenant-alpha",
+          "accessProfileId": "access-profile-alpha-admin",
+          "positionId": "position-engineer",
+          "positionName": "Инженер",
+          "email": "engineer@kiss-pm.local",
+          "name": "Игорь Инженер",
+          "phone": null,
+          "telegram": null,
+          "status": "active",
+          "theme": "light",
+          "accentColor": "#0f766e"
+        },
+        {
+          "id": "user-alpha-plan-reader-no-resources",
+          "tenantId": "tenant-alpha",
+          "accessProfileId": "access-profile-plan-reader-no-resources",
+          "positionId": "position-engineer",
+          "positionName": "Инженер",
+          "email": "plan-reader-no-resources@kiss-pm.local",
+          "name": "Никита Без Ресурсов",
+          "phone": null,
+          "telegram": null,
+          "status": "active",
+          "theme": "light",
+          "accentColor": "#0f766e"
+        },
+        {
+          "id": "user-alpha-resource-reader",
+          "tenantId": "tenant-alpha",
+          "accessProfileId": "access-profile-resource-reader",
+          "positionId": "position-engineer",
+          "positionName": "Инженер",
+          "email": "resource-reader@kiss-pm.local",
+          "name": "Роман Ресурсный",
+          "phone": null,
+          "telegram": null,
+          "status": "active",
+          "theme": "light",
+          "accentColor": "#0f766e"
+        }
+      ],
+      "expectedActiveRuleCounts": {
+        "user-alpha-admin": 0,
+        "user-alpha-engineer": 0,
+        "user-alpha-plan-reader-no-resources": 0,
+        "user-alpha-resource-reader": 0
+      }
+    },
+    "screenshots": [
+      "screenshots/proj-089-a-live-directory.png"
+    ],
+    "error": null
+  },
+  "screenshotPathBase": "lane_root"
+}

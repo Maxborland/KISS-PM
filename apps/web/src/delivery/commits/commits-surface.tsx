@@ -164,16 +164,16 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_320px]" data-testid="commits-workspace">
         {/* лента коммитов */}
-        <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+        <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]" data-testid="commits-feed">
           <div className="border-b border-[var(--border)] px-3 py-2 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Лента ({commits.length})</div>
           {commits.map((c) => {
             const type = typeOf(c.actionType);
             const active = c.auditEventId === sel;
             const canRevert = canManagePlan && latestRevert?.auditEventId === c.auditEventId;
             return (
-              <button key={c.auditEventId} type="button" onClick={() => setSel(c.auditEventId)} className={cn("flex w-full items-start gap-2 border-b border-[var(--border-subtle)] px-3 py-2 text-left last:border-b-0 hover:bg-[var(--panel-subtle)]", active && "bg-[var(--accent-soft)]")}>
+              <button key={c.auditEventId} type="button" onClick={() => setSel(c.auditEventId)} className={cn("flex w-full items-start gap-2 border-b border-[var(--border-subtle)] px-3 py-2 text-left last:border-b-0 hover:bg-[var(--panel-subtle)]", active && "bg-[var(--accent-soft)]")} data-testid="commit-row" data-audit-event-id={c.auditEventId} data-plan-version={c.version} aria-pressed={active}>
                 <span className="mono mt-0.5 w-[78px] shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">{hhmm(c.at)}</span>
                 <GitCommitVertical className="mt-0.5 size-4 shrink-0 text-[var(--muted-soft)]" aria-hidden />
                 <span className="min-w-0 flex-1">
@@ -194,7 +194,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
         </div>
 
         {/* детали события */}
-        <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+        <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]" data-testid="commit-details">
           <div className="border-b border-[var(--border)] px-3 py-2 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Детали коммита</div>
           {selected ? (
             <div className="px-3 py-3 text-[length:var(--text-sm)]">
@@ -212,7 +212,7 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
                 <div className="mt-3">
                   <div className="mb-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Затронутые задачи ({selected.changedTaskIds.length})</div>
                   <ul className="space-y-1">
-                    {selected.changedTaskIds.slice(0, 8).map((id) => <li key={id} className="truncate rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1 text-[length:var(--text-xs)] text-[var(--text)]">{taskTitle(id)}</li>)}
+                    {selected.changedTaskIds.slice(0, 8).map((id) => <li key={id} data-testid="commit-task" data-task-id={id} className="truncate rounded-[var(--radius-sm)] bg-[var(--panel-subtle)] px-2 py-1 text-[length:var(--text-xs)] text-[var(--text)]">{taskTitle(id)}</li>)}
                   </ul>
                 </div>
               ) : null}
@@ -221,12 +221,12 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
                 <Button variant="secondary" size="sm" className="mt-3" disabled={busy} onClick={() => void onRevert(selected)}><RotateCcw className="size-3.5" aria-hidden />Откатить коммит</Button>
               ) : selected.revertible ? <p className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Откат доступен только для последнего обратимого коммита.</p> : <p className="mt-3 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Откат недоступен (необратимая операция или системная запись).</p> : null}
 
-              {prototypeNotesEnabled ? (
+
               <details className="mt-3 rounded-[var(--radius-md)] border border-[var(--border)]">
                 <summary className="cursor-pointer px-2 py-1.5 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Показать raw payload</summary>
-                <pre className="mono overflow-auto rounded-b-[var(--radius-md)] bg-[var(--text-strong)] px-2 py-2 text-[length:var(--text-2xs)] leading-relaxed text-[var(--panel)]">{JSON.stringify({ version: selected.version, actionType: selected.actionType, auditEventId: selected.auditEventId, changedTaskIds: selected.changedTaskIds, revertible: selected.revertible, at: selected.at }, null, 2)}</pre>
+                <pre data-testid="commit-raw-payload" className="mono overflow-auto rounded-b-[var(--radius-md)] bg-[var(--text-strong)] px-2 py-2 text-[length:var(--text-2xs)] leading-relaxed text-[var(--panel)]">{JSON.stringify({ version: selected.version, actionType: selected.actionType, auditEventId: selected.auditEventId, changedTaskIds: selected.changedTaskIds, revertible: selected.revertible, at: selected.at }, null, 2)}</pre>
               </details>
-              ) : null}
+
             </div>
           ) : <div className="px-3 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted)]">Выберите коммит из ленты.</div>}
         </div>

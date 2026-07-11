@@ -14,15 +14,14 @@ export type CommitsView = { commits: CommitMetaView[]; latestRevert: { auditEven
 // в getCommits, чтобы live-адаптер знал, какой из исторических коммитов ещё обратим.
 export type LastApply = { afterVersion: number; commands: PlanningCommand[]; before: PlanningReadModel } | null;
 
-// Боевой журнал = GET /api/tenant/current/audit-events. Сервер хранит компенсирующие
-// команды в afterState, поэтому UI может безопасно предложить откат текущего коммита.
+// Боевой журнал возвращает только безопасный project-scoped DTO без полного audit payload.
 type PlanningAuditEvent = {
   id: string;
   actionType: string;
   sourceWorkflow: string | null;
-  input?: { command?: { type?: string } };
-  afterState: { planVersion: number; changedTaskIds?: string[]; compensatingCommands?: unknown[] };
-  executionResult?: { status?: string };
+  commandType: string | null;
+  afterState: { planVersion: number; changedTaskIds: string[]; hasCompensatingCommands: boolean };
+  executionStatus: string | null;
   createdAt: string;
 };
 const PLAN_COMMAND_SUMMARY: Record<string, string> = {
@@ -76,7 +75,7 @@ export function createDeliveryPlanningClient(live: boolean) {
     // Серверный revert-last принимает только текущий коммит. Поэтому обратимым
     // помечаем исключительно первый успешный planning-event с компенсацией.
     const body = await requestJson<{ auditEvents: PlanningAuditEvent[] }>(
-      `/api/tenant/current/audit-events?projectId=${encodeURIComponent(projectId)}`
+      `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/commits`
     );
     const planningEvents = body.auditEvents
       .filter((event) => event.sourceWorkflow === "planning" && event.afterState?.planVersion != null)
@@ -84,15 +83,14 @@ export function createDeliveryPlanningClient(live: boolean) {
     const latestEvent = planningEvents[0] ?? null;
     const canRevertLatest = Boolean(
       latestEvent &&
-      latestEvent.executionResult?.status === "succeeded" &&
-      Array.isArray(latestEvent.afterState.compensatingCommands) &&
-      latestEvent.afterState.compensatingCommands.length > 0
+      latestEvent.executionStatus === "succeeded" &&
+      latestEvent.afterState.hasCompensatingCommands
     );
     const commits: CommitMetaView[] = planningEvents.map((event) => ({
       version: event.afterState.planVersion,
       actionType: event.actionType,
       summary:
-        (event.input?.command?.type && PLAN_COMMAND_SUMMARY[event.input.command.type]) ||
+        (event.commandType && PLAN_COMMAND_SUMMARY[event.commandType]) ||
         PLAN_COMMAND_SUMMARY[event.actionType] ||
         event.actionType,
       changedTaskIds: event.afterState.changedTaskIds ?? [],

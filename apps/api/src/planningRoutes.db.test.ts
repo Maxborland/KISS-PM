@@ -36,7 +36,7 @@ const dataset: SeedTenantDataset = {
       id: "access-profile-plan-reader-no-resources",
       tenantId: "tenant-alpha",
       name: "Наблюдатель плана без ресурсов",
-      permissions: ["tenant.projects.read", "tenant.project_plan.read"]
+      permissions: ["tenant.projects.read", "tenant.project_plan.read", "tenant.planning_scenarios.preview"]
     },
     {
       id: "access-profile-plan-manager-no-read",
@@ -2893,6 +2893,16 @@ describe("planning API routes", () => {
       headers: { cookie: planOnlyCookie, Accept: "text/event-stream" }
     });
     expect(events.status).toBe(200);
+
+    const commits = await app.request(
+      "/api/workspace/projects/project-alpha/planning/commits",
+      { headers: { cookie: planOnlyCookie } }
+    );
+    expect(commits.status).toBe(200);
+    const commitsBody = await commits.json() as {
+      auditEvents: Array<{ sourceWorkflow: string | null }>;
+    };
+    expect(commitsBody.auditEvents.every((event) => event.sourceWorkflow === "planning")).toBe(true);
   });
 
   it("applies project.settings.update with audit and plan recalc", async () => {

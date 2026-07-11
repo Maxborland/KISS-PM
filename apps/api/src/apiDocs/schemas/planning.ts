@@ -992,11 +992,22 @@ export const planningSchemas = openApiSchemaFragment({
   },
   PlanningScenarioProposal: {
     type: "object",
-    required: ["id", "profile", "conflictEffect", "planDelta", "explainability"],
+    required: ["id", "profile", "conflictEffect", "availability", "unavailableReason", "planDelta", "explainability"],
     properties: {
       id: stringIdSchema,
       profile: planningScenarioProfileSchema,
       conflictEffect: { type: "string", enum: ["accepted", "reduced", "removed"] },
+      availability: { type: "string", enum: ["available", "unavailable"] },
+      unavailableReason: {
+        type: ["string", "null"],
+        enum: [
+          "target_bucket_not_found",
+          "target_assignment_not_found",
+          "no_eligible_alternate_resource",
+          "alternate_resource_has_insufficient_capacity",
+          null
+        ]
+      },
       planDelta: schemaRef("PlanningPlanDelta"),
       explainability: schemaRef("PlanningProposalExplainability")
     },
@@ -1175,6 +1186,45 @@ export const planningSchemas = openApiSchemaFragment({
       expiresAt: dateTimeSchema,
       appliedProposalId: nullableStringSchema,
       proposals: { type: "array", items: schemaRef("PlanningAutoSolverProposal") }
+    },
+    additionalProperties: false
+  },
+  PlanningCommitEvent: {
+    type: "object",
+    required: [
+      "id",
+      "actionType",
+      "sourceWorkflow",
+      "commandType",
+      "afterState",
+      "executionStatus",
+      "createdAt"
+    ],
+    properties: {
+      id: stringIdSchema,
+      actionType: { type: "string", minLength: 1 },
+      sourceWorkflow: { type: ["string", "null"] },
+      commandType: nullableStringSchema,
+      afterState: {
+        type: "object",
+        required: ["planVersion", "changedTaskIds", "hasCompensatingCommands"],
+        properties: {
+          planVersion: { type: ["integer", "null"], minimum: 0 },
+          changedTaskIds: { type: "array", items: stringIdSchema },
+          hasCompensatingCommands: { type: "boolean" }
+        },
+        additionalProperties: false
+      },
+      executionStatus: nullableStringSchema,
+      createdAt: dateTimeSchema
+    },
+    additionalProperties: false
+  },
+  PlanningCommitsResponse: {
+    type: "object",
+    required: ["auditEvents"],
+    properties: {
+      auditEvents: { type: "array", items: schemaRef("PlanningCommitEvent") }
     },
     additionalProperties: false
   },

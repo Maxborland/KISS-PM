@@ -1,0 +1,55 @@
+{
+  "scenarioId": "PROJ-108",
+  "role": "A",
+  "status": "pass",
+  "runId": "final29-commits-review-r1",
+  "generatedAt": "2026-07-11T05:35:21.262Z",
+  "assertions": [
+    "Used a newly activated real project without request interception",
+    "API readback proved the initial planVersion and no planning audit events",
+    "Feed and details rendered their distinct empty states",
+    "Both empty states survived a full reload"
+  ],
+  "details": {
+    "projectId": "project-commits-1783748120344-b50d0d",
+    "planVersion": 1,
+    "allProjectEvents": [],
+    "creation": {
+      "opportunityId": "opportunity-commits-1783748120344-b50d0d",
+      "createStatus": 201,
+      "feasibilityStatus": 200,
+      "activateStatus": 201,
+      "activatedBody": {
+        "project": {
+          "id": "project-commits-1783748120344-b50d0d",
+          "tenantId": "tenant-alpha",
+          "sourceType": "opportunity",
+          "sourceOpportunityId": "opportunity-commits-1783748120344-b50d0d",
+          "clientId": "client-romashka",
+          "projectTypeId": "project-type-implementation",
+          "title": "PROJ-108 empty history 1783748120344-b50d0d",
+          "clientName": "ООО Ромашка",
+          "status": "active",
+          "plannedStart": "2028-03-01T00:00:00.000Z",
+          "plannedFinish": "2028-03-31T00:00:00.000Z",
+          "contractValue": 100000,
+          "plannedHours": 40,
+          "templateId": null,
+          "createdAt": "2026-07-11T05:35:20.533Z",
+          "activatedAt": "2026-07-11T05:35:20.538Z",
+          "closedAt": null,
+          "demand": [
+            {
+              "positionId": "position-engineer",
+              "requiredHours": 8
+            }
+          ]
+        }
+      }
+    }
+  },
+  "screenshots": [
+    "screenshots/proj-108-admin-actual-empty-history-reload.png"
+  ],
+  "screenshotPathBase": "lane_root"
+}

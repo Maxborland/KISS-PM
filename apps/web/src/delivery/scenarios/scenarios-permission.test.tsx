@@ -14,6 +14,8 @@ const previewScenarios = vi.fn(async () => ({
       id: "scenario-1",
       profile: "aggressive",
       conflictEffect: "accepted",
+      availability: "available",
+      unavailableReason: null,
       planDelta: {
         commands: [
           {
@@ -27,6 +29,36 @@ const previewScenarios = vi.fn(async () => ({
         overloadMinutes: 120,
         changedTaskIds: [],
         riskScore: 80,
+        requiredApprovals: []
+      }
+    },
+    {
+      id: "scenario-2",
+      profile: "balanced",
+      conflictEffect: "reduced",
+      availability: "unavailable",
+      unavailableReason: "no_eligible_alternate_resource",
+      planDelta: { commands: [] },
+      explainability: {
+        finishDate: "2026-07-12",
+        overloadMinutes: 120,
+        changedTaskIds: [],
+        riskScore: 40,
+        requiredApprovals: []
+      }
+    },
+    {
+      id: "scenario-3",
+      profile: "resilient",
+      conflictEffect: "removed",
+      availability: "unavailable",
+      unavailableReason: "alternate_resource_has_insufficient_capacity",
+      planDelta: { commands: [] },
+      explainability: {
+        finishDate: "2026-07-12",
+        overloadMinutes: 120,
+        changedTaskIds: [],
+        riskScore: 20,
         requiredApprovals: []
       }
     }
@@ -121,6 +153,9 @@ describe("scenario permission controls", () => {
     expect(button(previewOnly.host, "Запросить заново")).toBeDefined();
     expect(button(previewOnly.host, "Сравнить")).toBeDefined();
     expect(button(previewOnly.host, "Применить")).toBeUndefined();
+    expect(previewOnly.host.querySelectorAll('[data-testid^="scenario-card-"]')).toHaveLength(3);
+    expect(previewOnly.host.querySelector('[data-testid="scenario-card-balanced"]')?.getAttribute("data-availability")).toBe("unavailable");
+    expect(previewOnly.host.textContent).toContain("В команде нет ресурса подходящей позиции.");
     expect(previewOnly.host.querySelector('input[placeholder*="согласовано"]')).toBeNull();
     await act(async () => {
       button(previewOnly.host, "Сравнить")?.click();

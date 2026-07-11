@@ -96,6 +96,17 @@ afterEach(async () => {
 });
 
 describe("projects list navigation", () => {
+  it("offers the CRM-backed project creation workflow even when projects already exist", async () => {
+    harness.data = { projects: [project("project-alpha", "Alpha project")] };
+    harness.status = "ready";
+
+    await renderSurface();
+
+    const createLink = [...document.querySelectorAll<HTMLAnchorElement>("a")]
+      .find((link) => link.textContent === "Создать проект");
+    expect(createLink?.getAttribute("href")).toBe("/crm/deals");
+  });
+
   it("gives every available project title a native, keyboard-focusable detail link", async () => {
     harness.data = {
       projects: [

@@ -224,6 +224,46 @@ describe("commit permission controls", () => {
     expect(rendered.host.textContent).not.toContain("Устаревшая история");
     await act(async () => rendered.root.unmount());
   });
+
+  it("keeps commit details and raw payload available in live read-only mode", async () => {
+    permissions = ["tenant.project_plan.read"];
+    loadCommits.mockResolvedValueOnce({
+      commits: [
+        { auditEventId: "audit-new", actionType: "planning.task.updated", version: 5, at: "2026-07-10T05:00:00.000Z", summary: "Новая версия", changedTaskIds: ["task-1"], revertible: false },
+        { auditEventId: "audit-deleted", actionType: "planning.unknown", version: 4, at: "2026-07-10T04:00:00.000Z", summary: "planning.unknown", changedTaskIds: ["task-deleted"], revertible: false }
+      ],
+      latestRevert: null
+    });
+
+    const rendered = await renderCommits();
+    const rows = [...rendered.host.querySelectorAll<HTMLButtonElement>('[data-testid="commit-row"]')];
+    expect(rows.map((row) => row.dataset.planVersion)).toEqual(["5", "4"]);
+    expect(rows[0]?.getAttribute("aria-pressed")).toBe("true");
+    expect(rendered.host.textContent).toContain("1 Task");
+    expect(rendered.host.textContent).toContain("Показать raw payload");
+
+    await act(async () => rows[1]?.click());
+    expect(rows[1]?.getAttribute("aria-pressed")).toBe("true");
+    expect(rendered.host.textContent).toContain("task-deleted");
+    const raw = rendered.host.querySelector('[data-testid="commit-raw-payload"]');
+    expect(raw?.textContent).toContain('"auditEventId": "audit-deleted"');
+    expect(raw?.textContent).toContain('"actionType": "planning.unknown"');
+    await act(async () => rendered.root.unmount());
+  });
+
+  it("renders both empty-history states without inventing a selected commit", async () => {
+    permissions = ["tenant.project_plan.read"];
+    loadCommits.mockResolvedValueOnce({ commits: [], latestRevert: null });
+
+    const rendered = await renderCommits();
+    expect(rendered.host.textContent).toContain("Лента (0)");
+    expect(rendered.host.textContent).toContain("История пуста.");
+    expect(rendered.host.textContent).toContain("Выберите коммит из ленты.");
+    expect(rendered.host.querySelectorAll('[data-testid="commit-row"]')).toHaveLength(0);
+    expect(rendered.host.querySelector('[data-testid="commit-raw-payload"]')).toBeNull();
+    await act(async () => rendered.root.unmount());
+  });
+
 });
 
 function deferred<T>() {

@@ -225,7 +225,7 @@ test.describe("Projects scenarios write flow", () => {
     }
   });
 
-  test("PLAN reader has no scenario controls and both direct capabilities are denied unchanged", async ({
+  test("PLAN reader can preview scenarios but cannot apply them", async ({
     page
   }) => {
     test.setTimeout(60_000);
@@ -246,21 +246,19 @@ test.describe("Projects scenarios write flow", () => {
     await expect(
       page.getByRole("heading", { name: "Сценарии планирования", exact: true })
     ).toBeVisible();
-    await expect(
-      page.getByText("Недостаточно прав для расчёта сценариев.", { exact: true })
-    ).toBeVisible();
+    await expect(page.locator('[data-testid^="scenario-card-"]')).toHaveCount(3);
     await expect(
       page.getByRole("button", { name: "Запросить заново", exact: true })
-    ).toHaveCount(0);
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Сравнить", exact: true })
-    ).toHaveCount(0);
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Применить", exact: true })
     ).toHaveCount(0);
     expect(uiApplyRequests).toBe(0);
 
-    const deniedPreview = await page.request.post(
+    const preview = await page.request.post(
       `/api/workspace/projects/${encodeURIComponent(
         projectId
       )}/planning/scenarios/preview`,
@@ -269,7 +267,7 @@ test.describe("Projects scenarios write flow", () => {
         data: { target, clientPlanVersion: before.planVersion }
       }
     );
-    expect(deniedPreview.status()).toBe(403);
+    expect(preview.status()).toBe(200);
 
     const deniedApply = await page.request.post(
       `/api/workspace/projects/${encodeURIComponent(
@@ -282,18 +280,16 @@ test.describe("Projects scenarios write flow", () => {
     );
     expect(deniedApply.status()).toBe(403);
 
-    const afterDenied = await getReadModel(page, projectId);
-    expect(afterDenied.planVersion).toBe(before.planVersion);
-    expect(sortedAssignments(afterDenied)).toEqual(sortedAssignments(before));
-    expect(findTargetOverload(afterDenied, target)).toEqual(
+    const afterPreview = await getReadModel(page, projectId);
+    expect(afterPreview.planVersion).toBe(before.planVersion);
+    expect(sortedAssignments(afterPreview)).toEqual(sortedAssignments(before));
+    expect(findTargetOverload(afterPreview, target)).toEqual(
       findTargetOverload(before, target)
     );
     expect(uiApplyRequests).toBe(0);
 
     await page.reload();
-    await expect(
-      page.getByText("Недостаточно прав для расчёта сценариев.", { exact: true })
-    ).toBeVisible();
+    await expect(page.locator('[data-testid^="scenario-card-"]')).toHaveCount(3);
     await expect(
       page.getByRole("button", { name: "Применить", exact: true })
     ).toHaveCount(0);

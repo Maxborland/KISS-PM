@@ -1,0 +1,15 @@
+{
+  "scenarioId": "PROJ-113",
+  "role": "planReader",
+  "status": "pass",
+  "runId": "final29-settings-review-r1",
+  "generatedAt": "2026-07-11T05:35:26.734Z",
+  "assertions": [
+    "Режим планирования rendered from the live project surface for planReader",
+    "The surface exposed no fake write affordance for this read-only state"
+  ],
+  "details": {},
+  "screenshots": [
+    "screenshots/proj-113-planReader.png"
+  ]
+}

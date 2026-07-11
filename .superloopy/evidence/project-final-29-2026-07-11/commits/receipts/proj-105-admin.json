@@ -1,0 +1,55 @@
+{
+  "scenarioId": "PROJ-105",
+  "role": "A",
+  "status": "pass",
+  "runId": "final29-commits-review-r1",
+  "generatedAt": "2026-07-11T05:35:18.086Z",
+  "assertions": [
+    "API and UI exposed exactly the same filtered planning-history rows",
+    "Versions were numeric, unique and sorted descending",
+    "Every row exposed timestamp, vN, summary, type and changed-task metadata",
+    "Admin completed the manager traversal"
+  ],
+  "details": {
+    "projectId": "project-vektor-portal",
+    "allEventCount": 2,
+    "apiVersions": [
+      3,
+      2
+    ],
+    "uiVersions": [
+      3,
+      2
+    ],
+    "events": [
+      {
+        "id": "audit-cfcbaf5c-c953-4c64-b510-a3d8dfe2636d",
+        "actionType": "planning.task.updated",
+        "sourceWorkflow": "planning",
+        "commandType": "task.update_identity",
+        "planVersion": 3,
+        "changedTaskIds": [
+          "task-vektor-phase-prep"
+        ],
+        "executionStatus": "succeeded",
+        "createdAt": "2026-07-11T05:35:17.362Z"
+      },
+      {
+        "id": "audit-a5f445f6-d1d6-4b0b-8a1d-a4f957e953ac",
+        "actionType": "planning.task.updated",
+        "sourceWorkflow": "planning",
+        "commandType": "task.update_identity",
+        "planVersion": 2,
+        "changedTaskIds": [
+          "task-vektor-phase-prep"
+        ],
+        "executionStatus": "succeeded",
+        "createdAt": "2026-07-11T05:35:17.223Z"
+      }
+    ]
+  },
+  "screenshots": [
+    "screenshots/proj-105-admin-populated-sorted-history.png"
+  ],
+  "screenshotPathBase": "lane_root"
+}

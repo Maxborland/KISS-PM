@@ -20,11 +20,13 @@ import { demoAction } from "@/views/lib/demo";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { PlanningCommand, PlanCalendar } from "@kiss-pm/domain";
+import { ProjectCustomFields } from "./project-custom-fields";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 // PROJECT_FALLBACK (шапка loading/error) импортируется из delivery/lib/project-chrome
 const DOW_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const SETTINGS_MANAGE_PERMISSION = "tenant.project_plan.manage";
+const WORKSPACE_CONFIG_MANAGE_PERMISSION = "tenant.workspace_config.manage";
 const ddmmyyyy = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 const calLabel = (c: PlanCalendar) => { const days = c.workingWeekdays.map((d) => DOW_RU[d] ?? "?"); const span = days.length ? `${days[0]}–${days[days.length - 1]}` : "—"; return `Производственный · ${span} ${Math.round(c.workingMinutesPerDay / 60)} ч`; };
 
@@ -54,7 +56,9 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const { readModel, status, error, reload, apply } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const sessionUser = useSessionUser();
-  const canManageSettings = hasPermission(sessionUser?.permissions ?? [], SETTINGS_MANAGE_PERMISSION);
+  const permissions = sessionUser?.permissions ?? [];
+  const canManageSettings = hasPermission(permissions, SETTINGS_MANAGE_PERMISSION);
+  const canManageCustomFields = hasPermission(permissions, WORKSPACE_CONFIG_MANAGE_PERMISSION);
   const [busy, setBusy] = useState(false);
   const [editDeadline, setEditDeadline] = useState(false);
   const [draftDeadline, setDraftDeadline] = useState("");
@@ -206,6 +210,10 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
               <Chip variant="warning">Ручной · {model.manualCount}</Chip>
               <span className="text-[length:var(--text-sm)] text-[var(--muted)]">из {model.leafCount} задач</span>
             </div>
+          </Section>
+
+          <Section title="Пользовательские поля WBS" hint="Определения дополнительных полей задач из реального каталога рабочей области.">
+            <ProjectCustomFields canManage={canManageCustomFields} />
           </Section>
 
           {/* Права на проект — честная заметка вместо выдуманной таблицы */}

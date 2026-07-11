@@ -80,6 +80,8 @@ export function serializeScenarioProposal(proposal: ScenarioProposal): Record<st
     id: proposal.id,
     profile: proposal.profile,
     conflictEffect: proposal.conflictEffect,
+    availability: proposal.availability,
+    unavailableReason: proposal.unavailableReason,
     planDelta: proposal.planDelta,
     explainability: proposal.explainability
   };

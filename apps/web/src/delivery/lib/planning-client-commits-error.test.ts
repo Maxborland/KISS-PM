@@ -47,29 +47,31 @@ describe("createDeliveryPlanningClient live getCommits", () => {
                 id: "audit-2",
                 actionType: "planning.command.applied",
                 sourceWorkflow: "planning",
-                input: { command: { type: "task.update_schedule" } },
-                afterState: { planVersion: 2, changedTaskIds: ["task-2"] },
+                commandType: "task.update_schedule",
+                afterState: { planVersion: 2, changedTaskIds: ["task-2"], hasCompensatingCommands: false },
+                executionStatus: "succeeded",
                 createdAt: "2026-07-10T09:00:00.000Z"
               },
               {
                 id: "audit-4",
                 actionType: "planning.custom.applied",
                 sourceWorkflow: "planning",
-                input: { command: { type: "custom.command" } },
+                commandType: "custom.command",
                 afterState: {
                   planVersion: 4,
-                  compensatingCommands: [
-                    { type: "task.update_identity", payload: { taskId: "task-4", title: "Before" } }
-                  ]
+                  changedTaskIds: [],
+                  hasCompensatingCommands: true
                 },
-                executionResult: { status: "succeeded" },
+                executionStatus: "succeeded",
                 createdAt: "2026-07-10T11:00:00.000Z"
               },
               {
                 id: "audit-other",
                 actionType: "workspace.updated",
                 sourceWorkflow: "workspace",
-                afterState: { planVersion: 8 },
+                commandType: null,
+                afterState: { planVersion: 8, changedTaskIds: [], hasCompensatingCommands: false },
+                executionStatus: "succeeded",
                 createdAt: "2026-07-10T12:00:00.000Z"
               }
             ]

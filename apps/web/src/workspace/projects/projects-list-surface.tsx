@@ -102,9 +102,14 @@ export function ProjectsListSurface() {
       <main className="min-w-0 flex-1 overflow-auto p-4">
         <ProtoBanner />
 
-        <div className="mb-3">
-          <h1 className="text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Проекты</h1>
-          <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Активные проекты рабочей области</p>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Проекты</h1>
+            <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Активные проекты рабочей области</p>
+          </div>
+          <Button asChild variant="default" size="sm">
+            <Link href="/crm/deals">Создать проект</Link>
+          </Button>
         </div>
 
 

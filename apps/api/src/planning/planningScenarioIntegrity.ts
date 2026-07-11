@@ -5,6 +5,10 @@ import { parsePlanningCommand } from "../planningParsers";
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { createPlanningReadModel } from "./planningReadModel";
 
+export function scenarioIsAvailable(proposal: ScenarioProposal): boolean {
+  return proposal.availability === "available";
+}
+
 export function scenarioRequiresAcceptedRiskReason(proposal: ScenarioProposal): boolean {
   return proposal.planDelta.commands.some((command) => command.type === "risk.accept_overload");
 }
@@ -78,6 +82,17 @@ export function parseScenarioTargetRecord(input: Record<string, unknown>): Scena
 }
 
 export function parseScenarioProposal(input: Record<string, unknown>): ScenarioProposal | null {
+  if (input.availability !== "available" && input.availability !== "unavailable") return null;
+  const unavailableReason = input.unavailableReason;
+  if (
+    unavailableReason !== null &&
+    unavailableReason !== "target_bucket_not_found" &&
+    unavailableReason !== "target_assignment_not_found" &&
+    unavailableReason !== "no_eligible_alternate_resource" &&
+    unavailableReason !== "alternate_resource_has_insufficient_capacity"
+  ) return null;
+  if (input.availability === "available" && unavailableReason !== null) return null;
+  if (input.availability === "unavailable" && unavailableReason === null) return null;
   const planDelta = isRecord(input.planDelta) ? input.planDelta : null;
   if (!Array.isArray(planDelta?.commands)) {
     return null;

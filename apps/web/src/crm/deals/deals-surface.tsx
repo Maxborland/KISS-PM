@@ -31,6 +31,11 @@ const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const isoToday = () => isoOf(new Date());
 const isoPlusMonths = (m: number) => { const d = new Date(); d.setMonth(d.getMonth() + m); return isoOf(d); };
+export const isValidOpportunityProbability = (value: string) => {
+  if (value.trim() === "") return false;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 100;
+};
 const STATUS_LABEL: Record<Opportunity["status"], string> = { new: "Новая", feasibility: "Проверка", ready_to_activate: "Готова", won_closed: "Выиграна", lost_rejected: "Проиграна" };
 const isFinal = (o: Opportunity) => o.status === "won_closed" || o.status === "lost_rejected";
 
@@ -489,7 +494,7 @@ function CreateDealDialog({ stages, data, busy, setBusy, create, disabledReason 
   const clients = data.clients.filter((c) => c.status === "active");
   const contacts = data.contacts.filter((c) => c.clientId === clientId && c.status === "active");
   const projectTypeId = data.projectTypes[0]?.id ?? "";
-  const valid = title.trim() && clientId && contactId && stageId && Number(contractValue) > 0 && Number(rate) > 0 && finish >= start;
+  const valid = title.trim() && clientId && contactId && stageId && Number(contractValue) > 0 && Number(rate) > 0 && finish >= start && isValidOpportunityProbability(probability);
 
   // Онбординг пустого тенанта (G8-12): честно объясняем, чего не хватает для создания
   // сделки и где это создать, — вместо вечно неактивной кнопки «Создать» без причины.
@@ -528,13 +533,13 @@ function CreateDealDialog({ stages, data, busy, setBusy, create, disabledReason 
         <div className="grid grid-cols-2 gap-3">
           <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Название<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Внедрение портала" /></label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Клиент
-            <select value={clientId} onChange={(e) => { setClientId(e.target.value); setContactId(""); }} className={selCls}><option value="" disabled>Выберите…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+            <select data-testid="deal-client" value={clientId} onChange={(e) => { setClientId(e.target.value); setContactId(""); }} className={selCls}><option value="" disabled>Выберите…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
           </label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Контакт
-            <select value={contactId} onChange={(e) => setContactId(e.target.value)} disabled={!clientId} className={selCls}><option value="" disabled>{clientId ? "Выберите…" : "Сначала клиент"}</option>{contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+            <select data-testid="deal-contact" value={contactId} onChange={(e) => setContactId(e.target.value)} disabled={!clientId} className={selCls}><option value="" disabled>{clientId ? "Выберите…" : "Сначала клиент"}</option>{contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
           </label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Стадия
-            <select value={stageId} onChange={(e) => setStageId(e.target.value)} className={selCls}><option value="" disabled>Выберите…</option>{stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+            <select data-testid="deal-stage" value={stageId} onChange={(e) => setStageId(e.target.value)} className={selCls}><option value="" disabled>Выберите…</option>{stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
           </label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Вероятность, %<Input type="number" min={0} max={100} value={probability} onChange={(e) => setProbability(e.target.value)} className="text-right" /></label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Сумма, ₽<Input type="number" min={1} value={contractValue} onChange={(e) => setContractValue(e.target.value)} placeholder="1 000 000" className="text-right" /></label>

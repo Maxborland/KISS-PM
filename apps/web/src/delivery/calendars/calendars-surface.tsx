@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, TriangleAlert, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -80,7 +80,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     const exns = readModel.calendarExceptions ?? [];
     const full = cal.workingMinutesPerDay;
     // нерабочие исключения (workingMinutes < полного дня): праздники (resourceId=null) и отсутствия
-    const active = exns.filter((x) => x.workingMinutes < full);
+    const active = exns.filter((x) => x.calendarId === cal.id && x.workingMinutes < full);
     const holidayByDay = new Map<number, PlanCalendarException>();
     const absByResDay = new Map<string, Map<number, PlanCalendarException>>();
     for (const x of active) {
@@ -120,6 +120,11 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     });
     return { cal, full, holidayByDay, absByResDay, anyHolidayByDay, anyAbsByResDay, leafTasks, conflicts, monthsList };
   }, [readModel, projectCalendar]);
+
+  const firstHorizonMonth = model?.monthsList[0] ?? null;
+  useEffect(() => {
+    setMonthOffset(0);
+  }, [projectId, firstHorizonMonth]);
 
   // Верхнеуровневое состояние поверхности через <SurfaceState> (loading/forbidden/error);
   // готовый контент — только при наличии model+readModel. Frame-обёртку сохраняем.
@@ -249,7 +254,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
         {/* LEFT: календари/ресурсы */}
         <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
           <div className="border-b border-[var(--border)] px-3 py-2 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]">Календари · ресурсы</div>
-          <button type="button" onClick={() => setSelCal("project")} className={cn("flex w-full items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-2 text-left hover:bg-[var(--panel-subtle)]", !isResourceView && "bg-[var(--accent-soft)]")}>
+          <button data-testid="calendar-project-selector" type="button" onClick={() => setSelCal("project")} className={cn("flex w-full items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-2 text-left hover:bg-[var(--panel-subtle)]", !isResourceView && "bg-[var(--accent-soft)]")}>
             <span className="flex items-center gap-2"><CalendarDays className="size-4 text-[var(--accent)]" aria-hidden /><span className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Календарь проекта</span></span>
             <span className="rounded-full bg-[var(--accent-soft)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--accent)]">проект</span>
           </button>
@@ -258,12 +263,12 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
               const cnt = model.absByResDay.get(r.id)?.size ?? 0;
               const active = selCal === r.id;
               return (
-                <button key={r.id} type="button" onClick={() => setSelCal(r.id)} className={cn("flex w-full items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-1.5 text-left hover:bg-[var(--panel-subtle)]", active && "bg-[var(--accent-soft)]")}>
+                <button key={r.id} data-testid={`calendar-resource-${r.id}`} type="button" onClick={() => setSelCal(r.id)} className={cn("flex w-full items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-1.5 text-left hover:bg-[var(--panel-subtle)]", active && "bg-[var(--accent-soft)]")}>
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{r.name.slice(0, 1)}</span>
                     <span className="min-w-0"><span className="block truncate text-[length:var(--text-sm)] text-[var(--text)]">{r.name}</span><span className="block truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{r.positionName}</span></span>
                   </span>
-                  {cnt > 0 ? <span className="shrink-0 rounded-full bg-[var(--warning-soft)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--warning-text)]">правил · {cnt}</span> : <span className="shrink-0 rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-soft)]">наследует</span>}
+                  {cnt > 0 ? <span data-testid={`calendar-resource-badge-${r.id}`} className="shrink-0 rounded-full bg-[var(--warning-soft)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--warning-text)]">правил · {cnt}</span> : <span data-testid={`calendar-resource-badge-${r.id}`} className="shrink-0 rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-soft)]">наследует</span>}
                 </button>
               );
             })}
@@ -275,7 +280,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-0.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-0.5 py-0.5">
               <button type="button" onClick={() => setMonthOffset((o) => Math.max(0, o - 1))} disabled={monthOffset <= 0} className="grid size-6 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)] disabled:opacity-40" aria-label="Предыдущий месяц"><ChevronLeft className="size-4" aria-hidden /></button>
-              <span className="min-w-[120px] text-center text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{monthLabel}</span>
+              <span data-testid="calendar-month-label" data-month-key={focusMonth} className="min-w-[120px] text-center text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{monthLabel}</span>
               <button type="button" onClick={() => setMonthOffset((o) => Math.min(model.monthsList.length - 1, o + 1))} disabled={monthOffset >= model.monthsList.length - 1} className="grid size-6 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--panel-strong)] disabled:opacity-40" aria-label="Следующий месяц"><ChevronRight className="size-4" aria-hidden /></button>
             </div>
             <span className="text-[length:var(--text-sm)] text-[var(--muted)]">{isResourceView && selRes ? `${selRes.name} · наследует календарь проекта` : "Календарь проекта · базовый"}</span>
@@ -284,7 +289,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
               <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-strong)]">{workdayHours} ч/день</span>
             </span>
           </div>
-          <div className="grid grid-cols-7 gap-1">
+          <div data-testid="calendar-month-grid" className="grid grid-cols-7 gap-1">
             {DOW_SHORT.map((d) => <div key={d} className="py-1 text-center text-[length:var(--text-xs)] font-semibold text-[var(--muted-soft)]">{d}</div>)}
             {grid.map((day) => {
               const st = dayState(day);
@@ -293,7 +298,7 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
               const clickable = canManageView && st.inMonth && !st.weekend && !(isResourceView && st.holiday);
               const dayTone = st.holiday ? NON_WORKING_TONE.holiday : st.absence ? NON_WORKING_TONE.absence : st.weekend ? NON_WORKING_TONE.weekend : { bg: "var(--panel-subtle)", fg: "var(--text)", border: "var(--border-subtle)" };
               return (
-                <button key={day} type="button" disabled={!clickable || busy} onClick={() => toggleDay(day)} title={st.holiday ? `${ddmm(dayToIso(day))} · ${st.holiday.reason || "Праздник"}` : st.absence ? `${ddmm(dayToIso(day))} · ${st.absence.reason || "Отсутствие"}` : st.weekend ? "Выходной" : canManageView ? "Рабочий день — клик: нерабочий" : "Рабочий день"} style={{ background: dayTone.bg, color: dayTone.fg, borderColor: dayTone.border }} className={cn("relative flex h-[58px] flex-col rounded-[var(--radius-sm)] border p-1 text-left outline-none transition-colors", !st.inMonth && "opacity-35", clickable && "hover:ring-1 hover:ring-[var(--accent)]")}>
+                <button key={day} data-testid={`calendar-day-${dayToIso(day)}`} data-in-month={st.inMonth ? "true" : "false"} type="button" disabled={!clickable || busy} onClick={() => toggleDay(day)} title={st.holiday ? `${ddmm(dayToIso(day))} · ${st.holiday.reason || "Праздник"}` : st.absence ? `${ddmm(dayToIso(day))} · ${st.absence.reason || "Отсутствие"}` : st.weekend ? "Выходной" : canManageView ? "Рабочий день — клик: нерабочий" : "Рабочий день"} style={{ background: dayTone.bg, color: dayTone.fg, borderColor: dayTone.border }} className={cn("relative flex h-[58px] flex-col rounded-[var(--radius-sm)] border p-1 text-left outline-none transition-colors", !st.inMonth && "opacity-35", clickable && "hover:ring-1 hover:ring-[var(--accent)]")}>
                   <span className="text-[length:var(--text-xs)] font-semibold tabular-nums">{dt.getUTCDate()}</span>
                   <span className="mt-auto self-end text-[length:var(--text-2xs)] font-medium">{st.holiday ? "праздник" : st.absence ? (st.absence.reason || "отсутствие").toLowerCase() : st.weekend ? "" : `${workdayHours} ч`}</span>
                 </button>

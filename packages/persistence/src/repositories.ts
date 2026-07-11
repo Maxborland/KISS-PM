@@ -190,6 +190,10 @@ export type PostgresTenantDataSource = CrmRepository &
   createCustomFieldDefinition(
     input: CustomFieldDefinitionInput
   ): Promise<CustomFieldDefinitionRecord>;
+  deleteCustomFieldDefinition(
+    tenantId: TenantId,
+    fieldId: string
+  ): Promise<CustomFieldDefinitionRecord | undefined>;
   updateCustomFieldDefinition(
     input: CustomFieldDefinitionInput
   ): Promise<CustomFieldDefinitionRecord>;
