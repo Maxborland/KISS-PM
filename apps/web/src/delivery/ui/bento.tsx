@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { cn } from "@/lib/cn";
 
@@ -82,17 +83,21 @@ export function BentoCard({
   );
 }
 
-/** KPI-плитка: метка, крупное число, дельта. Плоская, без градиентов. */
+/** KPI-плитка: метка, крупное число, дельта. Плоская, без градиентов.
+ *  href — drill-down к источнику числа (плитка становится ссылкой с видимым фокусом);
+ *  без href — статичная плитка (например, когда раздел недоступен роли). */
 export function StatTile({
   label,
   value,
   delta,
-  tone = "default"
+  tone = "default",
+  href
 }: {
   label: ReactNode;
   value: ReactNode;
   delta?: ReactNode;
   tone?: "default" | "success" | "warning" | "danger";
+  href?: string;
 }) {
   const deltaTone = {
     default: "text-[var(--muted)]",
@@ -106,8 +111,9 @@ export function StatTile({
     warning: "text-[var(--warning-text)]",
     danger: "text-[var(--danger-text)]"
   }[tone];
-  return (
-    <div className="hover-lift flex min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-4 shadow-[var(--shadow-card)]">
+  const rootCls = "hover-lift flex min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-4 shadow-[var(--shadow-card)]";
+  const body = (
+    <>
       <span className="truncate text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.07em] text-[var(--muted-soft)]">
         {label}
       </span>
@@ -120,6 +126,14 @@ export function StatTile({
         {value}
       </span>
       {delta ? <span className={cn("v4-num text-[length:var(--text-sm)] font-medium", deltaTone)}>{delta}</span> : null}
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} className={cn(rootCls, "outline-none focus-visible:shadow-[var(--ring-focus)]")}>
+        {body}
+      </Link>
+    );
+  }
+  return <div className={rootCls}>{body}</div>;
 }
