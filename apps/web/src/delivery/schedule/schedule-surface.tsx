@@ -1056,8 +1056,17 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // Окно виртуализации: item.start/end включают scrollMargin (см. virtual-core),
   // поэтому высоты spacer'ов считаем за его вычетом.
   const virtualItems = rowVirtualizer.getVirtualItems();
-  const firstVirtualIndex = virtualItems[0]?.index ?? 0;
-  const lastVirtualIndex = virtualItems[virtualItems.length - 1]?.index ?? -1;
+  // Границы для SVG-фильтра связей — НЕПРЕРЫВНОЕ окно вьюпорта (range виртуализатора
+  // + overscan), БЕЗ закреплённых строк: pinned-строка редактирования далеко от окна
+  // не должна раздувать интервал «видимых» индексов (иначе при правке сверху и скролле
+  // вниз монтируются тысячи связей — ровно то, от чего защищает виртуализация).
+  const contiguousRange = rowVirtualizer.range;
+  const firstVirtualIndex = contiguousRange
+    ? Math.max(0, contiguousRange.startIndex - VIRTUAL_ROW_OVERSCAN)
+    : virtualItems[0]?.index ?? 0;
+  const lastVirtualIndex = contiguousRange
+    ? Math.min(visibleRows.length - 1, contiguousRange.endIndex + VIRTUAL_ROW_OVERSCAN)
+    : virtualItems[virtualItems.length - 1]?.index ?? -1;
   const virtualPadTop = virtualItems.length > 0 ? virtualItems[0]!.start - rowsScrollMargin : 0;
   // inlineNew-строка (ROW_H) живёт только в потоке WBS-таблицы — virtualizer о ней не знает.
   // Вычитаем её высоту из нижнего spacer'а, чтобы фактическая высота tbody сходилась

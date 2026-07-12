@@ -429,4 +429,29 @@ describe("schedule row virtualization (pinned editing rows)", () => {
     expect(editInputAfterScroll).toBe(editInput); // тот же DOM-узел — remount не было
     expect(document.activeElement).toBe(editInput);
   });
+
+  it("закреплённая строка не раздувает окно SVG-связей (границы — непрерывный вьюпорт)", async () => {
+    // Связь на каждой строке: до фикса merged first/last (pinned index 1 + окно у низа)
+    // трактовали весь разрыв как «видимый» → тысячи <g> при правке сверху и скролле вниз.
+    const rows = makeRows(1_000).map((row, index, all) => index > 0
+      ? { ...row, predList: [{ depId: `dep-${index}`, predId: all[index - 1]!.id, type: "FS" as const, lagDays: 0 }] }
+      : row);
+    harness.rows = rows;
+
+    await renderSchedule();
+    const nameCell = document.querySelector<HTMLTableCellElement>('[data-schedule-row-id="task-2"] td[title]');
+    await act(async () => {
+      nameCell!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
+    });
+    expect(document.querySelector('[data-schedule-row-id="task-2"] td[title] input')).not.toBeNull();
+
+    await scrollWindowTo(900 * ROW_H);
+    await flushFrames(3);
+
+    // Закреплённая строка всё ещё смонтирована, но связи ограничены окном вьюпорта.
+    expect(document.querySelector('[data-schedule-row-id="task-2"]')).not.toBeNull();
+    const renderedLinks = document.querySelectorAll("[data-dep-id]");
+    expect(renderedLinks.length).toBeGreaterThan(0);
+    expect(renderedLinks.length).toBeLessThan(MAX_WINDOW_ROWS * 2);
+  });
 });
