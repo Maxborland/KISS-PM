@@ -209,7 +209,9 @@ export function usePlanning(projectId: string) {
 
   // BUG-PROJ-24: откат последнего обратимого коммита через серверный revert-last
   // (работает из истории /commits, не зависит от in-session lastApplyRef).
-  const revertLast = useCallback(async (targetCommitId: string): Promise<ApplyResult> => {
+  // Откат идёт через тот же PlanningPreviewGate, что apply/applyBatch: компенсирующие
+  // команды коммита (из журнала) прогоняются через previewCommandBatch → подтверждение → revert.
+  const revertLast = useCallback(async (targetCommitId: string, compensatingCommands: PlanningCommand[] = []): Promise<ApplyResult> => {
     if (!client) return { ok: false, conflict: false, message: "no_client" };
     if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
     const current = revertRequestRef.current;
@@ -222,6 +224,16 @@ export function usePlanning(projectId: string) {
         };
     revertRequestRef.current = request;
     try {
+      // Пустой список команд теоретичен (журнал помечает обратимыми только коммиты
+      // с компенсацией) — в этом случае честно применяем без превью-гейта.
+      if (compensatingCommands.length > 0) {
+        const previewResult = await client.previewCommandBatch(projectId, {
+          commands: compensatingCommands,
+          clientPlanVersion: readModel.planVersion
+        });
+        const confirmed = await requestConfirmation({ commands: compensatingCommands, preview: previewResult });
+        if (!confirmed) return { ok: false, conflict: false, message: "preview_cancelled" };
+      }
       const res = await client.revertLast(projectId, request);
       revertRequestRef.current = null;
       setReadModel(res.readModel);
@@ -235,7 +247,7 @@ export function usePlanning(projectId: string) {
       const mappedError = mapPlanningError(e, "revert_failed");
       return { ok: false, conflict: false, code: mappedError.code, message: mappedError.message };
     }
-  }, [client, projectId, readModel, load]);
+  }, [client, projectId, readModel, load, requestConfirmation]);
   const previewScenarios = useCallback(
     async (target: Record<string, unknown>): Promise<ScenarioPreviewResult> => {
       if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };

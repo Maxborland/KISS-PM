@@ -1178,6 +1178,8 @@ test.describe("Schedule exhaustive browser closeout: 40 role rows / 11 bundles",
         const beforeRevert = await getReadModel(page, projectId);
         const revertResponsePromise = waitForRevertResponse(page, projectId);
         await page.getByRole("button", { name: "Откатить последний", exact: true }).click();
+        // откат идёт через тот же превью-гейт, что и правки плана
+        await confirmPlanningPreview(page);
         const revertResponse = await revertResponsePromise;
         expect(revertResponse.status()).toBe(200);
         const revertEnvelope = revertResponse.request().postDataJSON() as {

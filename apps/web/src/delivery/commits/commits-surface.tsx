@@ -128,15 +128,18 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   const latestRevert = data?.latestRevert ?? null;
   const selected = commits.find((c) => c.auditEventId === sel) ?? commits[0] ?? null;
 
+  // Откат теперь идёт через тот же превью-гейт, что и обычные правки: revertLast
+  // показывает PlanningPreviewGate по компенсирующим командам коммита; отмена в гейте — не ошибка.
   const runRevert = async (targetCommitId: string) => {
     setBusy(true);
-    const res = await revertLast(targetCommitId);
+    const res = await revertLast(targetCommitId, latestRevert?.commands ?? []);
     setBusy(false);
     if (res.ok) {
       preferredHistoryVersion.current = res.planVersion;
       toast.success(`Откат применён компенсирующим коммитом v${res.planVersion}`);
       return;
     }
+    if (res.message === "preview_cancelled") return;
     toast.error(res.conflict ? "Конфликт версий — перезагружено" : `Отклонено: ${res.message}`);
   };
 

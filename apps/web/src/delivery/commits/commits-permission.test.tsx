@@ -141,7 +141,8 @@ describe("commit permission controls", () => {
     expect(revertButton).toBeDefined();
     await act(async () => revertButton?.click());
     expect(revertLast).toHaveBeenCalledTimes(1);
-    expect(revertLast).toHaveBeenCalledWith("audit-1");
+    // компенсирующие команды latestRevert прокидываются в revertLast (вход превью-гейта отката)
+    expect(revertLast).toHaveBeenCalledWith("audit-1", []);
     await act(async () => manager.root.unmount());
   });
 

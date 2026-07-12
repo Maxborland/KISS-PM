@@ -7,7 +7,9 @@ import { createMockPlanningFetch, RESOURCES, type Resource } from "./mock-planni
 
 // ── Журнал коммитов (PM-as-code) ──────────────────────────────────────────────
 export type CommitMetaView = { version: number; actionType: string; summary: string; changedTaskIds: string[]; auditEventId: string; at: string; revertible: boolean };
-export type CommitsView = { commits: CommitMetaView[]; latestRevert: { auditEventId: string } | null };
+// latestRevert несёт и компенсирующие команды: по ним revertLast показывает
+// тот же PlanningPreviewGate (previewCommandBatch → подтверждение → revert-last).
+export type CommitsView = { commits: CommitMetaView[]; latestRevert: { auditEventId: string; commands: PlanningCommand[] } | null };
 
 // Последний применённый этой сессией apply: команды + read-model ДО него + версия ПОСЛЕ.
 // Держим в памяти хука (audit.beforeState — только счётчики, для отката недостаточен), передаём
@@ -20,7 +22,7 @@ type PlanningAuditEvent = {
   actionType: string;
   sourceWorkflow: string | null;
   commandType: string | null;
-  afterState: { planVersion: number; changedTaskIds: string[]; hasCompensatingCommands: boolean };
+  afterState: { planVersion: number; changedTaskIds: string[]; hasCompensatingCommands: boolean; compensatingCommands?: PlanningCommand[] };
   executionStatus: string | null;
   createdAt: string;
 };
@@ -99,7 +101,7 @@ export function createDeliveryPlanningClient(live: boolean) {
       revertible: canRevertLatest && event.id === latestEvent?.id
     }));
     const latestRevert = canRevertLatest && latestEvent
-      ? { auditEventId: latestEvent.id }
+      ? { auditEventId: latestEvent.id, commands: latestEvent.afterState.compensatingCommands ?? [] }
       : null;
     return { commits, latestRevert };
   };

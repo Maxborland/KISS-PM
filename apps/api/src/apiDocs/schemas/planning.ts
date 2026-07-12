@@ -1234,11 +1234,13 @@ export const planningSchemas = openApiSchemaFragment({
       commandType: nullableStringSchema,
       afterState: {
         type: "object",
-        required: ["planVersion", "changedTaskIds", "hasCompensatingCommands"],
+        required: ["planVersion", "changedTaskIds", "hasCompensatingCommands", "compensatingCommands"],
         properties: {
           planVersion: { type: ["integer", "null"], minimum: 0 },
           changedTaskIds: { type: "array", items: stringIdSchema },
-          hasCompensatingCommands: { type: "boolean" }
+          hasCompensatingCommands: { type: "boolean" },
+          // компенсирующие команды коммита — вход клиентского превью-гейта отката
+          compensatingCommands: { type: "array", items: schemaRef("PlanningCommand") }
         },
         additionalProperties: false
       },

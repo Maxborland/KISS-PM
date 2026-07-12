@@ -160,7 +160,11 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
               planVersion: event.afterState?.["planVersion"] ?? null,
               changedTaskIds: Array.isArray(changedTaskIds) ? changedTaskIds : [],
               hasCompensatingCommands:
-                Array.isArray(compensatingCommands) && compensatingCommands.length > 0
+                Array.isArray(compensatingCommands) && compensatingCommands.length > 0,
+              // Сами компенсирующие команды: клиент показывает превью-гейт отката
+              // (previewCommandBatch → подтверждение → revert-last). Это plan-данные,
+              // а не полный audit payload — endpoint уже гейтится canReadPlanningReadModel.
+              compensatingCommands: Array.isArray(compensatingCommands) ? compensatingCommands : []
             },
             executionStatus:
               typeof event.executionResult["status"] === "string"
