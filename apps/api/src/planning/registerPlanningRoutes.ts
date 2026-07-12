@@ -281,7 +281,8 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         "getPlanSnapshot",
         "applyPlanningCommand",
         "incrementPlanVersion",
-        "appendAuditEvent"
+        "appendAuditEvent",
+        "lockTenantResourcePlanning",
       ]);
       if (!transactionDataSource) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
@@ -295,7 +296,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       }
 
       const projectId = parsedProjectId.value;
-      await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      await transactionDataSource.lockTenantResourcePlanning(actor.tenantId);
       const idempotencyKey = parsed.value.idempotencyKey;
       const requestHash = idempotencyKey
         ? hashJson({
@@ -477,7 +478,8 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         "getPlanSnapshot",
         "applyPlanningCommand",
         "incrementPlanVersion",
-        "appendAuditEvent"
+        "appendAuditEvent",
+        "lockTenantResourcePlanning",
       ]);
       if (!transactionDataSource) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
@@ -490,7 +492,7 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
 
-      await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      await transactionDataSource.lockTenantResourcePlanning(actor.tenantId);
       const idempotencyKey = parsed.value.idempotencyKey;
       const requestHash = idempotencyKey
         ? hashJson({
@@ -831,14 +833,15 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
         "applyPlanningCommand",
         "incrementPlanVersion",
         "markPlanningScenarioRunApplied",
-        "appendAuditEvent"
+        "appendAuditEvent",
+        "lockTenantResourcePlanning",
       ]);
       if (!transactionDataSource) {
         return { ok: false as const, status: 501, error: "persistence_not_configured" };
       }
 
       const projectId = parsedProjectId.value;
-      await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+      await transactionDataSource.lockTenantResourcePlanning(actor.tenantId);
       const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
       if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
       if (snapshot.planVersion !== parsed.value.clientPlanVersion) {

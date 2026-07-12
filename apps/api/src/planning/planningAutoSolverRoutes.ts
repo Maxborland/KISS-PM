@@ -311,12 +311,13 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
           !transactionDataSource.markPlanningSolverRunApplied ||
           !transactionDataSource.applyPlanningCommand ||
           !transactionDataSource.incrementPlanVersion ||
-          !transactionDataSource.appendAuditEvent
+          !transactionDataSource.appendAuditEvent ||
+          !transactionDataSource.lockTenantResourcePlanning
         ) {
           return { ok: false as const, status: 501, error: "persistence_not_configured" };
         }
 
-        await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+        await transactionDataSource.lockTenantResourcePlanning(actor.tenantId);
         const snapshot = await transactionDataSource.getPlanSnapshot(actor.tenantId, projectId);
         if (!snapshot) return { ok: false as const, status: 404, error: "project_not_found" };
         const run = await transactionDataSource.findPlanningSolverRun(actor.tenantId, projectId, runId);

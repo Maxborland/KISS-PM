@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { buildBaselineComparison, calculatePlan } from "@kiss-pm/domain";
+import {
+  buildBaselineComparison,
+  calculatePlan,
+  planningAssignmentId
+} from "@kiss-pm/domain";
 
 import {
   createDatabase,
@@ -238,12 +242,14 @@ describe("planning repository", () => {
       assignments: expect.arrayContaining([
         expect.objectContaining({ id: "assignment-alpha" }),
         expect.objectContaining({
-          id: "task-alpha-user-alpha-admin-controller",
+          id: planningAssignmentId("task-alpha", "user-alpha-admin", "controller"),
           taskId: "task-alpha",
           resourceId: "user-alpha-admin",
           role: "controller"
         }),
-        expect.objectContaining({ id: "task-beta-user-alpha-executor-executor" })
+        expect.objectContaining({
+          id: planningAssignmentId("task-beta", "user-alpha-executor", "executor")
+        })
       ]),
       dependencies: [expect.objectContaining({ id: "dep-alpha-beta", type: "FS" })],
       baselines: [expect.objectContaining({ id: "baseline-alpha" })],
@@ -1074,6 +1080,17 @@ describe("planning repository", () => {
     const workRepository = createProjectWorkRepository(db);
     const planningRepository = createPlanningRepository(db);
     const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+    const hiddenCollisionId = planningAssignmentId(
+      "task-alpha",
+      "user-alpha-admin",
+      "controller"
+    );
+    await db.insert(taskParticipants).values({
+      tenantId: "tenant-alpha",
+      taskId: "task-alpha",
+      userId: "user-alpha-admin",
+      role: "controller"
+    });
 
     await planningRepository.upsertTaskAssignment({
       id: "assignment-inactive-executor",
@@ -1084,6 +1101,17 @@ describe("planning repository", () => {
       role: "executor",
       unitsPermille: 1000,
       workMinutes: 960,
+      calendarId: null
+    });
+    await planningRepository.upsertTaskAssignment({
+      id: hiddenCollisionId,
+      tenantId: "tenant-alpha",
+      projectId,
+      taskId: "task-beta",
+      resourceId: "user-alpha-executor",
+      role: "observer",
+      unitsPermille: 1000,
+      workMinutes: null,
       calendarId: null
     });
     await client`
@@ -1097,6 +1125,60 @@ describe("planning repository", () => {
 
     expect(snapshot?.resources.some((resource) => resource.id === "user-alpha-executor")).toBe(false);
     expect(snapshot?.assignments.some((assignment) => assignment.resourceId === "user-alpha-executor")).toBe(false);
+    expect(snapshot?.assignments).toContainEqual(
+      expect.objectContaining({
+        id: `${hiddenCollisionId}-2`,
+        taskId: "task-alpha",
+        resourceId: "user-alpha-admin",
+        role: "controller"
+      })
+    );
+    const rawAssignments = await planningRepository.listProjectTaskAssignments(
+      "tenant-alpha",
+      projectId
+    );
+    expect(rawAssignments).toContainEqual(
+      expect.objectContaining({ id: "assignment-inactive-executor" })
+    );
+    expect(rawAssignments).toContainEqual(expect.objectContaining({ id: hiddenCollisionId }));
+  });
+
+  it("suffixes a fallback assignment id occupied by an imported assignment", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+    const occupiedId = planningAssignmentId(
+      "task-alpha",
+      "user-alpha-executor",
+      "executor"
+    );
+
+    await planningRepository.upsertTaskAssignment({
+      id: occupiedId,
+      tenantId: "tenant-alpha",
+      projectId,
+      taskId: "task-beta",
+      resourceId: "user-alpha-admin",
+      role: "observer",
+      unitsPermille: 1000,
+      workMinutes: null,
+      calendarId: null
+    });
+
+    const snapshot = await planningRepository.getPlanSnapshot("tenant-alpha", projectId);
+    expect(snapshot?.assignments).toContainEqual(
+      expect.objectContaining({
+        id: `${occupiedId}-2`,
+        taskId: "task-alpha",
+        resourceId: "user-alpha-executor",
+        role: "executor"
+      })
+    );
+    expect(new Set(snapshot?.assignments.map((assignment) => assignment.id)).size).toBe(
+      snapshot?.assignments.length
+    );
   });
 
   it("uses a real project default calendar when only resource calendars exist", async () => {

@@ -1,5 +1,6 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
-import type { PlanSnapshot, PlanningCommand, TenantUser } from "@kiss-pm/domain";
+import { planningAssignmentId } from "@kiss-pm/domain";
+import type { PlanAssignment, PlanSnapshot, PlanningCommand, TenantUser } from "@kiss-pm/domain";
 import type { TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
 import { describe, expect, it } from "vitest";
 
@@ -93,6 +94,18 @@ function createTask(overrides: Partial<TaskRecord> = {}): TaskRecord {
   };
 }
 
+function snapshotAssignment(taskId: string): PlanAssignment {
+  return {
+    id: "",
+    taskId,
+    resourceId: "",
+    role: "executor",
+    unitsPermille: 1000,
+    workMinutes: null,
+    calendarId: null
+  };
+}
+
 function createHarness(
   initialTask = createTask(),
   taskAtTransactionStart?: TaskRecord,
@@ -105,7 +118,8 @@ function createHarness(
   snapshotWorkModel?: {
     workMinutes: number;
     durationMinutes: number;
-  }
+  },
+  projectAssignments?: readonly PlanAssignment[]
 ) {
   let currentTask = initialTask;
   let transactionCalls = 0;
@@ -126,7 +140,7 @@ function createHarness(
       : [],
     assignments: [
       {
-        id: assignment.id ?? `${initialTask.id}-user-executor-executor`,
+        id: assignment.id ?? planningAssignmentId(initialTask.id, "user-executor", "executor"),
         taskId: initialTask.id,
         resourceId: assignment.resourceId ?? "user-executor",
         role: "executor",
@@ -139,6 +153,9 @@ function createHarness(
   const dataSource = {
     findTaskById: async () => currentTask,
     getPlanSnapshot: async () => snapshot,
+    listProjectTaskAssignments: async () =>
+      projectAssignments ?? snapshot.assignments,
+    lockTenantResourcePlanning: async () => undefined,
     applyPlanningCommand: async (input: { command: PlanningCommand }) => {
       appliedCommands.push(input.command);
       if (input.command.type === "task.update_identity") {
@@ -211,6 +228,7 @@ function createHarness(
 
   return {
     workspace,
+    dataSource,
     appliedCommands,
     get transactionCalls() {
       return transactionCalls;
@@ -242,6 +260,23 @@ function updateBody(
 }
 
 describe("updateTask status boundary", () => {
+  it("fails preflight closed when the planning lock is unavailable", async () => {
+    const harness = createHarness();
+    delete (harness.dataSource as Partial<ApiTenantDataSource>).lockTenantResourcePlanning;
+
+    const result = await harness.workspace.preflightUpdateTask({
+      actor,
+      profile: taskEditorProfile,
+      taskId: createTask().id
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 501,
+      error: "persistence_not_configured"
+    });
+  });
+
   it("rejects a status change that would bypass transition and acceptance rules", async () => {
     const task = createTask();
     const harness = createHarness(task);
@@ -497,9 +532,68 @@ describe("updateTask status boundary", () => {
     );
   });
 
+  it("preserves hidden assignments while reserving their ids", async () => {
+    const task = createTask();
+    const hiddenAssignmentId = planningAssignmentId(
+      task.id,
+      "user-next-executor",
+      "executor"
+    );
+    const harness = createHarness(
+      task,
+      undefined,
+      {},
+      undefined,
+      [
+        {
+          ...snapshotAssignment(task.id),
+          id: planningAssignmentId(task.id, "user-executor", "executor"),
+          resourceId: "user-executor"
+        },
+        {
+          ...snapshotAssignment(task.id),
+          id: hiddenAssignmentId,
+          resourceId: "user-inactive",
+          role: "executor"
+        }
+      ]
+    );
+
+    const result = await harness.workspace.updateTask({
+      actor,
+      profile: taskEditorProfile,
+      taskId: task.id,
+      body: updateBody(task, {
+        participants: [
+          { userId: actor.id, role: "requester" },
+          { userId: "user-next-executor", role: "executor" }
+        ]
+      })
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(harness.appliedCommands).toContainEqual(
+      expect.objectContaining({
+        type: "assignment.upsert",
+        payload: expect.objectContaining({
+          id: `${hiddenAssignmentId}-2`,
+          resourceId: "user-next-executor"
+        })
+      })
+    );
+    expect(harness.appliedCommands).not.toContainEqual({
+      type: "assignment.delete",
+      payload: { assignmentId: hiddenAssignmentId }
+    });
+  });
+
   it("allocates unique ids when an imported assignment collides with a new deterministic id", () => {
     const task = createTask();
-    const collidingId = `${task.id}-user-next-executor-co_executor`;
+    const collidingId = planningAssignmentId(
+      task.id,
+      "user-next-executor",
+      "co_executor"
+    );
     const body = updateBody(task, {
       participants: [
         { userId: actor.id, role: "requester" },
@@ -528,7 +622,8 @@ describe("updateTask status boundary", () => {
       task,
       body,
       participants: body.participants,
-      snapshot
+      snapshot,
+      projectAssignments: snapshot.assignments
     });
     const assignmentUpserts = commands.filter(
       (command) => command.type === "assignment.upsert"
@@ -548,7 +643,11 @@ describe("updateTask status boundary", () => {
 
   it("does not reuse an assignment id reserved by another task in the project", () => {
     const task = createTask();
-    const reservedForeignId = `${task.id}-user-next-executor-co_executor`;
+    const reservedForeignId = planningAssignmentId(
+      task.id,
+      "user-next-executor",
+      "co_executor"
+    );
     const body = updateBody(task, {
       participants: [
         { userId: actor.id, role: "requester" },
@@ -563,7 +662,7 @@ describe("updateTask status boundary", () => {
       tasks: [],
       assignments: [
         {
-          id: `${task.id}-user-executor-executor`,
+          id: planningAssignmentId(task.id, "user-executor", "executor"),
           taskId: task.id,
           resourceId: "user-executor",
           role: "executor",
@@ -585,7 +684,8 @@ describe("updateTask status boundary", () => {
       task,
       body,
       participants: body.participants,
-      snapshot
+      snapshot,
+      projectAssignments: snapshot.assignments
     });
     const assignmentUpserts = commands.filter(
       (command) => command.type === "assignment.upsert"

@@ -1,6 +1,10 @@
 import { and, asc, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 
-import { calculatePlan } from "@kiss-pm/domain";
+import {
+  allocatePlanningAssignmentId,
+  calculatePlan,
+  planningAssignmentId
+} from "@kiss-pm/domain";
 import type {
   DependencyType,
   PlanningCommand,
@@ -76,6 +80,7 @@ export type PlanningAssignmentInput = {
 
 export type PlanningRepository = {
   getPlanSnapshot(tenantId: string, projectId: string): Promise<PlanSnapshot | undefined>;
+  listProjectTaskAssignments(tenantId: string, projectId: string): Promise<PlanAssignment[]>;
   ensurePlanVersion(tenantId: string, projectId: string): Promise<number>;
   incrementPlanVersion(tenantId: string, projectId: string): Promise<number>;
   createPlanningScenarioRun(input: PlanningScenarioRunInput): Promise<PlanningScenarioRunRecord>;
@@ -447,6 +452,28 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
         })),
         capturedAt: new Date().toISOString()
       };
+    },
+
+    async listProjectTaskAssignments(tenantId, projectId) {
+      const rows = await db
+        .select()
+        .from(taskAssignments)
+        .where(
+          and(
+            eq(taskAssignments.tenantId, tenantId),
+            eq(taskAssignments.projectId, projectId)
+          )
+        )
+        .orderBy(taskAssignments.id);
+      return rows.map((assignment) => ({
+        id: assignment.id,
+        taskId: assignment.taskId,
+        resourceId: assignment.resourceId,
+        role: assignment.role as PlanAssignmentRole,
+        unitsPermille: assignment.unitsPermille,
+        workMinutes: assignment.workMinutes,
+        calendarId: assignment.calendarId
+      }));
     },
 
     async ensurePlanVersion(tenantId, projectId) {
@@ -1658,6 +1685,7 @@ function mapAssignments(
     workMinutes: assignment.workMinutes,
     calendarId: assignment.calendarId
   }));
+  const reservedAssignmentIds = new Set(assignmentRows.map((assignment) => assignment.id));
   const fallbackAssignments = participantRows
     .filter(
       (participant) =>
@@ -1668,15 +1696,22 @@ function mapAssignments(
           assignmentFallbackKey(participant.taskId, participant.userId, participant.role)
         )
     )
-    .map<PlanAssignment>((participant) => ({
-      id: `${participant.taskId}-${participant.userId}-${participant.role}`,
-      taskId: participant.taskId,
-      resourceId: participant.userId,
-      role: participant.role as PlanAssignmentRole,
-      unitsPermille: 1000,
-      workMinutes: null,
-      calendarId: null
-    }));
+    .map<PlanAssignment>((participant) => {
+      const preferredId = planningAssignmentId(
+        participant.taskId,
+        participant.userId,
+        participant.role as PlanAssignmentRole
+      );
+      return {
+        id: allocatePlanningAssignmentId(preferredId, reservedAssignmentIds),
+        taskId: participant.taskId,
+        resourceId: participant.userId,
+        role: participant.role as PlanAssignmentRole,
+        unitsPermille: 1000,
+        workMinutes: null,
+        calendarId: null
+      };
+    });
 
   return [...explicitAssignments, ...fallbackAssignments].sort((left, right) =>
     left.id.localeCompare(right.id)

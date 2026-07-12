@@ -84,7 +84,18 @@ export type TaskCommentParseResult =
   | { ok: false; error: string };
 
 export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
+  if (
+    input !== null &&
+    typeof input === "object" &&
+    "id" in input &&
+    typeof (input as Record<string, unknown>).id !== "string"
+  ) {
+    return { ok: false, error: "invalid_task_id" };
+  }
   const id = getOptionalString(input, "id") ?? undefined;
+  if (id !== undefined && !isSafeIdentifier(id)) {
+    return { ok: false, error: "invalid_task_id" };
+  }
   const title = getStringField(input, "title") ?? "";
   if (title.length < 3 || title.length > 160 || !isSafeSingleLineText(title)) {
     return { ok: false, error: "invalid_task_title" };

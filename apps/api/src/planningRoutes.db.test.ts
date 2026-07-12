@@ -356,6 +356,102 @@ describe("planning API routes", () => {
     }
   );
 
+  it("rejects unsafe persisted IDs from direct planning apply before database writes", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const before = await client`
+      SELECT
+        (SELECT version FROM plan_versions
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS version,
+        (SELECT count(*)::int FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS task_count,
+        (SELECT count(*)::int FROM task_assignments
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS assignment_count,
+        (SELECT count(*)::int FROM plan_accepted_overloads
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS accepted_overload_count,
+        (SELECT count(*)::int FROM audit_events
+          WHERE tenant_id = 'tenant-alpha' AND source_entity ->> 'id' = 'project-alpha') AS audit_count,
+        (SELECT count(*)::int FROM planning_command_idempotency_keys
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS idempotency_count
+    `;
+    const clientPlanVersion = Number(before[0]?.version);
+    const commands = [
+      ...["\ud800", "\ufffd", " task-safe "].flatMap((unsafeId) => [
+        {
+          type: "task.create",
+          payload: {
+            id: unsafeId,
+            projectId: "project-alpha",
+            title: "Unsafe direct task",
+            statusId: "task-status-new",
+            plannedStart: "2026-06-01",
+            plannedFinish: "2026-06-02",
+            durationMinutes: 480,
+            workMinutes: 480,
+            assignments: []
+          }
+        },
+        {
+          type: "assignment.upsert",
+          payload: {
+            id: unsafeId,
+            taskId: "task-alpha",
+            resourceId: "user-alpha-executor",
+            role: "executor",
+            unitsPermille: 1000,
+            workMinutes: null
+          }
+        }
+      ]),
+      {
+        type: "risk.accept_overload",
+        payload: {
+          overloadId: "user-alpha-executor:2026-02-30",
+          acceptedRiskReason: "impossible date"
+        }
+      }
+    ];
+
+    for (const [index, command] of commands.entries()) {
+      const response = await app.request(
+        "/api/workspace/projects/project-alpha/planning/apply-command",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-kiss-pm-action": "same-origin",
+            cookie: adminCookie
+          },
+          body: JSON.stringify({
+            command,
+            clientPlanVersion,
+            idempotencyKey: `unsafe-boundary-${index}`
+          })
+        }
+      );
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "planning_command_invalid"
+      });
+    }
+
+    const after = await client`
+      SELECT
+        (SELECT version FROM plan_versions
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS version,
+        (SELECT count(*)::int FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS task_count,
+        (SELECT count(*)::int FROM task_assignments
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS assignment_count,
+        (SELECT count(*)::int FROM plan_accepted_overloads
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS accepted_overload_count,
+        (SELECT count(*)::int FROM audit_events
+          WHERE tenant_id = 'tenant-alpha' AND source_entity ->> 'id' = 'project-alpha') AS audit_count,
+        (SELECT count(*)::int FROM planning_command_idempotency_keys
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS idempotency_count
+    `;
+    expect(after[0]).toEqual(before[0]);
+  });
+
   it.each(["single", "batch"] as const)(
     "rolls back task, version, audit, and idempotency when post-write readback is missing for %s apply",
     async (applyMode) => {
@@ -453,6 +549,78 @@ describe("planning API routes", () => {
     expect(afterState[0]).toEqual(beforeState[0]);
     }
   );
+
+  it.each([
+    ["single command", "/api/workspace/projects/project-alpha/planning/apply-command", false],
+    ["command batch", "/api/workspace/projects/project-alpha/planning/apply-command-batch", true],
+    [
+      "scenario apply",
+      "/api/workspace/projects/project-alpha/planning/scenario-proposals/planning-scenario-missing/apply",
+      null
+    ]
+  ] as const)("fails %s closed when the planning lock is unavailable", async (_label, path, batch) => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    await createTask(adminCookie, {
+      id: "task-lock-required",
+      title: "Planning lock required",
+      start: "2026-06-01",
+      finish: "2026-06-02"
+    });
+    const before = await client`
+      SELECT
+        (SELECT version FROM plan_versions
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS version,
+        (SELECT progress FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha'
+            AND id = 'task-lock-required') AS progress
+    `;
+    const planVersion = Number(before[0]?.version);
+    const command = {
+      type: "task.update_progress",
+      payload: { taskId: "task-lock-required", percentComplete: 42 }
+    };
+    const baseDataSource = createPostgresTenantDataSource(createDatabase(client));
+    const noLockDataSource: PostgresTenantDataSource = {
+      ...baseDataSource,
+      async withTransaction<T>(
+        operation: (transactionDataSource: PostgresTenantDataSource) => Promise<T>
+      ): Promise<T> {
+        return baseDataSource.withTransaction(async (transactionDataSource) => {
+          const transactionWithoutLock = { ...transactionDataSource };
+          Reflect.deleteProperty(transactionWithoutLock, "lockTenantResourcePlanning");
+          return operation(transactionWithoutLock as PostgresTenantDataSource);
+        });
+      }
+    };
+    const noLockApp = createApp({ dataSource: noLockDataSource });
+    const response = await noLockApp.request(path, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-kiss-pm-action": "same-origin",
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        ...(batch === true ? { commands: [command] } : batch === false ? { command } : {}),
+        clientPlanVersion: planVersion
+      })
+    });
+
+    const responseBody = await response.json();
+    expect({ status: response.status, body: responseBody }).toEqual({
+      status: 501,
+      body: { error: "persistence_not_configured" }
+    });
+    const after = await client`
+      SELECT
+        (SELECT version FROM plan_versions
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha') AS version,
+        (SELECT progress FROM tasks
+          WHERE tenant_id = 'tenant-alpha' AND project_id = 'project-alpha'
+            AND id = 'task-lock-required') AS progress
+    `;
+    expect(after[0]).toEqual(before[0]);
+  });
 
   it("exposes task CRUD records through planning read-model and applies dependency commands with versioned audit", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");

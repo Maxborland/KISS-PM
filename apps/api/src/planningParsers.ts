@@ -55,6 +55,7 @@ const constraintTypes = [
   "must_finish_on"
 ] as const;
 const maxPlanningStringLength = 500;
+const maxAcceptedOverloadIdLength = maxPlanningStringLength + 11;
 const maxTaskCustomFieldKeyLength = 120;
 const maxTaskCustomFieldValueLength = 500;
 const unsafeObjectKeys = new Set(["__proto__", "prototype", "constructor"]);
@@ -102,7 +103,7 @@ export function parsePlanningCommandBatchEnvelope(
 
 export function parsePlanningRevertEnvelope(input: unknown): PlanningRevertEnvelopeParseResult {
   if (!isObject(input)) return { ok: false, error: "planning_revert_invalid" };
-  const targetCommitId = parseBoundedString(input.targetCommitId);
+  const targetCommitId = parsePersistedId(input.targetCommitId);
   const envelopeFields = parseCommandEnvelopeFields(input);
   if (
     targetCommitId === null ||
@@ -164,10 +165,10 @@ export function parsePlanningCommand(input: unknown):
 
   switch (type) {
     case "task.create": {
-      const id = getString(payload, "id");
-      const projectId = getString(payload, "projectId");
+      const id = getPersistedId(payload, "id");
+      const projectId = getPersistedId(payload, "projectId");
       const title = getString(payload, "title");
-      const statusId = getString(payload, "statusId");
+      const statusId = getPersistedId(payload, "statusId");
       const plannedStart = getNullableDate(payload, "plannedStart");
       const plannedFinish = getNullableDate(payload, "plannedFinish");
       const durationMinutes = getNullableInteger(payload, "durationMinutes") ?? null;
@@ -193,18 +194,21 @@ export function parsePlanningCommand(input: unknown):
         workMinutes,
         assignments: assignments.value
       };
-      const parentTaskId = getOptionalString(payload, "parentTaskId");
+      const parentTaskId = getOptionalPersistedId(payload, "parentTaskId");
+      if (parentTaskId === false) {
+        return { ok: false, error: "planning_command_invalid" };
+      }
       if (parentTaskId !== null) createPayload.parentTaskId = parentTaskId;
       return { ok: true, value: { type, payload: createPayload } };
     }
     case "task.update_identity": {
-      const taskId = getString(payload, "taskId");
+      const taskId = getPersistedId(payload, "taskId");
       const title = getString(payload, "title");
       if (!taskId || !title) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { taskId, title } } };
     }
     case "task.update_schedule": {
-      const taskId = getString(payload, "taskId");
+      const taskId = getPersistedId(payload, "taskId");
       const plannedStart = getNullableDate(payload, "plannedStart");
       const plannedFinish = getNullableDate(payload, "plannedFinish");
       if (!taskId || plannedStart === undefined || plannedFinish === undefined) {
@@ -213,7 +217,7 @@ export function parsePlanningCommand(input: unknown):
       return { ok: true, value: { type, payload: { taskId, plannedStart, plannedFinish } } };
     }
     case "task.update_work_model": {
-      const taskId = getString(payload, "taskId");
+      const taskId = getPersistedId(payload, "taskId");
       const taskType = getString(payload, "taskType");
       const effortDriven = getBoolean(payload, "effortDriven");
       const durationMinutes = getNullableInteger(payload, "durationMinutes");
@@ -224,13 +228,13 @@ export function parsePlanningCommand(input: unknown):
       return { ok: true, value: { type, payload: { taskId, taskType, effortDriven, durationMinutes, workMinutes } } };
     }
     case "task.update_status": {
-      const taskId = getString(payload, "taskId");
-      const statusId = getString(payload, "statusId");
+      const taskId = getPersistedId(payload, "taskId");
+      const statusId = getPersistedId(payload, "statusId");
       if (!taskId || !statusId) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { taskId, statusId } } };
     }
     case "task.update_progress": {
-      const taskId = getString(payload, "taskId");
+      const taskId = getPersistedId(payload, "taskId");
       const percentComplete = getInteger(payload, "percentComplete");
       if (
         !taskId ||
@@ -243,22 +247,24 @@ export function parsePlanningCommand(input: unknown):
       return { ok: true, value: { type, payload: { taskId, percentComplete } } };
     }
     case "task.move_wbs": {
-      const taskId = getString(payload, "taskId");
-      const parentTaskId = getOptionalString(payload, "parentTaskId");
+      const taskId = getPersistedId(payload, "taskId");
+      const parentTaskId = getOptionalPersistedId(payload, "parentTaskId");
       const sortOrder = getInteger(payload, "sortOrder");
-      if (!taskId || sortOrder === null || sortOrder < 0) return { ok: false, error: "planning_command_invalid" };
+      if (!taskId || parentTaskId === false || sortOrder === null || sortOrder < 0) {
+        return { ok: false, error: "planning_command_invalid" };
+      }
       return { ok: true, value: { type, payload: { taskId, parentTaskId, sortOrder } } };
     }
     case "task.delete_or_archive": {
-      const taskId = getString(payload, "taskId");
+      const taskId = getPersistedId(payload, "taskId");
       const mode = getString(payload, "mode");
       if (!taskId || (mode !== "archive" && mode !== "delete")) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { taskId, mode } } };
     }
     case "dependency.upsert": {
-      const id = getString(payload, "id");
-      const predecessorTaskId = getString(payload, "predecessorTaskId");
-      const successorTaskId = getString(payload, "successorTaskId");
+      const id = getPersistedId(payload, "id");
+      const predecessorTaskId = getPersistedId(payload, "predecessorTaskId");
+      const successorTaskId = getPersistedId(payload, "successorTaskId");
       const dependencyType = getString(payload, "dependencyType");
       const lagMinutes = getInteger(payload, "lagMinutes");
       if (!id || !predecessorTaskId || !successorTaskId || !isDependencyType(dependencyType) || lagMinutes === null) {
@@ -267,14 +273,14 @@ export function parsePlanningCommand(input: unknown):
       return { ok: true, value: { type, payload: { id, predecessorTaskId, successorTaskId, dependencyType, lagMinutes } } };
     }
     case "dependency.delete": {
-      const dependencyId = getString(payload, "dependencyId");
+      const dependencyId = getPersistedId(payload, "dependencyId");
       if (!dependencyId) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { dependencyId } } };
     }
     case "assignment.upsert": {
-      const id = getString(payload, "id");
-      const taskId = getString(payload, "taskId");
-      const resourceId = getString(payload, "resourceId");
+      const id = getPersistedId(payload, "id");
+      const taskId = getPersistedId(payload, "taskId");
+      const resourceId = getPersistedId(payload, "resourceId");
       const role = getString(payload, "role");
       const unitsPermille = getInteger(payload, "unitsPermille");
       const workMinutes = getNullableInteger(payload, "workMinutes");
@@ -284,36 +290,43 @@ export function parsePlanningCommand(input: unknown):
       return { ok: true, value: { type, payload: { id, taskId, resourceId, role, unitsPermille, workMinutes } } };
     }
     case "assignment.delete": {
-      const assignmentId = getString(payload, "assignmentId");
+      const assignmentId = getPersistedId(payload, "assignmentId");
       if (!assignmentId) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { assignmentId } } };
     }
     case "assignment.allocations.replace": {
-      const assignmentId = getString(payload, "assignmentId");
+      const assignmentId = getPersistedId(payload, "assignmentId");
       const allocations = parseAssignmentAllocations(payload.allocations);
       if (!assignmentId || !allocations.ok) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { assignmentId, allocations: allocations.value } } };
     }
     case "baseline.capture": {
-      const baselineId = getString(payload, "baselineId");
+      const baselineId = getPersistedId(payload, "baselineId");
       const label = getString(payload, "label");
       if (!baselineId || !label) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { baselineId, label } } };
     }
     case "calendar.exception.upsert": {
-      const id = getString(payload, "id");
-      const calendarId = getString(payload, "calendarId");
-      const resourceId = getOptionalString(payload, "resourceId");
+      const id = getPersistedId(payload, "id");
+      const calendarId = getPersistedId(payload, "calendarId");
+      const resourceId = getOptionalPersistedId(payload, "resourceId");
       const date = getDate(payload, "date");
       const workingMinutes = getInteger(payload, "workingMinutes");
-      if (!id || !calendarId || !date || workingMinutes === null || workingMinutes < 0) {
+      if (
+        !id ||
+        !calendarId ||
+        resourceId === false ||
+        !date ||
+        workingMinutes === null ||
+        workingMinutes < 0
+      ) {
         return { ok: false, error: "planning_command_invalid" };
       }
       return { ok: true, value: { type, payload: { id, calendarId, resourceId, date, workingMinutes, reason: getOptionalString(payload, "reason") } } };
     }
     case "constraint.update": {
-      const taskId = getString(payload, "taskId");
-      const constraintId = getString(payload, "constraintId");
+      const taskId = getPersistedId(payload, "taskId");
+      const constraintId = getPersistedId(payload, "constraintId");
       const constraintType = getString(payload, "type");
       const date = getNullableDate(payload, "date");
       if (!taskId || !constraintId || !isConstraintType(constraintType) || date === undefined) {
@@ -322,8 +335,8 @@ export function parsePlanningCommand(input: unknown):
       return { ok: true, value: { type, payload: { taskId, constraintId, type: constraintType, date } } };
     }
     case "resource.reserve": {
-      const id = getString(payload, "id");
-      const resourceId = getString(payload, "resourceId");
+      const id = getPersistedId(payload, "id");
+      const resourceId = getPersistedId(payload, "resourceId");
       const start = getDate(payload, "start");
       const finish = getDate(payload, "finish");
       const workMinutes = getInteger(payload, "workMinutes");
@@ -333,7 +346,7 @@ export function parsePlanningCommand(input: unknown):
       return { ok: true, value: { type, payload: { id, resourceId, start, finish, workMinutes, reason: getOptionalString(payload, "reason") } } };
     }
     case "risk.accept_overload": {
-      const overloadId = getString(payload, "overloadId");
+      const overloadId = parseAcceptedOverloadId(payload.overloadId);
       const acceptedRiskReason = getString(payload, "acceptedRiskReason");
       if (!overloadId || !acceptedRiskReason) return { ok: false, error: "planning_command_invalid" };
       return { ok: true, value: { type, payload: { overloadId, acceptedRiskReason } } };
@@ -345,11 +358,14 @@ export function parsePlanningCommand(input: unknown):
       return { ok: true, value: { type, payload: { deadline, reason } } };
     }
     case "project.settings.update": {
-      const calendarId = getOptionalString(payload, "calendarId");
+      const calendarId = getOptionalPersistedId(payload, "calendarId");
+      if (calendarId === false) {
+        return { ok: false, error: "planning_command_invalid" };
+      }
       return { ok: true, value: { type, payload: { calendarId } } };
     }
     case "task.update_custom_field": {
-      const taskId = getString(payload, "taskId");
+      const taskId = getPersistedId(payload, "taskId");
       const fieldKey = parseTaskCustomFieldKey(payload.fieldKey);
       const value = parseTaskCustomFieldValue(payload.value);
       if (!taskId || !fieldKey || !value.ok) return { ok: false, error: "planning_command_invalid" };
@@ -370,7 +386,7 @@ function parseCreateAssignments(input: unknown):
   const assignments = [];
   for (const item of input) {
     if (!isObject(item)) return { ok: false, error: "planning_command_invalid" };
-    const resourceId = getString(item, "resourceId");
+    const resourceId = getPersistedId(item, "resourceId");
     const role = getString(item, "role");
     const unitsPermille = getInteger(item, "unitsPermille");
     const workMinutes = getNullableInteger(item, "workMinutes");
@@ -383,7 +399,8 @@ function parseCreateAssignments(input: unknown):
       unitsPermille,
       workMinutes
     };
-    const id = getOptionalString(item, "id");
+    const id = getOptionalPersistedId(item, "id");
+    if (id === false) return { ok: false, error: "planning_command_invalid" };
     if (id !== null) assignment.id = id;
     assignments.push(assignment);
   }
@@ -413,7 +430,7 @@ function parseScenarioTarget(input: Record<string, unknown>):
   | { ok: true; value: ScenarioTarget }
   | { ok: false; error: string } {
   const type = getString(input, "type");
-  const resourceId = getString(input, "resourceId");
+  const resourceId = getPersistedId(input, "resourceId");
   const date = getDate(input, "date");
   const overloadMinutes = getInteger(input, "overloadMinutes");
   if (
@@ -426,7 +443,7 @@ function parseScenarioTarget(input: Record<string, unknown>):
   ) {
     return { ok: false, error: "planning_scenario_invalid" };
   }
-  const taskIds = input.taskIds.map((item) => parseBoundedString(item));
+  const taskIds = input.taskIds.map((item) => parsePersistedId(item));
   if (taskIds.some((taskId) => taskId === null)) {
     return { ok: false, error: "planning_scenario_invalid" };
   }
@@ -449,6 +466,44 @@ function isObject(value: unknown): value is Record<string, unknown> {
 function getString(input: Record<string, unknown>, key: string): string | null {
   return parseBoundedString(input[key]);
 }
+function parsePersistedId(value: unknown): string | null {
+  return typeof value === "string" &&
+    value.length >= 1 &&
+    value.length <= maxPlanningStringLength &&
+    /^[A-Za-z0-9._:-]+(?![\s\S])/.test(value)
+    ? value
+    : null;
+}
+
+function parseAcceptedOverloadId(value: unknown): string | null {
+  if (
+    typeof value !== "string" ||
+    value.length < 12 ||
+    value.length > maxAcceptedOverloadIdLength ||
+    !/^[A-Za-z0-9._:-]+(?![\s\S])/.test(value)
+  ) {
+    return null;
+  }
+  const separator = value.lastIndexOf(":");
+  if (separator <= 0) return null;
+  const resourceId = value.slice(0, separator);
+  const date = value.slice(separator + 1);
+  return parsePersistedId(resourceId) !== null && isPlanDate(date) ? value : null;
+}
+
+function getPersistedId(input: Record<string, unknown>, key: string): string | null {
+  return parsePersistedId(input[key]);
+}
+
+function getOptionalPersistedId(
+  input: Record<string, unknown>,
+  key: string
+): string | null | false {
+  const value = input[key];
+  if (value === null || value === undefined) return null;
+  return parsePersistedId(value) ?? false;
+}
+
 
 function getOptionalString(input: Record<string, unknown>, key: string): string | null {
   const value = input[key];
@@ -488,11 +543,16 @@ function parseCommandEnvelopeFields(input: Record<string, unknown>):
 
 function parseIdempotencyKey(input: Record<string, unknown>): string | undefined | false {
   const value = input.idempotencyKey;
-  if (value === null || value === undefined) return undefined;
-  if (typeof value !== "string") return false;
-  const trimmed = value.trim();
-  if (trimmed.length === 0 || trimmed.length > 120) return false;
-  return /^[A-Za-z0-9._:-]+$/.test(trimmed) ? trimmed : false;
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 120 ||
+    !/^[A-Za-z0-9._:-]+(?![\s\S])/.test(value)
+  ) {
+    return false;
+  }
+  return value;
 }
 
 function getInteger(input: Record<string, unknown>, key: string): number | null {

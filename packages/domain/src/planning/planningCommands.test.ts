@@ -7,8 +7,76 @@ import {
   type PlanSnapshot
 } from "./planningCommands";
 import { reducePlanningCommand } from "./commandReducer";
+import { allocatePlanningAssignmentId, planningAssignmentId } from "./types";
 
 describe("planning command contract", () => {
+  it("builds total unambiguous assignment ids and allocates collision suffixes", () => {
+    const left = planningAssignmentId("abc-def", "ghi", "executor");
+    const right = planningAssignmentId("abc", "def-ghi", "executor");
+
+    expect(left).toBe("assignment:7:abc-def:3:ghi:8:executor");
+    expect(left).not.toBe(right);
+    expect(allocatePlanningAssignmentId(left, new Set([left]))).toBe(`${left}-2`);
+  });
+
+  it("keeps generated and collision-suffixed assignment ids within the persisted boundary", () => {
+    const preferredId = planningAssignmentId(
+      "task".repeat(59),
+      "resource".repeat(30),
+      "co_executor"
+    );
+    const reservedIds = new Set([preferredId]);
+
+    expect(preferredId.length).toBeLessThanOrEqual(500);
+    for (let suffix = 2; suffix <= 10; suffix += 1) {
+      const allocatedId = allocatePlanningAssignmentId(preferredId, reservedIds);
+      expect(allocatedId.length).toBeLessThanOrEqual(500);
+      expect(allocatedId).toMatch(new RegExp(`-${suffix}$`));
+    }
+
+    const maxLengthPreferredId = "a".repeat(500);
+    const maxLengthReservedIds = new Set([maxLengthPreferredId]);
+    for (let suffix = 2; suffix <= 10; suffix += 1) {
+      const maxLengthAllocatedId = allocatePlanningAssignmentId(
+        maxLengthPreferredId,
+        maxLengthReservedIds
+      );
+      const collisionSuffix = `-${suffix}`;
+      expect(maxLengthAllocatedId).toBe(
+        `${"a".repeat(500 - collisionSuffix.length)}${collisionSuffix}`
+      );
+      expect(maxLengthAllocatedId.length).toBe(500);
+    }
+
+    const oversizedAllocatedId = allocatePlanningAssignmentId(
+      "assignment:".repeat(60),
+      new Set()
+    );
+    expect(oversizedAllocatedId.length).toBeLessThanOrEqual(500);
+
+    const sharedTaskId = "t".repeat(490);
+    const sharedResourcePrefix = "resource".repeat(20);
+    const firstLongId = planningAssignmentId(
+      sharedTaskId,
+      `${sharedResourcePrefix}a`,
+      "executor"
+    );
+    const secondLongId = planningAssignmentId(
+      sharedTaskId,
+      `${sharedResourcePrefix}b`,
+      "executor"
+    );
+    expect(firstLongId).toBe("assignment:5eeb001e-d9bf-54d6-9677-aa66df9bdd53");
+    expect(
+      planningAssignmentId(
+        sharedTaskId,
+        `${sharedResourcePrefix}a`,
+        "executor"
+      )
+    ).toBe(firstLongId);
+    expect(secondLongId).not.toBe(firstLongId);
+  });
+
   it("creates a task.create planning command for task CRUD wrappers", () => {
     const command = createPlanningCommand({
       type: "task.create",

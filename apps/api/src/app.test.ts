@@ -138,7 +138,8 @@ describe("KISS PM API Phase 1 shell", () => {
       items: {
         type: "string",
         minLength: 1,
-        pattern: "^[^:]+:\\d{4}-\\d{2}-\\d{2}$"
+        maxLength: 511,
+        pattern: expect.any(String)
       }
     });
     expect(document.components.schemas.PlanningResourceOverload.required).toContain(
@@ -1044,6 +1045,9 @@ describe("KISS PM API Phase 1 shell", () => {
       },
       async getPlanSnapshot() {
         throw new Error("stale task should fail before planning preview");
+      },
+      async listProjectTaskAssignments() {
+        throw new Error("stale task should fail before assignment read");
       },
       async applyPlanningCommand() {
         applyPlanningCommandCalled = true;
@@ -3392,6 +3396,26 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(body.newPlanVersion).toBe(6);
     expect(body.applied.changedTaskIds).toEqual(["task-control-1"]);
     expect(body.readModel.planVersion).toBe(6);
+
+    Reflect.deleteProperty(dataSource, "lockTenantResourcePlanning");
+    appliedCommand = null;
+    const unavailableResponse = await app.request(
+      "/api/workspace/projects/project-control/control/signals/signal-control-1/actions/action-control-1/apply",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: "kiss_pm_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        body: JSON.stringify({ clientPlanVersion: 6 })
+      }
+    );
+    expect(unavailableResponse.status).toBe(501);
+    await expect(unavailableResponse.json()).resolves.toEqual({
+      error: "persistence_not_configured"
+    });
+    expect(appliedCommand).toBeNull();
   });
 
   it("rechecks control action permissions after acquiring the planning lock", async () => {

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { parsePlanDate } from "@kiss-pm/domain";
 import {
   createKissPmOpenApiDocument,
   listAllKnownApiRoutes,
@@ -133,6 +134,102 @@ describe("OpenAPI route inventory", () => {
       | undefined;
     expect(errorCodes?.enum).toContain("same_origin_action_required");
   });
+  it("documents the safe persisted-ID boundary for planning write requests", () => {
+    const document = createTestDocument();
+    const schemas = document.components.schemas as Record<string, JsonSchema>;
+    const persistedId = {
+      type: "string",
+      minLength: 1,
+      maxLength: 500,
+      pattern: "^[A-Za-z0-9._:-]+(?![\\s\\S])"
+    };
+    const nullablePersistedId = {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 500,
+      pattern: "^[A-Za-z0-9._:-]+(?![\\s\\S])"
+    };
+    const persistedIdPattern = new RegExp(persistedId.pattern);
+    for (const terminator of ["\n", "\r", "\u2028", "\u2029"]) {
+      expect(persistedIdPattern.test(`task-safe${terminator}`)).toBe(false);
+    }
+    const createPayload = schemas.PlanningTaskCreateCommand?.properties?.payload as JsonSchema;
+    const calendarPayload = schemas.PlanningCalendarExceptionUpsertCommand?.properties
+      ?.payload as JsonSchema;
+    const overloadPayload = schemas.PlanningRiskAcceptOverloadCommand?.properties
+      ?.payload as JsonSchema;
+
+    expect(schemas.PlanningRevertRequest?.properties?.targetCommitId).toEqual(persistedId);
+    expect(createPayload.properties?.id).toEqual(persistedId);
+    expect(createPayload.properties?.projectId).toEqual(persistedId);
+    expect(createPayload.properties?.parentTaskId).toEqual(nullablePersistedId);
+    expect(calendarPayload.properties?.resourceId).toEqual(nullablePersistedId);
+    const overloadIdSchema = overloadPayload.properties?.overloadId as JsonSchema;
+    expect(overloadIdSchema).toMatchObject({
+      ...persistedId,
+      maxLength: 511,
+      pattern: expect.any(String)
+    });
+    const overloadIdPattern = new RegExp(
+      (overloadIdSchema as unknown as { pattern: string }).pattern
+    );
+    for (const validId of [
+      "resource-alpha:2026-06-10",
+      "resource:alpha:2026-02-28",
+      "resource-alpha:2000-02-29"
+    ]) {
+      expect(overloadIdPattern.test(validId)).toBe(true);
+    }
+    for (const invalidId of [
+      ":2026-06-10",
+      "resource alpha:2026-06-10",
+      "resource-alpha:2026-6-1",
+      "resource-alpha:2026-02-30",
+      "resource-alpha:1900-02-29",
+      "resource-alpha:2026-06-10:suffix",
+      "resource-alpha:2026-06-10\n",
+      "resource-alpha:2026-06-10\r",
+      "resource-alpha:2026-06-10\u2028",
+      "resource-alpha:2026-06-10\u2029"
+    ]) {
+      expect(overloadIdPattern.test(invalidId)).toBe(false);
+    }
+    const mismatches: string[] = [];
+    const years = [
+      ...Array.from({ length: 400 }, (_, year) => year),
+      1896,
+      1900,
+      2000,
+      2100,
+      2400,
+      9999
+    ];
+    for (const year of years) {
+      for (let month = 1; month <= 12; month += 1) {
+        for (let day = 1; day <= 31; day += 1) {
+          const date = [year, month, day]
+            .map((part, index) => part.toString().padStart(index === 0 ? 4 : 2, "0"))
+            .join("-");
+          let runtimeAccepts = true;
+          try {
+            parsePlanDate(date);
+          } catch {
+            runtimeAccepts = false;
+          }
+          if (overloadIdPattern.test(`resource:alpha:${date}`) !== runtimeAccepts) {
+            mismatches.push(date);
+          }
+        }
+      }
+    }
+    expect(mismatches).toEqual([]);
+    expect(schemas.PlanningScenarioTarget?.properties?.resourceId).toEqual(persistedId);
+    expect(schemas.PlanningScenarioTarget?.properties?.taskIds).toEqual({
+      type: "array",
+      items: persistedId
+    });
+  });
+
 
   it("keeps Saved View create, rename, and delete contracts in the API document", () => {
     const document = createTestDocument();

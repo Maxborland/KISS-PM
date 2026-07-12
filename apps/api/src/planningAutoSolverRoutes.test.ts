@@ -335,6 +335,17 @@ describe("planning auto-solver API", () => {
     expect(body.error).toBe("permission_missing");
     expect(harness.auditActionTypes).toEqual(["planning.auto_solver.read_denied"]);
   });
+  it("fails proposal apply closed when the planning lock is unavailable", async () => {
+    const harness = createApiHarness({ omitPlanningLock: true });
+    const createBody = await createSolverRun(harness);
+
+    const response = await applyProposal(harness, createBody);
+
+    expect(response.status).toBe(501);
+    await expect(response.json()).resolves.toEqual({ error: "persistence_not_configured" });
+    expect(harness.appliedCommandTypes).toEqual([]);
+  });
+
 });
 
 type ApiHarness = {
@@ -357,6 +368,7 @@ function createApiHarness(input: {
   permissions?: AccessProfile["permissions"];
   snapshot?: PlanSnapshot;
   listOccupancyWindows?: ApiTenantDataSource["listOccupancyWindows"];
+  omitPlanningLock?: boolean;
 } = {}): ApiHarness {
   let snapshot = input.snapshot ?? createSnapshot();
   const storedRunBox: { value: PlanningSolverRunRecord | null } = { value: null };
@@ -423,9 +435,6 @@ function createApiHarness(input: {
     async withTransaction(operation) {
       return operation(dataSource as ApiTenantDataSource);
     },
-    async lockTenantResourcePlanning() {
-      return;
-    },
     async getPlanSnapshot() {
       return snapshot;
     },
@@ -462,6 +471,9 @@ function createApiHarness(input: {
       auditActionTypes.push(auditInput.actionType);
     }
   };
+  if (!input.omitPlanningLock) {
+    dataSource.lockTenantResourcePlanning = async () => undefined;
+  }
   if (input.listOccupancyWindows) {
     dataSource.listOccupancyWindows = input.listOccupancyWindows;
   }

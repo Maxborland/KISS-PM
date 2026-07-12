@@ -1,3 +1,5 @@
+import { v5 as uuidV5 } from "uuid";
+
 export type PlanDate = string;
 export type PlanDateTime = string;
 
@@ -65,6 +67,43 @@ export type PlanAssignmentRole =
   | "controller"
   | "approver"
   | "observer";
+
+const maxPlanningPersistedIdLength = 500;
+const planningAssignmentNamespace = "6ba7b811-9dad-11d1-80b4-00c04fd430c8";
+
+function boundedPlanningAssignmentId(preferredId: string): string {
+  if (preferredId.length <= maxPlanningPersistedIdLength) return preferredId;
+  return `assignment:${uuidV5(preferredId, planningAssignmentNamespace)}`;
+}
+
+export function planningAssignmentId(
+  taskId: string,
+  resourceId: string,
+  role: PlanAssignmentRole
+): string {
+  return boundedPlanningAssignmentId(
+    `assignment:${taskId.length}:${taskId}:${resourceId.length}:${resourceId}:${role.length}:${role}`
+  );
+}
+
+export function allocatePlanningAssignmentId(
+  preferredId: string,
+  reservedIds: Set<string>
+): string {
+  const boundedPreferredId = boundedPlanningAssignmentId(preferredId);
+  let id = boundedPreferredId;
+  let suffix = 2;
+  while (reservedIds.has(id)) {
+    const collisionSuffix = `-${suffix}`;
+    id = `${boundedPreferredId.slice(
+      0,
+      maxPlanningPersistedIdLength - collisionSuffix.length
+    )}${collisionSuffix}`;
+    suffix += 1;
+  }
+  reservedIds.add(id);
+  return id;
+}
 
 export type PlanAssignment = {
   id: string;

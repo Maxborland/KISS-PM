@@ -530,12 +530,13 @@ export function registerControlRoutes(app: ApiApp, deps: ApiRouteDeps) {
           !transactionDataSource.applyPlanningCommand ||
           !transactionDataSource.incrementPlanVersion ||
           !transactionDataSource.appendAuditEvent ||
-          !transactionDataSource.createActionExecution
+          !transactionDataSource.createActionExecution ||
+          !transactionDataSource.lockTenantResourcePlanning
         ) {
           return { ok: false as const, status: 501, error: "persistence_not_configured" };
         }
 
-        await transactionDataSource.lockTenantResourcePlanning?.(actor.tenantId);
+        await transactionDataSource.lockTenantResourcePlanning(actor.tenantId);
         const lockedSignal = (
           await transactionDataSource.listControlSignals(actor.tenantId, projectId)
         ).find((candidate) => candidate.id === signalId);

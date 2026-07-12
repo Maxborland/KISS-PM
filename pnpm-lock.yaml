@@ -429,7 +429,11 @@ importers:
         specifier: workspace:*
         version: link:../domain
 
-  packages/domain: {}
+  packages/domain:
+    dependencies:
+      uuid:
+        specifier: ^11.1.1
+        version: 11.1.1
 
   packages/persistence:
     dependencies:
@@ -10310,7 +10314,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.16
       tinyrainbow: 2.0.0
-      vitest: 3.2.6(@types/debug@4.1.13)(@types/node@22.19.19)(@vitest/ui@3.2.6)(happy-dom@15.11.7)(jiti@2.7.0)(lightningcss@1.32.0)(msw@2.14.6(@types/node@22.19.19)(typescript@5.9.3))(terser@5.48.0)(tsx@4.22.1)(yaml@2.9.0)
+      vitest: 3.2.6(@types/debug@4.1.13)(@types/node@22.19.19)(@vitest/ui@3.2.6)(happy-dom@20.9.0)(jiti@2.7.0)(lightningcss@1.32.0)(msw@2.14.6(@types/node@22.19.19)(typescript@5.9.3))(terser@5.48.0)(tsx@4.22.1)(yaml@2.9.0)
 
   '@vitest/utils@2.0.5':
     dependencies:

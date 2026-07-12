@@ -27,6 +27,7 @@ export async function archiveTask(
 ): Promise<TaskResult> {
   if (
     !deps.dataSource.findTaskByIdIncludingArchived ||
+    !deps.dataSource.lockTenantResourcePlanning ||
     !deps.dataSource.applyPlanningCommand ||
     !deps.dataSource.incrementPlanVersion ||
     !deps.dataSource.withTransaction
@@ -46,12 +47,13 @@ export async function archiveTask(
   return deps.runDataSourceTransaction(async (transactionDataSource) => {
     if (
       !transactionDataSource.findTaskByIdIncludingArchived ||
+      !transactionDataSource.lockTenantResourcePlanning ||
       !transactionDataSource.applyPlanningCommand ||
       !transactionDataSource.incrementPlanVersion
     ) {
       throw new Error("persistence_not_configured");
     }
-    await transactionDataSource.lockTenantResourcePlanning?.(input.actor.tenantId);
+    await transactionDataSource.lockTenantResourcePlanning(input.actor.tenantId);
     const currentTask = await transactionDataSource.findTaskByIdIncludingArchived(
       input.actor.tenantId,
       task.id
@@ -103,6 +105,7 @@ export async function transitionTaskStatus(
     !deps.dataSource.listProjects ||
     !deps.dataSource.listProjectTasks ||
     !deps.dataSource.listTaskStatuses ||
+    !deps.dataSource.lockTenantResourcePlanning ||
     !deps.dataSource.applyPlanningCommand ||
     !deps.dataSource.findTaskById ||
     !deps.dataSource.incrementPlanVersion ||
@@ -127,6 +130,7 @@ export async function transitionTaskStatus(
       !transactionDataSource.listProjects ||
       !transactionDataSource.listProjectTasks ||
       !transactionDataSource.listTaskStatuses ||
+      !transactionDataSource.lockTenantResourcePlanning ||
       !transactionDataSource.applyPlanningCommand ||
       !transactionDataSource.findTaskById ||
       !transactionDataSource.incrementPlanVersion ||
@@ -135,7 +139,7 @@ export async function transitionTaskStatus(
       throw new Error("persistence_not_configured");
     }
 
-    await transactionDataSource.lockTenantResourcePlanning?.(input.actor.tenantId);
+    await transactionDataSource.lockTenantResourcePlanning(input.actor.tenantId);
     const project = await findActiveProject(
       transactionDataSource,
       input.actor.tenantId,

@@ -200,6 +200,40 @@ describe("project work parsers", () => {
     ).toEqual({ ok: false, error: "task_executor_required" });
   });
 
+  it.each(["\ud800", "\ufffd", "bad/task", "ab"])(
+    "rejects unsafe client task id %j before persistence",
+    (id) => {
+      expect(
+        parseCreateTaskBody({
+          id,
+          title: "Подготовить план",
+          plannedStart: "2026-06-02",
+          plannedFinish: "2026-06-05",
+          durationWorkingDays: 1,
+          plannedWork: 8,
+          participants: [{ userId: "user-alpha-executor", role: "executor" }]
+        })
+      ).toEqual({ ok: false, error: "invalid_task_id" });
+    }
+  );
+  it.each([42, {}, null])(
+    "rejects non-string client task id %j instead of generating one",
+    (id) => {
+      expect(
+        parseCreateTaskBody({
+          id,
+          title: "Подготовить план",
+          plannedStart: "2026-06-02",
+          plannedFinish: "2026-06-05",
+          durationWorkingDays: 1,
+          plannedWork: 8,
+          participants: [{ userId: "user-alpha-executor", role: "executor" }]
+        })
+      ).toEqual({ ok: false, error: "invalid_task_id" });
+    }
+  );
+
+
   it("treats blank task id as absent so callers can generate one", () => {
     expect(
       parseCreateTaskBody({

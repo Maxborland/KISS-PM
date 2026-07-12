@@ -53,6 +53,8 @@ export async function preflightUpdateTask(
   if (
     !deps.dataSource.findTaskById ||
     !deps.dataSource.getPlanSnapshot ||
+    !deps.dataSource.listProjectTaskAssignments ||
+    !deps.dataSource.lockTenantResourcePlanning ||
     !deps.dataSource.applyPlanningCommand ||
     !deps.dataSource.updateTaskMetadata ||
     !deps.dataSource.incrementPlanVersion ||
@@ -80,6 +82,7 @@ export async function preflightTransitionTaskStatus(
     !deps.dataSource.listProjects ||
     !deps.dataSource.listProjectTasks ||
     !deps.dataSource.listTaskStatuses ||
+    !deps.dataSource.lockTenantResourcePlanning ||
     !deps.dataSource.applyPlanningCommand ||
     !deps.dataSource.findTaskById ||
     !deps.dataSource.incrementPlanVersion ||
