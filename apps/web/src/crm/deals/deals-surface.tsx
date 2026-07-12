@@ -39,6 +39,22 @@ export const isValidOpportunityProbability = (value: string) => {
 };
 const STATUS_LABEL: Record<Opportunity["status"], string> = { new: "Новая", feasibility: "Проверка", ready_to_activate: "Готова", won_closed: "Выиграна", lost_rejected: "Проиграна" };
 const isFinal = (o: Opportunity) => o.status === "won_closed" || o.status === "lost_rejected";
+// Текстовые статус-чипы по паттерну STATUS_CHIP агента (agent-review): токен-тройка
+// border/soft-bg/text вместо заливных BEM-чипов — сдержанная глубина KISS Operational.
+const STATUS_CHIP: Record<Opportunity["status"], string> = {
+  new: "border-[var(--accent-muted)] bg-[var(--accent-soft)] text-[var(--accent)]",
+  feasibility: "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-text)]",
+  ready_to_activate: "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success-text)]",
+  won_closed: "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success-text)]",
+  lost_rejected: "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"
+};
+function DealStatusChip({ status, className }: { status: Opportunity["status"]; className?: string }) {
+  return (
+    <span className={cn("inline-flex shrink-0 items-center rounded-[var(--radius-full)] border px-2 py-0.5 text-[length:var(--text-xs)] font-medium", STATUS_CHIP[status], className)}>
+      {STATUS_LABEL[status]}
+    </span>
+  );
+}
 
 const ERR_RU: Record<string, string> = {
   opportunity_stage_locked: "Сделка закрыта — стадию не изменить",
@@ -311,7 +327,7 @@ export function ProjectDeals() {
                         onDragStart={() => { if (draggable) setDragId(o.id); }}
                         onDragEnd={() => { setDragId(null); setOverStage(null); }}
                         onClick={(e) => openDealPeek(e, o.id)}
-                        className={cn("hover-lift rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]", draggable ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50")}
+                        className={cn("v4-row rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)]", "p-2.5", draggable ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50 shadow-[var(--shadow-raise)]")}
                       >
                         <div className="mb-1 flex items-center justify-between gap-2">
                           {prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</span> : <span />}
@@ -331,7 +347,7 @@ export function ProjectDeals() {
                         <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{o.clientName}</p>
                         <div className="mt-1.5 flex items-center justify-between gap-2">
                           <span className="v4-num text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</span>
-                          {final ? <Chip variant={o.status === "won_closed" ? "success" : "danger"}>{STATUS_LABEL[o.status]}</Chip> : <span className="v4-num text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.probability}%</span>}
+                          {final ? <DealStatusChip status={o.status} /> : <span className="v4-num text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.probability}%</span>}
                         </div>
                       </article>
                     );
@@ -346,7 +362,7 @@ export function ProjectDeals() {
               <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2"><span className="text-[length:var(--text-sm)] font-semibold text-[var(--muted-strong)]">Без стадии</span><span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{model.unstaged.length}</span></div>
               <div className="flex flex-col gap-2 p-2">
                 {model.unstaged.map((o) => (
-                  <article data-deal-id={o.id} key={o.id} onClick={(e) => openDealPeek(e, o.id)} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]">
+                  <article data-deal-id={o.id} key={o.id} onClick={(e) => openDealPeek(e, o.id)} className="v4-row rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5">
                     <div className="mb-1 flex items-center justify-between gap-2">{prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</span> : <span />}<BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" /></div>
                     <h3 className="flex items-start justify-between gap-1 text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">
                       <Link
@@ -387,7 +403,7 @@ export function ProjectDeals() {
           ) : null}
         </div>
       ) : mode === "list" ? (
-        <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+        <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
           <table className="w-full border-collapse text-[length:var(--text-sm)]">
             <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
               <th className="px-3 py-2 font-semibold">Сделка</th><th className="px-3 py-2 font-semibold">Клиент</th><th className="px-3 py-2 font-semibold">Стадия</th><th className="px-3 py-2 text-right font-semibold">Сумма</th><th className="px-3 py-2 text-right font-semibold">Вероятн.</th><th className="px-3 py-2 font-semibold">Владелец</th><th className="px-3 py-2" />
@@ -402,7 +418,7 @@ export function ProjectDeals() {
                       {model.stages.some((s) => s.id === o.stageId) ? null : <option value={o.stageId ?? ""}>— без стадии —</option>}
                       {model.stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
-                    {isFinal(o) ? <Chip variant={o.status === "won_closed" ? "success" : "danger"} className="ml-1.5">{STATUS_LABEL[o.status]}</Chip> : null}
+                    {isFinal(o) ? <DealStatusChip status={o.status} className="ml-1.5" /> : null}
                   </td>
                   <td className="px-3 py-2 text-right"><span className="v4-num font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</span></td>
                   <td className="px-3 py-2 text-right"><span className="v4-num text-[var(--muted-strong)]">{o.probability}%</span></td>
@@ -439,7 +455,7 @@ function Forecast({ stages, byStage }: { stages: DealStage[]; byStage: Map<strin
         <StatTile label="Выиграно" value={money(won)} delta="закрытые сделки" tone="success" />
         <StatTile label="Стадий" value={`${stages.length}`} delta="в воронке" />
       </div>
-      <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+      <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
         <table className="w-full border-collapse text-[length:var(--text-sm)]">
           <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
             <th className="px-3 py-2 font-semibold">Стадия</th><th className="px-3 py-2 text-right font-semibold">Сделок</th><th className="px-3 py-2 text-right font-semibold">Сумма</th><th className="px-3 py-2 text-right font-semibold">Взвешенно</th>
