@@ -40,6 +40,11 @@ test("canonical Task Peek opens from My Work, project and Gantt", async ({ page 
   await page.goto(`/projects/${PROJECT_ID}/schedule`);
   await openTaskPeek(page, `Открыть задачу «${TASK_TITLE}»`);
   await expect(page).toHaveURL(taskQuery(`/projects/${PROJECT_ID}/schedule`));
+  // Регрессия: клик по неинтерактивному факту ВНУТРИ открытого peek не закрывает панель
+  // (события портала всплывают по React-дереву до onClick строки Графика).
+  await page.getByRole("dialog").getByText("Проект", { exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: TASK_TITLE })).toBeVisible();
+  await expect(page).toHaveURL(taskQuery(`/projects/${PROJECT_ID}/schedule`));
   await page.getByRole("link", { name: "Открыть полностью", exact: true }).click();
 
   await expect(page).toHaveURL(new RegExp(`/tasks/${TASK_ID}$`));

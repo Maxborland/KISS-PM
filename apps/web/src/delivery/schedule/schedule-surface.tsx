@@ -1146,14 +1146,26 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     withScheduleRowNode(id, (rowId) => taskPeekTriggerRefs.current.get(rowId), (node) => node.click());
   };
   const openRow = openTaskPeek;
+  // Клик из открытого TaskPeek (SheetContent — React-потомок строки, события портала
+  // всплывают по React-дереву до onClick строки/ячейки) не должен дойти до openRow:
+  // программный click() по Radix-триггеру ТОГГЛИТ панель и закрыл бы её.
+  const isPortalEvent = (event: ReactMouseEvent<Element>) =>
+    !(event.target instanceof Node) || !event.currentTarget.contains(event.target);
+  // Выделение текста мышью — не намерение «открыть строку/peek».
+  const hasTextSelection = () => Boolean(window.getSelection()?.toString());
   const cancelEditableClick = () => {
     if (editableClickTimerRef.current !== null) window.clearTimeout(editableClickTimerRef.current);
     editableClickTimerRef.current = null;
   };
   const selectEditableCell = (event: ReactMouseEvent, row: Row) => {
+    if (isPortalEvent(event)) return;
     stop(event);
+    // ВАЖНО: cancelEditableClick — до selection-гварда: второй клик double-click уже
+    // выделил слово, но обязан снять таймер первого клика (иначе peek откроется во
+    // время начатого редактирования ячейки).
     cancelEditableClick();
     if (event.detail > 1) return;
+    if (hasTextSelection()) return;
     editableClickTimerRef.current = window.setTimeout(() => {
       openRow(row.id);
       editableClickTimerRef.current = null;
@@ -1943,7 +1955,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                         tabIndex={sel === r.id ? 0 : -1}
                         aria-selected={sel === r.id}
                         onFocus={() => setSel(r.id)}
-                        onClick={(event) => { event.currentTarget.focus(); openRow(r.id); }}
+                        onClick={(event) => { if (isPortalEvent(event) || hasTextSelection()) return; event.currentTarget.focus(); openRow(r.id); }}
                         className={cn(r.kind === "summary" && "is-summary", sel === r.id && "is-selected", flash.has(r.id) && "bg-[var(--success-soft)]", errors.has(r.id) && "bg-[var(--danger-soft)]", fillDragRange.has(r.id) && "bg-[var(--accent-soft)]")}
                       >
                         <td className="num muted text-[length:var(--text-xs)]">

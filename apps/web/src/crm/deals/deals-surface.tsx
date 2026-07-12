@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeftRight, Plus } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { ArrowLeftRight, ChevronRight, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
@@ -16,10 +17,12 @@ import { StatTile } from "@/delivery/ui/bento";
 import { cn } from "@/lib/cn";
 import { makeRuError } from "@/lib/error-messages";
 import { CrmFrame } from "@/crm/ui/crm-frame";
-import { money } from "@/crm/ui/crm-bits";
+import { OPPORTUNITY_STATUS_LABEL, money } from "@/crm/ui/crm-bits";
 import { getCrmWriteCapability } from "@/crm/ui/permissions";
-import { useCrm, useCrmUsers } from "@/crm/lib/use-crm";
+import { useCrm, useCrmUsers, type CrmData } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
+import { DealPeek } from "@/crm/deals/deal-peek";
+import { useUrlPeekParamCleaner } from "@/workspace/lib/url-peek";
 import type { DealStage, Opportunity, Pipeline, StageTransition } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useSessionUser } from "@/shell/use-session-user";
@@ -36,8 +39,26 @@ export const isValidOpportunityProbability = (value: string) => {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 100;
 };
-const STATUS_LABEL: Record<Opportunity["status"], string> = { new: "Новая", feasibility: "Проверка", ready_to_activate: "Готова", won_closed: "Выиграна", lost_rejected: "Проиграна" };
+// Канонические подписи — crm-bits; локальный override: в компактных чипах
+// канбана/списка «Готова к запуску» не помещается, поэтому короткое «Готова».
+const STATUS_LABEL: Record<Opportunity["status"], string> = { ...OPPORTUNITY_STATUS_LABEL, ready_to_activate: "Готова" };
 const isFinal = (o: Opportunity) => o.status === "won_closed" || o.status === "lost_rejected";
+// Текстовые статус-чипы по паттерну STATUS_CHIP агента (agent-review): токен-тройка
+// border/soft-bg/text вместо заливных BEM-чипов — сдержанная глубина KISS Operational.
+const STATUS_CHIP: Record<Opportunity["status"], string> = {
+  new: "border-[var(--accent-muted)] bg-[var(--accent-soft)] text-[var(--accent)]",
+  feasibility: "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-text)]",
+  ready_to_activate: "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success-text)]",
+  won_closed: "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success-text)]",
+  lost_rejected: "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]"
+};
+function DealStatusChip({ status, className }: { status: Opportunity["status"]; className?: string }) {
+  return (
+    <span className={cn("inline-flex shrink-0 items-center rounded-[var(--radius-full)] border px-2 py-0.5 text-[length:var(--text-xs)] font-medium", STATUS_CHIP[status], className)}>
+      {STATUS_LABEL[status]}
+    </span>
+  );
+}
 
 const ERR_RU: Record<string, string> = {
   opportunity_stage_locked: "Сделка закрыта — стадию не изменить",
@@ -72,7 +93,7 @@ export function ProjectDeals() {
   const canManageDeals = createDealCapability.allowed;
   const createPipelineDisabledReason = createPipelineCapability.disabledReason ?? createStageCapability.disabledReason;
   const crm = useCrm();
-  const { data, status, error, reload, moveStage, movePipeline, createOpportunity } = crm;
+  const { data, status, error, reload, moveStage, movePipeline, createOpportunity, loadActivities } = crm;
   const users = useCrmUsers();
   const [mode, setMode] = useState<Mode>("kanban");
   const [pipelineId, setPipelineId] = useState<string | null>(null);
@@ -80,6 +101,9 @@ export function ProjectDeals() {
   const [busy, setBusy] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<string | null>(null);
+  // Триггеры DealPeek по id сделки: клик по телу карточки/строки программно «нажимает»
+  // триггер (URL-драйв ?deal= живёт внутри DealPeek) — паттерн schedule-строк.
+  const dealPeekTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const model = useMemo(() => {
     if (!data) return null;
@@ -135,6 +159,37 @@ export function ProjectDeals() {
       : null;
   const pipelineName = (id: string | null) => model.pipelines.find((p) => p.id === id)?.name ?? "—";
   const pipelineOfStage = (stageId: string | null) => model.allStages.find((s) => s.id === stageId)?.pipelineId ?? null;
+
+  // Клик по ТЕЛУ карточки/строки открывает peek-сводку; интерактивные элементы
+  // (title-ссылка — канонический переход /crm/deals/[id], select стадии, кнопки,
+  // drag-handle) обрабатываются сами и peek не открывают.
+  const openDealPeek = (event: ReactMouseEvent<HTMLElement>, id: string) => {
+    // SheetContent открытого peek — React-потомок карточки/строки: клики из портала
+    // всплывают по React-дереву до этого onClick, а программный click() по Radix-триггеру
+    // ТОГГЛИТ панель (то есть закрыл бы её). DOM-contains отсекает события портала.
+    if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return;
+    // Выделение текста мышью — не намерение открыть peek.
+    if (window.getSelection()?.toString()) return;
+    if ((event.target as HTMLElement).closest("a,button,select,input,textarea,label")) return;
+    dealPeekTriggerRefs.current.get(id)?.click();
+  };
+  // Клавиатурная альтернатива клику по телу — видимый триггер-шеврон (паттерн schedule-строк);
+  // aria-label отличается от title-ссылки «Открыть сделку …» (канонический e2e-контракт).
+  const dealPeekTrigger = (o: Opportunity) => (
+    <DealPeek deal={o} pipelineName={pipelineName(pipelineOfStage(o.stageId))} stageName={stageName(o.stageId)} ownerName={ownerName(o.ownerUserId)} loadActivities={loadActivities}>
+      <button
+        ref={(node) => { if (node) dealPeekTriggerRefs.current.set(o.id, node); else dealPeekTriggerRefs.current.delete(o.id); }}
+        type="button"
+        draggable={false}
+        aria-label={`Просмотр сделки «${o.title}»`}
+        title="Просмотр сделки"
+        // size-6 = 24px — минимальный hit-target (WCAG 2.5.8); иконка остаётся мелкой.
+        className="grid size-6 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] outline-none transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] focus-visible:shadow-[var(--ring-focus)]"
+      >
+        <ChevronRight className="size-3.5" aria-hidden />
+      </button>
+    </DealPeek>
+  );
 
   async function doMove(id: string, stageId: string): Promise<boolean> {
     setBusy(true);
@@ -216,6 +271,9 @@ export function ProjectDeals() {
 
   return (
     <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={createDealDialog}>
+      {/* Резолв deep-link ?deal= — только в ready-ветке: useSearchParams внутри резолвера
+          не исполняется при prerender страницы (иначе Next требует Suspense-границу). */}
+      <DealDeepLinkResolver data={data} setPipelineId={setPipelineId} />
       {/* мультиворонки: выбор воронки — фильтрует стадии/сделки/переходы */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Воронка:</span>
@@ -282,26 +340,28 @@ export function ProjectDeals() {
                         draggable={draggable}
                         onDragStart={() => { if (draggable) setDragId(o.id); }}
                         onDragEnd={() => { setDragId(null); setOverStage(null); }}
-                        className={cn("hover-lift rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]", draggable ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50")}
+                        onClick={(e) => openDealPeek(e, o.id)}
+                        className={cn("v4-row rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)]", "p-2.5", draggable ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50 shadow-[var(--shadow-raise)]")}
                       >
                         <div className="mb-1 flex items-center justify-between gap-2">
                           {prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</span> : <span />}
                           <BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" title={ownerName(o.ownerUserId)} />
                         </div>
-                        <h3 className="text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">
+                        <h3 className="flex items-start justify-between gap-1 text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">
                           <Link
                             href={`/crm/deals/${o.id}`}
                             draggable={false}
                             aria-label={`Открыть сделку «${o.title}»`}
-                            className="rounded-[var(--radius-sm)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]"
+                            className="min-w-0 rounded-[var(--radius-sm)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]"
                           >
                             {o.title}
                           </Link>
+                          {dealPeekTrigger(o)}
                         </h3>
                         <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{o.clientName}</p>
                         <div className="mt-1.5 flex items-center justify-between gap-2">
                           <span className="v4-num text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</span>
-                          {final ? <Chip variant={o.status === "won_closed" ? "success" : "danger"}>{STATUS_LABEL[o.status]}</Chip> : <span className="v4-num text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.probability}%</span>}
+                          {final ? <DealStatusChip status={o.status} /> : <span className="v4-num text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.probability}%</span>}
                         </div>
                       </article>
                     );
@@ -316,17 +376,18 @@ export function ProjectDeals() {
               <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2"><span className="text-[length:var(--text-sm)] font-semibold text-[var(--muted-strong)]">Без стадии</span><span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{model.unstaged.length}</span></div>
               <div className="flex flex-col gap-2 p-2">
                 {model.unstaged.map((o) => (
-                  <article data-deal-id={o.id} key={o.id} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-card)]">
+                  <article data-deal-id={o.id} key={o.id} onClick={(e) => openDealPeek(e, o.id)} className="v4-row rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5">
                     <div className="mb-1 flex items-center justify-between gap-2">{prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</span> : <span />}<BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" /></div>
-                    <h3 className="text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">
+                    <h3 className="flex items-start justify-between gap-1 text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">
                       <Link
                         href={`/crm/deals/${o.id}`}
                         draggable={false}
                         aria-label={`Открыть сделку «${o.title}»`}
-                        className="rounded-[var(--radius-sm)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]"
+                        className="min-w-0 rounded-[var(--radius-sm)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]"
                       >
                         {o.title}
                       </Link>
+                      {dealPeekTrigger(o)}
                     </h3>
                     <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{o.clientName}</p>
                     <div className="v4-num mt-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</div>
@@ -356,22 +417,22 @@ export function ProjectDeals() {
           ) : null}
         </div>
       ) : mode === "list" ? (
-        <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+        <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
           <table className="w-full border-collapse text-[length:var(--text-sm)]">
             <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
               <th className="px-3 py-2 font-semibold">Сделка</th><th className="px-3 py-2 font-semibold">Клиент</th><th className="px-3 py-2 font-semibold">Стадия</th><th className="px-3 py-2 text-right font-semibold">Сумма</th><th className="px-3 py-2 text-right font-semibold">Вероятн.</th><th className="px-3 py-2 font-semibold">Владелец</th><th className="px-3 py-2" />
             </tr></thead>
             <tbody>
               {model.opps.map((o) => (
-                <tr key={o.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
-                  <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]"><Link href={`/crm/deals/${o.id}`} aria-label={`Открыть сделку «${o.title}»`} className="rounded-[var(--radius-sm)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]">{o.title}</Link></div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</div> : null}</td>
+                <tr key={o.id} onClick={(e) => openDealPeek(e, o.id)} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
+                  <td className="px-3 py-2"><div className="flex items-center gap-1 font-medium text-[var(--text-strong)]"><Link href={`/crm/deals/${o.id}`} aria-label={`Открыть сделку «${o.title}»`} className="min-w-0 rounded-[var(--radius-sm)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]">{o.title}</Link>{dealPeekTrigger(o)}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</div> : null}</td>
                   <td className="px-3 py-2 text-[var(--muted-strong)]">{o.clientName}</td>
                   <td className="px-3 py-2">
                     <select aria-label={`Стадия сделки «${o.title}»`} value={o.stageId ?? ""} disabled={busy || isFinal(o) || !canManageDeals} onChange={(e) => void doMove(o.id, e.target.value)} title={canManageDeals ? "Изменить стадию" : createDealCapability.disabledReason ?? "Недостаточно прав для создания или изменения"} className="h-7 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-1.5 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)] focus-visible:shadow-[var(--ring-focus)] disabled:opacity-60">
                       {model.stages.some((s) => s.id === o.stageId) ? null : <option value={o.stageId ?? ""}>— без стадии —</option>}
                       {model.stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
-                    {isFinal(o) ? <Chip variant={o.status === "won_closed" ? "success" : "danger"} className="ml-1.5">{STATUS_LABEL[o.status]}</Chip> : null}
+                    {isFinal(o) ? <DealStatusChip status={o.status} className="ml-1.5" /> : null}
                   </td>
                   <td className="px-3 py-2 text-right"><span className="v4-num font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</span></td>
                   <td className="px-3 py-2 text-right"><span className="v4-num text-[var(--muted-strong)]">{o.probability}%</span></td>
@@ -392,6 +453,43 @@ export function ProjectDeals() {
   );
 }
 
+/**
+ * Deep-link `?deal=<id>`: pipelineId — локальный state, а DealPeek монтируется только
+ * для отрендеренных сделок, поэтому сделка чужой воронки (или несуществующая) молча
+ * не открывалась. После загрузки данных резолвим id по ВСЕМ воронкам: сделка в другой
+ * воронке → переключаем выбор (её DealPeek смонтируется и откроется по URL);
+ * не найдена/её стадия недоступна → снимаем параметр replace-ом и сообщаем toast'ом.
+ * Отдельный null-компонент, монтируемый ТОЛЬКО в ready-ветке: useSearchParams вне её
+ * заставил бы Next требовать Suspense-границу при prerender (см. login-surface).
+ */
+function DealDeepLinkResolver({ data, setPipelineId }: { data: CrmData; setPipelineId: (id: string) => void }) {
+  // В Next это App Router-параметры; в Storybook (без App Router) хук отдаёт null —
+  // тогда эффект читает window.location.search (fallback как в useUrlPeek).
+  const searchParams = useSearchParams();
+  const clearDealParam = useUrlPeekParamCleaner("deal");
+  const resolvedDealParamRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const search = searchParams ? searchParams.toString() : window.location.search;
+    const dealParam = new URLSearchParams(search).get("deal");
+    // Каждое значение параметра резолвим один раз: ручное переключение воронки при
+    // открытом peek не должно принудительно возвращать пользователя обратно.
+    if (resolvedDealParamRef.current === dealParam) return;
+    resolvedDealParamRef.current = dealParam;
+    if (!dealParam) return;
+    const deal = data.opportunities.find((o) => o.id === dealParam);
+    const stage = deal?.stageId ? data.dealStages.find((s) => s.id === deal.stageId) ?? null : null;
+    if (!deal || (deal.stageId && !stage?.pipelineId)) {
+      clearDealParam();
+      toast.error("Сделка не найдена или недоступна");
+      return;
+    }
+    if (stage?.pipelineId) setPipelineId(stage.pipelineId);
+  }, [clearDealParam, data, searchParams, setPipelineId]);
+
+  return null;
+}
+
 function Forecast({ stages, byStage }: { stages: DealStage[]; byStage: Map<string, Opportunity[]> }) {
   const all = stages.flatMap((s) => byStage.get(s.id) ?? []);
   // В воронке/прогнозе — только незакрытые: исключаем ОБА финала (lost_rejected и won_closed),
@@ -408,7 +506,7 @@ function Forecast({ stages, byStage }: { stages: DealStage[]; byStage: Map<strin
         <StatTile label="Выиграно" value={money(won)} delta="закрытые сделки" tone="success" />
         <StatTile label="Стадий" value={`${stages.length}`} delta="в воронке" />
       </div>
-      <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+      <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
         <table className="w-full border-collapse text-[length:var(--text-sm)]">
           <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
             <th className="px-3 py-2 font-semibold">Стадия</th><th className="px-3 py-2 text-right font-semibold">Сделок</th><th className="px-3 py-2 text-right font-semibold">Сумма</th><th className="px-3 py-2 text-right font-semibold">Взвешенно</th>
