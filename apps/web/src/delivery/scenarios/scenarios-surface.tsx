@@ -38,6 +38,8 @@ const PROFILE_META: Record<Profile, { label: string; desc: string }> = {
   balanced: { label: "Балансированный", desc: "Снять половину перегруза на альт-исполнителя, минимальный сдвиг" },
   resilient: { label: "Устойчивый", desc: "Снять весь перегруз, заложить резерв; финиш сдвигается больше" }
 };const h = (min: number) => Math.round(min / 60);
+// локальное время пользователя: TTL превью показываем как «действует до HH:MM» на его часах
+const hhmmLocal = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 const riskOf = (score: number) => score >= 67 ? { label: "высокий риск", cls: "bg-[var(--danger-soft)] text-[var(--danger-text)]" } : score >= 34 ? { label: "средний риск", cls: "bg-[var(--warning-soft)] text-[var(--warning-text)]" } : { label: "низкий риск", cls: "bg-[var(--success-soft)] text-[var(--success-text)]" };
 
@@ -54,6 +56,10 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const resName = (id: string) => { const n = resDir.name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
   const [targetKey, setTargetKey] = useState<string>("");
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
+  // TTL persisted-превью: сервер отдаёт expiresAt (+15 мин); клиентский таймер даёт мягкое
+  // состояние «истекло» (Применить disabled + подсказка пересчитать). Авторитет — серверный 409 scenario_expired.
+  const [previewExpiresAt, setPreviewExpiresAt] = useState<string | null>(null);
+  const [previewExpired, setPreviewExpired] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [compareId, setCompareId] = useState<string | null>(null);
   const [applyBusy, setApplyBusy] = useState(false);
@@ -92,9 +98,20 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     setPreviewBusy(true); setScenarioErr(null); setCompareId(null);
     const res = await previewScenarios({ type: "resource_overload", resourceId: t.resourceId, date: t.date, overloadMinutes: t.overloadMinutes, taskIds: t.taskIds });
     setPreviewBusy(false);
-    if (res.ok) setProposals(res.proposals);
-    else { setProposals([]); setScenarioErr(res.conflict ? "Конфликт версий — перезагружено, запросите сценарии заново" : "Не удалось получить сценарии"); }
+    if (res.ok) { setProposals(res.proposals); setPreviewExpiresAt(res.expiresAt ?? null); }
+    else { setProposals([]); setPreviewExpiresAt(null); setScenarioErr(res.conflict ? "Конфликт версий — перезагружено, запросите сценарии заново" : "Не удалось получить сценарии"); }
   }
+
+  // клиентский таймер TTL: по достижении expiresAt переводим предложения в состояние «истекло»
+  useEffect(() => {
+    if (!previewExpiresAt) { setPreviewExpired(false); return; }
+    const msLeft = Date.parse(previewExpiresAt) - Date.now();
+    if (Number.isNaN(msLeft)) { setPreviewExpired(false); return; }
+    if (msLeft <= 0) { setPreviewExpired(true); return; }
+    setPreviewExpired(false);
+    const timer = setTimeout(() => setPreviewExpired(true), msLeft);
+    return () => clearTimeout(timer);
+  }, [previewExpiresAt]);
 
   // авто-превью для худшего перегруза при загрузке и после применения (planVersion сменился → proposals=null)
   useEffect(() => {
@@ -165,7 +182,14 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Сценарии планирования</h2>
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Бэкенд предлагает три профиля разрешения перегруза ресурса; выбранный применяется как пакет команд (коммит плана).</p>
         </div>
-        {canPreviewScenarios ? <Button variant="ghost" size="sm" className="ml-auto" disabled={previewBusy || !target} onClick={() => { if (target) { setProposals(null); void runPreview(target); } }}><RefreshCw className={cn("size-3.5", previewBusy && "animate-spin")} aria-hidden />Запросить заново</Button> : null}
+        <div className="ml-auto flex items-center gap-2">
+          {previewExpiresAt && list.length > 0 ? (
+            previewExpired
+              ? <span data-testid="scenario-ttl-expired" className="inline-flex items-center rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Предложения истекли — запросите заново</span>
+              : <span data-testid="scenario-ttl" className="inline-flex items-center rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Предложение действует до {hhmmLocal(previewExpiresAt)}</span>
+          ) : null}
+          {canPreviewScenarios ? <Button variant="ghost" size="sm" disabled={previewBusy || !target} onClick={() => { if (target) { setProposals(null); void runPreview(target); } }}><RefreshCw className={cn("size-3.5", previewBusy && "animate-spin")} aria-hidden />Запросить заново</Button> : null}
+        </div>
       </div>
 
       {prototypeNotesEnabled && (
@@ -236,7 +260,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
                         <Button variant="secondary" size="sm" disabled={!available} onClick={() => setCompareId(compareId === p.id ? null : p.id)}>{compareId === p.id ? "Скрыть" : "Сравнить"}</Button>
-                        {canApplyScenarios ? <Button variant="default" size="sm" disabled={applyBusy || !available} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button> : null}
+                        {canApplyScenarios ? <Button variant="default" size="sm" disabled={applyBusy || !available || previewExpired} title={previewExpired ? "Предложение истекло — запросите сценарии заново" : undefined} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button> : null}
                       </div>
                     </div>
 
