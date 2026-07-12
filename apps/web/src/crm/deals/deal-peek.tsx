@@ -4,9 +4,17 @@ import { useEffect, useState, type ReactElement } from "react";
 import { Loader2 } from "lucide-react";
 
 import { FEASIBILITY_LABEL as FEAS_LABEL, OPPORTUNITY_STATUS_LABEL as STATUS_LABEL, money } from "@/crm/ui/crm-bits";
+import { makeRuError } from "@/lib/error-messages";
 import type { CrmActivity, Opportunity } from "@/crm/lib/crm-client";
 import type { CrmDataResult } from "@/crm/lib/use-crm";
 import { UrlPeekSheet } from "@/workspace/lib/url-peek";
+
+// RU-тексты ошибок ленты peek: транспорт/сессия/права — из COMMON_ERR, доменный код
+// ленты — crm_entity_not_found. Сырые коды пользователю не показываем (defaultFallback).
+const ACTIVITY_ERR_RU: Record<string, string> = {
+  crm_entity_not_found: "Сделка не найдена или недоступна"
+};
+const activityErr = makeRuError(ACTIVITY_ERR_RU, "неизвестная ошибка");
 
 const DEAL_DATE_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
 const dealDate = (value: string) => {
@@ -66,9 +74,10 @@ export function DealPeek({ deal, pipelineName, stageName, ownerName, loadActivit
           ))}
         </dl>
 
+        {/* Заголовок панели (SheetTitle) — h2, секции внутри peek — уровнем ниже (h3). */}
         {deal.description?.trim() ? (
           <section aria-labelledby="deal-peek-description">
-            <h2 id="deal-peek-description" className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Описание</h2>
+            <h3 id="deal-peek-description" className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Описание</h3>
             <p className="mt-2 whitespace-pre-wrap text-[length:var(--text-sm)] leading-[var(--lh-md)] text-[var(--text)]">{deal.description}</p>
           </section>
         ) : null}
@@ -82,7 +91,7 @@ export function DealPeek({ deal, pipelineName, stageName, ownerName, loadActivit
 
 /** Последние события ленты — read-only, с честными loading/error состояниями. */
 function DealPeekActivity({ dealId, loadActivities }: { dealId: string; loadActivities: DealPeekProps["loadActivities"] }) {
-  const [state, setState] = useState<{ status: "loading" } | { status: "error"; message: string } | { status: "ready"; items: CrmActivity[] }>({ status: "loading" });
+  const [state, setState] = useState<{ status: "loading" } | { status: "error"; code?: string | undefined } | { status: "ready"; items: CrmActivity[] }>({ status: "loading" });
 
   useEffect(() => {
     let alive = true;
@@ -90,18 +99,18 @@ function DealPeekActivity({ dealId, loadActivities }: { dealId: string; loadActi
     void loadActivities("opportunity", dealId).then((r) => {
       if (!alive) return;
       if (r.ok) setState({ status: "ready", items: r.data.slice(0, DEAL_PEEK_ACTIVITY_LIMIT) });
-      else setState({ status: "error", message: r.message });
+      else setState({ status: "error", code: r.code });
     });
     return () => { alive = false; };
   }, [dealId, loadActivities]);
 
   return (
     <section aria-labelledby="deal-peek-activity">
-      <h2 id="deal-peek-activity" className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Последние события</h2>
+      <h3 id="deal-peek-activity" className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Последние события</h3>
       {state.status === "loading" ? (
-        <div className="mt-2 flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--muted)]"><Loader2 className="size-3.5 animate-spin" aria-hidden /> Загрузка ленты…</div>
+        <div role="status" className="mt-2 flex items-center gap-2 text-[length:var(--text-xs)] text-[var(--muted)]"><Loader2 className="size-3.5 animate-spin" aria-hidden /> Загрузка ленты…</div>
       ) : state.status === "error" ? (
-        <p role="alert" className="mt-2 text-[length:var(--text-xs)] text-[var(--danger-text)]">Не удалось загрузить ленту: {state.message}</p>
+        <p role="alert" className="mt-2 text-[length:var(--text-xs)] text-[var(--danger-text)]">Не удалось загрузить ленту: {activityErr(state.code)}</p>
       ) : state.items.length === 0 ? (
         <p className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Пока нет активностей.</p>
       ) : (

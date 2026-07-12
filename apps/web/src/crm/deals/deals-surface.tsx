@@ -212,7 +212,8 @@ export function ProjectDeals() {
         draggable={false}
         aria-label={`Просмотр сделки «${o.title}»`}
         title="Просмотр сделки"
-        className="grid size-5 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] outline-none transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] focus-visible:shadow-[var(--ring-focus)]"
+        // size-6 = 24px — минимальный hit-target (WCAG 2.5.8); иконка остаётся мелкой.
+        className="grid size-6 shrink-0 place-items-center rounded-[var(--radius-sm)] text-[var(--muted)] outline-none transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] focus-visible:shadow-[var(--ring-focus)]"
       >
         <ChevronRight className="size-3.5" aria-hidden />
       </button>
