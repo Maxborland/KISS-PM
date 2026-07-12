@@ -68,6 +68,19 @@ const TASK_STATUS_TONE: Record<TaskStatusCategory, "info" | "violet" | "warning"
   done: "success"
 };
 
+/** Per-source вид для контента: после settled источник либо ready (данные есть),
+ *  либо forbidden (403 — честная копия про роль), либо error (500/сеть — «Не
+ *  удалось загрузить» + повтор ИМЕННО этого источника). Раньше оба провала
+ *  схлопывались в data=null, и при 500 показывалась копия про роль. */
+type SourceView<T> = {
+  data: T | null;
+  status: "ready" | "forbidden" | "error";
+  reload: () => Promise<void>;
+};
+
+const srcStatus = (s: { data: unknown; status: string }): SourceView<never>["status"] =>
+  s.data ? "ready" : s.status === "forbidden" ? "forbidden" : "error";
+
 export function DashboardSurface() {
   const myWork = useMyWork();
   const projects = useProjects();
@@ -112,9 +125,15 @@ export function DashboardSurface() {
         >
           {settled && !allFailed ? (
             <DashboardContent
-              tasks={myWork.data?.tasks ?? null}
-              projects={projects.data ? { count: projects.data.projects.length, hours: projects.data.projects.reduce((s, p) => s + p.plannedHours, 0) } : null}
-              opportunities={opportunities.data}
+              tasks={{ data: myWork.data?.tasks ?? null, status: srcStatus(myWork), reload: myWork.reload }}
+              projects={{
+                data: projects.data
+                  ? { count: projects.data.projects.length, hours: projects.data.projects.reduce((s, p) => s + p.plannedHours, 0) }
+                  : null,
+                status: srcStatus(projects),
+                reload: projects.reload
+              }}
+              opportunities={{ data: opportunities.data, status: srcStatus(opportunities), reload: opportunities.reload }}
             />
           ) : (
             <span />
@@ -130,6 +149,29 @@ function NoAccessNote({ what }: { what: string }) {
   return (
     <p className="px-4 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">
       {what} недоступны вашей роли.
+    </p>
+  );
+}
+
+// Инлайн-повтор конкретного источника (ошибка 500/сети — НЕ вопрос прав).
+function RetryInline({ onRetry }: { onRetry: () => Promise<void> }) {
+  return (
+    <button
+      type="button"
+      onClick={() => void onRetry()}
+      className="rounded-[var(--radius-sm)] font-medium text-[var(--accent)] underline-offset-2 outline-none hover:underline focus-visible:shadow-[var(--ring-focus)]"
+    >
+      Повторить
+    </button>
+  );
+}
+
+// Секция, которую не удалось загрузить (500/сеть): честная ошибка + повтор
+// именно этого источника — а не копия «недоступны вашей роли».
+function LoadErrorNote({ what, onRetry }: { what: string; onRetry: () => Promise<void> }) {
+  return (
+    <p className="px-4 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">
+      Не удалось загрузить {what}. <RetryInline onRetry={onRetry} />
     </p>
   );
 }
@@ -150,12 +192,27 @@ function CardAllLink({ href, children }: { href: string; children: React.ReactNo
   );
 }
 
-function AttentionCard({ tasks, opportunities }: { tasks: TaskRecord[] | null; opportunities: Opportunity[] | null }) {
-  const { shown, restCount } = useMemo(() => buildAttentionSignals(tasks, opportunities), [tasks, opportunities]);
-  // Честность по правам: недоступный источник не даёт сигналов — говорим об этом явно.
-  const unavailable = [tasks === null ? "задачам" : null, opportunities === null ? "сделкам" : null].filter(
-    (v): v is string => v !== null
+function AttentionCard({
+  tasks,
+  opportunities
+}: {
+  tasks: SourceView<TaskRecord[]>;
+  opportunities: SourceView<Opportunity[]>;
+}) {
+  const { shown, restCount } = useMemo(
+    () => buildAttentionSignals(tasks.data, opportunities.data),
+    [tasks.data, opportunities.data]
   );
+  // Честность по статусу источника: forbidden (нет прав) и error (не загрузилось) —
+  // разные состояния с разной копией; повтор — у конкретного упавшего источника.
+  const forbidden = [
+    tasks.status === "forbidden" ? "задачам" : null,
+    opportunities.status === "forbidden" ? "сделкам" : null
+  ].filter((v): v is string => v !== null);
+  const errored = [
+    tasks.status === "error" ? { what: "задачи", reload: tasks.reload } : null,
+    opportunities.status === "error" ? { what: "сделки", reload: opportunities.reload } : null
+  ].filter((v): v is { what: string; reload: () => Promise<void> } => v !== null);
 
   return (
     <BentoCard
@@ -184,10 +241,15 @@ function AttentionCard({ tasks, opportunities }: { tasks: TaskRecord[] | null; o
           ))}
         </ul>
       )}
-      {restCount > 0 || unavailable.length > 0 ? (
+      {restCount > 0 || forbidden.length > 0 || errored.length > 0 ? (
         <p className="border-t border-[var(--border-subtle)] px-4 py-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
           {restCount > 0 ? `И ещё ${restCount} — полные списки в «Мои задачи» и «Сделки». ` : ""}
-          {unavailable.length > 0 ? `Сигналы по ${unavailable.join(" и ")} не рассчитываются: раздел недоступен вашей роли.` : ""}
+          {forbidden.length > 0 ? `Сигналы по ${forbidden.join(" и ")} не рассчитываются: раздел недоступен вашей роли. ` : ""}
+          {errored.map((e) => (
+            <span key={e.what}>
+              Не удалось загрузить {e.what} — сигналы по ним не рассчитаны. <RetryInline onRetry={e.reload} />{" "}
+            </span>
+          ))}
         </p>
       ) : null}
     </BentoCard>
@@ -199,32 +261,35 @@ function DashboardContent({
   projects,
   opportunities
 }: {
-  tasks: TaskRecord[] | null;
-  projects: { count: number; hours: number } | null;
-  opportunities: Opportunity[] | null;
+  tasks: SourceView<TaskRecord[]>;
+  projects: SourceView<{ count: number; hours: number }>;
+  opportunities: SourceView<Opportunity[]>;
 }) {
-  // Фильтр — внутри useMemo с зависимостью [tasks]: раньше activeTasks строился
+  // Фильтр — внутри useMemo с зависимостью [tasks.data]: раньше activeTasks строился
   // заново на каждый рендер, и мемоизация upcoming по [activeTasks] была фиктивной.
   const { activeTasks, upcoming } = useMemo(() => {
-    const active = (tasks ?? []).filter((t) => t.statusCategory !== "done");
+    const active = (tasks.data ?? []).filter((t) => t.statusCategory !== "done");
     return {
       activeTasks: active,
       upcoming: [...active].sort((a, b) => a.plannedFinish.localeCompare(b.plannedFinish)).slice(0, 6)
     };
-  }, [tasks]);
+  }, [tasks.data]);
   const today = localIsoDay();
   const overdueCount = activeTasks.filter((t) => t.plannedFinish.slice(0, 10) < today).length;
   const inProgressCount = activeTasks.filter((t) => t.statusCategory === "in_progress").length;
 
-  // Агрегаты по сделкам (null = раздел недоступен роли).
-  const openOpps = (opportunities ?? []).filter((o) => OPP_OPEN.includes(o.status));
+  // Агрегаты по сделкам (data=null: раздел недоступен роли либо не загрузился).
+  const openOpps = (opportunities.data ?? []).filter((o) => OPP_OPEN.includes(o.status));
   const openValue = openOpps.reduce((s, o) => s + o.contractValue, 0);
   const oppsByStatus = useMemo(() => {
     const order: Opportunity["status"][] = ["new", "feasibility", "ready_to_activate", "won_closed", "lost_rejected"];
     return order
-      .map((s) => ({ status: s, count: (opportunities ?? []).filter((o) => o.status === s).length }))
+      .map((s) => ({ status: s, count: (opportunities.data ?? []).filter((o) => o.status === s).length }))
       .filter((r) => r.count > 0);
-  }, [opportunities]);
+  }, [opportunities.data]);
+
+  // Подпись KPI-плитки для недоступного источника: роль — только при forbidden.
+  const failDelta = (s: SourceView<unknown>) => (s.status === "forbidden" ? "нет доступа" : "не удалось загрузить");
 
   return (
     <div className="flex flex-col gap-3">
@@ -233,42 +298,51 @@ function DashboardContent({
         <AttentionCard tasks={tasks} opportunities={opportunities} />
       </Bento>
 
-      {/* KPI-плитки — реальные агрегаты, каждая ведёт к источнику; недоступный роли источник → «—» без ссылки */}
+      {/* KPI-плитки — реальные агрегаты, каждая ведёт к источнику; недоступный источник → «—» без ссылки
+          («нет доступа» при forbidden, «не удалось загрузить» при ошибке) */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatTile
           label="Мои задачи"
-          value={tasks ? tasks.length : "—"}
-          delta={!tasks ? "нет доступа" : overdueCount > 0 ? `${overdueCount} просрочено` : `${inProgressCount} в работе`}
-          tone={tasks && overdueCount > 0 ? "danger" : "default"}
-          {...(tasks ? { href: "/my-work" } : {})}
+          value={tasks.data ? tasks.data.length : "—"}
+          delta={!tasks.data ? failDelta(tasks) : overdueCount > 0 ? `${overdueCount} просрочено` : `${inProgressCount} в работе`}
+          tone={tasks.data && overdueCount > 0 ? "danger" : "default"}
+          {...(tasks.data ? { href: "/my-work" } : {})}
         />
         <StatTile
           label="Открытые сделки"
-          value={opportunities ? openOpps.length : "—"}
-          delta={opportunities ? money(openValue) : "нет доступа"}
+          value={opportunities.data ? openOpps.length : "—"}
+          delta={opportunities.data ? money(openValue) : failDelta(opportunities)}
           tone="default"
-          {...(opportunities ? { href: "/crm/deals" } : {})}
+          {...(opportunities.data ? { href: "/crm/deals" } : {})}
         />
         <StatTile
           label="Активные проекты"
-          value={projects ? projects.count : "—"}
-          delta={projects ? `${projects.hours.toLocaleString("ru-RU")} ч плана` : "нет доступа"}
+          value={projects.data ? projects.data.count : "—"}
+          delta={projects.data ? `${projects.data.hours.toLocaleString("ru-RU")} ч плана` : failDelta(projects)}
           tone="default"
-          {...(projects ? { href: "/projects" } : {})}
+          {...(projects.data ? { href: "/projects" } : {})}
         />
       </div>
+      {/* У проектов нет собственной карточки ниже — повтор упавшего источника живёт под плитками. */}
+      {projects.status === "error" ? (
+        <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">
+          Не удалось загрузить проекты — счётчик не рассчитан. <RetryInline onRetry={projects.reload} />
+        </p>
+      ) : null}
 
       <Bento>
         {/* Ближайшие задачи — реальные my-work; строка — drill-down в /my-work?task= */}
         <BentoCard
           title="Ближайшие задачи"
           subtitle="Мои незавершённые задачи по плановому финишу"
-          actions={tasks !== null ? <CardAllLink href="/my-work">Все задачи</CardAllLink> : undefined}
+          actions={tasks.data !== null ? <CardAllLink href="/my-work">Все задачи</CardAllLink> : undefined}
           span={7}
           flush
         >
-          {tasks === null ? (
+          {tasks.status === "forbidden" ? (
             <NoAccessNote what="Задачи" />
+          ) : tasks.status === "error" ? (
+            <LoadErrorNote what="задачи" onRetry={tasks.reload} />
           ) : upcoming.length === 0 ? (
             <p className="px-4 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">Незавершённых задач нет — всё закрыто.</p>
           ) : (
@@ -300,17 +374,19 @@ function DashboardContent({
         <BentoCard
           title="Сделки по статусам"
           subtitle="Распределение возможностей CRM"
-          actions={opportunities !== null ? <CardAllLink href="/crm/deals">Все сделки</CardAllLink> : undefined}
+          actions={opportunities.data !== null ? <CardAllLink href="/crm/deals">Все сделки</CardAllLink> : undefined}
           span={5}
         >
-          {opportunities === null ? (
+          {opportunities.status === "forbidden" ? (
             <NoAccessNote what="Сделки" />
+          ) : opportunities.status === "error" ? (
+            <LoadErrorNote what="сделки" onRetry={opportunities.reload} />
           ) : oppsByStatus.length === 0 ? (
             <p className="py-4 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">Сделок пока нет.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {oppsByStatus.map((r) => {
-                const pct = Math.round((r.count / (opportunities?.length || 1)) * 100);
+                const pct = Math.round((r.count / (opportunities.data?.length || 1)) * 100);
                 return (
                   <li key={r.status} className="flex items-center gap-2">
                     <span className="w-24 shrink-0 text-[length:var(--text-sm)] text-[var(--muted-strong)]">{OPP_STATUS_LABEL[r.status]}</span>
