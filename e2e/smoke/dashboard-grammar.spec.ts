@@ -221,9 +221,11 @@ test("dashboard is summary-first: real signals drill down to task and deal, no d
     const tileBaseShadow = await tasksTile.evaluate((el) => getComputedStyle(el).boxShadow);
     const reachedTile = await tabUntil(page, () => tasksTile.evaluate((el) => el === document.activeElement));
     expect(reachedTile).toBe(true);
-    const tileFocusShadow = await tasksTile.evaluate((el) => getComputedStyle(el).boxShadow);
-    expect(tileFocusShadow).not.toBe("none");
-    expect(tileFocusShadow).not.toBe(tileBaseShadow);
+    // poll: box-shadow анимируется transition'ом hover-lift — ждём конца перехода.
+    await expect
+      .poll(() => tasksTile.evaluate((el) => getComputedStyle(el).boxShadow))
+      .not.toBe(tileBaseShadow);
+    expect(await tasksTile.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/my-work$/);
 
@@ -332,9 +334,9 @@ test("settings segmented control is reachable by Tab with visible focus ring", a
     page.evaluate(() => Boolean(document.activeElement?.closest(".segmented__btn")))
   );
   expect(reached).toBe(true);
-  const focusShadow = await page.evaluate(
-    () => getComputedStyle(document.activeElement!.closest(".segmented__btn")!).boxShadow
-  );
-  expect(focusShadow).not.toBe("none");
-  expect(focusShadow).not.toBe(baseShadow);
+  // poll: возможный transition на box-shadow — ждём установившееся значение.
+  const readFocusShadow = () =>
+    page.evaluate(() => getComputedStyle(document.activeElement!.closest(".segmented__btn")!).boxShadow);
+  await expect.poll(readFocusShadow).not.toBe(baseShadow);
+  expect(await readFocusShadow()).not.toBe("none");
 });
