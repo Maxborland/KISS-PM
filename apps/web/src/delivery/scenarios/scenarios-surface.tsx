@@ -134,11 +134,8 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     if (!readModel) return null;
     // Уже принятые перегрузки исключаем из целей сценария (каноничный ключ `resourceId:dateIso`),
     // иначе после применения сценария только что принятый день остаётся целью по умолчанию и снова предлагается.
-    // `acceptedOverloads` — мок-only поле бэкенда: в каноничном ResourceLoadMatrix его нет,
-    // поэтому это узкий документированный каст (не `as unknown as`), а не доступ по контракту.
-    const accepted = new Set(
-      (readModel.resourceLoad as { acceptedOverloads?: string[] }).acceptedOverloads ?? []
-    );
+    // acceptedOverloads — каноническое поле ResourceLoadMatrix (BUG-PROJ-19), читаем по контракту.
+    const accepted = new Set(readModel.resourceLoad.acceptedOverloads ?? []);
     const overloads = (readModel.resourceLoad.overloads ?? [])
       .filter((o) => o.granularity === "day")
       .filter((o) => !accepted.has(`${o.resourceId}:${o.date}`))
