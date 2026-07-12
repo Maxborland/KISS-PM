@@ -83,6 +83,9 @@ export function buildAttentionSignals(
     )
     .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
 
+  // aria-label ссылки замещает её контент для скринридера, поэтому в него
+  // входит и причина сигнала (чип с порогом), и срок — а не только заголовок.
+  const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
   const taskSignal = (t: TaskRecord, chip: string, tone: "danger" | "warning"): AttentionSignal => ({
     key: `task-${chip}-${t.id}`,
     chip,
@@ -90,26 +93,44 @@ export function buildAttentionSignals(
     title: t.title,
     detail: `${t.statusName} · финиш ${fmtDate(t.plannedFinish)}`,
     href: `/my-work?task=${encodeURIComponent(t.id)}`,
-    ariaLabel: `Открыть задачу «${t.title}» в Моих задачах`
+    ariaLabel: `Открыть задачу «${t.title}»: ${lowerFirst(chip)}, финиш ${fmtDate(t.plannedFinish)}`
   });
-  const oppSignal = (o: Opportunity, chip: string, tone: "danger" | "warning", detail: string): AttentionSignal => ({
+  const oppSignal = (
+    o: Opportunity,
+    chip: string,
+    tone: "danger" | "warning",
+    detail: string,
+    ariaDetail: string
+  ): AttentionSignal => ({
     key: `deal-${chip}-${o.id}`,
     chip,
     tone,
     title: o.title,
     detail,
     href: `/crm/deals?deal=${encodeURIComponent(o.id)}`,
-    ariaLabel: `Открыть сделку «${o.title}» в CRM`
+    ariaLabel: `Открыть сделку «${o.title}»: ${lowerFirst(chip)}, ${ariaDetail}`
   });
 
   const groups: AttentionSignal[][] = [
     overdueTasks.map((t) => taskSignal(t, "Задача просрочена", "danger")),
     overdueOpps.map((o) =>
-      oppSignal(o, "Сделка просрочена", "danger", `${OPP_STATUS_LABEL[o.status]} · финиш ${fmtDate(o.plannedFinish)}`)
+      oppSignal(
+        o,
+        "Сделка просрочена",
+        "danger",
+        `${OPP_STATUS_LABEL[o.status]} · финиш ${fmtDate(o.plannedFinish)}`,
+        `финиш ${fmtDate(o.plannedFinish)}`
+      )
     ),
     dueSoonTasks.map((t) => taskSignal(t, `Дедлайн ≤ ${DUE_SOON_DAYS} дн.`, "warning")),
     staleOpps.map((o) =>
-      oppSignal(o, `Без движения ${STALE_DEAL_DAYS}+ дн.`, "warning", `${OPP_STATUS_LABEL[o.status]} · обновлена ${fmtDate(o.updatedAt)}`)
+      oppSignal(
+        o,
+        `Без движения ${STALE_DEAL_DAYS}+ дн.`,
+        "warning",
+        `${OPP_STATUS_LABEL[o.status]} · обновлена ${fmtDate(o.updatedAt)}`,
+        `обновлена ${fmtDate(o.updatedAt)}`
+      )
     )
   ];
   const shown = groups.flatMap((g) => g.slice(0, MAX_ROWS_PER_GROUP));

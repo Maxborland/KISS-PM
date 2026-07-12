@@ -14,6 +14,12 @@ import {
 const attentionSection = (page: Page) =>
   page.locator("section").filter({ has: page.getByRole("heading", { name: "Требует внимания" }) });
 
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// aria-label сигнала включает причину и срок («Открыть задачу «X»: задача просрочена, финиш 12.01.2024») —
+// матчим по префиксу с заголовком, не прибиваясь к дате.
+const taskSignalName = (title: string) => new RegExp(`^Открыть задачу «${escapeRegExp(title)}»: `);
+const dealSignalName = (title: string) => new RegExp(`^Открыть сделку «${escapeRegExp(title)}»: `);
+
 // Просроченная задача через реальный контракт POST /api/workspace/tasks (inbox-задача).
 // Даты фиксированно в прошлом (2024) → сигнал «Задача просрочена» первый в группе
 // (сортировка по plannedFinish asc). Уборка — DELETE (архивация: сигнал гаснет).
@@ -83,10 +89,7 @@ test("dashboard is summary-first: real signals drill down to task and deal, no d
 
     // Summary-first: блок сигналов виден и стоит на реальных данных.
     await expect(page.getByRole("heading", { name: "Требует внимания" })).toBeVisible();
-    const taskSignal = attention.getByRole("link", {
-      name: `Открыть задачу «${task.title}» в Моих задачах`,
-      exact: true
-    });
+    const taskSignal = attention.getByRole("link", { name: taskSignalName(task.title) });
     await expect(taskSignal).toBeVisible();
     await expect(attention.getByText("Задача просрочена").first()).toBeVisible();
 
@@ -102,10 +105,7 @@ test("dashboard is summary-first: real signals drill down to task and deal, no d
 
     // Drill-down сигнала сделки: /crm/deals?deal=<id> + открытый peek сделки.
     await page.goto("/dashboard");
-    const dealSignal = attention.getByRole("link", {
-      name: `Открыть сделку «${deal.title}» в CRM`,
-      exact: true
-    });
+    const dealSignal = attention.getByRole("link", { name: dealSignalName(deal.title) });
     await expect(dealSignal).toBeVisible();
     await expect(attention.getByText("Сделка просрочена").first()).toBeVisible();
     await dealSignal.click();
@@ -182,10 +182,7 @@ test("reader without CRM sees honest partial dashboard and can drill down to a t
 
   // Сид: задача «Тестирование портала» этого пользователя просрочена (финиш 2026-07-08) —
   // реальный сигнал с drill-down в /my-work?task= и открытым peek.
-  const seededSignal = attention.getByRole("link", {
-    name: "Открыть задачу «Тестирование портала» в Моих задачах",
-    exact: true
-  });
+  const seededSignal = attention.getByRole("link", { name: taskSignalName("Тестирование портала") });
   await expect(seededSignal).toBeVisible();
   await seededSignal.click();
   await expect(page).toHaveURL(/\/my-work\?task=task-vektor-testing$/);
