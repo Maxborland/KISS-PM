@@ -1,8 +1,10 @@
 # Design Contract — KISS PM (design-v3)
 
+> Нормативный вход — корневой [`DESIGN.md`](../../DESIGN.md); этот документ — enforceable-детали копирайтинга/типографики/компонентов. С 2026-07-12 `tokens.css` — единственный владелец `:root` (значения индиго-канона перенесены из `kiss-v4.css`, тот остался утилитарным слоем); BEM-слой заморожен ratchet-гейтом.
+
 Краткий enforceable-контракт для UI и Storybook. Источник токенов: [`apps/web/src/styles/tokens.css`](../../apps/web/src/styles/tokens.css). Детали компонентов: [`SHADCN-OVERRIDE.md`](./SHADCN-OVERRIDE.md), [`TOKENS.md`](./TOKENS.md).
 
-**Путь визуала:** `tokens.css` → `bem.css` / `bem-supplement.css` → `components/{ui,domain}`, `shell`, `widgets` → `app` / `features` / `views`.
+**Путь визуала:** `tokens.css` (+ `tokens.planning.css`) → `globals.css` / `kiss-v4.css` (утилиты) / `bem*.css` (заморожен) → `components/{ui,domain}`, `shell`, `widgets` → `app` / `features` / `views`.
 
 ---
 

@@ -15,10 +15,32 @@ import { useSessionUser } from "@/shell/use-session-user";
 type NavItem = { label: string; href: string; requires?: string[] };
 type NavGroup = { title: string; items: NavItem[] };
 
+// Гейт «Агента» — any-of по read-permissions, каждая из которых открывает хотя бы
+// один инструмент реестра агента (apps/api/src/agent/toolRegistry + tools/*):
+// роль без проектов, но с ресурсами/CRM/коммуникациями/админкой тоже имеет
+// рабочие инструменты и не должна терять единственную точку входа.
+const AGENT_TOOL_PERMISSIONS = [
+  "tenant.projects.read",
+  "tenant.project_plan.read",
+  "tenant.project_resources.read",
+  "tenant.planning_scenarios.preview",
+  "tenant.opportunities.read",
+  "tenant.clients.read",
+  "tenant.contacts.read",
+  "tenant.products.read",
+  "tenant.crm_pipelines.read",
+  "tenant.communications.read",
+  "tenant.users.read",
+  "tenant.access_profiles.read",
+  "tenant.org_structure.read",
+  "tenant.positions.read"
+];
+
 const NAV: NavGroup[] = [
   {
     title: "Работа",
     items: [
+      { label: "Агент", href: "/agent", requires: AGENT_TOOL_PERMISSIONS },
       { label: "Мои задачи", href: "/my-work", requires: ["tenant.projects.read"] },
       { label: "Проекты", href: "/projects", requires: ["tenant.projects.read"] },
       { label: "Сделки", href: "/crm/deals", requires: ["tenant.opportunities.read"] }
@@ -163,7 +185,7 @@ export function WorkspaceShell({ activeNav, children }: { activeNav: string; chi
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4">
+        <header className="flex h-[var(--shell-topbar-h)] shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4">
           <button
             ref={mobileNavToggleRef}
             type="button"

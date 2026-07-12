@@ -200,12 +200,13 @@ Decisions / assumptions:
 Risks / follow-up:
 ```
 
-## 10. Design-v3 lockdown
+## 10. Design lockdown
 
-После миграции UI единственный путь визуала:
+Нормативный вход в визуальную систему — корневой **[DESIGN.md](./DESIGN.md)**. Путь визуала:
 
 ```txt
-docs/design-v3/TOKENS.md → apps/web/src/styles/{tokens,tokens.planning,bem}.css
+DESIGN.md → apps/web/src/styles/tokens.css (+ tokens.planning.css) — единственный владелец :root
+  → app/globals.css (слои/@theme/base/motion/dark) + styles/kiss-v4.css (только утилиты)
   → apps/web/src/components/{ui,domain}/* + widgets/* + shell/*
   → apps/web/src/{app,features}/**
 ```
@@ -222,9 +223,9 @@ docs/design-v3/TOKENS.md → apps/web/src/styles/{tokens,tokens.planning,bem}.cs
    - hex `#xxxxxx` / `rgba(...)` в TSX
    - прямой импорт `lucide-react@1.x` (правильно `^0.460`)
    - любой импорт из legacy `apps/web/src/features/dv2/*` или `apps/web/src/design-v2/*`
-3. Запрещено создавать `*.css` в `features/**` или `components/**` — все стили в `apps/web/src/styles/{bem.css, widgets/*.css}` и `app/globals.css`.
-4. Новые BEM-классы добавляются в `apps/web/src/styles/bem.css` (общие) или `apps/web/src/styles/widgets/<name>.css` (widget-specific).
-5. shadcn primitives генерируются с `cssVariables: false`. Variants под BEM-визуал — `docs/design-v3/SHADCN-OVERRIDE.md`.
+3. Запрещено создавать `*.css` в `features/**` или `components/**`; новые `:root`-блоки — только в `styles/tokens*.css` (гейт).
+4. **BEM-слой заморожен**: новые классы в `bem.css`/`bem-supplement.css` запрещены (ratchet-гейт). Новые стили — `components/ui|domain` + Tailwind на токенах; правки существующих BEM-классов допустимы. Новые цвета — сначала токен в `tokens.css`.
+5. shadcn primitives генерируются с `cssVariables: false`. Variants — `docs/design-v3/SHADCN-OVERRIDE.md`.
 6. Перед PR: `pnpm --filter @kiss-pm/web typecheck && pnpm --filter @kiss-pm/web test && pnpm --filter @kiss-pm/web build`.
 7. Каталог компонентов: Storybook (`pnpm --filter @kiss-pm/web storybook`).
 
