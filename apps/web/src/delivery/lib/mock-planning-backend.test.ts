@@ -317,26 +317,64 @@ describe("contract-mock planning backend (PM-as-code spine)", () => {
     expect(baselines.some((b) => b.id === "baseline-b3" && b.label === "Контроль")).toBe(true);
   });
 
-  it("commit log seeds the session history with a revertible latest commit (commands + before)", async () => {
+  it("commit log seeds the session history with a revertible latest commit (compensating commands)", async () => {
     const f = createMockPlanningFetch();
-    const body = (await (await f("/planning/commits")).json()) as { commits: Array<{ version: number; revertible: boolean }>; latestRevert: { auditEventId: string; commands: Array<{ type: string }>; before: { authored: { tasks: Array<{ id: string; percentComplete: number }> } } } | null };
+    const body = (await (await f("/planning/commits")).json()) as { commits: Array<{ version: number; revertible: boolean }>; latestRevert: { auditEventId: string; commands: Array<{ type: string; payload: { taskId: string; percentComplete: number } }>; before: { authored: { tasks: Array<{ id: string; percentComplete: number }> } } } | null };
     expect(body.commits.length).toBeGreaterThanOrEqual(3);
     expect(body.commits[0]!.version).toBe(17);
     expect(body.latestRevert?.auditEventId).toBe("audit-17");
-    expect(body.latestRevert?.commands[0]?.type).toBe("task.update_progress");
-    // before-снимок несёт ПРЕЖНИЙ прогресс (80) — основа для компенсирующей команды отката
+    // latestRevert.commands — КОМПЕНСИРУЮЩИЕ (как afterState.compensatingCommands боевого аудита):
+    // прямой apply был 92%, откат возвращает прежние 80% из before-снимка
+    expect(body.latestRevert?.commands).toEqual([
+      { type: "task.update_progress", payload: { taskId: "t-3.1.1", percentComplete: 80 } }
+    ]);
     const beforeTask = body.latestRevert?.before.authored.tasks.find((t) => t.id === "t-3.1.1");
     expect(beforeTask?.percentComplete).toBe(80);
   });
 
-  it("a live apply appends a revertible commit to the session log", async () => {
+  it("a live apply appends a revertible commit with compensating commands to the session log", async () => {
     const f = createMockPlanningFetch();
     const applied = (await (await f("/planning/apply-command", { method: "POST", body: JSON.stringify({ command: { type: "task.update_progress", payload: { taskId: "t-1.1", percentComplete: 50 } }, clientPlanVersion: 17 }) })).json()) as { newPlanVersion: number };
     expect(applied.newPlanVersion).toBe(18);
-    const body = (await (await f("/planning/commits")).json()) as { commits: Array<{ version: number; revertible: boolean; summary: string }>; latestRevert: { auditEventId: string } | null };
+    const body = (await (await f("/planning/commits")).json()) as { commits: Array<{ version: number; revertible: boolean; summary: string }>; latestRevert: { auditEventId: string; commands: Array<{ type: string; payload: { taskId: string; percentComplete: number } }> } | null };
     expect(body.commits[0]!.version).toBe(18);
     expect(body.commits[0]!.revertible).toBe(true);
     expect(body.latestRevert?.auditEventId).toBe("audit-18");
+    // компенсация построена по before-снимку: t-1.1 до правки был на 100%
+    expect(body.latestRevert?.commands).toEqual([
+      { type: "task.update_progress", payload: { taskId: "t-1.1", percentComplete: 100 } }
+    ]);
+  });
+
+  it("POST /planning/revert-last applies the compensating commands as a new irreversible commit", async () => {
+    const f = createMockPlanningFetch();
+    // применяем прямую правку (92 → 50), затем откатываем её компенсирующим коммитом
+    await f("/planning/apply-command", { method: "POST", body: JSON.stringify({ command: { type: "task.update_progress", payload: { taskId: "t-3.1.1", percentComplete: 50 } }, clientPlanVersion: 17 }) });
+    const log = (await (await f("/planning/commits")).json()) as { latestRevert: { auditEventId: string } | null };
+    expect(log.latestRevert?.auditEventId).toBe("audit-18");
+
+    const res = await f("/planning/revert-last", { method: "POST", body: JSON.stringify({ targetCommitId: "audit-18", clientPlanVersion: 18, idempotencyKey: "revert-1" }) });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reverted: string; newPlanVersion: number; readModel: { authored: { tasks: Array<{ id: string; percentComplete: number }> } } };
+    expect(body.reverted).toBe("audit-18");
+    expect(body.newPlanVersion).toBe(19);
+    // значение восстановлено к before прямой правки
+    expect(body.readModel.authored.tasks.find((t) => t.id === "t-3.1.1")?.percentComplete).toBe(92);
+
+    const after = (await (await f("/planning/commits")).json()) as { commits: Array<{ version: number; actionType: string; revertible: boolean }>; latestRevert: unknown };
+    expect(after.commits[0]).toMatchObject({ version: 19, actionType: "planning.commit.reverted", revertible: false });
+    expect(after.latestRevert).toBeNull(); // сам откат необратим — как боевой revert (compensatingCommands=[])
+  });
+
+  it("revert-last guards the plan version and the revertible target", async () => {
+    const f = createMockPlanningFetch();
+    const stale = await f("/planning/revert-last", { method: "POST", body: JSON.stringify({ targetCommitId: "audit-17", clientPlanVersion: 5, idempotencyKey: "revert-stale" }) });
+    expect(stale.status).toBe(409);
+    expect(((await stale.json()) as { error: string }).error).toBe("plan_version_conflict");
+
+    const wrongTarget = await f("/planning/revert-last", { method: "POST", body: JSON.stringify({ targetCommitId: "audit-1", clientPlanVersion: 17, idempotencyKey: "revert-wrong" }) });
+    expect(wrongTarget.status).toBe(409);
+    expect(((await wrongTarget.json()) as { error: string }).error).toBe("planning_commit_not_revertible");
   });
 
   it("applies a command, bumps the version, and rejects a stale version with 409", async () => {
