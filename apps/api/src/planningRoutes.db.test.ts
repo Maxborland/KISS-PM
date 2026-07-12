@@ -1565,6 +1565,18 @@ describe("planning API routes", () => {
     const previous = commitsBody.auditEvents.find((event) => event.id === firstUpdateBody.auditEventId);
     expect(previous?.afterState.hasCompensatingCommands).toBe(true);
     expect(previous?.afterState.compensatingCommands).toEqual([]);
+
+    // Читатель истории (без права отката) видит только флаг: undo-payload
+    // с прошлыми значениями плана отдаётся лишь актору с canManageProjectPlan.
+    const readerCookie = await loginAs("plan-reader-no-resources@kiss-pm.local", "reader12345");
+    const readerCommits = await app.request("/api/workspace/projects/project-alpha/planning/commits", {
+      headers: { cookie: readerCookie }
+    });
+    expect(readerCommits.status).toBe(200);
+    const readerBody = (await readerCommits.json()) as typeof commitsBody;
+    const readerLatest = readerBody.auditEvents.find((event) => event.id === secondUpdateBody.auditEventId);
+    expect(readerLatest?.afterState.hasCompensatingCommands).toBe(true);
+    expect(readerLatest?.afterState.compensatingCommands).toEqual([]);
   });
 
   it("requires resource management permission to create and read auto-solver runs", async () => {

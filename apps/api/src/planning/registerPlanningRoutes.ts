@@ -1,5 +1,6 @@
 import {
   canApplyPlanningScenarios,
+  canManageProjectPlan,
   canManageProjectResources,
   canPreviewPlanningScenarios,
   canReadProjectResources
@@ -135,6 +136,10 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     const decision = canReadPlanningReadModel({ actor, profile });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    // Undo-payload (compensatingCommands с прошлыми значениями плана) — только тем,
+    // кто вправе откатывать: /planning/revert-last гейтится canManageProjectPlan,
+    // читателю истории достаточно флага hasCompensatingCommands.
+    const canRevert = canManageProjectPlan({ actor, profile, targetTenantId: actor.tenantId }).allowed;
 
     const projectId = parsedProjectId.value;
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
@@ -177,10 +182,11 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
               changedTaskIds: Array.isArray(changedTaskIds) ? changedTaskIds : [],
               hasCompensatingCommands,
               // Сами компенсирующие команды: клиент показывает превью-гейт отката
-              // (previewCommandBatch → подтверждение → revert-last). Это plan-данные,
-              // а не полный audit payload — endpoint уже гейтится canReadPlanningReadModel.
+              // (previewCommandBatch → подтверждение → revert-last). Отдаются только
+              // актору с правом отката (canManageProjectPlan) и только последнему
+              // обратимому коммиту; читателю истории — флаг hasCompensatingCommands.
               compensatingCommands:
-                hasCompensatingCommands && event.id === latestRevertibleId
+                canRevert && hasCompensatingCommands && event.id === latestRevertibleId
                   ? compensatingCommands
                   : []
             },
