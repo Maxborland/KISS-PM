@@ -47,6 +47,12 @@ const UNAVAILABLE_REASON: Record<Exclude<Proposal["unavailableReason"], null>, s
   no_eligible_alternate_resource: "В команде нет ресурса подходящей позиции.",
   alternate_resource_has_insufficient_capacity: "У подходящих ресурсов недостаточно свободной ёмкости."
 };
+// RU-подписи требуемых прав (explainability.requiredApprovals); неизвестный id показываем как есть
+const APPROVAL_LABEL: Record<string, string> = {
+  "tenant.planning_scenarios.apply": "право применения сценариев планирования",
+  "tenant.project_plan.manage": "право управления планом проекта",
+  "tenant.project_resources.manage": "право управления ресурсами проекта"
+};
 const PROFILE_META: Record<Profile, { label: string; desc: string }> = {
   aggressive: { label: "Агрессивный", desc: "Принять перегруз, сохранить дату финиша" },
   balanced: { label: "Балансированный", desc: "Снять половину перегруза на альт-исполнителя, минимальный сдвиг" },
@@ -315,6 +321,14 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                         </div>
                         <div className="mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{meta.desc}</div>
                         {!available && p.unavailableReason ? <div data-testid={`scenario-unavailable-${p.profile}`} className="mt-1 text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Недоступен: {UNAVAILABLE_REASON[p.unavailableReason]}</div> : null}
+                        {/* требуемые права применения (explainability.requiredApprovals — контрактное поле) */}
+                        {p.explainability.requiredApprovals.length > 0 ? (
+                          <ul data-testid={`scenario-approvals-${p.profile}`} className="mt-1 flex flex-wrap gap-1">
+                            {p.explainability.requiredApprovals.map((approval) => (
+                              <li key={approval} className="inline-flex items-center rounded-full bg-[var(--panel-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-strong)]">Требуется: {APPROVAL_LABEL[approval] ?? `право ${approval}`}</li>
+                            ))}
+                          </ul>
+                        ) : null}
                       </div>
                       <div className="w-[120px]">
                         <div className="text-[length:var(--text-2xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Финиш</div>

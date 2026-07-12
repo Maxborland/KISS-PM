@@ -968,6 +968,8 @@ type ScenarioMetrics = { finishDay: number; finishDate: string; targetOverloadMi
 type ScenarioProposalMock = {
   id: string;
   profile: "aggressive" | "balanced" | "resilient";
+  availability: "available" | "unavailable";
+  unavailableReason: string | null;
   conflictEffect: "accepted" | "reduced" | "removed";
   planDelta: { commands: PlanningCommand[]; changedTaskIds: string[]; changedAssignmentIds: string[]; acceptedRiskIds: string[] };
   explainability: { finishDate: string | null; deadlineDeltaDays: number; overloadMinutes: number; overloadedResourceIds: string[]; changedTaskIds: string[]; changedAssignmentIds: string[]; dependencyWarnings: string[]; requiredApprovals: string[]; riskScore: number };
@@ -1062,14 +1064,19 @@ export function buildScenarioProposals(base: Authored, target: ScenarioTargetMoc
 
   // proposal содержит ТОЛЬКО контрактные поля (как доменный ScenarioProposal): база/дельты/diff
   // вычисляются на клиенте из explainability + planDelta.commands + live read-model.
+  // deadlineDeltaDays — как в домене: на сколько календарных дней прогнозный финиш профиля срывает дедлайн (0 — не срывает).
+  const deadlineDelta = (finishDate: string | null) =>
+    finishDate && base.projectDeadline ? Math.max(0, isoToDay(finishDate) - isoToDay(base.projectDeadline)) : 0;
   const mk = (
     profile: ScenarioProposalMock["profile"], conflictEffect: ScenarioProposalMock["conflictEffect"], riskScore: number,
     commands: PlanningCommand[], m: ScenarioMetrics, changedAssignmentIds: string[]
   ): ScenarioProposalMock => ({
-    id: `scenario-${profile}`, profile, conflictEffect,
+    // parity с боевым previewScenarios: mock отдаёт только применимые профили,
+    // поэтому availability всегда "available" (недоступные профили просто не попадают в out)
+    id: `scenario-${profile}`, profile, availability: "available", unavailableReason: null, conflictEffect,
     planDelta: { commands, changedTaskIds: m.changedTaskIds, changedAssignmentIds, acceptedRiskIds: conflictEffect === "accepted" ? [`${target.resourceId}:${target.date}`] : [] },
     explainability: {
-      finishDate: m.finishDate, deadlineDeltaDays: 0, overloadMinutes: m.targetOverloadMinutes, overloadedResourceIds: m.overloadedResourceIds,
+      finishDate: m.finishDate, deadlineDeltaDays: deadlineDelta(m.finishDate), overloadMinutes: m.targetOverloadMinutes, overloadedResourceIds: m.overloadedResourceIds,
       changedTaskIds: m.changedTaskIds, changedAssignmentIds, dependencyWarnings: [], requiredApprovals: conflictEffect === "accepted" ? ["tenant.planning_scenarios.apply"] : [], riskScore
     }
   });
