@@ -1246,9 +1246,16 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       const unitsDriven = units > 0 && modalWorkMinutes > 0 &&
         (workModel.taskType === "fixed_units" || (workModel.taskType === "fixed_work" && workModel.effortDriven));
       if (!workChanged && !durationChanged && originalTask) {
-        // Труд/длительность не трогали — шлём точную исходную пару (save без сюрпризов).
+        // Труд/длительность не трогали — шлём точную исходную пару (save без сюрпризов),
+        // а finish пересчитываем от ТОЧНОЙ длительности (не от округлённых дней модалки).
         modalWorkMinutes = originalTask.workMinutes;
         modalDurationMinutes = originalTask.durationMinutes ?? modalDurationMinutes;
+        modalFinishIso = resolveScheduleTiming(
+          scheduleReadModel,
+          editedRow?.effectiveCalendarId,
+          values.startIso || null,
+          modalDurationMinutes / timing.workingMinutesPerDay
+        ).finishIso;
       } else if (unitsDriven) {
         if (workChanged) {
           try {

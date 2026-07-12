@@ -168,10 +168,13 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       const durationChanged = v.durDays !== m.initial.durDays;
       const unitsDriven = units > 0 && workMinutes > 0 &&
         (taskType === "fixed_units" || (taskType === "fixed_work" && effortDriven));
+      let finishOverrideIso: string | null = null;
       if (!workChanged && !durationChanged && existingTask) {
-        // Труд/длительность не трогали — точная исходная пара (save без сюрпризов).
+        // Труд/длительность не трогали — точная исходная пара (save без сюрпризов);
+        // finish берём исходный (fin() от округлённых дней сдвинул бы дробные задачи).
         workMinutes = existingTask.workMinutes;
         durDays = (existingTask.durationMinutes ?? v.durDays * MIN_PER_DAY) / MIN_PER_DAY;
+        if (v.startIso === m.initial.startIso) finishOverrideIso = existingTask.plannedFinish ?? null;
       } else if (unitsDriven) {
         if (workChanged) {
           try {
@@ -189,7 +192,7 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
         }
       }
       cmds.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId: id, taskType, effortDriven, durationMinutes: Math.round(durDays * MIN_PER_DAY), workMinutes } }));
-      if (v.startIso) cmds.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: fin(v.startIso, Math.ceil(durDays)) } }));
+      if (v.startIso) cmds.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: finishOverrideIso ?? fin(v.startIso, Math.ceil(durDays)) } }));
       cmds.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } }));
       // upsert по id СУЩЕСТВУЮЩЕГО назначения (reduceAssignmentUpsert ключ — payload.id), новый id только когда назначения ещё нет
       if (v.assigneeId) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: m.asgId ?? nid("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes } }));
