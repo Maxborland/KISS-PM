@@ -122,6 +122,17 @@ export function useCrm() {
   return { client, data, status, error, reload: load, moveStage, movePipeline, finalize, createOpportunity, createClient, updateClient, createContact, updateContact, createProduct, updateProduct, createPipeline, createStageTransition, deleteStageTransition, updateOpportunity, checkFeasibility, activate, loadActivities, createComment, createTask, createFile, updateTaskStatus };
 }
 
+// ---- useOpportunities: лёгкий срез CRM для сводок (дашборд) ----
+// Один запрос GET /api/workspace/opportunities под ОДНИМ правом
+// tenant.opportunities.read. Полный useCrm() тянет 8+ ручек, каждая под своим
+// правом: 403 на products/contacts гасил бы сигналы по сделкам целиком.
+export function useOpportunities() {
+  const client = useCrmClient();
+  const loader = useCallback(async () => (await client.listOpportunities()).opportunities, [client]);
+  const { data, status, error, reload } = useResource(loader);
+  return { data, status, error, reload };
+}
+
 // ---- useCrmUsers: справочник пользователей (владелец/автор/исполнитель). mock=CRM_USERS, live=GET /api/workspace/users ----
 // Зеркало useWorkspaceUsers: useState+useEffect+useMemo, отдаёт { list, byId, name, indexOf }.
 export type CrmUsersIndex = {

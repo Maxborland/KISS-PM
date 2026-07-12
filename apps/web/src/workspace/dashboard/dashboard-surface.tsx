@@ -9,7 +9,7 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { Bento, BentoCard, StatTile } from "@/delivery/ui/bento";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { cn } from "@/lib/cn";
-import { useCrm } from "@/crm/lib/use-crm";
+import { useOpportunities } from "@/crm/lib/use-crm";
 import { useMyWork, useProjects } from "@/workspace/lib/use-workspace";
 import type { TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
 import type { Opportunity } from "@/crm/lib/crm-client";
@@ -18,9 +18,14 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 /* ============================================================
    Workspace/Дашборд — summary-first сводка на КЛИЕНТСКОЙ АГРЕГАЦИИ
    реальных контрактов (tenant-широкого агрегата нет ни у одной ручки):
-   - Мои задачи      → useMyWork()  (GET /api/workspace/my-work)
-   - Активные проекты → useProjects() (GET /api/workspace/projects)
-   - Сделки          → useCrm()      (GET CRM read-model)
+   - Мои задачи      → useMyWork()          (GET /api/workspace/my-work)
+   - Активные проекты → useProjects()        (GET /api/workspace/projects)
+   - Сделки          → useOpportunities()   (GET /api/workspace/opportunities)
+
+   Каждый источник — ровно один запрос под одним правом: полный useCrm()
+   (8+ ручек, каждая под своим правом) здесь сознательно не используется —
+   403 на products/contacts гасил бы сигналы по сделкам целиком, а
+   /api/workspace/projects грузился бы дважды.
 
    Грамматика (PR9): сверху — «Требует внимания» (реальные сигналы:
    просроченные задачи/сделки, приближающиеся дедлайны, сделки без
@@ -167,17 +172,17 @@ function buildAttentionSignals(
 export function DashboardSurface() {
   const myWork = useMyWork();
   const projects = useProjects();
-  const crm = useCrm();
+  const opportunities = useOpportunities();
 
   // Повиджетная деградация (G8-06): один недоступный источник (403/ошибка) не
   // убивает весь дашборд — его секция показывает «нет доступа», остальные живут.
   // Целиком forbidden/error — только когда ВСЕ три источника недоступны.
-  const sources = [myWork, projects, crm];
+  const sources = [myWork, projects, opportunities];
   const settled = sources.every((s) => Boolean(s.data) || s.status === "error" || s.status === "forbidden");
   const allForbidden = sources.every((s) => s.status === "forbidden");
   const allFailed = sources.every((s) => !s.data && (s.status === "error" || s.status === "forbidden"));
   const surfaceStatus = !settled ? "loading" : allForbidden ? "forbidden" : allFailed ? "error" : "ready";
-  const errorCode = myWork.error ?? projects.error ?? crm.error ?? null;
+  const errorCode = myWork.error ?? projects.error ?? opportunities.error ?? null;
 
   return (
     <WorkspaceShell activeNav="Дашборд">
@@ -194,7 +199,7 @@ export function DashboardSurface() {
           onRetry={() => {
             void myWork.reload();
             void projects.reload();
-            void crm.reload();
+            void opportunities.reload();
           }}
           loadingLabel="Собираем сводку…"
           errorTitle="Не удалось собрать сводку"
@@ -208,7 +213,7 @@ export function DashboardSurface() {
             <DashboardContent
               tasks={myWork.data?.tasks ?? null}
               projects={projects.data ? { count: projects.data.projects.length, hours: projects.data.projects.reduce((s, p) => s + p.plannedHours, 0) } : null}
-              opportunities={crm.data?.opportunities ?? null}
+              opportunities={opportunities.data}
             />
           ) : (
             <span />
@@ -431,7 +436,7 @@ function ProtoBanner() {
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
       <span>
-        Клиентская агрегация реальных контрактов: GET /api/workspace/my-work + /projects + CRM read-model. Tenant-широкого
+        Клиентская агрегация реальных контрактов: GET /api/workspace/my-work + /projects + /opportunities. Tenant-широкого
         агрегата у ручек нет — сигналы «Требует внимания» и KPI считаются на клиенте из этих трёх источников; сигналов без
         данных в API (митинги, перегрузка ресурсов) здесь нет сознательно. Переключение на боевой = apiOrigin; данные in-memory.
       </span>
