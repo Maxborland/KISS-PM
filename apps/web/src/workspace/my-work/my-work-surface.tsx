@@ -172,7 +172,7 @@ export function MyWorkSurface() {
     <WorkspaceShell activeNav="Мои задачи">
       <main className="min-w-0 flex-1 overflow-auto p-4">
         <ProtoBanner />
-        {tasks ? <MyWorkTaskDeepLinkResolver tasks={tasks} /> : null}
+        {tasks ? <MyWorkTaskDeepLinkResolver tasks={filteredTasks} /> : null}
 
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>

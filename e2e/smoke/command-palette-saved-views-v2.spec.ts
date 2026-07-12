@@ -32,6 +32,8 @@ test("admin uses the keyboard palette for task/deal/project peeks and the real c
   await expect(palette.dialog.getByText("Действия", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
+  // Палитра должна разрешить задачу, скрытую локальным фильтром списка.
+  await page.getByRole("textbox", { name: "Поиск задачи" }).fill("задача скрыта локальным фильтром");
 
   palette = await openPalette(page);
   const taskResponse = page.waitForResponse((response) => {
@@ -102,6 +104,7 @@ test("resource Saved Views v2 round-trip, partial fallback and legacy schedule p
   let legacyViewId = LEGACY_VIEW_ID;
   let legacyViewName = "PR10 legacy baseline";
   const legacyEndpoint = `/api/workspace/projects/${LEGACY_PROJECT_ID}/planning/saved-views`;
+  let createdLegacyReplay = false;
   const legacyList = await page.request.get(legacyEndpoint);
   expect(legacyList.status()).toBe(200);
   const legacyViews = ((await legacyList.json()) as { savedViews: Array<{ id: string }> }).savedViews;
@@ -118,8 +121,8 @@ test("resource Saved Views v2 round-trip, partial fallback and legacy schedule p
     });
     expect(legacyCreate.status()).toBe(201);
     legacyViewId = ((await legacyCreate.json()) as { savedView: { id: string } }).savedView.id;
+    createdLegacyReplay = true;
   }
-
 
   try {
     await page.goto(`/projects/${PROJECT_ID}/resources`);
@@ -173,7 +176,7 @@ test("resource Saved Views v2 round-trip, partial fallback and legacy schedule p
     await page.getByTestId("saved-views-dropdown").selectOption(legacyViewId);
     await expect(page.getByRole("button", { name: "День", exact: true })).toHaveAttribute("aria-pressed", "true");
   } finally {
-    for (const [projectId, id] of [[PROJECT_ID, viewId], [PROJECT_ID, partialViewId], [LEGACY_PROJECT_ID, legacyViewId]] as const) {
+    for (const [projectId, id] of [[PROJECT_ID, viewId], [PROJECT_ID, partialViewId], [LEGACY_PROJECT_ID, createdLegacyReplay ? legacyViewId : ""]] as const) {
       if (!id) continue;
       const response = await page.request.delete(`/api/workspace/projects/${projectId}/planning/saved-views/${encodeURIComponent(id)}`, {
         headers: { "x-kiss-pm-action": "same-origin" },
