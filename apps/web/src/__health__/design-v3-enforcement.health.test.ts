@@ -93,7 +93,9 @@ describe("design-v3 enforcement (Phase 16)", () => {
   it("defines :root only in the token owner files", () => {
     const offenders = allCss
       .filter((f) => !TOKEN_OWNERS.has(rel(f)))
-      .filter((f) => /^:root/m.test(readFileSync(f, "utf8")))
+      // Определение токен-блока (`:root {` / `:root,` — в т.ч. с отступом внутри @layer),
+      // но не селекторы-квалификаторы вида `:root:not(...)` (reduced-motion гарды).
+      .filter((f) => /^\s*:root\s*[{,]/m.test(readFileSync(f, "utf8")))
       .map(rel);
     expect(offenders, `новые :root вне styles/tokens*.css запрещены — токены живут в одном месте:\n${offenders.join("\n")}`).toEqual([]);
   });
