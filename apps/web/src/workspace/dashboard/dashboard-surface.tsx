@@ -89,7 +89,9 @@ export function DashboardSurface() {
         <ProtoBanner />
         <div className="mb-3">
           <h1 className="text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Дашборд</h1>
-          <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Сначала сигналы, затем сводка — каждое число ведёт к источнику</p>
+          {/* «каждая карточка», не «каждое число»: счётчики воронки по статусам — честный текст,
+              URL-фильтра по статусу у /crm/deals нет, обещать drill-down каждой цифре — оверклейм. */}
+          <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Сначала сигналы, затем сводка — каждая карточка ведёт к источнику</p>
         </div>
 
         <SurfaceState
