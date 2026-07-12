@@ -213,6 +213,12 @@ function AttentionCard({
     tasks.status === "error" ? { what: "задачи", reload: tasks.reload } : null,
     opportunities.status === "error" ? { what: "сделки", reload: opportunities.reload } : null
   ].filter((v): v is { what: string; reload: () => Promise<void> } => v !== null);
+  // «И ещё N» называет только ДОСТУПНЫЕ разделы (переполнение возможно лишь от
+  // источника с данными) — и ведёт в них ссылками, а не голым текстом.
+  const restLinks = [
+    tasks.data !== null ? { label: "Мои задачи", href: "/my-work" } : null,
+    opportunities.data !== null ? { label: "Сделки", href: "/crm/deals" } : null
+  ].filter((v): v is { label: string; href: string } => v !== null);
 
   return (
     <BentoCard
@@ -243,7 +249,23 @@ function AttentionCard({
       )}
       {restCount > 0 || forbidden.length > 0 || errored.length > 0 ? (
         <p className="border-t border-[var(--border-subtle)] px-4 py-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
-          {restCount > 0 ? `И ещё ${restCount} — полные списки в «Мои задачи» и «Сделки». ` : ""}
+          {restCount > 0 && restLinks.length > 0 ? (
+            <>
+              И ещё {restCount} — полные списки в{" "}
+              {restLinks.map((l, i) => (
+                <span key={l.href}>
+                  {i > 0 ? " и " : ""}
+                  <Link
+                    href={l.href}
+                    className="rounded-[var(--radius-sm)] font-medium text-[var(--accent)] underline-offset-2 outline-none hover:underline focus-visible:shadow-[var(--ring-focus)]"
+                  >
+                    «{l.label}»
+                  </Link>
+                </span>
+              ))}
+              .{" "}
+            </>
+          ) : null}
           {forbidden.length > 0 ? `Сигналы по ${forbidden.join(" и ")} не рассчитываются: раздел недоступен вашей роли. ` : ""}
           {errored.map((e) => (
             <span key={e.what}>
