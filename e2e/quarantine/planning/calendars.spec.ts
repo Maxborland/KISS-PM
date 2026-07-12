@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { loginAsAdmin } from "./planningHelpers";
+import { loginAsAdmin } from "../../planning/planningHelpers";
 
 test("calendar exception dialog opens preview", async ({ page }) => {
   await loginAsAdmin(page);

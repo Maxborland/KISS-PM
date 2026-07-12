@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { loginToWorkspace } from "../smoke/smokeHelpers";
+import { loginToWorkspace } from "../../smoke/smokeHelpers";
 
 test.describe("production calendar", () => {
   test("admin opens tenant production calendar and loads RF preset", async ({ page }) => {
