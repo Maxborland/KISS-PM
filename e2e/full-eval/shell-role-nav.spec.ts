@@ -88,7 +88,9 @@ const ROLES: RoleCase[] = [
     userId: "user-alpha-resource-reader",
     name: "Роман Ресурсный",
     initials: "РР",
-    visibleNav: []
+    // tenant.project_resources.read открывает инструменты агента (detect_resource_overloads
+    // и др.) — «Агент» видим любой роли с хотя бы одним рабочим инструментом реестра.
+    visibleNav: ["Агент"]
   },
   {
     code: "BADM",
