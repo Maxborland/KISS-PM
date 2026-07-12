@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PlanningCommand } from "@kiss-pm/domain";
+import type { PlanningCommand, ScenarioProposal } from "@kiss-pm/domain";
 import {
   PlanningApiError,
   type PlanningPreviewResponse,
@@ -30,10 +30,10 @@ export type ApplyResult =
   | { ok: false; conflict: boolean; code?: string; message: string; issues?: ValidationHit[] };
 
 export type ScenarioPreviewResult =
-  | { ok: true; proposals: Array<Record<string, unknown>>; expiresAt: string }
+  | { ok: true; proposals: ScenarioProposal[]; planVersion: number; expiresAt: string }
   | { ok: false; conflict: boolean; code?: string; message: string };
 export type ScenarioApplyResult =
-  | { ok: true; planVersion: number; scenarioRunId: string }
+  | { ok: true; planVersion: number; scenarioRunId: string; auditEventId: string }
   | { ok: false; conflict: boolean; code?: string; message: string };
 /**
  * Работает через настоящий @kiss-pm/planning-client. Транспорт —
@@ -231,7 +231,7 @@ export function usePlanning(projectId: string) {
       if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
       try {
         const res = await client.previewScenarios(projectId, { target, clientPlanVersion: readModel.planVersion });
-        return { ok: true, proposals: res.proposals, expiresAt: res.expiresAt };
+        return { ok: true, proposals: res.proposals, planVersion: res.planVersion, expiresAt: res.expiresAt };
       } catch (e) {
         if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
           await load();
@@ -251,7 +251,8 @@ export function usePlanning(projectId: string) {
       try {
         const res = await client.applyScenario(projectId, scenarioId, { clientPlanVersion: readModel.planVersion, ...(acceptedRiskReason ? { acceptedRiskReason } : {}) });
         setReadModel(res.readModel);
-        return { ok: true, planVersion: res.newPlanVersion, scenarioRunId: res.scenarioRunId };
+        // auditEventId — квитанция применения: по ней success-состояние сценариев ссылается на вкладку «Коммиты».
+        return { ok: true, planVersion: res.newPlanVersion, scenarioRunId: res.scenarioRunId, auditEventId: res.auditEventId };
       } catch (e) {
         if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
           await load();

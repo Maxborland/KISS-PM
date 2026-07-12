@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { ScenarioProposal } from "@kiss-pm/domain";
 import { Check, Loader2, RefreshCw, Sparkles, TriangleAlert, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,16 +19,9 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 type Profile = "aggressive" | "balanced" | "resilient";
 type DiffRow = { wbs: string; title: string; detail: string; delta: string };
-// форма ровно как доменный ScenarioProposal — никаких мок-only полей; база/дельты/diff считаем на клиенте
-type Proposal = {
-  id: string;
-  profile: Profile;
-  conflictEffect: "accepted" | "reduced" | "removed";
-  availability: "available" | "unavailable";
-  unavailableReason: "target_bucket_not_found" | "target_assignment_not_found" | "no_eligible_alternate_resource" | "alternate_resource_has_insufficient_capacity" | null;
-  planDelta: { commands: Array<{ type: string; payload?: Record<string, unknown> }> };
-  explainability: { finishDate: string | null; overloadMinutes: number; changedTaskIds: string[]; riskScore: number; requiredApprovals: string[] };
-};
+// Канонический wire-тип предложения — доменный ScenarioProposal (его же отдают
+// previewScenarios боевого API и contract-mock); локального «почти такого же» типа больше нет.
+type Proposal = ScenarioProposal;
 type Overload = { resourceId: string; date: string; overloadMinutes: number; taskIds: string[] };
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
@@ -98,7 +92,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     setPreviewBusy(true); setScenarioErr(null); setCompareId(null);
     const res = await previewScenarios({ type: "resource_overload", resourceId: t.resourceId, date: t.date, overloadMinutes: t.overloadMinutes, taskIds: t.taskIds });
     setPreviewBusy(false);
-    if (res.ok) setProposals(res.proposals as unknown as Proposal[]);
+    if (res.ok) setProposals(res.proposals);
     else { setProposals([]); setScenarioErr(res.conflict ? "Конфликт версий — перезагружено, запросите сценарии заново" : "Не удалось получить сценарии"); }
   }
 
@@ -135,7 +129,8 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const finishDelta = (p: Proposal) => dayN(p.explainability.finishDate) - dayN(model.baseFinish);
   const overloadDelta = (p: Proposal) => p.explainability.overloadMinutes - baseOverloadMin;
   const deriveDiff = (p: Proposal): DiffRow[] => p.planDelta.commands.map((cmd): DiffRow => {
-    const pay = cmd.payload ?? {};
+    // payload дискриминированного PlanningCommand читаем по строковым ключам (diff — деривация для UI)
+    const pay = (cmd.payload ?? {}) as Record<string, unknown>;
     if (cmd.type === "risk.accept_overload") return { wbs: "—", title: target ? `${resName(target.resourceId)} · ${ddmm(target.date)}` : "—", detail: "Перегруз принят как осознанный риск", delta: "+0 дн" };
     const taskId = String(pay.taskId ?? ""); const rid = String(pay.resourceId ?? ""); const wm = Number(pay.workMinutes ?? 0);
     const task = model.taskById.get(taskId);
