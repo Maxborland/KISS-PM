@@ -28,7 +28,11 @@ export function ChatThread({
       {messages.length === 0 && !thinking ? <ChatEmpty /> : null}
       {messages.map((message) =>
         message.role === "trace" ? (
-          <TraceSteps key={message.id} steps={message.steps} done />
+          // aria-live=off: шаги уже были озвучены при стриме — повторная вставка
+          // завершённого трейса не должна объявляться второй раз.
+          <div key={message.id} aria-live="off">
+            <TraceSteps steps={message.steps} done failed={message.failed ?? false} />
+          </div>
         ) : (
           <MessageBubble key={message.id} message={message} />
         )
@@ -43,7 +47,7 @@ function ChatEmpty() {
     <div className="flex flex-1 flex-col items-center justify-center gap-2 text-[var(--muted)]">
       <MessageSquare className="size-5" aria-hidden />
       <span className="text-[length:var(--text-sm)]">
-        Опишите задачу — Генри подготовит изменения и покажет их на сверку перед применением.
+        Опишите задачу: Генри подготовит изменения и покажет их на сверку перед применением.
       </span>
     </div>
   );
@@ -52,6 +56,8 @@ function ChatEmpty() {
 function MessageBubble({ message }: { message: Extract<AgentMessage, { role: "user" | "agent" }> }) {
   const isUser = message.role === "user";
   return (
+    // 720px — намеренная локальная мера строки треда (комфортное чтение);
+    // токен не заводим до второго консьюмера.
     <article className={cn("flex max-w-[720px] gap-2.5", isUser && "self-end flex-row-reverse")}>
       <span
         aria-hidden
@@ -74,7 +80,9 @@ function MessageBubble({ message }: { message: Extract<AgentMessage, { role: "us
             "whitespace-pre-wrap rounded-[var(--radius-lg)] px-3 py-2 text-left text-[length:var(--text-md)] leading-[var(--lh-md)] text-[var(--text)]",
             isUser ? "bg-[var(--panel-strong)]" : "bg-[var(--panel)] border border-[var(--border)]",
             message.role === "agent" && message.kind === "error" && "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]",
-            message.role === "agent" && message.kind === "result" && "border-[var(--accent-muted)] bg-[var(--accent-soft)]"
+            // result: только акцентная рамка на dark-адаптированной панели —
+            // accent-soft не имеет тёмного значения и делал текст нечитаемым в dark.
+            message.role === "agent" && message.kind === "result" && "border-[var(--accent)]"
           )}
         >
           {message.text}
@@ -88,20 +96,31 @@ function MessageBubble({ message }: { message: Extract<AgentMessage, { role: "us
  * CoT-шаги агента. Только реальные события SSE — до первого события честный
  * индикатор «анализирует», без выдуманных шагов (демо-fallback удалён сознательно).
  */
-export function TraceSteps({ steps, done }: { steps: string[]; done: boolean }) {
+export function TraceSteps({ steps, done, failed = false }: { steps: string[]; done: boolean; failed?: boolean }) {
   return (
-    <div className="ml-9 flex max-w-[720px] flex-col gap-1" aria-label="Действия агента">
+    <div role="group" className="ml-9 flex max-w-[720px] flex-col gap-1" aria-label="Действия агента">
       {steps.map((step, index) => {
-        const settled = done || index < steps.length - 1;
+        const last = index === steps.length - 1;
+        const settled = done || !last;
+        const interrupted = failed && last;
         return (
           <div key={`${index}-${step}`} className="flex items-start gap-2 text-[length:var(--text-sm)] text-[var(--muted-strong)]">
             <span className="mt-0.5 grid size-4 shrink-0 place-items-center text-[var(--muted-soft)]" aria-hidden>
-              {settled ? <Check className="size-3.5 text-[var(--success)]" /> : <Clock3 className="size-3.5" />}
+              {interrupted ? (
+                <Clock3 className="size-3.5 text-[var(--danger)]" />
+              ) : settled ? (
+                <Check className="size-3.5 text-[var(--success)]" />
+              ) : (
+                <Clock3 className="size-3.5" />
+              )}
             </span>
             <span className="min-w-0 break-words">{step}</span>
           </div>
         );
       })}
+      {done && failed ? (
+        <div className="ml-6 text-[length:var(--text-sm)] text-[var(--danger-text)]">Ход прерван ошибкой.</div>
+      ) : null}
       {!done ? (
         <div className="flex items-center gap-2 text-[length:var(--text-sm)] text-[var(--muted)]">
           <Spinner className="size-3.5" />

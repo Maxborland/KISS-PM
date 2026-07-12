@@ -53,7 +53,7 @@ const formatMessageTime = (date = new Date()): string =>
  * Оболочку (WorkspaceShell) даёт route — поверхность рендерится и в Storybook standalone.
  */
 export function AgentSurface() {
-  const { proposeStream, execute, uploadAttachment, listProjects, status, provider, tools, toolsError, reloadTools } = useAgent();
+  const { proposeStream, execute, uploadAttachment, listProjects, status, provider, tools, toolsError, toolsReloading, reloadTools } = useAgent();
 
   const [phase, setPhase] = useState<AgentPhase>("draft");
   const [inputValue, setInputValue] = useState("");
@@ -68,6 +68,7 @@ export function AgentSurface() {
   const [editingChangeId, setEditingChangeId] = useState<string | undefined>(undefined);
   const [actionMap, setActionMap] = useState<Record<string, AgentActionInput>>({});
   const [mobileReview, setMobileReview] = useState(false);
+  const reviewButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const thinking = phase === "thinking" || status === "proposing";
   const reviewVisible = changes.length > 0 && !thinking && phase !== "draft";
@@ -101,6 +102,7 @@ export function AgentSurface() {
 
   async function sendMessage() {
     if (applyInFlight.current) return;
+    if (status === "proposing") return; // второй submit во время thinking перемешал бы два хода
     const goal = inputValue.trim();
     if (goal.length === 0) return;
     if (provider?.configured === false) {
@@ -127,9 +129,13 @@ export function AgentSurface() {
       collectedSteps.push(label);
       setLiveSteps((steps) => [...steps, label]);
     }, attachmentIds, history);
-    // Завершённый трейс остаётся в треде сообщением-ролью trace (история хода агента).
+    // Завершённый трейс остаётся в треде сообщением-ролью trace (история хода агента);
+    // прерванный ошибкой ход помечается честно, а не зелёными галочками.
     if (collectedSteps.length > 0) {
-      setMessages((m) => [...m, { id: `trace-${m.length}`, role: "trace", time: now(), steps: collectedSteps }]);
+      setMessages((m) => [
+        ...m,
+        { id: `trace-${m.length}`, role: "trace", time: now(), steps: collectedSteps, ...(res.ok ? {} : { failed: true }) }
+      ]);
     }
     setLiveSteps([]);
     if (!res.ok) {
@@ -234,7 +240,8 @@ export function AgentSurface() {
   // немого пустого чата, composer заблокирован до ответа.
   if (status === "loading") {
     return (
-      <div className="flex h-[calc(100dvh-3.5rem)] flex-col" data-testid="agent-loading">
+      <div className="flex h-[calc(100dvh-var(--shell-topbar-h))] flex-col" data-testid="agent-loading">
+        <span role="status" className="sr-only">Загрузка агента…</span>
         <div className="flex items-center gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4 py-2.5 md:px-6">
           <Skeleton className="size-8 rounded-full" />
           <SkeletonText className="w-40" />
@@ -249,7 +256,7 @@ export function AgentSurface() {
 
   return (
     // 3.5rem = h-14 топбара WorkspaceShell: чат скроллится внутри, страница — нет.
-    <div className="flex h-[calc(100dvh-3.5rem)] flex-col bg-[var(--canvas)]">
+    <div className="flex h-[calc(100dvh-var(--shell-topbar-h))] flex-col bg-[var(--canvas)]">
       {/* Честная деградация (G7-01): без LLM-ключа агент отвечает детерминированной
           заглушкой — иначе «Предложений нет» неотличимо от нормальной работы. */}
       {provider && !provider.live ? (
@@ -265,12 +272,21 @@ export function AgentSurface() {
         </div>
       ) : null}
       {toolsError ? (
-        <BannerInline variant="danger" className="m-3">
-          <span>Не удалось загрузить возможности агента ({toolsError}) — предложения могут быть неполными.</span>
-          <Button type="button" size="sm" variant="secondary" onClick={() => void reloadTools()}>
-            Повторить
-          </Button>
-        </BannerInline>
+        // role=alert: баннер появляется асинхронно — иначе SR его не озвучит.
+        // Сырой код ошибки — только в title (в тексте страницы запрещённые литералы
+        // вроде permission_missing ловит гейт shell-role-nav).
+        <div role="alert" title={toolsError}>
+          <BannerInline variant="danger" className="m-3">
+            <span>
+              {toolsError === "permission_missing" || toolsError === "forbidden"
+                ? "Нет прав на просмотр возможностей агента."
+                : "Не удалось загрузить возможности агента — предложения могут быть неполными."}
+            </span>
+            <Button type="button" size="sm" variant="secondary" disabled={toolsReloading} onClick={() => void reloadTools()}>
+              {toolsReloading ? "Повторяем…" : "Повторить"}
+            </Button>
+          </BannerInline>
+        </div>
       ) : null}
       <div className="flex min-h-0 flex-1">
         <section className="flex min-w-0 flex-1 flex-col" aria-label="Чат с Генри Ганттом">
@@ -279,6 +295,7 @@ export function AgentSurface() {
             tools={tools}
             reviewVisible={reviewVisible}
             onOpenMobileReview={() => setMobileReview(true)}
+            reviewButtonRef={reviewButtonRef}
           />
           <ChatThread messages={messages} thinking={thinking} liveSteps={liveSteps} />
           <AgentComposer
@@ -301,6 +318,7 @@ export function AgentSurface() {
           visible={reviewVisible}
           mobileOpen={reviewVisible && mobileReview}
           onCloseMobile={() => setMobileReview(false)}
+          returnFocusRef={reviewButtonRef}
           state={{ changes, busy: status === "executing", activeChangeId, editingChangeId }}
           handlers={{
             onSelectChange: (id) => {

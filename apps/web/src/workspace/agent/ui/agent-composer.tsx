@@ -60,15 +60,17 @@ export function AgentComposer({
             ))}
           </select>
           {attachments.map((file) => (
+            // Нейтральный чип: panel-strong/text адаптированы в dark,
+            // accent-soft тёмного значения не имеет (текст был бы нечитаем).
             <span
               key={file.id}
-              className="inline-flex items-center gap-1 rounded-[var(--radius-full)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-2.5 py-1 text-[length:var(--text-sm)] text-[var(--text)]"
+              className="inline-flex items-center gap-1 rounded-[var(--radius-full)] border border-[var(--border-strong)] bg-[var(--panel-strong)] px-2.5 py-1 text-[length:var(--text-sm)] text-[var(--text)]"
             >
               {file.name}
               <button
                 type="button"
-                aria-label="Убрать файл"
-                className="grid size-4 place-items-center rounded-full text-[var(--muted-strong)] hover:bg-[var(--accent-muted)]"
+                aria-label={`Убрать файл ${file.name}`}
+                className="grid size-4 place-items-center rounded-full text-[var(--muted-strong)] hover:bg-[var(--border)]"
                 onClick={() => onRemoveAttachment(file.id)}
               >
                 ×

@@ -175,7 +175,11 @@ describe("AgentSurface production shell contract", () => {
     agentMock.toolsError = "request_failed";
     const root = await renderAgent();
 
-    expect(document.body.textContent).toContain("Не удалось загрузить возможности агента (request_failed)");
+    // Сырой код ошибки не попадает в текст страницы (гейт shell-role-nav
+    // запрещает литералы вроде permission_missing) — только в title.
+    expect(document.body.textContent).toContain("Не удалось загрузить возможности агента");
+    expect(document.body.textContent).not.toContain("request_failed");
+    expect(document.querySelector("[role='alert']")?.getAttribute("title")).toBe("request_failed");
     const retry = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "Повторить");
     expect(retry).toBeDefined();

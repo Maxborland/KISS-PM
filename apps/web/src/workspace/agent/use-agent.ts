@@ -41,16 +41,21 @@ export function useAgent() {
   // Сбой listTools раньше молча схлопывался в tools=[] — UI не мог отличить
   // «нет прав ни на что» от «ручка недоступна». Теперь код ошибки виден поверхности.
   const [toolsError, setToolsError] = useState<string | null>(null);
+  const [toolsReloading, setToolsReloading] = useState(false);
 
   const reloadTools = useCallback(async () => {
-    setToolsError(null);
+    // Баннер ошибки НЕ прячем на время повтора — иначе «всё хорошо»-окно до ответа.
+    setToolsReloading(true);
     try {
       const r = await client.listTools();
       setTools(r.tools);
       setProvider(r.provider ?? null);
+      setToolsError(null);
     } catch (e) {
       setTools([]);
       setToolsError(e instanceof AgentApiError ? e.code : "request_failed");
+    } finally {
+      setToolsReloading(false);
     }
   }, [client]);
 
@@ -152,5 +157,5 @@ export function useAgent() {
     [client]
   );
 
-  return { tools, toolsError, reloadTools, provider, proposal, setProposal, status, error, propose, proposeStream, uploadAttachment, listProjects, execute };
+  return { tools, toolsError, toolsReloading, reloadTools, provider, proposal, setProposal, status, error, propose, proposeStream, uploadAttachment, listProjects, execute };
 }

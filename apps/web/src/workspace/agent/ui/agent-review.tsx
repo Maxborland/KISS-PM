@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Check, RotateCcw, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
 import {
   TERMINAL_STATUSES,
@@ -30,40 +31,74 @@ type ReviewState = {
   editingChangeId?: string | undefined;
 };
 
-/** Панель сверки: desktop-колонка + мобильный Sheet (focus-trap/Escape — от Radix). */
+/** md-брейкпоинт Tailwind: desktop-колонка ↔ мобильный Sheet. */
+function useIsDesktop(): boolean {
+  // SSR/первый рендер — desktop-ветка (совпадает с md:flex поведением до гидрации).
+  const [isDesktop, setIsDesktop] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const sync = () => setIsDesktop(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  return isDesktop;
+}
+
+/**
+ * Панель сверки: desktop-колонка ИЛИ мобильный Sheet (focus-trap/Escape — от Radix).
+ * В DOM всегда ровно один экземпляр контента — иначе e2e-локаторы ловят
+ * strict mode violation на дублях текста (скрытая колонка + открытый Sheet).
+ */
 export function ChangeReviewPanel({
   visible,
   mobileOpen,
   onCloseMobile,
+  returnFocusRef,
   state,
   handlers
 }: {
   visible: boolean;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  /** Куда вернуть фокус при закрытии Sheet: без Trigger Radix уронил бы его на body. */
+  returnFocusRef?: React.RefObject<HTMLButtonElement | null>;
   state: ReviewState;
   handlers: ReviewHandlers;
 }) {
+  const isDesktop = useIsDesktop();
   if (!visible) return null;
-  return (
-    <>
+  if (isDesktop) {
+    return (
       <aside
         aria-label="Сверка изменений"
-        className="hidden w-[var(--inspector-width)] shrink-0 flex-col border-l border-[var(--border)] bg-[var(--panel-subtle)] md:flex"
+        className="flex w-[var(--side-panel-width)] shrink-0 flex-col border-l border-[var(--border)] bg-[var(--panel-subtle)]"
       >
         <ReviewContent state={state} handlers={handlers} />
       </aside>
-      <Sheet open={mobileOpen} onOpenChange={(open) => { if (!open) onCloseMobile(); }}>
-        <SheetContent side="right" className="w-full max-w-[420px] p-0 md:hidden">
-          <SheetHeader className="border-b border-[var(--border)] px-4 py-3">
-            <SheetTitle>Сверка изменений</SheetTitle>
-          </SheetHeader>
-          <div className="flex min-h-0 flex-1 flex-col">
-            <ReviewContent state={state} handlers={handlers} />
-          </div>
-        </SheetContent>
-      </Sheet>
-    </>
+    );
+  }
+  return (
+    <Sheet open={mobileOpen} onOpenChange={(open) => { if (!open) onCloseMobile(); }}>
+      <SheetContent
+        side="right"
+        className="w-full max-w-[var(--modal-sm)] p-0"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          returnFocusRef?.current?.focus();
+        }}
+      >
+        <SheetHeader className="border-b border-[var(--border)] px-4 py-3">
+          <SheetTitle>Сверка изменений</SheetTitle>
+          <SheetDescription className="sr-only">
+            Предложенные агентом изменения: проверьте, отредактируйте и примените выбранные.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <ReviewContent state={state} handlers={handlers} />
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -127,7 +162,15 @@ function ReviewContent({ state, handlers }: { state: ReviewState; handlers: Revi
         </div>
       ) : null}
       <div className="flex shrink-0 gap-2 border-t border-[var(--border)] px-4 py-3">
-        <Button type="button" size="sm" onClick={handlers.onApply} disabled={busy || selectedCount === 0}>
+        {/* Во время busy кнопка остаётся фокусируемой (aria-disabled + guard):
+            нативный disabled сбросил бы фокус на body посреди клавиатурного apply. */}
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => { if (!busy) handlers.onApply(); }}
+          disabled={selectedCount === 0}
+          aria-disabled={busy || selectedCount === 0}
+        >
           <Check aria-hidden />
           {busy ? "Применяем…" : hasExecutionOutcome ? "Применить оставшиеся" : "Применить выбранное"}
         </Button>
@@ -176,30 +219,24 @@ function ChangeHunkCard({
 }) {
   const terminal = TERMINAL_STATUSES.includes(change.status);
   return (
+    // Карточка не интерактивна сама по себе (article с Enter/Space — ложная семантика
+    // для SR); клавиатурный путь — внутренние кнопки: чип статуса (toggle выбора),
+    // «Изменить», «Отклонить». onFocus поднимает active-подсветку при табе внутрь.
     <article
       data-testid="agent-change-card"
-      tabIndex={0}
       aria-label={`Изменение ${change.number}: ${change.title}`}
       className={cn(
-        "rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--panel)] p-3 outline-none",
-        "focus-visible:ring-[3px] focus-visible:ring-[var(--accent-ring)]",
+        "rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--panel)] p-3",
         active && "border-[var(--accent)]"
       )}
       onClick={onFocus}
       onFocus={onFocus}
-      onKeyDown={(event) => {
-        // Клавиатурный выбор карточки: Enter/Space = переключить участие в применении.
-        if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
-          event.preventDefault();
-          if (!busy && !terminal) onSelect();
-        }
-      }}
     >
       <div className="flex items-start gap-2">
         <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]" aria-hidden>
           {change.number}
         </span>
-        <strong className="min-w-0 flex-1 text-[length:var(--text-sm)] leading-[var(--lh-sm)] text-[var(--text-strong)]">
+        <strong id={`agent-change-title-${change.id}`} className="min-w-0 flex-1 text-[length:var(--text-sm)] leading-[var(--lh-sm)] text-[var(--text-strong)]">
           {change.title}
         </strong>
         <button
@@ -208,6 +245,8 @@ function ChangeHunkCard({
             "shrink-0 rounded-[var(--radius-full)] border px-2 py-0.5 text-[length:var(--text-xs)] font-medium disabled:opacity-70",
             STATUS_CHIP[change.status]
           )}
+          // Имя кнопки = статус (контракт e2e); контекст «какого изменения» — через describedby.
+          aria-describedby={`agent-change-title-${change.id}`}
           disabled={busy || terminal}
           onClick={(event) => {
             event.stopPropagation();

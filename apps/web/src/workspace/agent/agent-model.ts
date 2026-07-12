@@ -48,7 +48,8 @@ export const UNRESOLVED_STATUSES: readonly AgentChangeStatus[] = [
 export type AgentMessage =
   | { id: string; role: "user"; time: string; text: string }
   | { id: string; role: "agent"; time: string; text: string; kind?: "error" | "result" }
-  /** Завершённый CoT-трейс хода агента — остаётся в треде после ответа. */
-  | { id: string; role: "trace"; time: string; steps: string[] };
+  /** Завершённый CoT-трейс хода агента — остаётся в треде после ответа.
+      failed=true — ход прервался ошибкой (последний шаг помечается). */
+  | { id: string; role: "trace"; time: string; steps: string[]; failed?: boolean };
 
 export type AgentPhase = "draft" | "thinking" | "review-open" | "applied";

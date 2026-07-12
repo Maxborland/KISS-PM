@@ -3,11 +3,11 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { AgentSurface } from "@/workspace/agent/agent-surface";
 
 /**
- * Агент — альтернативное ведение работы через безопасные предложения. Анализирует
- * задачи пользователя (GET /api/workspace/my-work) и предлагает разрешённые переходы
- * статусов (ALLOWED_TRANSITIONS); применение — по двухшаговому подтверждению, боевым
- * PATCH /api/workspace/projects/:id/tasks/:taskId/status. createWorkspaceClient +
- * in-memory mock; данные in-memory.
+ * Агент — чат с ассистентом на боевом контракте propose/execute: сообщение →
+ * POST /agent/propose (LLM-цикл, ничего не меняется) → сверка изменений →
+ * подтверждение → POST /agent/execute (governed-команды + audit). В Storybook —
+ * contract-mock (createMockAgentFetch): детерминированный «мозг», реальный клиент.
+ * Оболочку WorkspaceShell даёт route; здесь поверхность standalone.
  */
 const meta: Meta<typeof AgentSurface> = {
   title: "Workspace/Agent",

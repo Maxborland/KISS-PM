@@ -146,7 +146,9 @@
 
   /* Layout */
   --sidebar-width: 232px;
-  --topbar-height: 60px;
+  --topbar-height: 60px; /* legacy BEM-топбар (bem.css) */
+  --shell-topbar-h: 56px; /* топбар WorkspaceShell (v4); full-height поверхности считают от него */
+  --side-panel-width: 360px; /* боковая панель поверхности (сверка агента и т.п.) */
   --page-header-height: 64px;
   --row-h: 36px;
   --toolbar-h: 36px;

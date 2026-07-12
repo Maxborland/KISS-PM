@@ -164,7 +164,7 @@ export function WorkspaceShell({ activeNav, children }: { activeNav: string; chi
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4">
+        <header className="flex h-[var(--shell-topbar-h)] shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4">
           <button
             ref={mobileNavToggleRef}
             type="button"
