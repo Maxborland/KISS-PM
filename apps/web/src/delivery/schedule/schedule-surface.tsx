@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Fragment, type ClipboardEvent as ReactClipboardEvent, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Plus, TriangleAlert, Undo2 } from "lucide-react";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { createClientId } from "@/delivery/lib/client-id";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { dayToIso, isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { currentPlanDate, deriveScheduleTimeline, formatWeekLabel } from "@/delivery/lib/date-origin";
+import { VIRTUAL_INITIAL_RECT, VIRTUAL_ROW_OVERSCAN } from "@/delivery/lib/virtual-rows";
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
 import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
 import { usePointerDrag } from "@/delivery/lib/use-pointer-drag";
@@ -523,6 +525,43 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }
 
   const mapped = useMemo(() => (readModel ? mapRows(readModel, resName) : null), [readModel, resName]);
+  const allRowsById = useMemo(() => new Map((mapped?.rows ?? []).map((r) => [r.id, r] as const)), [mapped]);
+  // Видимые строки (сворачивание summary скрывает поддерево) — мемо до early-return,
+  // т.к. virtualizer-хук ниже должен вызываться безусловно.
+  const visibleRows = useMemo(() => {
+    const isHidden = (row: Row) => {
+      let parentId = row.parentId;
+      while (parentId) {
+        if (collapsed.has(parentId)) return true;
+        parentId = allRowsById.get(parentId)?.parentId ?? null;
+      }
+      return false;
+    };
+    return (mapped?.rows ?? []).filter((r) => !isHidden(r));
+  }, [allRowsById, collapsed, mapped]);
+  // Виртуализация строк: WBS-таблица, gantt-lane и SVG-связи рендерят только окно
+  // вокруг вьюпорта (+overscan). Вертикальную ось прокручивает документ (карточка
+  // грида без max-height растёт с контентом), поэтому window-virtualizer со
+  // scrollMargin = отступ первой строки от верха документа (верх карточки + шапка).
+  const scheduleGridRef = useRef<HTMLDivElement | null>(null);
+  const [rowsScrollMargin, setRowsScrollMargin] = useState(0);
+  useEffect(() => {
+    // Без deps: контент над гридом (баннеры/ошибки) меняет отступ — перемеряем после
+    // каждого рендера; guarded setState не даёт зациклиться.
+    const grid = scheduleGridRef.current;
+    if (!grid) return;
+    const next = Math.round(grid.getBoundingClientRect().top + window.scrollY) + HEADER_H;
+    if (next !== rowsScrollMargin) setRowsScrollMargin(next);
+  });
+  const rowVirtualizer = useWindowVirtualizer({
+    count: visibleRows.length,
+    // Строки строго ROW_H — динамический measureElement не нужен (и это единственный
+    // детерминированный замер в happy-dom, где элементы имеют нулевые размеры).
+    estimateSize: () => ROW_H,
+    overscan: VIRTUAL_ROW_OVERSCAN,
+    scrollMargin: rowsScrollMargin,
+    initialRect: VIRTUAL_INITIAL_RECT
+  });
   // Общий selection-контракт кокпита: переход с ?task= (из Ресурсов/пиков) выбирает
   // строку в WBS. Однократно после готовности read-model; TaskPeek читает тот же параметр сам.
   const urlSelectionAppliedRef = useRef(false);
@@ -973,18 +1012,18 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const weekW = 7 * dayW;
   timelineOriginDayRef.current = timeline.originDay;
 
-  const allRowsById = new Map(rows.map((r) => [r.id, r] as const));
-  const isHidden = (row: Row) => {
-    let parentId = row.parentId;
-    while (parentId) {
-      if (collapsed.has(parentId)) return true;
-      parentId = allRowsById.get(parentId)?.parentId ?? null;
-    }
-    return false;
-  };
-  const visibleRows = rows.filter((r) => !isHidden(r));
   const hasChildren = (row: Row) => row.hasChildren || rows.some((r) => r.parentId === row.id);
   const toggle = (id: string) => setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
+  // Окно виртуализации: item.start/end включают scrollMargin (см. virtual-core),
+  // поэтому высоты spacer'ов считаем за его вычетом.
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const firstVirtualIndex = virtualItems[0]?.index ?? 0;
+  const lastVirtualIndex = virtualItems[virtualItems.length - 1]?.index ?? -1;
+  const virtualPadTop = virtualItems.length > 0 ? virtualItems[0]!.start - rowsScrollMargin : 0;
+  const virtualPadBottom = virtualItems.length > 0
+    ? rowVirtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]!.end - rowsScrollMargin)
+    : 0;
 
   // связи
   const indexById = new Map(visibleRows.map((r, i) => [r.id, i] as const));
@@ -996,6 +1035,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       const si = indexById.get(p.predId);
       const di = indexById.get(succ.id);
       if (!pred || si == null || di == null) continue;
+      // Виртуализация SVG-связей: рендерим линию, если диапазон индексов между её
+      // концами пересекает окно (линия может проходить сквозь окно, когда оба конца
+      // за его пределами — поэтому проверяем интервал, а не только концы).
+      if (Math.max(si, di) < firstVirtualIndex || Math.min(si, di) > lastVirtualIndex) continue;
       const sFromRight = p.type === "FS" || p.type === "FF";
       const dToRight = p.type === "FF" || p.type === "SF";
       const sx = toTimelineX(sFromRight ? pred.dayStart + pred.dayDur : pred.dayStart);
@@ -1015,9 +1058,33 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const ganttH = visibleRows.length * ROW_H;
   const selected = rows.find((r) => r.id === sel) ?? null;
 
+  // Виртуализация рендерит только окно строк: если целевой элемент ещё не в DOM,
+  // скроллим к индексу и повторяем действие по кадрам до появления строки.
+  const scrollRowIntoView = (id: string) => {
+    const index = visibleRows.findIndex((row) => row.id === id);
+    if (index >= 0) rowVirtualizer.scrollToIndex(index);
+  };
+  const withScheduleRowNode = <T extends HTMLElement>(
+    id: string,
+    resolve: (rowId: string) => T | undefined,
+    action: (node: T) => void
+  ) => {
+    const node = resolve(id);
+    if (node) { action(node); return; }
+    scrollRowIntoView(id);
+    let attempts = 10;
+    const retry = () => {
+      const nextNode = resolve(id);
+      if (nextNode) { action(nextNode); return; }
+      if (attempts-- > 0) window.requestAnimationFrame(retry);
+    };
+    window.requestAnimationFrame(retry);
+  };
   const openTaskPeek = (id: string) => {
     setSel(id);
-    taskPeekTriggerRefs.current.get(id)?.click();
+    // TaskPeek открывается кликом по своему триггеру (URL-драйв ?task= внутри TaskPeek);
+    // для строки вне окна виртуализации триггер появится после scrollToIndex.
+    withScheduleRowNode(id, (rowId) => taskPeekTriggerRefs.current.get(rowId), (node) => node.click());
   };
   const openRow = openTaskPeek;
   const cancelEditableClick = () => {
@@ -1426,7 +1493,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   };
   const focusScheduleRow = (id: string) => {
     setSel(id);
-    window.requestAnimationFrame(() => rowElementsRef.get(id)?.focus());
+    // Строка может быть вне окна виртуализации — helper доскроллит и сфокусирует
+    // после того, как <tr> появится в DOM.
+    window.requestAnimationFrame(() =>
+      withScheduleRowNode(id, (rowId) => rowElementsRef.get(rowId), (node) => node.focus()));
   };
   const toggleTaskSelection = (id: string) => {
     setSelectedTaskIds((current) => {
@@ -1724,7 +1794,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       ) : null}
 
       <div className="relative">
-        <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+        <div ref={scheduleGridRef} className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
           <div className="inline-flex min-w-full align-top">
             <div className="sticky left-0 z-20 shrink-0 border-r border-[var(--border-strong)] bg-[var(--panel)]">
               <table className="msgrid">
@@ -1759,7 +1829,16 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       </td>
                     </tr>
                   ) : null}
-                  {visibleRows.map((r, i) => (
+                  {/* Spacer'ы держат высоту вне окна виртуализации (высоты кратны ROW_H). */}
+                  {virtualPadTop > 0 ? (
+                    <tr aria-hidden data-testid="schedule-virtual-spacer-top">
+                      <td colSpan={COLS.length} style={{ height: virtualPadTop, padding: 0 }} />
+                    </tr>
+                  ) : null}
+                  {virtualItems.map((virtualRow) => {
+                    const r = visibleRows[virtualRow.index]!;
+                    const i = virtualRow.index;
+                    return (
                     <Fragment key={r.id}>
                     <ScheduleRowMenu
                       canManagePlan={canManagePlan}
@@ -1889,7 +1968,13 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       </tr>
                     ) : null}
                     </Fragment>
-                  ))}
+                    );
+                  })}
+                  {virtualPadBottom > 0 ? (
+                    <tr aria-hidden data-testid="schedule-virtual-spacer-bottom">
+                      <td colSpan={COLS.length} style={{ height: virtualPadBottom, padding: 0 }} />
+                    </tr>
+                  ) : null}
                   {/* Excel-подобная строка создания: имя → Enter создаёт задачу и очищает для следующей. */}
                   {canManagePlan ? (
                     <tr className="msgrid-newrow">
@@ -1922,7 +2007,11 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
               </div>
               <span className="pointer-events-none absolute bottom-0 top-9 z-[1] w-px bg-[var(--accent)]" style={{ left: timeline.todayOffsetDays * dayW }} title="Сегодня" />
               {deadlineDay !== null && <span className="pointer-events-none absolute bottom-0 top-9 z-[1] w-px border-l border-dashed border-[var(--danger)]" style={{ left: toTimelineX(deadlineDay) }} title="Дедлайн" />}
-              {visibleRows.map((r) => {
+              {/* Обёртка держит полную высоту лейна; строки окна виртуализации
+                  позиционируются абсолютно по index*ROW_H (та же геометрия, что раньше в потоке). */}
+              <div className="relative" style={{ height: ganttH }}>
+              {virtualItems.map((virtualRow) => {
+                const r = visibleRows[virtualRow.index]!;
                 const dragging = drag?.id === r.id;
                 const dMove = dragging && drag.mode === "move" ? drag.deltaDays : 0;
                 const dLeft = dragging && drag.mode === "resizeLeft" ? drag.deltaDays : 0;
@@ -1932,7 +2021,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                 const barRight = left + width;
                 const fillPct = dragging && drag.mode === "progress" ? drag.curPct : r.pct;
                 return (
-                  <div key={r.id} data-task-id={r.id} onClick={() => setSel(r.id)} className={cn("group relative h-[var(--row-h)] cursor-pointer border-b border-[var(--border-subtle)] last:border-0", errors.has(r.id) ? "bg-[var(--danger-soft)]" : sel === r.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--panel-subtle)]")} style={{ backgroundImage: sel === r.id || errors.has(r.id) ? undefined : `repeating-linear-gradient(to right, transparent, transparent ${weekW - 1}px, var(--border-subtle) ${weekW - 1}px, var(--border-subtle) ${weekW}px)` }}>
+                  <div key={r.id} data-task-id={r.id} onClick={() => setSel(r.id)} className={cn("group absolute inset-x-0 h-[var(--row-h)] cursor-pointer border-b border-[var(--border-subtle)] last:border-0", errors.has(r.id) ? "bg-[var(--danger-soft)]" : sel === r.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--panel-subtle)]")} style={{ top: virtualRow.index * ROW_H, backgroundImage: sel === r.id || errors.has(r.id) ? undefined : `repeating-linear-gradient(to right, transparent, transparent ${weekW - 1}px, var(--border-subtle) ${weekW - 1}px, var(--border-subtle) ${weekW}px)` }}>
                     {r.kind === "milestone" ? (
                       <>
                         {r.baseDay != null ? <span className="gantt-baseline-milestone absolute bottom-1 size-2.5 -translate-x-1/2 rotate-45 rounded-[2px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" style={{ left: toTimelineX(r.baseDay) }} title={readModel.baselineComparison?.label ?? "Базовый план"} /> : null}
@@ -1965,10 +2054,11 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                   </div>
                 );
               })}
+              </div>
               {links.length > 0 || link ? (
                 <svg className="pointer-events-none absolute left-0 z-[3]" style={{ top: HEADER_H, width: timelineW, height: ganttH }} aria-hidden>
                   {links.map((l) => (
-                    <g key={l.key}>
+                    <g key={l.key} data-dep-id={l.depId}>
                       <polyline points={l.points} fill="none" stroke={l.accent ? "var(--accent)" : "var(--muted-soft)"} strokeWidth={l.accent ? 1.75 : 1.25} strokeLinejoin="round" />
                       <polygon points={l.head} fill={l.accent ? "var(--accent)" : "var(--muted-soft)"} />
                     </g>
