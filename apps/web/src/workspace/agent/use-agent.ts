@@ -38,16 +38,32 @@ export function useAgent() {
   const [proposal, setProposal] = useState<AgentProposeResponse | null>(null);
   const [status, setStatus] = useState<AgentStatus>("loading");
   const [error, setError] = useState<string | null>(null);
+  // Сбой listTools раньше молча схлопывался в tools=[] — UI не мог отличить
+  // «нет прав ни на что» от «ручка недоступна». Теперь код ошибки виден поверхности.
+  const [toolsError, setToolsError] = useState<string | null>(null);
+  const [toolsReloading, setToolsReloading] = useState(false);
+
+  const reloadTools = useCallback(async () => {
+    // Баннер ошибки НЕ прячем на время повтора — иначе «всё хорошо»-окно до ответа.
+    setToolsReloading(true);
+    try {
+      const r = await client.listTools();
+      setTools(r.tools);
+      setProvider(r.provider ?? null);
+      setToolsError(null);
+    } catch (e) {
+      setTools([]);
+      setToolsError(e instanceof AgentApiError ? e.code : "request_failed");
+    } finally {
+      setToolsReloading(false);
+    }
+  }, [client]);
 
   useEffect(() => {
     let active = true;
-    void client
-      .listTools()
-      .then((r) => { if (active) { setTools(r.tools); setProvider(r.provider ?? null); } })
-      .catch(() => { if (active) setTools([]); })
-      .finally(() => { if (active) setStatus("idle"); });
+    void reloadTools().finally(() => { if (active) setStatus("idle"); });
     return () => { active = false; };
-  }, [client]);
+  }, [reloadTools]);
 
   const propose = useCallback(
     async (goal: string): Promise<AgentResult<AgentProposeResponse>> => {
@@ -141,5 +157,5 @@ export function useAgent() {
     [client]
   );
 
-  return { tools, provider, proposal, setProposal, status, error, propose, proposeStream, uploadAttachment, listProjects, execute };
+  return { tools, toolsError, toolsReloading, reloadTools, provider, proposal, setProposal, status, error, propose, proposeStream, uploadAttachment, listProjects, execute };
 }

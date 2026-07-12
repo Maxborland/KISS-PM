@@ -171,4 +171,8 @@
     transition: none !important;
     transform: none !important;
   }
+  /* Спиннеры — essential-индикатор (WCAG 2.3.3 допускает), но замедляем вращение. */
+  :root:not([data-force-motion]) .animate-spin {
+    animation-duration: 2s !important;
+  }
 }

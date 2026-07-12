@@ -12,6 +12,7 @@ const EVIDENCE_DIR = join(
 );
 
 const NAV_ITEMS = [
+  { label: "Агент", href: "/agent" },
   { label: "Мои задачи", href: "/my-work" },
   { label: "Проекты", href: "/projects" },
   { label: "Сделки", href: "/crm/deals" },
@@ -73,7 +74,7 @@ const ROLES: RoleCase[] = [
     userId: "user-alpha-plan-reader-no-resources",
     name: "Никита Без Ресурсов",
     initials: "НБ",
-    visibleNav: ["Мои задачи", "Проекты", "Дашборд"],
+    visibleNav: ["Агент", "Мои задачи", "Проекты", "Дашборд"],
     searchResult: {
       typeLabel: "Проект",
       title: "Портал подрядчиков Вектор",
@@ -87,7 +88,9 @@ const ROLES: RoleCase[] = [
     userId: "user-alpha-resource-reader",
     name: "Роман Ресурсный",
     initials: "РР",
-    visibleNav: []
+    // tenant.project_resources.read открывает инструменты агента (detect_resource_overloads
+    // и др.) — «Агент» видим любой роли с хотя бы одним рабочим инструментом реестра.
+    visibleNav: ["Агент"]
   },
   {
     code: "BADM",
