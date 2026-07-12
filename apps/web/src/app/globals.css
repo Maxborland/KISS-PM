@@ -72,8 +72,14 @@
     box-sizing: border-box;
   }
 
+  /* Декларации переехали с :root из kiss-v4.css при выносе токенов —
+     сохраняем буквальный computed-parity на <html>. */
   html {
     height: 100%;
+    background: var(--canvas);
+    color: var(--text);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
   }
 
   body {

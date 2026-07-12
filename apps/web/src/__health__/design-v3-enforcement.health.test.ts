@@ -61,11 +61,13 @@ describe("design-v3 enforcement (Phase 16)", () => {
     expect(offenders, `hardcoded brand hex/rgba — use tokens/color-mix:\n${offenders.join("\n")}`).toEqual([]);
   });
 
-  it("has a single canonical token root (indigo kiss-v4 promoted to :root, scope island removed)", () => {
+  it("has a single canonical token owner: tokens.css; kiss-v4.css is utilities-only", () => {
     const kissV4 = readFileSync(join(srcRoot, "styles/kiss-v4.css"), "utf8");
-    expect(kissV4, "kiss-v4.css must define :root, not a .kiss-v4 scope").toContain(":root {");
-    expect(kissV4, "kiss-v4 scope island must be gone (promoted to :root)").not.toContain(".kiss-v4");
+    expect(kissV4, "kiss-v4.css must not define tokens — owner is styles/tokens.css").not.toContain(":root");
+    expect(kissV4, "kiss-v4 scope island must be gone").not.toContain(".kiss-v4");
     const tokens = readFileSync(join(srcRoot, "styles/tokens.css"), "utf8");
+    expect(tokens, "tokens.css must be the :root owner").toContain(":root {");
+    expect(tokens, "canonical indigo accent must live in tokens.css").toContain("--accent: #5b5bd6");
     expect(tokens, "--text-2xs micro token must exist").toContain("--text-2xs");
   });
 });

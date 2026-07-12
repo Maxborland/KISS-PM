@@ -1,81 +1,10 @@
 /* ============================================================
-   KISS PM — design v4 (checkpoint 1: Project Delivery)
-   Сильная shadcn+TW+bento база. Современный Linear/Attio-grade бар:
-   мягкие границы + тонкая elevation вместо «коробок», аккуратный
-   indigo-акцент, чистая семантика, уверенная типографическая иерархия,
-   planning layout-токены. Унификация: промоутнут в глобальный :root —
-   единый канонический индиго-look для всех поверхностей (BEM-слой ретайрится).
+   KISS PM — design v4, утилитарный слой (checkpoint 1: Project Delivery)
+   Сильная shadcn+TW+bento база: микроинтеракции строк, gantt-бары,
+   MS Project-подобная сетка задач, split-раскладка инспектора.
+   Переменные здесь НЕ определяются: единственный владелец токенов —
+   styles/tokens.css (+ tokens.planning.css), см. корневой DESIGN.md.
    ============================================================ */
-:root {
-  /* Surfaces — холодный светлый фон, чистые карточки */
-  --canvas: #f7f8fa;
-  --canvas-tint: #fbfbfc;
-  --panel: #ffffff;
-  --panel-subtle: #fafbfc;
-  --panel-strong: #f1f2f6;
-  --panel-elevated: #ffffff;
-  /* Тонкие, низкоконтрастные границы — главное отличие от «2000-х» */
-  --border: #ececf1;
-  --border-strong: #e0e1e8;
-  --border-subtle: #f3f3f7;
-
-  /* Text — глубокий neutral, уверенный контраст */
-  --text: #1c2024;
-  --text-strong: #0c0d10;
-  --muted: #6a7280;
-  --muted-strong: #494f59;
-  --muted-soft: #9ca3af;
-
-  /* Accent — современный indigo. Используется точечно (ссылки/активное/фокус).
-     Primary-действия — тёмный neutral (button variant=default). */
-  --accent: #5b5bd6;
-  --accent-hover: #5151c8;
-  --accent-soft: #eeeefb;
-  --accent-muted: #e0e0f8;
-  --accent-ring: rgba(91, 91, 214, 0.22);
-
-  /* Semantic — чистые, контролируемые (Radix-grade) */
-  --success: #30a46c;
-  --success-text: #1a7a4c;
-  --success-soft: #e7f6ee;
-  --warning: #e08c2c;
-  --warning-text: #9a5b12;
-  --warning-soft: #fbf0df;
-  --danger: #e5484d;
-  --danger-text: #c2353b;
-  --danger-soft: #fdecec;
-  --info: #5b5bd6;
-  --info-soft: #eeeefb;
-  --violet: #8347b9;
-  --violet-soft: #f3ecfb;
-
-  /* Без декоративных градиентов */
-  --grad-warm: var(--panel);
-  --grad-cool: var(--panel);
-
-  /* Планировочные layout-токены (MS Project-class) */
-  --row-h: 36px;
-  --row-h-summary: 36px;
-  --gantt-bar-h: 18px;
-  --wbs-width: 720px;
-  --inspector-width: 360px;
-  --cell-day: 40px;
-  --cell-week: 140px;
-  --cell-month: 220px;
-  --critical-stripe: #e5484d;
-
-  /* Современная мягкая elevation вместо жёстких рамок */
-  --shadow-card: 0 1px 2px rgba(12, 13, 16, 0.04), 0 1px 3px rgba(12, 13, 16, 0.03);
-  --shadow-raise: 0 2px 4px rgba(12, 13, 16, 0.05), 0 4px 12px -2px rgba(12, 13, 16, 0.06);
-  --shadow-pop: 0 12px 32px -8px rgba(12, 13, 16, 0.16);
-
-  --radius-card: 14px;
-
-  background: var(--canvas);
-  color: var(--text);
-  font-family: var(--font-ui);
-  -webkit-font-smoothing: antialiased;
-}
 
 /* Числа/коды/даты — табличные цифры */
 .v4-mono {
