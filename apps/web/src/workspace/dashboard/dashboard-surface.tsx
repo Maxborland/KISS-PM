@@ -203,14 +203,18 @@ function DashboardContent({
   projects: { count: number; hours: number } | null;
   opportunities: Opportunity[] | null;
 }) {
-  const activeTasks = (tasks ?? []).filter((t) => t.statusCategory !== "done");
+  // Фильтр — внутри useMemo с зависимостью [tasks]: раньше activeTasks строился
+  // заново на каждый рендер, и мемоизация upcoming по [activeTasks] была фиктивной.
+  const { activeTasks, upcoming } = useMemo(() => {
+    const active = (tasks ?? []).filter((t) => t.statusCategory !== "done");
+    return {
+      activeTasks: active,
+      upcoming: [...active].sort((a, b) => a.plannedFinish.localeCompare(b.plannedFinish)).slice(0, 6)
+    };
+  }, [tasks]);
   const today = localIsoDay();
   const overdueCount = activeTasks.filter((t) => t.plannedFinish.slice(0, 10) < today).length;
   const inProgressCount = activeTasks.filter((t) => t.statusCategory === "in_progress").length;
-  const upcoming = useMemo(
-    () => [...activeTasks].sort((a, b) => a.plannedFinish.localeCompare(b.plannedFinish)).slice(0, 6),
-    [activeTasks]
-  );
 
   // Агрегаты по сделкам (null = раздел недоступен роли).
   const openOpps = (opportunities ?? []).filter((o) => OPP_OPEN.includes(o.status));
