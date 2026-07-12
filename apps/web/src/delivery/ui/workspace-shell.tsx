@@ -19,6 +19,7 @@ const NAV: NavGroup[] = [
   {
     title: "Работа",
     items: [
+      { label: "Агент", href: "/agent", requires: ["tenant.projects.read"] },
       { label: "Мои задачи", href: "/my-work", requires: ["tenant.projects.read"] },
       { label: "Проекты", href: "/projects", requires: ["tenant.projects.read"] },
       { label: "Сделки", href: "/crm/deals", requires: ["tenant.opportunities.read"] }

@@ -12,6 +12,7 @@ const EVIDENCE_DIR = join(
 );
 
 const NAV_ITEMS = [
+  { label: "Агент", href: "/agent" },
   { label: "Мои задачи", href: "/my-work" },
   { label: "Проекты", href: "/projects" },
   { label: "Сделки", href: "/crm/deals" },
@@ -73,7 +74,7 @@ const ROLES: RoleCase[] = [
     userId: "user-alpha-plan-reader-no-resources",
     name: "Никита Без Ресурсов",
     initials: "НБ",
-    visibleNav: ["Мои задачи", "Проекты", "Дашборд"],
+    visibleNav: ["Агент", "Мои задачи", "Проекты", "Дашборд"],
     searchResult: {
       typeLabel: "Проект",
       title: "Портал подрядчиков Вектор",

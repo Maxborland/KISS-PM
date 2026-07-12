@@ -193,6 +193,7 @@ test.describe("Responsive authenticated shell regressions", () => {
     }
 
     for (const label of [
+      "Агент",
       "Мои задачи",
       "Проекты",
       "Сделки",
