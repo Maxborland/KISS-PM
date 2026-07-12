@@ -59,7 +59,6 @@ export function buildAttentionSignals(
 ): { shown: AttentionSignal[]; restCount: number } {
   const today = localIsoDay(0, now);
   const soon = localIsoDay(DUE_SOON_DAYS, now);
-  const staleBefore = localIsoDay(-STALE_DEAL_DAYS, now);
   const byFinish = <T extends { plannedFinish: string }>(list: T[]) =>
     [...list].sort((a, b) => a.plannedFinish.localeCompare(b.plannedFinish));
 
@@ -74,8 +73,14 @@ export function buildAttentionSignals(
 
   const openOpps = (opportunities ?? []).filter((o) => OPP_OPEN.includes(o.status));
   const overdueOpps = byFinish(openOpps.filter((o) => o.plannedFinish.slice(0, 10) < today));
+  // «Без движения»: точная миллисекундная арифметика от updatedAt (timestamp),
+  // а не сравнение UTC-дня строки с локальным днём (давало ±1 день на границе).
   const staleOpps = openOpps
-    .filter((o) => o.plannedFinish.slice(0, 10) >= today && o.updatedAt.slice(0, 10) <= staleBefore)
+    .filter(
+      (o) =>
+        o.plannedFinish.slice(0, 10) >= today &&
+        (now.getTime() - new Date(o.updatedAt).getTime()) / 86_400_000 >= STALE_DEAL_DAYS
+    )
     .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
 
   const taskSignal = (t: TaskRecord, chip: string, tone: "danger" | "warning"): AttentionSignal => ({
