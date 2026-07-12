@@ -13,9 +13,12 @@ import {
   buildScheduleMoveCommand,
   buildScheduleRangeCommands,
   buildScheduleWorkCommand,
+  engineConsistentWorkMinutes,
   optimisticPatch,
   resolveScheduleTiming,
-  scheduleUnitsPercent
+  resolveTaskWorkModel,
+  scheduleUnitsPercent,
+  taskUnitsPermille
 } from "./schedule-surface";
 import type { Row } from "./schedule-rows";
 
@@ -490,6 +493,32 @@ describe("Schedule batch and undo integrity", () => {
 });
 
 describe("Schedule surface calendar command builders", () => {
+  it("sends engine-consistent work for units-driven task types", () => {
+    const calendarRow = row(); // 6h/день; см. row() фикстуру
+    const base = { row: calendarRow, durationMinutes: 720 };
+    // fixed_units: движок выведет duration = work×1000/units — труд из длительности×юнитов.
+    expect(engineConsistentWorkMinutes({ ...base, workModel: { taskType: "fixed_units", effortDriven: false }, unitsPermille: 500 })).toBe(360);
+    // fixed_work (не effortDriven): труд фиксирован — прежние часы строки.
+    expect(engineConsistentWorkMinutes({ ...base, workModel: { taskType: "fixed_work", effortDriven: false }, unitsPermille: 500 })).toBe(Math.round(calendarRow.workH * 60));
+    // fixed_duration или нет назначений: прежняя пропорция (scaledWorkMinutes).
+    expect(engineConsistentWorkMinutes({ ...base, workModel: { taskType: "fixed_duration", effortDriven: false }, unitsPermille: 500 }))
+      .toBe(engineConsistentWorkMinutes({ ...base, workModel: { taskType: "fixed_units", effortDriven: false }, unitsPermille: 0 }));
+    expect(taskUnitsPermille([{ taskId: "t", unitsPermille: 600 }, { taskId: "t", unitsPermille: 400 }, { taskId: "x", unitsPermille: 999 }], "t")).toBe(1000);
+  });
+
+  it("preserves the task's work model semantics instead of forcing fixed_duration", () => {
+    const calendarRow = row();
+    const tasks = [{ id: calendarRow.id, taskType: "fixed_units" as const, effortDriven: true }];
+
+    const workModel = resolveTaskWorkModel(tasks, calendarRow.id);
+    expect(workModel).toEqual({ taskType: "fixed_units", effortDriven: true });
+    expect(buildScheduleWorkCommand(calendarRow, 2, 12, workModel)).toMatchObject({
+      payload: { taskType: "fixed_units", effortDriven: true }
+    });
+    // Неизвестная задача (legacy) — честный fallback.
+    expect(resolveTaskWorkModel(tasks, "missing")).toEqual({ taskType: "fixed_duration", effortDriven: false });
+  });
+
   it("uses the row calendar for work, units, dependency lag and dated timing", () => {
     const calendarRow = row();
 

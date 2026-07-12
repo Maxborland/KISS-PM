@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "runId": "project-resources-20260711-final3",
-  "generatedAt": "2026-07-11T03:43:46.645Z",
+  "runId": "project-resources-1783846025175",
+  "generatedAt": "2026-07-12T08:47:28.936Z",
   "targetRowCount": 16,
   "statusCounts": {
     "pass": 16,
@@ -14,8 +14,8 @@
       "role": "admin",
       "key": "PROJ-062:admin",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:30.187Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:10.555Z",
       "assertions": [
         "Live read-model resource buckets rendered team, role, person and total rows",
         "Collapsing a summary row removed descendants and exposed the matching expand control",
@@ -32,8 +32,8 @@
       "role": "planReader",
       "key": "PROJ-062:planReader",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:34.790Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:16.757Z",
       "assertions": [
         "Live read-model resource buckets rendered team, role, person and total rows",
         "Collapsing a summary row removed descendants and exposed the matching expand control",
@@ -50,8 +50,8 @@
       "role": "admin",
       "key": "PROJ-063:admin",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:30.580Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:11.081Z",
       "assertions": [
         "Day, week and month controls were live and switched the matrix",
         "Month navigation existed for windowed day/week modes and disappeared for full-horizon month mode",
@@ -68,8 +68,8 @@
       "role": "planReader",
       "key": "PROJ-063:planReader",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:35.160Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:17.095Z",
       "assertions": [
         "Day, week and month controls were live and switched the matrix",
         "Month navigation existed for windowed day/week modes and disappeared for full-horizon month mode",
@@ -86,8 +86,8 @@
       "role": "admin",
       "key": "PROJ-064:admin",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:30.974Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:11.623Z",
       "assertions": [
         "Live Team and Role selects both offered non-All values",
         "Changing Team reset Role to All",
@@ -104,8 +104,8 @@
       "role": "planReader",
       "key": "PROJ-064:planReader",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:35.539Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:17.503Z",
       "assertions": [
         "Live Team and Role selects both offered non-All values",
         "Changing Team reset Role to All",
@@ -122,8 +122,8 @@
       "role": "admin",
       "key": "PROJ-065:admin",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:31.232Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:12.061Z",
       "assertions": [
         "Derived idle resources from live day buckets for the visible month",
         "Hide idle removed every zero-commitment resource",
@@ -140,8 +140,8 @@
       "role": "planReader",
       "key": "PROJ-065:planReader",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:35.792Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:17.778Z",
       "assertions": [
         "Derived idle resources from live day buckets for the visible month",
         "Hide idle removed every zero-commitment resource",
@@ -158,8 +158,8 @@
       "role": "admin",
       "key": "PROJ-066:admin",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:31.837Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:12.833Z",
       "assertions": [
         "LIVE: capacity and committed minutes were summed from first-month API day buckets",
         "LIVE: Capacity, Assigned, Load and Free UI values matched the API-derived values",
@@ -176,8 +176,8 @@
       "role": "planReader",
       "key": "PROJ-066:planReader",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:36.355Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:18.450Z",
       "assertions": [
         "LIVE: capacity and committed minutes were summed from first-month API day buckets",
         "LIVE: Capacity, Assigned, Load and Free UI values matched the API-derived values",
@@ -194,8 +194,8 @@
       "role": "admin",
       "key": "PROJ-067:admin",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:32.401Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:13.719Z",
       "assertions": [
         "Clicked a live person/day bucket selected from API assignment contributions",
         "Inspector identity, date and authored task title matched the read-model",
@@ -212,8 +212,8 @@
       "role": "planReader",
       "key": "PROJ-067:planReader",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:36.937Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:19.270Z",
       "assertions": [
         "Clicked a live person/day bucket selected from API assignment contributions",
         "Inspector identity, date and authored task title matched the read-model",
@@ -230,8 +230,8 @@
       "role": "admin",
       "key": "PROJ-072:admin",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:33.092Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:14.595Z",
       "assertions": [
         "SYNTHETIC ROUTE FIXTURE: deterministic normal, overload, absence, holiday and weekend buckets rendered through the production matrix",
         "SYNTHETIC ROUTE FIXTURE: all five semantic classes produced distinct inline background values",
@@ -248,8 +248,8 @@
       "role": "planReader",
       "key": "PROJ-072:planReader",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:37.699Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:20.079Z",
       "assertions": [
         "SYNTHETIC ROUTE FIXTURE: deterministic normal, overload, absence, holiday and weekend buckets rendered through the production matrix",
         "SYNTHETIC ROUTE FIXTURE: all five semantic classes produced distinct inline background values",
@@ -266,8 +266,8 @@
       "role": "admin",
       "key": "PROJ-069:admin",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:41.999Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:24.660Z",
       "assertions": [
         "UI hours edit emitted matching assignment.upsert preview and apply envelopes",
         "API readback converted hours to exact minutes and survived reload",
@@ -301,7 +301,7 @@
             }
           },
           "clientPlanVersion": 6,
-          "idempotencyKey": "planning-apply-3df8228e-c42d-46f5-bd5e-7a08374312c4"
+          "idempotencyKey": "planning-apply-0b501264-a163-4bb8-974a-bc346a263fa8"
         },
         "reloadReadback": {
           "reloaded": true,
@@ -344,7 +344,7 @@
               }
             },
             "clientPlanVersion": 7,
-            "idempotencyKey": "planning-apply-f9c4b98f-cbd0-4aeb-86d1-ee5589a7e14f"
+            "idempotencyKey": "planning-apply-0cdef85c-7563-40e3-9d8a-51b66bc59aab"
           },
           "allocations": {
             "previewEnvelope": {
@@ -394,8 +394,8 @@
       "role": "admin",
       "key": "PROJ-070:admin",
       "status": "pass",
-      "runId": "project-resources-20260711-final3",
-      "generatedAt": "2026-07-11T03:43:46.329Z",
+      "runId": "project-resources-1783846025175",
+      "generatedAt": "2026-07-12T08:47:28.616Z",
       "assertions": [
         "Selected a live person/day cell and proved TaskModal preset the exact resourceId",
         "UI create emitted matching batch preview/apply commands and API readback contained task plus assignment",
@@ -407,10 +407,10 @@
             {
               "type": "task.create",
               "payload": {
-                "id": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "id": "t-9f5a8c9a-31c6-4301-9a7b-a7785e0c23fe",
                 "projectId": "project-gorset-migration",
                 "parentTaskId": null,
-                "title": "PROJ-070 preset project-resources-20260711-final3",
+                "title": "PROJ-070 preset project-resources-1783846025175",
                 "statusId": "todo",
                 "plannedStart": "2026-05-25",
                 "plannedFinish": "2026-05-26",
@@ -422,7 +422,7 @@
             {
               "type": "task.update_schedule",
               "payload": {
-                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "taskId": "t-9f5a8c9a-31c6-4301-9a7b-a7785e0c23fe",
                 "plannedStart": "2026-05-25",
                 "plannedFinish": "2026-05-26"
               }
@@ -430,8 +430,8 @@
             {
               "type": "assignment.upsert",
               "payload": {
-                "id": "a-816050fc-e648-4dc9-98dc-4c810a896b5c",
-                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "id": "a-c99b3063-8e19-4eb6-b62c-8c6c8aa3ae94",
+                "taskId": "t-9f5a8c9a-31c6-4301-9a7b-a7785e0c23fe",
                 "resourceId": "user-alpha-admin",
                 "role": "executor",
                 "unitsPermille": 1000,
@@ -446,10 +446,10 @@
             {
               "type": "task.create",
               "payload": {
-                "id": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "id": "t-9f5a8c9a-31c6-4301-9a7b-a7785e0c23fe",
                 "projectId": "project-gorset-migration",
                 "parentTaskId": null,
-                "title": "PROJ-070 preset project-resources-20260711-final3",
+                "title": "PROJ-070 preset project-resources-1783846025175",
                 "statusId": "todo",
                 "plannedStart": "2026-05-25",
                 "plannedFinish": "2026-05-26",
@@ -461,7 +461,7 @@
             {
               "type": "task.update_schedule",
               "payload": {
-                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "taskId": "t-9f5a8c9a-31c6-4301-9a7b-a7785e0c23fe",
                 "plannedStart": "2026-05-25",
                 "plannedFinish": "2026-05-26"
               }
@@ -469,8 +469,8 @@
             {
               "type": "assignment.upsert",
               "payload": {
-                "id": "a-816050fc-e648-4dc9-98dc-4c810a896b5c",
-                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "id": "a-c99b3063-8e19-4eb6-b62c-8c6c8aa3ae94",
+                "taskId": "t-9f5a8c9a-31c6-4301-9a7b-a7785e0c23fe",
                 "resourceId": "user-alpha-admin",
                 "role": "executor",
                 "unitsPermille": 1000,
@@ -479,7 +479,7 @@
             }
           ],
           "clientPlanVersion": 9,
-          "idempotencyKey": "planning-batch-0e05f755-8604-4c20-a61a-a8ff36664381"
+          "idempotencyKey": "planning-batch-07367afe-45bb-45ba-96df-d7f104396ea9"
         },
         "reloadReadback": {
           "reloaded": true,
@@ -492,7 +492,7 @@
             "command": {
               "type": "task.delete_or_archive",
               "payload": {
-                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "taskId": "t-9f5a8c9a-31c6-4301-9a7b-a7785e0c23fe",
                 "mode": "delete"
               }
             },
@@ -503,7 +503,7 @@
             "command": {
               "type": "task.delete_or_archive",
               "payload": {
-                "taskId": "t-8d747a4a-578d-4f3c-adbf-d6cd670b4652",
+                "taskId": "t-9f5a8c9a-31c6-4301-9a7b-a7785e0c23fe",
                 "mode": "delete"
               }
             },

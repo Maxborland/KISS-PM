@@ -4,8 +4,8 @@
   "role": "admin",
   "key": "PROJ-069:admin",
   "status": "pass",
-  "runId": "project-resources-20260711-final3",
-  "generatedAt": "2026-07-11T03:43:41.999Z",
+  "runId": "project-resources-1783846025175",
+  "generatedAt": "2026-07-12T08:47:24.660Z",
   "assertions": [
     "UI hours edit emitted matching assignment.upsert preview and apply envelopes",
     "API readback converted hours to exact minutes and survived reload",
@@ -39,7 +39,7 @@
         }
       },
       "clientPlanVersion": 6,
-      "idempotencyKey": "planning-apply-3df8228e-c42d-46f5-bd5e-7a08374312c4"
+      "idempotencyKey": "planning-apply-0b501264-a163-4bb8-974a-bc346a263fa8"
     },
     "reloadReadback": {
       "reloaded": true,
@@ -82,7 +82,7 @@
           }
         },
         "clientPlanVersion": 7,
-        "idempotencyKey": "planning-apply-f9c4b98f-cbd0-4aeb-86d1-ee5589a7e14f"
+        "idempotencyKey": "planning-apply-0cdef85c-7563-40e3-9d8a-51b66bc59aab"
       },
       "allocations": {
         "previewEnvelope": {

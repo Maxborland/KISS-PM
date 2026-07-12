@@ -4,8 +4,8 @@
   "role": "admin",
   "key": "PROJ-066:admin",
   "status": "pass",
-  "runId": "project-resources-20260711-final3",
-  "generatedAt": "2026-07-11T03:43:31.837Z",
+  "runId": "project-resources-1783846025175",
+  "generatedAt": "2026-07-12T08:47:12.833Z",
   "assertions": [
     "LIVE: capacity and committed minutes were summed from first-month API day buckets",
     "LIVE: Capacity, Assigned, Load and Free UI values matched the API-derived values",

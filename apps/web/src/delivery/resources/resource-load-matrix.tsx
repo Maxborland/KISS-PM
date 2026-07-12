@@ -83,7 +83,7 @@ export function canManageResourceControls({ live, permissions }: { live: boolean
   return !live || hasPermission(permissions, RESOURCE_MANAGE_PERMISSION);
 }
 
-const ROW_H = 34;
+const ROW_H = 36; // = var(--row-h): единая плотность строк с грид-таблицей Графика
 const HEADER_H = 40;
 const MONTHS = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
 const MONTHS_CAP = ["", "Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
@@ -350,7 +350,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
                 type="button"
                 onMouseEnter={() => setHover({ key: r.key, date: d })}
                 onClick={() => (opts?.totals ? undefined : toggle(r.key))}
-                className={cn("relative flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] font-semibold tabular-nums outline-none", opts?.totals ? "cursor-default" : "cursor-pointer", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")}
+                className={cn("relative flex shrink-0 items-center justify-end overflow-hidden border-r border-[var(--border-subtle)] px-1 text-[length:var(--text-2xs)] font-semibold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-hover)]", opts?.totals ? "cursor-default" : "cursor-pointer", isFocal ? CROSS_FOCAL : inCross ? CROSS : "")}
                 style={{ flex: `1 0 ${colW}px`, minWidth: colW, color: over ? "var(--danger)" : "var(--muted-strong)" }}
                 title={`${r.label} · ${d}\nСвод ${c.pct}% · ${h1(c.committed)}/${h1(c.capacity)} ч${c.overload ? " · перегруз" : ""}`}
               >
@@ -373,7 +373,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
               type="button"
               onMouseEnter={() => setHover({ key: r.key, date: d })}
               onClick={() => (r.resourceId ? setSel({ resourceId: r.resourceId, date: d }) : undefined)}
-              className={cn("flex shrink-0 items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-2xs)] font-semibold tabular-nums outline-none", isSel ? "ring-2 ring-inset ring-[var(--accent)]" : isFocal ? CROSS_FOCAL : inCross ? CROSS : "")}
+              className={cn("flex shrink-0 items-center justify-end overflow-hidden border-r border-[var(--border-subtle)] px-1 text-[length:var(--text-2xs)] font-semibold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-hover)]", isSel ? "ring-2 ring-inset ring-[var(--accent)]" : isFocal ? CROSS_FOCAL : inCross ? CROSS : "")}
               style={{ flex: `1 0 ${colW}px`, minWidth: colW, background: tone.bg, color: tone.fg }}
               title={c.bucket ? `${r.label} · ${d}\nЗагрузка ${c.pct}% · ${h1(c.committed)}/${h1(c.capacity)} ч${c.overload ? (c.accepted ? " · перегруз принят" : " · ПЕРЕГРУЗ") : ""}` : `${r.label} · ${d}`}
             >
@@ -454,12 +454,14 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
         ))}
       </div>
 
-      <div className="relative" data-testid="resource-load-matrix">
-        <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+      {/* Дрилдаун — сосед грида (резервирует место), а не absolute-оверлей поверх колонок. */}
+      <div className="relative flex items-stretch" data-testid="resource-load-matrix">
+        <div className="max-h-[75dvh] min-w-[420px] flex-1 overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
           <div className="flex min-w-full align-top" onMouseLeave={() => setHover(null)}>
-            {/* sticky-left: имена + загрузка часами */}
+            {/* sticky-left: имена + загрузка часами; шапка также sticky-top (вертикальный
+                скролл не теряет заголовок периода — паритет со sticky thead Графика) */}
             <div className="sticky left-0 z-20 shrink-0 border-r border-[var(--border-strong)] bg-[var(--panel)]">
-              <div className="flex items-end gap-2 border-b border-[var(--border-strong)] bg-[var(--panel-subtle)] px-3 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]" style={{ height: HEADER_H, width: LEFT_W }}>
+              <div className="sticky top-0 z-30 flex items-end gap-2 border-b border-[var(--border-strong)] bg-[var(--panel-subtle)] px-3 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]" style={{ height: HEADER_H, width: LEFT_W }}>
                 <span className="flex-1 self-center">Ресурс / команда</span><span className="w-[84px] self-center text-right">Часы / ёмк.</span>
               </div>
               {rows.map((r) => leftRow(r))}
@@ -468,7 +470,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
 
             {/* scrolling: периоды (flex-fill — без правого зазора) */}
             <div className="relative min-w-0 flex-1">
-              <div className="flex border-b border-[var(--border-strong)] bg-[var(--panel-subtle)]" style={{ height: HEADER_H }}>
+              <div className="sticky top-0 z-10 flex border-b border-[var(--border-strong)] bg-[var(--panel-subtle)]" style={{ height: HEADER_H }}>
                 {periods.map((d) => { const pl = periodLabel(d, gran); const inCol = crosshair?.date === d; return <span key={d} className={cn("flex flex-col items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-xs)] leading-none", pl.weekend && "bg-[color-mix(in_oklab,var(--muted-soft)_18%,var(--panel))]", inCol && CROSS)} style={{ flex: `1 0 ${colW}px`, minWidth: colW }}><span className={cn("font-semibold", inCol ? "text-[var(--accent)]" : "text-[var(--muted-strong)]")}>{pl.top}</span><span className="mt-0.5 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{pl.sub}</span></span>; })}
               </div>
               {rows.map((r) => periodRow(r))}
@@ -480,7 +482,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
 
         {/* drilldown */}
         {sel && selRes ? (
-          <aside className="absolute right-0 top-0 z-30 flex h-full w-[360px] flex-col border-l border-[var(--border-strong)] bg-[var(--panel)] shadow-[var(--shadow-pop)]">
+          <aside className="flex w-[360px] shrink-0 flex-col rounded-r-[var(--radius-card)] border border-l-0 border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)] max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-30 max-lg:rounded-[var(--radius-card)] max-lg:border-l max-lg:shadow-[var(--shadow-pop)]">
             <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
               <div className="min-w-0">
                 <div className="text-[length:var(--text-xs)] text-[var(--muted)]">{selRes.positionName} · {selRes.teamName}</div>
@@ -517,6 +519,17 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
                             ) : (
                               <span className="mt-0.5 block truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{task.projectName}</span>
                             )
+                          ) : null}
+                          {task?.projectId ? (
+                            // Общий selection-контракт кокпита: строка Графика выберется по ?task=.
+                            <a
+                              href={`/projects/${task.projectId}/schedule?task=${info.taskId.includes("::") ? info.taskId.split("::")[1] : info.taskId}`}
+                              className="mt-0.5 flex items-center gap-0.5 truncate text-[length:var(--text-2xs)] text-[var(--accent)] hover:underline"
+                              title="Открыть строку задачи в Графике"
+                            >
+                              <ArrowUpRight className="size-3 shrink-0" aria-hidden />
+                              <span className="truncate">Открыть в Графике</span>
+                            </a>
                           ) : null}
                           {asg && onEditAssignmentHours ? (
                             edit === assignmentId ? (
