@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import type { ScenarioProposal } from "@kiss-pm/domain";
 import { Check, Loader2, RefreshCw, Sparkles, TriangleAlert, X } from "lucide-react";
 import { toast } from "sonner";
@@ -67,6 +68,8 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   // валидация причины принятия риска — у поля причины (G3-19), не в toast
   const [reasonError, setReasonError] = useState<string | null>(null);
   const [scenarioErr, setScenarioErr] = useState<string | null>(null);
+  // Квитанция последнего применения этой сессии: auditEventId из ответа apply + ссылка на вкладку «Коммиты».
+  const [lastApplied, setLastApplied] = useState<{ label: string; planVersion: number; auditEventId: string } | null>(null);
 
   const model = useMemo(() => {
     if (!readModel) return null;
@@ -165,6 +168,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     setApplyBusy(false);
     if (res.ok) {
       toast.success(`Сценарий «${PROFILE_META[p.profile].label}» применён · коммит v${res.planVersion}${prototypeNotesEnabled ? ` · scenarioRunId ${res.scenarioRunId}` : ""}`);
+      setLastApplied({ label: PROFILE_META[p.profile].label, planVersion: res.planVersion, auditEventId: res.auditEventId });
       setRiskReason(""); setCompareId(null); setProposals(null); // авто-превью пересчитает по новому состоянию
     } else if (res.conflict) { setScenarioErr("Конфликт версий — перезагружено, запросите сценарии заново"); setProposals(null); }
     else if (res.code === "accepted_risk_reason_required") setReasonError("Требуется причина принятия риска");
@@ -198,6 +202,17 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           Реальный контракт: previewScenarios(target) → 3 профиля (наборы PlanningCommand с пересчётом метрик) → applyScenario (permission + audit «planning.scenario.applied», bump версии). Агрессивный принимает перегруз — нужна причина риска. Данные in-memory.
         </div>
       )}
+
+      {/* success-квитанция применения: реальный auditEventId + переход к коммиту плана */}
+      {lastApplied ? (
+        <div data-testid="scenario-apply-receipt" className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--success-border,var(--border))] bg-[var(--success-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--success-text)]">
+          <Check className="size-4 shrink-0" aria-hidden />
+          {/* формулировка сознательно отличается от toast («Сценарий … применён»): e2e ловит текст тоста substring-регекспом */}
+          <span>Применён сценарий «{lastApplied.label}» — коммит v{lastApplied.planVersion}.</span>
+          <span className="mono text-[length:var(--text-2xs)] text-[var(--muted-strong)]">{lastApplied.auditEventId}</span>
+          <Link href={`/projects/${encodeURIComponent(projectId)}/commits`} className="font-medium text-[var(--accent)] underline-offset-2 hover:underline">Открыть в Коммитах</Link>
+        </div>
+      ) : null}
 
       {model.overloads.length === 0 ? (
         <div data-testid="scenario-empty-state" className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-10 text-center text-[length:var(--text-sm)] text-[var(--muted)] shadow-[var(--shadow-card)]">
@@ -322,7 +337,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           {/* конфликт-баннер: рекомендованный сценарий не устраняет (если все accepted) — опускаем; банер про коммит */}
           <div className="mt-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--muted)]">
             <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-[var(--muted-soft)]" aria-hidden />
-            <span>Применение сценария вносит все изменения одной операцией: она проверяется по правам, записывается в историю изменений, и план получает новую версию. Откат доступен на вкладке «Коммиты».</span>
+            <span>Применение сценария вносит все изменения одной операцией: она проверяется по правам, записывается в историю изменений, и план получает новую версию. Откат доступен на вкладке <Link href={`/projects/${encodeURIComponent(projectId)}/commits`} className="font-medium text-[var(--accent)] underline-offset-2 hover:underline">Коммиты</Link>.</span>
           </div>
         </>
       )}
