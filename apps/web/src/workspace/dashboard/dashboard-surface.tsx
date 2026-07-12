@@ -10,11 +10,14 @@ import { Bento, BentoCard, StatTile } from "@/delivery/ui/bento";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { cn } from "@/lib/cn";
 import { useOpportunities } from "@/crm/lib/use-crm";
+import { useCrmRuntime } from "@/crm/lib/crm-runtime";
+import { useSessionUser } from "@/shell/use-session-user";
+import { hasAllPermissions } from "@/lib/permissions";
 import { useMyWork, useProjects } from "@/workspace/lib/use-workspace";
 import type { TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
 import type { Opportunity } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
-import { OPP_OPEN, OPP_STATUS_LABEL, buildAttentionSignals, fmtDate, localIsoDay } from "./attention-signals";
+import { DEALS_READ_BUNDLE, OPP_OPEN, OPP_STATUS_LABEL, buildAttentionSignals, fmtDate, localIsoDay } from "./attention-signals";
 
 /* ============================================================
    Workspace/Дашборд — summary-first сводка на КЛИЕНТСКОЙ АГРЕГАЦИИ
@@ -84,7 +87,19 @@ const srcStatus = (s: { data: unknown; status: string }): SourceView<never>["sta
 export function DashboardSurface() {
   const myWork = useMyWork();
   const projects = useProjects();
-  const opportunities = useOpportunities();
+  const opportunitiesRaw = useOpportunities();
+  const { live } = useCrmRuntime();
+  const sessionUser = useSessionUser();
+
+  // Drill-down в /crm/deals доступен только при ПОЛНОМ CRM-доступе (страница
+  // грузит useCrm целиком). Роль с одним opportunities.read увидела бы сигналы
+  // и ссылки, ведущие на forbidden-экран, — поэтому при неполном доступе
+  // трактуем сделки как недоступный роли источник: честное «нет доступа» без
+  // drill-down, а не ложное обещание. В mock/Storybook (live=false) — доступно.
+  const canReachDeals = !live || hasAllPermissions(sessionUser?.permissions ?? [], DEALS_READ_BUNDLE);
+  const opportunities = canReachDeals
+    ? opportunitiesRaw
+    : { data: null, status: "forbidden" as const, error: opportunitiesRaw.error, reload: opportunitiesRaw.reload };
 
   // Повиджетная деградация (G8-06): один недоступный источник (403/ошибка) не
   // убивает весь дашборд — его секция показывает «нет доступа», остальные живут.
