@@ -219,6 +219,18 @@ function AttentionCard({
     tasks.data !== null ? { label: "Мои задачи", href: "/my-work" } : null,
     opportunities.data !== null ? { label: "Сделки", href: "/crm/deals" } : null
   ].filter((v): v is { label: string; href: string } => v !== null);
+  // «Всё чисто» честно только когда ОБА источника реально рассчитаны: при
+  // недоступном разделе пустой список — не доказательство отсутствия сигналов.
+  const evaluated = [
+    tasks.data !== null ? "задачам" : null,
+    opportunities.data !== null ? "сделкам" : null
+  ].filter((v): v is string => v !== null);
+  const emptyCopy =
+    evaluated.length === 2
+      ? "Сигналов нет: просроченных задач и застрявших сделок не найдено."
+      : evaluated.length === 1
+        ? `Сигналов по ${evaluated[0]} нет.`
+        : "Сигналы не рассчитаны.";
 
   return (
     <BentoCard
@@ -230,7 +242,7 @@ function AttentionCard({
     >
       {shown.length === 0 ? (
         <p className="px-4 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">
-          Сигналов нет: просроченных задач и застрявших сделок не найдено.
+          {emptyCopy}
         </p>
       ) : (
         <ul className="flex flex-col" aria-label="Сигналы, требующие внимания">
