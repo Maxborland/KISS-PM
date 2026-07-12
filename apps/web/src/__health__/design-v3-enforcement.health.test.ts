@@ -151,7 +151,9 @@ describe("design-v3 enforcement (Phase 16)", () => {
     for (const [file, limit] of Object.entries(BEM_BASELINE)) {
       const css = readFileSync(join(srcRoot, file), "utf8");
       const classes = new Set<string>();
-      for (const m of css.matchAll(/^\.([a-zA-Z][\w-]*)/gm)) classes.add(m[1]);
+      for (const m of css.matchAll(/^\.([a-zA-Z][\w-]*)/gm)) {
+        if (m[1]) classes.add(m[1]);
+      }
       if (classes.size > limit) offenders.push(`${file}: ${classes.size} top-level классов > baseline ${limit}`);
     }
     expect(offenders, `BEM-слой заморожен — новые классы в components/ui|domain:\n${offenders.join("\n")}`).toEqual([]);
