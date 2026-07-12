@@ -34,18 +34,41 @@ describe("planning command contract", () => {
       expect(allocatedId).toMatch(new RegExp(`-${suffix}$`));
     }
 
+    const maxLengthPreferredId = "a".repeat(500);
+    const maxLengthAllocatedId = allocatePlanningAssignmentId(
+      maxLengthPreferredId,
+      new Set([maxLengthPreferredId])
+    );
+    expect(maxLengthAllocatedId).toBe(`${"a".repeat(498)}-2`);
+    expect(maxLengthAllocatedId.length).toBe(500);
+
     const oversizedAllocatedId = allocatePlanningAssignmentId(
       "assignment:".repeat(60),
       new Set()
     );
     expect(oversizedAllocatedId.length).toBeLessThanOrEqual(500);
 
-    const sharedPrefix = "task".repeat(120);
-    expect(
-      planningAssignmentId(`${sharedPrefix}a`, "resource-alpha", "executor")
-    ).not.toBe(
-      planningAssignmentId(`${sharedPrefix}b`, "resource-alpha", "executor")
+    const sharedTaskId = "t".repeat(490);
+    const sharedResourcePrefix = "resource".repeat(20);
+    const firstLongId = planningAssignmentId(
+      sharedTaskId,
+      `${sharedResourcePrefix}a`,
+      "executor"
     );
+    const secondLongId = planningAssignmentId(
+      sharedTaskId,
+      `${sharedResourcePrefix}b`,
+      "executor"
+    );
+    expect(firstLongId).toBe("assignment:5eeb001e-d9bf-54d6-9677-aa66df9bdd53");
+    expect(
+      planningAssignmentId(
+        sharedTaskId,
+        `${sharedResourcePrefix}a`,
+        "executor"
+      )
+    ).toBe(firstLongId);
+    expect(secondLongId).not.toBe(firstLongId);
   });
 
   it("creates a task.create planning command for task CRUD wrappers", () => {
