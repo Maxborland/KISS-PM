@@ -4,8 +4,8 @@
   "role": "admin",
   "key": "PROJ-067:admin",
   "status": "pass",
-  "runId": "project-resources-20260711-final3",
-  "generatedAt": "2026-07-11T03:43:32.401Z",
+  "runId": "project-resources-1783846025175",
+  "generatedAt": "2026-07-12T08:47:13.719Z",
   "assertions": [
     "Clicked a live person/day bucket selected from API assignment contributions",
     "Inspector identity, date and authored task title matched the read-model",
