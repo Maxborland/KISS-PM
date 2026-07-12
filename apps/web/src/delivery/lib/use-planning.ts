@@ -197,6 +197,16 @@ export function usePlanning(projectId: string) {
     [client, projectId, readModel, load, requestConfirmation]
   );
 
+  // Read-only батч-превью БЕЗ гейта подтверждения: детализация последствий для панелей
+  // сравнения (сценарии показывают задачи с датами до→после). План не мутирует.
+  const previewBatch = useCallback(
+    async (commands: PlanningCommand[]): Promise<PlanningPreviewResponse | null> => {
+      if (!readModel || commands.length === 0) return null;
+      return client.previewCommandBatch(projectId, { commands, clientPlanVersion: readModel.planVersion });
+    },
+    [client, projectId, readModel]
+  );
+
   // BUG-PROJ-24: откат последнего обратимого коммита через серверный revert-last
   // (работает из истории /commits, не зависит от in-session lastApplyRef).
   const revertLast = useCallback(async (targetCommitId: string): Promise<ApplyResult> => {
@@ -272,7 +282,7 @@ export function usePlanning(projectId: string) {
     return client.getCommits(projectId, lastApplyRef.current);
   }, [client, projectId]);
 
-  return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch, revertLast, previewScenarios, applyScenario, loadCommits };
+  return { client, readModel, setReadModel, status, error, reload: load, preview, previewBatch, apply, applyBatch, revertLast, previewScenarios, applyScenario, loadCommits };
 }
 function planningWriteSignature(planVersion: number, commands: readonly PlanningCommand[]): string {
   return JSON.stringify({ planVersion, commands });

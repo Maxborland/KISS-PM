@@ -20,6 +20,9 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 type Profile = "aggressive" | "balanced" | "resilient";
 type DiffRow = { wbs: string; title: string; detail: string; delta: string };
+// entity-level последствия выбранного proposal: даты задачи до→после из батч-превью его команд
+type CompareTaskRow = { taskId: string; wbs: string; title: string; beforeStart: string | null; beforeFinish: string | null; afterStart: string | null; afterFinish: string | null };
+type CompareDetails = { forId: string; status: "loading" | "ready" | "error"; rows: CompareTaskRow[] };
 // Канонический wire-тип предложения — доменный ScenarioProposal (его же отдают
 // previewScenarios боевого API и contract-mock); локального «почти такого же» типа больше нет.
 type Proposal = ScenarioProposal;
@@ -55,7 +58,7 @@ const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Dat
 const riskOf = (score: number) => score >= 67 ? { label: "высокий риск", cls: "bg-[var(--danger-soft)] text-[var(--danger-text)]" } : score >= 34 ? { label: "средний риск", cls: "bg-[var(--warning-soft)] text-[var(--warning-text)]" } : { label: "низкий риск", cls: "bg-[var(--success-soft)] text-[var(--success-text)]" };
 
 export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
-  const { readModel, status, error, reload, previewScenarios, applyScenario } = usePlanning(projectId);
+  const { readModel, status, error, reload, previewScenarios, applyScenario, previewBatch } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
   const sessionUser = useSessionUser();
@@ -80,6 +83,46 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const [scenarioErr, setScenarioErr] = useState<string | null>(null);
   // Квитанция последнего применения этой сессии: auditEventId из ответа apply + ссылка на вкладку «Коммиты».
   const [lastApplied, setLastApplied] = useState<{ label: string; planVersion: number; auditEventId: string } | null>(null);
+  const [compareDetails, setCompareDetails] = useState<CompareDetails | null>(null);
+
+  // entity-level последствия: команды выбранного proposal прогоняем через СУЩЕСТВУЮЩИЙ
+  // батч-превью (read-only) и берём даты задач до→после из before/after read-model.
+  // Ошибка превью НЕ блокирует apply — остаются агрегаты + честная пометка «детализация недоступна».
+  const selectedProposal = compareId ? (proposals ?? []).find((p) => p.id === compareId) ?? null : null;
+  useEffect(() => {
+    if (!selectedProposal || selectedProposal.planDelta.commands.length === 0) { setCompareDetails(null); return; }
+    const forId = selectedProposal.id;
+    const commands = selectedProposal.planDelta.commands;
+    let active = true;
+    setCompareDetails({ forId, status: "loading", rows: [] });
+    void (async () => {
+      try {
+        const batch = await previewBatch(commands);
+        if (!active) return;
+        if (!batch) { setCompareDetails({ forId, status: "error", rows: [] }); return; }
+        const beforeById = new Map(batch.before.calculatedPlan.tasks.map((t) => [t.id, t]));
+        const afterById = new Map(batch.after.calculatedPlan.tasks.map((t) => [t.id, t]));
+        const rows = (batch.planDelta.changedTaskIds ?? []).map((taskId): CompareTaskRow => {
+          const b = beforeById.get(taskId);
+          const a = afterById.get(taskId);
+          return {
+            taskId,
+            wbs: a?.wbsCode ?? b?.wbsCode ?? "—",
+            title: a?.title ?? b?.title ?? taskId,
+            beforeStart: b?.calculatedStart ?? null,
+            beforeFinish: b?.calculatedFinish ?? null,
+            afterStart: a?.calculatedStart ?? null,
+            afterFinish: a?.calculatedFinish ?? null
+          };
+        });
+        setCompareDetails({ forId, status: "ready", rows });
+      } catch {
+        if (active) setCompareDetails({ forId, status: "error", rows: [] });
+      }
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProposal?.id, previewBatch]);
 
   const model = useMemo(() => {
     if (!readModel) return null;
@@ -325,6 +368,26 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                             </div>
                           ))}
                         </div>
+                        {/* entity-level последствия: даты задач до→после из батч-превью команд proposal */}
+                        {compareDetails && compareDetails.forId === p.id ? (
+                          compareDetails.status === "loading" ? (
+                            <div className="mt-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--muted)]"><Loader2 className="size-3.5 animate-spin" aria-hidden /> Расчёт последствий по задачам…</div>
+                          ) : compareDetails.status === "error" ? (
+                            <div data-testid="scenario-compare-details-unavailable" className="mt-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--muted)]">Детализация по задачам недоступна — показаны только агрегатные метрики. Применение сценария по-прежнему возможно.</div>
+                          ) : compareDetails.rows.length > 0 ? (
+                            <div data-testid="scenario-compare-details" className="mt-2 rounded-[var(--radius-md)] border border-[var(--border)]">
+                              <div className="border-b border-[var(--border-subtle)] px-2.5 py-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Задачи: даты до → после ({compareDetails.rows.length})</div>
+                              {compareDetails.rows.map((row) => (
+                                <div key={row.taskId} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2.5 py-1.5 last:border-b-0 text-[length:var(--text-xs)]">
+                                  <span className="mono w-[42px] shrink-0 text-[var(--muted)]">{row.wbs}</span>
+                                  <span className="min-w-0 flex-1 truncate font-medium text-[var(--text)]">{row.title}</span>
+                                  <span className="mono shrink-0 text-[var(--muted-strong)]">{ddmm(row.beforeStart)} – {ddmm(row.beforeFinish)} → {ddmm(row.afterStart)} – {ddmm(row.afterFinish)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null
+                        ) : null}
+
                         {/* diff-list изменений (из planDelta.commands — контрактные данные) */}
                         {(() => { const diff = deriveDiff(p); return (
                         <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--border)]">
