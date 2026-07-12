@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CrmFrame } from "@/crm/ui/crm-frame";
-import { money } from "@/crm/ui/crm-bits";
+import { FEASIBILITY_LABEL as FEAS_LABEL, OPPORTUNITY_STATUS_LABEL as STATUS_LABEL, money } from "@/crm/ui/crm-bits";
 import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { makeRuError } from "@/lib/error-messages";
 import { useCrm, useCrmUsers, type CrmUsersIndex } from "@/crm/lib/use-crm";
@@ -31,10 +31,8 @@ const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim
 const ownerName = (users: CrmUsersIndex, id: string | null) => { if (!id) return "—"; return users.byId.get(id)?.name ?? `Участник ${id.slice(-4)}`; };
 const ownerColor = (users: CrmUsersIndex, id: string | null): BemAvatarColor => { const i = users.indexOf(id); return i < 0 ? "c5" : AV[i % AV.length]!; };
 
-const STATUS_LABEL: Record<Opportunity["status"], string> = { new: "Новая", feasibility: "Проверка", ready_to_activate: "Готова к запуску", won_closed: "Выиграна", lost_rejected: "Проиграна" };
 const isFinal = (o: Opportunity) => o.status === "won_closed" || o.status === "lost_rejected";
 const FEAS_TONE: Record<string, "success" | "warning" | "danger"> = { ok: "success", warning: "warning", conflict: "danger", blocked: "danger" };
-const FEAS_LABEL: Record<string, string> = { ok: "Реализуема", warning: "С оговорками", conflict: "Конфликт ресурсов", blocked: "Заблокирована" };
 const BLOCKER_RU: Record<string, string> = {
   invalid_dates: "Некорректные даты планирования",
   invalid_contract_terms: "Некорректные условия (сумма/ставка)",

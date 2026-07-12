@@ -1,6 +1,23 @@
 import { Chip } from "@/components/ui/chip";
 import { makeRuError } from "@/lib/error-messages";
+import type { Opportunity } from "@/crm/lib/crm-client";
 export { money, rub } from "./money";
+
+// Канонические RU-подписи статуса сделки и осуществимости (каноника — карточка
+// сделки /crm/deals/[id]); поверхности импортируют отсюда, а не копируют словари.
+export const OPPORTUNITY_STATUS_LABEL: Record<Opportunity["status"], string> = {
+  new: "Новая",
+  feasibility: "Проверка",
+  ready_to_activate: "Готова к запуску",
+  won_closed: "Выиграна",
+  lost_rejected: "Проиграна"
+};
+export const FEASIBILITY_LABEL: Record<string, string> = {
+  ok: "Реализуема",
+  warning: "С оговорками",
+  conflict: "Конфликт ресурсов",
+  blocked: "Заблокирована"
+};
 
 /** Общие крошки CRM-поверхностей: форматирование сумм, чип статуса, RU-сообщения ошибок. */
 const ERR: Record<string, string> = {

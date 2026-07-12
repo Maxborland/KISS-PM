@@ -3,14 +3,10 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { Loader2 } from "lucide-react";
 
-import { money } from "@/crm/ui/crm-bits";
+import { FEASIBILITY_LABEL as FEAS_LABEL, OPPORTUNITY_STATUS_LABEL as STATUS_LABEL, money } from "@/crm/ui/crm-bits";
 import type { CrmActivity, Opportunity } from "@/crm/lib/crm-client";
 import type { CrmDataResult } from "@/crm/lib/use-crm";
 import { UrlPeekSheet } from "@/workspace/lib/url-peek";
-
-// Локальные словари статусов — как в deal-card-surface (карточка остаётся канонической).
-const STATUS_LABEL: Record<Opportunity["status"], string> = { new: "Новая", feasibility: "Проверка", ready_to_activate: "Готова к запуску", won_closed: "Выиграна", lost_rejected: "Проиграна" };
-const FEAS_LABEL: Record<string, string> = { ok: "Реализуема", warning: "С оговорками", conflict: "Конфликт ресурсов", blocked: "Заблокирована" };
 
 const DEAL_DATE_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
 const dealDate = (value: string) => {

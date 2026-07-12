@@ -17,7 +17,7 @@ import { StatTile } from "@/delivery/ui/bento";
 import { cn } from "@/lib/cn";
 import { makeRuError } from "@/lib/error-messages";
 import { CrmFrame } from "@/crm/ui/crm-frame";
-import { money } from "@/crm/ui/crm-bits";
+import { OPPORTUNITY_STATUS_LABEL, money } from "@/crm/ui/crm-bits";
 import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { useCrm, useCrmUsers } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
@@ -39,7 +39,9 @@ export const isValidOpportunityProbability = (value: string) => {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 100;
 };
-const STATUS_LABEL: Record<Opportunity["status"], string> = { new: "Новая", feasibility: "Проверка", ready_to_activate: "Готова", won_closed: "Выиграна", lost_rejected: "Проиграна" };
+// Канонические подписи — crm-bits; локальный override: в компактных чипах
+// канбана/списка «Готова к запуску» не помещается, поэтому короткое «Готова».
+const STATUS_LABEL: Record<Opportunity["status"], string> = { ...OPPORTUNITY_STATUS_LABEL, ready_to_activate: "Готова" };
 const isFinal = (o: Opportunity) => o.status === "won_closed" || o.status === "lost_rejected";
 // Текстовые статус-чипы по паттерну STATUS_CHIP агента (agent-review): токен-тройка
 // border/soft-bg/text вместо заливных BEM-чипов — сдержанная глубина KISS Operational.
