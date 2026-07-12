@@ -160,6 +160,12 @@ export function ProjectDeals() {
   // (title-ссылка — канонический переход /crm/deals/[id], select стадии, кнопки,
   // drag-handle) обрабатываются сами и peek не открывают.
   const openDealPeek = (event: ReactMouseEvent<HTMLElement>, id: string) => {
+    // SheetContent открытого peek — React-потомок карточки/строки: клики из портала
+    // всплывают по React-дереву до этого onClick, а программный click() по Radix-триггеру
+    // ТОГГЛИТ панель (то есть закрыл бы её). DOM-contains отсекает события портала.
+    if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return;
+    // Выделение текста мышью — не намерение открыть peek.
+    if (window.getSelection()?.toString()) return;
     if ((event.target as HTMLElement).closest("a,button,select,input,textarea,label")) return;
     dealPeekTriggerRefs.current.get(id)?.click();
   };

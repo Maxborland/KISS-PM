@@ -70,6 +70,12 @@ test("deal peek opens from kanban and list, is URL-driven and closes with focus 
   await expect(dialog.getByRole("button", { name: "Сохранить" })).toHaveCount(0);
   await expect(dialog.getByRole("textbox")).toHaveCount(0);
 
+  // Регрессия: клик по неинтерактивному контенту ВНУТРИ открытого peek не закрывает
+  // панель (события портала всплывают по React-дереву до onClick карточки).
+  await dialog.getByText("E2E проверка peek-сводки сделки", { exact: true }).click();
+  await expect(dialog.getByRole("heading", { name: deal.title })).toBeVisible();
+  await expect(page).toHaveURL(peekUrl);
+
   // Title-ссылка внутри карточки осталась канонической (href не перехвачен peek'ом).
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
