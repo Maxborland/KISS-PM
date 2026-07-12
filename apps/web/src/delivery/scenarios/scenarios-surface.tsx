@@ -231,7 +231,14 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     else if (res.code === "accepted_risk_reason_required") setReasonError("Требуется причина принятия риска");
     // persisted-run больше неприменим (истёк/не найден/уже применён/integrity-mismatch):
     // показываем RU-текст кода (PLANNING_ERROR_MESSAGES) и сбрасываем предложения — авто-превью пересчитает
-    else if (res.code && STALE_SCENARIO_CODES.has(res.code)) { setScenarioErr(res.message); setProposals(null); }
+    else if (res.code && STALE_SCENARIO_CODES.has(res.code)) {
+      // already_applied: план на сервере уже ушёл вперёд, а клиентская версия отстала. Копия обещает
+      // «Данные обновлены» — держим её честной: reload ДО сброса предложений, чтобы авто-превью пошло
+      // со свежей planVersion (иначе следующий preview ловит 409-конфликт и второй противоречащий баннер).
+      if (res.code === "planning_scenario_already_applied") await reload();
+      setScenarioErr(res.message);
+      setProposals(null);
+    }
     else toast.error(`Отклонено: ${res.message}`);
   };
 
