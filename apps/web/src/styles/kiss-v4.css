@@ -27,37 +27,12 @@
   background: var(--panel-subtle);
 }
 
-/* Лёгкий подъём карточек/плиток при наведении */
-.v4-lift {
-  transition:
-    box-shadow var(--duration-base, 200ms) var(--ease-out, ease-out),
-    transform var(--duration-base, 200ms) var(--ease-out, ease-out),
-    border-color var(--duration-base, 200ms) var(--ease-out, ease-out);
-}
-.v4-lift:hover {
-  box-shadow: var(--shadow-raise);
-  transform: translateY(-2px);
-  border-color: var(--border-strong);
-}
-
 /* Стрелка «уезжает» вправо при наведении на строку */
 .v4-arrow {
   transition: transform var(--duration-base, 200ms) var(--ease-out, ease-out);
 }
 .group:hover .v4-arrow {
   transform: translateX(3px);
-}
-
-/* Кнопка отката: мягко увеличивается */
-.v4-pop {
-  transition:
-    transform var(--duration-fast, 120ms) var(--ease-out, ease-out),
-    color var(--duration-fast, 120ms) var(--ease-out, ease-out),
-    opacity var(--duration-base, 200ms) var(--ease-out, ease-out);
-}
-.v4-pop:hover {
-  transform: scale(1.12);
-  color: var(--accent);
 }
 
 /* Пульс индикатора «Сохранено» */
@@ -77,14 +52,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .v4-lift,
-  .v4-arrow,
-  .v4-pop {
+  .v4-arrow {
     transition: none;
   }
-  .v4-lift:hover,
-  .group:hover .v4-arrow,
-  .v4-pop:hover {
+  .group:hover .v4-arrow {
     transform: none;
   }
   .v4-pulse {
