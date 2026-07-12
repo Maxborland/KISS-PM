@@ -14,6 +14,9 @@ const webOrigin = `http://127.0.0.1:${webPort}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  // Карантин: спеки, нацеленные на удалённый UI (см. e2e/quarantine/README.md).
+  // Выходят из карантина только переписанными на живые якоря.
+  testIgnore: "**/quarantine/**",
   timeout: 90_000,
   workers: 1,
   expect: {

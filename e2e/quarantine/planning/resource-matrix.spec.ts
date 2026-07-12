@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { loginToWorkspace } from "../smoke/smokeHelpers";
+import { loginToWorkspace } from "../../smoke/smokeHelpers";
 
 test.describe("resource matrix", () => {
   test("planning resources tab shows monthly matrix", async ({ page }) => {

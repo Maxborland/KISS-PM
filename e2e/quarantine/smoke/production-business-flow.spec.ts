@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test } from "../runtime/runtimeQaFixtures";
+import { expect, test } from "../../runtime/runtimeQaFixtures";
 
 const adminCredentials = {
   email: "admin@kiss-pm.local",

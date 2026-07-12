@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { loginToWorkspace } from "../smoke/smokeHelpers";
+import { loginToWorkspace } from "../../smoke/smokeHelpers";
 
 test.describe("org structure", () => {
   test("admin configures structure, placement and saves", async ({ page }) => {
