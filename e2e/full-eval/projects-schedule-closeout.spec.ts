@@ -9,8 +9,8 @@ const SPEC_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SPEC_DIR, "../..");
 const EVIDENCE_ROOT = resolve(REPO_ROOT, ".superloopy/evidence/schedule-closeout-2026-07-10");
 const MACHINE_PATH = resolve(EVIDENCE_ROOT, "schedule-closeout-machine.json");
-const UI_ORIGIN = "http://127.0.0.1:3180";
-const API_ORIGIN = "http://127.0.0.1:4192";
+const UI_ORIGIN = `http://127.0.0.1:${process.env.E2E_WEB_PORT ?? "3180"}`;
+const API_ORIGIN = `http://127.0.0.1:${process.env.E2E_API_PORT ?? "4192"}`;
 const ADMIN = { email: "admin@kiss-pm.local", password: "admin12345" };
 const PLAN_READER = { email: "plan-reader-no-resources@kiss-pm.local", password: "reader12345" };
 const RUN_ID = process.env.SCHEDULE_CLOSEOUT_RUN_ID ?? `${Date.now()}-${process.pid}`;
@@ -181,13 +181,15 @@ test.describe("Schedule exhaustive browser closeout: 40 role rows / 11 bundles",
 
   test.beforeEach(async ({ context, page }, testInfo) => {
     page.setDefaultTimeout(10_000);
-    expect(process.env.E2E_API_PORT, "closeout must use isolated API port 4192").toBe("4192");
-    expect(process.env.E2E_WEB_PORT, "closeout UI must be served on port 3180").toBe("3180");
+    // Изолированный стенд обязателен (мутирующий closeout); конкретные порты берём из env,
+    // чтобы параллельные агенты могли гонять спек на своих портах, не толкаясь на 4192/3180.
+    expect(process.env.E2E_API_PORT, "closeout must use an isolated API port (e.g. 4192)").toBeTruthy();
+    expect(process.env.E2E_WEB_PORT, "closeout UI must be served on an isolated port (e.g. 3180)").toBeTruthy();
     expect(process.env.KISS_PM_E2E_DISPOSABLE_DATABASE, "mutating closeout requires an explicitly disposable seeded DB").toBe("1");
     expect(process.env.SCHEDULE_CLOSEOUT_RUN_ID, "set one stable run id so evidence survives Playwright worker restarts").toBeTruthy();
     expect(new URL(String(testInfo.project.use.baseURL)).origin).toBe(UI_ORIGIN);
     expect(testInfo.config.workers, "machine evidence writer requires --workers=1").toBe(1);
-    await routeBrowserApi(contextRoute(context), "4192");
+    await routeBrowserApi(contextRoute(context), process.env.E2E_API_PORT ?? "4192");
   });
 
   test("C01 admin authoring, modal, inline editors, row menu, and quick-create", async ({ page, browser }, testInfo) => {
@@ -1029,7 +1031,7 @@ test.describe("Schedule exhaustive browser closeout: 40 role rows / 11 bundles",
           markPreviewIntercepted();
           await previewGate;
           const target = new URL(route.request().url());
-          target.port = "4192";
+          target.port = process.env.E2E_API_PORT ?? "4192";
           const response = await route.fetch({ url: target.toString() });
           await route.fulfill({ response });
         }, { times: 1 });
@@ -2101,7 +2103,7 @@ async function routeBrowserApi(context: { route: Page["route"] }, apiPort: strin
 
 async function authenticatedPage(browser: Browser, credentials: typeof ADMIN) {
   const context = await browser.newContext({ baseURL: UI_ORIGIN, locale: "ru-RU" });
-  await routeBrowserApi(context, "4192");
+  await routeBrowserApi(context, process.env.E2E_API_PORT ?? "4192");
   const page = await context.newPage();
   page.setDefaultTimeout(10_000);
   await loginAndGetProject(page, credentials);
