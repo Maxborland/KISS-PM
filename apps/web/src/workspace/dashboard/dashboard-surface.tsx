@@ -88,8 +88,9 @@ const localIsoDay = (deltaDays = 0) => {
 const STALE_DEAL_DAYS = 14;
 /** Горизонт «дедлайн близко» для задач, дней. */
 const DUE_SOON_DAYS = 7;
-/** Максимум строк в блоке сигналов; остаток — честной строкой «и ещё N». */
-const MAX_SIGNAL_ROWS = 8;
+/** Максимум строк НА ГРУППУ сигналов (просроченные задачи/сделки, дедлайны, застой):
+ *  одна шумная группа не вытесняет остальные; остаток — честной строкой «и ещё N». */
+const MAX_ROWS_PER_GROUP = 4;
 
 type AttentionSignal = {
   key: string;
@@ -103,23 +104,31 @@ type AttentionSignal = {
 
 // Сигналы «требует внимания» из РЕАЛЬНЫХ данных доступных источников.
 // null-источник (нет прав) просто не даёт сигналов — об этом честная пометка в блоке.
-function buildAttentionSignals(tasks: TaskRecord[] | null, opportunities: Opportunity[] | null): AttentionSignal[] {
+// Внутри группы — сортировка по срочности (старейший срок первым), потом cap на группу.
+function buildAttentionSignals(
+  tasks: TaskRecord[] | null,
+  opportunities: Opportunity[] | null
+): { shown: AttentionSignal[]; restCount: number } {
   const today = localIsoDay();
   const soon = localIsoDay(DUE_SOON_DAYS);
   const staleBefore = localIsoDay(-STALE_DEAL_DAYS);
+  const byFinish = <T extends { plannedFinish: string }>(list: T[]) =>
+    [...list].sort((a, b) => a.plannedFinish.localeCompare(b.plannedFinish));
 
   const activeTasks = (tasks ?? []).filter((t) => t.statusCategory !== "done");
-  const overdueTasks = activeTasks.filter((t) => t.plannedFinish.slice(0, 10) < today);
-  const dueSoonTasks = activeTasks.filter((t) => {
-    const f = t.plannedFinish.slice(0, 10);
-    return f >= today && f <= soon;
-  });
+  const overdueTasks = byFinish(activeTasks.filter((t) => t.plannedFinish.slice(0, 10) < today));
+  const dueSoonTasks = byFinish(
+    activeTasks.filter((t) => {
+      const f = t.plannedFinish.slice(0, 10);
+      return f >= today && f <= soon;
+    })
+  );
 
   const openOpps = (opportunities ?? []).filter((o) => OPP_OPEN.includes(o.status));
-  const overdueOpps = openOpps.filter((o) => o.plannedFinish.slice(0, 10) < today);
-  const staleOpps = openOpps.filter(
-    (o) => o.plannedFinish.slice(0, 10) >= today && o.updatedAt.slice(0, 10) <= staleBefore
-  );
+  const overdueOpps = byFinish(openOpps.filter((o) => o.plannedFinish.slice(0, 10) < today));
+  const staleOpps = openOpps
+    .filter((o) => o.plannedFinish.slice(0, 10) >= today && o.updatedAt.slice(0, 10) <= staleBefore)
+    .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
 
   const taskSignal = (t: TaskRecord, chip: string, tone: "danger" | "warning"): AttentionSignal => ({
     key: `task-${chip}-${t.id}`,
@@ -140,16 +149,19 @@ function buildAttentionSignals(tasks: TaskRecord[] | null, opportunities: Opport
     ariaLabel: `Открыть сделку «${o.title}» в CRM`
   });
 
-  return [
-    ...overdueTasks.map((t) => taskSignal(t, "Задача просрочена", "danger")),
-    ...overdueOpps.map((o) =>
+  const groups: AttentionSignal[][] = [
+    overdueTasks.map((t) => taskSignal(t, "Задача просрочена", "danger")),
+    overdueOpps.map((o) =>
       oppSignal(o, "Сделка просрочена", "danger", `${OPP_STATUS_LABEL[o.status]} · финиш ${fmtDate(o.plannedFinish)}`)
     ),
-    ...dueSoonTasks.map((t) => taskSignal(t, `Дедлайн ≤ ${DUE_SOON_DAYS} дн.`, "warning")),
-    ...staleOpps.map((o) =>
+    dueSoonTasks.map((t) => taskSignal(t, `Дедлайн ≤ ${DUE_SOON_DAYS} дн.`, "warning")),
+    staleOpps.map((o) =>
       oppSignal(o, `Без движения ${STALE_DEAL_DAYS}+ дн.`, "warning", `${OPP_STATUS_LABEL[o.status]} · обновлена ${fmtDate(o.updatedAt)}`)
     )
   ];
+  const shown = groups.flatMap((g) => g.slice(0, MAX_ROWS_PER_GROUP));
+  const restCount = groups.reduce((s, g) => s + Math.max(0, g.length - MAX_ROWS_PER_GROUP), 0);
+  return { shown, restCount };
 }
 
 export function DashboardSurface() {
@@ -233,9 +245,7 @@ function CardAllLink({ href, children }: { href: string; children: React.ReactNo
 }
 
 function AttentionCard({ tasks, opportunities }: { tasks: TaskRecord[] | null; opportunities: Opportunity[] | null }) {
-  const signals = useMemo(() => buildAttentionSignals(tasks, opportunities), [tasks, opportunities]);
-  const shown = signals.slice(0, MAX_SIGNAL_ROWS);
-  const restCount = signals.length - shown.length;
+  const { shown, restCount } = useMemo(() => buildAttentionSignals(tasks, opportunities), [tasks, opportunities]);
   // Честность по правам: недоступный источник не даёт сигналов — говорим об этом явно.
   const unavailable = [tasks === null ? "задачам" : null, opportunities === null ? "сделкам" : null].filter(
     (v): v is string => v !== null
