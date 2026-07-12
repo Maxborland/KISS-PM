@@ -22,7 +22,7 @@ import {
 import { TaskModal, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
 import { useSessionUser } from "@/shell/use-session-user";
 import { hasPermission } from "@/lib/permissions";
-import { createPlanningCommand } from "@kiss-pm/domain";
+import { createPlanningCommand, recalculateWorkModel } from "@kiss-pm/domain";
 import type { PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
@@ -152,11 +152,39 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       // Семантику задачи (taskType/effortDriven) сохраняем — правка метаданных
       // не должна молча превращать fixed_units/fixed_work в fixed_duration.
       const existingTask = readModel?.authored.tasks.find((task) => task.id === id);
-      cmds.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId: id, taskType: existingTask?.taskType ?? "fixed_duration", effortDriven: existingTask?.effortDriven ?? false, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60 } }));
-      if (v.startIso) cmds.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: fin(v.startIso, v.durDays) } }));
+      const taskType = existingTask?.taskType ?? "fixed_duration";
+      const effortDriven = existingTask?.effortDriven ?? false;
+      // Для units-типов пара нормализуется под движок (duration = work×1000/units):
+      // менялся труд → выводим длительность; менялась только длительность → выводим труд.
+      const units = (readModel?.authored.assignments ?? [])
+        .filter((a) => a.taskId === id && (a.role === "executor" || a.role === "co_executor"))
+        .reduce((sum, a) => sum + (a.unitsPermille ?? 0), 0);
+      let workMinutes = Math.max(0, Math.round(v.workH * 60));
+      let durDays = v.durDays;
+      const unitsDriven = units > 0 && workMinutes > 0 &&
+        (taskType === "fixed_units" || (taskType === "fixed_work" && effortDriven));
+      if (unitsDriven) {
+        const workChanged = !existingTask || workMinutes !== existingTask.workMinutes;
+        if (workChanged) {
+          try {
+            durDays = recalculateWorkModel({
+              taskType,
+              effortDriven,
+              workMinutes,
+              durationMinutes: Math.max(1, v.durDays * MIN_PER_DAY),
+              unitsPermille: units,
+              changedField: "workMinutes"
+            }).durationMinutes / MIN_PER_DAY;
+          } catch { /* движок отдаст validation issue */ }
+        } else {
+          workMinutes = Math.max(0, Math.round((v.durDays * MIN_PER_DAY * units) / 1000));
+        }
+      }
+      cmds.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId: id, taskType, effortDriven, durationMinutes: Math.round(durDays * MIN_PER_DAY), workMinutes } }));
+      if (v.startIso) cmds.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: fin(v.startIso, Math.ceil(durDays)) } }));
       cmds.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } }));
       // upsert по id СУЩЕСТВУЮЩЕГО назначения (reduceAssignmentUpsert ключ — payload.id), новый id только когда назначения ещё нет
-      if (v.assigneeId) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: m.asgId ?? nid("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: v.workH * 60 } }));
+      if (v.assigneeId) cmds.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: m.asgId ?? nid("a"), taskId: id, resourceId: v.assigneeId, role: "executor", unitsPermille: 1000, workMinutes } }));
     }
     if (!cmds.length) return;
     setBusy(true);

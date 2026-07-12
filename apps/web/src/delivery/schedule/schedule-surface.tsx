@@ -76,13 +76,19 @@ function scaledWorkMinutes(row: Row, durationMinutes: number): number {
     : Math.max(0, durationMinutes);
 }
 
-/** Σ unitsPermille назначений задачи — та же величина, которой движок кормит recalculateWorkModel. */
+/**
+ * Σ unitsPermille РАБОЧИХ назначений задачи (executor/co_executor) — ровно та
+ * величина, которой движок кормит recalculateWorkModel (schedulingEngine
+ * фильтрует те же роли; controller/approver/observer в длительность не входят).
+ */
 export function taskUnitsPermille(
-  assignments: ReadonlyArray<{ taskId: string; unitsPermille?: number | null }>,
+  assignments: ReadonlyArray<{ taskId: string; role?: string | null; unitsPermille?: number | null }>,
   taskId: string
 ): number {
   return assignments
-    .filter((assignment) => assignment.taskId === taskId)
+    .filter((assignment) =>
+      assignment.taskId === taskId &&
+      (assignment.role == null || assignment.role === "executor" || assignment.role === "co_executor"))
     .reduce((sum, assignment) => sum + (assignment.unitsPermille ?? 0), 0);
 }
 
@@ -300,9 +306,10 @@ export function optimisticPatch(
         // Проекция эха движка: при units>0 и work>0 движок пересчитает длительность
         // через recalculateWorkModel — оптимистичный бар должен лечь туда же.
         let effectiveDuration = T.durationMinutes;
-        const units = (rm.authored.assignments as ReadonlyArray<{ taskId: string; unitsPermille?: number | null }>)
-          .filter((assignment) => assignment.taskId === id)
-          .reduce((sum, assignment) => sum + (assignment.unitsPermille ?? 0), 0);
+        const units = taskUnitsPermille(
+          rm.authored.assignments as ReadonlyArray<{ taskId: string; role?: string | null; unitsPermille?: number | null }>,
+          id
+        );
         if (units > 0 && T.workMinutes > 0) {
           try {
             effectiveDuration = recalculateWorkModel({
@@ -1223,11 +1230,43 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       const taskId = modal.taskId;
       commands.push(createPlanningCommand({ type: "task.update_identity", payload: { taskId, title: values.title } }));
       const workModel = resolveTaskWorkModel(readModel?.authored.tasks ?? [], taskId);
-      commands.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId, taskType: workModel.taskType, effortDriven: workModel.effortDriven, durationMinutes: timing.durationMinutes, workMinutes: Math.round(values.workH * 60) } }));
-      if (values.startIso) commands.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId, plannedStart: values.startIso, plannedFinish: timing.finishIso } }));
+      // Для units-типов пара из модалки нормализуется под семантику движка (duration
+      // следует из work×units): труд менял пользователь → длительность выводим;
+      // менял только длительность → труд выводим (как engineConsistentWorkMinutes в гриде).
+      const originalTask = readModel?.authored.tasks.find((task) => task.id === taskId);
+      const units = taskUnitsPermille(readModel?.authored.assignments ?? [], taskId);
+      let modalWorkMinutes = Math.max(0, Math.round(values.workH * 60));
+      let modalDurationMinutes = timing.durationMinutes;
+      let modalFinishIso = timing.finishIso;
+      const unitsDriven = units > 0 && modalWorkMinutes > 0 &&
+        (workModel.taskType === "fixed_units" || (workModel.taskType === "fixed_work" && workModel.effortDriven));
+      if (unitsDriven) {
+        const workChanged = !originalTask || modalWorkMinutes !== originalTask.workMinutes;
+        if (workChanged) {
+          try {
+            modalDurationMinutes = recalculateWorkModel({
+              ...workModel,
+              workMinutes: modalWorkMinutes,
+              durationMinutes: Math.max(1, modalDurationMinutes),
+              unitsPermille: units,
+              changedField: "workMinutes"
+            }).durationMinutes;
+            modalFinishIso = resolveScheduleTiming(
+              scheduleReadModel,
+              editedRow?.effectiveCalendarId,
+              values.startIso || null,
+              modalDurationMinutes / timing.workingMinutesPerDay
+            ).finishIso;
+          } catch { /* некорректная модель — движок отдаст validation issue */ }
+        } else {
+          modalWorkMinutes = Math.max(0, Math.round((modalDurationMinutes * units) / 1000));
+        }
+      }
+      commands.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId, taskType: workModel.taskType, effortDriven: workModel.effortDriven, durationMinutes: modalDurationMinutes, workMinutes: modalWorkMinutes } }));
+      if (values.startIso) commands.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId, plannedStart: values.startIso, plannedFinish: modalFinishIso } }));
       commands.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId, percentComplete: values.pct } }));
       if (canManageResources && values.assigneeId) {
-        commands.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: modal.asgId ?? genId("a"), taskId, resourceId: values.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: values.workH * 60 } }));
+        commands.push(createPlanningCommand({ type: "assignment.upsert", payload: { id: modal.asgId ?? genId("a"), taskId, resourceId: values.assigneeId, role: "executor", unitsPermille: 1000, workMinutes: modalWorkMinutes } }));
       } else if (canManageResources && modal.asgId) {
         commands.push(createPlanningCommand({ type: "assignment.delete", payload: { assignmentId: modal.asgId } }));
       }
