@@ -10,7 +10,8 @@ test.describe("custom wbs fields", () => {
       password: "admin12345"
     });
 
-    await page.goto("/projects/project-alpha/settings");
+    // project-vektor-portal сидируется в scripts/seed-dev.ts (project-alpha — нет).
+    await page.goto("/projects/project-vektor-portal/settings");
     await expect(
       page.getByTestId("custom-field-definitions").or(page.getByTestId("custom-fields-empty"))
     ).toBeVisible();
