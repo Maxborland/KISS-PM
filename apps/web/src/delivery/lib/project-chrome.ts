@@ -99,7 +99,16 @@ const PLANNING_ERROR_MESSAGES: Record<string, string> = {
   transport_failure: TRANSPORT_FAILURE_MESSAGE,
   network_error: TRANSPORT_FAILURE_MESSAGE,
   invalid_json_response: "Сервис планирования вернул некорректный ответ",
-  nothing_to_revert: "Нет изменений, которые можно отменить"
+  nothing_to_revert: "Нет изменений, которые можно отменить",
+  // Сценарии: persisted-превью живёт 15 минут и одноразово; все коды ниже означают
+  // «предложение больше неприменимо» с разной причиной (см. apply в registerPlanningRoutes).
+  scenario_expired: "Срок предложения истёк. Запросите сценарии заново",
+  scenario_not_found: "Предложение сценария не найдено. Запросите сценарии заново",
+  scenario_unavailable: "Сценарий стал недоступен для применения. Запросите сценарии заново",
+  planning_scenario_already_applied: "Этот сценарий уже применён. Данные обновлены",
+  planning_scenario_hash_mismatch: "Данные предложения изменились после расчёта. Запросите сценарии заново",
+  planning_scenario_engine_mismatch: "Версия планировщика обновилась. Запросите сценарии заново",
+  planning_scenario_target_mismatch: "Целевой перегруз изменился. Запросите сценарии заново"
 };
 
 const STATUS_ERROR_MESSAGES: Record<number, string> = {

@@ -28,6 +28,16 @@ type Overload = { resourceId: string; date: string; overloadMinutes: number; tas
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const SCENARIO_PREVIEW_PERMISSION = "tenant.planning_scenarios.preview";
 const SCENARIO_APPLY_PERMISSION = "tenant.planning_scenarios.apply";
+// коды apply, после которых persisted-предложения заведомо неприменимы — сбрасываем и пересчитываем
+const STALE_SCENARIO_CODES = new Set([
+  "scenario_expired",
+  "scenario_not_found",
+  "scenario_unavailable",
+  "planning_scenario_already_applied",
+  "planning_scenario_hash_mismatch",
+  "planning_scenario_engine_mismatch",
+  "planning_scenario_target_mismatch"
+]);
 const UNAVAILABLE_REASON: Record<Exclude<Proposal["unavailableReason"], null>, string> = {
   target_bucket_not_found: "Целевой день перегруза больше не найден.",
   target_assignment_not_found: "Назначение, создающее перегруз, больше не найдено.",
@@ -172,7 +182,9 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       setRiskReason(""); setCompareId(null); setProposals(null); // авто-превью пересчитает по новому состоянию
     } else if (res.conflict) { setScenarioErr("Конфликт версий — перезагружено, запросите сценарии заново"); setProposals(null); }
     else if (res.code === "accepted_risk_reason_required") setReasonError("Требуется причина принятия риска");
-    else if (res.code === "scenario_expired" || res.code === "scenario_not_found") { setScenarioErr("Предложения устарели — запросите заново"); setProposals(null); }
+    // persisted-run больше неприменим (истёк/не найден/уже применён/integrity-mismatch):
+    // показываем RU-текст кода (PLANNING_ERROR_MESSAGES) и сбрасываем предложения — авто-превью пересчитает
+    else if (res.code && STALE_SCENARIO_CODES.has(res.code)) { setScenarioErr(res.message); setProposals(null); }
     else toast.error(`Отклонено: ${res.message}`);
   };
 
