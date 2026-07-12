@@ -35,12 +35,18 @@ describe("planning command contract", () => {
     }
 
     const maxLengthPreferredId = "a".repeat(500);
-    const maxLengthAllocatedId = allocatePlanningAssignmentId(
-      maxLengthPreferredId,
-      new Set([maxLengthPreferredId])
-    );
-    expect(maxLengthAllocatedId).toBe(`${"a".repeat(498)}-2`);
-    expect(maxLengthAllocatedId.length).toBe(500);
+    const maxLengthReservedIds = new Set([maxLengthPreferredId]);
+    for (let suffix = 2; suffix <= 10; suffix += 1) {
+      const maxLengthAllocatedId = allocatePlanningAssignmentId(
+        maxLengthPreferredId,
+        maxLengthReservedIds
+      );
+      const collisionSuffix = `-${suffix}`;
+      expect(maxLengthAllocatedId).toBe(
+        `${"a".repeat(500 - collisionSuffix.length)}${collisionSuffix}`
+      );
+      expect(maxLengthAllocatedId.length).toBe(500);
+    }
 
     const oversizedAllocatedId = allocatePlanningAssignmentId(
       "assignment:".repeat(60),
