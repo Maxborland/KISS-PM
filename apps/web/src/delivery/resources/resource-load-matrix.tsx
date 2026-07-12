@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowDownWideNarrow, ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, EyeOff, Filter, Pencil, Plus, ShieldCheck, UserPlus, X } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -9,6 +10,7 @@ import { hasPermission } from "@/lib/permissions";
 import { dayToIso, isoToDay, type Resource } from "@/delivery/lib/planning-demo-data";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
+import { VIRTUAL_INITIAL_RECT, VIRTUAL_ROW_OVERSCAN } from "@/delivery/lib/virtual-rows";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
@@ -288,6 +290,29 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
 
   const { byKey, periods, monthsList, windowed, monthLabel, projOf, committedFor, cellFor, rows, visibleResList, teamsAll, rolesAll, showTeamFilter, kCap, kCommitted, kOverHours, kLoad, kFree, overloadedCount, allVisibleIds, totalsCells } = M;
 
+  // Виртуализация строк матрицы: ОДИН virtualizer на скролл-карточку (max-h-[75dvh]) —
+  // левая панель и период-строки рендерят одинаковое окно, построчный lockstep сохраняется.
+  // Итоговая строка «Итого» — вне окна, всегда рендерится в конце обеих колонок.
+  const matrixScrollRef = useRef<HTMLDivElement | null>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => matrixScrollRef.current,
+    // Строки строго ROW_H — динамический measureElement не нужен (и это единственный
+    // детерминированный замер в happy-dom, где элементы имеют нулевые размеры).
+    estimateSize: () => ROW_H,
+    overscan: VIRTUAL_ROW_OVERSCAN,
+    // Строки начинаются под sticky-шапкой периодов.
+    scrollMargin: HEADER_H,
+    initialRect: VIRTUAL_INITIAL_RECT
+  });
+  // item.start/end включают scrollMargin (см. virtual-core) — spacer'ы считаем за его вычетом.
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const virtualPadTop = virtualItems.length > 0 ? virtualItems[0]!.start - HEADER_H : 0;
+  const virtualPadBottom = virtualItems.length > 0
+    ? rowVirtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]!.end - HEADER_H)
+    : 0;
+  const virtualSpacer = (height: number) => (height > 0 ? <div aria-hidden data-testid="matrix-virtual-spacer" style={{ height }} /> : null);
+
   // эффективный «прицел»: под курсором (hover); когда курсор ушёл из сетки, но открыт дрилдаун —
   // держим подсветку на выбранной строке/столбце (визуальная связь с источником дрилдауна).
   const crosshair = hover ?? (sel ? { key: sel.resourceId, date: sel.date } : null);
@@ -312,7 +337,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
     const collapsedHere = collapsed.has(r.key);
     const rowHover = crosshair?.key === r.key;
     return (
-      <div key={r.key} onMouseEnter={() => setHover({ key: r.key, date: "" })} className={cn("flex items-center gap-1.5 border-b px-2", opts?.totals ? "border-[var(--border-strong)] bg-[var(--panel-subtle)]" : "border-[var(--border-subtle)]", !opts?.totals && (r.depth === 0 ? "bg-[color-mix(in_oklab,var(--panel-strong)_55%,var(--panel))]" : r.depth === 1 && "bg-[color-mix(in_oklab,var(--panel-strong)_25%,var(--panel))]"), rowHover && CROSS_SOFT)} style={{ height: ROW_H, width: LEFT_W }}>
+      <div key={r.key} data-matrix-left-row={r.key} onMouseEnter={() => setHover({ key: r.key, date: "" })} className={cn("flex items-center gap-1.5 border-b px-2", opts?.totals ? "border-[var(--border-strong)] bg-[var(--panel-subtle)]" : "border-[var(--border-subtle)]", !opts?.totals && (r.depth === 0 ? "bg-[color-mix(in_oklab,var(--panel-strong)_55%,var(--panel))]" : r.depth === 1 && "bg-[color-mix(in_oklab,var(--panel-strong)_25%,var(--panel))]"), rowHover && CROSS_SOFT)} style={{ height: ROW_H, width: LEFT_W }}>
         <span className="flex min-w-0 flex-1 items-center gap-1.5" style={{ paddingLeft: r.depth * 16 }}>
           {opts?.totals ? <span className="text-[length:var(--text-sm)] font-bold text-[var(--text-strong)]">Итого</span> : r.isPerson ? (
             <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--panel-strong)] text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{r.label.slice(0, 1)}</span>
@@ -333,7 +358,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
   const periodRow = (r: Rrow, opts?: { totals?: boolean }) => {
     const aggregate = !r.isPerson; // команда / позиция / Итого — это свод, рисуем баром
     return (
-      <div key={r.key} onMouseEnter={() => setHover((h) => ({ key: r.key, date: h?.date ?? "" }))} className={cn("flex border-b", opts?.totals ? "border-[var(--border-strong)] bg-[var(--panel-subtle)]" : "border-[var(--border-subtle)]", !opts?.totals && (r.depth === 0 ? "bg-[color-mix(in_oklab,var(--panel-strong)_40%,var(--panel))]" : r.depth === 1 && "bg-[color-mix(in_oklab,var(--panel-strong)_18%,var(--panel))]"))} style={{ height: ROW_H }}>
+      <div key={r.key} data-matrix-period-row={r.key} onMouseEnter={() => setHover((h) => ({ key: r.key, date: h?.date ?? "" }))} className={cn("flex border-b", opts?.totals ? "border-[var(--border-strong)] bg-[var(--panel-subtle)]" : "border-[var(--border-subtle)]", !opts?.totals && (r.depth === 0 ? "bg-[color-mix(in_oklab,var(--panel-strong)_40%,var(--panel))]" : r.depth === 1 && "bg-[color-mix(in_oklab,var(--panel-strong)_18%,var(--panel))]"))} style={{ height: ROW_H }}>
         {periods.map((d) => {
           const c = r.cells.get(d)!;
           const inCross = crosshair?.date === d || crosshair?.key === r.key;
@@ -456,7 +481,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
 
       {/* Дрилдаун — сосед грида (резервирует место), а не absolute-оверлей поверх колонок. */}
       <div className="relative flex items-stretch" data-testid="resource-load-matrix">
-        <div className="max-h-[75dvh] min-w-[420px] flex-1 overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
+        <div ref={matrixScrollRef} className="max-h-[75dvh] min-w-[420px] flex-1 overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
           <div className="flex min-w-full align-top" onMouseLeave={() => setHover(null)}>
             {/* sticky-left: имена + загрузка часами; шапка также sticky-top (вертикальный
                 скролл не теряет заголовок периода — паритет со sticky thead Графика) */}
@@ -464,7 +489,9 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
               <div className="sticky top-0 z-30 flex items-end gap-2 border-b border-[var(--border-strong)] bg-[var(--panel-subtle)] px-3 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.03em] text-[var(--muted-soft)]" style={{ height: HEADER_H, width: LEFT_W }}>
                 <span className="flex-1 self-center">Ресурс / команда</span><span className="w-[84px] self-center text-right">Часы / ёмк.</span>
               </div>
-              {rows.map((r) => leftRow(r))}
+              {virtualSpacer(virtualPadTop)}
+              {virtualItems.map((virtualRow) => leftRow(rows[virtualRow.index]!))}
+              {virtualSpacer(virtualPadBottom)}
               {rows.length ? leftRow({ key: "__totals", depth: 0, isPerson: false, label: "Итого", sub: "", memberIds: allVisibleIds, cells: totalsCells }, { totals: true }) : null}
             </div>
 
@@ -473,7 +500,9 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
               <div className="sticky top-0 z-10 flex border-b border-[var(--border-strong)] bg-[var(--panel-subtle)]" style={{ height: HEADER_H }}>
                 {periods.map((d) => { const pl = periodLabel(d, gran); const inCol = crosshair?.date === d; return <span key={d} className={cn("flex flex-col items-center justify-center border-r border-[var(--border-subtle)] text-[length:var(--text-xs)] leading-none", pl.weekend && "bg-[color-mix(in_oklab,var(--muted-soft)_18%,var(--panel))]", inCol && CROSS)} style={{ flex: `1 0 ${colW}px`, minWidth: colW }}><span className={cn("font-semibold", inCol ? "text-[var(--accent)]" : "text-[var(--muted-strong)]")}>{pl.top}</span><span className="mt-0.5 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{pl.sub}</span></span>; })}
               </div>
-              {rows.map((r) => periodRow(r))}
+              {virtualSpacer(virtualPadTop)}
+              {virtualItems.map((virtualRow) => periodRow(rows[virtualRow.index]!))}
+              {virtualSpacer(virtualPadBottom)}
               {rows.length ? periodRow({ key: "__totals", depth: 0, isPerson: false, label: "Итого", sub: "", memberIds: allVisibleIds, cells: totalsCells }, { totals: true }) : null}
             </div>
           </div>

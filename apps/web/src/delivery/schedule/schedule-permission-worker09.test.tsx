@@ -47,8 +47,39 @@ vi.mock("@/delivery/lib/use-pointer-drag", () => ({
   usePointerDrag: () => ({ state: null, begin: vi.fn() })
 }));
 
+// Непустой план: SSR-markup обязан содержать строки — пин честной серверной
+// отрисовки окна виртуализации через VIRTUAL_INITIAL_RECT (см. virtual-rows.ts).
 vi.mock("@/delivery/schedule/schedule-rows", () => ({
-  mapRows: () => ({ rows: [], deadlineDay: null, projectFinishDay: 5 })
+  mapRows: () => ({
+    rows: [{
+      id: "task-ssr-1",
+      wbs: "1",
+      name: "Задача SSR",
+      level: 0,
+      kind: "task",
+      hasChildren: false,
+      mode: "auto",
+      parentId: null,
+      durDays: 5,
+      durationMinutes: 2_400,
+      pct: 0,
+      startIso: "2026-07-06",
+      finishIso: "2026-07-10",
+      predDisplay: "",
+      predList: [],
+      res: "",
+      workH: 40,
+      slackDays: 0,
+      dayStart: 0,
+      dayDur: 5,
+      critical: false,
+      warning: false,
+      effectiveCalendarId: null,
+      workingMinutesPerDay: 480
+    }],
+    deadlineDay: null,
+    projectFinishDay: 5
+  })
 }));
 
 vi.mock("@/delivery/lib/date-origin", () => ({
@@ -73,12 +104,15 @@ describe("schedule permission controls worker 09", () => {
     expect(readOnlyMarkup).not.toContain(">Пакет<");
     expect(readOnlyMarkup).not.toContain("Новая задача — Enter");
     expect(readOnlyMarkup).toContain("Baseline");
+    // SSR не пустой: окно виртуализации рендерит строки на сервере (VIRTUAL_INITIAL_RECT)
+    expect(readOnlyMarkup).toContain("data-schedule-row-id");
 
     permissions = ["tenant.project_plan.read", "tenant.project_plan.manage"];
     const managerMarkup = renderToStaticMarkup(<ProjectSchedule projectId="project" />);
 
     expect(managerMarkup).toContain(">Пакет<");
     expect(managerMarkup).toContain("Новая задача — Enter");
+    expect(managerMarkup).toContain("data-schedule-row-id");
   });
 
   it("requires resource-manage permission for resource controls in live mode", () => {
