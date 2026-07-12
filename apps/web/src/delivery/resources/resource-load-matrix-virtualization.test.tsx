@@ -115,11 +115,14 @@ describe("resource load matrix row virtualization (bounded DOM)", () => {
     expect(document.querySelector('[data-matrix-left-row="__totals"]')).not.toBeNull();
     expect(document.querySelector('[data-matrix-period-row="__totals"]')).not.toBeNull();
 
-    // spacer'ы компенсируют невиртуализованные строки (в каждой колонке пара top/bottom)
+    // spacer'ы компенсируют невиртуализованные строки: окно у верха списка, поэтому
+    // верхние spacer'ы не рендерятся (высота 0) — остаётся ровно по одному нижнему
+    // на колонку (левая панель + период-строки), и их высоты обязаны совпадать
     const spacers = [...document.querySelectorAll<HTMLElement>('[data-testid="matrix-virtual-spacer"]')];
+    expect(spacers).toHaveLength(2);
+    const [leftBottom, periodBottom] = spacers.map((spacer) => Number.parseFloat(spacer.style.height));
+    expect(leftBottom).toBe(periodBottom);
     const windowRowCount = leftRows.length - 1; // без «Итого»
-    const leftSpacersHeight = spacers.slice(0, spacers.length / 2)
-      .reduce((sum, spacer) => sum + Number.parseFloat(spacer.style.height), 0);
-    expect(leftSpacersHeight + windowRowCount * ROW_H).toBe(count * ROW_H);
+    expect(leftBottom! + windowRowCount * ROW_H).toBe(count * ROW_H);
   });
 });
