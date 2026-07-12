@@ -258,7 +258,10 @@ async function expectDashboardState(page: Page, state: DashboardState) {
     return;
   }
 
-  for (const label of ["Мои задачи", "Открытые сделки", "Активные проекты", "Сделки выиграны"]) {
+  // Грамматика PR9: summary-first — блок «Требует внимания» рендерится во всех
+  // не-forbidden состояниях; декоративная плитка «Сделки выиграны» удалена.
+  await expect(main.getByRole("heading", { name: "Требует внимания" })).toBeVisible();
+  for (const label of ["Мои задачи", "Открытые сделки", "Активные проекты"]) {
     await expect(main.getByText(label, { exact: true })).toBeVisible();
   }
 
@@ -269,7 +272,8 @@ async function expectDashboardState(page: Page, state: DashboardState) {
   }
 
   if (state === "partial") {
-    await expect(main.getByText("нет доступа", { exact: true })).toHaveCount(2);
+    // Единственная CRM-плитка «Открытые сделки» → ровно одна пометка «нет доступа».
+    await expect(main.getByText("нет доступа", { exact: true })).toHaveCount(1);
     await expect(main.getByText("Сделки недоступны вашей роли.", { exact: true })).toBeVisible();
     await expect(main.getByText("Активные проекты", { exact: true })).toBeVisible();
     return;
@@ -277,7 +281,8 @@ async function expectDashboardState(page: Page, state: DashboardState) {
 
   await expect(main.getByText("Незавершённых задач нет — всё закрыто.", { exact: true })).toBeVisible();
   await expect(main.getByText("Сделок пока нет.", { exact: true })).toBeVisible();
-  await expect(main.getByText("0", { exact: true })).toHaveCount(4);
+  // Три KPI-плитки (задачи/сделки/проекты) с нулевыми значениями.
+  await expect(main.getByText("0", { exact: true })).toHaveCount(3);
   await expect(main.getByText("нет доступа", { exact: true })).toHaveCount(0);
 }
 

@@ -1177,6 +1177,16 @@ a:hover { color: var(--accent-hover); }
   box-shadow: var(--shadow-xs);
 }
 
+/* Видимый фокус сегмента с клавиатуры: radio внутри скрыт (sr-only),
+   поэтому кольцо рисуем на label по :focus-visible вложенного input. */
+.segmented__btn:has(input:focus-visible) {
+  box-shadow: var(--ring-focus);
+}
+
+.segmented__btn.is-active:has(input:focus-visible) {
+  box-shadow: var(--shadow-xs), var(--ring-focus);
+}
+
 .tabs {
   display: flex;
   align-items: center;

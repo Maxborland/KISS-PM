@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { cn } from "@/lib/cn";
 
@@ -31,6 +32,10 @@ export type BentoCardProps = {
   span?: 3 | 4 | 5 | 6 | 7 | 8 | 9 | 12;
   /** Убрать внутренние отступы тела (для таблиц/списков впритык). */
   flush?: boolean;
+  /** Уровень заголовка карточки в outline страницы: у страницы с голым h1
+   *  секции-карточки должны быть h2 (без пропуска уровня). Default 3 —
+   *  прежнее поведение для существующих потребителей. */
+  headingLevel?: 2 | 3 | 4;
   className?: string;
   bodyClassName?: string;
   children: ReactNode;
@@ -43,10 +48,12 @@ export function BentoCard({
   footer,
   span = 6,
   flush,
+  headingLevel = 3,
   className,
   bodyClassName,
   children
 }: BentoCardProps) {
+  const Heading = `h${headingLevel}` as "h2" | "h3" | "h4";
   return (
     <section
       className={cn(
@@ -59,9 +66,9 @@ export function BentoCard({
         <header className="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
           <div className="min-w-0">
             {title ? (
-              <h3 className="truncate font-[family-name:var(--font-display)] text-[length:var(--text-15)] font-bold leading-tight tracking-[-0.015em] text-[var(--text-strong)]">
+              <Heading className="truncate font-[family-name:var(--font-display)] text-[length:var(--text-15)] font-bold leading-tight tracking-[-0.015em] text-[var(--text-strong)]">
                 {title}
-              </h3>
+              </Heading>
             ) : null}
             {subtitle ? (
               <p className="mt-0.5 truncate text-[length:var(--text-sm)] text-[var(--muted-soft)]">{subtitle}</p>
@@ -82,17 +89,21 @@ export function BentoCard({
   );
 }
 
-/** KPI-плитка: метка, крупное число, дельта. Плоская, без градиентов. */
+/** KPI-плитка: метка, крупное число, дельта. Плоская, без градиентов.
+ *  href — drill-down к источнику числа (плитка становится ссылкой с видимым фокусом);
+ *  без href — статичная плитка (например, когда раздел недоступен роли). */
 export function StatTile({
   label,
   value,
   delta,
-  tone = "default"
+  tone = "default",
+  href
 }: {
   label: ReactNode;
   value: ReactNode;
   delta?: ReactNode;
   tone?: "default" | "success" | "warning" | "danger";
+  href?: string;
 }) {
   const deltaTone = {
     default: "text-[var(--muted)]",
@@ -106,8 +117,9 @@ export function StatTile({
     warning: "text-[var(--warning-text)]",
     danger: "text-[var(--danger-text)]"
   }[tone];
-  return (
-    <div className="hover-lift flex min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-4 shadow-[var(--shadow-card)]">
+  const rootCls = "hover-lift flex min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-4 shadow-[var(--shadow-card)]";
+  const body = (
+    <>
       <span className="truncate text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.07em] text-[var(--muted-soft)]">
         {label}
       </span>
@@ -120,6 +132,14 @@ export function StatTile({
         {value}
       </span>
       {delta ? <span className={cn("v4-num text-[length:var(--text-sm)] font-medium", deltaTone)}>{delta}</span> : null}
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} className={cn(rootCls, "outline-none focus-visible:shadow-[var(--ring-focus)]")}>
+        {body}
+      </Link>
+    );
+  }
+  return <div className={rootCls}>{body}</div>;
 }
