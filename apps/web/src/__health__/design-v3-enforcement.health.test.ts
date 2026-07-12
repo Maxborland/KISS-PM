@@ -24,6 +24,22 @@ function tsxFiles(dir: string): string[] {
 
 const rel = (f: string) => relative(srcRoot, f).replace(/\\/g, "/");
 
+function cssFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) {
+      out.push(...cssFiles(p));
+      continue;
+    }
+    if (name.endsWith(".css")) out.push(p);
+  }
+  return out;
+}
+
+/** Файлы-владельцы токенов: единственное место, где живут hex-значения и :root. */
+const TOKEN_OWNERS = new Set(["styles/tokens.css", "styles/tokens.planning.css"]);
+
 /**
  * Design-v3 lockdown (AGENTS.md §10) — реальный гейт, фиксирующий унификацию:
  *  - один канонический индиго `:root` (kiss-v4 промоутнут, scope-остров убран);
@@ -69,5 +85,75 @@ describe("design-v3 enforcement (Phase 16)", () => {
     expect(tokens, "tokens.css must be the :root owner").toContain(":root {");
     expect(tokens, "canonical indigo accent must live in tokens.css").toContain("--accent: #5b5bd6");
     expect(tokens, "--text-2xs micro token must exist").toContain("--text-2xs");
+  });
+
+  // ---- CSS-слой: ratchet-гейты (убывать можно, расти нельзя) ----
+  const allCss = cssFiles(srcRoot);
+
+  it("defines :root only in the token owner files", () => {
+    const offenders = allCss
+      .filter((f) => !TOKEN_OWNERS.has(rel(f)))
+      .filter((f) => /^:root/m.test(readFileSync(f, "utf8")))
+      .map(rel);
+    expect(offenders, `новые :root вне styles/tokens*.css запрещены — токены живут в одном месте:\n${offenders.join("\n")}`).toEqual([]);
+  });
+
+  it("does not grow raw hex literals in the CSS layer (ratchet)", () => {
+    // Baseline 2026-07-12 (унификация владельца токенов). Новые цвета — только токеном
+    // в styles/tokens.css. Уменьшение baseline при миграции файла — ожидаемо и желательно.
+    const HEX_BASELINE: Record<string, number> = {
+      "app/globals.css": 15, // dark-map поверхностей до PR11
+      "styles/bem.css": 38,
+      "styles/bem-supplement.css": 12,
+      "styles/kiss-v4.css": 2, // #ffffff внутри color-mix gantt-баров
+      "styles/widgets/gantt.css": 9,
+      "styles/widgets/landing-agent-demo.css": 18, // маркетинговый остров, де-айленд в PR5
+      "styles/widgets/resource-matrix.css": 15,
+    };
+    const offenders: string[] = [];
+    for (const f of allCss) {
+      const key = rel(f);
+      if (TOKEN_OWNERS.has(key)) continue;
+      const count = (readFileSync(f, "utf8").match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length;
+      const limit = HEX_BASELINE[key] ?? 0;
+      if (count > limit) offenders.push(`${key}: hex ${count} > baseline ${limit}`);
+    }
+    expect(offenders, `raw hex в CSS-слое вырос — новые цвета только через var(--*) из tokens.css:\n${offenders.join("\n")}`).toEqual([]);
+  });
+
+  it("does not grow literal 10-12px font sizes in the CSS layer (ratchet)", () => {
+    const FS_BASELINE: Record<string, number> = {
+      "styles/bem.css": 11,
+      "styles/bem-supplement.css": 6,
+      "styles/kiss-v4.css": 1, // .msgrid td — документированное техническое исключение
+      "styles/widgets/gantt.css": 7,
+      "styles/widgets/landing-agent-demo.css": 1,
+      "styles/widgets/resource-matrix.css": 6,
+    };
+    const offenders: string[] = [];
+    for (const f of allCss) {
+      const key = rel(f);
+      const count = (readFileSync(f, "utf8").match(/font-size:\s*1[0-2]px/g) ?? []).length;
+      const limit = FS_BASELINE[key] ?? 0;
+      if (count > limit) offenders.push(`${key}: font-size 10-12px ${count} > baseline ${limit}`);
+    }
+    expect(offenders, `литеральные 10-12px выросли — используйте var(--text-2xs|xs|sm):\n${offenders.join("\n")}`).toEqual([]);
+  });
+
+  it("freezes the BEM layer (no new top-level classes)", () => {
+    // Форвард-путь — components/ui + components/domain (AGENTS.md §10, DESIGN.md).
+    // BEM-слой заморожен: правки существующих классов допустимы, новые классы — нет.
+    const BEM_BASELINE: Record<string, number> = {
+      "styles/bem.css": 343,
+      "styles/bem-supplement.css": 123,
+    };
+    const offenders: string[] = [];
+    for (const [file, limit] of Object.entries(BEM_BASELINE)) {
+      const css = readFileSync(join(srcRoot, file), "utf8");
+      const classes = new Set<string>();
+      for (const m of css.matchAll(/^\.([a-zA-Z][\w-]*)/gm)) classes.add(m[1]);
+      if (classes.size > limit) offenders.push(`${file}: ${classes.size} top-level классов > baseline ${limit}`);
+    }
+    expect(offenders, `BEM-слой заморожен — новые классы в components/ui|domain:\n${offenders.join("\n")}`).toEqual([]);
   });
 });
