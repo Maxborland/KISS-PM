@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { GripVertical, Search } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,8 +15,9 @@ import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { cn } from "@/lib/cn";
 import { useSessionUser } from "@/shell/use-session-user";
-import { useMyWork, useProjects, useWorkspaceTaskStatuses, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
+import { useMyWork, useProjects, useTaskDetail, useWorkspaceTaskStatuses, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
 import type { TaskPriority, TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
+import { useUrlPeekParamCleaner } from "@/workspace/lib/url-peek";
 import { TaskPeek, taskPeekRecordFromWorkspace } from "@/workspace/task-peek/task-peek";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
@@ -170,6 +172,7 @@ export function MyWorkSurface() {
     <WorkspaceShell activeNav="Мои задачи">
       <main className="min-w-0 flex-1 overflow-auto p-4">
         <ProtoBanner />
+        {tasks ? <MyWorkTaskDeepLinkResolver tasks={tasks} /> : null}
 
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -381,6 +384,36 @@ function ProtoBanner() {
 }
 
 // Карточка задачи канбана (draggable). Реордер внутри колонки боевым контрактом не покрыт — не реализуем.
+export function MyWorkTaskDeepLinkResolver({ tasks }: { tasks: readonly TaskRecord[] }) {
+  const searchParams = useSearchParams();
+  const taskId = new URLSearchParams(searchParams?.toString() ?? (typeof window === "undefined" ? "" : window.location.search)).get("task");
+  if (!taskId || tasks.some((task) => task.id === taskId)) return null;
+  return <DeferredTaskPeek key={taskId} taskId={taskId} />;
+}
+
+function DeferredTaskPeek({ taskId }: { taskId: string }) {
+  const { data, status, notFound } = useTaskDetail(taskId);
+  const clearTaskParam = useUrlPeekParamCleaner("task");
+  const reportedRef = useRef(false);
+
+  useEffect(() => {
+    if (reportedRef.current || (status !== "error" && status !== "forbidden")) return;
+    reportedRef.current = true;
+    clearTaskParam();
+    toast.error(notFound ? "Задача не найдена" : status === "forbidden" ? "Задача недоступна для вашей роли" : "Не удалось открыть задачу");
+  }, [clearTaskParam, notFound, status]);
+
+  if (!data?.task) {
+    return status === "loading" ? <span className="sr-only" role="status">Загрузка задачи…</span> : null;
+  }
+
+  return (
+    <TaskPeek task={taskPeekRecordFromWorkspace(data.task)}>
+      <button type="button" className="sr-only">Открыть задачу «{data.task.title}»</button>
+    </TaskPeek>
+  );
+}
+
 function TaskCard({
   task,
   busy,

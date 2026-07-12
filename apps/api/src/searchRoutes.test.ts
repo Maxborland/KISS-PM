@@ -85,7 +85,7 @@ describe("unified search routes", () => {
       getSessionActorFromHeaders: async () => actor
     });
 
-    const response = await app.request("/api/workspace/search?q=договор&limit=1", {
+    const response = await app.request("/api/workspace/search?q=договор&limit=1&types=task", {
       headers: { cookie: "kiss_pm_session=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" }
     });
 
