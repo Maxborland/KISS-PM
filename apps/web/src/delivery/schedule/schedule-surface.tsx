@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, type ClipboardEvent as ReactClipboardEvent, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type ClipboardEvent as ReactClipboardEvent, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Plus, TriangleAlert, Undo2 } from "lucide-react";
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import { defaultRangeExtractor, useWindowVirtualizer, type Range } from "@tanstack/react-virtual";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -544,15 +544,50 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   // грида без max-height растёт с контентом), поэтому window-virtualizer со
   // scrollMargin = отступ первой строки от верха документа (верх карточки + шапка).
   const scheduleGridRef = useRef<HTMLDivElement | null>(null);
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
   const [rowsScrollMargin, setRowsScrollMargin] = useState(0);
-  useEffect(() => {
-    // Без deps: контент над гридом (баннеры/ошибки) меняет отступ — перемеряем после
-    // каждого рендера; guarded setState не даёт зациклиться.
+  const measureRowsScrollMargin = () => {
     const grid = scheduleGridRef.current;
     if (!grid) return;
     const next = Math.round(grid.getBoundingClientRect().top + window.scrollY) + HEADER_H;
-    if (next !== rowsScrollMargin) setRowsScrollMargin(next);
-  });
+    setRowsScrollMargin((current) => (current === next ? current : next));
+  };
+  // Без deps: контент над гридом (баннеры/ошибки) меняет отступ — перемеряем после
+  // каждого рендера; guarded setState не даёт зациклиться. useLayoutEffect (не useEffect):
+  // замер ДО paint, иначе окно строк на кадр съезжает при каждом сдвиге контента над гридом.
+  useLayoutEffect(measureRowsScrollMargin);
+  // Контент над гридом может менять высоту и БЕЗ ре-рендера поверхности (async-баннеры,
+  // догрузка шрифтов): ResizeObserver на workspace-обёртке перемеряет отступ, чтобы окно
+  // виртуализации не съехало навсегда.
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => measureRowsScrollMargin());
+    if (workspaceRef.current) observer.observe(workspaceRef.current);
+    return () => observer.disconnect();
+    // measureRowsScrollMargin читает только рефы и делает guarded setState — подписка mount-only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Строки с активным вводом ЗАКРЕПЛЯЕМ в отрендеренном наборе (rangeExtractor):
+  // окно виртуализации не должно размонтировать inline-редактор ячейки или
+  // inlineNew-строку при скролле — иначе ввод и фокус молча умирают вместе с DOM.
+  const pinnedRowIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (edit) ids.add(edit.id);
+    if (inlineNew) ids.add(inlineNew.afterId);
+    return ids;
+  }, [edit, inlineNew]);
+  const pinnedIndices = useMemo(() => {
+    if (pinnedRowIds.size === 0) return [];
+    const indices: number[] = [];
+    visibleRows.forEach((row, index) => { if (pinnedRowIds.has(row.id)) indices.push(index); });
+    return indices;
+  }, [pinnedRowIds, visibleRows]);
+  const rowRangeExtractor = useCallback((range: Range) => {
+    const windowIndices = defaultRangeExtractor(range);
+    if (pinnedIndices.length === 0) return windowIndices;
+    const merged = new Set([...pinnedIndices, ...windowIndices]);
+    return [...merged].sort((a, b) => a - b);
+  }, [pinnedIndices]);
   const rowVirtualizer = useWindowVirtualizer({
     count: visibleRows.length,
     // Строки строго ROW_H — динамический measureElement не нужен (и это единственный
@@ -560,7 +595,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     estimateSize: () => ROW_H,
     overscan: VIRTUAL_ROW_OVERSCAN,
     scrollMargin: rowsScrollMargin,
-    initialRect: VIRTUAL_INITIAL_RECT
+    initialRect: VIRTUAL_INITIAL_RECT,
+    rangeExtractor: rowRangeExtractor
   });
   // Общий selection-контракт кокпита: переход с ?task= (из Ресурсов/пиков) выбирает
   // строку в WBS. Однократно после готовности read-model; TaskPeek читает тот же параметр сам.
@@ -585,6 +621,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const lastAppliedPasteRef = useRef<string | null>(null);
   const quickCreateRef = useRef<HTMLInputElement | null>(null);
   const rowElementsRef = useRef<Map<string, HTMLTableRowElement>>(new Map()).current;
+  // generation-counter retry-циклов withScheduleRowNode: новый вызов отменяет предыдущие.
+  const rowNodeRequestRef = useRef(0);
   const fillDragTargetRef = useRef<string | null>(null);
   const ganttRef = useRef<HTMLDivElement>(null);
   const taskPeekTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -1021,8 +1059,16 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const firstVirtualIndex = virtualItems[0]?.index ?? 0;
   const lastVirtualIndex = virtualItems[virtualItems.length - 1]?.index ?? -1;
   const virtualPadTop = virtualItems.length > 0 ? virtualItems[0]!.start - rowsScrollMargin : 0;
+  // inlineNew-строка (ROW_H) живёт только в потоке WBS-таблицы — virtualizer о ней не знает.
+  // Вычитаем её высоту из нижнего spacer'а, чтобы фактическая высота tbody сходилась
+  // с totalSize (иначе вертикальная геометрия дрейфует на ROW_H, пока строка открыта).
+  const inlineNewRowRendered = canManagePlan && inlineNew != null &&
+    visibleRows.some((row) => row.id === inlineNew.afterId);
   const virtualPadBottom = virtualItems.length > 0
-    ? rowVirtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]!.end - rowsScrollMargin)
+    ? Math.max(0,
+        rowVirtualizer.getTotalSize()
+        - (virtualItems[virtualItems.length - 1]!.end - rowsScrollMargin)
+        - (inlineNewRowRendered ? ROW_H : 0))
     : 0;
 
   // связи
@@ -1071,9 +1117,13 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   ) => {
     const node = resolve(id);
     if (node) { action(node); return; }
+    // generation-counter: новый вызов прекращает предыдущие retry-циклы — два
+    // конкурирующих скролла к разным строкам не выполняют действие по устаревшей цели.
+    const requestId = ++rowNodeRequestRef.current;
     scrollRowIntoView(id);
     let attempts = 10;
     const retry = () => {
+      if (rowNodeRequestRef.current !== requestId) return;
       const nextNode = resolve(id);
       if (nextNode) { action(nextNode); return; }
       if (attempts-- > 0) window.requestAnimationFrame(retry);
@@ -1737,6 +1787,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   return (
     <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="График">
       <div
+        ref={workspaceRef}
         data-testid="schedule-productivity-workspace"
         tabIndex={0}
         onKeyDown={handleWorkspaceKeyDown}
@@ -1835,11 +1886,20 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       <td colSpan={COLS.length} style={{ height: virtualPadTop, padding: 0 }} />
                     </tr>
                   ) : null}
-                  {virtualItems.map((virtualRow) => {
+                  {virtualItems.map((virtualRow, itemIndex) => {
                     const r = visibleRows[virtualRow.index]!;
                     const i = virtualRow.index;
+                    // Закреплённая rangeExtractor'ом строка может стоять вне сплошного окна —
+                    // разрыв держим отдельным spacer'ом (высота кратна ROW_H).
+                    const prevItem = itemIndex > 0 ? virtualItems[itemIndex - 1]! : null;
+                    const gapBefore = prevItem ? virtualRow.start - prevItem.end : 0;
                     return (
                     <Fragment key={r.id}>
+                    {gapBefore > 0 ? (
+                      <tr aria-hidden data-testid="schedule-virtual-spacer-gap">
+                        <td colSpan={COLS.length} style={{ height: gapBefore, padding: 0 }} />
+                      </tr>
+                    ) : null}
                     <ScheduleRowMenu
                       canManagePlan={canManagePlan}
                       isLeaf={r.kind !== "summary"}
@@ -1856,7 +1916,20 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       onDelete={() => setConfirmDelete(r)}
                     >
                       <tr
-                        ref={(node) => { if (node) rowElementsRef.set(r.id, node); else rowElementsRef.delete(r.id); }}
+                        ref={(node) => {
+                          if (node) { rowElementsRef.set(r.id, node); return; }
+                          const prev = rowElementsRef.get(r.id);
+                          rowElementsRef.delete(r.id);
+                          // Строку с фокусом внутри размонтировало окно виртуализации — возвращаем
+                          // фокус на workspace-обёртку, чтобы клавиатурная навигация не умирала
+                          // (handleWorkspaceKeyDown продолжит от sel). rAF-проверка отсекает
+                          // re-attach ref при обычном ре-рендере той же строки.
+                          if (prev && document.activeElement && prev.contains(document.activeElement)) {
+                            window.requestAnimationFrame(() => {
+                              if (!rowElementsRef.has(r.id)) workspaceRef.current?.focus({ preventScroll: true });
+                            });
+                          }
+                        }}
                         data-schedule-row-id={r.id}
                         tabIndex={sel === r.id ? 0 : -1}
                         aria-selected={sel === r.id}
