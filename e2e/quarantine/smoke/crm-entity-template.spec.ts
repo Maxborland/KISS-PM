@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { loginToWorkspace } from "./smokeHelpers";
+import { loginToWorkspace } from "../../smoke/smokeHelpers";
 
 test("CRM entity detail pages share workspace template and persisted inline editing", async ({
   page,

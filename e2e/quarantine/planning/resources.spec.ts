@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { loginAsAdmin } from "./planningHelpers";
+import { loginAsAdmin } from "../../planning/planningHelpers";
 
 test("resources pane opens from project tab", async ({ page }) => {
   await loginAsAdmin(page);

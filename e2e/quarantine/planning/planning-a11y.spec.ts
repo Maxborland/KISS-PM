@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-import { loginAsAdmin, openFirstProjectSchedule } from "./planningHelpers";
+import { loginAsAdmin, openFirstProjectSchedule } from "../../planning/planningHelpers";
 
 test.describe("Planning accessibility", () => {
   test.beforeEach(async ({ page }) => {

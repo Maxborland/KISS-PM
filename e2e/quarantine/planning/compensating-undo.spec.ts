@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { loginAsAdmin, openFirstProjectSchedule } from "./planningHelpers";
+import { loginAsAdmin, openFirstProjectSchedule } from "../../planning/planningHelpers";
 
 test.describe("Planning compensating undo", () => {
   test.beforeEach(async ({ page }) => {

@@ -5,7 +5,7 @@ import {
   getRequiredOpportunityCustomFieldValues,
   loginToWorkspace,
   logoutThroughUserMenu
-} from "./smokeHelpers";
+} from "../../smoke/smokeHelpers";
 
 test("deal detail shows persisted feed and tasks in one CRM activity rail", async ({
   page

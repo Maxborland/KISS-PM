@@ -3,7 +3,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   expectAuditEventForSource,
   loginToWorkspace
-} from "./smokeHelpers";
+} from "../../smoke/smokeHelpers";
 
 test("task workspace supports kanban creation, detail activity, drag status and bulk status", async ({
   page,
