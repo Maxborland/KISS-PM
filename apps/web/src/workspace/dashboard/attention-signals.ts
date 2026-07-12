@@ -13,14 +13,15 @@ import type { Opportunity } from "@/crm/lib/crm-client";
 // и любой отсутствующий read даёт 403 на весь экран. Дашборд обещает drill-down
 // в /crm/deals?deal=, поэтому сигналы по сделкам и ссылки на них показываются
 // только при полном доступе — иначе клик привёл бы на forbidden-страницу.
+// Воронки/переходы читает /api/workspace/pipelines под canReadDealStages (НЕ
+// crm_pipelines.read — см. crmRoutes.ts:748), поэтому pipelines.read в bundle нет.
 export const DEALS_READ_BUNDLE = [
   "tenant.opportunities.read",
   "tenant.deal_stages.read",
   "tenant.clients.read",
   "tenant.contacts.read",
   "tenant.products.read",
-  "tenant.project_types.read",
-  "tenant.crm_pipelines.read"
+  "tenant.project_types.read"
 ] as const;
 
 export const OPP_OPEN: Opportunity["status"][] = ["new", "feasibility", "ready_to_activate"];
