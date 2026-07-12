@@ -31,6 +31,8 @@ type Overload = { resourceId: string; date: string; overloadMinutes: number; tas
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const SCENARIO_PREVIEW_PERMISSION = "tenant.planning_scenarios.preview";
 const SCENARIO_APPLY_PERMISSION = "tenant.planning_scenarios.apply";
+// entity-последствия: показываем первые N задач до→после, остальное сворачиваем в «…и ещё N задач»
+const COMPARE_TASK_ROWS_LIMIT = 20;
 // коды apply, после которых persisted-предложения заведомо неприменимы — сбрасываем и пересчитываем
 const STALE_SCENARIO_CODES = new Set([
   "scenario_expired",
@@ -396,13 +398,17 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                           ) : compareDetails.rows.length > 0 ? (
                             <div data-testid="scenario-compare-details" className="mt-2 rounded-[var(--radius-md)] border border-[var(--border)]">
                               <div className="border-b border-[var(--border-subtle)] px-2.5 py-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Задачи: даты до → после ({compareDetails.rows.length})</div>
-                              {compareDetails.rows.map((row) => (
+                              {/* cap списка (как slice(0,8) затронутых задач в commits-surface): большой каскад не раздувает карточку */}
+                              {compareDetails.rows.slice(0, COMPARE_TASK_ROWS_LIMIT).map((row) => (
                                 <div key={row.taskId} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2.5 py-1.5 last:border-b-0 text-[length:var(--text-xs)]">
                                   <span className="mono w-[42px] shrink-0 text-[var(--muted)]">{row.wbs}</span>
                                   <span className="min-w-0 flex-1 truncate font-medium text-[var(--text)]">{row.title}</span>
                                   <span className="mono shrink-0 text-[var(--muted-strong)]">{ddmm(row.beforeStart)} – {ddmm(row.beforeFinish)} → {ddmm(row.afterStart)} – {ddmm(row.afterFinish)}</span>
                                 </div>
                               ))}
+                              {compareDetails.rows.length > COMPARE_TASK_ROWS_LIMIT ? (
+                                <div data-testid="scenario-compare-details-more" className="px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--muted)]">…и ещё {compareDetails.rows.length - COMPARE_TASK_ROWS_LIMIT} задач</div>
+                              ) : null}
                             </div>
                           ) : null
                         ) : null}
