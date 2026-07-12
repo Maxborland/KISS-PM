@@ -1500,6 +1500,73 @@ describe("planning API routes", () => {
     expect(task?.percentComplete).toBe(0);
   });
 
+  // GET /planning/commits не раздувается: полные compensatingCommands несёт только
+  // последнее succeeded planning-событие (единственное обратимое через revert-last);
+  // у прежних событий остаётся флаг hasCompensatingCommands при пустом массиве.
+  it("returns full compensating commands only for the latest succeeded planning commit", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const headers = { "content-type": "application/json", "x-kiss-pm-action": "same-origin", cookie: adminCookie };
+    const rm0 = await app.request("/api/workspace/projects/project-alpha/planning/read-model", { headers: { cookie: adminCookie } });
+    const v0 = (await rm0.json()).planVersion;
+
+    const created = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        command: {
+          type: "task.create",
+          payload: { id: "task-commits-cap", projectId: "project-alpha", parentTaskId: null, title: "Кап истории", statusId: "task-status-new", plannedStart: "2026-06-10", plannedFinish: "2026-06-11", durationMinutes: 480, workMinutes: 480, assignments: [] }
+        },
+        clientPlanVersion: v0
+      })
+    });
+    expect(created.status).toBe(200);
+    const v1 = (await created.json()).newPlanVersion;
+
+    const firstUpdate = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        command: { type: "task.update_progress", payload: { taskId: "task-commits-cap", percentComplete: 25 } },
+        clientPlanVersion: v1
+      })
+    });
+    expect(firstUpdate.status).toBe(200);
+    const firstUpdateBody = await firstUpdate.json();
+
+    const secondUpdate = await app.request("/api/workspace/projects/project-alpha/planning/apply-command", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        command: { type: "task.update_progress", payload: { taskId: "task-commits-cap", percentComplete: 75 } },
+        clientPlanVersion: firstUpdateBody.newPlanVersion
+      })
+    });
+    expect(secondUpdate.status).toBe(200);
+    const secondUpdateBody = await secondUpdate.json();
+
+    const commits = await app.request("/api/workspace/projects/project-alpha/planning/commits", {
+      headers: { cookie: adminCookie }
+    });
+    expect(commits.status).toBe(200);
+    const commitsBody = (await commits.json()) as {
+      auditEvents: Array<{
+        id: string;
+        afterState: { hasCompensatingCommands: boolean; compensatingCommands: unknown[] };
+      }>;
+    };
+
+    const latest = commitsBody.auditEvents.find((event) => event.id === secondUpdateBody.auditEventId);
+    expect(latest?.afterState.hasCompensatingCommands).toBe(true);
+    expect(latest?.afterState.compensatingCommands).toEqual([
+      { type: "task.update_progress", payload: { taskId: "task-commits-cap", percentComplete: 25 } }
+    ]);
+
+    const previous = commitsBody.auditEvents.find((event) => event.id === firstUpdateBody.auditEventId);
+    expect(previous?.afterState.hasCompensatingCommands).toBe(true);
+    expect(previous?.afterState.compensatingCommands).toEqual([]);
+  });
+
   it("requires resource management permission to create and read auto-solver runs", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const limitedManagerCookie = await loginAs(

@@ -144,13 +144,29 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       limit: 100,
       projectId
     });
+    const planningEvents = events.filter((event) => event.sourceWorkflow === "planning");
+    // Полные compensatingCommands нужны только последнему succeeded planning-событию:
+    // revert-last принимает исключительно текущий коммит, и клиент читает команды только у него.
+    // Остальным — прежний флаг hasCompensatingCommands, без раздувания ответа на всю историю.
+    const latestRevertibleId = planningEvents.reduce<{ id: string; planVersion: number } | null>(
+      (latest, event) => {
+        const planVersion = event.afterState?.["planVersion"];
+        if (typeof planVersion !== "number") return latest;
+        if (event.executionResult["status"] !== "succeeded") return latest;
+        return latest === null || planVersion > latest.planVersion
+          ? { id: event.id, planVersion }
+          : latest;
+      },
+      null
+    )?.id ?? null;
     return context.json({
-      auditEvents: events
-        .filter((event) => event.sourceWorkflow === "planning")
+      auditEvents: planningEvents
         .map((event) => {
           const command = event.input["command"] as Record<string, unknown> | undefined;
           const changedTaskIds = event.afterState?.["changedTaskIds"];
           const compensatingCommands = event.afterState?.["compensatingCommands"];
+          const hasCompensatingCommands =
+            Array.isArray(compensatingCommands) && compensatingCommands.length > 0;
           return {
             id: event.id,
             actionType: event.actionType,
@@ -159,12 +175,14 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
             afterState: {
               planVersion: event.afterState?.["planVersion"] ?? null,
               changedTaskIds: Array.isArray(changedTaskIds) ? changedTaskIds : [],
-              hasCompensatingCommands:
-                Array.isArray(compensatingCommands) && compensatingCommands.length > 0,
+              hasCompensatingCommands,
               // Сами компенсирующие команды: клиент показывает превью-гейт отката
               // (previewCommandBatch → подтверждение → revert-last). Это plan-данные,
               // а не полный audit payload — endpoint уже гейтится canReadPlanningReadModel.
-              compensatingCommands: Array.isArray(compensatingCommands) ? compensatingCommands : []
+              compensatingCommands:
+                hasCompensatingCommands && event.id === latestRevertibleId
+                  ? compensatingCommands
+                  : []
             },
             executionStatus:
               typeof event.executionResult["status"] === "string"
