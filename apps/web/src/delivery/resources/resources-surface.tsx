@@ -161,10 +161,18 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
         .reduce((sum, a) => sum + (a.unitsPermille ?? 0), 0);
       let workMinutes = Math.max(0, Math.round(v.workH * 60));
       let durDays = v.durDays;
+      // «Менялось ли поле» — против seed-значений модалки (m.initial), а не против точных
+      // минут: модалка сидируется округлёнными часами/днями, сравнение с точными минутами
+      // делало title-only save «правкой труда» для задач с дробным трудом.
+      const workChanged = v.workH !== m.initial.workH;
+      const durationChanged = v.durDays !== m.initial.durDays;
       const unitsDriven = units > 0 && workMinutes > 0 &&
         (taskType === "fixed_units" || (taskType === "fixed_work" && effortDriven));
-      if (unitsDriven) {
-        const workChanged = !existingTask || workMinutes !== existingTask.workMinutes;
+      if (!workChanged && !durationChanged && existingTask) {
+        // Труд/длительность не трогали — точная исходная пара (save без сюрпризов).
+        workMinutes = existingTask.workMinutes;
+        durDays = (existingTask.durationMinutes ?? v.durDays * MIN_PER_DAY) / MIN_PER_DAY;
+      } else if (unitsDriven) {
         if (workChanged) {
           try {
             durDays = recalculateWorkModel({

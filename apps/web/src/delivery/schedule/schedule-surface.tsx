@@ -1238,10 +1238,18 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       let modalWorkMinutes = Math.max(0, Math.round(values.workH * 60));
       let modalDurationMinutes = timing.durationMinutes;
       let modalFinishIso = timing.finishIso;
+      // «Менялось ли поле» — против seed-значений модалки (modal.initial), а не против
+      // точных минут задачи: модалка сидируется ОКРУГЛЁННЫМИ часами/днями, и сравнение
+      // с точными минутами делало title-only save «правкой труда» для дробных задач.
+      const workChanged = values.workH !== modal.initial.workH;
+      const durationChanged = values.durDays !== modal.initial.durDays;
       const unitsDriven = units > 0 && modalWorkMinutes > 0 &&
         (workModel.taskType === "fixed_units" || (workModel.taskType === "fixed_work" && workModel.effortDriven));
-      if (unitsDriven) {
-        const workChanged = !originalTask || modalWorkMinutes !== originalTask.workMinutes;
+      if (!workChanged && !durationChanged && originalTask) {
+        // Труд/длительность не трогали — шлём точную исходную пару (save без сюрпризов).
+        modalWorkMinutes = originalTask.workMinutes;
+        modalDurationMinutes = originalTask.durationMinutes ?? modalDurationMinutes;
+      } else if (unitsDriven) {
         if (workChanged) {
           try {
             modalDurationMinutes = recalculateWorkModel({
