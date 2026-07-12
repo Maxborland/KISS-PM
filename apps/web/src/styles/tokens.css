@@ -1,44 +1,48 @@
-﻿/* KISS PM Design v2 — Soft UI Evolution + Bento, 2026 */
+/* KISS PM — канонический токен-слой (единственный владелец семантических переменных).
+   Значения = индиго-канон design v4 (бывший kiss-v4 :root, промоутнут сюда 1:1 —
+   см. docs/design-v3/TOKENS.md и корневой DESIGN.md). kiss-v4.css содержит только
+   утилитарные классы и переменных не определяет. */
 :root {
-  /* Surface */
-  --canvas: #eef0f4;
-  --canvas-tint: #f4f5f8;
+  /* Surface — холодный светлый фон, чистые карточки, тонкие границы */
+  --canvas: #f7f8fa;
+  --canvas-tint: #fbfbfc;
   --panel: #ffffff;
   --panel-subtle: #fafbfc;
-  --panel-strong: #f3f5f8;
+  --panel-strong: #f1f2f6;
   --panel-elevated: #ffffff;
-  --border: #e6e8ee;
-  --border-strong: #d4d8e0;
-  --border-subtle: #eef0f4;
+  --border: #ececf1;
+  --border-strong: #e0e1e8;
+  --border-subtle: #f3f3f7;
 
-  /* Text */
-  --text: #0f172a;
-  --text-strong: #020617;
-  --muted: #64748b;
-  --muted-strong: #475569;
-  --muted-soft: #94a3b8;
+  /* Text — глубокий neutral, уверенный контраст */
+  --text: #1c2024;
+  --text-strong: #0c0d10;
+  --muted: #6a7280;
+  --muted-strong: #494f59;
+  --muted-soft: #9ca3af;
 
-  /* Brand & accents */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-soft: #eef4ff;
-  --accent-muted: #dbeafe;
-  --accent-ring: rgba(37, 99, 235, 0.18);
+  /* Brand & accents — современный indigo, точечно (ссылки/активное/фокус).
+     Primary-действия — тёмный neutral (button variant=default). */
+  --accent: #5b5bd6;
+  --accent-hover: #5151c8;
+  --accent-soft: #eeeefb;
+  --accent-muted: #e0e0f8;
+  --accent-ring: rgba(91, 91, 214, 0.22);
 
-  /* Semantic */
-  --success: #10b981;
-  --success-text: #047857;
-  --success-soft: #ecfdf5;
-  --warning: #f59e0b;
-  --warning-text: #b45309;
-  --warning-soft: #fffbeb;
-  --danger: #ef4444;
-  --danger-text: #b91c1c;
-  --danger-soft: #fef2f2;
-  --info: #0ea5e9;
-  --info-soft: #f0f9ff;
-  --violet: #8b5cf6;
-  --violet-soft: #f5f3ff;
+  /* Semantic — чистые, контролируемые (Radix-grade) */
+  --success: #30a46c;
+  --success-text: #1a7a4c;
+  --success-soft: #e7f6ee;
+  --warning: #e08c2c;
+  --warning-text: #9a5b12;
+  --warning-soft: #fbf0df;
+  --danger: #e5484d;
+  --danger-text: #c2353b;
+  --danger-soft: #fdecec;
+  --info: #5b5bd6;
+  --info-soft: #eeeefb;
+  --violet: #8347b9;
+  --violet-soft: #f3ecfb;
 
   /* Priority chips (kanban) */
   --prio-urgent: #ef4444;
@@ -54,10 +58,10 @@
   --prio-low: #10b981;
   --prio-low-soft: #ecfdf5;
 
-  /* Gradient tiles (dashboard accent cards) */
-  --grad-warm: linear-gradient(135deg, #fda4af 0%, #fdba74 50%, #fcd34d 100%);
+  /* Градиенты выключены в v4-каноне (плоские панели); overlay/mono — legacy-консьюмеры bem */
+  --grad-warm: var(--panel);
   --grad-warm-overlay: rgba(255, 255, 255, 0.18);
-  --grad-cool: linear-gradient(135deg, #a5f3fc 0%, #93c5fd 60%, #c4b5fd 100%);
+  --grad-cool: var(--panel);
   --grad-cool-overlay: rgba(255, 255, 255, 0.22);
   --grad-mono: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 
@@ -123,6 +127,7 @@
   --radius-2xl: 20px;
   --radius-3xl: 28px;
   --radius-full: 999px;
+  --radius-card: 14px;
 
   /* Shadows — soft UI evolution, multi-layer */
   --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -132,13 +137,18 @@
   --shadow-xl: 0 24px 48px -12px rgba(15, 23, 42, 0.18);
   --shadow-panel: 0 1px 2px rgba(15, 23, 42, 0.04), 0 24px 48px -16px rgba(15, 23, 42, 0.12);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  /* Мягкая elevation карточек (v4-канон) */
+  --shadow-card: 0 1px 2px rgba(12, 13, 16, 0.04), 0 1px 3px rgba(12, 13, 16, 0.03);
+  --shadow-raise: 0 2px 4px rgba(12, 13, 16, 0.05), 0 4px 12px -2px rgba(12, 13, 16, 0.06);
+  --shadow-pop: 0 12px 32px -8px rgba(12, 13, 16, 0.16);
+  --shadow-lift: 0 8px 24px -6px rgba(15, 23, 42, 0.16);
   --ring-focus: 0 0 0 3px var(--accent-ring);
 
   /* Layout */
   --sidebar-width: 232px;
   --topbar-height: 60px;
   --page-header-height: 64px;
-  --row-h: 30px;
+  --row-h: 36px;
   --toolbar-h: 36px;
   --touch-target: 44px;
   --content-max: 1480px;
