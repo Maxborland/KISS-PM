@@ -3,14 +3,16 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { DashboardSurface } from "@/workspace/dashboard/dashboard-surface";
 
 /**
- * Workspace — функциональный «Дашборд» (персональный home). Заменяет статический
+ * Workspace — функциональный «Дашборд» (summary-first). Заменяет статический
  * views/blocks/dashboard-bento.tsx.
  *
  * Собран КЛИЕНТСКОЙ АГРЕГАЦИЕЙ реальных контрактов через contract-mock
  * (переключение на боевой = apiOrigin): мои задачи (GET /api/workspace/my-work),
  * активные проекты (GET /api/workspace/projects) и сделки (CRM read-model).
- * Tenant-широкого агрегата у ручек нет — KPI/списки считаются на клиенте; чего
- * контракт не даёт (митинги/сигналы дня) — честный плейсхолдер, не фейк.
+ * Наверху — «Требует внимания»: реальные сигналы (просроченные задачи/сделки,
+ * дедлайны ≤ 7 дней, сделки без движения), каждый сигнал и каждое число —
+ * drill-down к источнику (/my-work?task=, /crm/deals?deal=, /projects).
+ * Сигналов без данных в API (митинги, перегрузка ресурсов) нет сознательно.
  */
 const meta: Meta<typeof DashboardSurface> = {
   title: "Workspace/Dashboard",

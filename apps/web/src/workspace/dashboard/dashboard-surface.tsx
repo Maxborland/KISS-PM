@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { CalendarClock } from "lucide-react";
 
 import { Chip } from "@/components/ui/chip";
@@ -15,16 +16,20 @@ import type { Opportunity } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
-   Workspace/Дашборд — персональный home, СОБРАННЫЙ КЛИЕНТСКОЙ
-   АГРЕГАЦИЕЙ реальных контрактов (заменяет статический
-   views/blocks/dashboard-bento.tsx). Честность: tenant-широкого
-   агрегата НЕТ ни у одной ручки, поэтому считаем на клиенте из того,
-   что реально отдают per-surface контракты:
+   Workspace/Дашборд — summary-first сводка на КЛИЕНТСКОЙ АГРЕГАЦИИ
+   реальных контрактов (tenant-широкого агрегата нет ни у одной ручки):
    - Мои задачи      → useMyWork()  (GET /api/workspace/my-work)
    - Активные проекты → useProjects() (GET /api/workspace/projects)
    - Сделки          → useCrm()      (GET CRM read-model)
-   Чего контракт НЕ даёт (митинги «на сегодня», фокус-график,
-   tenant-сигналы) — честный плейсхолдер, не фейковые числа.
+
+   Грамматика (PR9): сверху — «Требует внимания» (реальные сигналы:
+   просроченные задачи/сделки, приближающиеся дедлайны, сделки без
+   движения), каждый сигнал и каждое число — drill-down к причине
+   (/my-work?task=, /crm/deals?deal=, /projects). Сигналы, для которых
+   нет данных в API (митинги, перегрузка ресурсов, pending-предложения
+   агента), НЕ выдумываются и не показываются. Декоративные блоки
+   («Встречи и сигналы»-плейсхолдер, плитка «Сделки выиграны» без
+   действия) удалены сознательно.
    Переключение на боевой = apiOrigin; данные in-memory.
    ============================================================ */
 
@@ -72,6 +77,81 @@ const fmtDate = (iso: string) => {
   return d && m && y ? `${d}.${m}.${y}` : iso.slice(0, 10);
 };
 
+// Локальный день в ISO (YYYY-MM-DD) со сдвигом на deltaDays — для сравнения дат сигналов.
+const localIsoDay = (deltaDays = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + deltaDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/** Порог «сделка без движения»: открыта и не обновлялась N дней. Порог показан в подписи сигнала. */
+const STALE_DEAL_DAYS = 14;
+/** Горизонт «дедлайн близко» для задач, дней. */
+const DUE_SOON_DAYS = 7;
+/** Максимум строк в блоке сигналов; остаток — честной строкой «и ещё N». */
+const MAX_SIGNAL_ROWS = 8;
+
+type AttentionSignal = {
+  key: string;
+  chip: string;
+  tone: "danger" | "warning";
+  title: string;
+  detail: string;
+  href: string;
+  ariaLabel: string;
+};
+
+// Сигналы «требует внимания» из РЕАЛЬНЫХ данных доступных источников.
+// null-источник (нет прав) просто не даёт сигналов — об этом честная пометка в блоке.
+function buildAttentionSignals(tasks: TaskRecord[] | null, opportunities: Opportunity[] | null): AttentionSignal[] {
+  const today = localIsoDay();
+  const soon = localIsoDay(DUE_SOON_DAYS);
+  const staleBefore = localIsoDay(-STALE_DEAL_DAYS);
+
+  const activeTasks = (tasks ?? []).filter((t) => t.statusCategory !== "done");
+  const overdueTasks = activeTasks.filter((t) => t.plannedFinish.slice(0, 10) < today);
+  const dueSoonTasks = activeTasks.filter((t) => {
+    const f = t.plannedFinish.slice(0, 10);
+    return f >= today && f <= soon;
+  });
+
+  const openOpps = (opportunities ?? []).filter((o) => OPP_OPEN.includes(o.status));
+  const overdueOpps = openOpps.filter((o) => o.plannedFinish.slice(0, 10) < today);
+  const staleOpps = openOpps.filter(
+    (o) => o.plannedFinish.slice(0, 10) >= today && o.updatedAt.slice(0, 10) <= staleBefore
+  );
+
+  const taskSignal = (t: TaskRecord, chip: string, tone: "danger" | "warning"): AttentionSignal => ({
+    key: `task-${chip}-${t.id}`,
+    chip,
+    tone,
+    title: t.title,
+    detail: `${t.statusName} · финиш ${fmtDate(t.plannedFinish)}`,
+    href: `/my-work?task=${encodeURIComponent(t.id)}`,
+    ariaLabel: `Открыть задачу «${t.title}» в Моих задачах`
+  });
+  const oppSignal = (o: Opportunity, chip: string, tone: "danger" | "warning", detail: string): AttentionSignal => ({
+    key: `deal-${chip}-${o.id}`,
+    chip,
+    tone,
+    title: o.title,
+    detail,
+    href: `/crm/deals?deal=${encodeURIComponent(o.id)}`,
+    ariaLabel: `Открыть сделку «${o.title}» в CRM`
+  });
+
+  return [
+    ...overdueTasks.map((t) => taskSignal(t, "Задача просрочена", "danger")),
+    ...overdueOpps.map((o) =>
+      oppSignal(o, "Сделка просрочена", "danger", `${OPP_STATUS_LABEL[o.status]} · финиш ${fmtDate(o.plannedFinish)}`)
+    ),
+    ...dueSoonTasks.map((t) => taskSignal(t, `Дедлайн ≤ ${DUE_SOON_DAYS} дн.`, "warning")),
+    ...staleOpps.map((o) =>
+      oppSignal(o, `Без движения ${STALE_DEAL_DAYS}+ дн.`, "warning", `${OPP_STATUS_LABEL[o.status]} · обновлена ${fmtDate(o.updatedAt)}`)
+    )
+  ];
+}
+
 export function DashboardSurface() {
   const myWork = useMyWork();
   const projects = useProjects();
@@ -93,7 +173,7 @@ export function DashboardSurface() {
         <ProtoBanner />
         <div className="mb-3">
           <h1 className="text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Дашборд</h1>
-          <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Персональная сводка: задачи, проекты и сделки рабочей области</p>
+          <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Сначала сигналы, затем сводка — каждое число ведёт к источнику</p>
         </div>
 
         <SurfaceState
@@ -136,6 +216,68 @@ function NoAccessNote({ what }: { what: string }) {
   );
 }
 
+// Общий стиль строки-ссылки в списках сводки: hover-подсветка + видимый фокус.
+const rowLinkCls =
+  "flex items-center gap-3 border-b border-[var(--border-subtle)] px-4 py-2.5 outline-none last:border-0 hover:bg-[var(--panel-subtle)] focus-visible:shadow-[var(--ring-focus)]";
+
+// Ссылка «весь раздел» в шапке карточки.
+function CardAllLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-[var(--radius-sm)] text-[length:var(--text-sm)] font-medium text-[var(--accent)] underline-offset-2 outline-none hover:underline focus-visible:shadow-[var(--ring-focus)]"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function AttentionCard({ tasks, opportunities }: { tasks: TaskRecord[] | null; opportunities: Opportunity[] | null }) {
+  const signals = useMemo(() => buildAttentionSignals(tasks, opportunities), [tasks, opportunities]);
+  const shown = signals.slice(0, MAX_SIGNAL_ROWS);
+  const restCount = signals.length - shown.length;
+  // Честность по правам: недоступный источник не даёт сигналов — говорим об этом явно.
+  const unavailable = [tasks === null ? "задачам" : null, opportunities === null ? "сделкам" : null].filter(
+    (v): v is string => v !== null
+  );
+
+  return (
+    <BentoCard
+      title="Требует внимания"
+      subtitle="Просроченное, приближающиеся дедлайны и сделки без движения — из ваших задач и CRM"
+      span={12}
+      flush
+    >
+      {shown.length === 0 ? (
+        <p className="px-4 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">
+          Сигналов нет: просроченных задач и застрявших сделок не найдено.
+        </p>
+      ) : (
+        <ul className="flex flex-col" aria-label="Сигналы, требующие внимания">
+          {shown.map((s) => (
+            <li key={s.key}>
+              <Link href={s.href} aria-label={s.ariaLabel} className={rowLinkCls}>
+                <Chip variant={s.tone}>{s.chip}</Chip>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{s.title}</span>
+                  <span className="block truncate text-[length:var(--text-xs)] text-[var(--muted-soft)]">{s.detail}</span>
+                </span>
+                <span className="shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">открыть →</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {restCount > 0 || unavailable.length > 0 ? (
+        <p className="border-t border-[var(--border-subtle)] px-4 py-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
+          {restCount > 0 ? `И ещё ${restCount} — полные списки в «Мои задачи» и «Сделки». ` : ""}
+          {unavailable.length > 0 ? `Сигналы по ${unavailable.join(" и ")} не рассчитываются: раздел недоступен вашей роли.` : ""}
+        </p>
+      ) : null}
+    </BentoCard>
+  );
+}
+
 function DashboardContent({
   tasks,
   projects,
@@ -145,13 +287,10 @@ function DashboardContent({
   projects: { count: number; hours: number } | null;
   opportunities: Opportunity[] | null;
 }) {
-  // Агрегаты по моим задачам (null = раздел недоступен роли).
-  const tasksByStatus = useMemo(() => {
-    const m = new Map<TaskStatusCategory, number>();
-    for (const t of tasks ?? []) m.set(t.statusCategory, (m.get(t.statusCategory) ?? 0) + 1);
-    return m;
-  }, [tasks]);
   const activeTasks = (tasks ?? []).filter((t) => t.statusCategory !== "done");
+  const today = localIsoDay();
+  const overdueCount = activeTasks.filter((t) => t.plannedFinish.slice(0, 10) < today).length;
+  const inProgressCount = activeTasks.filter((t) => t.statusCategory === "in_progress").length;
   const upcoming = useMemo(
     () => [...activeTasks].sort((a, b) => a.plannedFinish.localeCompare(b.plannedFinish)).slice(0, 6),
     [activeTasks]
@@ -160,7 +299,6 @@ function DashboardContent({
   // Агрегаты по сделкам (null = раздел недоступен роли).
   const openOpps = (opportunities ?? []).filter((o) => OPP_OPEN.includes(o.status));
   const openValue = openOpps.reduce((s, o) => s + o.contractValue, 0);
-  const wonCount = (opportunities ?? []).filter((o) => o.status === "won_closed").length;
   const oppsByStatus = useMemo(() => {
     const order: Opportunity["status"][] = ["new", "feasibility", "ready_to_activate", "won_closed", "lost_rejected"];
     return order
@@ -170,17 +308,45 @@ function DashboardContent({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* KPI-плитки — реальные агрегаты; недоступный роли источник → «—» */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatTile label="Мои задачи" value={tasks ? tasks.length : "—"} delta={tasks ? `${tasksByStatus.get("in_progress") ?? 0} в работе` : "нет доступа"} tone="default" />
-        <StatTile label="Открытые сделки" value={opportunities ? openOpps.length : "—"} delta={opportunities ? money(openValue) : "нет доступа"} tone="default" />
-        <StatTile label="Активные проекты" value={projects ? projects.count : "—"} delta={projects ? `${projects.hours.toLocaleString("ru-RU")} ч плана` : "нет доступа"} tone="default" />
-        <StatTile label="Сделки выиграны" value={opportunities ? wonCount : "—"} delta={!opportunities ? "нет доступа" : wonCount > 0 ? "закрыты в плюс" : "пока нет"} tone={opportunities && wonCount > 0 ? "success" : "default"} />
+      {/* Summary-first: реальные сигналы наверху, до любых агрегатов. */}
+      <Bento>
+        <AttentionCard tasks={tasks} opportunities={opportunities} />
+      </Bento>
+
+      {/* KPI-плитки — реальные агрегаты, каждая ведёт к источнику; недоступный роли источник → «—» без ссылки */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatTile
+          label="Мои задачи"
+          value={tasks ? tasks.length : "—"}
+          delta={!tasks ? "нет доступа" : overdueCount > 0 ? `${overdueCount} просрочено` : `${inProgressCount} в работе`}
+          tone={tasks && overdueCount > 0 ? "danger" : "default"}
+          {...(tasks ? { href: "/my-work" } : {})}
+        />
+        <StatTile
+          label="Открытые сделки"
+          value={opportunities ? openOpps.length : "—"}
+          delta={opportunities ? money(openValue) : "нет доступа"}
+          tone="default"
+          {...(opportunities ? { href: "/crm/deals" } : {})}
+        />
+        <StatTile
+          label="Активные проекты"
+          value={projects ? projects.count : "—"}
+          delta={projects ? `${projects.hours.toLocaleString("ru-RU")} ч плана` : "нет доступа"}
+          tone="default"
+          {...(projects ? { href: "/projects" } : {})}
+        />
       </div>
 
       <Bento>
-        {/* Ближайшие задачи — реальные my-work, сортировка по плановому финишу */}
-        <BentoCard title="Ближайшие задачи" subtitle="Мои незавершённые задачи по плановому финишу" span={7} flush>
+        {/* Ближайшие задачи — реальные my-work; строка — drill-down в /my-work?task= */}
+        <BentoCard
+          title="Ближайшие задачи"
+          subtitle="Мои незавершённые задачи по плановому финишу"
+          actions={tasks !== null ? <CardAllLink href="/my-work">Все задачи</CardAllLink> : undefined}
+          span={7}
+          flush
+        >
           {tasks === null ? (
             <NoAccessNote what="Задачи" />
           ) : upcoming.length === 0 ? (
@@ -188,24 +354,35 @@ function DashboardContent({
           ) : (
             <ul className="flex flex-col">
               {upcoming.map((t) => (
-                <li key={t.id} className="flex items-center gap-3 border-b border-[var(--border-subtle)] px-4 py-2.5 last:border-0">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{t.title}</span>
-                    <span className="block truncate text-[length:var(--text-xs)] text-[var(--muted-soft)]">{t.statusName} · прогресс {t.progress}%</span>
-                  </span>
-                  <Chip variant={TASK_STATUS_TONE[t.statusCategory]}>{TASK_STATUS_LABEL[t.statusCategory]}</Chip>
-                  <span className="inline-flex shrink-0 items-center gap-1 text-[length:var(--text-xs)] text-[var(--muted)]">
-                    <CalendarClock className="size-3.5" aria-hidden />
-                    <span className="v4-num">{fmtDate(t.plannedFinish)}</span>
-                  </span>
+                <li key={t.id}>
+                  <Link
+                    href={`/my-work?task=${encodeURIComponent(t.id)}`}
+                    aria-label={`Открыть задачу «${t.title}» в Моих задачах`}
+                    className={rowLinkCls}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{t.title}</span>
+                      <span className="block truncate text-[length:var(--text-xs)] text-[var(--muted-soft)]">{t.statusName} · прогресс {t.progress}%</span>
+                    </span>
+                    <Chip variant={TASK_STATUS_TONE[t.statusCategory]}>{TASK_STATUS_LABEL[t.statusCategory]}</Chip>
+                    <span className="inline-flex shrink-0 items-center gap-1 text-[length:var(--text-xs)] text-[var(--muted)]">
+                      <CalendarClock className="size-3.5" aria-hidden />
+                      <span className="v4-num">{fmtDate(t.plannedFinish)}</span>
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>
           )}
         </BentoCard>
 
-        {/* Воронка сделок — реальное распределение по статусам */}
-        <BentoCard title="Сделки по статусам" subtitle="Распределение возможностей CRM" span={5}>
+        {/* Воронка сделок — реальное распределение по статусам; drill-down — «Все сделки» */}
+        <BentoCard
+          title="Сделки по статусам"
+          subtitle="Распределение возможностей CRM"
+          actions={opportunities !== null ? <CardAllLink href="/crm/deals">Все сделки</CardAllLink> : undefined}
+          span={5}
+        >
           {opportunities === null ? (
             <NoAccessNote what="Сделки" />
           ) : oppsByStatus.length === 0 ? (
@@ -233,14 +410,6 @@ function DashboardContent({
             </ul>
           )}
         </BentoCard>
-
-        {/* Честный плейсхолдер: митинги/сигналы — нет tenant-агрегата у контракта (G2-05/G8-15:
-            без внутреннего жаргона про «контракты» и «ручки» в пользовательском тексте) */}
-        <BentoCard title="Встречи и сигналы" subtitle="Сводка дня" span={12}>
-          <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-3 text-[length:var(--text-sm)] text-[var(--muted-soft)]">
-            Сводка встреч и сигналов дня появится в одном из следующих обновлений.
-          </div>
-        </BentoCard>
       </Bento>
     </div>
   );
@@ -253,8 +422,8 @@ function ProtoBanner() {
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
       <span>
         Клиентская агрегация реальных контрактов: GET /api/workspace/my-work + /projects + CRM read-model. Tenant-широкого
-        агрегата у ручек нет — считаем на клиенте; чего контракт не даёт (митинги/сигналы) — честный плейсхолдер.
-        Переключение на боевой = apiOrigin; данные in-memory.
+        агрегата у ручек нет — сигналы «Требует внимания» и KPI считаются на клиенте из этих трёх источников; сигналов без
+        данных в API (митинги, перегрузка ресурсов) здесь нет сознательно. Переключение на боевой = apiOrigin; данные in-memory.
       </span>
     </div>
   );
