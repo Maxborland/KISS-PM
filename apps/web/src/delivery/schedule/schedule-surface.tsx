@@ -523,13 +523,17 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   });
   const drag = barDrag.state;
 
-  // resize колонок: тот же общий жест
+  // resize колонок: тот же общий жест; ширина мутирует live в onMove,
+  // поэтому отмена (Escape/pointercancel) откатывает к исходной ширине.
   const colResize = usePointerDrag<ColDrag>({
     onMove: (e, cur) => {
       const w = Math.max(36, Math.round(cur.origW + (e.clientX - cur.startX)));
       setColW((prev) => { const n = [...prev]; n[cur.index] = w; return n; });
     },
-    onUp: () => {}
+    onUp: () => {},
+    onCancel: (cur) => {
+      setColW((prev) => { const n = [...prev]; n[cur.index] = cur.origW; return n; });
+    }
   });
 
   // перетягивание связи между барами (создание зависимости): тот же общий жест
@@ -1250,6 +1254,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     if (!canManagePlan || source.kind !== "task" || !source.finishIso) return;
     event.preventDefault();
     event.stopPropagation();
+    const gesturePointerId = event.pointerId; // жест привязан к указателю (мультитач игнорируется)
     const rowIds = fillTaskRows.map((row) => row.id);
     fillDragTargetRef.current = source.id;
 
@@ -1269,19 +1274,31 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       setFillDragRange(new Set(resolved?.targetIds ?? []));
     };
     const moveDrag = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== gesturePointerId) return;
       updateTarget(pointerEvent.clientX, pointerEvent.clientY);
     };
-    const cancelDrag = () => {
+    const teardown = () => {
       window.removeEventListener("pointermove", moveDrag);
       window.removeEventListener("pointerup", stopDrag);
       window.removeEventListener("pointercancel", cancelDrag);
+      window.removeEventListener("keydown", escapeDrag, true);
+    };
+    const cancelDrag = (pointerEvent?: PointerEvent) => {
+      if (pointerEvent && pointerEvent.pointerId !== gesturePointerId) return;
+      teardown();
       setFillDragRange(new Set());
       fillDragTargetRef.current = null;
     };
+    // Escape отменяет жест, не закрывая попутно диалоги/меню.
+    const escapeDrag = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key !== "Escape") return;
+      keyEvent.preventDefault();
+      keyEvent.stopPropagation();
+      cancelDrag();
+    };
     const stopDrag = (pointerEvent: PointerEvent) => {
-      window.removeEventListener("pointermove", moveDrag);
-      window.removeEventListener("pointerup", stopDrag);
-      window.removeEventListener("pointercancel", cancelDrag);
+      if (pointerEvent.pointerId !== gesturePointerId) return;
+      teardown();
       updateTarget(pointerEvent.clientX, pointerEvent.clientY);
       const targetId = fillDragTargetRef.current;
       const resolved = targetId
@@ -1304,6 +1321,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     window.addEventListener("pointermove", moveDrag);
     window.addEventListener("pointerup", stopDrag);
     window.addEventListener("pointercancel", cancelDrag);
+    window.addEventListener("keydown", escapeDrag, true);
   };
 
   const updatePasteDraft = (value: string) => {
@@ -1413,24 +1431,25 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }
   const predRows = (r: Row) => r.predList.map((p) => ({ depId: p.depId, predId: p.predId, predLabel: rowById.get(p.predId)?.wbs ?? rows.find((x) => x.id === p.predId)?.wbs ?? "?", type: p.type, lagDays: p.lagDays }));
 
-  // --- drag/resize/link ---
+  // --- drag/resize/link --- (begin получает событие: жест привязан к pointerId,
+  // активация после порога, Escape/pointercancel — отмена без команд)
   const startDrag = (e: ReactPointerEvent, r: Row, mode: DragMode) => {
     e.stopPropagation();
     e.preventDefault();
     if (r.kind !== "task") return;
-    barDrag.begin({ id: r.id, mode, startX: e.clientX, origStart: r.dayStart, origDur: r.dayDur, origWorkH: r.workH, origPct: r.pct, deltaDays: 0, curPct: r.pct });
+    barDrag.begin(e, { id: r.id, mode, startX: e.clientX, origStart: r.dayStart, origDur: r.dayDur, origWorkH: r.workH, origPct: r.pct, deltaDays: 0, curPct: r.pct });
   };
   const startColResize = (e: ReactPointerEvent, index: number) => {
     e.stopPropagation();
     e.preventDefault();
-    colResize.begin({ index, startX: e.clientX, origW: colW[index] ?? 80 });
+    colResize.begin(e, { index, startX: e.clientX, origW: colW[index] ?? 80 });
   };
   const startLink = (e: ReactPointerEvent, r: Row, edge: "start" | "finish") => {
     e.stopPropagation();
     e.preventDefault();
     const fromX = toTimelineX(edge === "finish" ? r.dayStart + r.dayDur : r.dayStart);
     const fromY = (indexById.get(r.id) ?? 0) * ROW_H + ROW_H / 2;
-    linkDrag.begin({ fromId: r.id, fromEdge: edge, fromX, fromY, curX: fromX, curY: fromY });
+    linkDrag.begin(e, { fromId: r.id, fromEdge: edge, fromX, fromY, curX: fromX, curY: fromY });
   };
 
   return (
@@ -1511,7 +1530,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                         )}
                         {i < COLS.length - 1 ? (
                           <span
-                            className="absolute -right-[3px] top-0 z-10 h-full w-[6px] cursor-col-resize hover:bg-[var(--accent)]"
+                            className="absolute -right-[3px] top-0 z-10 h-full w-[6px] touch-none cursor-col-resize hover:bg-[var(--accent)]"
                             onPointerDown={(e) => startColResize(e, i)}
                             title="Перетащите — изменить ширину колонки"
                           />
@@ -1713,21 +1732,21 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       <>
                         {r.baseDay != null && r.baseDur != null ? <span className="absolute rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" style={{ left: toTimelineX(r.baseDay), width: Math.max(r.baseDur * dayW, 6), height: 6, bottom: 5 }} title={readModel.baselineComparison?.label ?? "Базовый план"} /> : null}
                         <span
-                          className={cn("gantt-bar absolute top-1/2 flex -translate-y-1/2 items-center overflow-hidden rounded-[5px] shadow-[var(--shadow-card)]", canManagePlan ? "cursor-grab active:cursor-grabbing" : "cursor-default", r.critical && "gantt-bar--crit", dragging && "opacity-90 outline-dashed outline-2 outline-offset-1 outline-[var(--accent)]", flash.has(r.id) && "ring-2 ring-[var(--success)]")}
+                          className={cn("gantt-bar absolute top-1/2 flex -translate-y-1/2 items-center overflow-hidden rounded-[5px] shadow-[var(--shadow-card)]", canManagePlan ? "touch-none cursor-grab active:cursor-grabbing" : "cursor-default", r.critical && "gantt-bar--crit", dragging && "opacity-90 outline-dashed outline-2 outline-offset-1 outline-[var(--accent)]", flash.has(r.id) && "ring-2 ring-[var(--success)]")}
                           style={{ left, width, height: 18 }}
                           title={canManagePlan ? `${r.name} · ${fillPct}% · тело — сдвиг, края — длительность` : `${r.name} · ${fillPct}%`}
                           onPointerDown={canManagePlan ? (e) => startDrag(e, r, "move") : undefined}
                         >
                           <span className={cn("gantt-bar-fill h-full", r.critical && "gantt-bar-fill--crit")} style={{ width: `${fillPct}%` }} />
                           {canManagePlan ? <>
-                            <span className="absolute top-0 z-[3] h-full w-1 -translate-x-1/2 cursor-ew-resize bg-[var(--accent)] opacity-0 group-hover:opacity-100" style={{ left: `clamp(2px, ${fillPct}%, calc(100% - 2px))` }} onPointerDown={(e) => startDrag(e, r, "progress")} title="Тяните — % выполнения" />
-                            <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resizeLeft")} title="Потяните — сдвинуть начало" />
-                            <span className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resize")} title="Потяните — изменить длительность" />
+                            <span className="absolute top-0 z-[3] h-full w-1 -translate-x-1/2 touch-none cursor-ew-resize bg-[var(--accent)] opacity-0 group-hover:opacity-100" style={{ left: `clamp(2px, ${fillPct}%, calc(100% - 2px))` }} onPointerDown={(e) => startDrag(e, r, "progress")} title="Тяните — % выполнения" />
+                            <span className="absolute left-0 top-0 h-full w-1.5 touch-none cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resizeLeft")} title="Потяните — сдвинуть начало" />
+                            <span className="absolute right-0 top-0 h-full w-1.5 touch-none cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resize")} title="Потяните — изменить длительность" />
                           </> : null}
                         </span>
                         {canManagePlan ? <>
-                          <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--muted-soft)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: left - 12 }} onPointerDown={(e) => startLink(e, r, "start")} title="Тяните от начала → связь НН/НО" />
-                          <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--accent)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: barRight + 8 }} onPointerDown={(e) => startLink(e, r, "finish")} title="Тяните от конца → связь ОН/ОО" />
+                          <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 touch-none cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--muted-soft)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: left - 12 }} onPointerDown={(e) => startLink(e, r, "start")} title="Тяните от начала → связь НН/НО" />
+                          <span className="absolute top-1/2 z-[2] size-2.5 -translate-y-1/2 touch-none cursor-crosshair rounded-full border-2 border-[var(--panel)] bg-[var(--accent)] opacity-0 shadow-[var(--shadow-card)] transition-opacity group-hover:opacity-100" style={{ left: barRight + 8 }} onPointerDown={(e) => startLink(e, r, "finish")} title="Тяните от конца → связь ОН/ОО" />
                         </> : null}
                       </>
                     )}
