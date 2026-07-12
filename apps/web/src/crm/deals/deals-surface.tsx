@@ -19,7 +19,7 @@ import { makeRuError } from "@/lib/error-messages";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { OPPORTUNITY_STATUS_LABEL, money } from "@/crm/ui/crm-bits";
 import { getCrmWriteCapability } from "@/crm/ui/permissions";
-import { useCrm, useCrmUsers } from "@/crm/lib/use-crm";
+import { useCrm, useCrmUsers, type CrmData } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import { DealPeek } from "@/crm/deals/deal-peek";
 import { useUrlPeekParamCleaner } from "@/workspace/lib/url-peek";
@@ -104,11 +104,6 @@ export function ProjectDeals() {
   // Триггеры DealPeek по id сделки: клик по телу карточки/строки программно «нажимает»
   // триггер (URL-драйв ?deal= живёт внутри DealPeek) — паттерн schedule-строк.
   const dealPeekTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
-  // В Next это App Router-параметры; в Storybook (без App Router) хук отдаёт null —
-  // эффект резолва ниже читает window.location.search (fallback как в useUrlPeek).
-  const searchParams = useSearchParams();
-  const clearDealParam = useUrlPeekParamCleaner("deal");
-  const resolvedDealParamRef = useRef<string | null>(null);
 
   const model = useMemo(() => {
     if (!data) return null;
@@ -130,30 +125,6 @@ export function ProjectDeals() {
     const transitions = data.stageTransitions.filter((t) => selected && t.pipelineId === selected.id);
     return { pipelines, selected, stages, byStage, unstaged, opps: inPipeline, transitions, allStages: data.dealStages };
   }, [data, pipelineId]);
-
-  // Deep-link `?deal=<id>`: pipelineId — локальный state, а DealPeek монтируется только
-  // для отрендеренных сделок, поэтому сделка чужой воронки (или несуществующая) молча
-  // не открывалась. После загрузки данных резолвим id по ВСЕМ воронкам: сделка в другой
-  // воронке → переключаем выбор (её DealPeek смонтируется и откроется по URL);
-  // не найдена/её стадия недоступна → снимаем параметр replace-ом и сообщаем toast'ом.
-  useEffect(() => {
-    if (!data) return;
-    const search = searchParams ? searchParams.toString() : window.location.search;
-    const dealParam = new URLSearchParams(search).get("deal");
-    // Каждое значение параметра резолвим один раз: ручное переключение воронки при
-    // открытом peek не должно принудительно возвращать пользователя обратно.
-    if (resolvedDealParamRef.current === dealParam) return;
-    resolvedDealParamRef.current = dealParam;
-    if (!dealParam) return;
-    const deal = data.opportunities.find((o) => o.id === dealParam);
-    const stage = deal?.stageId ? data.dealStages.find((s) => s.id === deal.stageId) ?? null : null;
-    if (!deal || (deal.stageId && !stage?.pipelineId)) {
-      clearDealParam();
-      toast.error("Сделка не найдена или недоступна");
-      return;
-    }
-    if (stage?.pipelineId) setPipelineId(stage.pipelineId);
-  }, [clearDealParam, data, searchParams]);
 
   // Верхнеуровневые loading/error/forbidden — через SurfaceState (внутри CrmFrame).
   // Лестница статусов — общий surfaceStatusOf; reload-с-данными по-прежнему рендерит ready (поведение не меняем).
@@ -300,6 +271,9 @@ export function ProjectDeals() {
 
   return (
     <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={createDealDialog}>
+      {/* Резолв deep-link ?deal= — только в ready-ветке: useSearchParams внутри резолвера
+          не исполняется при prerender страницы (иначе Next требует Suspense-границу). */}
+      <DealDeepLinkResolver data={data} setPipelineId={setPipelineId} />
       {/* мультиворонки: выбор воронки — фильтрует стадии/сделки/переходы */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Воронка:</span>
@@ -477,6 +451,43 @@ export function ProjectDeals() {
       <TransitionsPanel transitions={model.transitions} pipelineName={model.selected?.name ?? "—"} stageName={stageName} />
     </CrmFrame>
   );
+}
+
+/**
+ * Deep-link `?deal=<id>`: pipelineId — локальный state, а DealPeek монтируется только
+ * для отрендеренных сделок, поэтому сделка чужой воронки (или несуществующая) молча
+ * не открывалась. После загрузки данных резолвим id по ВСЕМ воронкам: сделка в другой
+ * воронке → переключаем выбор (её DealPeek смонтируется и откроется по URL);
+ * не найдена/её стадия недоступна → снимаем параметр replace-ом и сообщаем toast'ом.
+ * Отдельный null-компонент, монтируемый ТОЛЬКО в ready-ветке: useSearchParams вне её
+ * заставил бы Next требовать Suspense-границу при prerender (см. login-surface).
+ */
+function DealDeepLinkResolver({ data, setPipelineId }: { data: CrmData; setPipelineId: (id: string) => void }) {
+  // В Next это App Router-параметры; в Storybook (без App Router) хук отдаёт null —
+  // тогда эффект читает window.location.search (fallback как в useUrlPeek).
+  const searchParams = useSearchParams();
+  const clearDealParam = useUrlPeekParamCleaner("deal");
+  const resolvedDealParamRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const search = searchParams ? searchParams.toString() : window.location.search;
+    const dealParam = new URLSearchParams(search).get("deal");
+    // Каждое значение параметра резолвим один раз: ручное переключение воронки при
+    // открытом peek не должно принудительно возвращать пользователя обратно.
+    if (resolvedDealParamRef.current === dealParam) return;
+    resolvedDealParamRef.current = dealParam;
+    if (!dealParam) return;
+    const deal = data.opportunities.find((o) => o.id === dealParam);
+    const stage = deal?.stageId ? data.dealStages.find((s) => s.id === deal.stageId) ?? null : null;
+    if (!deal || (deal.stageId && !stage?.pipelineId)) {
+      clearDealParam();
+      toast.error("Сделка не найдена или недоступна");
+      return;
+    }
+    if (stage?.pipelineId) setPipelineId(stage.pipelineId);
+  }, [clearDealParam, data, searchParams, setPipelineId]);
+
+  return null;
 }
 
 function Forecast({ stages, byStage }: { stages: DealStage[]; byStage: Map<string, Opportunity[]> }) {
