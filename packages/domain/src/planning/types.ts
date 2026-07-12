@@ -1,3 +1,5 @@
+import { v5 as uuidV5 } from "uuid";
+
 export type PlanDate = string;
 export type PlanDateTime = string;
 
@@ -66,22 +68,37 @@ export type PlanAssignmentRole =
   | "approver"
   | "observer";
 
+const maxPlanningPersistedIdLength = 500;
+const planningAssignmentNamespace = "6ba7b811-9dad-11d1-80b4-00c04fd430c8";
+
+function boundedPlanningAssignmentId(preferredId: string): string {
+  if (preferredId.length <= maxPlanningPersistedIdLength) return preferredId;
+  return `assignment:${uuidV5(preferredId, planningAssignmentNamespace)}`;
+}
+
 export function planningAssignmentId(
   taskId: string,
   resourceId: string,
   role: PlanAssignmentRole
 ): string {
-  return `assignment:${taskId.length}:${taskId}:${resourceId.length}:${resourceId}:${role.length}:${role}`;
+  return boundedPlanningAssignmentId(
+    `assignment:${taskId.length}:${taskId}:${resourceId.length}:${resourceId}:${role.length}:${role}`
+  );
 }
 
 export function allocatePlanningAssignmentId(
   preferredId: string,
   reservedIds: Set<string>
 ): string {
-  let id = preferredId;
+  const boundedPreferredId = boundedPlanningAssignmentId(preferredId);
+  let id = boundedPreferredId;
   let suffix = 2;
   while (reservedIds.has(id)) {
-    id = `${preferredId}-${suffix}`;
+    const collisionSuffix = `-${suffix}`;
+    id = `${boundedPreferredId.slice(
+      0,
+      maxPlanningPersistedIdLength - collisionSuffix.length
+    )}${collisionSuffix}`;
     suffix += 1;
   }
   reservedIds.add(id);

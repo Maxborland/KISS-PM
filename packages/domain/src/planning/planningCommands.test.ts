@@ -14,8 +14,38 @@ describe("planning command contract", () => {
     const left = planningAssignmentId("abc-def", "ghi", "executor");
     const right = planningAssignmentId("abc", "def-ghi", "executor");
 
+    expect(left).toBe("assignment:7:abc-def:3:ghi:8:executor");
     expect(left).not.toBe(right);
     expect(allocatePlanningAssignmentId(left, new Set([left]))).toBe(`${left}-2`);
+  });
+
+  it("keeps generated and collision-suffixed assignment ids within the persisted boundary", () => {
+    const preferredId = planningAssignmentId(
+      "task".repeat(59),
+      "resource".repeat(30),
+      "co_executor"
+    );
+    const reservedIds = new Set([preferredId]);
+
+    expect(preferredId.length).toBeLessThanOrEqual(500);
+    for (let suffix = 2; suffix <= 10; suffix += 1) {
+      const allocatedId = allocatePlanningAssignmentId(preferredId, reservedIds);
+      expect(allocatedId.length).toBeLessThanOrEqual(500);
+      expect(allocatedId).toMatch(new RegExp(`-${suffix}$`));
+    }
+
+    const oversizedAllocatedId = allocatePlanningAssignmentId(
+      "assignment:".repeat(60),
+      new Set()
+    );
+    expect(oversizedAllocatedId.length).toBeLessThanOrEqual(500);
+
+    const sharedPrefix = "task".repeat(120);
+    expect(
+      planningAssignmentId(`${sharedPrefix}a`, "resource-alpha", "executor")
+    ).not.toBe(
+      planningAssignmentId(`${sharedPrefix}b`, "resource-alpha", "executor")
+    );
   });
 
   it("creates a task.create planning command for task CRUD wrappers", () => {
