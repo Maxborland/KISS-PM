@@ -15,6 +15,7 @@ import {
   buildScheduleWorkCommand,
   optimisticPatch,
   resolveScheduleTiming,
+  resolveTaskWorkModel,
   scheduleUnitsPercent
 } from "./schedule-surface";
 import type { Row } from "./schedule-rows";
@@ -490,6 +491,19 @@ describe("Schedule batch and undo integrity", () => {
 });
 
 describe("Schedule surface calendar command builders", () => {
+  it("preserves the task's work model semantics instead of forcing fixed_duration", () => {
+    const calendarRow = row();
+    const tasks = [{ id: calendarRow.id, taskType: "fixed_units" as const, effortDriven: true }];
+
+    const workModel = resolveTaskWorkModel(tasks, calendarRow.id);
+    expect(workModel).toEqual({ taskType: "fixed_units", effortDriven: true });
+    expect(buildScheduleWorkCommand(calendarRow, 2, 12, workModel)).toMatchObject({
+      payload: { taskType: "fixed_units", effortDriven: true }
+    });
+    // Неизвестная задача (legacy) — честный fallback.
+    expect(resolveTaskWorkModel(tasks, "missing")).toEqual({ taskType: "fixed_duration", effortDriven: false });
+  });
+
   it("uses the row calendar for work, units, dependency lag and dated timing", () => {
     const calendarRow = row();
 

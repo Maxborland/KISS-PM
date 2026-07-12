@@ -149,7 +149,10 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     } else if (m.taskId) {
       const id = m.taskId;
       cmds.push(createPlanningCommand({ type: "task.update_identity", payload: { taskId: id, title: v.title } }));
-      cmds.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId: id, taskType: "fixed_duration", effortDriven: false, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60 } }));
+      // Семантику задачи (taskType/effortDriven) сохраняем — правка метаданных
+      // не должна молча превращать fixed_units/fixed_work в fixed_duration.
+      const existingTask = readModel?.authored.tasks.find((task) => task.id === id);
+      cmds.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId: id, taskType: existingTask?.taskType ?? "fixed_duration", effortDriven: existingTask?.effortDriven ?? false, durationMinutes: v.durDays * MIN_PER_DAY, workMinutes: v.workH * 60 } }));
       if (v.startIso) cmds.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId: id, plannedStart: v.startIso, plannedFinish: fin(v.startIso, v.durDays) } }));
       cmds.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId: id, percentComplete: v.pct } }));
       // upsert по id СУЩЕСТВУЮЩЕГО назначения (reduceAssignmentUpsert ключ — payload.id), новый id только когда назначения ещё нет

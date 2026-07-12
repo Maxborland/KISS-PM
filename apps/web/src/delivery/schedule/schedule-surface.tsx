@@ -23,7 +23,7 @@ import { hasPermission } from "@/lib/permissions";
 import { useSessionUser } from "@/shell/use-session-user";
 import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu, TaskModal, type TaskModalSubmitResult, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
 import { createPlanningCommand } from "@kiss-pm/domain";
-import type { DependencyType, PlanAssignmentRole, PlanningCommand } from "@kiss-pm/domain";
+import type { DependencyType, PlanAssignmentRole, PlanningCommand, TaskType } from "@kiss-pm/domain";
 import { buildCompensatingCommandBatch, type PlanningReadModel } from "@kiss-pm/planning-client";
 import { mapRows, type Kind, type Mode, type Pred, type Row } from "@/delivery/schedule/schedule-rows";
 import { buildFinishDateFillCommands, buildPasteCommands, createTaskTsvId, getScheduleNavigationTarget, parseTaskTsv, resolveFinishFillDrag, shouldRunScheduleUndo } from "@/delivery/schedule/schedule-productivity";
@@ -96,17 +96,34 @@ export function resolveScheduleTiming(
   };
 }
 
+export type ScheduleWorkModelRef = { taskType: TaskType; effortDriven: boolean };
+
+/**
+ * Существующая семантика work model задачи. Правки длительности/дат/труда НЕ должны
+ * молча переписывать taskType/effortDriven (иначе редактирование метаданных превращало
+ * fixed_units/fixed_work задачу в fixed_duration — семантика планирования терялась).
+ * Fallback fixed_duration/false — только для legacy-строк без задачи в read-model.
+ */
+export function resolveTaskWorkModel(
+  tasks: ReadonlyArray<{ id: string; taskType: TaskType; effortDriven: boolean }>,
+  taskId: string
+): ScheduleWorkModelRef {
+  const task = tasks.find((candidate) => candidate.id === taskId);
+  return { taskType: task?.taskType ?? "fixed_duration", effortDriven: task?.effortDriven ?? false };
+}
+
 export function buildScheduleWorkCommand(
   row: Row,
   durationDays: number,
-  workHours: number
+  workHours: number,
+  workModel: ScheduleWorkModelRef = { taskType: "fixed_duration", effortDriven: false }
 ): PlanningCommand {
   return createPlanningCommand({
     type: "task.update_work_model",
     payload: {
       taskId: row.id,
-      taskType: "fixed_duration",
-      effortDriven: false,
+      taskType: workModel.taskType,
+      effortDriven: workModel.effortDriven,
       durationMinutes: Math.max(0, Math.round(durationDays * row.workingMinutesPerDay)),
       workMinutes: Math.max(0, Math.round(workHours * 60))
     }
@@ -138,6 +155,8 @@ export function buildScheduleRangeCommands(input: {
   startIso: string;
   finishIso: string;
   assignment?: ScheduleAssignmentRef;
+  /** Семантика задачи (resolveTaskWorkModel) — без неё legacy fixed_duration. */
+  workModel?: ScheduleWorkModelRef;
 }): PlanningCommand[] | null {
   const workingTime = resolveScheduleWorkingTime(
     input.source,
@@ -162,8 +181,8 @@ export function buildScheduleRangeCommands(input: {
       type: "task.update_work_model",
       payload: {
         taskId: input.row.id,
-        taskType: "fixed_duration",
-        effortDriven: false,
+        taskType: input.workModel?.taskType ?? "fixed_duration",
+        effortDriven: input.workModel?.effortDriven ?? false,
         durationMinutes,
         workMinutes
       }
@@ -503,6 +522,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
             row,
             startIso: dayToIso(ns),
             finishIso: dayToIso(nf),
+            workModel: resolveTaskWorkModel(source.authored.tasks, cur.id),
             ...(assignment ? { assignment } : {})
           });
           if (commands) void runBatch(commands);
@@ -515,6 +535,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           row,
           startIso: row.startIso,
           finishIso: dayToIso(cur.origStart + nd),
+          workModel: resolveTaskWorkModel(source.authored.tasks, cur.id),
           ...(assignment ? { assignment } : {})
         });
         if (commands) void runBatch(commands);
@@ -928,7 +949,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const authoredAsgs = readModel.authored.assignments;
   const currentAsg = (taskId: string): AsgRM | undefined => authoredAsgs.find((x) => x.taskId === taskId);
   const workCmd = (row: Row, durationDays: number, workHours: number): PlanningCommand =>
-    buildScheduleWorkCommand(row, durationDays, workHours);
+    buildScheduleWorkCommand(row, durationDays, workHours, resolveTaskWorkModel(readModel.authored.tasks, row.id));
   // Правка труда/длительности должна синхронизировать ТРУД назначения: загрузка ресурса
   // считается из assignment.workMinutes, иначе WBS покажет новые часы, а Ресурсы/Сценарии —
   // старую нагрузку. Шлём task.update_work_model + assignment.upsert (по id текущего назначения).
@@ -959,6 +980,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       row: r,
       startIso,
       finishIso: iso,
+      workModel: resolveTaskWorkModel(readModel.authored.tasks, r.id),
       ...(asg ? { assignment: asg } : {})
     });
     if (commands) void runBatch(commands);
@@ -1089,7 +1111,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     } else if (modal.taskId) {
       const taskId = modal.taskId;
       commands.push(createPlanningCommand({ type: "task.update_identity", payload: { taskId, title: values.title } }));
-      commands.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId, taskType: "fixed_duration", effortDriven: false, durationMinutes: timing.durationMinutes, workMinutes: Math.round(values.workH * 60) } }));
+      const workModel = resolveTaskWorkModel(readModel?.authored.tasks ?? [], taskId);
+      commands.push(createPlanningCommand({ type: "task.update_work_model", payload: { taskId, taskType: workModel.taskType, effortDriven: workModel.effortDriven, durationMinutes: timing.durationMinutes, workMinutes: Math.round(values.workH * 60) } }));
       if (values.startIso) commands.push(createPlanningCommand({ type: "task.update_schedule", payload: { taskId, plannedStart: values.startIso, plannedFinish: timing.finishIso } }));
       commands.push(createPlanningCommand({ type: "task.update_progress", payload: { taskId, percentComplete: values.pct } }));
       if (canManageResources && values.assigneeId) {
