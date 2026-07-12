@@ -105,7 +105,8 @@ describe("createDeliveryPlanningClient live getCommits", () => {
         }
       ],
       latestRevert: {
-        auditEventId: "audit-4"
+        auditEventId: "audit-4",
+        commands: []
       }
     });
   });

@@ -1,5 +1,6 @@
 import {
   canApplyPlanningScenarios,
+  canManageProjectPlan,
   canManageProjectResources,
   canPreviewPlanningScenarios,
   canReadProjectResources
@@ -135,6 +136,10 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
     const profile = await deps.getActorProfile(actor);
     const decision = canReadPlanningReadModel({ actor, profile });
     if (!decision.allowed) return context.json({ error: decision.reason }, 403);
+    // Undo-payload (compensatingCommands с прошлыми значениями плана) — только тем,
+    // кто вправе откатывать: /planning/revert-last гейтится canManageProjectPlan,
+    // читателю истории достаточно флага hasCompensatingCommands.
+    const canRevert = canManageProjectPlan({ actor, profile, targetTenantId: actor.tenantId }).allowed;
 
     const projectId = parsedProjectId.value;
     const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
@@ -144,13 +149,29 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
       limit: 100,
       projectId
     });
+    const planningEvents = events.filter((event) => event.sourceWorkflow === "planning");
+    // Полные compensatingCommands нужны только последнему succeeded planning-событию:
+    // revert-last принимает исключительно текущий коммит, и клиент читает команды только у него.
+    // Остальным — прежний флаг hasCompensatingCommands, без раздувания ответа на всю историю.
+    const latestRevertibleId = planningEvents.reduce<{ id: string; planVersion: number } | null>(
+      (latest, event) => {
+        const planVersion = event.afterState?.["planVersion"];
+        if (typeof planVersion !== "number") return latest;
+        if (event.executionResult["status"] !== "succeeded") return latest;
+        return latest === null || planVersion > latest.planVersion
+          ? { id: event.id, planVersion }
+          : latest;
+      },
+      null
+    )?.id ?? null;
     return context.json({
-      auditEvents: events
-        .filter((event) => event.sourceWorkflow === "planning")
+      auditEvents: planningEvents
         .map((event) => {
           const command = event.input["command"] as Record<string, unknown> | undefined;
           const changedTaskIds = event.afterState?.["changedTaskIds"];
           const compensatingCommands = event.afterState?.["compensatingCommands"];
+          const hasCompensatingCommands =
+            Array.isArray(compensatingCommands) && compensatingCommands.length > 0;
           return {
             id: event.id,
             actionType: event.actionType,
@@ -159,8 +180,15 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
             afterState: {
               planVersion: event.afterState?.["planVersion"] ?? null,
               changedTaskIds: Array.isArray(changedTaskIds) ? changedTaskIds : [],
-              hasCompensatingCommands:
-                Array.isArray(compensatingCommands) && compensatingCommands.length > 0
+              hasCompensatingCommands,
+              // Сами компенсирующие команды: клиент показывает превью-гейт отката
+              // (previewCommandBatch → подтверждение → revert-last). Отдаются только
+              // актору с правом отката (canManageProjectPlan) и только последнему
+              // обратимому коммиту; читателю истории — флаг hasCompensatingCommands.
+              compensatingCommands:
+                canRevert && hasCompensatingCommands && event.id === latestRevertibleId
+                  ? compensatingCommands
+                  : []
             },
             executionStatus:
               typeof event.executionResult["status"] === "string"

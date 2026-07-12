@@ -258,6 +258,10 @@ runtimeTest("project commits selects the compensating commit after a revert", as
       response.url().endsWith(`/api/workspace/projects/${PROJECT_ID}/planning/revert-last`)
   );
   await page.getByRole("button", { name: "Откатить последний", exact: true }).click();
+  // откат идёт через тот же превью-гейт, что и правки плана
+  const previewDialog = page.getByRole("dialog", { name: "Предпросмотр изменений" });
+  await expect(previewDialog).toBeVisible();
+  await previewDialog.getByRole("button", { name: "Применить изменения", exact: true }).click();
   const reverted = (await (await revertResponse).json()) as { newPlanVersion: number };
 
   await expect(

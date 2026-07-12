@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PlanningCommand } from "@kiss-pm/domain";
+import type { PlanningCommand, ScenarioProposal } from "@kiss-pm/domain";
 import {
   PlanningApiError,
   type PlanningPreviewResponse,
@@ -30,10 +30,10 @@ export type ApplyResult =
   | { ok: false; conflict: boolean; code?: string; message: string; issues?: ValidationHit[] };
 
 export type ScenarioPreviewResult =
-  | { ok: true; proposals: Array<Record<string, unknown>>; expiresAt: string }
+  | { ok: true; proposals: ScenarioProposal[]; planVersion: number; expiresAt: string }
   | { ok: false; conflict: boolean; code?: string; message: string };
 export type ScenarioApplyResult =
-  | { ok: true; planVersion: number; scenarioRunId: string }
+  | { ok: true; planVersion: number; scenarioRunId: string; auditEventId: string }
   | { ok: false; conflict: boolean; code?: string; message: string };
 /**
  * Работает через настоящий @kiss-pm/planning-client. Транспорт —
@@ -197,9 +197,21 @@ export function usePlanning(projectId: string) {
     [client, projectId, readModel, load, requestConfirmation]
   );
 
+  // Read-only батч-превью БЕЗ гейта подтверждения: детализация последствий для панелей
+  // сравнения (сценарии показывают задачи с датами до→после). План не мутирует.
+  const previewBatch = useCallback(
+    async (commands: PlanningCommand[]): Promise<PlanningPreviewResponse | null> => {
+      if (!readModel || commands.length === 0) return null;
+      return client.previewCommandBatch(projectId, { commands, clientPlanVersion: readModel.planVersion });
+    },
+    [client, projectId, readModel]
+  );
+
   // BUG-PROJ-24: откат последнего обратимого коммита через серверный revert-last
   // (работает из истории /commits, не зависит от in-session lastApplyRef).
-  const revertLast = useCallback(async (targetCommitId: string): Promise<ApplyResult> => {
+  // Откат идёт через тот же PlanningPreviewGate, что apply/applyBatch: компенсирующие
+  // команды коммита (из журнала) прогоняются через previewCommandBatch → подтверждение → revert.
+  const revertLast = useCallback(async (targetCommitId: string, compensatingCommands: PlanningCommand[] = []): Promise<ApplyResult> => {
     if (!client) return { ok: false, conflict: false, message: "no_client" };
     if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
     const current = revertRequestRef.current;
@@ -212,6 +224,16 @@ export function usePlanning(projectId: string) {
         };
     revertRequestRef.current = request;
     try {
+      // Пустой список команд теоретичен (журнал помечает обратимыми только коммиты
+      // с компенсацией) — в этом случае честно применяем без превью-гейта.
+      if (compensatingCommands.length > 0) {
+        const previewResult = await client.previewCommandBatch(projectId, {
+          commands: compensatingCommands,
+          clientPlanVersion: readModel.planVersion
+        });
+        const confirmed = await requestConfirmation({ commands: compensatingCommands, preview: previewResult });
+        if (!confirmed) return { ok: false, conflict: false, message: "preview_cancelled" };
+      }
       const res = await client.revertLast(projectId, request);
       revertRequestRef.current = null;
       setReadModel(res.readModel);
@@ -225,13 +247,13 @@ export function usePlanning(projectId: string) {
       const mappedError = mapPlanningError(e, "revert_failed");
       return { ok: false, conflict: false, code: mappedError.code, message: mappedError.message };
     }
-  }, [client, projectId, readModel, load]);
+  }, [client, projectId, readModel, load, requestConfirmation]);
   const previewScenarios = useCallback(
     async (target: Record<string, unknown>): Promise<ScenarioPreviewResult> => {
       if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
       try {
         const res = await client.previewScenarios(projectId, { target, clientPlanVersion: readModel.planVersion });
-        return { ok: true, proposals: res.proposals, expiresAt: res.expiresAt };
+        return { ok: true, proposals: res.proposals, planVersion: res.planVersion, expiresAt: res.expiresAt };
       } catch (e) {
         if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
           await load();
@@ -251,7 +273,8 @@ export function usePlanning(projectId: string) {
       try {
         const res = await client.applyScenario(projectId, scenarioId, { clientPlanVersion: readModel.planVersion, ...(acceptedRiskReason ? { acceptedRiskReason } : {}) });
         setReadModel(res.readModel);
-        return { ok: true, planVersion: res.newPlanVersion, scenarioRunId: res.scenarioRunId };
+        // auditEventId — квитанция применения: по ней success-состояние сценариев ссылается на вкладку «Коммиты».
+        return { ok: true, planVersion: res.newPlanVersion, scenarioRunId: res.scenarioRunId, auditEventId: res.auditEventId };
       } catch (e) {
         if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
           await load();
@@ -271,7 +294,7 @@ export function usePlanning(projectId: string) {
     return client.getCommits(projectId, lastApplyRef.current);
   }, [client, projectId]);
 
-  return { client, readModel, setReadModel, status, error, reload: load, preview, apply, applyBatch, revertLast, previewScenarios, applyScenario, loadCommits };
+  return { client, readModel, setReadModel, status, error, reload: load, preview, previewBatch, apply, applyBatch, revertLast, previewScenarios, applyScenario, loadCommits };
 }
 function planningWriteSignature(planVersion: number, commands: readonly PlanningCommand[]): string {
   return JSON.stringify({ planVersion, commands });

@@ -5,7 +5,8 @@ import type {
   PlanningCommandRequest,
   PlanningPreviewResponse,
   PlanningRevertRequest,
-  PlanningReadModel
+  PlanningReadModel,
+  ScenarioPreviewResponse
 } from "./types";
 
 export class PlanningApiError extends Error {
@@ -116,7 +117,7 @@ export function createPlanningApiClient(options: PlanningApiClientOptions) {
       );
     },
     previewScenarios(projectId: string, input: { target: Record<string, unknown>; clientPlanVersion: number }) {
-      return requestJson<{ proposals: Array<Record<string, unknown>>; expiresAt: string }>(
+      return requestJson<ScenarioPreviewResponse>(
         `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/scenarios/preview`,
         { method: "POST", body: JSON.stringify(input) }
       );

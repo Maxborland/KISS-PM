@@ -250,8 +250,13 @@ test.describe("Projects scenarios write flow", () => {
     await expect(
       page.getByRole("button", { name: "Запросить заново", exact: true })
     ).toBeVisible();
+    // «Сравнить» рендерится в каждой из трёх карточек — проверяем количество,
+    // а не единственную видимость (strict mode падал на 3 элементах).
     await expect(
       page.getByRole("button", { name: "Сравнить", exact: true })
+    ).toHaveCount(3);
+    await expect(
+      page.getByRole("button", { name: "Сравнить", exact: true }).first()
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Применить", exact: true })

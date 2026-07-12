@@ -152,6 +152,8 @@ test.describe("Projects baseline and commits write flows", () => {
       await page
         .getByRole("button", { name: "Откатить последний", exact: true })
         .click();
+      // откат идёт через тот же превью-гейт, что и правки плана
+      await confirmPlanningPreview(page);
       const revertResponse = await revertPromise;
       expect(revertResponse.status()).toBe(200);
       const reverted = (await revertResponse.json()) as ApplyResponse & {

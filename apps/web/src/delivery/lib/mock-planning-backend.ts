@@ -14,6 +14,7 @@
    ============================================================ */
 
 import type { PlanningCommand } from "@kiss-pm/domain";
+import { buildCompensatingCommandBatch, type PlanningReadModel } from "@kiss-pm/planning-client";
 
 import {
   dayToIso,
@@ -968,6 +969,8 @@ type ScenarioMetrics = { finishDay: number; finishDate: string; targetOverloadMi
 type ScenarioProposalMock = {
   id: string;
   profile: "aggressive" | "balanced" | "resilient";
+  availability: "available" | "unavailable";
+  unavailableReason: string | null;
   conflictEffect: "accepted" | "reduced" | "removed";
   planDelta: { commands: PlanningCommand[]; changedTaskIds: string[]; changedAssignmentIds: string[]; acceptedRiskIds: string[] };
   explainability: { finishDate: string | null; deadlineDeltaDays: number; overloadMinutes: number; overloadedResourceIds: string[]; changedTaskIds: string[]; changedAssignmentIds: string[]; dependencyWarnings: string[]; requiredApprovals: string[]; riskScore: number };
@@ -1062,14 +1065,19 @@ export function buildScenarioProposals(base: Authored, target: ScenarioTargetMoc
 
   // proposal содержит ТОЛЬКО контрактные поля (как доменный ScenarioProposal): база/дельты/diff
   // вычисляются на клиенте из explainability + planDelta.commands + live read-model.
+  // deadlineDeltaDays — как в домене: на сколько календарных дней прогнозный финиш профиля срывает дедлайн (0 — не срывает).
+  const deadlineDelta = (finishDate: string | null) =>
+    finishDate && base.projectDeadline ? Math.max(0, isoToDay(finishDate) - isoToDay(base.projectDeadline)) : 0;
   const mk = (
     profile: ScenarioProposalMock["profile"], conflictEffect: ScenarioProposalMock["conflictEffect"], riskScore: number,
     commands: PlanningCommand[], m: ScenarioMetrics, changedAssignmentIds: string[]
   ): ScenarioProposalMock => ({
-    id: `scenario-${profile}`, profile, conflictEffect,
+    // parity с боевым previewScenarios: mock отдаёт только применимые профили,
+    // поэтому availability всегда "available" (недоступные профили просто не попадают в out)
+    id: `scenario-${profile}`, profile, availability: "available", unavailableReason: null, conflictEffect,
     planDelta: { commands, changedTaskIds: m.changedTaskIds, changedAssignmentIds, acceptedRiskIds: conflictEffect === "accepted" ? [`${target.resourceId}:${target.date}`] : [] },
     explainability: {
-      finishDate: m.finishDate, deadlineDeltaDays: 0, overloadMinutes: m.targetOverloadMinutes, overloadedResourceIds: m.overloadedResourceIds,
+      finishDate: m.finishDate, deadlineDeltaDays: deadlineDelta(m.finishDate), overloadMinutes: m.targetOverloadMinutes, overloadedResourceIds: m.overloadedResourceIds,
       changedTaskIds: m.changedTaskIds, changedAssignmentIds, dependencyWarnings: [], requiredApprovals: conflictEffect === "accepted" ? ["tenant.planning_scenarios.apply"] : [], riskScore
     }
   });
@@ -1097,8 +1105,6 @@ export function buildScenarioProposals(base: Authored, target: ScenarioTargetMoc
 
 /* ---- Журнал коммитов (PM-as-code история сессии) ---- */
 type CommitMeta = { version: number; actionType: string; summary: string; changedTaskIds: string[]; auditEventId: string; at: string; revertible: boolean };
-// команды, для которых buildCompensatingCommands строит обратные (откат) — см. planning-client/undo
-const REVERTIBLE_TYPES = new Set(["task.update_identity", "task.update_schedule", "task.update_progress", "task.update_status", "task.update_work_model", "dependency.upsert", "dependency.delete"]);
 
 function summarizeCommand(cmd: PlanningCommand, a: Authored): string {
   const c = cmd as { type: string; payload: Record<string, unknown> };
@@ -1142,20 +1148,33 @@ export function createMockPlanningFetch(): typeof fetch {
     { version: 16, actionType: "planning.task.updated", summary: "«Контур безопасности» → ручной режим (manual)", changedTaskIds: ["t-2.2"], auditEventId: "audit-16", at: "2026-06-20T15:30:00.000Z", revertible: false },
     { version: 15, actionType: "planning.baseline.captured", summary: "Зафиксирован базовый план «После kick-off»", changedTaskIds: [], auditEventId: "audit-15", at: "2026-05-20T08:00:00.000Z", revertible: false }
   ];
-  // данные отката последнего обратимого коммита (как Schedule undo: команды + read-model ДО)
+  // данные отката последнего обратимого коммита. КОНТРАКТ (как боевой afterState.compensatingCommands):
+  // храним КОМПЕНСИРУЮЩИЕ команды (инверсию по before-снимку), а не прямые применённые — превью-гейт
+  // отката в CommitsView показывает дельту возврата к before, а POST /planning/revert-last их применяет.
   const seedBefore = cloneAuthored(authored);
   const seedT = seedBefore.tasks.find((t) => t.id === "t-3.1.1");
   if (seedT) seedT.pct = 80;
+  const seedBeforeReadModel = buildReadModel(seedBefore, 16) as unknown as PlanningReadModel;
   let lastRevert: { auditEventId: string; commands: PlanningCommand[]; before: unknown } | null = {
     auditEventId: "audit-17",
-    commands: [{ type: "task.update_progress", payload: { taskId: "t-3.1.1", percentComplete: 92 } }] as unknown as PlanningCommand[],
-    before: buildReadModel(seedBefore, 16)
+    commands: buildCompensatingCommandBatch(
+      [{ type: "task.update_progress", payload: { taskId: "t-3.1.1", percentComplete: 92 } }] as unknown as PlanningCommand[],
+      seedBeforeReadModel
+    ),
+    before: seedBeforeReadModel
   };
-  const pushCommit = (commands: PlanningCommand[], changed: string[], summary: string, actionType: string, before: unknown) => {
+  const pushCommit = (commands: PlanningCommand[], changed: string[], summary: string, actionType: string, before: unknown, options?: { compensable?: boolean }) => {
     const auditEventId = `audit-${planVersion}`;
-    const revertible = commands.length === 1 && REVERTIBLE_TYPES.has((commands[0] as { type: string }).type);
+    // как боевой apply/apply-batch: обратимость = непустой батч компенсирующих команд
+    // (buildCompensatingCommandBatch по before-снимку); пустой батч — необратимый коммит.
+    // compensable:false — parity с событиями, где боевой аудит компенсацию не пишет (сценарии, откат).
+    const compensating = options?.compensable === false
+      ? []
+      : buildCompensatingCommandBatch(commands, before as PlanningReadModel);
+    const revertible = compensating.length > 0;
     commitLog.unshift({ version: planVersion, actionType, summary, changedTaskIds: changed, auditEventId, at: new Date().toISOString(), revertible });
-    if (revertible) lastRevert = { auditEventId, commands, before };
+    // как live getCommits: обратим только ПОСЛЕДНИЙ коммит — необратимый сверху закрывает откат предыдущего
+    lastRevert = revertible ? { auditEventId, commands: compensating, before } : null;
   };
 
   const mockFetch: typeof fetch = async (input, init) => {
@@ -1283,7 +1302,8 @@ export function createMockPlanningFetch(): typeof fetch {
       authored = after;
       planVersion += 1;
       lastPreview = null; // proposals одноразовые (как боевой markScenarioRunApplied)
-      pushCommit(proposal.planDelta.commands, [...allChanged], `Сценарий «${proposal.profile}» применён`, "planning.scenario.applied", buildReadModel(before, planVersion - 1));
+      // parity: боевой аудит «planning.scenario.applied» не пишет compensatingCommands → коммит необратим
+      pushCommit(proposal.planDelta.commands, [...allChanged], `Сценарий «${proposal.profile}» применён`, "planning.scenario.applied", buildReadModel(before, planVersion - 1), { compensable: false });
       return json({
         scenarioRunId: `scenario-run-${planVersion}`,
         newPlanVersion: planVersion,
@@ -1296,6 +1316,41 @@ export function createMockPlanningFetch(): typeof fetch {
     // КОММИТЫ: журнал версий сессии + данные отката последнего обратимого коммита
     if (method === "GET" && /\/planning\/commits$/.test(path)) {
       return json({ commits: commitLog, latestRevert: lastRevert });
+    }
+
+    // ОТКАТ: применение компенсирующих команд последнего обратимого коммита
+    // (parity с боевым POST /planning/revert-last: guard версии, компенсация, новый необратимый коммит)
+    if (method === "POST" && /\/planning\/revert-last$/.test(path)) {
+      const reqBody = init?.body ? (JSON.parse(String(init.body)) as { targetCommitId?: string; clientPlanVersion: number }) : null;
+      if (!reqBody?.targetCommitId) return json({ error: "planning_revert_invalid" }, 400);
+      if (reqBody.clientPlanVersion !== planVersion) return json({ error: "plan_version_conflict", currentPlanVersion: planVersion }, 409);
+      if (!lastRevert || lastRevert.auditEventId !== reqBody.targetCommitId) return json({ error: "planning_commit_not_revertible" }, 409);
+      const before = cloneAuthored(authored);
+      const after = cloneAuthored(authored);
+      const allChanged = new Set<string>();
+      for (const command of lastRevert.commands) {
+        const r = applyCommand(after, command);
+        if (!r.ok) {
+          const issue = r.issue ?? { code: "planning_command_invalid", message: r.error ?? "invalid", entityId: null };
+          return json({ error: "planning_precondition_failed", validationIssues: [{ code: issue.code, severity: "error", message: issue.message, entity: issue.entityId ? { type: "task", id: issue.entityId } : null }] }, 409);
+        }
+        r.changedTaskIds.forEach((cid) => allChanged.add(cid));
+      }
+      changedByCascade(before, after).forEach((cid) => allChanged.add(cid));
+      const reverted = lastRevert.auditEventId;
+      authored = after;
+      planVersion += 1;
+      const auditEventId = `audit-${planVersion}`;
+      // как боевой revert: afterState.compensatingCommands=[] → сам откат необратим, lastRevert закрывается
+      commitLog.unshift({ version: planVersion, actionType: "planning.commit.reverted", summary: "Откат коммита", changedTaskIds: [...allChanged], auditEventId, at: new Date().toISOString(), revertible: false });
+      lastRevert = null;
+      return json({
+        reverted,
+        applied: { changedTaskIds: [...allChanged], changedAssignmentIds: [], changedDependencyIds: [] },
+        newPlanVersion: planVersion,
+        auditEventId,
+        readModel: buildReadModel(authored, planVersion)
+      });
     }
 
     return json({ error: "not_found" }, 404);

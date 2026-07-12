@@ -72,10 +72,9 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       // (неявное назначение → работа деривится из задачи), поэтому мапим в число с фолбэком 0.
       asgById: new Map(authored.assignments.map((x): [string, MatrixAssignment] => [x.id, { id: x.id, taskId: x.taskId, resourceId: x.resourceId, unitsPermille: x.unitsPermille, workMinutes: x.workMinutes ?? 0, role: x.role }])),
       calcStartById: new Map(calc.map((c) => [c.id, c.calculatedStart ?? ""])),
-      // acceptedOverloads — mock-only поле бэкенда (в каноническом ResourceLoadMatrix домена его нет,
-      // поэтому узкий каст). scenarios-surface читает так же; без него контрол «принять перегруз» мёртв
-      // в mock/Storybook (KPI не падают, ✓ не рендерится).
-      accepted: new Set((readModel.resourceLoad as { acceptedOverloads?: string[] }).acceptedOverloads ?? [])
+      // acceptedOverloads — каноническое поле ResourceLoadMatrix (BUG-PROJ-19), читаем по контракту;
+      // без него контрол «принять перегруз» мёртв (KPI не падают, ✓ не рендерится).
+      accepted: new Set(readModel.resourceLoad.acceptedOverloads ?? [])
     };
     return { data, rawById, calendar, projectHolidayDates };
   }, [readModel, resDir.list]);

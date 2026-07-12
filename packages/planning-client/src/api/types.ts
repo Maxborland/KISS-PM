@@ -1,9 +1,24 @@
-import type { PlanningCommand, PlanningReadModel, ValidationIssue } from "@kiss-pm/domain";
+import type { PlanningCommand, PlanningReadModel, ScenarioProposal, ValidationIssue } from "@kiss-pm/domain";
 
 // Канонический тип read-model живёт в @kiss-pm/domain (владелец проекции). planning-client лишь
 // ре-экспортит его, чтобы web и api видели одну форму — раньше здесь был Record<string,unknown>×8,
 // стиравший тип на границе пакета.
 export type { PlanningReadModel };
+
+// Решение пермишен-проверки, которое превью возвращает вместе с расчётом
+// (боевой preview-command/preview-command-batch уже отдают эти поля).
+export type PlanningPermissionPreview = {
+  allowed: boolean;
+  reason: string;
+};
+
+// Аудит-событие, которое будет записано, если команду применить.
+export type PlanningAuditPreview = {
+  actionType: string;
+  sourceWorkflow: string;
+  planVersionBefore: number;
+  planVersionAfter: number;
+};
 
 export type PlanningPreviewResponse = {
   before: PlanningReadModel;
@@ -14,6 +29,21 @@ export type PlanningPreviewResponse = {
     changedDependencyIds: string[];
   };
   validationIssues: ValidationIssue[];
+  // preview-command отдаёт единичный permissionPreview, preview-command-batch — массив
+  // permissionPreviews (по одному на команду). Оба optional: старые ответы и мок-сессии
+  // без этих полей остаются валидными.
+  permissionPreview?: PlanningPermissionPreview;
+  permissionPreviews?: PlanningPermissionPreview[];
+  auditPreview?: PlanningAuditPreview;
+};
+
+// Wire-контракт превью сценариев: persisted-run id внутри proposals + срок годности предложения.
+// ScenarioProposal — канонический доменный тип (владелец — @kiss-pm/domain/scenarioPlanning).
+export type ScenarioPreviewResponse = {
+  proposals: ScenarioProposal[];
+  planVersion: number;
+  engineVersion: string;
+  expiresAt: string;
 };
 
 export type PlanningApplyResponse = {

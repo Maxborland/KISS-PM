@@ -1234,11 +1234,21 @@ export const planningSchemas = openApiSchemaFragment({
       commandType: nullableStringSchema,
       afterState: {
         type: "object",
-        required: ["planVersion", "changedTaskIds", "hasCompensatingCommands"],
+        required: ["planVersion", "changedTaskIds", "hasCompensatingCommands", "compensatingCommands"],
         properties: {
           planVersion: { type: ["integer", "null"], minimum: 0 },
           changedTaskIds: { type: "array", items: stringIdSchema },
-          hasCompensatingCommands: { type: "boolean" }
+          hasCompensatingCommands: { type: "boolean" },
+          // компенсирующие команды коммита — вход клиентского превью-гейта отката.
+          // Полный список отдаётся ТОЛЬКО последнему succeeded planning-событию
+          // (единственному обратимому через revert-last); у остальных — пустой массив,
+          // обратимость в прошлом видна по hasCompensatingCommands.
+          compensatingCommands: {
+            type: "array",
+            items: schemaRef("PlanningCommand"),
+            description:
+              "Компенсирующие команды отката. Непустой только у последнего succeeded planning-события (единственного обратимого через revert-last); у остальных событий пустой, а прежняя обратимость видна по hasCompensatingCommands."
+          }
         },
         additionalProperties: false
       },

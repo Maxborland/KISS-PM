@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
+import type { ScenarioProposal } from "@kiss-pm/domain";
 import { Check, Loader2, RefreshCw, Sparkles, TriangleAlert, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,37 +20,54 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 type Profile = "aggressive" | "balanced" | "resilient";
 type DiffRow = { wbs: string; title: string; detail: string; delta: string };
-// форма ровно как доменный ScenarioProposal — никаких мок-only полей; база/дельты/diff считаем на клиенте
-type Proposal = {
-  id: string;
-  profile: Profile;
-  conflictEffect: "accepted" | "reduced" | "removed";
-  availability: "available" | "unavailable";
-  unavailableReason: "target_bucket_not_found" | "target_assignment_not_found" | "no_eligible_alternate_resource" | "alternate_resource_has_insufficient_capacity" | null;
-  planDelta: { commands: Array<{ type: string; payload?: Record<string, unknown> }> };
-  explainability: { finishDate: string | null; overloadMinutes: number; changedTaskIds: string[]; riskScore: number; requiredApprovals: string[] };
-};
+// entity-level последствия выбранного proposal: даты задачи до→после из батч-превью его команд
+type CompareTaskRow = { taskId: string; wbs: string; title: string; beforeStart: string | null; beforeFinish: string | null; afterStart: string | null; afterFinish: string | null };
+type CompareDetails = { forId: string; status: "loading" | "ready" | "error"; rows: CompareTaskRow[] };
+// Канонический wire-тип предложения — доменный ScenarioProposal (его же отдают
+// previewScenarios боевого API и contract-mock); локального «почти такого же» типа больше нет.
+type Proposal = ScenarioProposal;
 type Overload = { resourceId: string; date: string; overloadMinutes: number; taskIds: string[] };
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
 const SCENARIO_PREVIEW_PERMISSION = "tenant.planning_scenarios.preview";
 const SCENARIO_APPLY_PERMISSION = "tenant.planning_scenarios.apply";
+// entity-последствия: показываем первые N задач до→после, остальное сворачиваем в «…и ещё N задач»
+const COMPARE_TASK_ROWS_LIMIT = 20;
+// коды apply, после которых persisted-предложения заведомо неприменимы — сбрасываем и пересчитываем
+const STALE_SCENARIO_CODES = new Set([
+  "scenario_expired",
+  "scenario_not_found",
+  "scenario_unavailable",
+  "planning_scenario_already_applied",
+  "planning_scenario_invalid",
+  "planning_scenario_hash_mismatch",
+  "planning_scenario_engine_mismatch",
+  "planning_scenario_target_mismatch"
+]);
 const UNAVAILABLE_REASON: Record<Exclude<Proposal["unavailableReason"], null>, string> = {
   target_bucket_not_found: "Целевой день перегруза больше не найден.",
   target_assignment_not_found: "Назначение, создающее перегруз, больше не найдено.",
   no_eligible_alternate_resource: "В команде нет ресурса подходящей позиции.",
   alternate_resource_has_insufficient_capacity: "У подходящих ресурсов недостаточно свободной ёмкости."
 };
+// RU-подписи требуемых прав (explainability.requiredApprovals); неизвестный id показываем как есть
+const APPROVAL_LABEL: Record<string, string> = {
+  "tenant.planning_scenarios.apply": "право применения сценариев планирования",
+  "tenant.project_plan.manage": "право управления планом проекта",
+  "tenant.project_resources.manage": "право управления ресурсами проекта"
+};
 const PROFILE_META: Record<Profile, { label: string; desc: string }> = {
   aggressive: { label: "Агрессивный", desc: "Принять перегруз, сохранить дату финиша" },
   balanced: { label: "Балансированный", desc: "Снять половину перегруза на альт-исполнителя, минимальный сдвиг" },
   resilient: { label: "Устойчивый", desc: "Снять весь перегруз, заложить резерв; финиш сдвигается больше" }
 };const h = (min: number) => Math.round(min / 60);
+// локальное время пользователя: TTL превью показываем как «действует до HH:MM» на его часах
+const hhmmLocal = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00Z"); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
 const riskOf = (score: number) => score >= 67 ? { label: "высокий риск", cls: "bg-[var(--danger-soft)] text-[var(--danger-text)]" } : score >= 34 ? { label: "средний риск", cls: "bg-[var(--warning-soft)] text-[var(--warning-text)]" } : { label: "низкий риск", cls: "bg-[var(--success-soft)] text-[var(--success-text)]" };
 
 export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
-  const { readModel, status, error, reload, previewScenarios, applyScenario } = usePlanning(projectId);
+  const { readModel, status, error, reload, previewScenarios, applyScenario, previewBatch } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
   const sessionUser = useSessionUser();
@@ -60,6 +79,10 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const resName = (id: string) => { const n = resDir.name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
   const [targetKey, setTargetKey] = useState<string>("");
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
+  // TTL persisted-превью: сервер отдаёт expiresAt (+15 мин); клиентский таймер даёт мягкое
+  // состояние «истекло» (Применить disabled + подсказка пересчитать). Авторитет — серверный 409 scenario_expired.
+  const [previewExpiresAt, setPreviewExpiresAt] = useState<string | null>(null);
+  const [previewExpired, setPreviewExpired] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [compareId, setCompareId] = useState<string | null>(null);
   const [applyBusy, setApplyBusy] = useState(false);
@@ -67,16 +90,55 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   // валидация причины принятия риска — у поля причины (G3-19), не в toast
   const [reasonError, setReasonError] = useState<string | null>(null);
   const [scenarioErr, setScenarioErr] = useState<string | null>(null);
+  // Квитанция последнего применения этой сессии: auditEventId из ответа apply + ссылка на вкладку «Коммиты».
+  const [lastApplied, setLastApplied] = useState<{ label: string; planVersion: number; auditEventId: string } | null>(null);
+  const [compareDetails, setCompareDetails] = useState<CompareDetails | null>(null);
+
+  // entity-level последствия: команды выбранного proposal прогоняем через СУЩЕСТВУЮЩИЙ
+  // батч-превью (read-only) и берём даты задач до→после из before/after read-model.
+  // Ошибка превью НЕ блокирует apply — остаются агрегаты + честная пометка «детализация недоступна».
+  const selectedProposal = compareId ? (proposals ?? []).find((p) => p.id === compareId) ?? null : null;
+  useEffect(() => {
+    if (!selectedProposal || selectedProposal.planDelta.commands.length === 0) { setCompareDetails(null); return; }
+    const forId = selectedProposal.id;
+    const commands = selectedProposal.planDelta.commands;
+    let active = true;
+    setCompareDetails({ forId, status: "loading", rows: [] });
+    void (async () => {
+      try {
+        const batch = await previewBatch(commands);
+        if (!active) return;
+        if (!batch) { setCompareDetails({ forId, status: "error", rows: [] }); return; }
+        const beforeById = new Map(batch.before.calculatedPlan.tasks.map((t) => [t.id, t]));
+        const afterById = new Map(batch.after.calculatedPlan.tasks.map((t) => [t.id, t]));
+        const rows = (batch.planDelta.changedTaskIds ?? []).map((taskId): CompareTaskRow => {
+          const b = beforeById.get(taskId);
+          const a = afterById.get(taskId);
+          return {
+            taskId,
+            wbs: a?.wbsCode ?? b?.wbsCode ?? "—",
+            title: a?.title ?? b?.title ?? taskId,
+            beforeStart: b?.calculatedStart ?? null,
+            beforeFinish: b?.calculatedFinish ?? null,
+            afterStart: a?.calculatedStart ?? null,
+            afterFinish: a?.calculatedFinish ?? null
+          };
+        });
+        setCompareDetails({ forId, status: "ready", rows });
+      } catch {
+        if (active) setCompareDetails({ forId, status: "error", rows: [] });
+      }
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProposal?.id, previewBatch]);
 
   const model = useMemo(() => {
     if (!readModel) return null;
     // Уже принятые перегрузки исключаем из целей сценария (каноничный ключ `resourceId:dateIso`),
     // иначе после применения сценария только что принятый день остаётся целью по умолчанию и снова предлагается.
-    // `acceptedOverloads` — мок-only поле бэкенда: в каноничном ResourceLoadMatrix его нет,
-    // поэтому это узкий документированный каст (не `as unknown as`), а не доступ по контракту.
-    const accepted = new Set(
-      (readModel.resourceLoad as { acceptedOverloads?: string[] }).acceptedOverloads ?? []
-    );
+    // acceptedOverloads — каноническое поле ResourceLoadMatrix (BUG-PROJ-19), читаем по контракту.
+    const accepted = new Set(readModel.resourceLoad.acceptedOverloads ?? []);
     const overloads = (readModel.resourceLoad.overloads ?? [])
       .filter((o) => o.granularity === "day")
       .filter((o) => !accepted.has(`${o.resourceId}:${o.date}`))
@@ -98,9 +160,20 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     setPreviewBusy(true); setScenarioErr(null); setCompareId(null);
     const res = await previewScenarios({ type: "resource_overload", resourceId: t.resourceId, date: t.date, overloadMinutes: t.overloadMinutes, taskIds: t.taskIds });
     setPreviewBusy(false);
-    if (res.ok) setProposals(res.proposals as unknown as Proposal[]);
-    else { setProposals([]); setScenarioErr(res.conflict ? "Конфликт версий — перезагружено, запросите сценарии заново" : "Не удалось получить сценарии"); }
+    if (res.ok) { setProposals(res.proposals); setPreviewExpiresAt(res.expiresAt ?? null); }
+    else { setProposals([]); setPreviewExpiresAt(null); setScenarioErr(res.conflict ? "Конфликт версий — перезагружено, запросите сценарии заново" : "Не удалось получить сценарии"); }
   }
+
+  // клиентский таймер TTL: по достижении expiresAt переводим предложения в состояние «истекло»
+  useEffect(() => {
+    if (!previewExpiresAt) { setPreviewExpired(false); return; }
+    const msLeft = Date.parse(previewExpiresAt) - Date.now();
+    if (Number.isNaN(msLeft)) { setPreviewExpired(false); return; }
+    if (msLeft <= 0) { setPreviewExpired(true); return; }
+    setPreviewExpired(false);
+    const timer = setTimeout(() => setPreviewExpired(true), msLeft);
+    return () => clearTimeout(timer);
+  }, [previewExpiresAt]);
 
   // авто-превью для худшего перегруза при загрузке и после применения (planVersion сменился → proposals=null)
   useEffect(() => {
@@ -135,7 +208,8 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const finishDelta = (p: Proposal) => dayN(p.explainability.finishDate) - dayN(model.baseFinish);
   const overloadDelta = (p: Proposal) => p.explainability.overloadMinutes - baseOverloadMin;
   const deriveDiff = (p: Proposal): DiffRow[] => p.planDelta.commands.map((cmd): DiffRow => {
-    const pay = cmd.payload ?? {};
+    // payload дискриминированного PlanningCommand читаем по строковым ключам (diff — деривация для UI)
+    const pay = (cmd.payload ?? {}) as Record<string, unknown>;
     if (cmd.type === "risk.accept_overload") return { wbs: "—", title: target ? `${resName(target.resourceId)} · ${ddmm(target.date)}` : "—", detail: "Перегруз принят как осознанный риск", delta: "+0 дн" };
     const taskId = String(pay.taskId ?? ""); const rid = String(pay.resourceId ?? ""); const wm = Number(pay.workMinutes ?? 0);
     const task = model.taskById.get(taskId);
@@ -153,10 +227,20 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     setApplyBusy(false);
     if (res.ok) {
       toast.success(`Сценарий «${PROFILE_META[p.profile].label}» применён · коммит v${res.planVersion}${prototypeNotesEnabled ? ` · scenarioRunId ${res.scenarioRunId}` : ""}`);
+      setLastApplied({ label: PROFILE_META[p.profile].label, planVersion: res.planVersion, auditEventId: res.auditEventId });
       setRiskReason(""); setCompareId(null); setProposals(null); // авто-превью пересчитает по новому состоянию
     } else if (res.conflict) { setScenarioErr("Конфликт версий — перезагружено, запросите сценарии заново"); setProposals(null); }
     else if (res.code === "accepted_risk_reason_required") setReasonError("Требуется причина принятия риска");
-    else if (res.code === "scenario_expired" || res.code === "scenario_not_found") { setScenarioErr("Предложения устарели — запросите заново"); setProposals(null); }
+    // persisted-run больше неприменим (истёк/не найден/уже применён/integrity-mismatch):
+    // показываем RU-текст кода (PLANNING_ERROR_MESSAGES) и сбрасываем предложения — авто-превью пересчитает
+    else if (res.code && STALE_SCENARIO_CODES.has(res.code)) {
+      // already_applied: план на сервере уже ушёл вперёд, а клиентская версия отстала. Копия обещает
+      // «Данные обновлены» — держим её честной: reload ДО сброса предложений, чтобы авто-превью пошло
+      // со свежей planVersion (иначе следующий preview ловит 409-конфликт и второй противоречащий баннер).
+      if (res.code === "planning_scenario_already_applied") await reload();
+      setScenarioErr(res.message);
+      setProposals(null);
+    }
     else toast.error(`Отклонено: ${res.message}`);
   };
 
@@ -170,7 +254,14 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Сценарии планирования</h2>
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Бэкенд предлагает три профиля разрешения перегруза ресурса; выбранный применяется как пакет команд (коммит плана).</p>
         </div>
-        {canPreviewScenarios ? <Button variant="ghost" size="sm" className="ml-auto" disabled={previewBusy || !target} onClick={() => { if (target) { setProposals(null); void runPreview(target); } }}><RefreshCw className={cn("size-3.5", previewBusy && "animate-spin")} aria-hidden />Запросить заново</Button> : null}
+        <div className="ml-auto flex items-center gap-2">
+          {previewExpiresAt && list.length > 0 ? (
+            previewExpired
+              ? <span data-testid="scenario-ttl-expired" className="inline-flex items-center rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Предложения истекли — запросите заново</span>
+              : <span data-testid="scenario-ttl" className="inline-flex items-center rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Предложение действует до {hhmmLocal(previewExpiresAt)}</span>
+          ) : null}
+          {canPreviewScenarios ? <Button variant="ghost" size="sm" disabled={previewBusy || !target} onClick={() => { if (target) { setProposals(null); void runPreview(target); } }}><RefreshCw className={cn("size-3.5", previewBusy && "animate-spin")} aria-hidden />Запросить заново</Button> : null}
+        </div>
       </div>
 
       {prototypeNotesEnabled && (
@@ -179,6 +270,17 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           Реальный контракт: previewScenarios(target) → 3 профиля (наборы PlanningCommand с пересчётом метрик) → applyScenario (permission + audit «planning.scenario.applied», bump версии). Агрессивный принимает перегруз — нужна причина риска. Данные in-memory.
         </div>
       )}
+
+      {/* success-квитанция применения: реальный auditEventId + переход к коммиту плана */}
+      {lastApplied ? (
+        <div data-testid="scenario-apply-receipt" className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--success-border,var(--border))] bg-[var(--success-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--success-text)]">
+          <Check className="size-4 shrink-0" aria-hidden />
+          {/* формулировка сознательно отличается от toast («Сценарий … применён»): e2e ловит текст тоста substring-регекспом */}
+          <span>Применён сценарий «{lastApplied.label}» — коммит v{lastApplied.planVersion}.</span>
+          <span className="mono text-[length:var(--text-2xs)] text-[var(--muted-strong)]">{lastApplied.auditEventId}</span>
+          <Link href={`/projects/${encodeURIComponent(projectId)}/commits`} className="font-medium text-[var(--accent)] underline-offset-2 hover:underline">Открыть в Коммитах</Link>
+        </div>
+      ) : null}
 
       {model.overloads.length === 0 ? (
         <div data-testid="scenario-empty-state" className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-10 text-center text-[length:var(--text-sm)] text-[var(--muted)] shadow-[var(--shadow-card)]">
@@ -226,6 +328,14 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                         </div>
                         <div className="mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{meta.desc}</div>
                         {!available && p.unavailableReason ? <div data-testid={`scenario-unavailable-${p.profile}`} className="mt-1 text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Недоступен: {UNAVAILABLE_REASON[p.unavailableReason]}</div> : null}
+                        {/* требуемые права применения (explainability.requiredApprovals — контрактное поле) */}
+                        {p.explainability.requiredApprovals.length > 0 ? (
+                          <ul data-testid={`scenario-approvals-${p.profile}`} className="mt-1 flex flex-wrap gap-1">
+                            {p.explainability.requiredApprovals.map((approval) => (
+                              <li key={approval} className="inline-flex items-center rounded-full bg-[var(--panel-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-strong)]">Требуется: {APPROVAL_LABEL[approval] ?? `право ${approval}`}</li>
+                            ))}
+                          </ul>
+                        ) : null}
                       </div>
                       <div className="w-[120px]">
                         <div className="text-[length:var(--text-2xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Финиш</div>
@@ -241,7 +351,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
                         <Button variant="secondary" size="sm" disabled={!available} onClick={() => setCompareId(compareId === p.id ? null : p.id)}>{compareId === p.id ? "Скрыть" : "Сравнить"}</Button>
-                        {canApplyScenarios ? <Button variant="default" size="sm" disabled={applyBusy || !available} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button> : null}
+                        {canApplyScenarios ? <Button variant="default" size="sm" disabled={applyBusy || !available || previewExpired} title={previewExpired ? "Предложение истекло — запросите сценарии заново" : undefined} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button> : null}
                       </div>
                     </div>
 
@@ -279,6 +389,30 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                             </div>
                           ))}
                         </div>
+                        {/* entity-level последствия: даты задач до→после из батч-превью команд proposal */}
+                        {compareDetails && compareDetails.forId === p.id ? (
+                          compareDetails.status === "loading" ? (
+                            <div className="mt-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--muted)]"><Loader2 className="size-3.5 animate-spin" aria-hidden /> Расчёт последствий по задачам…</div>
+                          ) : compareDetails.status === "error" ? (
+                            <div data-testid="scenario-compare-details-unavailable" className="mt-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--muted)]">Детализация по задачам недоступна — показаны только агрегатные метрики. Применение сценария по-прежнему возможно.</div>
+                          ) : compareDetails.rows.length > 0 ? (
+                            <div data-testid="scenario-compare-details" className="mt-2 rounded-[var(--radius-md)] border border-[var(--border)]">
+                              <div className="border-b border-[var(--border-subtle)] px-2.5 py-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Задачи: даты до → после ({compareDetails.rows.length})</div>
+                              {/* cap списка (как slice(0,8) затронутых задач в commits-surface): большой каскад не раздувает карточку */}
+                              {compareDetails.rows.slice(0, COMPARE_TASK_ROWS_LIMIT).map((row) => (
+                                <div key={row.taskId} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2.5 py-1.5 last:border-b-0 text-[length:var(--text-xs)]">
+                                  <span className="mono w-[42px] shrink-0 text-[var(--muted)]">{row.wbs}</span>
+                                  <span className="min-w-0 flex-1 truncate font-medium text-[var(--text)]">{row.title}</span>
+                                  <span className="mono shrink-0 text-[var(--muted-strong)]">{ddmm(row.beforeStart)} – {ddmm(row.beforeFinish)} → {ddmm(row.afterStart)} – {ddmm(row.afterFinish)}</span>
+                                </div>
+                              ))}
+                              {compareDetails.rows.length > COMPARE_TASK_ROWS_LIMIT ? (
+                                <div data-testid="scenario-compare-details-more" className="px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--muted)]">…и ещё {compareDetails.rows.length - COMPARE_TASK_ROWS_LIMIT} задач</div>
+                              ) : null}
+                            </div>
+                          ) : null
+                        ) : null}
+
                         {/* diff-list изменений (из planDelta.commands — контрактные данные) */}
                         {(() => { const diff = deriveDiff(p); return (
                         <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--border)]">
@@ -303,7 +437,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           {/* конфликт-баннер: рекомендованный сценарий не устраняет (если все accepted) — опускаем; банер про коммит */}
           <div className="mt-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--muted)]">
             <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-[var(--muted-soft)]" aria-hidden />
-            <span>Применение сценария вносит все изменения одной операцией: она проверяется по правам, записывается в историю изменений, и план получает новую версию. Откат доступен на вкладке «Коммиты».</span>
+            <span>Применение сценария вносит все изменения одной операцией: она проверяется по правам, записывается в историю изменений, и план получает новую версию. Откат доступен на вкладке <Link href={`/projects/${encodeURIComponent(projectId)}/commits`} className="font-medium text-[var(--accent)] underline-offset-2 hover:underline">Коммиты</Link>.</span>
           </div>
         </>
       )}

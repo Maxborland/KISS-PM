@@ -1,3 +1,4 @@
+import { comparePlanDates, diffCalendarDays } from "./calendar";
 import { reducePlanningCommand } from "./commandReducer";
 import { createEmptyPlanDelta, type PlanDelta, type PlanningCommand } from "./planningCommands";
 import { buildResourceLoadMatrix, type ResourceLoadMatrix } from "./resourcePlanning";
@@ -220,6 +221,7 @@ function createUnavailableProposal(
   profile: Extract<ScenarioProfile, "balanced" | "resilient">,
   effect: Extract<ScenarioProposal["conflictEffect"], "reduced" | "removed">,
   input: {
+    snapshot: PlanSnapshot;
     calculatedPlan: CalculatedPlan;
     resourceLoad: ResourceLoadMatrix;
     target: ScenarioTarget;
@@ -307,6 +309,7 @@ function createProposal(
   profile: ScenarioProfile,
   conflictEffect: ScenarioProposal["conflictEffect"],
   input: {
+    snapshot: PlanSnapshot;
     calculatedPlan: CalculatedPlan;
     resourceLoad: ResourceLoadMatrix;
     target: ScenarioTarget;
@@ -341,6 +344,15 @@ function createProposal(
   const remainingOverloads = input.resourceLoad.overloads.filter(
     (overload) => overload.granularity === "day"
   );
+  // Честная дельта к дедлайну: прогнозный финиш профиля против дедлайна проекта
+  // (0 — если финиш не позже дедлайна или одна из дат отсутствует). Семантика как
+  // deadlineMissDays в autoSolver — «на сколько календарных дней профиль срывает дедлайн».
+  const finishDate = input.calculatedPlan.projectFinish;
+  const deadline = input.snapshot.project.deadline;
+  const deadlineDeltaDays =
+    finishDate && deadline && comparePlanDates(finishDate, deadline) > 0
+      ? diffCalendarDays(deadline, finishDate)
+      : 0;
 
   return {
     id: `scenario-${profile}-${input.target.resourceId}-${input.target.date}`,
@@ -350,8 +362,8 @@ function createProposal(
     conflictEffect,
     planDelta,
     explainability: {
-      finishDate: input.calculatedPlan.projectFinish,
-      deadlineDeltaDays: 0,
+      finishDate,
+      deadlineDeltaDays,
       overloadMinutes: sumDayOverload(input.resourceLoad, input.target.date),
       overloadedResourceIds: [...new Set(remainingOverloads.map((overload) => overload.resourceId))].sort(),
       changedTaskIds,
@@ -361,6 +373,9 @@ function createProposal(
         .map((issue) => issue.message),
       requiredApprovals:
         conflictEffect === "accepted" ? ["tenant.planning_scenarios.apply"] : [],
+      // riskScore СОЗНАТЕЛЬНО остаётся профильной константой (80/40/20): UI-чипы
+      // «высокий/средний/низкий риск» и выбор «рекомендуется» (минимальный score среди
+      // доступных) прибиты e2e к этим порогам. Честная модель риска — отдельная задача.
       riskScore: profile === "aggressive" ? 80 : profile === "balanced" ? 40 : 20
     }
   };
@@ -390,6 +405,3 @@ function sumDayOverload(resourceLoad: ResourceLoadMatrix, date: string): number 
     .reduce((total, overload) => total + overload.overloadMinutes, 0);
 }
 
-function isScenarioProposal(value: ScenarioProposal | null): value is ScenarioProposal {
-  return value !== null;
-}
