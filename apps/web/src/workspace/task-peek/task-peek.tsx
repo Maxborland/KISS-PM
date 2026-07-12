@@ -1,11 +1,8 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useMemo, useState, type ReactElement } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
-import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import { useMemo, type ReactElement } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { UrlPeekSheet } from "@/workspace/lib/url-peek";
 import type { TaskPriority, TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
 
 export type TaskPeekFact = {
@@ -77,89 +74,27 @@ type TaskPeekProps = {
   children: ReactElement;
 };
 
-type BrowserLocation = {
-  pathname: string;
-  search: string;
-  hash: string;
-};
-
-const SERVER_LOCATION: BrowserLocation = { pathname: "", search: "", hash: "" };
-
-function browserLocation(): BrowserLocation {
-  if (typeof window === "undefined") return SERVER_LOCATION;
-  return { pathname: window.location.pathname, search: window.location.search, hash: window.location.hash };
-}
-
-function useBrowserLocation() {
-  const [location, setLocation] = useState<BrowserLocation>(browserLocation);
-  const sync = useCallback(() => setLocation(browserLocation()), []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.addEventListener("popstate", sync);
-    return () => window.removeEventListener("popstate", sync);
-  }, [sync]);
-
-  return [location, sync] as const;
-}
-
 /**
- * URL-controlled Sheet. It uses the App Router when mounted by Next and falls
- * back to browser history for Storybook, where no App Router context exists.
+ * URL-controlled Sheet (`?task=<id>`) поверх общего примитива UrlPeekSheet
+ * (App Router внутри Next, window.history-fallback в Storybook — см. url-peek.tsx).
  */
 export function TaskPeek({ task, children }: TaskPeekProps): ReactElement {
-  const router = useContext(AppRouterContext);
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [fallbackLocation, syncFallbackLocation] = useBrowserLocation();
-
-  const useRouterLocation = router !== null && pathname !== null && searchParams !== null;
-  const currentPathname = useRouterLocation ? pathname : fallbackLocation.pathname;
-  const currentSearch = useRouterLocation ? searchParams.toString() : fallbackLocation.search;
-  const currentHash = typeof window === "undefined" ? "" : window.location.hash;
-  const open = new URLSearchParams(currentSearch).get("task") === task.id;
-
-  const setOpen = useCallback((nextOpen: boolean) => {
-    const params = new URLSearchParams(useRouterLocation ? searchParams.toString() : fallbackLocation.search);
-    if (nextOpen) params.set("task", task.id);
-    else params.delete("task");
-
-    const query = params.toString();
-    const href = `${currentPathname || "/"}${query ? `?${query}` : ""}${currentHash}`;
-    if (useRouterLocation) {
-      if (nextOpen) router.push(href, { scroll: false });
-      else router.replace(href, { scroll: false });
-      return;
-    }
-
-    if (nextOpen) window.history.pushState(window.history.state, "", href);
-    else window.history.replaceState(window.history.state, "", href);
-    syncFallbackLocation();
-  }, [currentHash, currentPathname, fallbackLocation.search, router, searchParams, syncFallbackLocation, task.id, useRouterLocation]);
-
   const summary = useMemo(() => {
     const parts = [task.status?.label, typeof task.progress === "number" ? `${task.progress}%` : undefined].filter(Boolean);
     return parts.length > 0 ? parts.join(" · ") : "Детали задачи";
   }, [task.progress, task.status?.label]);
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent side="right">
-        <SheetHeader>
-          <SheetTitle>{task.title}</SheetTitle>
-          <SheetDescription>{summary}</SheetDescription>
-        </SheetHeader>
-        <SheetBody>
-          <TaskPeekDetails task={task} />
-        </SheetBody>
-        <SheetFooter>
-          <Button asChild variant="secondary">
-            <a href={`/tasks/${encodeURIComponent(task.id)}`}>Открыть полностью</a>
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+    <UrlPeekSheet
+      param="task"
+      id={task.id}
+      title={task.title}
+      description={summary}
+      fullHref={`/tasks/${encodeURIComponent(task.id)}`}
+      trigger={children}
+    >
+      <TaskPeekDetails task={task} />
+    </UrlPeekSheet>
   );
 }
 
