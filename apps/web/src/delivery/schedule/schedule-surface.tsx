@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, type ClipboardEvent as ReactClipboardEvent, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, Columns3, Filter, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Layers, Plus, TriangleAlert, Undo2 } from "lucide-react";
+import { CalendarRange, ChevronDown, ChevronRight, ClipboardPaste, GitBranch, GripVertical, IndentDecrease, IndentIncrease, Plus, TriangleAlert, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { createClientId } from "@/delivery/lib/client-id";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
-import { dayToIso, isoToDay, MOCK_PROJECT_ID, RESOURCES } from "@/delivery/lib/planning-demo-data";
+import { dayToIso, isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { currentPlanDate, deriveScheduleTimeline, formatWeekLabel } from "@/delivery/lib/date-origin";
 import { usePlanning, type ApplyResult } from "@/delivery/lib/use-planning";
 import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
@@ -231,7 +231,11 @@ export function scheduleUnitsPercent(row: Row): number {
 
 // Оптимистичный патч read-model: применяем правку локально мгновенно (до ответа бэка).
 // summary-rollup пересчитает mapRows; полный каскад/критпуть вернёт бэк.
-export function optimisticPatch(rm: PlanningReadModel, command: PlanningCommand): PlanningReadModel {
+export function optimisticPatch(
+  rm: PlanningReadModel,
+  command: PlanningCommand,
+  resolveResourceName?: (id: string) => string
+): PlanningReadModel {
   const cmd = command as { type: string; payload: Record<string, unknown> };
   // optimisticPatch мутирует ЧАСТИЧНУЮ копию (только трогаемые поля) — авторитетную полную форму
   // вернёт бэк, поэтому здесь узкие локальные типы, а не полный PlanTask/CalculatedTask.
@@ -270,9 +274,10 @@ export function optimisticPatch(rm: PlanningReadModel, command: PlanningCommand)
       break;
     }
     case "assignment.upsert": {
+      // Оптимистичная метка — через резолвер справочника ресурсов поверхности
+      // (демо-список RESOURCES не используется); без резолвера — сырой id до эха бэка.
       const rid = String(cmd.payload.resourceId);
-      const name = RESOURCES.find((resource) => resource.id === rid)?.name ?? rid;
-      if (T) T.customFields = { ...(T.customFields ?? {}), resLabel: name };
+      if (T) T.customFields = { ...(T.customFields ?? {}), resLabel: resolveResourceName?.(rid) ?? rid };
       break;
     }
     case "task.create": {
@@ -394,7 +399,8 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     return (id: string) => names.get(id) ?? `Участник ${id.slice(-4)}`;
   }, [planningResources]);
   const [zoom, setZoom] = useState<Zoom>("week");
-  const [sel, setSel] = useState<string | null>("t-3.2.1");
+  // Ничего не выбрано по умолчанию (демо-id 't-3.2.1' убран); ?task= из URL выбирает строку.
+  const [sel, setSel] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [edit, setEdit] = useState<{ id: string; field: EditField } | null>(null);
   const [draft, setDraft] = useState("");
@@ -446,6 +452,15 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   }
 
   const mapped = useMemo(() => (readModel ? mapRows(readModel, resName) : null), [readModel, resName]);
+  // Общий selection-контракт кокпита: переход с ?task= (из Ресурсов/пиков) выбирает
+  // строку в WBS. Однократно после готовности read-model; TaskPeek читает тот же параметр сам.
+  const urlSelectionAppliedRef = useRef(false);
+  useEffect(() => {
+    if (urlSelectionAppliedRef.current || !mapped) return;
+    urlSelectionAppliedRef.current = true;
+    const urlTaskId = new URLSearchParams(window.location.search).get("task");
+    if (urlTaskId && mapped.rows.some((row) => row.id === urlTaskId)) setSel(urlTaskId);
+  }, [mapped]);
   const parsedPaste = useMemo(() => parseTaskTsv(pasteDraft, readModel ?? {}), [pasteDraft, readModel]);
   const dayW = ZOOM_DAY_W[zoom];
   const lastCommitRef = useRef<{ commands: PlanningCommand[]; before: PlanningReadModel; afterVersion: number } | null>(null);
@@ -799,7 +814,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       if (!batchBaseRef.current) batchBaseRef.current = readModel;
       setStaged((current) => [...current, ...commands]);
       if (readModel) {
-        const optimistic = commands.reduce(optimisticPatch, readModel);
+        const optimistic = commands.reduce((acc, command) => optimisticPatch(acc, command, resName), readModel);
         if (optimistic !== readModel) setReadModel(optimistic);
       }
       return null;
@@ -808,7 +823,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     if (!beginOperation()) return null;
     const before = readModel;
     if (before) {
-      const optimistic = commands.reduce(optimisticPatch, before);
+      const optimistic = commands.reduce((acc, command) => optimisticPatch(acc, command, resName), before);
       if (optimistic !== before) setReadModel(optimistic);
     }
 
@@ -1433,6 +1448,18 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     if ((event.key === "F2" || event.key === "Enter") && canManagePlan && current) {
       event.preventDefault();
       beginEdit(current, "name", current.name);
+    } else if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && event.ctrlKey && canManagePlan && current?.kind === "task") {
+      // Клавиатурная альтернатива drag-жестам бара: Ctrl+←/→ — сдвиг задачи на день
+      // (та же команда, что drag тела), Ctrl+Shift+←/→ — длительность ±1 день
+      // (та же команда, что drag края). Без мыши доступен весь контракт бара.
+      event.preventDefault();
+      const delta = event.key === "ArrowRight" ? 1 : -1;
+      if (event.shiftKey) {
+        const nextDur = Math.max(1, current.durDays + delta);
+        if (nextDur !== current.durDays) editDuration(current, nextDur);
+      } else {
+        editDate(current, dayToIso(Math.max(0, current.dayStart + delta)));
+      }
     } else if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && current?.kind === "summary" && hasChildren(current)) {
       event.preventDefault();
       const shouldCollapse = event.key === "ArrowLeft";
@@ -1482,7 +1509,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         tabIndex={0}
         onKeyDown={handleWorkspaceKeyDown}
         onPaste={handleWorkspacePaste}
-        aria-label="График проекта. Insert создаёт задачу, стрелки перемещают по строкам"
+        aria-label="График проекта. Insert создаёт задачу, стрелки перемещают по строкам, Ctrl+стрелки сдвигают задачу на день, Ctrl+Shift+стрелки меняют длительность"
         className="outline-none"
       >
       {/* Toolbar */}

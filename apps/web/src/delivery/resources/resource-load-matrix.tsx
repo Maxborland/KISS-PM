@@ -520,6 +520,17 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
                               <span className="mt-0.5 block truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{task.projectName}</span>
                             )
                           ) : null}
+                          {task?.projectId ? (
+                            // Общий selection-контракт кокпита: строка Графика выберется по ?task=.
+                            <a
+                              href={`/projects/${task.projectId}/schedule?task=${info.taskId}`}
+                              className="mt-0.5 flex items-center gap-0.5 truncate text-[length:var(--text-2xs)] text-[var(--accent)] hover:underline"
+                              title="Открыть строку задачи в Графике"
+                            >
+                              <ArrowUpRight className="size-3 shrink-0" aria-hidden />
+                              <span className="truncate">Открыть в Графике</span>
+                            </a>
+                          ) : null}
                           {asg && onEditAssignmentHours ? (
                             edit === assignmentId ? (
                               <span className="mt-0.5 flex items-center gap-1 text-[length:var(--text-2xs)] text-[var(--muted-soft)]">всего <input autoFocus type="number" step={0.5} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={(e) => { setEdit(null); if (e.currentTarget.dataset.cancelled === "true") return; const hours = parseResourceAssignmentHours(draft); if (hours !== null && Math.round(hours * 60) !== asg.workMinutes) onEditAssignmentHours(asg, hours); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } if (e.key === "Escape") { e.preventDefault(); e.currentTarget.dataset.cancelled = "true"; e.currentTarget.blur(); } }} className="w-14 rounded border border-[var(--accent)] bg-[var(--panel)] px-1 text-right tabular-nums outline-none" /> ч</span>
