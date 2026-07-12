@@ -106,6 +106,7 @@ const PLANNING_ERROR_MESSAGES: Record<string, string> = {
   scenario_not_found: "Предложение сценария не найдено. Запросите сценарии заново",
   scenario_unavailable: "Сценарий стал недоступен для применения. Запросите сценарии заново",
   planning_scenario_already_applied: "Этот сценарий уже применён. Данные обновлены",
+  planning_scenario_invalid: "Предложение повреждено или устарело — запросите сценарии заново",
   planning_scenario_hash_mismatch: "Данные предложения изменились после расчёта. Запросите сценарии заново",
   planning_scenario_engine_mismatch: "Версия планировщика обновилась. Запросите сценарии заново",
   planning_scenario_target_mismatch: "Целевой перегруз изменился. Запросите сценарии заново"

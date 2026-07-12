@@ -37,6 +37,7 @@ const STALE_SCENARIO_CODES = new Set([
   "scenario_not_found",
   "scenario_unavailable",
   "planning_scenario_already_applied",
+  "planning_scenario_invalid",
   "planning_scenario_hash_mismatch",
   "planning_scenario_engine_mismatch",
   "planning_scenario_target_mismatch"
