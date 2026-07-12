@@ -1,4 +1,4 @@
-import { createPlanningCommand, type PlanAssignmentRole, type PlanningCommand } from "@kiss-pm/domain";
+import { createPlanningCommand, type PlanAssignmentRole, type PlanningCommand, type TaskType } from "@kiss-pm/domain";
 
 import {
   nextScheduleWorkingDate,
@@ -202,13 +202,16 @@ export function buildFinishDateFillCommands({
   mode,
   rows,
   assignments,
-  calendarSource
+  calendarSource,
+  resolveWorkModel
 }: {
   firstFinishIso: string;
   mode: "same" | "series";
   rows: readonly FinishFillRow[];
   assignments: readonly FinishFillAssignment[];
   calendarSource?: ScheduleCalendarSource;
+  /** Семантика задачи + Σ units назначений; без резолвера — legacy fixed_duration. */
+  resolveWorkModel?: (taskId: string) => { taskType: TaskType; effortDriven: boolean; unitsPermille: number };
 }): FinishFillResult {
   if (!isIsoDate(firstFinishIso)) return { ok: false, errors: rows.map((row) => ({ taskId: row.id, message: "Укажите корректную дату окончания" })) };
   if (!calendarSource) {
@@ -237,11 +240,17 @@ export function buildFinishDateFillCommands({
     const workMinutesPerDurationMinute = previousDurationMinutes > 0
       ? row.workHours * 60 / previousDurationMinutes
       : 1;
-    const workHours = Math.max(
-      0,
-      Math.round(durationMinutes * workMinutesPerDurationMinute) / 60
-    );
-    return { taskId: row.id, finishIso, durationDays, workHours, durationMinutes };
+    // Труд согласован с семантикой типа (та же логика, что engineConsistentWorkMinutes):
+    // fixed_units / fixed_work+effortDriven — из длительности×юнитов (движок выведет
+    // обратно эту длительность); fixed_work — труд не меняется; иначе — пропорция.
+    const model = resolveWorkModel?.(row.id) ?? { taskType: "fixed_duration" as TaskType, effortDriven: false, unitsPermille: 0 };
+    const engineRecalculates = model.unitsPermille > 0 && row.workHours > 0;
+    const workHours = !engineRecalculates || model.taskType === "fixed_duration"
+      ? Math.max(0, Math.round(durationMinutes * workMinutesPerDurationMinute) / 60)
+      : model.taskType === "fixed_work" && !model.effortDriven
+        ? row.workHours
+        : Math.max(0, Math.round((durationMinutes * model.unitsPermille) / 1000) / 60);
+    return { taskId: row.id, finishIso, durationDays, workHours, durationMinutes, model };
   });
   const errors = preview
     .filter((item) => {
@@ -259,8 +268,9 @@ export function buildFinishDateFillCommands({
         type: "task.update_work_model",
         payload: {
           taskId: item.taskId,
-          taskType: "fixed_duration",
-          effortDriven: false,
+          // Семантика задачи сохраняется (fixed_units не превращается в fixed_duration).
+          taskType: item.model.taskType,
+          effortDriven: item.model.effortDriven,
           durationMinutes: item.durationMinutes,
           workMinutes: Math.round(item.workHours * 60)
         }

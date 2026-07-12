@@ -67,7 +67,7 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     const data: MatrixData = {
       buckets: readModel.resourceLoad.buckets ?? [],
       resources: resDir.list,
-      taskById: new Map(authored.tasks.map((t) => [t.id, { id: t.id, wbsCode: t.wbsCode, title: t.title, workMinutes: t.workMinutes, percentComplete: t.percentComplete }])),
+      taskById: new Map(authored.tasks.map((t) => [t.id, { id: t.id, wbsCode: t.wbsCode, title: t.title, workMinutes: t.workMinutes, percentComplete: t.percentComplete, projectId }])),
       // asgById — VIEW-модель матрицы (MatrixAssignment.workMinutes: number); домен допускает workMinutes=null
       // (неявное назначение → работа деривится из задачи), поэтому мапим в число с фолбэком 0.
       asgById: new Map(authored.assignments.map((x): [string, MatrixAssignment] => [x.id, { id: x.id, taskId: x.taskId, resourceId: x.resourceId, unitsPermille: x.unitsPermille, workMinutes: x.workMinutes ?? 0, role: x.role }])),

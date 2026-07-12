@@ -105,6 +105,9 @@ export function usePointerDrag<S>(handlers: {
   }, [tracking]);
 
   const begin = (e: { pointerId: number; clientX: number; clientY: number }, next: S) => {
+    // Второй указатель (мультитач) во время активного жеста игнорируется —
+    // иначе он молча перехватил бы жест без onUp/onCancel у первого.
+    if (pointerIdRef.current != null) return;
     pointerIdRef.current = e.pointerId;
     pendingRef.current = { x: e.clientX, y: e.clientY, state: next };
     setTracking(true);

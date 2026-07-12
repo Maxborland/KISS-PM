@@ -22,7 +22,7 @@ import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
 import { hasPermission } from "@/lib/permissions";
 import { useSessionUser } from "@/shell/use-session-user";
 import { DateEditor, DependencyEditor, DEP_RU, LinkLagEditor, ResourceEditor, RowMenu, TaskModal, type TaskModalSubmitResult, type TaskModalValues } from "@/delivery/schedule/schedule-editors";
-import { createPlanningCommand } from "@kiss-pm/domain";
+import { createPlanningCommand, recalculateWorkModel } from "@kiss-pm/domain";
 import type { DependencyType, PlanAssignmentRole, PlanningCommand, TaskType } from "@kiss-pm/domain";
 import { buildCompensatingCommandBatch, type PlanningReadModel } from "@kiss-pm/planning-client";
 import { mapRows, type Kind, type Mode, type Pred, type Row } from "@/delivery/schedule/schedule-rows";
@@ -74,6 +74,44 @@ function scaledWorkMinutes(row: Row, durationMinutes: number): number {
   return previousDurationMinutes > 0
     ? Math.max(0, Math.round(durationMinutes * row.workH * 60 / previousDurationMinutes))
     : Math.max(0, durationMinutes);
+}
+
+/** Σ unitsPermille назначений задачи — та же величина, которой движок кормит recalculateWorkModel. */
+export function taskUnitsPermille(
+  assignments: ReadonlyArray<{ taskId: string; unitsPermille?: number | null }>,
+  taskId: string
+): number {
+  return assignments
+    .filter((assignment) => assignment.taskId === taskId)
+    .reduce((sum, assignment) => sum + (assignment.unitsPermille ?? 0), 0);
+}
+
+/**
+ * Труд для новой длительности, который движок примет БЕЗ отскока бара.
+ * Движок (schedulingEngine) при units>0 и work>0 всегда прогоняет присланную пару
+ * через recalculateWorkModel(changedField:'workMinutes'):
+ * - fixed_units и fixed_work+effortDriven: duration := work×1000/units — чтобы бар
+ *   лёг где брошен, труд следует из длительности×юнитов;
+ * - fixed_work (не effortDriven): труд фиксирован по смыслу типа — шлём прежний,
+ *   движок сохранит присланную длительность;
+ * - fixed_duration (или нет назначений/труда): движок сохранит длительность —
+ *   прежняя пропорция scaledWorkMinutes.
+ */
+export function engineConsistentWorkMinutes(input: {
+  row: Row;
+  durationMinutes: number;
+  workModel: ScheduleWorkModelRef;
+  unitsPermille: number;
+}): number {
+  const { row, durationMinutes, workModel, unitsPermille } = input;
+  const engineRecalculates = unitsPermille > 0 && row.workH > 0;
+  if (!engineRecalculates || workModel.taskType === "fixed_duration") {
+    return scaledWorkMinutes(row, durationMinutes);
+  }
+  if (workModel.taskType === "fixed_work" && !workModel.effortDriven) {
+    return Math.max(0, Math.round(row.workH * 60));
+  }
+  return Math.max(0, Math.round((durationMinutes * unitsPermille) / 1000));
 }
 
 export function resolveScheduleTiming(
@@ -157,6 +195,8 @@ export function buildScheduleRangeCommands(input: {
   assignment?: ScheduleAssignmentRef;
   /** Семантика задачи (resolveTaskWorkModel) — без неё legacy fixed_duration. */
   workModel?: ScheduleWorkModelRef;
+  /** Σ unitsPermille назначений задачи (taskUnitsPermille) — для engine-consistent труда. */
+  unitsPermille?: number;
 }): PlanningCommand[] | null {
   const workingTime = resolveScheduleWorkingTime(
     input.source,
@@ -171,7 +211,12 @@ export function buildScheduleRangeCommands(input: {
   );
   if (durationMinutes <= 0) return null;
 
-  const workMinutes = scaledWorkMinutes(input.row, durationMinutes);
+  const workMinutes = engineConsistentWorkMinutes({
+    row: input.row,
+    durationMinutes,
+    workModel: input.workModel ?? { taskType: "fixed_duration", effortDriven: false },
+    unitsPermille: input.unitsPermille ?? 0
+  });
   const commands: PlanningCommand[] = [
     createPlanningCommand({
       type: "task.update_schedule",
@@ -249,17 +294,36 @@ export function optimisticPatch(
   const T = tasks.find((t) => t.id === id);
   const C = calc.find((c) => c.id === id);
   switch (cmd.type) {
-    case "task.update_work_model":
+    case "task.update_work_model": {
       if (T) { if (cmd.payload.durationMinutes != null) T.durationMinutes = cmd.payload.durationMinutes as number; if (typeof cmd.payload.workMinutes === "number") T.workMinutes = cmd.payload.workMinutes; }
       if (T && C?.calculatedStart && T.durationMinutes != null) {
+        // Проекция эха движка: при units>0 и work>0 движок пересчитает длительность
+        // через recalculateWorkModel — оптимистичный бар должен лечь туда же.
+        let effectiveDuration = T.durationMinutes;
+        const units = (rm.authored.assignments as ReadonlyArray<{ taskId: string; unitsPermille?: number | null }>)
+          .filter((assignment) => assignment.taskId === id)
+          .reduce((sum, assignment) => sum + (assignment.unitsPermille ?? 0), 0);
+        if (units > 0 && T.workMinutes > 0) {
+          try {
+            effectiveDuration = recalculateWorkModel({
+              taskType: (cmd.payload.taskType as TaskType) ?? "fixed_duration",
+              effortDriven: Boolean(cmd.payload.effortDriven),
+              workMinutes: T.workMinutes,
+              durationMinutes: Math.max(1, T.durationMinutes),
+              unitsPermille: units,
+              changedField: "workMinutes"
+            }).durationMinutes;
+          } catch { /* движок отдаст validation issue — оставляем присланную длительность */ }
+        }
         const workingTime = resolveScheduleWorkingTime(rm, T.calendarId);
         C.calculatedFinish = scheduleFinishDateForDuration(
           C.calculatedStart,
-          T.durationMinutes,
+          effectiveDuration,
           workingTime
         );
       }
       break;
+    }
     case "task.update_progress":
       if (T) T.percentComplete = cmd.payload.percentComplete as number;
       break;
@@ -459,7 +523,11 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     if (urlSelectionAppliedRef.current || !mapped) return;
     urlSelectionAppliedRef.current = true;
     const urlTaskId = new URLSearchParams(window.location.search).get("task");
-    if (urlTaskId && mapped.rows.some((row) => row.id === urlTaskId)) setSel(urlTaskId);
+    if (urlTaskId && mapped.rows.some((row) => row.id === urlTaskId)) {
+      setSel(urlTaskId);
+      // Прокрутка/фокус выбранной строки — на длинных планах selection без скролла невидим.
+      window.requestAnimationFrame(() => focusScheduleRow(urlTaskId));
+    }
   }, [mapped]);
   const parsedPaste = useMemo(() => parseTaskTsv(pasteDraft, readModel ?? {}), [pasteDraft, readModel]);
   const dayW = ZOOM_DAY_W[zoom];
@@ -538,6 +606,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
             startIso: dayToIso(ns),
             finishIso: dayToIso(nf),
             workModel: resolveTaskWorkModel(source.authored.tasks, cur.id),
+            unitsPermille: taskUnitsPermille(source.authored.assignments, cur.id),
             ...(assignment ? { assignment } : {})
           });
           if (commands) void runBatch(commands);
@@ -551,6 +620,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           startIso: row.startIso,
           finishIso: dayToIso(cur.origStart + nd),
           workModel: resolveTaskWorkModel(source.authored.tasks, cur.id),
+            unitsPermille: taskUnitsPermille(source.authored.assignments, cur.id),
           ...(assignment ? { assignment } : {})
         });
         if (commands) void runBatch(commands);
@@ -977,9 +1047,34 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   };
   const editDuration = (r: Row, days: number) => {
     const durationMinutes = Math.max(0, Math.round(days * r.workingMinutesPerDay));
-    workEdit(r, days, scaledWorkMinutes(r, durationMinutes) / 60);
+    const workMinutes = engineConsistentWorkMinutes({
+      row: r,
+      durationMinutes,
+      workModel: resolveTaskWorkModel(readModel.authored.tasks, r.id),
+      unitsPermille: taskUnitsPermille(readModel.authored.assignments, r.id)
+    });
+    workEdit(r, days, workMinutes / 60);
   };
-  const editWork = (r: Row, workH: number) => workEdit(r, r.durDays, workH);
+  // Правка труда: для units-типов движок выведет duration = work×1000/units — шлём
+  // согласованную длительность сразу, чтобы authored/колонка не расходились с баром.
+  const editWork = (r: Row, workH: number) => {
+    const workMinutes = Math.max(0, Math.round(workH * 60));
+    const units = taskUnitsPermille(readModel.authored.assignments, r.id);
+    let durDays = r.durDays;
+    if (units > 0 && workMinutes > 0) {
+      try {
+        const normalized = recalculateWorkModel({
+          ...resolveTaskWorkModel(readModel.authored.tasks, r.id),
+          workMinutes,
+          durationMinutes: Math.max(1, rowDurationMinutes(r)),
+          unitsPermille: units,
+          changedField: "workMinutes"
+        });
+        durDays = normalized.durationMinutes / r.workingMinutesPerDay;
+      } catch { /* некорректная модель — оставляем прежнюю длительность, движок обозначит issue */ }
+    }
+    workEdit(r, durDays, workH);
+  };
   const editName = (r: Row, title: string) => void applyCmd(createPlanningCommand({ type: "task.update_identity", payload: { taskId: r.id, title } }));
   const editPct = (r: Row, pct: number) => void applyCmd(createPlanningCommand({ type: "task.update_progress", payload: { taskId: r.id, percentComplete: Math.max(0, Math.min(100, pct)) } }));
   const editDate = (r: Row, iso: string) =>
@@ -996,6 +1091,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       startIso,
       finishIso: iso,
       workModel: resolveTaskWorkModel(readModel.authored.tasks, r.id),
+      unitsPermille: taskUnitsPermille(readModel.authored.assignments, r.id),
       ...(asg ? { assignment: asg } : {})
     });
     if (commands) void runBatch(commands);
@@ -1262,7 +1358,11 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           calendarId: row.effectiveCalendarId
         })),
         assignments: authoredAsgs,
-        calendarSource: scheduleReadModel
+        calendarSource: scheduleReadModel,
+        resolveWorkModel: (taskId) => ({
+          ...resolveTaskWorkModel(readModel?.authored.tasks ?? [], taskId),
+          unitsPermille: taskUnitsPermille(readModel?.authored.assignments ?? [], taskId)
+        })
       })
     : null;
 
@@ -1320,7 +1420,9 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
       window.removeEventListener("pointerup", stopDrag);
       window.removeEventListener("pointercancel", cancelDrag);
       window.removeEventListener("keydown", escapeDrag, true);
+      window.removeEventListener("blur", blurDrag);
     };
+    const blurDrag = () => cancelDrag();
     const cancelDrag = (pointerEvent?: PointerEvent) => {
       if (pointerEvent && pointerEvent.pointerId !== gesturePointerId) return;
       teardown();
@@ -1360,6 +1462,9 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     window.addEventListener("pointerup", stopDrag);
     window.addEventListener("pointercancel", cancelDrag);
     window.addEventListener("keydown", escapeDrag, true);
+    // Потеря фокуса окна (Alt+Tab с зажатой кнопкой) — жест отменяется, иначе
+    // следующий click в вернувшемся окне открыл бы fill-диалог по чужой цели.
+    window.addEventListener("blur", blurDrag);
   };
 
   const updatePasteDraft = (value: string) => {
@@ -1458,7 +1563,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         const nextDur = Math.max(1, current.durDays + delta);
         if (nextDur !== current.durDays) editDuration(current, nextDur);
       } else {
-        editDate(current, dayToIso(Math.max(0, current.dayStart + delta)));
+        // Тот же clamp, что у drag тела бара: не раньше старта проекта; на границе — no-op.
+        const projectStartDay = isoToDay(readModel.project.plannedStart);
+        const targetDay = Math.max(projectStartDay, current.dayStart + delta);
+        if (targetDay !== current.dayStart) editDate(current, dayToIso(targetDay));
       }
     } else if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && current?.kind === "summary" && hasChildren(current)) {
       event.preventDefault();
@@ -1580,7 +1688,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                         )}
                         {i < COLS.length - 1 ? (
                           <span
-                            className="absolute -right-[3px] top-0 z-10 h-full w-[6px] touch-none cursor-col-resize hover:bg-[var(--accent)]"
+                            className="absolute -right-[3px] top-0 z-10 h-full w-[6px] touch-pan-y cursor-col-resize hover:bg-[var(--accent)]"
                             onPointerDown={(e) => startColResize(e, i)}
                             title="Перетащите — изменить ширину колонки"
                           />
@@ -1687,7 +1795,7 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                                   type="button"
                                   aria-label={"Протянуть дату окончания от " + r.name}
                                   title="Потяните вниз — последовательное заполнение дат"
-                                  className="grid size-5 shrink-0 cursor-ns-resize place-items-center rounded-[var(--radius-xs)] text-[var(--muted-soft)] hover:bg-[var(--panel-strong)] hover:text-[var(--accent)]"
+                                  className="grid size-5 shrink-0 touch-none cursor-ns-resize place-items-center rounded-[var(--radius-xs)] text-[var(--muted-soft)] hover:bg-[var(--panel-strong)] hover:text-[var(--accent)]"
                                   onClick={stop}
                                   onPointerDown={(event) => startFinishFillDrag(event, r)}
                                 >
@@ -1782,16 +1890,16 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                       <>
                         {r.baseDay != null && r.baseDur != null ? <span className="absolute rounded-[3px] border border-[var(--border-strong)] bg-[var(--panel-strong)]" style={{ left: toTimelineX(r.baseDay), width: Math.max(r.baseDur * dayW, 6), height: 6, bottom: 5 }} title={readModel.baselineComparison?.label ?? "Базовый план"} /> : null}
                         <span
-                          className={cn("gantt-bar absolute top-1/2 flex -translate-y-1/2 items-center overflow-hidden rounded-[5px] shadow-[var(--shadow-card)]", canManagePlan ? "touch-none cursor-grab active:cursor-grabbing" : "cursor-default", r.critical && "gantt-bar--crit", dragging && "opacity-90 outline-dashed outline-2 outline-offset-1 outline-[var(--accent)]", flash.has(r.id) && "ring-2 ring-[var(--success)]")}
+                          className={cn("gantt-bar absolute top-1/2 flex -translate-y-1/2 items-center overflow-hidden rounded-[5px] shadow-[var(--shadow-card)]", canManagePlan ? "touch-pan-y cursor-grab active:cursor-grabbing" : "cursor-default", r.critical && "gantt-bar--crit", dragging && "opacity-90 outline-dashed outline-2 outline-offset-1 outline-[var(--accent)]", flash.has(r.id) && "ring-2 ring-[var(--success)]")}
                           style={{ left, width, height: 18 }}
                           title={canManagePlan ? `${r.name} · ${fillPct}% · тело — сдвиг, края — длительность` : `${r.name} · ${fillPct}%`}
                           onPointerDown={canManagePlan ? (e) => startDrag(e, r, "move") : undefined}
                         >
                           <span className={cn("gantt-bar-fill h-full", r.critical && "gantt-bar-fill--crit")} style={{ width: `${fillPct}%` }} />
                           {canManagePlan ? <>
-                            <span className="absolute top-0 z-[3] h-full w-1 -translate-x-1/2 touch-none cursor-ew-resize bg-[var(--accent)] opacity-0 group-hover:opacity-100" style={{ left: `clamp(2px, ${fillPct}%, calc(100% - 2px))` }} onPointerDown={(e) => startDrag(e, r, "progress")} title="Тяните — % выполнения" />
-                            <span className="absolute left-0 top-0 h-full w-1.5 touch-none cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resizeLeft")} title="Потяните — сдвинуть начало" />
-                            <span className="absolute right-0 top-0 h-full w-1.5 touch-none cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resize")} title="Потяните — изменить длительность" />
+                            <span className="absolute top-0 z-[3] h-full w-1 -translate-x-1/2 touch-pan-y cursor-ew-resize bg-[var(--accent)] opacity-0 group-hover:opacity-100" style={{ left: `clamp(2px, ${fillPct}%, calc(100% - 2px))` }} onPointerDown={(e) => startDrag(e, r, "progress")} title="Тяните — % выполнения" />
+                            <span className="absolute left-0 top-0 h-full w-1.5 touch-pan-y cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resizeLeft")} title="Потяните — сдвинуть начало" />
+                            <span className="absolute right-0 top-0 h-full w-1.5 touch-pan-y cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100" onPointerDown={(e) => startDrag(e, r, "resize")} title="Потяните — изменить длительность" />
                           </> : null}
                         </span>
                         {canManagePlan ? <>
