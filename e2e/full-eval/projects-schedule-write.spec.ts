@@ -30,10 +30,12 @@ test.describe("Projects schedule write flows", () => {
       await page.goto(`/projects/${projectId}/schedule`);
       await expect(page.getByRole("button", { name: "Задача", exact: true })).toBeVisible();
 
+      // Создание с одним лишь названием — ОДНА команда task.create: клиент шлёт
+      // singular preview-command/apply-command (batch-ручки — для ≥2 команд).
       const createPreviewPromise = waitForPlanningResponse(
         page,
         projectId,
-        "preview-command-batch"
+        "preview-command"
       );
       await page.getByRole("button", { name: "Задача", exact: true }).click();
       const createDialog = page.getByRole("dialog", { name: "Новая задача" });
@@ -43,7 +45,7 @@ test.describe("Projects schedule write flows", () => {
       const createResponsePromise = waitForPlanningResponse(
         page,
         projectId,
-        "apply-command-batch"
+        "apply-command"
       );
       await confirmPlanningPreview(page);
       const createResponse = await createResponsePromise;
