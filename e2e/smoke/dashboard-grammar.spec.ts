@@ -16,7 +16,7 @@ const attentionSection = (page: Page) =>
 
 // Просроченная задача через реальный контракт POST /api/workspace/tasks (inbox-задача).
 // Даты фиксированно в прошлом (2024) → сигнал «Задача просрочена» первый в группе
-// (сортировка по plannedFinish asc). Уборка — статус done (сигнал гаснет).
+// (сортировка по plannedFinish asc). Уборка — DELETE (архивация: сигнал гаснет).
 async function createOverdueTask(page: Page) {
   const suffix = Date.now().toString(36);
   const title = `Просроченная задача e2e ${suffix}`;
@@ -34,8 +34,8 @@ async function createOverdueTask(page: Page) {
     headers: { "x-kiss-pm-action": "same-origin" }
   });
   expect(response.status()).toBe(201);
-  const payload = (await response.json()) as { task: { id: string }; project: { id: string } };
-  return { id: payload.task.id, projectId: payload.project.id, title };
+  const payload = (await response.json()) as { task: { id: string } };
+  return { id: payload.task.id, title };
 }
 
 // Просроченная открытая сделка (plannedFinish в прошлом) — паттерн crm-deal-peek.
@@ -137,16 +137,12 @@ test("dashboard is summary-first: real signals drill down to task and deal, no d
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
       .toBeLessThanOrEqual(0);
   } finally {
-    // Failure-safe уборка: сигнал задачи гасим статусом done, сделку закрываем как
-    // проигранную; повторный финал уже закрытой сделки отдаёт 409/422 — допустимо.
-    const taskCleanup = await page.request.patch(
-      `/api/workspace/projects/${task.projectId}/tasks/${task.id}/status`,
-      {
-        data: { statusId: "task-status-done" },
-        headers: { "x-kiss-pm-action": "same-origin" }
-      }
-    );
-    expect([200, 404, 409]).toContain(taskCleanup.status());
+    // Failure-safe уборка: задачу архивируем (DELETE — сигнал гаснет), сделку закрываем
+    // как проигранную; повторный финал уже закрытой сделки отдаёт 409/422 — допустимо.
+    const taskCleanup = await page.request.delete(`/api/workspace/tasks/${task.id}`, {
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect(taskCleanup.status()).toBe(200);
     const dealCleanup = await page.request.patch(`/api/workspace/opportunities/${deal.id}/finalize`, {
       data: { status: "lost_rejected", reason: "E2E cleanup" },
       headers: { "x-kiss-pm-action": "same-origin" }
@@ -175,7 +171,8 @@ test("reader without CRM sees honest partial dashboard and can drill down to a t
     main.getByText("Сигналы по сделкам не рассчитываются: раздел недоступен вашей роли.")
   ).toBeVisible();
   await expect(main.getByText("Сделки недоступны вашей роли.")).toBeVisible();
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  // Скоуп на main: вне его живёт пустой live-region тостера (role=alert от sonner).
+  await expect(main.getByRole("alert")).toHaveCount(0);
 
   // CRM-плитка честно без ссылки («—» / нет доступа), задачи и проекты — ссылки.
   await expect(main.getByRole("link", { name: /Открытые сделки/ })).toHaveCount(0);
