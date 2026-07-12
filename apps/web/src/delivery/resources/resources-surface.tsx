@@ -231,6 +231,7 @@ export function ProjectResources({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       <ResourceLoadMatrix
         scope={SCOPE}
         data={model.data}
+        savedViews={{ projectId, canManage: canManagePlan }}
         callbacks={{
           busy,
           ...(canManageResourceTasks ? { onCreateTask: openCreateTask, onEditTask: openEditTask } : {}),
