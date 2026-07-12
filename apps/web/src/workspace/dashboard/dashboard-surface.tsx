@@ -226,6 +226,7 @@ function AttentionCard({
       subtitle="Просроченное, приближающиеся дедлайны и сделки без движения — из ваших задач и CRM"
       span={12}
       flush
+      headingLevel={2}
     >
       {shown.length === 0 ? (
         <p className="px-4 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted-soft)]">
@@ -360,6 +361,7 @@ function DashboardContent({
           actions={tasks.data !== null ? <CardAllLink href="/my-work">Все задачи</CardAllLink> : undefined}
           span={7}
           flush
+          headingLevel={2}
         >
           {tasks.status === "forbidden" ? (
             <NoAccessNote what="Задачи" />
@@ -398,6 +400,7 @@ function DashboardContent({
           subtitle="Распределение возможностей CRM"
           actions={opportunities.data !== null ? <CardAllLink href="/crm/deals">Все сделки</CardAllLink> : undefined}
           span={5}
+          headingLevel={2}
         >
           {opportunities.status === "forbidden" ? (
             <NoAccessNote what="Сделки" />
