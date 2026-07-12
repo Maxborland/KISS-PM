@@ -132,6 +132,91 @@ test("deal peek opens from kanban and list, is URL-driven and closes with focus 
   expect(finalizeResponse.status()).toBe(200);
 });
 
+test("deal deep-link resolves across pipelines and clears unknown ids", async ({ page }) => {
+  await page.goto("/");
+  await loginToWorkspace(page, { password: "admin12345" });
+
+  // Несуществующий id: параметр честно снимается replace-ом, peek не открывается.
+  await page.goto(`/crm/deals?deal=deal-peek-missing-${Date.now().toString(36)}`);
+  await expect(page.getByText("Сделка не найдена или недоступна").first()).toBeVisible();
+  await expect(page).toHaveURL(/\/crm\/deals$/);
+  await expect(page.getByRole("dialog")).toBeHidden();
+
+  // Сделка в ДРУГОЙ воронке: surface переключает выбранную воронку и peek открывается.
+  // Вторая воронка со стадией — route-моки поверх живого API (паттерн crm-deal-activation).
+  const SECOND_PIPELINE = { id: "e2e-pipeline-second", name: "Вторая воронка E2E" };
+  const SECOND_STAGE = { id: "e2e-stage-second", name: "Входящие E2E" };
+  const deal = await createPeekDeal(page);
+  try {
+    await page.route("**/api/workspace/pipelines", async (route) => {
+      const response = await route.fetch();
+      const payload = (await response.json()) as { pipelines: Array<Record<string, unknown>> };
+      await route.fulfill({
+        response,
+        json: {
+          pipelines: [
+            ...payload.pipelines,
+            { ...payload.pipelines[0], id: SECOND_PIPELINE.id, name: SECOND_PIPELINE.name, isDefault: false, sortOrder: 99, status: "active" }
+          ]
+        }
+      });
+    });
+    await page.route(`**/api/workspace/pipelines/${SECOND_PIPELINE.id}/stage-transitions`, async (route) => {
+      await route.fulfill({ status: 200, json: { stageTransitions: [] } });
+    });
+    await page.route("**/api/workspace/deal-stages", async (route) => {
+      const response = await route.fetch();
+      const payload = (await response.json()) as { dealStages: Array<Record<string, unknown>> };
+      await route.fulfill({
+        response,
+        json: {
+          dealStages: [
+            ...payload.dealStages,
+            { ...payload.dealStages[0], id: SECOND_STAGE.id, name: SECOND_STAGE.name, pipelineId: SECOND_PIPELINE.id, sortOrder: 1, status: "active" }
+          ]
+        }
+      });
+    });
+    await page.route("**/api/workspace/opportunities", async (route) => {
+      const response = await route.fetch();
+      const payload = (await response.json()) as { opportunities: Array<Record<string, unknown> & { id: string }> };
+      await route.fulfill({
+        response,
+        json: {
+          opportunities: payload.opportunities.map((opportunity) =>
+            opportunity.id === deal.id
+              ? { ...opportunity, stageId: SECOND_STAGE.id, pipelineId: SECOND_PIPELINE.id }
+              : opportunity
+          )
+        }
+      });
+    });
+
+    await page.goto(`/crm/deals?deal=${deal.id}`);
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: deal.title })).toBeVisible();
+    // Факт «Стадия» — из второй воронки: доказывает резолв по всем воронкам.
+    await expect(dialog.getByText(SECOND_STAGE.name, { exact: true })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/crm/deals\\?deal=${deal.id}$`));
+    // После Escape карточка сделки видна в канбане второй воронки — выбор переключён.
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(page.locator(`article[data-deal-id="${deal.id}"]`)).toBeVisible();
+    await expect(page.getByText(SECOND_STAGE.name, { exact: true })).toBeVisible();
+  } finally {
+    await page.unroute("**/api/workspace/opportunities");
+    await page.unroute("**/api/workspace/deal-stages");
+    await page.unroute(`**/api/workspace/pipelines/${SECOND_PIPELINE.id}/stage-transitions`);
+    await page.unroute("**/api/workspace/pipelines");
+    // Failure-safe уборка: повторный финал (сделка уже закрыта) отдаёт 409/422 — допустимо.
+    const finalizeResponse = await page.request.patch(`/api/workspace/opportunities/${deal.id}/finalize`, {
+      data: { status: "lost_rejected", reason: "E2E cleanup" },
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect([200, 409, 422]).toContain(finalizeResponse.status());
+  }
+});
+
 test("CRM reader sees deal peek read-only without mutation requests", async ({ page }) => {
   await page.goto("/");
   await loginToWorkspace(page, {

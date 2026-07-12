@@ -75,6 +75,17 @@ export function useUrlPeek(param: string, id: string): [boolean, (nextOpen: bool
   return [open, setOpen];
 }
 
+/**
+ * Снятие peek-параметра с адреса replace-ом (без следа в истории) — для
+ * surface-уровневого резолва deep-link: `?param=<id>` указывает на несуществующую
+ * или недоступную сущность, и поверхность честно очищает параметр.
+ * Реализация — useUrlPeek с пустым id: setOpen(false) просто удаляет параметр.
+ */
+export function useUrlPeekParamCleaner(param: string): () => void {
+  const [, setOpen] = useUrlPeek(param, "");
+  return useCallback(() => setOpen(false), [setOpen]);
+}
+
 export type UrlPeekSheetProps = {
   /** Имя query-параметра (`task`, `deal`, …). */
   param: string;

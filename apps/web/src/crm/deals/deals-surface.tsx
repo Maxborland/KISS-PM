@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeftRight, ChevronRight, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,6 +22,7 @@ import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { useCrm, useCrmUsers } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import { DealPeek } from "@/crm/deals/deal-peek";
+import { useUrlPeekParamCleaner } from "@/workspace/lib/url-peek";
 import type { DealStage, Opportunity, Pipeline, StageTransition } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useSessionUser } from "@/shell/use-session-user";
@@ -100,6 +102,11 @@ export function ProjectDeals() {
   // Триггеры DealPeek по id сделки: клик по телу карточки/строки программно «нажимает»
   // триггер (URL-драйв ?deal= живёт внутри DealPeek) — паттерн schedule-строк.
   const dealPeekTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
+  // В Next это App Router-параметры; в Storybook (без App Router) хук отдаёт null —
+  // эффект резолва ниже читает window.location.search (fallback как в useUrlPeek).
+  const searchParams = useSearchParams();
+  const clearDealParam = useUrlPeekParamCleaner("deal");
+  const resolvedDealParamRef = useRef<string | null>(null);
 
   const model = useMemo(() => {
     if (!data) return null;
@@ -121,6 +128,30 @@ export function ProjectDeals() {
     const transitions = data.stageTransitions.filter((t) => selected && t.pipelineId === selected.id);
     return { pipelines, selected, stages, byStage, unstaged, opps: inPipeline, transitions, allStages: data.dealStages };
   }, [data, pipelineId]);
+
+  // Deep-link `?deal=<id>`: pipelineId — локальный state, а DealPeek монтируется только
+  // для отрендеренных сделок, поэтому сделка чужой воронки (или несуществующая) молча
+  // не открывалась. После загрузки данных резолвим id по ВСЕМ воронкам: сделка в другой
+  // воронке → переключаем выбор (её DealPeek смонтируется и откроется по URL);
+  // не найдена/её стадия недоступна → снимаем параметр replace-ом и сообщаем toast'ом.
+  useEffect(() => {
+    if (!data) return;
+    const search = searchParams ? searchParams.toString() : window.location.search;
+    const dealParam = new URLSearchParams(search).get("deal");
+    // Каждое значение параметра резолвим один раз: ручное переключение воронки при
+    // открытом peek не должно принудительно возвращать пользователя обратно.
+    if (resolvedDealParamRef.current === dealParam) return;
+    resolvedDealParamRef.current = dealParam;
+    if (!dealParam) return;
+    const deal = data.opportunities.find((o) => o.id === dealParam);
+    const stage = deal?.stageId ? data.dealStages.find((s) => s.id === deal.stageId) ?? null : null;
+    if (!deal || (deal.stageId && !stage?.pipelineId)) {
+      clearDealParam();
+      toast.error("Сделка не найдена или недоступна");
+      return;
+    }
+    if (stage?.pipelineId) setPipelineId(stage.pipelineId);
+  }, [clearDealParam, data, searchParams]);
 
   // Верхнеуровневые loading/error/forbidden — через SurfaceState (внутри CrmFrame).
   // Лестница статусов — общий surfaceStatusOf; reload-с-данными по-прежнему рендерит ready (поведение не меняем).
