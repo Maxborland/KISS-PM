@@ -54,6 +54,7 @@ test("deal peek opens from kanban and list, is URL-driven and closes with focus 
   const peekUrl = new RegExp(`/crm/deals\\?deal=${deal.id}$`);
   const dialog = page.getByRole("dialog");
 
+  try {
   await page.goto("/crm/deals");
   await page.setViewportSize({ width: 1440, height: 1000 });
 
@@ -67,6 +68,9 @@ test("deal peek opens from kanban and list, is URL-driven and closes with focus 
   await expect(dialog.getByText("Клиент", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Не проверялась", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("heading", { name: "Последние события" })).toBeVisible();
+  // Лента дошла до терминального состояния (событие или пустое состояние) без ошибок.
+  await expect(dialog.locator("li").or(dialog.getByText("Пока нет активностей.", { exact: true })).first()).toBeVisible();
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Сохранить" })).toHaveCount(0);
   await expect(dialog.getByRole("textbox")).toHaveCount(0);
 
@@ -124,12 +128,23 @@ test("deal peek opens from kanban and list, is URL-driven and closes with focus 
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 
-  // Уборка: сделку закрываем как проигранную, чтобы не копить активные сделки в общем сиде.
-  const finalizeResponse = await page.request.patch(`/api/workspace/opportunities/${deal.id}/finalize`, {
-    data: { status: "lost_rejected", reason: "E2E cleanup" },
-    headers: { "x-kiss-pm-action": "same-origin" }
-  });
-  expect(finalizeResponse.status()).toBe(200);
+  // Мобильная ширина 390px: peek открывается и видим, страница без горизонтального скролла.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/crm/deals?deal=${deal.id}`);
+  await expect(page.getByRole("dialog").getByRole("heading", { name: deal.title })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+    .toBeLessThanOrEqual(0);
+  } finally {
+    // Уборка failure-safe: сделку закрываем как проигранную даже при упавшем кейсе,
+    // чтобы не копить активные сделки в общем сиде; повторный финал (уже закрыта)
+    // отдаёт 409/422 — допустимо.
+    const finalizeResponse = await page.request.patch(`/api/workspace/opportunities/${deal.id}/finalize`, {
+      data: { status: "lost_rejected", reason: "E2E cleanup" },
+      headers: { "x-kiss-pm-action": "same-origin" }
+    });
+    expect([200, 409, 422]).toContain(finalizeResponse.status());
+  }
 });
 
 test("deal deep-link resolves across pipelines and clears unknown ids", async ({ page }) => {
@@ -245,6 +260,10 @@ test("CRM reader sees deal peek read-only without mutation requests", async ({ p
   await expect(page).toHaveURL(new RegExp(`/crm/deals\\?deal=${READER_DEAL.id}$`));
   await expect(dialog.getByText("Клиент", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("heading", { name: "Последние события" })).toBeVisible();
+  // Лента под reader-ролью дошла до терминального состояния (событие или пустое
+  // состояние) БЕЗ ошибок — заголовок секции сам по себе этого не доказывает.
+  await expect(dialog.locator("li").or(dialog.getByText("Пока нет активностей.", { exact: true })).first()).toBeVisible();
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
   // Peek строго read-only: никаких форм и мутационных кнопок.
   await expect(dialog.getByRole("textbox")).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Сохранить" })).toHaveCount(0);
