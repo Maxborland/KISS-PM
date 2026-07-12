@@ -63,7 +63,8 @@ export function AgentHeader({
               {provider && !provider.live ? " · демо-режим" : ""}
             </span>
           </div>
-          <dl className="flex flex-col gap-3 px-4 py-3 text-[length:var(--text-sm)]">
+          {/* Реальные инсталляции отдают ~50 инструментов — список скроллится внутри поповера. */}
+          <dl className="flex max-h-[60dvh] flex-col gap-3 overflow-y-auto overscroll-contain px-4 py-3 text-[length:var(--text-sm)]">
             <div>
               <dt className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.05em] text-[var(--muted-soft)]">
                 Поведение
