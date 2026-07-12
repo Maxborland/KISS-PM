@@ -267,12 +267,12 @@ function AttentionCard({ tasks, opportunities }: { tasks: TaskRecord[] | null; o
           {shown.map((s) => (
             <li key={s.key}>
               <Link href={s.href} aria-label={s.ariaLabel} className={rowLinkCls}>
-                <Chip variant={s.tone}>{s.chip}</Chip>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{s.title}</span>
                   <span className="block truncate text-[length:var(--text-xs)] text-[var(--muted-soft)]">{s.detail}</span>
                 </span>
-                <span className="shrink-0 text-[length:var(--text-xs)] text-[var(--muted)]">открыть →</span>
+                <Chip variant={s.tone}>{s.chip}</Chip>
+                <span className="hidden shrink-0 text-[length:var(--text-xs)] text-[var(--muted)] sm:inline">открыть →</span>
               </Link>
             </li>
           ))}
