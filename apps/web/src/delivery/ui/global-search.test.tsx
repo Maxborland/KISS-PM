@@ -117,6 +117,30 @@ describe("GlobalSearch command palette", () => {
     expect(document.body.textContent).toContain("Ничего не найдено по «вектор»");
   });
 
+  it("keeps server matches that do not occur in the visible title", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([{
+      id: "task:description-match",
+      type: "task",
+      title: "Подготовить оценку",
+      subtitle: "Проект Вектор",
+      snippet: "Уникальный термин только в описании",
+      route: "/projects/project-vektor",
+      entityId: "description-match"
+    }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await pressShortcut();
+    await setCommandInput("уникальный термин");
+    await waitForDebounce();
+    await act(async () => Promise.resolve());
+
+    expect(document.body.textContent).toContain("Подготовить оценку");
+    const item = document.querySelector('[cmdk-item][data-value="task:description-match"]');
+    expect(item).not.toBeNull();
+    expect(item?.closest("[cmdk-group]")?.hasAttribute("hidden")).toBe(false);
+    expect(document.body.textContent).not.toContain("Ничего не найдено");
+  });
+
   it("does not let a stale response replace a newer query", async () => {
     const first = deferred<Response>();
     const second = deferred<Response>();
