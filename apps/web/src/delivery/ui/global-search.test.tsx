@@ -20,7 +20,11 @@ vi.mock("@/shell/use-session-user", () => ({
     user: {
       id: "user-admin",
       name: "Администратор",
-      permissions: ["tenant.projects.read", "tenant.opportunities.read", "tenant.opportunities.manage"]
+      permissions: [
+        "tenant.projects.read", "tenant.opportunities.read", "tenant.opportunities.manage",
+        "tenant.deal_stages.read", "tenant.clients.read", "tenant.contacts.read",
+        "tenant.products.read", "tenant.project_types.read", "tenant.crm_pipelines.read"
+      ]
     }
   })
 }));

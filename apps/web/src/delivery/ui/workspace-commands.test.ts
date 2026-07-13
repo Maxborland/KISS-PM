@@ -11,7 +11,7 @@ describe("workspace palette command registry", () => {
     expect(getPaletteCommands({ loaded: true, permissions: null })).toEqual({ navigation: [], actions: [] });
   });
 
-  it("shows the real create-deal action only with manage permission", () => {
+  it("shows the real create-deal action only with manage and its readable CRM context", () => {
     const reader = getPaletteCommands({
       loaded: true,
       permissions: ["tenant.projects.read", "tenant.project_plan.read"]
@@ -21,10 +21,31 @@ describe("workspace palette command registry", () => {
 
     const admin = getPaletteCommands({
       loaded: true,
-      permissions: ["tenant.projects.read", "tenant.opportunities.read", "tenant.opportunities.manage"]
+      permissions: [
+        "tenant.opportunities.manage",
+        "tenant.opportunities.read",
+        "tenant.deal_stages.read",
+        "tenant.clients.read",
+        "tenant.contacts.read",
+        "tenant.products.read",
+        "tenant.project_types.read",
+        "tenant.crm_pipelines.read"
+      ]
     });
     expect(admin.actions.map((item) => item.label)).toEqual(["Создать сделку"]);
     expect(admin.actions[0]?.href).toBe("/crm/deals?create=deal");
+
+    const manageWithoutReadableContext = getPaletteCommands({
+      loaded: true,
+      permissions: ["tenant.opportunities.manage", "tenant.opportunities.read"]
+    });
+    expect(manageWithoutReadableContext.actions).toEqual([]);
+
+    const readableWithoutManage = getPaletteCommands({
+      loaded: true,
+      permissions: admin.actions[0]?.requiresAll ?? []
+    });
+    expect(readableWithoutManage.actions).toEqual([]);
   });
 
   it("maps task and deal ids to canonical URL-peek routes", () => {

@@ -11,6 +11,7 @@ export type WorkspaceNavGroup = {
 
 export type PaletteCommand = WorkspaceNavItem & {
   id: string;
+  requiresAll?: readonly string[];
   keywords?: readonly string[];
 };
 
@@ -80,15 +81,33 @@ export const WORKSPACE_NAV_GROUPS: readonly WorkspaceNavGroup[] = [
   }
 ] as const;
 
+const CRM_DEALS_CONTEXT_PERMISSIONS = [
+  "tenant.opportunities.read",
+  "tenant.deal_stages.read",
+  "tenant.clients.read",
+  "tenant.contacts.read",
+  "tenant.products.read",
+  "tenant.project_types.read",
+  "tenant.crm_pipelines.read"
+] as const;
+
 const WORKSPACE_ACTIONS: readonly PaletteCommand[] = [
   {
     id: "action:create-deal",
     label: "Создать сделку",
     href: "/crm/deals?create=deal",
+    requiresAll: CRM_DEALS_CONTEXT_PERMISSIONS,
     requires: ["tenant.opportunities.manage"],
     keywords: ["новая", "crm", "продажа"]
   }
 ] as const;
+
+function hasAllPermissions(
+  permissions: readonly string[],
+  required?: readonly string[]
+): boolean {
+  return !required || required.every((permission) => permissions.includes(permission));
+}
 
 export function hasAnyPermission(
   permissions: readonly string[],
@@ -112,7 +131,7 @@ export function getPaletteCommands({
       ...item,
       id: `navigation:${item.href}`
     }));
-  const actions = WORKSPACE_ACTIONS.filter((item) => hasAnyPermission(permissions, item.requires));
+  const actions = WORKSPACE_ACTIONS.filter((item) => hasAnyPermission(permissions, item.requires) && hasAllPermissions(permissions, item.requiresAll));
   return { navigation, actions };
 }
 
