@@ -21,27 +21,6 @@
    tokens/bem/kiss-v4 → весь preview без стилей). */
 @plugin "tailwindcss-animate";
 
-/* Тёмная тема — UNLAYERED (бьёт :root из tokens.css И kiss-v4.css, которые в @layer).
-   Активируется <html data-theme="dark"> из профиля. Минимальный функциональный набор основных
-   поверхностей/текста; акцент задаётся отдельно inline-переменной --accent. Полная палитра
-   (success/danger/accent-soft и т.д.) — отдельная работа. */
-[data-theme="dark"] {
-  --canvas: #0f172a;
-  --canvas-tint: #131c2e;
-  --panel: #1e293b;
-  --panel-subtle: #18222f;
-  --panel-strong: #243042;
-  --panel-elevated: #243042;
-  --border: #334155;
-  --border-strong: #475569;
-  --border-subtle: #1e293b;
-  --text: #e2e8f0;
-  --text-strong: #f8fafc;
-  --muted: #94a3b8;
-  --muted-strong: #cbd5e1;
-  --muted-soft: #64748b;
-}
-
 @theme inline {
   --color-background: var(--canvas);
   --color-foreground: var(--text);
@@ -170,6 +149,23 @@
   :root:not([data-force-motion]) .hover-lift:hover {
     transition: none !important;
     transform: none !important;
+  }
+  /* tailwindcss-animate overlays need animationend to unmount closed Radix content.
+     Keep a near-zero lifecycle instead of animation:none, and neutralize all motion axes. */
+  :root:not([data-force-motion]) [class*="animate-in"],
+  :root:not([data-force-motion]) [class*="animate-out"] {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    --tw-enter-opacity: 1;
+    --tw-enter-scale: 1;
+    --tw-enter-rotate: 0;
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+    --tw-exit-opacity: 1;
+    --tw-exit-scale: 1;
+    --tw-exit-rotate: 0;
+    --tw-exit-translate-x: 0;
+    --tw-exit-translate-y: 0;
   }
   /* Спиннеры — essential-индикатор (WCAG 2.3.3 допускает), но замедляем вращение. */
   :root:not([data-force-motion]) .animate-spin {

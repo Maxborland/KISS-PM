@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { cn } from "@/lib/cn";
+import { applyDocumentTheme } from "@/lib/document-theme";
 import { authErr, FormError } from "@/auth/lib/auth-bits";
 import { permissionLabel } from "@/admin/ui/admin-bits";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
@@ -326,12 +327,10 @@ function ProfileForm({
   }, [user]);
 
   // Живое применение к документу: акцент → CSS-переменная --accent (раньше контрол был placebo),
-  // тема → атрибут data-theme (минимальная тёмная палитра в tokens.css). Сохранение персистит
+  // тема → канонический data-theme. Сохранение персистит
   // через updateTheme; на других страницах применяется при их загрузке из сохранённого профиля.
   useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.theme = theme;
-    if (/^#[0-9a-fA-F]{6}$/.test(accentColor)) root.style.setProperty("--accent", accentColor);
+    applyDocumentTheme({ theme, accentColor });
   }, [theme, accentColor]);
 
   // Дельта профиля (PATCH /api/profile): name/phone/telegram (пустая строка → null).
