@@ -58,6 +58,19 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(document.paths["/api/auth/me"].get.responses["200"].content["application/json"].schema).toEqual({
       $ref: "#/components/schemas/AuthMeResponse"
     });
+    expect(document.components.schemas.RegisterRequest.properties.workspaceName).toEqual({
+      type: "string",
+      minLength: 1,
+      maxLength: 160
+    });
+    expect(document.components.schemas.WorkspaceIdentity.properties.name).toEqual({
+      type: "string",
+      minLength: 1,
+      maxLength: 160
+    });
+    expect(document.paths["/api/profile/deactivation-request"].post.responses["202"].content["application/json"].schema).toEqual({
+      $ref: "#/components/schemas/ProfileDeactivationRequestResponse"
+    });
     expect(
       document.paths["/api/workspace/users"].post.responses["201"].content["application/json"].schema
     ).toEqual({ $ref: "#/components/schemas/WorkspaceUserResponse" });
@@ -3920,9 +3933,9 @@ describe("KISS PM API Phase 1 shell", () => {
         positionName: "Engineer"
       }]
     });
-    expect(workspaceUserDirectoryResponse([user], true)).toEqual({
+    expect(workspaceUserDirectoryResponse([user], true, [{ id: "profile-alpha", name: "CRM Reader" }])).toEqual({
       privateFieldsIncluded: true,
-      users: [user]
+      users: [{ ...user, accessProfileName: "CRM Reader" }]
     });
   });
 

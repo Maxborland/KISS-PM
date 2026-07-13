@@ -51,6 +51,7 @@ const routeDocs: RouteDoc[] = [
   { method: "delete", path: "/api/workspace/users/:userId", tag: "Workspace users", summary: "Archive workspace user", body: "none" },
   { method: "patch", path: "/api/profile", tag: "Profile", summary: "Update current profile", requestSchema: "ProfilePatchRequest", successSchema: "WorkspaceUserResponse" },
   { method: "patch", path: "/api/profile/theme", tag: "Profile", summary: "Update current theme preference", requestSchema: "ProfileThemePatchRequest", successSchema: "WorkspaceUserResponse" },
+  { method: "post", path: "/api/profile/deactivation-request", tag: "Profile", summary: "Record current profile deactivation request", body: "none", successSchema: "ProfileDeactivationRequestResponse", successStatus: 202 },
   { method: "get", path: "/api/workspace/positions", tag: "Org structure", summary: "List positions", successSchema: "PositionsResponse" },
   { method: "post", path: "/api/workspace/positions", tag: "Org structure", summary: "Create position", requestSchema: "PositionWriteRequest", successSchema: "PositionResponse", successStatus: 201 },
   { method: "patch", path: "/api/workspace/positions/:positionId", tag: "Org structure", summary: "Update position", requestSchema: "PositionWriteRequest", successSchema: "PositionResponse" },

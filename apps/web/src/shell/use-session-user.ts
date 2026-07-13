@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 // Лёгкий общий доступ к текущей сессии для оболочки (аватар, роле-гейт пунктов
 // навигации). Одноразовый GET /api/auth/me без внешних зависимостей — работает и
 // в проде (боевой контракт), и в Storybook (там 401/ошибка → null, аватар «—»).
-export type SessionUser = { id: string; name: string; permissions: string[] };
+export type SessionUser = { id: string; tenantId: string; name: string; permissions: string[] };
 
 // Публичные страницы: сессии заведомо нет — не дёргаем /api/auth/me,
 // чтобы не сыпать 401 в консоль на каждом открытии (G1-AUTH-13).
@@ -36,7 +36,7 @@ export function useSessionState(): SessionState {
         if (!alive) return;
         setState(
           d?.user
-            ? { user: { id: d.user.id ?? "", name: d.user.name ?? "", permissions: d.permissions ?? [] }, loaded: true }
+            ? { user: { id: d.user.id ?? "", tenantId: d.user.tenantId ?? "", name: d.user.name ?? "", permissions: d.permissions ?? [] }, loaded: true }
             : { user: null, loaded: true }
         );
       })

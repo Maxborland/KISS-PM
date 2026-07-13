@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarClock } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, Circle } from "lucide-react";
 
 import { Chip } from "@/components/ui/chip";
 import { SurfaceState } from "@/components/domain/surface-state";
@@ -11,13 +11,15 @@ import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { cn } from "@/lib/cn";
 import { useOpportunities } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
-import { useSessionUser } from "@/shell/use-session-user";
+import { useSessionUser, type SessionUser } from "@/shell/use-session-user";
 import { hasAllPermissions } from "@/lib/permissions";
 import { useMyWork, useProjects } from "@/workspace/lib/use-workspace";
 import type { TaskRecord, TaskStatusCategory } from "@/workspace/lib/workspace-client";
 import type { Opportunity } from "@/crm/lib/crm-client";
+import { readLastWorkContext, type LastWorkContext } from "@/workspace/lib/last-work-context";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { DEALS_READ_BUNDLE, OPP_OPEN, OPP_STATUS_LABEL, buildAttentionSignals, fmtDate, localIsoDay } from "./attention-signals";
+import { buildSetupSteps, type SetupStep } from "./setup-steps";
 
 /* ============================================================
    Workspace/Дашборд — summary-first сводка на КЛИЕНТСКОЙ АГРЕГАЦИИ
@@ -121,6 +123,7 @@ export function DashboardSurface() {
               URL-фильтра по статусу у /crm/deals нет, обещать drill-down каждой цифре — оверклейм. */}
           <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Сначала сигналы, затем сводка — каждая карточка ведёт к источнику</p>
         </div>
+        <ContinueWorkCard user={sessionUser} />
 
         <SurfaceState
           status={surfaceStatus}
@@ -140,6 +143,7 @@ export function DashboardSurface() {
         >
           {settled && !allFailed ? (
             <DashboardContent
+              permissions={sessionUser?.permissions ?? []}
               tasks={{ data: myWork.data?.tasks ?? null, status: srcStatus(myWork), reload: myWork.reload }}
               projects={{
                 data: projects.data
@@ -156,6 +160,32 @@ export function DashboardSurface() {
         </SurfaceState>
       </main>
     </WorkspaceShell>
+  );
+}
+
+function ContinueWorkCard({ user }: { user: SessionUser | null }) {
+  const [context, setContext] = useState<LastWorkContext | null>(null);
+
+  useEffect(() => {
+    if (!user?.id || !user.tenantId) {
+      setContext(null);
+      return;
+    }
+    setContext(readLastWorkContext(window.localStorage, user.tenantId, user.id));
+  }, [user?.id, user?.tenantId]);
+
+  if (!context) return null;
+  return (
+    <Link
+      href={context.href}
+      className="mb-3 flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-4 py-3 outline-none hover:border-[var(--accent)] focus-visible:shadow-[var(--ring-focus)]"
+    >
+      <span>
+        <span className="block text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.04em] text-[var(--accent)]">Продолжить работу</span>
+        <span className="mt-0.5 block text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{context.label}</span>
+      </span>
+      <ArrowRight className="size-4 shrink-0 text-[var(--accent)]" aria-hidden />
+    </Link>
   );
 }
 
@@ -306,12 +336,50 @@ function AttentionCard({
   );
 }
 
+function SetupCard({ steps }: { steps: SetupStep[] }) {
+  return (
+    <BentoCard
+      title="Настройка первого цикла"
+      subtitle="Три рабочих шага на реальных данных — без отдельного мастера и демо-сущностей"
+      span={12}
+      flush
+      headingLevel={2}
+    >
+      <ol className="grid grid-cols-1 sm:grid-cols-3">
+        {steps.map((step) => {
+          const content = (
+            <>
+              {step.done ? <CheckCircle2 className="size-4 text-[var(--success-text)]" aria-hidden /> : <Circle className="size-4 text-[var(--muted-soft)]" aria-hidden />}
+              <span className="min-w-0">
+                <span className="block text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{step.label}</span>
+                <span className="block text-[length:var(--text-xs)] text-[var(--muted-soft)]">{step.description}</span>
+              </span>
+            </>
+          );
+          return (
+            <li key={step.id} className="border-b border-[var(--border-subtle)] last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+              {step.done ? (
+                <span className="flex gap-2 px-4 py-3">{content}</span>
+              ) : (
+                <Link href={step.href} className="flex gap-2 px-4 py-3 outline-none hover:bg-[var(--panel-subtle)] focus-visible:shadow-[var(--ring-focus)]">
+                  {content}
+                </Link>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </BentoCard>
+  );
+}
 function DashboardContent({
   tasks,
+  permissions,
   projects,
   opportunities
 }: {
   tasks: SourceView<TaskRecord[]>;
+  permissions: string[];
   projects: SourceView<{ count: number; hours: number }>;
   opportunities: SourceView<Opportunity[]>;
 }) {
@@ -338,13 +406,26 @@ function DashboardContent({
       .filter((r) => r.count > 0);
   }, [opportunities.data]);
 
+  const setupSteps = buildSetupSteps({
+    permissions,
+    taskCount: tasks.data?.length ?? null,
+    opportunityCount: opportunities.data?.length ?? null,
+    projectCount: projects.data?.count ?? null
+  });
+  const showSetup = setupSteps.some((step) => !step.done);
   // Подпись KPI-плитки для недоступного источника: роль — только при forbidden.
   const failDelta = (s: SourceView<unknown>) => (s.status === "forbidden" ? "нет доступа" : "не удалось загрузить");
 
   return (
     <div className="flex flex-col gap-3">
       {/* Summary-first: реальные сигналы наверху, до любых агрегатов. */}
+      {showSetup ? (
+        <Bento>
+          <SetupCard steps={setupSteps} />
+        </Bento>
+      ) : null}
       <Bento>
+
         <AttentionCard tasks={tasks} opportunities={opportunities} />
       </Bento>
 

@@ -6,6 +6,7 @@ import { Check, LogOut } from "lucide-react";
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
@@ -81,7 +82,7 @@ export type ProfileSurfaceProps = {
 export function ProfileSurface({ demoAutoLogin = true }: ProfileSurfaceProps = {}) {
   // ЕДИНЫЙ useAuth: вход + профиль (user из me) + права + правка — одна сессия.
   // (Раздельный useProfile создавал бы ОТДЕЛЬНУЮ изолированную сессию → 401.)
-  const { state, status, error, user, permissions, login, logout, reload, updateProfile, updateTheme } = useAuth();
+  const { state, status, error, user, permissions, login, logout, reload, updateProfile, updateTheme, requestDeactivation } = useAuth();
 
   // Авто-вход демо-кредами ОДИН раз (мок стартует anonymous). useRef — защита от StrictMode-двойного эффекта.
   const autoLoginRef = useRef(false);
@@ -182,7 +183,7 @@ export function ProfileSurface({ demoAutoLogin = true }: ProfileSurfaceProps = {
           }}
         >
           {profileUser ? (
-            <ProfileContent user={profileUser} permissions={permissions} update={updateProfile} updateTheme={updateTheme} />
+            <ProfileContent user={profileUser} permissions={permissions} update={updateProfile} updateTheme={updateTheme} requestDeactivation={requestDeactivation} />
           ) : (
             <span />
           )}
@@ -215,17 +216,51 @@ export function ProfileContent({
   user,
   permissions,
   update,
-  updateTheme
+  updateTheme,
+  requestDeactivation
 }: {
   user: WorkspaceUser;
   permissions: string[];
   update: ReturnType<typeof useAuth>["updateProfile"];
   updateTheme: ReturnType<typeof useAuth>["updateTheme"];
+  requestDeactivation: ReturnType<typeof useAuth>["requestDeactivation"];
 }) {
+  const [deactivationState, setDeactivationState] = useState<"idle" | "recorded" | "error">("idle");
+
+  async function recordDeactivationRequest() {
+    setDeactivationState("idle");
+    const result = await requestDeactivation();
+    setDeactivationState(result.ok ? "recorded" : "error");
+  }
+
   return (
-    <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="grid min-w-0 gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
       <ProfileCard user={user} permissions={permissions} />
       <ProfileForm user={user} permissions={permissions} update={update} updateTheme={updateTheme} />
+      <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)] lg:col-span-2">
+        <h2 className="text-[length:var(--text-md)] font-bold text-[var(--text-strong)]">Деактивация профиля</h2>
+        <p className="mt-1 text-[length:var(--text-sm)] text-[var(--muted)]">
+          Запрос не отключает профиль автоматически. Он записывается в аудит, после чего администратор проверяет активные задачи и доступы. Владельцу workspace сначала нужно назначить другого владельца.
+        </p>
+        {deactivationState === "recorded" ? (
+          <p className="mt-3 rounded-[var(--radius-md)] border border-[var(--success-border)] bg-[var(--success-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--success-text)]" role="status">
+            Запрос записан в журнале аудита. Администратор должен обработать его вручную.
+          </p>
+        ) : null}
+        {deactivationState === "error" ? (
+          <p className="mt-3 text-[length:var(--text-sm)] text-[var(--danger-text)]" role="alert">Не удалось записать запрос. Повторите попытку.</p>
+        ) : null}
+        <div className="mt-3">
+          <ConfirmDialog
+            title="Запросить деактивацию профиля?"
+            description="Доступ сохранится до ручной обработки администратором. Запрос и время будут записаны в журнале аудита."
+            confirmLabel="Записать запрос"
+            onConfirm={recordDeactivationRequest}
+          >
+            <Button variant="destructive-soft">Запросить деактивацию</Button>
+          </ConfirmDialog>
+        </div>
+      </section>
     </div>
   );
 }
@@ -233,12 +268,12 @@ export function ProfileContent({
 // Карточка профиля: аватар + имя + email + роль/права.
 function ProfileCard({ user, permissions }: { user: WorkspaceUser; permissions: string[] }) {
   return (
-    <aside className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
-      <div className="flex items-center gap-3">
-        <BemAvatar initials={initials(user.name)} color={avatarColor(user.name)} size="xl" />
-        <div className="min-w-0">
-          <div className="truncate text-[length:var(--text-md)] font-bold text-[var(--text-strong)]">{user.name}</div>
-          <div className="truncate text-[length:var(--text-sm)] text-[var(--muted)]">{user.email}</div>
+    <aside className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]">
+      <div className="flex min-w-0 items-center gap-3">
+        <BemAvatar className="shrink-0" initials={initials(user.name)} color={avatarColor(user.name)} size="xl" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[length:var(--text-md)] font-bold text-[var(--text-strong)]" title={user.name}>{user.name}</div>
+          <div className="truncate text-[length:var(--text-sm)] text-[var(--muted)]" title={user.email}>{user.email}</div>
         </div>
       </div>
 
@@ -248,28 +283,33 @@ function ProfileCard({ user, permissions }: { user: WorkspaceUser; permissions: 
       </div>
 
       <dl className="flex flex-col gap-2 text-[length:var(--text-xs)]">
-        <div className="flex items-center justify-between gap-2">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2">
           <dt className="text-[var(--muted-soft)]">Рабочее пространство</dt>
-          <dd className="v4-mono text-[var(--muted-strong)]">{user.tenantId}</dd>
+          <dd className="min-w-0 truncate text-right font-medium text-[var(--muted-strong)]" title={user.workspaceName ?? "Текущее workspace"}>{user.workspaceName ?? "Текущее workspace"}</dd>
         </div>
-        <div className="flex items-center justify-between gap-2">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2">
           <dt className="text-[var(--muted-soft)]">Профиль доступа</dt>
-          <dd className="v4-mono text-[var(--muted-strong)]">{user.accessProfileId}</dd>
+          <dd className="min-w-0 truncate text-right font-medium text-[var(--muted-strong)]" title={user.accessProfileName ?? "Назначенный профиль"}>{user.accessProfileName ?? "Назначенный профиль"}</dd>
         </div>
-        <div className="flex items-center justify-between gap-2">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2">
           <dt className="text-[var(--muted-soft)]">Тема / акцент</dt>
-          <dd className="flex items-center gap-1.5 text-[var(--muted-strong)]">
+          <dd className="flex min-w-0 items-center justify-end gap-1.5 text-[var(--muted-strong)]">
             {THEME_LABEL[user.theme]}
-            <span className="inline-block size-3 rounded-full border border-[var(--border)]" style={{ backgroundColor: user.accentColor }} aria-hidden />
-            <span className="v4-mono">{user.accentColor}</span>
+            <span className="inline-block size-3 shrink-0 rounded-full border border-[var(--border)]" style={{ backgroundColor: user.accentColor }} aria-hidden />
+            <span className="v4-mono truncate">{user.accentColor}</span>
           </dd>
         </div>
       </dl>
 
-      <div className="border-t border-[var(--border-subtle)] pt-2">
-        <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.04em] text-[var(--muted-soft)]">Права доступа</div>
-        <PermissionsList permissions={permissions} />
-      </div>
+      <details className="min-w-0 border-t border-[var(--border-subtle)] pt-2">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-[var(--radius-sm)] text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.04em] text-[var(--muted-soft)] focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]">
+          <span>Права доступа</span>
+          <span className="v4-num rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{permissions.length}</span>
+        </summary>
+        <div className="mt-2 max-h-64 overflow-y-auto pr-1">
+          <PermissionsList permissions={permissions} />
+        </div>
+      </details>
     </aside>
   );
 }
@@ -282,7 +322,7 @@ function PermissionsList({ permissions }: { permissions: string[] }) {
       {permissions.map((p) => {
         const label = permissionLabel(p);
         return (
-          <li key={p} title={prototypeNotesEnabled ? p : undefined} className={cn("rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel-subtle)] px-1.5 py-0.5 text-[length:var(--text-2xs)] text-[var(--muted-strong)]", label === p && "v4-mono")}>
+          <li key={p} title={prototypeNotesEnabled ? p : undefined} className={cn("max-w-full break-words rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel-subtle)] px-1.5 py-0.5 text-[length:var(--text-2xs)] text-[var(--muted-strong)]", label === p && "v4-mono")}>
           {label}
         </li>
         );
@@ -398,7 +438,7 @@ function ProfileForm({
 
   return (
     <form
-      className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]"
+      className="flex min-w-0 flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-card)]"
       noValidate
       onSubmit={(e) => void submit(e)}
     >
@@ -432,7 +472,7 @@ function ProfileForm({
 
         <label className={labelCls}>
           Акцентный цвет
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2">
             <input
               type="color"
               value={accentValid ? accentColor : "#0f766e"}
@@ -477,11 +517,11 @@ function ProfileForm({
         </label>
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-3">
+      <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-3 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">
           {dirty ? `Изменено полей: ${changedCount}` : "Нет изменений"}
         </span>
-        <span className="flex items-center gap-2">
+        <span className="flex flex-wrap items-center justify-end gap-2">
           {saved ? (
             <span className="inline-flex items-center gap-1 text-[length:var(--text-xs)] font-medium text-[var(--success-text)]">
               <Check className="size-3.5" aria-hidden />

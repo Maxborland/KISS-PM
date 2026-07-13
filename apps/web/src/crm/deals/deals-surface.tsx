@@ -26,6 +26,7 @@ import { useUrlPeekParamCleaner } from "@/workspace/lib/url-peek";
 import type { DealStage, Opportunity, Pipeline, StageTransition } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useSessionUser } from "@/shell/use-session-user";
+import { kanbanInteractionHint } from "./deal-permission-copy";
 
 type Mode = "kanban" | "list" | "forecast";
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
@@ -40,6 +41,10 @@ export const isValidOpportunityProbability = (value: string) => {
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 100;
 };
 // Канонические подписи — crm-bits; локальный override: в компактных чипах
+export const hasCreateDealReferenceData = (
+  projectTypeId: string,
+  demandPositionId: string | null | undefined
+) => Boolean(projectTypeId && demandPositionId);
 // канбана/списка «Готова к запуску» не помещается, поэтому короткое «Готова».
 const STATUS_LABEL: Record<Opportunity["status"], string> = { ...OPPORTUNITY_STATUS_LABEL, ready_to_activate: "Готова" };
 const isFinal = (o: Opportunity) => o.status === "won_closed" || o.status === "lost_rejected";
@@ -267,7 +272,8 @@ export function ProjectDeals() {
     );
   }
 
-  const createDealDialog = <CreateDealDialog stages={model.stages} data={data} busy={busy} setBusy={setBusy} create={createOpportunity} disabledReason={createDealCapability.disabledReason} />;
+  const demandPositionId = users.byId.get(sessionUser?.id ?? "")?.positionId ?? users.list.find((user) => user.positionId)?.positionId ?? null;
+  const createDealDialog = <CreateDealDialog stages={model.stages} data={data} busy={busy} setBusy={setBusy} create={createOpportunity} demandPositionId={demandPositionId} disabledReason={createDealCapability.disabledReason} />;
 
   return (
     <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={createDealDialog}>
@@ -298,7 +304,7 @@ export function ProjectDeals() {
 
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <Segmented name="deals-mode" value={mode} onChange={setMode} options={[{ value: "kanban", label: "Канбан" }, { value: "list", label: "Список" }, { value: "forecast", label: "Прогноз" }]} />
-        {mode === "kanban" ? <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Перетащите карточку между стадиями (переход проверяется условиями воронки)</span> : null}
+        {mode === "kanban" ? <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">{kanbanInteractionHint(canManageDeals)}</span> : null}
         {mode === "list" ? <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Кнопка «⇄ Воронка» — перенос сделки в другую воронку</span> : null}
       </div>
 
@@ -314,7 +320,7 @@ export function ProjectDeals() {
 
       <div key={mode} className="anim-fade-in">
       {mode === "kanban" ? (
-        <div className="flex gap-3 overflow-x-auto pb-2">
+        <div data-testid="deal-kanban" className="grid grid-flow-col auto-cols-[minmax(180px,1fr)] gap-3 overflow-x-auto pb-2">
           {model.stages.map((s) => {
             const items = model.byStage.get(s.id) ?? [];
             const sum = items.reduce((a, o) => a + o.contractValue, 0);
@@ -323,11 +329,11 @@ export function ProjectDeals() {
                 key={s.id}
                 onDragOver={(e) => { if (!canManageDeals) return; e.preventDefault(); if (overStage !== s.id) setOverStage(s.id); }}
                 onDrop={() => dropOn(s.id)}
-                className={cn("flex w-[260px] shrink-0 flex-col rounded-[var(--radius-card)] border bg-[var(--panel-subtle)]", overStage === s.id ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)]")}
+                className={cn("flex min-w-0 flex-col rounded-[var(--radius-card)] border bg-[var(--panel-subtle)]", overStage === s.id ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)]")}
               >
                 <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2">
-                  <span className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{s.name}</span>
-                  <span className="flex items-center gap-1.5"><span className="v4-num text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{money(sum)}</span><span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{items.length}</span></span>
+                  <span className="min-w-0 truncate text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]" title={s.name}>{s.name}</span>
+                  <span className="flex shrink-0 items-center gap-1.5"><span className="v4-num text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{money(sum)}</span><span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{items.length}</span></span>
                 </div>
                 <div className="flex min-h-[120px] flex-col gap-2 p-2">
                   {items.map((o) => {
@@ -341,27 +347,27 @@ export function ProjectDeals() {
                         onDragStart={() => { if (draggable) setDragId(o.id); }}
                         onDragEnd={() => { setDragId(null); setOverStage(null); }}
                         onClick={(e) => openDealPeek(e, o.id)}
-                        className={cn("v4-row rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)]", "p-2.5", draggable ? "cursor-grab active:cursor-grabbing" : "opacity-90", dragId === o.id && "opacity-50 shadow-[var(--shadow-raise)]")}
+                        className={cn("v4-row min-w-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5", draggable && "cursor-grab active:cursor-grabbing", dragId === o.id && "opacity-50 shadow-[var(--shadow-raise)]")}
                       >
-                        <div className="mb-1 flex items-center justify-between gap-2">
-                          {prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</span> : <span />}
-                          <BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" title={ownerName(o.ownerUserId)} />
-                        </div>
+                        {prototypeNotesEnabled ? <div className="v4-mono mb-1 truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</div> : null}
                         <h3 className="flex items-start justify-between gap-1 text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">
                           <Link
                             href={`/crm/deals/${o.id}`}
                             draggable={false}
                             aria-label={`Открыть сделку «${o.title}»`}
-                            className="min-w-0 rounded-[var(--radius-sm)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]"
+                            className="line-clamp-2 min-w-0 break-words rounded-[var(--radius-sm)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]"
                           >
                             {o.title}
                           </Link>
                           {dealPeekTrigger(o)}
                         </h3>
-                        <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{o.clientName}</p>
+                        <div className="mt-1 flex min-w-0 items-center gap-2">
+                          <p className="min-w-0 flex-1 truncate text-[length:var(--text-xs)] text-[var(--muted)]" title={o.clientName}>{o.clientName}</p>
+                          <BemAvatar className="shrink-0" initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" title={ownerName(o.ownerUserId)} />
+                        </div>
                         <div className="mt-1.5 flex items-center justify-between gap-2">
                           <span className="v4-num text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</span>
-                          {final ? <DealStatusChip status={o.status} /> : <span className="v4-num text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.probability}%</span>}
+                          {final ? <DealStatusChip status={o.status} /> : <span className="v4-num text-[length:var(--text-xs)] text-[var(--muted-soft)]">{o.probability}%</span>}
                         </div>
                       </article>
                     );
@@ -372,24 +378,27 @@ export function ProjectDeals() {
             );
           })}
           {model.unstaged.length ? (
-            <div className="flex w-[260px] shrink-0 flex-col rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--panel-subtle)]">
+            <div className="flex min-w-0 flex-col rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--panel-subtle)]">
               <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2"><span className="text-[length:var(--text-sm)] font-semibold text-[var(--muted-strong)]">Без стадии</span><span className="rounded-full bg-[var(--panel-strong)] px-1.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]">{model.unstaged.length}</span></div>
               <div className="flex flex-col gap-2 p-2">
                 {model.unstaged.map((o) => (
-                  <article data-deal-id={o.id} key={o.id} onClick={(e) => openDealPeek(e, o.id)} className="v4-row rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5">
-                    <div className="mb-1 flex items-center justify-between gap-2">{prototypeNotesEnabled ? <span className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</span> : <span />}<BemAvatar initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" /></div>
+                  <article data-deal-id={o.id} key={o.id} onClick={(e) => openDealPeek(e, o.id)} className="v4-row min-w-0 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-2.5">
+                    {prototypeNotesEnabled ? <div className="v4-mono mb-1 truncate text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{o.id}</div> : null}
                     <h3 className="flex items-start justify-between gap-1 text-[length:var(--text-sm)] font-semibold leading-snug text-[var(--text-strong)]">
                       <Link
                         href={`/crm/deals/${o.id}`}
                         draggable={false}
                         aria-label={`Открыть сделку «${o.title}»`}
-                        className="min-w-0 rounded-[var(--radius-sm)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]"
+                        className="line-clamp-2 min-w-0 break-words rounded-[var(--radius-sm)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]"
                       >
                         {o.title}
                       </Link>
                       {dealPeekTrigger(o)}
                     </h3>
-                    <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{o.clientName}</p>
+                    <div className="mt-1 flex min-w-0 items-center gap-2">
+                      <p className="min-w-0 flex-1 truncate text-[length:var(--text-xs)] text-[var(--muted)]" title={o.clientName}>{o.clientName}</p>
+                      <BemAvatar className="shrink-0" initials={initials(ownerName(o.ownerUserId))} color={ownerColor(o.ownerUserId)} size="sm" title={ownerName(o.ownerUserId)} />
+                    </div>
                     <div className="v4-num mt-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--text-strong)]">{money(o.contractValue)}</div>
                     {canManageDeals && assignmentStage && !isFinal(o) ? (
                       <Button
@@ -614,12 +623,13 @@ function MovePipelineDialog({ target, pipelines, allStages, currentPipelineId, b
   );
 }
 
-export function CreateDealDialog({ stages, data, busy, setBusy, create, disabledReason }: {
+export function CreateDealDialog({ stages, data, busy, setBusy, create, demandPositionId, disabledReason }: {
   stages: DealStage[];
   data: ReturnType<typeof useCrm>["data"];
   busy: boolean;
   setBusy: (v: boolean) => void;
   create: ReturnType<typeof useCrm>["createOpportunity"];
+  demandPositionId?: string | null;
   disabledReason?: string | null;
 }) {
   const [title, setTitle] = useState("");
@@ -636,17 +646,19 @@ export function CreateDealDialog({ stages, data, busy, setBusy, create, disabled
   const createRequested = new URLSearchParams(searchParams?.toString() ?? (typeof window === "undefined" ? "" : window.location.search)).get("create") === "deal";
 
   useEffect(() => {
-    if (!createRequested || !disabledReason) return;
-    clearCreateParam();
-    toast.error(disabledReason);
-  }, [clearCreateParam, createRequested, disabledReason]);
-
-  const dialogOpen = open || (createRequested && !disabledReason);
-  const changeDialogOpen = (next: boolean) => {
-    if (createRequested) {
-      if (!next) clearCreateParam();
+    if (!createRequested) return;
+    if (disabledReason) {
+      clearCreateParam();
+      toast.error(disabledReason);
       return;
     }
+    // Не монтируем Radix сразу в open=true во время гидрации: его служебный
+    // onOpenChange(false) снимал URL-параметр и размонтировал форму под курсором.
+    setOpen(true);
+  }, [clearCreateParam, createRequested, disabledReason]);
+
+  const changeDialogOpen = (next: boolean) => {
+    if (!next && createRequested) clearCreateParam();
     setOpen(next);
   };
   // Разумные дефолты дат: старт = сегодня, финиш = +3 месяца (G4-15).
@@ -657,7 +669,7 @@ export function CreateDealDialog({ stages, data, busy, setBusy, create, disabled
   const clients = data.clients.filter((c) => c.status === "active");
   const contacts = data.contacts.filter((c) => c.clientId === clientId && c.status === "active");
   const projectTypeId = data.projectTypes[0]?.id ?? "";
-  const valid = title.trim() && clientId && contactId && stageId && Number(contractValue) > 0 && Number(rate) > 0 && finish >= start && isValidOpportunityProbability(probability);
+  const valid = title.trim() && clientId && contactId && stageId && hasCreateDealReferenceData(projectTypeId, demandPositionId) && Number(contractValue) > 0 && Number(rate) > 0 && finish >= start && isValidOpportunityProbability(probability);
 
   // Онбординг пустого тенанта (G8-12): честно объясняем, чего не хватает для создания
   // сделки и где это создать, — вместо вечно неактивной кнопки «Создать» без причины.
@@ -667,21 +679,22 @@ export function CreateDealDialog({ stages, data, busy, setBusy, create, disabled
   if (clientId && contacts.length === 0) missing.push(<>У выбранного клиента нет активных контактов — добавьте контакт в разделе <Link href="/crm/contacts" className={hintLink}>«Контакты»</Link>.</>);
   if (stages.length === 0) missing.push(<>Воронка продаж не настроена — создайте воронку на вкладке «Сделки», тогда появятся стадии.</>);
   if (data.projectTypes.length === 0) missing.push(<>Не настроены типы проектов — обратитесь к администратору рабочей области.</>);
+  if (!demandPositionId) missing.push(<>Не настроена должность для ресурсного спроса — назначьте позицию пользователю в разделе <Link href="/admin/users" className={hintLink}>«Администрирование»</Link>.</>);
 
   return (
     <FormDialog
       title="Новая сделка"
       trigger={<Button variant="default" size="sm" disabled={busy || Boolean(disabledReason)} title={disabledReason ?? "Создать сделку"}><Plus className="size-3.5" aria-hidden />Сделка</Button>}
-      open={dialogOpen}
+      open={open}
       onOpenChange={changeDialogOpen}
       submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
       submitDisabled={!valid || busy}
       successToast="Сделка создана"
       // Ошибка остаётся В модалке — раньше уходила строкой под оверлеем (G4-05).
       onSubmit={async () => {
-        if (!valid) return null;
+        if (!valid || !demandPositionId) return null;
         setBusy(true);
-        const res = await create({ clientId, primaryContactId: contactId, projectTypeId, stageId, title: title.trim(), plannedStart: start, plannedFinish: finish, contractValue: Math.round(Number(contractValue)), plannedHourlyRate: Math.round(Number(rate)), probability: Math.round(Number(probability)), demand: [{ positionId: "backend", requiredHours: Math.min(100000, Math.max(1, Math.floor(Number(contractValue) / Number(rate)))) }] });
+        const res = await create({ clientId, primaryContactId: contactId, projectTypeId, stageId, title: title.trim(), plannedStart: start, plannedFinish: finish, contractValue: Math.round(Number(contractValue)), plannedHourlyRate: Math.round(Number(rate)), probability: Math.round(Number(probability)), demand: [{ positionId: demandPositionId, requiredHours: Math.min(100000, Math.max(1, Math.floor(Number(contractValue) / Number(rate)))) }] });
         setBusy(false);
         return res.ok ? null : ruErr(res.code, res.message);
       }}

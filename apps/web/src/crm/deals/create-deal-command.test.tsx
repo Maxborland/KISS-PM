@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CreateDealDialog } from "./deals-surface";
+import { CreateDealDialog, hasCreateDealReferenceData } from "./deals-surface";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -52,5 +52,11 @@ describe("CreateDealDialog command query", () => {
     expect(document.querySelector<HTMLElement>('[data-testid="deal-dialog"]')?.dataset.open).toBe("false");
     expect(clearCreateParam).toHaveBeenCalledTimes(1);
     expect(toastError).toHaveBeenCalledWith("Недостаточно прав");
+  });
+
+  it("fails closed until both project type and demand position exist", () => {
+    expect(hasCreateDealReferenceData("", "position-generalist")).toBe(false);
+    expect(hasCreateDealReferenceData("project-type-default", null)).toBe(false);
+    expect(hasCreateDealReferenceData("project-type-default", "position-generalist")).toBe(true);
   });
 });

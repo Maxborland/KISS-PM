@@ -1,4 +1,7 @@
 ---
+import { appUrl } from "../lib/app-url";
+
+const loginUrl = appUrl("/login");
 const items: Array<{ href: string; label: string; id: string }> = [
   { href: "#agent-demo", label: "Генри", id: "agent-demo" },
   { href: "#loop", label: "Шесть шагов", id: "loop" },
@@ -32,6 +35,7 @@ const items: Array<{ href: string; label: string; id: string }> = [
     </nav>
 
     <div class="site-header__cta">
+      <a class="l-btn l-btn--ghost site-header__cta-btn" href={loginUrl}>Войти</a>
       <a class="l-btn l-btn--ghost site-header__cta-btn" href="#waitlist">
         <span>Запросить доступ</span>
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">

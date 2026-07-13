@@ -112,6 +112,24 @@ describe("AgentSurface production shell contract", () => {
     });
   });
 
+  it("квитирует реплику и очищает composer при ненастроенном LLM-провайдере", async () => {
+    agentMock.provider = { configured: false, live: false, model: "mock-provider" };
+    const root = await renderAgent();
+
+    await submitGoal("Проверь проект");
+
+    const input = document.querySelector<HTMLInputElement>("input[aria-label='Сообщение Генри Гантту']");
+    expect(input?.value).toBe("");
+    expect(getTextContent("[role='log']")).toContain("Проверь проект");
+    expect(getTextContent("[role='log']")).toContain("LLM-провайдер не настроен");
+    expect(agentMock.proposeStream).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(input);
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
   it("shows honest thinking indicator without fabricated demo steps", async () => {
     // proposeStream «висит» — фаза thinking без единого SSE-события.
     agentMock.proposeStream.mockReturnValueOnce(new Promise(() => {}));

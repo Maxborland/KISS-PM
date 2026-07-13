@@ -170,8 +170,46 @@ export function registerProfileRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     return context.json({ user });
   }));
-}
 
+  app.post("/api/profile/deactivation-request", withActor(deps, async (context, actor) => {
+    if (!dataSource.withTransaction || !dataSource.appendAuditEvent) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const requestedAt = new Date().toISOString();
+    await runDataSourceTransaction(async (transactionDataSource) => {
+      await appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "profile.deactivation_requested",
+          sourceWorkflow: "profile_offboarding_request",
+          sourceEntity: {
+            type: "TenantUser",
+            id: actor.id
+          },
+          commandInput: {
+            requestedAt
+          },
+          beforeState: {
+            requestStatus: "none"
+          },
+          afterState: {
+            requestStatus: "recorded"
+          },
+          permissionResult: {
+            allowed: true,
+            scope: "self"
+          }
+        },
+        transactionDataSource
+      );
+    });
+
+    return context.json({ status: "recorded", requestedAt }, 202);
+  }));
+
+}
 type ProfileTextFieldParseResult =
   | { ok: true; value: string | undefined }
   | { ok: false };

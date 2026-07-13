@@ -56,7 +56,7 @@ export function ProjectContacts() {
   const createContactDialog = data ? <CreateContactDialog data={data} busy={busy} setBusy={setBusy} create={createContact} disabledReason={createCapability.disabledReason} /> : null;
 
   return (
-    <CrmFrame activeTab="Контакты" subtitle="Справочник контактов" actions={createContactDialog}>
+    <CrmFrame activeTab="Контакты" subtitle="Справочник контактов" actions={data?.contacts.length ? createContactDialog : undefined}>
       {prototypeNotesEnabled && (
         <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
