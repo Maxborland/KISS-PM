@@ -512,16 +512,19 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const [taskModal, setTaskModal] = useState<{ mode: "create" | "edit"; parentId: string | null; taskId?: string; asgId?: string; initial: TaskModalValues } | null>(null);
   const [colW, setColW] = useState<number[]>(() => [...DEFAULT_COLW]);
   const savedViewPayload = useMemo<ScheduleSavedViewPayload>(() => ({
-    version: 1,
-    zoom,
-    columnWidths: [...colW],
-    collapsedTaskIds: [...collapsed]
+    version: 2,
+    surface: "schedule",
+    state: {
+      zoom,
+      columnWidths: [...colW],
+      collapsedTaskIds: [...collapsed]
+    }
   }), [collapsed, colW, zoom]);
 
   function applySavedView(payload: ScheduleSavedViewPayload) {
-    setZoom(payload.zoom);
-    setColW([...payload.columnWidths]);
-    setCollapsed(new Set(payload.collapsedTaskIds));
+    setZoom(payload.state.zoom);
+    setColW([...payload.state.columnWidths]);
+    setCollapsed(new Set(payload.state.collapsedTaskIds));
   }
 
   const mapped = useMemo(() => (readModel ? mapRows(readModel, resName) : null), [readModel, resName]);

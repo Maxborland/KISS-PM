@@ -18,11 +18,16 @@ import {
 
 export type ScheduleZoom = "day" | "week" | "month";
 
-export type ScheduleSavedViewPayload = {
-  version: 1;
+export type ScheduleSavedViewState = {
   zoom: ScheduleZoom;
   columnWidths: number[];
   collapsedTaskIds: string[];
+};
+
+export type ScheduleSavedViewPayload = {
+  version: 2;
+  surface: "schedule";
+  state: ScheduleSavedViewState;
 };
 
 type SavedView = {
@@ -37,35 +42,43 @@ type LoadStatus = "loading" | "ready" | "error";
 export function parseScheduleSavedViewPayload(value: unknown): ScheduleSavedViewPayload | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const payload = value as Record<string, unknown>;
-  const zoom = payload.zoom;
-  const columnWidths = payload.columnWidths;
-  const collapsedTaskIds = payload.collapsedTaskIds;
-  if (payload.version !== 1 || (zoom !== "day" && zoom !== "week" && zoom !== "month")) return null;
+  if (payload.version !== undefined && payload.version !== 1 && payload.version !== 2) return null;
+  if (payload.version === 2 && payload.surface !== "schedule") return null;
+  const rawState = payload.version === 2 ? payload.state : payload;
+  if (!rawState || typeof rawState !== "object" || Array.isArray(rawState)) return null;
+  const state = rawState as Record<string, unknown>;
+  const zoom = state.zoom;
+  const columnWidths = state.columnWidths;
+  const collapsedTaskIds = state.collapsedTaskIds;
+  if (zoom !== "day" && zoom !== "week" && zoom !== "month") return null;
   if (!Array.isArray(columnWidths) || columnWidths.length !== 11) return null;
   if (!columnWidths.every((width) => typeof width === "number" && Number.isFinite(width) && width >= 36 && width <= 600)) return null;
   if (!Array.isArray(collapsedTaskIds) || !collapsedTaskIds.every((id) => typeof id === "string" && id.length > 0)) return null;
   return {
-    version: 1,
-    zoom,
-    columnWidths: [...columnWidths],
-    collapsedTaskIds: [...new Set(collapsedTaskIds)]
+    version: 2,
+    surface: "schedule",
+    state: {
+      zoom,
+      columnWidths: [...columnWidths],
+      collapsedTaskIds: [...new Set(collapsedTaskIds)]
+    }
   };
 }
 
-export function ScheduleSavedViews({
-  projectId,
-  canManage,
-  current,
-  onApply
-}: {
+export function PlanningSavedViews<TPayload extends object>({ projectId, canManage, current, onApply, parsePayload, belongsToSurface, samePayload, description }: {
   projectId: string;
   canManage: boolean;
-  current: ScheduleSavedViewPayload;
-  onApply: (payload: ScheduleSavedViewPayload) => void;
+  current: TPayload;
+  onApply: (payload: TPayload) => void;
+  parsePayload: (value: unknown) => TPayload | null;
+  belongsToSurface: (value: unknown) => boolean;
+  samePayload: (left: TPayload, right: TPayload) => boolean;
+  description: string;
 }) {
   const [views, setViews] = useState<SavedView[]>([]);
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [selectedId, setSelectedId] = useState("");
+  const [invalidCount, setInvalidCount] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [name, setName] = useState("");
@@ -87,9 +100,12 @@ export function ScheduleSavedViews({
       const response = await fetch(endpoint, init);
       if (!response.ok) throw new Error("saved_views_load_failed");
       const body = await response.json() as { savedViews?: unknown };
-      const next = Array.isArray(body.savedViews)
-        ? body.savedViews.filter(isSavedView).sort((a, b) => a.name.localeCompare(b.name, "ru"))
-        : [];
+      const all = Array.isArray(body.savedViews) ? body.savedViews.filter(isSavedView) : [];
+      const relevant = all.filter((view) => belongsToSurface(view.payload));
+      const next = relevant
+        .filter((view) => parsePayload(view.payload) !== null)
+        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+      setInvalidCount(relevant.length - next.length);
       setViews(next);
       setSelectedId((value) => next.some((view) => view.id === value) ? value : "");
       setStatus("ready");
@@ -97,7 +113,7 @@ export function ScheduleSavedViews({
       if ((error as { name?: string }).name === "AbortError") return;
       setStatus("error");
     }
-  }, [endpoint]);
+  }, [belongsToSurface, endpoint, parsePayload]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -109,9 +125,9 @@ export function ScheduleSavedViews({
   useEffect(() => {
     if (!selectedId) return;
     const selected = views.find((view) => view.id === selectedId);
-    const payload = parseScheduleSavedViewPayload(selected?.payload);
-    if (!payload || !sameScheduleView(payload, current)) setSelectedId("");
-  }, [current, selectedId, views]);
+    const payload = parsePayload(selected?.payload);
+    if (!payload || !samePayload(payload, current)) setSelectedId("");
+  }, [current, parsePayload, samePayload, selectedId, views]);
 
   function beginMutation(): boolean {
     if (busyRef.current) return false;
@@ -129,7 +145,7 @@ export function ScheduleSavedViews({
     setSelectedId(viewId);
     if (!viewId) return;
     const view = views.find((candidate) => candidate.id === viewId);
-    const payload = parseScheduleSavedViewPayload(view?.payload);
+    const payload = parsePayload(view?.payload);
     if (!payload) {
       toast.error("Сохранённый вид повреждён и не был применён");
       return;
@@ -236,6 +252,7 @@ export function ScheduleSavedViews({
             {status === "loading" ? "Загрузка видов…" : status === "error" ? "Виды недоступны" : views.length ? "Сохранённые виды" : "Нет сохранённых видов"}
           </option>
           {views.map((view) => <option key={view.id} value={view.id}>{view.name}{view.scope === "project" ? " · общий" : ""}</option>)}
+          {invalidCount > 0 ? <option disabled>{invalidCount === 1 ? "1 вид недоступен: повреждён" : `${invalidCount} вида недоступны: повреждены`}</option> : null}
         </select>
         {status === "error" ? (
           <Button type="button" variant="ghost" size="icon-sm" onClick={() => void load()} title="Повторить загрузку видов" aria-label="Повторить загрузку видов">
@@ -261,7 +278,7 @@ export function ScheduleSavedViews({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Сохранить вид</DialogTitle>
-            <DialogDescription>Текущий масштаб, ширина колонок и свёрнутые группы.</DialogDescription>
+            <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           <label className="grid gap-1 text-[length:var(--text-sm)] text-[var(--muted-strong)]">
             Название
@@ -301,6 +318,17 @@ export function ScheduleSavedViews({
   );
 }
 
+export function ScheduleSavedViews({ projectId, canManage, current, onApply }: {
+  projectId: string;
+  canManage: boolean;
+  current: ScheduleSavedViewPayload;
+  onApply: (payload: ScheduleSavedViewPayload) => void;
+}) {
+  return <PlanningSavedViews projectId={projectId} canManage={canManage} current={current} onApply={onApply}
+    parsePayload={parseScheduleSavedViewPayload} belongsToSurface={isScheduleSavedViewPayload} samePayload={sameScheduleView}
+    description="Текущий масштаб, ширина колонок и свёрнутые группы." />;
+}
+
 function isSavedView(value: unknown): value is SavedView {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const view = value as Record<string, unknown>;
@@ -313,9 +341,17 @@ function isSavedView(value: unknown): value is SavedView {
 }
 
 function sameScheduleView(left: ScheduleSavedViewPayload, right: ScheduleSavedViewPayload): boolean {
-  return left.zoom === right.zoom
-    && left.columnWidths.length === right.columnWidths.length
-    && left.columnWidths.every((width, index) => width === right.columnWidths[index])
-    && left.collapsedTaskIds.length === right.collapsedTaskIds.length
-    && left.collapsedTaskIds.every((id) => right.collapsedTaskIds.includes(id));
+  return left.state.zoom === right.state.zoom
+    && left.state.columnWidths.length === right.state.columnWidths.length
+    && left.state.columnWidths.every((width, index) => width === right.state.columnWidths[index])
+    && left.state.collapsedTaskIds.length === right.state.collapsedTaskIds.length
+    && left.state.collapsedTaskIds.every((id) => right.state.collapsedTaskIds.includes(id));
+}
+
+function isScheduleSavedViewPayload(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const payload = value as Record<string, unknown>;
+  if (payload.version === 2) return payload.surface === "schedule";
+  if (payload.version !== undefined && payload.version !== 1) return false;
+  return "zoom" in payload || "columnWidths" in payload || "collapsedTaskIds" in payload;
 }

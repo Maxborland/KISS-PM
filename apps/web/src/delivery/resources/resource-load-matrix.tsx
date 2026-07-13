@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowDownWideNarrow, ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, EyeOff, Filter, Pencil, Plus, ShieldCheck, UserPlus, X } from "lucide-react";
+import { toast } from "sonner";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,8 @@ import { hasPermission } from "@/lib/permissions";
 import { dayToIso, isoToDay, type Resource } from "@/delivery/lib/planning-demo-data";
 import { AbsenceDialog } from "@/delivery/resources/resources-editors";
 import { NON_WORKING_TONE } from "@/delivery/ui/non-working-tones";
+import { ResourceSavedViews, sanitizeResourceSavedViewState, type ResourceSavedViewPayload } from "@/delivery/resources/resource-saved-views";
+
 import { VIRTUAL_INITIAL_RECT, VIRTUAL_ROW_OVERSCAN } from "@/delivery/lib/virtual-rows";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
@@ -79,6 +82,11 @@ export type MatrixCallbacks = {
   onAbsence?: (resourceId: string, typeLabel: string, startIso: string, finishIso: string) => void;
 };
 
+export type ResourceSavedViewsConfig = {
+  projectId: string;
+  canManage: boolean;
+};
+
 const RESOURCE_MANAGE_PERMISSION = "tenant.project_resources.manage";
 
 export function canManageResourceControls({ live, permissions }: { live: boolean; permissions: readonly string[] }): boolean {
@@ -138,7 +146,12 @@ const labelOf = (r: Resource, lvl: GroupLevel) => (lvl === "team" ? r.teamName :
 
 const selectCls = "h-7 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 
-export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: MatrixScope; data: MatrixData; callbacks?: MatrixCallbacks }) {
+export function ResourceLoadMatrix({ scope, data, callbacks = {}, savedViews }: {
+  scope: MatrixScope;
+  data: MatrixData;
+  callbacks?: MatrixCallbacks;
+  savedViews?: ResourceSavedViewsConfig;
+}) {
   const { busy, notice, onCreateTask, onEditTask, onAcceptOverload, onEditAssignmentHours, onAbsence } = callbacks;
   const [gran, setGran] = useState<Gran>("day");
   const [monthOffset, setMonthOffset] = useState(0);
@@ -414,15 +427,47 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
     ? "Реальный контракт resourceLoad (assigned/capacity/free + перегрузы). Клик по ячейке — из чего сложилась загрузка + правка часов и снятие перегруза (preview→apply). Данные in-memory."
     : "Снимок портфеля по нескольким проектам. Ёмкость человека считается один раз, назначения суммируются по проектам — поэтому видно межпроектный перегруз. Read-only · in-memory.";
 
+  const savedViewPayload = useMemo<ResourceSavedViewPayload>(() => ({ version: 2, surface: "resource-matrix", state: {
+    granularity: gran,
+    monthOffset,
+    collapsedGroupIds: [...collapsed].sort(),
+    onlyOverload,
+    hideIdle,
+    teamFilter,
+    roleFilter,
+    projectFilter,
+    sortBy
+  } }), [collapsed, gran, hideIdle, monthOffset, onlyOverload, projectFilter, roleFilter, sortBy, teamFilter]);
+
+  const applySavedView = (payload: ResourceSavedViewPayload) => {
+    const sanitized = sanitizeResourceSavedViewState(payload.state, {
+      teamIds: new Set(data.resources.map((resource) => resource.teamId)), roleIds: new Set(data.resources.map((resource) => resource.positionId)),
+      projectIds: new Set((data.projects ?? []).map((project) => project.id)), monthCount: monthsList.length
+    });
+    const state = sanitized.state;
+    setGran(state.granularity);
+    setMonthOffset(state.monthOffset);
+    setCollapsed(new Set(state.collapsedGroupIds));
+    setOnlyOverload(state.onlyOverload);
+    setHideIdle(state.hideIdle);
+    setTeamFilter(state.teamFilter);
+    setRoleFilter(state.roleFilter);
+    setProjectFilter(state.projectFilter);
+    setSortBy(state.sortBy);
+    setSel(null);
+    if (sanitized.partial) toast.warning("Вид применён частично: недоступные фильтры сброшены");
+  };
+
   return (
     <div>
       {/* toolbar */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         {onCreateTask ? <Button variant="default" size="sm" onClick={() => onCreateTask(sel?.resourceId)} disabled={busy}><Plus className="size-3.5" aria-hidden />Задача</Button> : null}
-        <Button variant="ghost" size="sm" onClick={() => setOnlyOverload((v) => !v)} className={cn(onlyOverload && "bg-[var(--danger-soft)] text-[var(--danger-text)]")}><Filter className="size-3.5" aria-hidden />Только перегруженные</Button>
-        <Button variant="ghost" size="sm" onClick={() => setHideIdle((v) => !v)} className={cn(hideIdle && "bg-[var(--panel-strong)] text-[var(--text-strong)]")}><EyeOff className="size-3.5" aria-hidden />Скрыть незанятых</Button>
+        <Button variant="ghost" size="sm" aria-pressed={onlyOverload} onClick={() => setOnlyOverload((v) => !v)} className={cn(onlyOverload && "bg-[var(--danger-soft)] text-[var(--danger-text)]")}><Filter className="size-3.5" aria-hidden />Только перегруженные</Button>
+        <Button variant="ghost" size="sm" aria-pressed={hideIdle} onClick={() => setHideIdle((v) => !v)} className={cn(hideIdle && "bg-[var(--panel-strong)] text-[var(--text-strong)]")}><EyeOff className="size-3.5" aria-hidden />Скрыть незанятых</Button>
         {onAbsence ? <AbsenceDialog onSubmit={onAbsence} resources={data.resources}><Button variant="ghost" size="sm" disabled={busy}><UserPlus className="size-3.5" aria-hidden />Отсутствие</Button></AbsenceDialog> : null}
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          {savedViews ? <ResourceSavedViews {...savedViews} current={savedViewPayload} onApply={applySavedView} /> : null}
           {showTeamFilter ? (
             <select value={teamFilter} onChange={(e) => { setTeamFilter(e.target.value); setRoleFilter("all"); }} className={selectCls} aria-label="Команда">
               <option value="all">Все команды</option>
@@ -449,7 +494,7 @@ export function ResourceLoadMatrix({ scope, data, callbacks = {} }: { scope: Mat
           ) : null}
           <div className="flex items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] p-0.5">
             {(["day", "week", "month"] as Gran[]).map((g) => (
-              <button key={g} type="button" onClick={() => setGran(g)} className={cn("rounded-[var(--radius-sm)] px-2.5 py-1 text-[length:var(--text-sm)] font-medium transition-colors", gran === g ? "bg-[var(--panel-strong)] text-[var(--text-strong)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>{g === "day" ? "День" : g === "week" ? "Неделя" : "Месяц"}</button>
+              <button key={g} type="button" aria-pressed={gran === g} onClick={() => setGran(g)} className={cn("rounded-[var(--radius-sm)] px-2.5 py-1 text-[length:var(--text-sm)] font-medium transition-colors", gran === g ? "bg-[var(--panel-strong)] text-[var(--text-strong)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>{g === "day" ? "День" : g === "week" ? "Неделя" : "Месяц"}</button>
             ))}
           </div>
         </div>

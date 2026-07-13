@@ -614,7 +614,7 @@ function MovePipelineDialog({ target, pipelines, allStages, currentPipelineId, b
   );
 }
 
-function CreateDealDialog({ stages, data, busy, setBusy, create, disabledReason }: {
+export function CreateDealDialog({ stages, data, busy, setBusy, create, disabledReason }: {
   stages: DealStage[];
   data: ReturnType<typeof useCrm>["data"];
   busy: boolean;
@@ -630,6 +630,25 @@ function CreateDealDialog({ stages, data, busy, setBusy, create, disabledReason 
   const [contractValue, setContractValue] = useState("");
   const [rate, setRate] = useState("");
   const [probability, setProbability] = useState("40");
+  const searchParams = useSearchParams();
+  const clearCreateParam = useUrlPeekParamCleaner("create");
+  const [open, setOpen] = useState(false);
+  const createRequested = new URLSearchParams(searchParams?.toString() ?? (typeof window === "undefined" ? "" : window.location.search)).get("create") === "deal";
+
+  useEffect(() => {
+    if (!createRequested || !disabledReason) return;
+    clearCreateParam();
+    toast.error(disabledReason);
+  }, [clearCreateParam, createRequested, disabledReason]);
+
+  const dialogOpen = open || (createRequested && !disabledReason);
+  const changeDialogOpen = (next: boolean) => {
+    if (createRequested) {
+      if (!next) clearCreateParam();
+      return;
+    }
+    setOpen(next);
+  };
   // Разумные дефолты дат: старт = сегодня, финиш = +3 месяца (G4-15).
   const [start, setStart] = useState(() => isoToday());
   const [finish, setFinish] = useState(() => isoPlusMonths(3));
@@ -653,6 +672,8 @@ function CreateDealDialog({ stages, data, busy, setBusy, create, disabledReason 
     <FormDialog
       title="Новая сделка"
       trigger={<Button variant="default" size="sm" disabled={busy || Boolean(disabledReason)} title={disabledReason ?? "Создать сделку"}><Plus className="size-3.5" aria-hidden />Сделка</Button>}
+      open={dialogOpen}
+      onOpenChange={changeDialogOpen}
       submitLabel={<><Plus className="size-3.5" aria-hidden />Создать</>}
       submitDisabled={!valid || busy}
       successToast="Сделка создана"
