@@ -104,7 +104,7 @@ describe("design-v3 enforcement (Phase 16)", () => {
     // Baseline 2026-07-12 (унификация владельца токенов). Новые цвета — только токеном
     // в styles/tokens.css. Уменьшение baseline при миграции файла — ожидаемо и желательно.
     const HEX_BASELINE: Record<string, number> = {
-      "app/globals.css": 15, // dark-map поверхностей до PR11
+      "app/globals.css": 1, // neutral #fff in Tailwind's primary foreground bridge
       "styles/bem.css": 38,
       "styles/bem-supplement.css": 12,
       "styles/kiss-v4.css": 2, // #ffffff внутри color-mix gantt-баров

@@ -1,12 +1,11 @@
 "use client";
 
 import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useDocumentTheme } from "@/lib/document-theme";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { resolvedTheme } = useTheme();
-  const theme: NonNullable<ToasterProps["theme"]> = resolvedTheme === "dark" ? "dark" : "light";
+  const theme: NonNullable<ToasterProps["theme"]> = useDocumentTheme();
 
   return (
     <Sonner

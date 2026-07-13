@@ -1,0 +1,11 @@
+{
+  "--canvas": "#0f172a",
+  "--panel": "#1e293b",
+  "--text": "#e2e8f0",
+  "--accent-soft": "#eeeefb",
+  "--success-soft": "#e7f6ee",
+  "--warning-soft": "#fbf0df",
+  "--danger-soft": "#fdecec",
+  "--prio-high-soft": "#fff7ed",
+  "--shadow-card": "0 1px 2px #0c0d100a, 0 1px 3px #0c0d1008"
+}

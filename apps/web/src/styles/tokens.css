@@ -28,17 +28,23 @@
   --accent-soft: #eeeefb;
   --accent-muted: #e0e0f8;
   --accent-ring: rgba(91, 91, 214, 0.22);
+  --accent-text: #4747b2;
 
   /* Semantic — чистые, контролируемые (Radix-grade) */
   --success: #30a46c;
   --success-text: #1a7a4c;
   --success-soft: #e7f6ee;
+  --success-border: #a9e8c5;
+  --success-subtle: #f0fbf5;
   --warning: #e08c2c;
   --warning-text: #9a5b12;
   --warning-soft: #fbf0df;
   --danger: #e5484d;
   --danger-text: #c2353b;
   --danger-soft: #fdecec;
+  --danger-border: #f4b4b7;
+  --danger-subtle: #fff5f5;
+  --danger-muted: #f2a7aa;
   --info: #5b5bd6;
   --info-soft: #eeeefb;
   --violet: #8347b9;
@@ -173,4 +179,81 @@
   --ease-in: cubic-bezier(.4, 0, 1, 1);
   --ease-out: cubic-bezier(0, 0, .2, 1);
   --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+}
+
+/* Dark theme stays in the canonical token owner. The selector follows :root so
+   equal specificity resolves to this semantic map without an unlayered override. */
+[data-theme="dark"] {
+  --canvas: #0f172a;
+  --canvas-tint: #131c2e;
+  --panel: #1e293b;
+  --panel-subtle: #18222f;
+  --panel-strong: #243042;
+  --panel-elevated: #293548;
+  --border: #334155;
+  --border-strong: #526176;
+  --border-subtle: #273449;
+
+  --text: #e2e8f0;
+  --text-strong: #f8fafc;
+  --muted: #a8b3c4;
+  --muted-strong: #cbd5e1;
+  --muted-soft: #7b8aa0;
+
+  --accent: #5b5bd6;
+  --accent-hover: #6e6edb;
+  --accent-soft: #29294a;
+  --accent-muted: #373762;
+  --accent-ring: rgba(139, 139, 240, 0.34);
+  --accent-text: #b8b8ff;
+
+  --success: #3dd68c;
+  --success-text: #76e6b5;
+  --success-soft: #12372a;
+  --success-border: #256648;
+  --success-subtle: #102d24;
+  --warning: #f2b65a;
+  --warning-text: #facc7b;
+  --warning-soft: #3a2a16;
+  --danger: #ff6369;
+  --danger-text: #ff9b9f;
+  --danger-soft: #3a1f23;
+  --danger-border: #7f3038;
+  --danger-subtle: #2d191c;
+  --danger-muted: #5f2a30;
+  --info: #8b8bf0;
+  --info-soft: #29294a;
+  --violet: #c4a1e6;
+  --violet-soft: #352747;
+
+  --prio-urgent: #fb7185;
+  --prio-urgent-soft: #3b1d25;
+  --prio-critical: #f87171;
+  --prio-critical-soft: #3d1a1a;
+  --prio-high: #fb923c;
+  --prio-high-soft: #3b2518;
+  --prio-normal: #fbbf24;
+  --prio-normal-soft: #3a2e14;
+  --prio-med: #fbbf24;
+  --prio-med-soft: #3a2e14;
+  --prio-low: #34d399;
+  --prio-low-soft: #14372c;
+
+  --grad-warm: var(--panel);
+  --grad-warm-overlay: rgba(15, 23, 42, 0.32);
+  --grad-cool: var(--panel);
+  --grad-cool-overlay: rgba(15, 23, 42, 0.38);
+  --grad-mono: linear-gradient(135deg, #0b1220 0%, #172033 100%);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.34), 0 2px 4px -2px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 12px 24px -8px rgba(0, 0, 0, 0.52), 0 4px 8px -2px rgba(0, 0, 0, 0.34);
+  --shadow-xl: 0 24px 48px -12px rgba(0, 0, 0, 0.62);
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.28), 0 24px 48px -16px rgba(0, 0, 0, 0.58);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 3px rgba(0, 0, 0, 0.24);
+  --shadow-raise: 0 2px 4px rgba(0, 0, 0, 0.32), 0 4px 12px -2px rgba(0, 0, 0, 0.42);
+  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.64);
+  --shadow-lift: 0 8px 24px -6px rgba(0, 0, 0, 0.58);
 }

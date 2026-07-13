@@ -1,5 +1,4 @@
 import type { Preview } from "@storybook/react";
-import { ThemeProvider } from "next-themes";
 import React from "react";
 
 import { TooltipProvider } from "../src/components/ui/tooltip";
@@ -42,7 +41,7 @@ const preview: Preview = {
     (Story, context) => {
       const fullscreen = context.parameters.layout === "fullscreen";
       return (
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+        <>
           <ForceMotion />
           <TooltipProvider delayDuration={200}>
             <StoryRuntime>
@@ -55,7 +54,7 @@ const preview: Preview = {
               )}
             </StoryRuntime>
           </TooltipProvider>
-        </ThemeProvider>
+        </>
       );
     }
   ]

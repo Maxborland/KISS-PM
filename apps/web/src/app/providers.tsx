@@ -1,11 +1,11 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "next-themes";
 import { useEffect, useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { isPublicAuthPath } from "@/shell/use-session-user";
+import { applyDocumentTheme } from "@/lib/document-theme";
 
 // Сохранённые в профиле тема/акцент применяются на ЛЮБОЙ странице при загрузке
 // (раньше data-theme ставил только экран профиля — остальное приложение
@@ -19,11 +19,7 @@ function ProfileThemeSync() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { user?: { theme?: unknown; accentColor?: unknown } } | null) => {
         if (!alive || !d?.user) return;
-        const root = document.documentElement;
-        if (d.user.theme === "dark" || d.user.theme === "light") root.dataset.theme = d.user.theme;
-        if (typeof d.user.accentColor === "string" && /^#[0-9a-fA-F]{6}$/.test(d.user.accentColor)) {
-          root.style.setProperty("--accent", d.user.accentColor);
-        }
+        applyDocumentTheme(d.user);
       })
       .catch(() => {});
     return () => { alive = false; };
@@ -49,14 +45,12 @@ export function Providers({ children }: ProvidersProps) {
   );
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider delayDuration={300}>
-          <ProfileThemeSync />
-          {children}
-          <Toaster richColors closeButton />
-        </TooltipProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider delayDuration={300}>
+        <ProfileThemeSync />
+        {children}
+        <Toaster richColors closeButton />
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }

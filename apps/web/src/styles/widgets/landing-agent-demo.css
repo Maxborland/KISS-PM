@@ -1180,3 +1180,13 @@
     display: none;
   }
 }
+
+/* The Storybook motion showcase opts out through data-force-motion on <html>.
+   Production respects the OS preference for every active widget entrance. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-force-motion]) .lad-message,
+  :root:not([data-force-motion]) .lad-review,
+  :root:not([data-force-motion]) .lad-agent-menu {
+    animation: none !important;
+  }
+}
