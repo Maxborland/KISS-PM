@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createAgentClient, type AgentStreamEvent } from "./agent-client";
-import { createMockAgentFetch } from "./mock-agent-backend";
+import { createMockAgentFetch, setMockAgentScenario } from "./mock-agent-backend";
 
 // Собираем Response с телом-ReadableStream из SSE-кадров (как Hono streamSSE).
 function sseResponse(frames: string[]): Response {
@@ -196,9 +196,87 @@ describe("mock-agent-backend optimistic contract", () => {
       method: "POST",
       body: JSON.stringify({ actions: [action] })
     });
-    await expect(applyResponse.json()).resolves.toMatchObject({
+    const applyBody = await applyResponse.json() as { results: Array<Record<string, unknown>>; correlationId?: string };
+    expect(applyBody).toMatchObject({
       results: [{ status: "applied", ok: true }],
       summary: { applied: 1, conflict: 0 }
     });
+    // Без опции executeReceipt квитанции честно нет: id не выдумываются.
+    expect(applyBody.correlationId).toBeUndefined();
+    expect(applyBody.results[0]!.auditEventId).toBeUndefined();
+  });
+});
+
+describe("mock-agent-backend options (витрина состояний)", () => {
+  it("отдаёт provider в tools и 503 agent_provider_not_configured в propose", async () => {
+    const provider = { model: "mock-llm", live: false, configured: false };
+    const fetchImpl = createMockAgentFetch({ provider, providerNotConfigured: true });
+
+    const toolsResponse = await fetchImpl("/api/workspace/agent/tools");
+    await expect(toolsResponse.json()).resolves.toMatchObject({ provider });
+
+    const proposeResponse = await fetchImpl("/api/workspace/agent/propose", {
+      method: "POST",
+      body: JSON.stringify({ goal: "Проверь проект" })
+    });
+    expect(proposeResponse.status).toBe(503);
+    await expect(proposeResponse.json()).resolves.toEqual({ error: "agent_provider_not_configured", provider });
+  });
+
+  it("без опций tools не содержит provider (прежний контракт)", async () => {
+    const fetchImpl = createMockAgentFetch();
+    const body = await (await fetchImpl("/api/workspace/agent/tools")).json() as Record<string, unknown>;
+    expect(body.provider).toBeUndefined();
+  });
+
+  it("proposeAllForward предлагает все безопасные forward-переходы", async () => {
+    const client = createAgentClient({ apiOrigin: "", fetchImpl: createMockAgentFetch({ proposeAllForward: true }) });
+    const proposal = await client.propose("Продвинь мои задачи");
+    expect(proposal.proposedActions.map((action) => action.tool)).toEqual([
+      "change_task_status",
+      "change_task_status",
+      "change_task_status"
+    ]);
+  });
+
+  it("executeReceipt: плановое действие в предложении и адресуемая квитанция в execute", async () => {
+    // Через реальный клиент: заодно проверяем совместимость с decodeExecuteResponse.
+    const client = createAgentClient({ apiOrigin: "", fetchImpl: createMockAgentFetch({ executeReceipt: true }) });
+    const proposal = await client.propose("Продвинь задачу и разреши перегрузку");
+    expect(proposal.proposedActions.map((action) => action.tool)).toEqual(["change_task_status", "apply_resource_resolution"]);
+
+    const execute = await client.execute(proposal.proposedActions.map((action) => ({
+      tool: action.tool,
+      input: action.input,
+      ...(action.preconditionVersions ? { preconditionVersions: action.preconditionVersions } : {})
+    })));
+    expect(execute.correlationId).toBe("agent-execute-demo");
+    expect(execute.results[0]).toMatchObject({ status: "applied", auditEventId: "agent-action-demo-1" });
+    expect(execute.results[1]).toMatchObject({
+      status: "applied",
+      planningAuditEventId: "audit-demo-9",
+      planVersion: 4,
+      projectId: "proj-portal"
+    });
+
+    // Optimistic-precondition плана честная: повторное применение той же версии — конфликт.
+    const stale = await client.execute([{
+      tool: "apply_resource_resolution",
+      input: { projectId: "proj-portal", scenarioId: "scenario-shift-1" },
+      preconditionVersions: { planVersion: 3 }
+    }]);
+    expect(stale.results[0]).toMatchObject({ status: "conflict", error: "plan_version_conflict" });
+  });
+
+  it("setMockAgentScenario задаёт вариант фабрике без аргументов (путь Storybook)", async () => {
+    try {
+      setMockAgentScenario({ provider: { model: "mock-llm", live: false, configured: false } });
+      const body = await (await createMockAgentFetch()("/api/workspace/agent/tools")).json() as Record<string, unknown>;
+      expect(body.provider).toEqual({ model: "mock-llm", live: false, configured: false });
+    } finally {
+      setMockAgentScenario(null);
+    }
+    const reset = await (await createMockAgentFetch()("/api/workspace/agent/tools")).json() as Record<string, unknown>;
+    expect(reset.provider).toBeUndefined();
   });
 });
