@@ -163,8 +163,8 @@ export const agentSchemas = openApiSchemaFragment({
       },
       planVersion: {
         type: "integer",
-        minimum: 0,
-        description: "Required for plan-affecting apply_* actions."
+        minimum: 1,
+        description: "Required for plan-affecting apply_* actions; planning parsers reject versions below 1."
       }
     },
     additionalProperties: false
