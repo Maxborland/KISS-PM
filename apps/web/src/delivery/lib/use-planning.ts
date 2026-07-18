@@ -35,6 +35,9 @@ export type ScenarioPreviewResult =
 export type ScenarioApplyResult =
   | { ok: true; planVersion: number; scenarioRunId: string; auditEventId: string }
   | { ok: false; conflict: boolean; code?: string; message: string };
+export type ScenarioRejectResult =
+  | { ok: true; scenarioRunId: string; rejectedAt: string }
+  | { ok: false; code?: string; message: string };
 /**
  * Работает через настоящий @kiss-pm/planning-client. Транспорт —
  * contract-mock (createMockPlanningFetch), отдельный на каждый монтаж
@@ -288,13 +291,28 @@ export function usePlanning(projectId: string) {
     [client, projectId, readModel, load, requestConfirmation]
   );
 
+  // Явное отклонение persisted-предложения: план не мутирует (версия не растёт),
+  // run на сервере помечается rejectedAt и становится неприменимым. Причину в v1 не собираем.
+  const rejectScenario = useCallback(
+    async (scenarioId: string): Promise<ScenarioRejectResult> => {
+      try {
+        const res = await client.rejectScenario(projectId, scenarioId);
+        return { ok: true, scenarioRunId: res.scenarioRunId, rejectedAt: res.rejectedAt };
+      } catch (e) {
+        const mappedError = mapPlanningError(e, "reject_scenario_failed");
+        return { ok: false, code: mappedError.code, message: mappedError.message };
+      }
+    },
+    [client, projectId]
+  );
+
   // журнал коммитов сессии — через единый шов клиента (mock /planning/commits vs live audit-events).
   // lastApplyRef.current даёт live-адаптеру данные отката последнего применённого этой сессией коммита.
   const loadCommits = useCallback((): Promise<CommitsView> => {
     return client.getCommits(projectId, lastApplyRef.current);
   }, [client, projectId]);
 
-  return { client, readModel, setReadModel, status, error, reload: load, preview, previewBatch, apply, applyBatch, revertLast, previewScenarios, applyScenario, loadCommits };
+  return { client, readModel, setReadModel, status, error, reload: load, preview, previewBatch, apply, applyBatch, revertLast, previewScenarios, applyScenario, rejectScenario, loadCommits };
 }
 function planningWriteSignature(planVersion: number, commands: readonly PlanningCommand[]): string {
   return JSON.stringify({ planVersion, commands });

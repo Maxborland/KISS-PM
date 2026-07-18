@@ -12,6 +12,7 @@ import { persistPlanningNotifications } from "../collaborationNotificationServic
 import { parseScenarioApplyEnvelope, parseScenarioPreviewEnvelope } from "../planningParsers";
 import { requireCapabilities } from "../dataSourceCapabilities";
 import { previewPlanningCommand, previewPlanningCommands } from "./planningCommandCore";
+import { registerPlanningScenarioRejectRoute } from "./planningScenarioRejectRoute";
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { createPlanningReadModel } from "./planningReadModel";
 import { canReadPlanningReadModel, includeResourceExceptionsFor } from "./planningRouteAuth";
@@ -227,6 +228,8 @@ const applyScenarioProposal: Handler = async (context) => {
     );
     if (!scenarioRun) return { ok: false as const, status: 404, error: "scenario_not_found" };
     if (scenarioRun.appliedAt) return { ok: false as const, status: 409, error: "planning_scenario_already_applied" };
+    // Явно отклонённый run неприменим независимо от TTL (reject-flow, fail-closed).
+    if (scenarioRun.rejectedAt) return { ok: false as const, status: 409, error: "scenario_rejected" };
     if (scenarioRun.expiresAt.getTime() <= Date.now()) {
       return { ok: false as const, status: 409, error: "scenario_expired" };
     }
@@ -374,4 +377,7 @@ const applyScenarioProposal: Handler = async (context) => {
 
 app.post("/api/workspace/projects/:projectId/planning/scenarios/:scenarioId/apply", applyScenarioProposal);
 app.post("/api/workspace/projects/:projectId/planning/scenario-proposals/:proposalId/apply", applyScenarioProposal);
+
+// Reject-flow вынесен в отдельный модуль (бюджет строк этого файла — planningRoutes.health.test).
+registerPlanningScenarioRejectRoute(app, deps);
 }

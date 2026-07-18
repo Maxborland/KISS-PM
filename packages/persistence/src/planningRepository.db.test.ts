@@ -964,6 +964,81 @@ describe("planning repository", () => {
     expect(crossProjectRun).toBeUndefined();
   });
 
+  it("markPlanningScenarioRunRejected персистит rejectedAt/rejectedReason строго в своём тенанте", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    const created = await planningRepository.createPlanningScenarioRun({
+      id: "scenario-reject-target",
+      tenantId: "tenant-alpha",
+      projectId,
+      planVersion: 1,
+      engineVersion: "planning-core-v1",
+      targetConflict: { type: "resource_overload" },
+      proposalPayload: { id: "p", profile: "balanced" },
+      proposalPayloadHash: "hash",
+      actorUserId: "user-alpha-admin",
+      expiresAt: new Date("2099-01-01T00:00:00.000Z")
+    });
+    // Свежесозданный run не отклонён.
+    expect(created.rejectedAt).toBeNull();
+    expect(created.rejectedReason).toBeNull();
+
+    // Чужой tenant не может пометить run отклонённым (tenant-isolation по ключу).
+    await planningRepository.markPlanningScenarioRunRejected({
+      tenantId: "tenant-beta",
+      projectId,
+      scenarioRunId: "scenario-reject-target",
+      rejectedAt: new Date("2026-05-21T00:05:00.000Z"),
+      rejectedReason: "чужая попытка"
+    });
+    const untouched = await planningRepository.findPlanningScenarioRun("tenant-alpha", projectId, "scenario-reject-target");
+    expect(untouched?.rejectedAt).toBeNull();
+    expect(untouched?.rejectedReason).toBeNull();
+
+    await planningRepository.markPlanningScenarioRunRejected({
+      tenantId: "tenant-alpha",
+      projectId,
+      scenarioRunId: "scenario-reject-target",
+      rejectedAt: new Date("2026-05-21T00:10:00.000Z"),
+      rejectedReason: "не подходит по срокам"
+    });
+    const rejected = await planningRepository.findPlanningScenarioRun("tenant-alpha", projectId, "scenario-reject-target");
+    expect(rejected?.rejectedAt?.toISOString()).toBe("2026-05-21T00:10:00.000Z");
+    expect(rejected?.rejectedReason).toBe("не подходит по срокам");
+    // appliedAt не затронут — reject не «применение».
+    expect(rejected?.appliedAt).toBeNull();
+
+    // Solver-run: тот же контракт отклонения.
+    await planningRepository.createPlanningSolverRun({
+      id: "solver-reject-target",
+      tenantId: "tenant-alpha",
+      projectId,
+      mode: "schedule",
+      clientPlanVersion: 1,
+      engineVersion: "planning-core-v1",
+      inputSnapshotMetadata: { projectId, planVersion: 1 },
+      targetDeadline: null,
+      proposals: [],
+      proposalPayloadHash: "hash-solver",
+      actorUserId: "user-alpha-admin",
+      expiresAt: new Date("2099-01-01T00:00:00.000Z")
+    });
+    await planningRepository.markPlanningSolverRunRejected({
+      tenantId: "tenant-alpha",
+      projectId,
+      runId: "solver-reject-target",
+      rejectedAt: new Date("2026-05-21T00:15:00.000Z"),
+      rejectedReason: null
+    });
+    const rejectedSolver = await planningRepository.findPlanningSolverRun("tenant-alpha", projectId, "solver-reject-target");
+    expect(rejectedSolver?.rejectedAt?.toISOString()).toBe("2026-05-21T00:15:00.000Z");
+    expect(rejectedSolver?.rejectedReason).toBeNull();
+  });
+
   it("purgeExpiredPlanningRuns удаляет только неприменённые истёкшие runs своего тенанта", async () => {
     const db = createDatabase(client);
     const intakeRepository = createProjectIntakeRepository(db);

@@ -134,7 +134,7 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
     async createTaskActivity() { return undefined as never; },
     async getPlanSnapshot() { return snapshot; },
     async createPlanningScenarioRun(run) {
-      const record: PlanningScenarioRunRecord = { ...run, appliedAt: null, createdAt: new Date("2026-06-01T00:00:00.000Z") };
+      const record: PlanningScenarioRunRecord = { ...run, appliedAt: null, rejectedAt: null, rejectedReason: null, createdAt: new Date("2026-06-01T00:00:00.000Z") };
       runs.set(run.id, record);
       return record;
     },
@@ -142,6 +142,10 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
     async markPlanningScenarioRunApplied({ scenarioRunId, appliedAt }) {
       const record = runs.get(scenarioRunId);
       if (record) runs.set(scenarioRunId, { ...record, appliedAt });
+    },
+    async markPlanningScenarioRunRejected({ scenarioRunId, rejectedAt, rejectedReason }) {
+      const record = runs.get(scenarioRunId);
+      if (record) runs.set(scenarioRunId, { ...record, rejectedAt, rejectedReason });
     },
     async applyPlanningCommand({ command }) {
       appliedCommandTypes.push(command.type);
@@ -805,6 +809,25 @@ describe("D2/D3: payload-backed карточки offerable-мутаций", () =
       currentVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
     });
     expect(harness.updateTaskInputs).toHaveLength(0);
+  });
+
+  it("apply_resource_resolution: отклонённый run — карточка с capability scenario_rejected", async () => {
+    const harness = createHarness();
+    const overload = createPlanningReadModel(overloadedSnapshot()).resourceLoad.overloads[0]!;
+    const preview = await post(harness.app, "/api/workspace/projects/project-1/planning/scenarios/preview", {
+      clientPlanVersion: 5,
+      target: { type: "resource_overload", resourceId: overload.resourceId, date: overload.date, overloadMinutes: overload.overloadMinutes, taskIds: overload.taskIds }
+    });
+    const scenarioId = (preview.body.proposals as Array<{ id: string }>)[0]!.id;
+    const reject = await post(harness.app, `/api/workspace/projects/project-1/planning/scenarios/${scenarioId}/reject`, {});
+    expect(reject.status).toBe(200);
+
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, plannerActor, plannerProfile,
+      { tool: "apply_resource_resolution", input: { projectId: "project-1", scenarioId } }
+    );
+    expect(metadata.capability).toEqual({ allowed: false, reason: "scenario_rejected" });
+    expect(metadata.preview.after).toContain("Сценарий отклонён");
   });
 
   it("execute принимает planVersion из preconditionVersions карточки (без серверной подстановки)", async () => {

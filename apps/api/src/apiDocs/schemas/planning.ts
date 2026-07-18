@@ -1097,6 +1097,22 @@ export const planningSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  PlanningScenarioRejectRequest: {
+    type: "object",
+    properties: {
+      reason: { type: ["string", "null"], maxLength: 500 }
+    },
+    additionalProperties: false
+  },
+  PlanningScenarioRejectResponse: {
+    type: "object",
+    required: ["scenarioRunId", "rejectedAt"],
+    properties: {
+      scenarioRunId: stringIdSchema,
+      rejectedAt: dateTimeSchema
+    },
+    additionalProperties: false
+  },
   PlanningSavedView: {
     type: "object",
     required: ["id", "tenantId", "projectId", "ownerUserId", "scope", "name", "payload", "createdAt"],

@@ -1141,6 +1141,8 @@ export function createMockPlanningFetch(): typeof fetch {
   // кэш ТОЛЬКО последнего превью (один таргет за раз); боевой бэкенд хранит каждый прогон по уникальному id.
   // UI сбрасывает proposals и перезапрашивает при смене таргета, поэтому отображаемый список всегда соответствует кэшу.
   let lastPreview: { proposals: ScenarioProposalMock[]; planVersion: number; expiresAt: number } | null = null;
+  // parity с боевым reject-flow (markPlanningScenarioRunRejected): отклонённые id сессии
+  const rejectedScenarioIds = new Set<string>();
 
   // журнал коммитов сессии (PM-as-code): сид-бутстрап «как собрался план v17» + живые правки
   const commitLog: CommitMeta[] = [
@@ -1271,6 +1273,9 @@ export function createMockPlanningFetch(): typeof fetch {
       if (reqBody.clientPlanVersion !== planVersion) return json({ error: "plan_version_conflict", currentPlanVersion: planVersion }, 409);
       const proposals = buildScenarioProposals(authored, reqBody.target);
       lastPreview = { proposals, planVersion, expiresAt: Date.now() + 15 * 60 * 1000 };
+      // новый превью-прогон = новые run'ы: mock переиспользует id `scenario-<profile>`,
+      // поэтому отклонения прошлого прогона сбрасываем (в бою у новых run новые id)
+      rejectedScenarioIds.clear();
       return json({ proposals, planVersion, engineVersion: "planning-core-v1", expiresAt: new Date(lastPreview.expiresAt).toISOString() });
     }
 
@@ -1284,6 +1289,8 @@ export function createMockPlanningFetch(): typeof fetch {
       if (Date.now() > lastPreview.expiresAt) return json({ error: "scenario_expired" }, 409);
       const proposal = lastPreview.proposals.find((p) => p.id === scenarioId);
       if (!proposal) return json({ error: "scenario_not_found" }, 404);
+      // parity с боевым apply: явно отклонённый run неприменим независимо от TTL
+      if (rejectedScenarioIds.has(scenarioId)) return json({ error: "scenario_rejected" }, 409);
       if (reqBody.clientPlanVersion !== planVersion) return json({ error: "plan_version_conflict", currentPlanVersion: planVersion }, 409);
       const requiresReason = proposal.planDelta.commands.some((c) => (c as { type: string }).type === "risk.accept_overload");
       if (requiresReason && !reqBody.acceptedRiskReason) return json({ error: "accepted_risk_reason_required" }, 400);
@@ -1311,6 +1318,19 @@ export function createMockPlanningFetch(): typeof fetch {
         applied: { changedTaskIds: [...allChanged], changedAssignmentIds: proposal.planDelta.changedAssignmentIds, changedDependencyIds: [] },
         readModel: buildReadModel(authored, planVersion)
       });
+    }
+
+    // СЦЕНАРИИ: явное отклонение предложения (parity с боевым POST scenarios/:id/reject —
+    // план не мутирует, версия не растёт, run становится неприменимым)
+    const rejectScenarioMatch = method === "POST" ? path.match(/\/planning\/scenarios\/([^/]+)\/reject$/) : null;
+    if (rejectScenarioMatch) {
+      const scenarioId = decodeURIComponent(rejectScenarioMatch[1]!);
+      if (!lastPreview) return json({ error: "scenario_not_found" }, 404);
+      const proposal = lastPreview.proposals.find((p) => p.id === scenarioId);
+      if (!proposal) return json({ error: "scenario_not_found" }, 404);
+      if (rejectedScenarioIds.has(scenarioId)) return json({ error: "planning_scenario_already_rejected" }, 409);
+      rejectedScenarioIds.add(scenarioId);
+      return json({ scenarioRunId: scenarioId, rejectedAt: new Date().toISOString() });
     }
 
     // КОММИТЫ: журнал версий сессии + данные отката последнего обратимого коммита

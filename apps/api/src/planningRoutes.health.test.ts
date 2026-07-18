@@ -18,6 +18,7 @@ describe("planning API route health budgets", () => {
   it.each([
     { path: "registerPlanningRoutes.ts", maxLines: 750 },
     { path: "planningScenarioRoutes.ts", maxLines: 420 },
+    { path: "planningScenarioRejectRoute.ts", maxLines: 160 },
     { path: "planningRouteHelpers.ts", maxLines: 280 },
     { path: "planningReadModel.ts", maxLines: 140 },
     { path: "planningCommandCore.ts", maxLines: 90 },

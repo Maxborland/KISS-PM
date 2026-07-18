@@ -155,6 +155,16 @@ export function parseScenarioApplyEnvelope(input: unknown):
   };
 }
 
+// Отклонение persisted-предложения: тело { reason?: string } (до 500 символов, опционально).
+export function parseScenarioRejectEnvelope(input: unknown):
+  | { ok: true; value: { reason: string | null } }
+  | { ok: false; error: string } {
+  if (!isObject(input)) return { ok: false, error: "planning_scenario_invalid" };
+  const reason = parseOptionalBoundedString(input, "reason");
+  if (!reason.ok) return { ok: false, error: "planning_scenario_invalid" };
+  return { ok: true, value: { reason: reason.value } };
+}
+
 export function parsePlanningCommand(input: unknown):
   | { ok: true; value: PlanningCommand }
   | { ok: false; error: string } {

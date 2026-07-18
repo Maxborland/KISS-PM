@@ -446,6 +446,8 @@ function createApiHarness(input: {
         ...runInput,
         appliedProposalId: runInput.appliedProposalId ?? null,
         appliedAt: runInput.appliedAt ?? null,
+        rejectedAt: runInput.rejectedAt ?? null,
+        rejectedReason: runInput.rejectedReason ?? null,
         createdAt: runInput.createdAt ?? new Date("2026-05-24T00:00:00.000Z")
       };
       return storedRunBox.value;
