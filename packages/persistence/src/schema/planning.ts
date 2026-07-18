@@ -609,6 +609,9 @@ export const planningScenarioRuns = pgTable(
     actorUserId: text("actor_user_id").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     appliedAt: timestamp("applied_at", { withTimezone: true }),
+    // Явное отклонение предложения: до этого статус «отклонён» выводился неявно (TTL).
+    rejectedAt: timestamp("rejected_at", { withTimezone: true }),
+    rejectedReason: text("rejected_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull()
   },
   (table) => [
@@ -651,6 +654,9 @@ export const planningSolverRuns = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     appliedProposalId: text("applied_proposal_id"),
     appliedAt: timestamp("applied_at", { withTimezone: true }),
+    // Явное отклонение предложений run: до этого статус «отклонён» выводился неявно (TTL).
+    rejectedAt: timestamp("rejected_at", { withTimezone: true }),
+    rejectedReason: text("rejected_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull()
   },
   (table) => [

@@ -127,6 +127,13 @@ export function createPlanningApiClient(options: PlanningApiClientOptions) {
         `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/scenarios/${encodeURIComponent(scenarioId)}/apply`,
         { method: "POST", body: JSON.stringify(input) }
       );
+    },
+    // Явное отклонение persisted-предложения: план не мутирует, run становится неприменимым.
+    rejectScenario(projectId: string, scenarioId: string, input: { reason?: string } = {}) {
+      return requestJson<{ scenarioRunId: string; rejectedAt: string }>(
+        `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/scenarios/${encodeURIComponent(scenarioId)}/reject`,
+        { method: "POST", body: JSON.stringify(input) }
+      );
     }
   };
 }

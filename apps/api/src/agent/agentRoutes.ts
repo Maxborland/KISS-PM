@@ -157,6 +157,13 @@ export async function buildProposalActionMetadata(
         capability: { allowed: false, reason: "scenario_already_applied" }
       };
     }
+    if (run.rejectedAt) {
+      return {
+        preview: { before: `План v${run.planVersion}`, after: "Сценарий отклонён — применение невозможно, постройте сценарии заново" },
+        preconditionVersions: {},
+        capability: { allowed: false, reason: "scenario_rejected" }
+      };
+    }
     if (run.expiresAt.getTime() <= Date.now()) {
       return {
         preview: { before: `План v${run.planVersion}`, after: "Срок действия сценария истёк — постройте сценарии заново" },

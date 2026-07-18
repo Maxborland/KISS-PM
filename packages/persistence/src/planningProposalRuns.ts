@@ -26,6 +26,8 @@ export function createPlanningProposalRunStore(db: KissPmDatabase) {
           actorUserId: input.actorUserId,
           expiresAt: input.expiresAt,
           appliedAt: input.appliedAt ?? null,
+          rejectedAt: input.rejectedAt ?? null,
+          rejectedReason: input.rejectedReason ?? null,
           createdAt: input.createdAt ?? new Date()
         })
         .onConflictDoUpdate({
@@ -42,7 +44,9 @@ export function createPlanningProposalRunStore(db: KissPmDatabase) {
             proposalPayloadHash: input.proposalPayloadHash,
             actorUserId: input.actorUserId,
             expiresAt: input.expiresAt,
-            appliedAt: input.appliedAt ?? null
+            appliedAt: input.appliedAt ?? null,
+            rejectedAt: input.rejectedAt ?? null,
+            rejectedReason: input.rejectedReason ?? null
           }
         })
         .returning();
@@ -87,6 +91,25 @@ export function createPlanningProposalRunStore(db: KissPmDatabase) {
         );
     },
 
+    async markPlanningScenarioRunRejected(input: {
+      tenantId: string;
+      projectId: string;
+      scenarioRunId: string;
+      rejectedAt: Date;
+      rejectedReason: string | null;
+    }): Promise<void> {
+      await db
+        .update(planningScenarioRuns)
+        .set({ rejectedAt: input.rejectedAt, rejectedReason: input.rejectedReason })
+        .where(
+          and(
+            eq(planningScenarioRuns.tenantId, input.tenantId),
+            eq(planningScenarioRuns.projectId, input.projectId),
+            eq(planningScenarioRuns.id, input.scenarioRunId)
+          )
+        );
+    },
+
     async createPlanningSolverRun(input: PlanningSolverRunInput): Promise<PlanningSolverRunRecord> {
       const [row] = await db
         .insert(planningSolverRuns)
@@ -105,6 +128,8 @@ export function createPlanningProposalRunStore(db: KissPmDatabase) {
           expiresAt: input.expiresAt,
           appliedProposalId: input.appliedProposalId ?? null,
           appliedAt: input.appliedAt ?? null,
+          rejectedAt: input.rejectedAt ?? null,
+          rejectedReason: input.rejectedReason ?? null,
           createdAt: input.createdAt ?? new Date()
         })
         .onConflictDoUpdate({
@@ -120,7 +145,9 @@ export function createPlanningProposalRunStore(db: KissPmDatabase) {
             actorUserId: input.actorUserId,
             expiresAt: input.expiresAt,
             appliedProposalId: input.appliedProposalId ?? null,
-            appliedAt: input.appliedAt ?? null
+            appliedAt: input.appliedAt ?? null,
+            rejectedAt: input.rejectedAt ?? null,
+            rejectedReason: input.rejectedReason ?? null
           }
         })
         .returning();
@@ -164,6 +191,25 @@ export function createPlanningProposalRunStore(db: KissPmDatabase) {
             eq(planningSolverRuns.id, input.solverRunId)
           )
         );
+    },
+
+    async markPlanningSolverRunRejected(input: {
+      tenantId: string;
+      projectId: string;
+      solverRunId: string;
+      rejectedAt: Date;
+      rejectedReason: string | null;
+    }): Promise<void> {
+      await db
+        .update(planningSolverRuns)
+        .set({ rejectedAt: input.rejectedAt, rejectedReason: input.rejectedReason })
+        .where(
+          and(
+            eq(planningSolverRuns.tenantId, input.tenantId),
+            eq(planningSolverRuns.projectId, input.projectId),
+            eq(planningSolverRuns.id, input.solverRunId)
+          )
+        );
     }
   };
 }
@@ -183,6 +229,8 @@ function mapPlanningScenarioRun(
     actorUserId: row.actorUserId,
     expiresAt: row.expiresAt,
     appliedAt: row.appliedAt,
+    rejectedAt: row.rejectedAt,
+    rejectedReason: row.rejectedReason,
     createdAt: row.createdAt
   };
 }
@@ -203,6 +251,8 @@ function mapPlanningSolverRun(row: typeof planningSolverRuns.$inferSelect): Plan
     expiresAt: row.expiresAt,
     appliedProposalId: row.appliedProposalId,
     appliedAt: row.appliedAt,
+    rejectedAt: row.rejectedAt,
+    rejectedReason: row.rejectedReason,
     createdAt: row.createdAt
   };
 }

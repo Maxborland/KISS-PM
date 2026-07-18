@@ -67,7 +67,7 @@ const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Dat
 const riskOf = (score: number) => score >= 67 ? { label: "высокий риск", cls: "bg-[var(--danger-soft)] text-[var(--danger-text)]" } : score >= 34 ? { label: "средний риск", cls: "bg-[var(--warning-soft)] text-[var(--warning-text)]" } : { label: "низкий риск", cls: "bg-[var(--success-soft)] text-[var(--success-text)]" };
 
 export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
-  const { readModel, status, error, reload, previewScenarios, applyScenario, previewBatch } = usePlanning(projectId);
+  const { readModel, status, error, reload, previewScenarios, applyScenario, rejectScenario, previewBatch } = usePlanning(projectId);
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
   const sessionUser = useSessionUser();
@@ -86,6 +86,10 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const [previewBusy, setPreviewBusy] = useState(false);
   const [compareId, setCompareId] = useState<string | null>(null);
   const [applyBusy, setApplyBusy] = useState(false);
+  const [rejectBusy, setRejectBusy] = useState(false);
+  // Отклонённые этой сессией предложения текущего прогона: карточка получает статус
+  // «Отклонён», применение скрывается. Авторитет — серверный rejectedAt (apply вернёт 409 scenario_rejected).
+  const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
   const [riskReason, setRiskReason] = useState("");
   // валидация причины принятия риска — у поля причины (G3-19), не в toast
   const [reasonError, setReasonError] = useState<string | null>(null);
@@ -160,7 +164,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     setPreviewBusy(true); setScenarioErr(null); setCompareId(null);
     const res = await previewScenarios({ type: "resource_overload", resourceId: t.resourceId, date: t.date, overloadMinutes: t.overloadMinutes, taskIds: t.taskIds });
     setPreviewBusy(false);
-    if (res.ok) { setProposals(res.proposals); setPreviewExpiresAt(res.expiresAt ?? null); }
+    if (res.ok) { setProposals(res.proposals); setPreviewExpiresAt(res.expiresAt ?? null); setRejectedIds(new Set()); }
     else { setProposals([]); setPreviewExpiresAt(null); setScenarioErr(res.conflict ? "Конфликт версий — перезагружено, запросите сценарии заново" : "Не удалось получить сценарии"); }
   }
 
@@ -198,7 +202,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
 
   const projectMeta = deriveProjectMeta(readModel, projectBase);
   const list = proposals ?? [];
-  const recommendedId = list.filter((p) => p.availability === "available" && p.conflictEffect !== "accepted").sort((a, b) => a.explainability.riskScore - b.explainability.riskScore)[0]?.id ?? null;
+  const recommendedId = list.filter((p) => p.availability === "available" && p.conflictEffect !== "accepted" && !rejectedIds.has(p.id)).sort((a, b) => a.explainability.riskScore - b.explainability.riskScore)[0]?.id ?? null;
   const compareP = compareId ? list.find((p) => p.id === compareId) ?? null : null;
 
   // ВСЁ для сравнения/дельт считаем из КОНТРАКТНЫХ полей (live read-model + explainability + planDelta.commands),
@@ -242,6 +246,29 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       setProposals(null);
     }
     else toast.error(`Отклонено: ${res.message}`);
+  };
+
+  // Отклонение предложения: план не меняется (версия не растёт), run на сервере помечается
+  // rejectedAt и становится неприменимым. Причину в v1 не собираем.
+  const onReject = async (p: Proposal) => {
+    if (!canApplyScenarios) return;
+    setRejectBusy(true); setScenarioErr(null);
+    const res = await rejectScenario(p.id);
+    setRejectBusy(false);
+    if (res.ok) {
+      setRejectedIds((prev) => new Set(prev).add(p.id));
+      if (compareId === p.id) setCompareId(null);
+      toast.success(`Сценарий «${PROFILE_META[p.profile].label}» отклонён`);
+    } else if (res.code && STALE_SCENARIO_CODES.has(res.code)) {
+      // run больше не существует/неприменим — сбрасываем предложения, авто-превью пересчитает
+      setScenarioErr(res.message);
+      setProposals(null);
+    } else if (res.code === "planning_scenario_already_rejected") {
+      // сервер уже считает run отклонённым (другая сессия) — честно отражаем статус
+      setRejectedIds((prev) => new Set(prev).add(p.id));
+    } else {
+      toast.error(`Не удалось отклонить: ${res.message}`);
+    }
   };
 
   const FinishChip = ({ d }: { d: number }) => <span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", d > 0 ? "bg-[var(--warning-soft)] text-[var(--warning-text)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{d > 0 ? `+${d} дн` : "+0 дн"}</span>;
@@ -316,7 +343,8 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
               {list.map((p) => {
                 const meta = PROFILE_META[p.profile];
                 const risk = riskOf(p.explainability.riskScore);
-                const available = p.availability === "available";
+                const rejected = rejectedIds.has(p.id);
+                const available = p.availability === "available" && !rejected;
                 const recommended = available && p.id === recommendedId;
                 return (
                   <div key={p.id} data-testid={`scenario-card-${p.profile}`} data-availability={p.availability} className={cn("rounded-[var(--radius-card)] border bg-[var(--panel)] p-3 shadow-[var(--shadow-card)]", recommended ? "border-[var(--info)] shadow-[0_0_0_1px_var(--info)]" : "border-[var(--border)]")}>
@@ -325,6 +353,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                         <div className="flex items-center gap-1.5">
                           <span className="text-[length:var(--text-base)] font-bold text-[var(--text-strong)]">{meta.label}</span>
                           {recommended ? <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--info-soft)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold text-[var(--info)]"><Sparkles className="size-3" aria-hidden />рекомендуется</span> : null}
+                          {rejected ? <span data-testid={`scenario-rejected-${p.profile}`} className="inline-flex items-center gap-0.5 rounded-full bg-[var(--panel-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold text-[var(--muted-strong)]"><X className="size-3" aria-hidden />Отклонён</span> : null}
                         </div>
                         <div className="mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{meta.desc}</div>
                         {!available && p.unavailableReason ? <div data-testid={`scenario-unavailable-${p.profile}`} className="mt-1 text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Недоступен: {UNAVAILABLE_REASON[p.unavailableReason]}</div> : null}
@@ -351,12 +380,14 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
                         <Button variant="secondary" size="sm" disabled={!available} onClick={() => setCompareId(compareId === p.id ? null : p.id)}>{compareId === p.id ? "Скрыть" : "Сравнить"}</Button>
-                        {canApplyScenarios ? <Button variant="default" size="sm" disabled={applyBusy || !available || previewExpired} title={previewExpired ? "Предложение истекло — запросите сценарии заново" : undefined} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button> : null}
+                        {/* отклонённая карточка: обе кнопки действия скрыты, остаётся статус «Отклонён» */}
+                        {canApplyScenarios && !rejected ? <Button variant="ghost" size="sm" disabled={rejectBusy || applyBusy || p.availability !== "available" || previewExpired} title={previewExpired ? "Предложение истекло — запросите сценарии заново" : undefined} onClick={() => void onReject(p)}><X className="size-3.5" aria-hidden />Отклонить</Button> : null}
+                        {canApplyScenarios && !rejected ? <Button variant="default" size="sm" disabled={applyBusy || !available || previewExpired} title={previewExpired ? "Предложение истекло — запросите сценарии заново" : undefined} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button> : null}
                       </div>
                     </div>
 
                     {/* поле причины риска для агрессивного */}
-                    {canApplyScenarios && p.conflictEffect === "accepted" ? (
+                    {canApplyScenarios && !rejected && p.conflictEffect === "accepted" ? (
                       <div className="mt-2 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-2.5 py-1.5">
                         <span className="text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Причина принятия риска (обязательна):</span>
                         <input value={riskReason} aria-invalid={reasonError ? true : undefined} onChange={(e) => { setReasonError(null); setRiskReason(e.target.value); }} placeholder="напр. согласовано с РП, срок критичнее" className="h-7 min-w-[240px] flex-1 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)] aria-[invalid]:border-[var(--danger)]" />

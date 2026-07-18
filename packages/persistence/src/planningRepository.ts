@@ -95,6 +95,13 @@ export type PlanningRepository = {
     scenarioRunId: string;
     appliedAt: Date;
   }): Promise<void>;
+  markPlanningScenarioRunRejected(input: {
+    tenantId: string;
+    projectId: string;
+    scenarioRunId: string;
+    rejectedAt: Date;
+    rejectedReason: string | null;
+  }): Promise<void>;
   createPlanningSolverRun(input: PlanningSolverRunInput): Promise<PlanningSolverRunRecord>;
   findPlanningSolverRun(
     tenantId: string,
@@ -107,6 +114,13 @@ export type PlanningRepository = {
     runId: string;
     proposalId: string;
     appliedAt: Date;
+  }): Promise<void>;
+  markPlanningSolverRunRejected(input: {
+    tenantId: string;
+    projectId: string;
+    runId: string;
+    rejectedAt: Date;
+    rejectedReason: string | null;
   }): Promise<void>;
   /** Purge неприменённых истёкших runs (TTL): applied-runs не трогаем — они историческая
       ссылка квитанций. Возвращает счётчики удалённого по обеим таблицам. */
@@ -132,9 +146,11 @@ export type PlanningRepository = {
 
 export type PlanningScenarioRunInput = Omit<
   PlanningScenarioRunRecord,
-  "createdAt" | "appliedAt"
+  "createdAt" | "appliedAt" | "rejectedAt" | "rejectedReason"
 > & {
   appliedAt?: Date | null;
+  rejectedAt?: Date | null;
+  rejectedReason?: string | null;
   createdAt?: Date;
 };
 
@@ -150,15 +166,19 @@ export type PlanningScenarioRunRecord = {
   actorUserId: string;
   expiresAt: Date;
   appliedAt: Date | null;
+  rejectedAt: Date | null;
+  rejectedReason: string | null;
   createdAt: Date;
 };
 
 export type PlanningSolverRunInput = Omit<
   PlanningSolverRunRecord,
-  "createdAt" | "appliedAt" | "appliedProposalId"
+  "createdAt" | "appliedAt" | "appliedProposalId" | "rejectedAt" | "rejectedReason"
 > & {
   appliedAt?: Date | null;
   appliedProposalId?: string | null;
+  rejectedAt?: Date | null;
+  rejectedReason?: string | null;
   createdAt?: Date;
 };
 
@@ -177,6 +197,8 @@ export type PlanningSolverRunRecord = {
   expiresAt: Date;
   appliedProposalId: string | null;
   appliedAt: Date | null;
+  rejectedAt: Date | null;
+  rejectedReason: string | null;
   createdAt: Date;
 };
 
@@ -527,6 +549,8 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           actorUserId: input.actorUserId,
           expiresAt: input.expiresAt,
           appliedAt: input.appliedAt ?? null,
+          rejectedAt: input.rejectedAt ?? null,
+          rejectedReason: input.rejectedReason ?? null,
           createdAt: input.createdAt ?? new Date()
         })
         .onConflictDoUpdate({
@@ -543,7 +567,9 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             proposalPayloadHash: input.proposalPayloadHash,
             actorUserId: input.actorUserId,
             expiresAt: input.expiresAt,
-            appliedAt: input.appliedAt ?? null
+            appliedAt: input.appliedAt ?? null,
+            rejectedAt: input.rejectedAt ?? null,
+            rejectedReason: input.rejectedReason ?? null
           }
         })
         .returning();
@@ -570,6 +596,19 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
       await db
         .update(planningScenarioRuns)
         .set({ appliedAt: input.appliedAt })
+        .where(
+          and(
+            eq(planningScenarioRuns.tenantId, input.tenantId),
+            eq(planningScenarioRuns.projectId, input.projectId),
+            eq(planningScenarioRuns.id, input.scenarioRunId)
+          )
+        );
+    },
+
+    async markPlanningScenarioRunRejected(input) {
+      await db
+        .update(planningScenarioRuns)
+        .set({ rejectedAt: input.rejectedAt, rejectedReason: input.rejectedReason })
         .where(
           and(
             eq(planningScenarioRuns.tenantId, input.tenantId),
@@ -621,6 +660,8 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           expiresAt: input.expiresAt,
           appliedProposalId: input.appliedProposalId ?? null,
           appliedAt: input.appliedAt ?? null,
+          rejectedAt: input.rejectedAt ?? null,
+          rejectedReason: input.rejectedReason ?? null,
           createdAt: input.createdAt ?? new Date()
         })
         .onConflictDoUpdate({
@@ -636,7 +677,9 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             actorUserId: input.actorUserId,
             expiresAt: input.expiresAt,
             appliedProposalId: input.appliedProposalId ?? null,
-            appliedAt: input.appliedAt ?? null
+            appliedAt: input.appliedAt ?? null,
+            rejectedAt: input.rejectedAt ?? null,
+            rejectedReason: input.rejectedReason ?? null
           }
         })
         .returning();
@@ -663,6 +706,19 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
       await db
         .update(planningSolverRuns)
         .set({ appliedProposalId: input.proposalId, appliedAt: input.appliedAt })
+        .where(
+          and(
+            eq(planningSolverRuns.tenantId, input.tenantId),
+            eq(planningSolverRuns.projectId, input.projectId),
+            eq(planningSolverRuns.id, input.runId)
+          )
+        );
+    },
+
+    async markPlanningSolverRunRejected(input) {
+      await db
+        .update(planningSolverRuns)
+        .set({ rejectedAt: input.rejectedAt, rejectedReason: input.rejectedReason })
         .where(
           and(
             eq(planningSolverRuns.tenantId, input.tenantId),
@@ -1933,6 +1989,8 @@ function mapPlanningScenarioRun(
     actorUserId: row.actorUserId,
     expiresAt: row.expiresAt,
     appliedAt: row.appliedAt,
+    rejectedAt: row.rejectedAt,
+    rejectedReason: row.rejectedReason,
     createdAt: row.createdAt
   };
 }
@@ -1955,6 +2013,8 @@ function mapPlanningSolverRun(
     expiresAt: row.expiresAt,
     appliedProposalId: row.appliedProposalId,
     appliedAt: row.appliedAt,
+    rejectedAt: row.rejectedAt,
+    rejectedReason: row.rejectedReason,
     createdAt: row.createdAt
   };
 }

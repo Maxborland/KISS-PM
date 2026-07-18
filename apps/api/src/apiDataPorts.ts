@@ -213,7 +213,9 @@ export type PlanningDataPort = PlanningCommandDataPort &
     | "findPlanningScenarioRun"
     | "findPlanningSolverRun"
     | "markPlanningScenarioRunApplied"
+    | "markPlanningScenarioRunRejected"
     | "markPlanningSolverRunApplied"
+    | "markPlanningSolverRunRejected"
   >;
 
 export type TransactionDataPort = Pick<ApiTenantDataSource, "withTransaction">;
