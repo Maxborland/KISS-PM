@@ -114,7 +114,14 @@ export async function updateTask(
       projectAssignments
     });
     if (currentTask.updatedAt.getTime() !== input.body.clientUpdatedAt.getTime()) {
-      return { ok: false as const, status: 409, error: "task_version_conflict" };
+      // Честный optimistic-concurrency: клиент получает актуальную версию для
+      // refresh/retry — как transitionTaskStatus (taskLifecycleCommands).
+      return {
+        ok: false as const,
+        status: 409,
+        error: "task_version_conflict",
+        currentVersions: { taskUpdatedAt: currentTask.updatedAt.toISOString() }
+      };
     }
     const planningParticipantsChanged =
       !planningParticipantsSemanticallyEqual(currentTask.participants, participants) ||

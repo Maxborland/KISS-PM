@@ -209,7 +209,11 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       body: parsed.value
     });
     if (!updateResult.ok) {
-      return context.json({ error: updateResult.error }, updateResult.status);
+      // currentVersions при 409 — версия для честного refresh/retry клиента.
+      return context.json({
+        error: updateResult.error,
+        ...("currentVersions" in updateResult && updateResult.currentVersions ? { currentVersions: updateResult.currentVersions } : {})
+      }, updateResult.status);
     }
 
     invalidateCapacityCacheForTenant(actor.tenantId);
@@ -268,7 +272,11 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       });
 
       if (!transition.ok) {
-        return context.json({ error: transition.error }, transition.status);
+        // Симметрично PATCH-задаче: 409 несёт currentVersions для refresh/retry.
+        return context.json({
+          error: transition.error,
+          ...("currentVersions" in transition && transition.currentVersions ? { currentVersions: transition.currentVersions } : {})
+        }, transition.status);
       }
       invalidateCapacityCacheForTenant(actor.tenantId);
       return context.json({ task: transition.task });
