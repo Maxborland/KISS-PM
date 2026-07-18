@@ -40,17 +40,39 @@ describe("agent thread history decode", () => {
     expect(page.nextCursor).toBe("m-0");
     expect(page.turns.map((turn) => turn.id)).toEqual(["m-1", "m-2", "m-4"]);
     expect(page.turns[0]).toMatchObject({ role: "user", body: "Разгрузи Иванова" });
-    expect(page.turns[1]!.proposal).toMatchObject({ actionsTotal: 1 });
+    expect(page.turns[1]).toMatchObject({ role: "agent", proposal: { actionsTotal: 1 } });
     // Битый outcome без status отброшен, валидный сохранил все поля квитанции.
-    expect(page.turns[2]!.outcomes).toEqual([{
-      tool: "apply_resource_resolution",
-      status: "applied",
-      auditEventId: "agent-action-1",
-      planningAuditEventId: "audit-9",
-      planVersion: 6,
-      projectId: "project-1"
+    expect(page.turns[2]).toMatchObject({
+      role: "agent",
+      correlationId: "agent-execute-1",
+      outcomes: [{
+        tool: "apply_resource_resolution",
+        status: "applied",
+        auditEventId: "agent-action-1",
+        planningAuditEventId: "audit-9",
+        planVersion: 6,
+        projectId: "project-1"
+      }]
+    });
+  });
+
+  it("декодирует персистентный trace-ход (шаги как в live-виде) и отбрасывает пустой", async () => {
+    const client = clientWithResponse({
+      messages: [
+        { id: "m-t", createdAt: "2026-07-18T10:00:03.000Z", body: "Ход агента: шагов 2.", metadata: { agent: { role: "trace", steps: ["Анализ: Мои задачи", "Предложение: Комментарий"], failed: false } } },
+        { id: "m-empty", createdAt: "2026-07-18T10:00:04.000Z", body: "x", metadata: { agent: { role: "trace", steps: [] } } }
+      ],
+      nextCursor: null
+    });
+
+    const page = await client.loadThreadHistory("agent-thread-user-1");
+    expect(page.turns).toEqual([{
+      id: "m-t",
+      createdAt: "2026-07-18T10:00:03.000Z",
+      role: "trace",
+      steps: ["Анализ: Мои задачи", "Предложение: Комментарий"]
     }]);
-    expect(page.turns[2]!.correlationId).toBe("agent-execute-1");
+    expect(page.rawCount).toBe(2);
   });
 
   it("loadThread отдаёт id беседы и падает 502-кодом на битом ответе", async () => {
