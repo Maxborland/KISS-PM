@@ -203,6 +203,7 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/unread-summary", tag: "Collaboration", summary: "Unread summary (notifications + conversation messages)" },
   { method: "post", path: "/api/workspace/notifications/:notificationId/read", tag: "Collaboration", summary: "Mark notification read", successSchema: "NotificationResponse" },
   { method: "get", path: "/api/workspace/agent/tools", tag: "Agent", summary: "List agent tools available to the current user" },
+  { method: "get", path: "/api/workspace/agent/thread", tag: "Agent", summary: "Create-or-get the current user's persistent agent thread (membership-scoped; messages are read via the conversations messages route; client writes are rejected as agent_conversation_readonly)" },
   { method: "post", path: "/api/workspace/agent/propose", tag: "Agent", summary: "Run the agent loop and return proposed actions (no mutation)" },
   { method: "post", path: "/api/workspace/agent/propose/stream", tag: "Agent", summary: "Run the agent loop and stream reasoning/tool/proposal events (SSE)", response: "event-stream" },
   { method: "post", path: "/api/workspace/agent/execute", tag: "Agent", summary: "Apply confirmed agent actions via governed commands; per-item outcomes applied/denied/conflict/failed with audit receipt (correlationId, auditEventId, planningAuditEventId for plan-affecting actions); apply_* actions require explicit clientPlanVersion" },

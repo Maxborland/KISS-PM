@@ -1014,6 +1014,28 @@ describe("collaboration and communications API", () => {
     expect(olderPayload.nextCursor).toBe(created[0]);
   });
 
+  it("GET /agent/thread: create-or-get идемпотентен на живой БД, история читается messages-роутом", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+
+    const first = await app.request("/api/workspace/agent/thread", { headers: { cookie: adminCookie } });
+    expect(first.status).toBe(200);
+    const firstPayload = await first.json() as { conversation: { id: string; entityType: string; conversationType: string } };
+    expect(firstPayload.conversation.entityType).toBe("agent");
+    expect(firstPayload.conversation.conversationType).toBe("agent");
+
+    // Повторный вызов — тот же тред (ensureConversation по детерминированному id).
+    const second = await app.request("/api/workspace/agent/thread", { headers: { cookie: adminCookie } });
+    const secondPayload = await second.json() as { conversation: { id: string } };
+    expect(secondPayload.conversation.id).toBe(firstPayload.conversation.id);
+
+    // Владелец читает пустую историю существующим messages-роутом (membership-доступ).
+    const messages = await app.request(`/api/workspace/conversations/${firstPayload.conversation.id}/messages`, {
+      headers: { cookie: adminCookie }
+    });
+    expect(messages.status).toBe(200);
+    await expect(messages.json()).resolves.toMatchObject({ messages: [] });
+  });
+
   it("agent-тред: member читает историю, клиентская запись запрещена (readonly), не-member — forbidden", async () => {
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
     const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
