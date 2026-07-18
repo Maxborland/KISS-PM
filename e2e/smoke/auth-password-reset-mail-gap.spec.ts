@@ -18,9 +18,17 @@ test("password reset browser flow exposes missing live mail delivery path", asyn
   await page.getByRole("button", { name: "Отправить инструкции" }).click();
   const response = await requestResponse;
   expect(response.status()).toBe(202);
-  await expect(response.json()).resolves.toEqual({ status: "ok", delivery: "none" });
+  // delivery — свойство инсталляции: "none" без SMTP (CI), "email" при настроенном
+  // канале (локальный Mailpit). Спек проверяет честность обеих веток UI, а не одну.
+  const body = (await response.json()) as { status: string; delivery: string };
+  expect(body.status).toBe("ok");
+  expect(["none", "email"]).toContain(body.delivery);
 
-  await expect(page.getByRole("status")).toContainText("отправка почты в этой инсталляции не настроена");
+  if (body.delivery === "none") {
+    await expect(page.getByRole("status")).toContainText("отправка почты в этой инсталляции не настроена");
+  } else {
+    await expect(page.getByRole("status")).toContainText("Если адрес зарегистрирован — мы отправили инструкции");
+  }
   await expect(page.getByText("Демо: почтового провайдера нет")).toHaveCount(0);
   await expect
     .poll(() => page.locator("body").innerText())
