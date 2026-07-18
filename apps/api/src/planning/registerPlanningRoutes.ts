@@ -987,7 +987,11 @@ export function registerPlanningRoutes(app: Hono, deps: PlanningRouteDeps) {
           planVersion: newPlanVersion,
           changedTaskIds: proposal.planDelta.changedTaskIds,
           changedAssignmentIds: proposal.planDelta.changedAssignmentIds,
-          acceptedRiskIds: proposal.planDelta.acceptedRiskIds
+          acceptedRiskIds: proposal.planDelta.acceptedRiskIds,
+          // Сценарный коммит откатим там, где его команды инвертируемы (reassignment):
+          // тот же контракт компенсаций, что у apply-command-batch. Для необратимых
+          // (принятие риска и т.п.) batch честно пуст — revert-last откажет.
+          compensatingCommands: buildCompensatingCommandBatch(commandsToApply, snapshot)
         },
         permissionResult: decision,
         executionResult: { status: "succeeded", validationIssues: preview.validationIssues }

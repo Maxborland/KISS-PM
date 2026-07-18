@@ -50,7 +50,10 @@ const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_res
 // Mutation-инструменты с ручным /execute. OFFERABLE_MUTATIONS — более узкий набор: только
 // действия, для которых review-карточка уже показывает полный честный before/after.
 const EXECUTABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "create_task", "apply_resource_resolution", "apply_plan_commands"]);
-const OFFERABLE_MUTATIONS = new Set(["change_task_status", "comment_task"]);
+// create_task и apply_resource_resolution стали offerable после появления полных
+// payload-backed карточек (D2/D3); apply_plan_commands остаётся вне набора —
+// его generic-preview («число команд») недостаточно честен для review.
+const OFFERABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "create_task", "apply_resource_resolution"]);
 
 export function isAgentToolOfferable(tool: AgentTool): boolean {
   return (Boolean(tool.binding) && tool.kind === "analyze")
@@ -69,7 +72,7 @@ const MAYBE_TEXT_MIME_RE = /^(application\/octet-stream|$)/i;
 
 type PreviewableAction = { tool: string; input: Record<string, unknown> };
 export type AgentActionPreview = { before: string; after: string };
-export type AgentActionPreconditionVersions = { taskUpdatedAt?: string };
+export type AgentActionPreconditionVersions = { taskUpdatedAt?: string; planVersion?: number };
 
 export async function buildProposalActionMetadata(
   dataSource: ApiRouteDeps["dataSource"],
@@ -120,6 +123,114 @@ export async function buildProposalActionMetadata(
         capability: { allowed: false, reason: planRead.reason }
       };
     }
+  }
+  // D3: payload-backed карточка применения сценария — из persisted scenario run
+  // (тот же источник, что и governed apply): профиль, последствия, TTL, версия плана.
+  if (action.tool === "apply_resource_resolution") {
+    const projectId = typeof action.input.projectId === "string" ? action.input.projectId : "";
+    const scenarioId = typeof action.input.scenarioId === "string" ? action.input.scenarioId : "";
+    const run = projectId && scenarioId
+      ? await dataSource.findPlanningScenarioRun?.(actor.tenantId, projectId, scenarioId)
+      : undefined;
+    if (!run) {
+      // Не найден = и «нет такого», и «чужой проект/тенант» — форма ответа одинаковая,
+      // существование чужих run'ов не раскрываем.
+      return {
+        preview: { before: "Сценарий не найден или недоступен", after: "Постройте сценарии заново (preview_resource_resolution)" },
+        preconditionVersions: {},
+        capability: { allowed: false, reason: "scenario_not_found" }
+      };
+    }
+    const payload = run.proposalPayload as Partial<import("@kiss-pm/domain").ScenarioProposal>;
+    const target = run.targetConflict as { resourceId?: unknown; date?: unknown; overloadMinutes?: unknown };
+    const explain = payload.explainability;
+    if (run.appliedAt) {
+      return {
+        preview: { before: `План v${run.planVersion}`, after: "Сценарий уже применён — повторное применение невозможно" },
+        preconditionVersions: {},
+        capability: { allowed: false, reason: "scenario_already_applied" }
+      };
+    }
+    if (run.expiresAt.getTime() <= Date.now()) {
+      return {
+        preview: { before: `План v${run.planVersion}`, after: "Срок действия сценария истёк — постройте сценарии заново" },
+        preconditionVersions: {},
+        capability: { allowed: false, reason: "scenario_expired" }
+      };
+    }
+    const commandCount = payload.planDelta?.commands?.length ?? 0;
+    const conflictEffectLabel =
+      payload.conflictEffect === "removed" ? "перегруз устранён"
+      : payload.conflictEffect === "reduced" ? "перегруз снижен"
+      : "перегруз принят как риск";
+    const expiresHhMm = run.expiresAt.toISOString().slice(11, 16);
+    // Entity-последствия обязаны быть видны ДО подтверждения: какие задачи и
+    // назначения меняет сценарий, а не только счётчик команд.
+    const listWithCap = (ids: string[], cap = 5) =>
+      ids.length === 0 ? "" : ` (${ids.slice(0, cap).join(", ")}${ids.length > cap ? ` и ещё ${ids.length - cap}` : ""})`;
+    const changedTaskIds = explain?.changedTaskIds ?? [];
+    const changedAssignmentIds = explain?.changedAssignmentIds ?? [];
+    return {
+      title: `Применить сценарий разрешения перегрузки: профиль «${payload.profile ?? "?"}» · проект ${projectId}`,
+      preview: {
+        before: `План v${run.planVersion}; перегруз ${typeof target.overloadMinutes === "number" ? `${target.overloadMinutes} мин` : "—"} · ресурс ${typeof target.resourceId === "string" ? target.resourceId : "—"} · ${typeof target.date === "string" ? target.date : "—"}`,
+        after: `Команд плана: ${commandCount}; ${conflictEffectLabel}`
+          + `; задач затронуто: ${changedTaskIds.length}${listWithCap(changedTaskIds)}`
+          + `; назначений: ${changedAssignmentIds.length}${listWithCap(changedAssignmentIds)}`
+          + (explain && explain.deadlineDeltaDays !== 0 ? `; сдвиг финиша: ${explain.deadlineDeltaDays > 0 ? "+" : ""}${explain.deadlineDeltaDays} дн` : "")
+          + (explain && explain.riskScore > 0 ? `; риск ${explain.riskScore}` : "")
+          + (explain && explain.requiredApprovals.length > 0 ? `; согласования: ${explain.requiredApprovals.join(", ")}` : "")
+          + `; действует до ${expiresHhMm} UTC`
+      },
+      // Версия плана — precondition применения: /execute требует её явно (A1, без
+      // серверной подстановки); review-карточка показывает её пользователю.
+      preconditionVersions: { planVersion: run.planVersion }
+    };
+  }
+  // D2: payload-backed карточка создания задачи — показывает ВСЁ, что реально будет
+  // создано, включая серверные дефолты (даты/работа/участники) из execute-ветки.
+  if (action.tool === "create_task") {
+    const title = typeof action.input.title === "string" ? action.input.title : "";
+    const projectId = typeof action.input.projectId === "string" ? action.input.projectId : "";
+    const project = projectId
+      ? (await dataSource.listProjects?.(actor.tenantId))?.find((candidate) => candidate.id === projectId)
+      : undefined;
+    const plannedStart = typeof action.input.plannedStart === "string" ? action.input.plannedStart : isoDate();
+    const plannedFinish = typeof action.input.plannedFinish === "string" ? action.input.plannedFinish : plannedStart;
+    const plannedWork = numberInput(action.input.plannedWork, 8);
+    // ВСЕ поля, которые execute передаст в governed-роут, видны до подтверждения:
+    // скрытые участники/приоритет/описание = одобрение вслепую (ревью #248).
+    const priority = typeof action.input.priority === "string" ? action.input.priority : "normal";
+    const rawParticipants = Array.isArray(action.input.participants) ? action.input.participants : [];
+    const participantLabels = rawParticipants
+      .map((entry) => {
+        const record = (entry && typeof entry === "object" ? entry : {}) as { userId?: unknown; role?: unknown };
+        if (typeof record.userId !== "string") return null;
+        return typeof record.role === "string" ? `${record.userId} (${record.role})` : record.userId;
+      })
+      .filter((label): label is string => label !== null);
+    const participants = participantLabels.length > 0
+      ? `участники: ${participantLabels.slice(0, 5).join(", ")}${participantLabels.length > 5 ? ` и ещё ${participantLabels.length - 5}` : ""}`
+      : "исполнитель: вы";
+    const description = typeof action.input.description === "string" && action.input.description.trim().length > 0
+      ? action.input.description.trim()
+      : "";
+    const descriptionPart = description
+      ? `; описание: «${description.length > 120 ? `${description.slice(0, 120)}…` : description}»`
+      : "";
+    const projectLabel = project
+      ? `проект «${project.title}»`
+      : projectId
+        ? `проект ${projectId} (не найден — создание завершится ошибкой)`
+        : "входящая задача (без проекта)";
+    return {
+      title: `Создать задачу: «${title}»${project ? ` · проект «${project.title}»` : ""}`,
+      preview: {
+        before: "Задачи не существует",
+        after: `«${title}» · ${projectLabel} · ${plannedStart} → ${plannedFinish} · ${plannedWork} ч · приоритет: ${priority} · ${participants}${descriptionPart}`
+      },
+      preconditionVersions: {}
+    };
   }
   if (action.tool !== "change_task_status") {
     return { preview: await buildActionPreview(dataSource, actor.tenantId, action), preconditionVersions: {} };
@@ -788,9 +899,14 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
           continue;
         }
-        // Optimistic lock без обходов: версию плана обязан прислать клиент — подстановка
+        // Optimistic lock без обходов: версию плана обязан прислать клиент — явно в input
+        // либо в preconditionVersions.planVersion из review-карточки (D3). Подстановка
         // текущей версии сервером обесценила бы precondition (как и у change_task_status).
-        const clientPlanVersion = typeof input.clientPlanVersion === "number" ? input.clientPlanVersion : undefined;
+        const clientPlanVersion = typeof input.clientPlanVersion === "number"
+          ? input.clientPlanVersion
+          : typeof preconditionVersions.planVersion === "number"
+            ? preconditionVersions.planVersion
+            : undefined;
         if (clientPlanVersion === undefined) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "missing_precondition_versions" });
           continue;
@@ -811,7 +927,11 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
           continue;
         }
-        const clientPlanVersion = typeof input.clientPlanVersion === "number" ? input.clientPlanVersion : undefined;
+        const clientPlanVersion = typeof input.clientPlanVersion === "number"
+          ? input.clientPlanVersion
+          : typeof preconditionVersions.planVersion === "number"
+            ? preconditionVersions.planVersion
+            : undefined;
         if (clientPlanVersion === undefined) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "missing_precondition_versions" });
           continue;

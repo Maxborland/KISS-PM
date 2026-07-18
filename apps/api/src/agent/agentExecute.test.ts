@@ -148,7 +148,7 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
       : { async appendAuditEvent(input: AuditEventRecordInput) { auditActionTypes.push(input.actionType); auditEvents.push(input); } })
   };
 
-  return { app: createApp({ dataSource: dataSource as ApiTenantDataSource }), task, appliedCommandTypes, auditActionTypes, auditEvents, get planVersion() { return snapshot.planVersion; } };
+  return { app: createApp({ dataSource: dataSource as ApiTenantDataSource }), dataSource: dataSource as ApiTenantDataSource, task, appliedCommandTypes, auditActionTypes, auditEvents, get planVersion() { return snapshot.planVersion; } };
 }
 
 async function post(app: ReturnType<typeof createApp>, path: string, body: unknown) {
@@ -572,10 +572,134 @@ describe("agent apply truth contract", () => {
     expect(isAgentToolOfferable(byName.get("check_opportunity_feasibility")!)).toBe(true);
     expect(isAgentToolOfferable(byName.get("change_task_status")!)).toBe(true);
     expect(isAgentToolOfferable(byName.get("comment_task")!)).toBe(true);
+    // D2/D3: create_task и apply_resource_resolution получили payload-backed карточки.
+    expect(isAgentToolOfferable(byName.get("create_task")!)).toBe(true);
+    expect(isAgentToolOfferable(byName.get("apply_resource_resolution")!)).toBe(true);
     expect(isAgentToolOfferable(byName.get("create_crm_client")!)).toBe(false);
-    expect(isAgentToolOfferable(byName.get("create_task")!)).toBe(false);
-    expect(isAgentToolOfferable(byName.get("apply_resource_resolution")!)).toBe(false);
     expect(isAgentToolOfferable(byName.get("apply_plan_commands")!)).toBe(false);
+    expect(isAgentToolOfferable(byName.get("update_task")!)).toBe(false);
+  });
+});
+
+describe("D2/D3: payload-backed карточки offerable-мутаций", () => {
+  const plannerActor: TenantUser = { id: "user-planner", tenantId: "tenant-1", name: "Планировщик", accessProfileId: "p" };
+  const plannerProfile = {
+    id: "p",
+    permissions: [
+      "tenant.projects.read",
+      "tenant.project_plan.read",
+      "tenant.project_plan.manage",
+      "tenant.project_resources.read",
+      "tenant.project_resources.manage",
+      "tenant.planning_scenarios.preview",
+      "tenant.planning_scenarios.apply",
+      "tenant.tasks.create"
+    ]
+  } as never;
+
+  it("create_task: карточка показывает всё создаваемое, включая серверные дефолты", async () => {
+    const harness = createHarness();
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, plannerActor, plannerProfile,
+      { tool: "create_task", input: { title: "Проверить смету", projectId: "project-1" } }
+    );
+
+    expect(metadata.title).toContain("Создать задачу: «Проверить смету»");
+    expect(metadata.title).toContain("Проект");
+    expect(metadata.preview.before).toBe("Задачи не существует");
+    // Дефолты execute-ветки честно видны до применения: 8 ч, приоритет и исполнитель-автор.
+    expect(metadata.preview.after).toContain("8 ч");
+    expect(metadata.preview.after).toContain("приоритет: normal");
+    expect(metadata.preview.after).toContain("исполнитель: вы");
+    expect(metadata.preview.after).toMatch(/\d{4}-\d{2}-\d{2} → \d{4}-\d{2}-\d{2}/);
+  });
+
+  it("create_task: явные участники, приоритет и описание видны в карточке (ревью #248 — без одобрения вслепую)", async () => {
+    const harness = createHarness();
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, plannerActor, plannerProfile,
+      {
+        tool: "create_task",
+        input: {
+          title: "Задача",
+          projectId: "project-1",
+          priority: "high",
+          description: "Проверить смету по разделу электрики до пятницы",
+          participants: [{ userId: "user-exec", role: "executor" }, { userId: "user-co", role: "co_executor" }]
+        }
+      }
+    );
+    expect(metadata.preview.after).toContain("приоритет: high");
+    expect(metadata.preview.after).toContain("user-exec (executor)");
+    expect(metadata.preview.after).toContain("user-co (co_executor)");
+    expect(metadata.preview.after).toContain("описание: «Проверить смету");
+  });
+
+  it("create_task: несуществующий проект честно маркируется в карточке", async () => {
+    const harness = createHarness();
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, plannerActor, plannerProfile,
+      { tool: "create_task", input: { title: "Задача", projectId: "project-ghost" } }
+    );
+    expect(metadata.preview.after).toContain("не найден");
+  });
+
+  it("apply_resource_resolution: карточка строится из persisted scenario run с версией плана в preconditions", async () => {
+    const harness = createHarness();
+    const overload = createPlanningReadModel(overloadedSnapshot()).resourceLoad.overloads[0]!;
+    const preview = await post(harness.app, "/api/workspace/projects/project-1/planning/scenarios/preview", {
+      clientPlanVersion: 5,
+      target: { type: "resource_overload", resourceId: overload.resourceId, date: overload.date, overloadMinutes: overload.overloadMinutes, taskIds: overload.taskIds }
+    });
+    const scenarioId = (preview.body.proposals as Array<{ id: string }>)[0]!.id;
+
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, plannerActor, plannerProfile,
+      { tool: "apply_resource_resolution", input: { projectId: "project-1", scenarioId } }
+    );
+
+    expect(metadata.title).toContain("Применить сценарий разрешения перегрузки");
+    expect(metadata.preview.before).toContain("План v5");
+    expect(metadata.preview.before).toContain(overload.resourceId);
+    expect(metadata.preview.after).toMatch(/Команд плана: \d+/);
+    // Entity-последствия видны до подтверждения (ревью #248): какие задачи/назначения.
+    expect(metadata.preview.after).toMatch(/задач затронуто: \d+/);
+    expect(metadata.preview.after).toMatch(/назначений: \d+/);
+    expect(metadata.preview.after).toContain("действует до");
+    expect(metadata.preconditionVersions).toEqual({ planVersion: 5 });
+    expect(metadata.capability).toBeUndefined();
+  });
+
+  it("apply_resource_resolution: неизвестный/чужой scenarioId — единый честный отказ без раскрытия существования", async () => {
+    const harness = createHarness();
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, plannerActor, plannerProfile,
+      { tool: "apply_resource_resolution", input: { projectId: "project-1", scenarioId: "scenario-ghost" } }
+    );
+    expect(metadata.capability).toEqual({ allowed: false, reason: "scenario_not_found" });
+    expect(metadata.preview.before).toContain("не найден");
+  });
+
+  it("execute принимает planVersion из preconditionVersions карточки (без серверной подстановки)", async () => {
+    const harness = createHarness();
+    const overload = createPlanningReadModel(overloadedSnapshot()).resourceLoad.overloads[0]!;
+    const preview = await post(harness.app, "/api/workspace/projects/project-1/planning/scenarios/preview", {
+      clientPlanVersion: 5,
+      target: { type: "resource_overload", resourceId: overload.resourceId, date: overload.date, overloadMinutes: overload.overloadMinutes, taskIds: overload.taskIds }
+    });
+    const scenarioId = (preview.body.proposals as Array<{ id: string }>)[0]!.id;
+
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "apply_resource_resolution",
+        input: { projectId: "project-1", scenarioId, acceptedRiskReason: "test" },
+        preconditionVersions: { planVersion: 5 }
+      }]
+    });
+
+    expect(execute.status).toBe(200);
+    expect((execute.body.results as Array<{ status: string }>)[0]!.status).toBe("applied");
+    expect(harness.planVersion).toBe(6);
   });
 });
 
