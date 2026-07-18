@@ -49,14 +49,16 @@ describe("parseRegistrationInput", () => {
       parseRegistrationInput({
         email: "  Owner@Example.COM ",
         password: "supersecret",
-        name: "  Иван Владелец  "
+        name: "  Иван Владелец  ",
+        workspaceName: "  Бюро Север  "
       })
     ).toEqual({
       ok: true,
       value: {
         email: "owner@example.com",
         password: "supersecret",
-        name: "Иван Владелец"
+        name: "Иван Владелец",
+        workspaceName: "Бюро Север"
       }
     });
   });

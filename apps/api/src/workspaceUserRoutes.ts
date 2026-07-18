@@ -25,9 +25,10 @@ export function canReadWorkspaceUserDirectory(
 }
 export function workspaceUserDirectoryEntry(
   user: WorkspaceUserRecord,
-  includePrivateFields: boolean
+  includePrivateFields: boolean,
+  accessProfileName?: string
 ) {
-  if (includePrivateFields) return user;
+  if (includePrivateFields) return accessProfileName ? { ...user, accessProfileName } : user;
   return {
     id: user.id,
     name: user.name,
@@ -38,11 +39,16 @@ export function workspaceUserDirectoryEntry(
 
 export function workspaceUserDirectoryResponse(
   users: WorkspaceUserRecord[],
-  includePrivateFields: boolean
+  includePrivateFields: boolean,
+  accessProfiles: Array<{ id: string; name: string }> = []
 ) {
   return {
     privateFieldsIncluded: includePrivateFields,
-    users: users.map((user) => workspaceUserDirectoryEntry(user, includePrivateFields))
+    users: users.map((user) => workspaceUserDirectoryEntry(
+      user,
+      includePrivateFields,
+      accessProfiles.find((profile) => profile.id === user.accessProfileId)?.name
+    ))
   };
 }
 
@@ -58,7 +64,7 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
   app.get("/api/workspace/users", async (context) => {
     const auth = await authorizeRoute(context, deps, {
       permission: canReadWorkspaceUserDirectory,
-      capabilities: ["listWorkspaceUsers"],
+      capabilities: ["listWorkspaceUsers", "listAccessProfilesByTenantId"],
       onDenied: ({ actor, decision }) =>
         appendWorkspaceUserDeniedAudit(deps, actor, {
           actionType: "workspace.user.read_denied",
@@ -75,10 +81,15 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       targetTenantId: actor.tenantId
     }).allowed;
 
+    const [users, accessProfiles] = await Promise.all([
+      dataSource.listWorkspaceUsers(actor.tenantId),
+      dataSource.listAccessProfilesByTenantId(actor.tenantId)
+    ]);
     return context.json(
       workspaceUserDirectoryResponse(
-        await dataSource.listWorkspaceUsers(actor.tenantId),
-        includePrivateFields
+        users,
+        includePrivateFields,
+        accessProfiles
       )
     );
   });

@@ -50,8 +50,12 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
     if (
       !dataSource.findCredentialByEmail ||
       !dataSource.createTenant ||
+      !dataSource.createPosition ||
       !dataSource.createAccessProfile ||
       !dataSource.createWorkspaceUser ||
+      !dataSource.createProjectType ||
+      !dataSource.createPipeline ||
+      !dataSource.createDealStage ||
       !dataSource.upsertCredential ||
       !dataSource.createSession ||
       !dataSource.withTransaction ||
@@ -64,7 +68,7 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseRegistrationInput(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-    const { email, password, name } = parsed.value;
+    const { email, password, name, workspaceName } = parsed.value;
 
     const rateLimitInput = {
       email,
@@ -94,14 +98,19 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
       const tenantId = `tenant-${randomUUID()}`;
       const accessProfileId = `access-profile-${randomUUID()}`;
       const userId = `user-${randomUUID()}`;
-      const tenantName = deriveTenantName(name, email);
+      const tenantName = workspaceName ?? deriveTenantName(name, email);
       const rawSessionToken = randomBytes(32).toString("hex");
+      const positionId = tenantId + "-position-generalist";
 
       const createdUser = await dataSource.withTransaction(async (tx) => {
         if (
           !tx.createTenant ||
+          !tx.createPosition ||
           !tx.createAccessProfile ||
           !tx.createWorkspaceUser ||
+          !tx.createProjectType ||
+          !tx.createPipeline ||
+          !tx.createDealStage ||
           !tx.upsertCredential ||
           !tx.createSession
         ) {
@@ -109,6 +118,12 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
         }
 
         await tx.createTenant({ id: tenantId, name: tenantName });
+        await tx.createPosition({
+          id: positionId,
+          tenantId,
+          name: "Специалист",
+          description: "Базовая роль для ресурсного спроса"
+        });
         // Роль владельца с полным admin-набором прав (переиспользуем seed-хелпер).
         await tx.createAccessProfile(
           createTenantAdminSeedProfile({
@@ -128,7 +143,7 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
           accentColor: "#0f766e",
           phone: null,
           telegram: null,
-          positionId: null
+          positionId
         });
         await tx.upsertCredential({
           userId,
@@ -145,6 +160,37 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
             await tx.createTaskStatus(status);
           }
         }
+        await tx.createProjectType({
+          id: "project-type-default",
+          tenantId,
+          name: "Базовый проект",
+          description: "Тип проекта по умолчанию для первого цикла продаж",
+          status: "active"
+        });
+        const pipelineId = `${tenantId}-pipeline-default`;
+        await tx.createPipeline({
+          id: pipelineId,
+          tenantId,
+          name: "Основная воронка",
+          description: null,
+          isDefault: true,
+          sortOrder: 1,
+          status: "active"
+        });
+        for (const [index, stageName] of ["Новая", "Переговоры", "Договор"].entries()) {
+          await tx.createDealStage({
+            id: `${pipelineId}-stage-${index + 1}`,
+            tenantId,
+            pipelineId,
+            name: stageName,
+            sortOrder: index + 1,
+            status: "active"
+          });
+        }
+        // createPipeline записал пустой lifecycleGraphMetadata (initialStageId: null,
+        // stages: []) — после сида стадий пересобираем граф тем же путём, что и
+        // штатный роут создания стадии, иначе переходы по воронке не работают.
+        await tx.refreshCrmPipelineLifecycleGraph?.(tenantId, pipelineId);
         // Авто-логин: выдаём сессию так же, как в /api/auth/login.
         await tx.createSession({
           id: `session-${randomUUID()}`,
@@ -161,7 +207,7 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
             actionType: "auth.registered",
             sourceWorkflow: "auth_self_registration",
             sourceEntity: { type: "Tenant", id: tenantId },
-            commandInput: { email, name, password: "***" },
+            commandInput: { email, name, workspaceName: tenantName, password: "***" },
             beforeState: null,
             afterState: { tenantId, userId, accessProfileId },
             permissionResult: { allowed: true }

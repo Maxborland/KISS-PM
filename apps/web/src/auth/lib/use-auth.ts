@@ -175,8 +175,16 @@ export function useAuth() {
       }),
     [client, refresh]
   );
+  const requestDeactivation = useCallback(
+    (): Promise<AuthMutationResult> =>
+      guard(async () => {
+        await client.requestDeactivation();
+      }),
+    [client]
+  );
 
-  return { client, state, status, error, user, permissions, sessions, loadSessions, revokeSession, reload: refresh, login, logout, register, requestPasswordReset, confirmPasswordReset, updateProfile, updateTheme };
+
+  return { client, state, status, error, user, permissions, sessions, loadSessions, revokeSession, reload: refresh, login, logout, register, requestPasswordReset, confirmPasswordReset, updateProfile, updateTheme, requestDeactivation };
 }
 
 /* ============================================================

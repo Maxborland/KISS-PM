@@ -1,5 +1,8 @@
 ---
 import HeroShader from "./HeroShader.tsx";
+import { appUrl } from "../lib/app-url";
+const loginUrl = appUrl("/login");
+const registerUrl = appUrl("/register");
 ---
 
 <section id="hero" class="hero" aria-labelledby="hero-title">
@@ -7,7 +10,11 @@ import HeroShader from "./HeroShader.tsx";
 
   <div class="l-container hero__inner">
     <h1 id="hero-title" class="hero__title">Управление проектами.<br />Переосмыслено.</h1>
-    <a class="hero__access l-btn l-btn--primary" href="#waitlist">Запросить доступ</a>
+    <div data-hero-actions>
+      <a class="hero__access l-btn l-btn--primary" href="#waitlist">Запросить доступ</a>
+      <a class="hero__access l-btn l-btn--ghost" href={registerUrl}>Создать workspace</a>
+      <a class="hero__access l-btn l-btn--ghost" href={loginUrl}>Войти</a>
+    </div>
   </div>
 </section>
 
@@ -87,10 +94,18 @@ import HeroShader from "./HeroShader.tsx";
   }
 
 
+  [data-hero-actions] {
+    z-index: 4;
+    margin-top: clamp(24px, 3.5vh, 44px);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+  }
   .hero__access {
     position: relative;
     z-index: 4;
-    margin-top: clamp(24px, 3.5vh, 44px);
+    margin-top: 0;
     min-width: 172px;
     justify-content: center;
     box-shadow:

@@ -69,6 +69,7 @@ export function AgentSurface() {
   const [actionMap, setActionMap] = useState<Record<string, AgentActionInput>>({});
   const [mobileReview, setMobileReview] = useState(false);
   const reviewButtonRef = useRef<HTMLButtonElement | null>(null);
+  const composerInputRef = useRef<HTMLInputElement | null>(null);
 
   const thinking = phase === "thinking" || status === "proposing";
   const reviewVisible = changes.length > 0 && !thinking && phase !== "draft";
@@ -105,16 +106,17 @@ export function AgentSurface() {
     if (status === "proposing") return; // второй submit во время thinking перемешал бы два хода
     const goal = inputValue.trim();
     if (goal.length === 0) return;
+    addMessage("user", goal);
+    setInputValue("");
+    composerInputRef.current?.focus();
     if (provider?.configured === false) {
       addMessage("agent", `LLM-провайдер не настроен (провайдер ${provider.model}) — задайте OPENROUTER_API_KEY или ANTHROPIC_API_KEY на сервере.`, "error");
       return;
     }
-    // Историю собираем ДО добавления текущей реплики (память чата: прошлые ходы → контекст агента).
+    // Историю собираем без текущей реплики: messages — снимок до addMessage этого submit.
     const history = messages
       .filter((message): message is Extract<AgentMessage, { role: "user" | "agent" }> => message.role !== "trace")
       .map((message) => ({ role: message.role === "user" ? ("user" as const) : ("assistant" as const), text: message.text }));
-    addMessage("user", goal);
-    setInputValue("");
     setPhase("thinking");
     setLiveSteps([]);
     const attachmentIds = attachments.map((file) => file.id);
@@ -300,6 +302,7 @@ export function AgentSurface() {
           <ChatThread messages={messages} thinking={thinking} liveSteps={liveSteps} />
           <AgentComposer
             value={inputValue}
+            inputRef={composerInputRef}
             disabled={status === "executing"}
             projects={projects}
             anchorId={anchorId}

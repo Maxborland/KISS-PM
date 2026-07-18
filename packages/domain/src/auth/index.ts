@@ -25,7 +25,7 @@ export type ParsePasswordResult =
   | { ok: false; error: "weak_password" };
 
 export type ParseRegistrationResult =
-  | { ok: true; value: { email: string; password: string; name: string } }
+  | { ok: true; value: { email: string; password: string; name: string; workspaceName?: string } }
   | { ok: false; error: "invalid_registration_payload" | "weak_password" };
 
 export type ParseResetConfirmResult =
@@ -58,7 +58,7 @@ export function parseRegistrationInput(body: unknown): ParseRegistrationResult {
   if (!isPlainObject(body)) {
     return { ok: false, error: "invalid_registration_payload" };
   }
-  const record = body as { email?: unknown; password?: unknown; name?: unknown };
+  const record = body as { email?: unknown; password?: unknown; name?: unknown; workspaceName?: unknown };
 
   const email = parseEmailValue(record.email);
   if (!email) {
@@ -71,11 +71,20 @@ export function parseRegistrationInput(body: unknown): ParseRegistrationResult {
   }
 
   const password = parsePassword(record.password);
+  const workspaceName = record.workspaceName === undefined
+    ? undefined
+    : parseSingleLineName(record.workspaceName);
+  if (record.workspaceName !== undefined && !workspaceName) {
+    return { ok: false, error: "invalid_registration_payload" };
+  }
   if (!password.ok) {
     return { ok: false, error: "weak_password" };
   }
 
-  return { ok: true, value: { email, password: password.value, name } };
+  return {
+    ok: true,
+    value: { email, password: password.value, name, ...(workspaceName ? { workspaceName } : {}) }
+  };
 }
 
 // Парсит тело подтверждения сброса пароля (token + новый пароль).

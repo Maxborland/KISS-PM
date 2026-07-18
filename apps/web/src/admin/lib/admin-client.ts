@@ -37,6 +37,7 @@ export type WorkspaceUser = {
   accessProfileId: string; positionId: string | null; positionName: string | null;
   phone: string | null; telegram: string | null; status: UserStatus;
   theme: string; accentColor: string;
+  accessProfileName?: string;
 };
 export type WorkspaceUserListResponse = {
   users: WorkspaceUser[];

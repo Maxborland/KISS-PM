@@ -40,6 +40,7 @@ export function RegisterSurface() {
   }, [state, user, router]);
 
   const [name, setName] = useState("");
+  const [workspaceName, setWorkspaceName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -49,7 +50,7 @@ export function RegisterSurface() {
   // Авто-логин при ok: после register refresh() переводит сессию в authenticated.
   const registered = state === "authenticated" && user !== null;
 
-  const valid = name.trim().length > 0 && email.trim().length > 0 && password.length > 0;
+  const valid = workspaceName.trim().length > 0 && name.trim().length > 0 && email.trim().length > 0 && password.length > 0;
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -57,7 +58,7 @@ export function RegisterSurface() {
     setBusy(true);
     setErrorCode(null);
     // Реальный submit в мок (НЕ заглушка). При ok register сам рефетчит me → authenticated.
-    const res = await register({ name: name.trim(), email: email.trim(), password });
+    const res = await register({ workspaceName: workspaceName.trim(), name: name.trim(), email: email.trim(), password });
     setBusy(false);
     // authErr понимает invalid_registration_payload/weak_password/email_taken; fallback на message.
     if (!res.ok) setErrorCode(res.code ?? res.message);
@@ -87,11 +88,11 @@ export function RegisterSurface() {
     <AuthShell>
       <AuthCard
         title="Регистрация"
-        subtitle="Создайте учётную запись в рабочем пространстве"
+        subtitle="Создайте новый workspace и учётную запись его владельца"
         onSubmit={onSubmit}
         footer={
           <span className="text-[length:var(--text-sm)] text-[var(--muted)]">
-            Уже есть аккаунт?{" "}
+            Уже приглашены или есть аккаунт?{" "}
             <Link className="font-medium text-[var(--accent-text)] hover:underline" href="/login">
               Войти
             </Link>
@@ -99,6 +100,19 @@ export function RegisterSurface() {
         }
       >
         <FormError code={errorCode} />
+        <label className="flex flex-col gap-1.5">
+          <Label>Название workspace</Label>
+          <Input
+            value={workspaceName}
+            onChange={(e) => setWorkspaceName(e.target.value)}
+            placeholder="Бюро Север"
+            autoComplete="organization"
+            disabled={busy}
+            aria-required
+          />
+          <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Приглашённым пользователям новый workspace создавать не нужно — используйте выданные данные для входа.</span>
+        </label>
+
 
         <label className="flex flex-col gap-1.5">
           <Label>Имя</Label>
@@ -143,7 +157,7 @@ export function RegisterSurface() {
 
         <Button type="submit" variant="default" disabled={!valid || busy} className="w-full">
           {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <UserPlus className="size-4" aria-hidden />}
-          Создать аккаунт
+          Создать workspace
         </Button>
 
         <PrototypeNote />

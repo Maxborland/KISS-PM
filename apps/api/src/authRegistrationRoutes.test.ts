@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { hashPassword, hashResetToken, verifyPassword } from "@kiss-pm/persistence";
+import { hashPassword, hashResetToken, verifyPassword, type DealStageRecord, type PipelineRecord } from "@kiss-pm/persistence";
 import { createApp } from "./app";
 import { createInMemoryEmailProvider, type SmtpEmailProvider, type PasswordResetEmailInput } from "./emailProvider";
 import type {
@@ -8,7 +8,7 @@ import type {
   UserCredentialRecord,
   UserSessionRecord
 } from "./apiTypes";
-import type { AccessProfileRecord, WorkspaceUserRecord } from "./apiTypes";
+import type { AccessProfileRecord, PositionRecord, ProjectTypeRecord, WorkspaceUserRecord } from "./apiTypes";
 import type { AuthRateLimiter } from "./authRateLimit";
 
 const sameOriginHeaders = {
@@ -22,10 +22,16 @@ const sameOriginHeaders = {
 function createAuthFakeDataSource() {
   const tenants = new Map<string, { id: string; name: string }>();
   const accessProfiles = new Map<string, AccessProfileRecord>();
+  const positions = new Map<string, PositionRecord>();
   const users = new Map<string, WorkspaceUserRecord>();
+  const projectTypes = new Map<string, ProjectTypeRecord>();
+  const pipelines = new Map<string, PipelineRecord>();
+  const dealStages = new Map<string, DealStageRecord>();
   const credentials = new Map<string, UserCredentialRecord>(); // ключ — email
   const sessions = new Map<string, UserSessionRecord>(); // ключ — tokenHash
   const resetTokens = new Map<string, PasswordResetTokenRecord>(); // ключ — id
+  const auditEvents: Array<{ actionType?: string }> = [];
+  const refreshedPipelineGraphs: string[] = []; // "tenantId:pipelineId" пересобранных графов воронок
 
   const dataSource: Partial<ApiTenantDataSource> = {
     async listDevUsers() {
@@ -58,6 +64,32 @@ function createAuthFakeDataSource() {
       const record: WorkspaceUserRecord = { ...input, positionName: null };
       users.set(record.id, record);
       return record;
+    },
+    async createPosition(input) {
+      positions.set(input.id, input);
+      return input;
+    },
+    async createProjectType(input) {
+      const now = new Date();
+      const record: ProjectTypeRecord = { ...input, createdAt: now, updatedAt: now };
+      projectTypes.set(record.id, record);
+      return record;
+    },
+    async createPipeline(input) {
+      const now = new Date();
+      const record: PipelineRecord = { ...input, createdAt: now, updatedAt: now };
+      pipelines.set(record.id, record);
+      return record;
+    },
+    async createDealStage(input) {
+      const now = new Date();
+      const record: DealStageRecord = { ...input, createdAt: now, updatedAt: now };
+      dealStages.set(record.id, record);
+      return record;
+    },
+    async refreshCrmPipelineLifecycleGraph(tenantId, pipelineId) {
+      refreshedPipelineGraphs.push(`${tenantId}:${pipelineId}`);
+      return undefined;
     },
     async findCredentialByEmail(email) {
       return credentials.get(email);
@@ -117,7 +149,8 @@ function createAuthFakeDataSource() {
         }
       }
     },
-    async appendAuditEvent() {
+    async appendAuditEvent(input) {
+      auditEvents.push(input);
       return;
     },
     async withTransaction(operation) {
@@ -127,7 +160,7 @@ function createAuthFakeDataSource() {
 
   return {
     dataSource: dataSource as ApiTenantDataSource,
-    state: { tenants, accessProfiles, users, credentials, sessions, resetTokens }
+    state: { tenants, accessProfiles, users, positions, projectTypes, pipelines, dealStages, credentials, sessions, resetTokens, auditEvents, refreshedPipelineGraphs }
   };
 }
 
@@ -153,11 +186,16 @@ describe("POST /api/auth/register", () => {
       body: JSON.stringify({
         email: "owner@example.com",
         password: "supersecret",
-        name: "Иван Владелец"
+        name: "Иван Владелец",
+        workspaceName: "Бюро Север"
       })
     });
 
     expect(response.status).toBe(201);
+    expect([...state.positions.values()]).toEqual([
+      expect.objectContaining({ name: "Специалист", description: "Базовая роль для ресурсного спроса" })
+    ]);
+    expect([...state.users.values()][0]?.positionId).toBe([...state.positions.keys()][0]);
     const setCookie = response.headers.get("set-cookie");
     expect(setCookie).toContain("kiss_pm_session=");
     expect(setCookie).toContain("HttpOnly");
@@ -166,13 +204,58 @@ describe("POST /api/auth/register", () => {
     expect(payload.workspace.id).toBe(payload.user.tenantId);
 
     expect(state.tenants.size).toBe(1);
+    expect(state.tenants.get(payload.workspace.id)?.name).toBe("Бюро Север");
     expect(state.users.size).toBe(1);
+    expect([...state.projectTypes.values()]).toEqual([
+      expect.objectContaining({ name: "Базовый проект", status: "active" })
+    ]);
     expect(state.credentials.has("owner@example.com")).toBe(true);
     expect(state.sessions.size).toBe(1);
+    expect([...state.pipelines.values()]).toEqual([
+      expect.objectContaining({ name: "Основная воронка", isDefault: true })
+    ]);
+    // Ревью #244: после сида стадий граф воронки пересобран — иначе createPipeline
+    // оставил бы пустой lifecycleGraphMetadata и переходы по стадиям не работали бы.
+    const seededPipelineId = [...state.pipelines.keys()][0];
+    expect(state.refreshedPipelineGraphs).toEqual([`${payload.workspace.id}:${seededPipelineId}`]);
     // У владельца полный admin-набор прав.
     const profile = [...state.accessProfiles.values()][0];
     expect(profile?.name).toBe("Владелец");
     expect(profile?.permissions).toContain("tenant.users.manage");
+  });
+
+  it("записывает запрос деактивации в аудит, не отключая пользователя автоматически", async () => {
+    const { dataSource, state } = createAuthFakeDataSource();
+    const app = createApp({ dataSource });
+    const registration = await app.request("/api/auth/register", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({
+        email: "leave@example.com",
+        password: "supersecret",
+        name: "Иван Владелец",
+        workspaceName: "Бюро Север"
+      })
+    });
+    const cookie = registration.headers.get("set-cookie")?.split(";")[0] ?? "";
+
+    const response = await app.request("/api/profile/deactivation-request", {
+      method: "POST",
+      headers: {
+        ...sameOriginHeaders,
+        cookie
+      }
+    });
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      status: "recorded",
+      requestedAt: expect.any(String)
+    });
+    expect([...state.users.values()][0]?.status).toBe("active");
+    expect(state.auditEvents.at(-1)).toMatchObject({
+      actionType: "profile.deactivation_requested"
+    });
   });
 
   it("возвращает 409 email_taken для занятого email", async () => {

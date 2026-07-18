@@ -36,6 +36,8 @@ export type TenantUser = { id: string; tenantId: string; name: string; accessPro
 /* Полная форма пользователя из GET /api/auth/me (боевой fullUser из listWorkspaceUsers).
    accentColor валидируется как /^#[0-9a-fA-F]{6}$/ (дефолт схемы #0f766e). */
 export type WorkspaceUser = TenantUser & {
+  workspaceName?: string;
+  accessProfileName?: string;
   email: string;
   positionId: string | null;
   positionName: string | null;
@@ -47,7 +49,7 @@ export type WorkspaceUser = TenantUser & {
 };
 
 /* Идентификатор рабочего пространства (= tenantId), возвращается во всех auth-ответах. */
-export type WorkspaceIdentity = { id: string };
+export type WorkspaceIdentity = { id: string; name?: string };
 
 export type LoginRequest = { email: string; password: string };
 
@@ -83,7 +85,7 @@ export type AuthSession = {
 };
 
 /* Боевой контракт register/reset (apps/api/src/authRegistrationRoutes.ts + packages/domain/src/auth). */
-export type RegisterRequest = { email: string; password: string; name: string };
+export type RegisterRequest = { email: string; password: string; name: string; workspaceName?: string };
 export type ResetRequestInput = { email: string };
 export type ResetConfirmInput = { token: string; password: string };
 
@@ -114,6 +116,9 @@ export function createAuthClient(options: AuthApiClientOptions) {
     // PATCH /api/profile/theme — ОТДЕЛЬНАЯ ручка: ТОЛЬКО theme/accentColor → обновлённый WorkspaceUser (боевой).
     updateTheme(input: ThemeUpdateInput) {
       return requestJson<{ user: WorkspaceUser }>("/api/profile/theme", { method: "PATCH", body: JSON.stringify(input) });
+    },
+    requestDeactivation() {
+      return requestJson<{ status: "recorded"; requestedAt: string }>("/api/profile/deactivation-request", { method: "POST" });
     },
 
     // GET /api/auth/sessions — активные сессии текущего пользователя (устройство/IP/активность/current).

@@ -8,6 +8,7 @@ import { cn } from "@/lib/cn";
 import { GlobalSearch } from "@/delivery/ui/global-search";
 import { ShellUserMenu } from "@/auth/avatar-menu/shell-user-menu";
 import { useSessionUser } from "@/shell/use-session-user";
+import { buildLastWorkContext, writeLastWorkContext } from "@/workspace/lib/last-work-context";
 
 // href — реальный роут; requires — права, при отсутствии ВСЕХ из которых пункт скрыт
 // (permission-aware навигация: пункты не должны вести в 403, G8-04). Мёртвые
@@ -107,6 +108,17 @@ export function WorkspaceShell({ activeNav, children }: { activeNav: string; chi
   const mobileNavRef = useRef<HTMLElement | null>(null);
   const mobileNavCloseRef = useRef<HTMLButtonElement | null>(null);
   const mobileNavToggleRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!user?.id || !user.tenantId) return;
+    const context = buildLastWorkContext(window.location.pathname, window.location.search, activeNav);
+    if (!context) return;
+    try {
+      writeLastWorkContext(window.localStorage, user.tenantId, user.id, context);
+    } catch {
+      // Блокировка/переполнение localStorage не должна ломать рабочую поверхность.
+    }
+  }, [activeNav, user?.id, user?.tenantId]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;

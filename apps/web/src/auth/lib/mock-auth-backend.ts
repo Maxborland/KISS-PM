@@ -35,6 +35,8 @@ const MAX_EMAIL = 254;
 const MAX_PASSWORD = 1024;
 const MIN_EMAIL = 3;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const WORKSPACE_NAME = "KISS PM";
+const ACCESS_PROFILE_NAME = "Администратор";
 // Парольная политика register/reset — боевой контракт (PASSWORD_POLICY в packages/domain/src/auth: ≥8, ≤1024, без control-chars).
 const MIN_STRONG_PASSWORD = 8;
 const MAX_NAME = 160; // register: имя single-line 1..160 (боевой parseSingleLineName, packages/domain/src/auth).
@@ -85,6 +87,8 @@ function seedUsers(): WorkspaceUser[] {
     base({
       id: "u-admin",
       name: "Администратор",
+      workspaceName: WORKSPACE_NAME,
+      accessProfileName: ACCESS_PROFILE_NAME,
       email: "admin@kiss-pm.local",
       accessProfileId: ACCESS_PROFILE,
       positionId: "pm",
@@ -377,6 +381,13 @@ export function createMockAuthFetch(): typeof fetch {
       return json({ user: actor });
     }
 
+    if (path === "/api/profile/deactivation-request" && method === "POST") {
+      if (sessionToken === null || currentUserId === null) return err("session_required", 401);
+      const actor = findUser(currentUserId);
+      if (!actor) return err("session_required", 401);
+      return json({ status: "recorded", requestedAt: nowIso() }, 202);
+    }
+
     /* ============================================================
        БОЕВЫЕ ручки register / password-reset/* (реализованы
        apps/api/src/authRegistrationRoutes.ts + packages/domain/src/auth).
@@ -391,8 +402,9 @@ export function createMockAuthFetch(): typeof fetch {
     if (path === "/api/auth/register" && method === "POST") {
       const email = isValidEmail(body.email) ? str(body.email).toLowerCase() : null;
       const name = str(body.name);
+      const workspaceName = body.workspaceName === undefined ? `${name} workspace` : str(body.workspaceName);
       // payload: email формат + name single-line 1..160 (боевой parseRegistrationInput).
-      if (!email || !name || name.length > MAX_NAME || hasControlChar(name)) return err("invalid_registration_payload", 400);
+      if (!email || !name || name.length > MAX_NAME || hasControlChar(name) || !workspaceName || workspaceName.length > MAX_NAME || hasControlChar(workspaceName)) return err("invalid_registration_payload", 400);
       // weak_password ПОСЛЕ payload (порядок как в боевом домене).
       if (isWeakPassword(body.password)) return err("weak_password", 400);
       // email занят глобально (по credentials; на боевом — findCredentialByEmail глобально уникален).
@@ -404,7 +416,8 @@ export function createMockAuthFetch(): typeof fetch {
       const id = `user-${suffix}`;
       const user: WorkspaceUser = {
         id, tenantId, name, accessProfileId, email,
-        positionId: null, positionName: null, phone: null, telegram: null,
+        workspaceName, accessProfileName: "Владелец",
+        positionId: `${tenantId}-position-generalist`, positionName: "Специалист", phone: null, telegram: null,
         status: "active", theme: "light", accentColor: "#0f766e"
       };
       users.push(user);

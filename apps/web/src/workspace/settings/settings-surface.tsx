@@ -75,7 +75,7 @@ export function SettingsSurface() {
 /* Вкладка «Профиль» — единый useAuth + авто-вход демо-кредами (мок стартует anonymous). */
 function ProfileTab() {
   const { live } = useAuthRuntime();
-  const { state, status, error, user, permissions, login, updateProfile, updateTheme } = useAuth();
+  const { state, status, error, user, permissions, login, updateProfile, updateTheme, requestDeactivation } = useAuth();
 
   const autoLoginRef = useRef(false);
   const [bootstrapping, setBootstrapping] = useState(true);
@@ -119,7 +119,7 @@ function ProfileTab() {
       forbidden={{ title: "Требуется вход в систему", description: "Сессия не найдена — войдите, чтобы открыть профиль." }}
     >
       {profileUser ? (
-        <ProfileContent user={profileUser} permissions={permissions} update={updateProfile} updateTheme={updateTheme} />
+        <ProfileContent user={profileUser} permissions={permissions} update={updateProfile} updateTheme={updateTheme} requestDeactivation={requestDeactivation} />
       ) : (
         <span />
       )}

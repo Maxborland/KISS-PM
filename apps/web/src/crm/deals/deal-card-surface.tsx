@@ -21,6 +21,7 @@ import { useCrmRuntime } from "@/crm/lib/crm-runtime";
 import type { CrmActivity, DealStage, FeasibilityAssessment, Opportunity } from "@/crm/lib/crm-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { useSessionUser } from "@/shell/use-session-user";
+import { feasibilityEmptyCopy } from "./deal-permission-copy";
 
 const AV: BemAvatarColor[] = ["c1", "c2", "c3", "c4", "c5"];
 const initials = (name: string) => { const p = name.replace(/[«»"]/g, "").trim().split(/\s+/).filter(Boolean); return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase() || "—"; };
@@ -425,7 +426,7 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
               <Button variant="secondary" size="sm" disabled={busy || locked || feasibilityActionReason !== null} onClick={() => void check()} title={feasibilityActionReason ?? undefined}><FlaskConical className="size-3.5" aria-hidden />Проверить</Button>
             </div>
             {feasibility ? <FeasibilityWidget a={feasibility} checkedAt={opp.feasibilityCheckedAt} /> : (
-              <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Проверка осуществимости ещё не запускалась. Нажмите «Проверить» — сервер оценит ресурсы по плановым часам, спросу и активным проектам.</p>
+              <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">{feasibilityEmptyCopy(canCheckFeasibility, feasibilityDisabledReason)}</p>
             )}
           </section>
 

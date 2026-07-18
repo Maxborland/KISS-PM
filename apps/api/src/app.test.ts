@@ -58,6 +58,19 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(document.paths["/api/auth/me"].get.responses["200"].content["application/json"].schema).toEqual({
       $ref: "#/components/schemas/AuthMeResponse"
     });
+    expect(document.components.schemas.RegisterRequest.properties.workspaceName).toEqual({
+      type: "string",
+      minLength: 1,
+      maxLength: 160
+    });
+    expect(document.components.schemas.WorkspaceIdentity.properties.name).toEqual({
+      type: "string",
+      minLength: 1,
+      maxLength: 160
+    });
+    expect(document.paths["/api/profile/deactivation-request"].post.responses["202"].content["application/json"].schema).toEqual({
+      $ref: "#/components/schemas/ProfileDeactivationRequestResponse"
+    });
     expect(
       document.paths["/api/workspace/users"].post.responses["201"].content["application/json"].schema
     ).toEqual({ $ref: "#/components/schemas/WorkspaceUserResponse" });
@@ -659,6 +672,39 @@ describe("KISS PM API Phase 1 shell", () => {
     });
     expect(logout.status).toBe(200);
     await expect(logout.json()).resolves.toEqual({ status: "ok" });
+  });
+
+  it("serves /api/auth/me without label enrichment when listAccessProfilesByTenantId is not wired", async () => {
+    // Ревью #244 (P3): в partial data-source режиме обогащение ярлыками опционально —
+    // сессия обязана вернуться без workspaceName/accessProfileName, а не 500.
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async findSessionByTokenHash() {
+        return { id: "session-1", tenantId: "tenant-1", userId: "user-1", tokenHash: "ignored", expiresAt: new Date(Date.now() + 60_000) };
+      },
+      async findUserById(userId) {
+        return userId === "user-1" ? { id: "user-1", tenantId: "tenant-1", name: "Партиал Пользователь", accessProfileId: "profile-1" } : undefined;
+      },
+      async findTenantById() {
+        return undefined;
+      },
+      async findAccessProfileById() {
+        return { id: "profile-1", permissions: ["tenant.projects.read"] };
+      },
+      async listWorkspaceUsers() {
+        return [];
+      }
+    };
+    const app = createApp({ dataSource: dataSource as ApiTenantDataSource });
+
+    const me = await app.request("/api/auth/me", {
+      headers: { cookie: `kiss_pm_session=${"d".repeat(64)}` }
+    });
+    expect(me.status).toBe(200);
+    const payload = await me.json() as { user: Record<string, unknown>; permissions: string[]; workspace: Record<string, unknown> };
+    expect(payload.user.id).toBe("user-1");
+    expect(payload.permissions).toEqual(["tenant.projects.read"]);
+    expect(payload.user.accessProfileName).toBeUndefined();
+    expect(payload.user.workspaceName).toBeUndefined();
   });
 
   it("rejects oversized login JSON before auth work", async () => {
@@ -3920,9 +3966,9 @@ describe("KISS PM API Phase 1 shell", () => {
         positionName: "Engineer"
       }]
     });
-    expect(workspaceUserDirectoryResponse([user], true)).toEqual({
+    expect(workspaceUserDirectoryResponse([user], true, [{ id: "profile-alpha", name: "CRM Reader" }])).toEqual({
       privateFieldsIncluded: true,
-      users: [user]
+      users: [{ ...user, accessProfileName: "CRM Reader" }]
     });
   });
 

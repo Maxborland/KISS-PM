@@ -31,6 +31,15 @@ export const coreSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  ProfileDeactivationRequestResponse: {
+    type: "object",
+    required: ["status", "requestedAt"],
+    properties: {
+      status: { type: "string", const: "recorded" },
+      requestedAt: { type: "string", format: "date-time" }
+    },
+    additionalProperties: false
+  },
   TenantUser: {
     type: "object",
     required: ["id", "tenantId", "name", "accessProfileId"],
@@ -64,6 +73,8 @@ export const coreSchemas = openApiSchemaFragment({
           phone: nullableStringSchema,
           telegram: nullableStringSchema,
           status: { type: "string", enum: ["active", "inactive"] },
+          workspaceName: { type: "string", minLength: 1, maxLength: 160 },
+          accessProfileName: { type: "string", minLength: 1, maxLength: 160 },
           theme: { type: "string", enum: ["light", "dark", "system"] },
           accentColor: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }
         },
@@ -112,7 +123,8 @@ export const coreSchemas = openApiSchemaFragment({
     properties: {
       email: { type: "string", format: "email", minLength: 3, maxLength: 254 },
       password: { type: "string", minLength: 8, maxLength: 1024 },
-      name: { type: "string", minLength: 1, maxLength: 160 }
+      name: { type: "string", minLength: 1, maxLength: 160 },
+      workspaceName: { type: "string", minLength: 1, maxLength: 160 }
     },
     additionalProperties: false
   },
@@ -162,7 +174,8 @@ export const coreSchemas = openApiSchemaFragment({
     type: "object",
     required: ["id"],
     properties: {
-      id: stringIdSchema
+      id: stringIdSchema,
+      name: { type: "string", minLength: 1, maxLength: 160 }
     },
     additionalProperties: false
   },

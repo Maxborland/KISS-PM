@@ -14,6 +14,8 @@ import { UserStatusChip, adminErr } from "@/admin/ui/admin-bits";
 import { useAdmin } from "@/admin/lib/use-admin";
 import { useAdminRuntime } from "@/admin/lib/admin-runtime";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
+import { useSessionUser } from "@/shell/use-session-user";
+import { getUserActionPolicy } from "./user-action-policy";
 import type { AccessProfile, Position, WorkspaceUser } from "@/admin/lib/admin-client";
 
 const selCls = "h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60 [@media(pointer:coarse)]:min-h-[var(--touch-target)]";
@@ -24,6 +26,7 @@ export function AdminUsersSurface() {
   const admin = useAdmin("users");
   const { data, status, error, reload, createUser, updateUser, deactivateUser } = admin;
   const [busy, setBusy] = useState(false);
+  const sessionUser = useSessionUser();
 
   // карта roleId → имя роли (для колонки «Роль»)
   const roleName = useMemo(() => {
@@ -33,9 +36,12 @@ export function AdminUsersSurface() {
   }, [data]);
 
   const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : !data ? "error" : data.users.length === 0 ? "empty" : "ready";
-  const createDisabledReason = data && data.roles.length === 0
-    ? "Создание пользователя недоступно: у роли нет доступа к справочнику ролей."
-    : undefined;
+  const canManageUsers = sessionUser?.permissions.includes("tenant.users.manage") ?? false;
+  const createDisabledReason = !canManageUsers
+    ? "Недостаточно прав для управления пользователями."
+    : data && data.roles.length === 0
+      ? "Создание пользователя недоступно: у роли нет доступа к справочнику ролей."
+      : undefined;
 
   // Деактивация: PATCH status:"inactive" — только через подтверждение (G6-03).
   const deactivate = async (u: WorkspaceUser) => {
@@ -82,16 +88,18 @@ export function AdminUsersSurface() {
                 <th className="px-3 py-2 font-semibold">Пользователь</th><th className="px-3 py-2 font-semibold">Email</th><th className="px-3 py-2 font-semibold">Роль</th><th className="px-3 py-2 font-semibold">Позиция</th><th className="px-3 py-2 font-semibold">Статус</th><th className="px-3 py-2" />
               </tr></thead>
               <tbody>
-                {data.users.map((u) => (
+                {data.users.map((u) => {
+                  const actionPolicy = getUserActionPolicy({ permissions: sessionUser?.permissions ?? [], currentUserId: sessionUser?.id ?? null, targetUserId: u.id });
+                  return (
                   <tr key={u.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
                     <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{u.name}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{u.id}</div> : null}</td>
                     <td className="px-3 py-2 text-[var(--muted)]">{u.email}</td>
-                    <td className="px-3 py-2 text-[var(--muted-strong)]">{roleName.get(u.accessProfileId) ?? u.accessProfileId}</td>
+                    <td className="px-3 py-2 text-[var(--muted-strong)]">{u.accessProfileName ?? roleName.get(u.accessProfileId) ?? "Профиль доступа"}</td>
                     <td className="px-3 py-2 text-[var(--muted)]">{u.positionName ?? "—"}</td>
                     <td className="px-3 py-2"><UserStatusChip status={u.status} /></td>
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-end gap-1">
-                        <EditUserDialog user={u} roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} update={updateUser} />
+                        <EditUserDialog user={u} roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} update={updateUser} {...(actionPolicy.editDisabledReason ? { disabledReason: actionPolicy.editDisabledReason } : {})} />
                         {u.status === "active" ? (
                           <ConfirmDialog
                             title={`Деактивировать «${u.name}»?`}
@@ -99,15 +107,16 @@ export function AdminUsersSurface() {
                             confirmLabel="Деактивировать"
                             onConfirm={() => deactivate(u)}
                           >
-                            <Button variant="ghost" size="sm" disabled={busy} title="Деактивировать"><UserMinus className="size-3.5" aria-hidden /></Button>
+                            <Button variant="ghost" size="sm" disabled={busy || Boolean(actionPolicy.statusDisabledReason)} title={actionPolicy.statusDisabledReason ?? "Деактивировать"}><UserMinus className="size-3.5" aria-hidden /></Button>
                           </ConfirmDialog>
                         ) : (
-                          <Button variant="ghost" size="sm" disabled={busy} onClick={() => void reactivate(u)} title="Активировать снова"><UserCheck className="size-3.5" aria-hidden /></Button>
+                          <Button variant="ghost" size="sm" disabled={busy || Boolean(actionPolicy.statusDisabledReason)} onClick={() => void reactivate(u)} title={actionPolicy.statusDisabledReason ?? "Активировать снова"}><UserCheck className="size-3.5" aria-hidden /></Button>
                         )}
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -170,10 +179,11 @@ function CreateUserDialog({ roles, positions, busy, setBusy, create, disabledRea
   );
 }
 
-function EditUserDialog({ user, roles, positions, busy, setBusy, update }: {
+function EditUserDialog({ user, roles, positions, busy, setBusy, update, disabledReason }: {
   user: WorkspaceUser; roles: AccessProfile[]; positions: Position[];
   busy: boolean; setBusy: (v: boolean) => void;
   update: ReturnType<typeof useAdmin>["updateUser"];
+  disabledReason?: string;
 }) {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
@@ -184,19 +194,20 @@ function EditUserDialog({ user, roles, positions, busy, setBusy, update }: {
   return (
     <FormDialog
       title="Изменить пользователя"
-      trigger={<Button variant="ghost" size="sm" title="Изменить"><Pencil className="size-3.5" aria-hidden /></Button>}
+      trigger={<Button variant="ghost" size="sm" disabled={Boolean(disabledReason)} title={disabledReason ?? "Изменить"}><Pencil className="size-3.5" aria-hidden /></Button>}
       // при открытии диалога синхронизируем форму с текущей записью
       onOpenChange={(v) => {
         if (v) { setName(user.name); setEmail(user.email); setAccessProfileId(user.accessProfileId); setPositionId(user.positionId ?? ""); }
       }}
       submitLabel={<><Pencil className="size-3.5" aria-hidden />Сохранить</>}
-      submitDisabled={!valid || busy}
+      submitDisabled={!valid || busy || Boolean(disabledReason)}
       contentClassName="max-w-[480px]"
       successToast={`Пользователь «${name.trim()}» обновлён`}
       // Ошибка остаётся В модалке — раньше уходила строкой позади оверлея (G6-02).
       onSubmit={async () => {
         if (!valid) return null;
         setBusy(true);
+        if (disabledReason) return disabledReason;
         // PATCH частичный; смена роли «себе» (user-anna) → self_access_change_forbidden.
         // Смена email (G6-14) проверяется сервером против домен-allowlist политики безопасности.
         const res = await update(user.id, { name: name.trim(), email: email.trim(), accessProfileId, positionId: positionId || null });

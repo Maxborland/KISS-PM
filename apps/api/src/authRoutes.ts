@@ -16,6 +16,27 @@ const dummyLoginPasswordRecord = {
     "8628f6260a2c5a566eb583da77de83c156308a75ce54f68d11c9383fc7ed0c4ecceb1d835be2c76353fe8c95060226b72eb8b5216f84411d607c343d0d061dec",
   passwordSalt: "kiss-pm-dummy-login-salt"
 };
+export function buildAuthMeResponse(input: {
+  actor: TenantUser;
+  fullUser?: Record<string, unknown>;
+  permissions: readonly string[];
+  workspaceName?: string;
+  accessProfileName?: string;
+}) {
+  const publicUser = input.fullUser ?? toPublicUser(input.actor);
+  const userLabels = {
+    ...(input.accessProfileName ? { accessProfileName: input.accessProfileName } : {}),
+    ...(input.workspaceName ? { workspaceName: input.workspaceName } : {})
+  };
+  return {
+    user: Object.keys(userLabels).length > 0 ? { ...publicUser, ...userLabels } : publicUser,
+    permissions: [...input.permissions],
+    workspace: input.workspaceName
+      ? { id: input.actor.tenantId, name: input.workspaceName }
+      : { id: input.actor.tenantId }
+  };
+}
+
 const maxLoginEmailLength = 254;
 const maxLoginPasswordLength = 1024;
 const loginEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -139,19 +160,29 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "session_required" }, 401);
     }
 
-    const profile = await getActorProfile(actor);
-    const users = dataSource.listWorkspaceUsers
-      ? await dataSource.listWorkspaceUsers(actor.tenantId)
-      : [];
+    // Обогащение ярлыками (имя профиля доступа/воркспейса) опционально: в partial
+    // data-source режиме listAccessProfilesByTenantId может быть не подключён, и
+    // /auth/me обязан вернуть сессию без ярлыков, а не 500.
+    const [profile, accessProfiles, workspace, users] = await Promise.all([
+      getActorProfile(actor),
+      dataSource.listAccessProfilesByTenantId
+        ? dataSource.listAccessProfilesByTenantId(actor.tenantId)
+        : Promise.resolve([]),
+      dataSource.findTenantById?.(actor.tenantId),
+      dataSource.listWorkspaceUsers
+        ? dataSource.listWorkspaceUsers(actor.tenantId)
+        : Promise.resolve([])
+    ]);
     const fullUser = users.find((user) => user.id === actor.id);
+    const accessProfile = accessProfiles.find((candidate) => candidate.id === actor.accessProfileId);
 
-    return context.json({
-      user: fullUser ?? toPublicUser(actor),
+    return context.json(buildAuthMeResponse({
+      actor,
       permissions: profile.permissions,
-      workspace: {
-        id: actor.tenantId
-      }
-    });
+      ...(fullUser ? { fullUser } : {}),
+      ...(workspace?.name ? { workspaceName: workspace.name } : {}),
+      ...(accessProfile?.name ? { accessProfileName: accessProfile.name } : {})
+    }));
   });
 
   // Активные сессии текущего пользователя (устройство/IP/последняя активность).

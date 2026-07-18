@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, type RefObject } from "react";
 import { Paperclip, Send } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ export type AgentAnchorProject = { id: string; label: string };
  */
 export function AgentComposer({
   value,
+  inputRef,
   disabled,
   projects,
   anchorId,
@@ -29,6 +30,7 @@ export function AgentComposer({
 }: {
   value: string;
   disabled: boolean;
+  inputRef: RefObject<HTMLInputElement | null>;
   projects: AgentAnchorProject[];
   anchorId: string;
   attachments: AgentAttachment[];
@@ -99,6 +101,7 @@ export function AgentComposer({
         }}
       >
         <Input
+          ref={inputRef}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder="Сообщение Генри Гантту..."

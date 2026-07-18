@@ -60,7 +60,7 @@ export function ProjectClients() {
   const createClientDialog = <CreateClientDialog busy={busy} setBusy={setBusy} create={createClient} disabledReason={createCapability.disabledReason} />;
 
   return (
-    <CrmFrame activeTab="Клиенты" subtitle="Справочник клиентов" actions={createClientDialog}>
+    <CrmFrame activeTab="Клиенты" subtitle="Справочник клиентов" actions={data?.clients.length ? createClientDialog : undefined}>
       {/* Плашка-прототип: только вне live (раньше пряталась display:none и оставалась в DOM). */}
       {!live ? (
       <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">

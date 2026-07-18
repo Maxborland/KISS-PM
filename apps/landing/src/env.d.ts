@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly RESEND_API_KEY?: string;
+  readonly PUBLIC_APP_URL?: string;
   readonly RESEND_FROM?: string;
   readonly RESEND_NOTIFY_TO?: string;
   readonly WAITLIST_DB_PATH?: string;
