@@ -15,6 +15,8 @@ type RouteDoc = {
   successStatus?: 200 | 201 | 202;
   queryParameters?: Array<Record<string, unknown>>;
   availability?: "always" | "test-hooks";
+  /** Route-specific non-default error responses (e.g. 429/503) merged over the shared error set. */
+  additionalResponses?: Record<string, { description: string; schema: string }>;
 };
 
 const routeDocs: RouteDoc[] = [
@@ -204,11 +206,11 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/notifications", tag: "Collaboration", summary: "List notifications", successSchema: "NotificationsResponse", queryParameters: [{ name: "status", in: "query", required: false, schema: { type: "string", enum: ["read", "unread"] } }, { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }] },
   { method: "get", path: "/api/workspace/unread-summary", tag: "Collaboration", summary: "Unread summary (notifications + conversation messages)" },
   { method: "post", path: "/api/workspace/notifications/:notificationId/read", tag: "Collaboration", summary: "Mark notification read", successSchema: "NotificationResponse" },
-  { method: "get", path: "/api/workspace/agent/tools", tag: "Agent", summary: "List agent tools available to the current user" },
-  { method: "get", path: "/api/workspace/agent/thread", tag: "Agent", summary: "Create-or-get the current user's persistent agent thread (membership-scoped; messages are read via the conversations messages route; client writes are rejected as agent_conversation_readonly)" },
-  { method: "post", path: "/api/workspace/agent/propose", tag: "Agent", summary: "Run the agent loop and return proposed actions (no mutation)" },
-  { method: "post", path: "/api/workspace/agent/propose/stream", tag: "Agent", summary: "Run the agent loop and stream reasoning/tool/proposal events (SSE)", response: "event-stream" },
-  { method: "post", path: "/api/workspace/agent/execute", tag: "Agent", summary: "Apply confirmed agent actions via governed commands; per-item outcomes applied/denied/conflict/failed with audit receipt (correlationId, auditEventId, planningAuditEventId for plan-affecting actions); apply_* actions require explicit clientPlanVersion" },
+  { method: "get", path: "/api/workspace/agent/tools", tag: "Agent", summary: "List agent tools available to the current user", successSchema: "AgentToolsResponse" },
+  { method: "get", path: "/api/workspace/agent/thread", tag: "Agent", summary: "Create-or-get the current user's persistent agent thread (membership-scoped; messages are read via GET /api/workspace/conversations/{conversationId}/messages; client writes are rejected as agent_conversation_readonly)", successSchema: "AgentThreadResponse", additionalResponses: { "501": { description: "Collaboration persistence is not configured (collaboration_not_configured).", schema: "ApiError" } } },
+  { method: "post", path: "/api/workspace/agent/propose", tag: "Agent", summary: "Run the agent loop and return proposed actions (no mutation)", requestSchema: "AgentProposeRequest", successSchema: "AgentProposeResponse", additionalResponses: { "403": { description: "threadId is not an agent thread owned by the caller (agent_thread_forbidden), or the mutation guard denied the request.", schema: "ApiError" }, "429": { description: "Concurrent agent runs limit per user reached (agent_busy).", schema: "ApiError" }, "503": { description: "No LLM provider is configured (agent_provider_not_configured).", schema: "AgentProviderNotConfiguredResponse" } } },
+  { method: "post", path: "/api/workspace/agent/propose/stream", tag: "Agent", summary: "Run the agent loop and stream reasoning/tool/proposal events (SSE); terminal `done` event carries the full propose result, `error` carries an error payload", response: "event-stream", requestSchema: "AgentProposeRequest", successSchema: "AgentProposeStreamEvent", additionalResponses: { "403": { description: "threadId is not an agent thread owned by the caller (agent_thread_forbidden), or the mutation guard denied the request.", schema: "ApiError" }, "429": { description: "Concurrent agent runs limit per user reached (agent_busy).", schema: "ApiError" }, "503": { description: "No LLM provider is configured (agent_provider_not_configured); returned as JSON before the stream starts.", schema: "AgentProviderNotConfiguredResponse" } } },
+  { method: "post", path: "/api/workspace/agent/execute", tag: "Agent", summary: "Apply confirmed agent actions via governed commands; per-item outcomes applied/denied/conflict/failed with audit receipt (correlationId, auditEventId, planningAuditEventId for plan-affecting actions); apply_* actions require explicit clientPlanVersion", requestSchema: "AgentExecuteRequest", successSchema: "AgentExecuteResponse", additionalResponses: { "400": { description: "actions is missing, empty, or longer than 20 items (invalid_actions); item-level validation errors are reported per item with HTTP 200.", schema: "ApiError" } } },
   { method: "get", path: "/api/workspace/realtime/events", tag: "Collaboration", summary: "Workspace realtime event stream (SSE)", response: "event-stream" },
   { method: "get", path: "/api/workspace/presence", tag: "Collaboration", summary: "Presence snapshot of tenant users" },
   { method: "get", path: "/api/workspace/notification-preferences", tag: "Collaboration", summary: "Read notification preferences", successSchema: "NotificationPreferencesResponse" },
@@ -386,7 +388,8 @@ function responsesFor(route: RouteDoc) {
       : route.response === "event-stream"
         ? {
             "text/event-stream": {
-              schema: { type: "string" }
+              // successSchema, if given, describes the JSON payload of each SSE `data:` frame.
+              schema: route.successSchema ? schemaRef(route.successSchema) : { type: "string" }
             }
           }
         : {
@@ -412,7 +415,13 @@ function responsesFor(route: RouteDoc) {
     "409": errorResponse("Optimistic concurrency, lifecycle, or uniqueness conflict.", errorSchema),
     "413": errorResponse("Request body exceeds route limits.", errorSchema),
     "415": errorResponse("Request media type is not supported.", errorSchema),
-    "501": errorResponse("Persistence/provider capability is not configured.", errorSchema)
+    "501": errorResponse("Persistence/provider capability is not configured.", errorSchema),
+    ...Object.fromEntries(
+      Object.entries(route.additionalResponses ?? {}).map(([status, extra]) => [
+        status,
+        errorResponse(extra.description, extra.schema)
+      ])
+    )
   };
 }
 

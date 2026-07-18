@@ -1,0 +1,63 @@
+{
+ "schemaVersion": 2,
+ "generatedAt": "2026-07-18T18:23:26.622431+00:00",
+ "scope": "agent-first / PM-as-code (Блок 7, документация направления)",
+ "journeyRun": "3 passed (agent-first-evidence, agent-journey-resume, agent-live-stream) — живой backend, без route-моков",
+ "matrix": [
+  {
+   "criterion": "S14-1 live SSE-стрим propose без моков",
+   "status": "pass",
+   "source": "e2e/smoke/agent-live-stream.spec.ts"
+  },
+  {
+   "criterion": "S14-2 история треда переживает reload (journey resume)",
+   "status": "pass",
+   "source": "e2e/smoke/agent-journey-resume.spec.ts"
+  },
+  {
+   "criterion": "S14-3 перегруз → сценарий → живой коммит → компенсирующий откат",
+   "status": "pass",
+   "source": "e2e/smoke/agent-scenario-commit.spec.ts + e2e/runtime/agent-first-evidence.spec.ts"
+  },
+  {
+   "criterion": "S14-4 квитанция адресуема (correlationId/auditEventId/planningAuditEventId/planVersion)",
+   "status": "pass",
+   "source": "execute-receipt.json + 03-receipt.png"
+  },
+  {
+   "criterion": "S14-5 квитанция ведёт к реальному коммиту плана",
+   "status": "pass",
+   "source": "04-commit-selected.png (data-audit-event-id совпал)"
+  },
+  {
+   "criterion": "S14-6 reject-flow: отклонённый сценарий неприменим (409)",
+   "status": "pass",
+   "source": "apps/api/src/planning/planningScenarioRoutes.test.ts (unit, PR #254)"
+  },
+  {
+   "criterion": "S14-7 честный update_task: merge не трогает участников/статус/приёмку",
+   "status": "pass",
+   "source": "apps/api/src/agent/agentExecute.test.ts (unit, PR #252)"
+  },
+  {
+   "criterion": "S14-8 trace персистентен и виден после reload",
+   "status": "pass",
+   "source": "e2e/smoke/agent-journey-resume.spec.ts (PR #251)"
+  }
+ ],
+ "matrixCounts": {
+  "pass": 8
+ },
+ "screenshotCount": 5,
+ "uniqueScreenshotHashes": 5,
+ "badArtifacts": 0,
+ "artifactHashes": {
+  "01-agent-thread.png": "2DB7C697334A86959196244672BD7A2150D25C95DB4B76854501BA454F9A61E5",
+  "02-proposal-card.png": "9F08FD5EC33C7200DBE12181C4E6B8B6B17E781B3D67771FC810FEB72B328C16",
+  "03-receipt.png": "CE469A0E6B35E172219E8112B5994FEB179E649B45CF1CD962B9E8F8929C0FE3",
+  "04-commit-selected.png": "B50DD0626EE6D2F764D3004E4524C2F48CA0A45D1BBD5B05ED791B6E27EA9A6C",
+  "05-revert-applied.png": "D1370693C1B3303A36C66069DCA996ECF4946BB322B9FD749CC64972A0E78B38",
+  "execute-receipt.json": "47436A5D9C3B399F1638C2D40BC8A1FA0EAA0C39C5C1ED24EFE8595E926E0A38",
+  "journey-iab.json": "C27CCCAC7D0EF820AC23CA84F8BEB77BB325CE86EA58DB8550B9B3468DC77BF4"
+ }
+}
