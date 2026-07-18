@@ -121,6 +121,57 @@ export function createDemoLlmProvider(): LlmProvider {
   };
 }
 
+// ---- scripted-провайдер (детерминированный, только для e2e за двойным гейтом) ----
+// Ведёт полный живой путь без сети и без мока HTTP-роутов: рассуждение →
+// list_my_tasks (analyze) → предложение comment_task по первой задаче → завершение.
+// comment_task выбран сознательно: его execute реально проходит governed-роут
+// комментариев на живом backend (в отличие от change_task_status, где demo-провайдер
+// хардкодит несуществующий statusId).
+export function createScriptedLlmProvider(): LlmProvider {
+  return {
+    model: "scripted-llm",
+    createMessage(input) {
+      let tasks: Array<{ id?: string; title?: string }> | null = null;
+      let alreadyProposed = false;
+      for (const message of input.messages) {
+        if (!Array.isArray(message.content)) continue;
+        for (const block of message.content) {
+          if (block.type === "tool_use" && block.name === "comment_task") alreadyProposed = true;
+          if (block.type !== "tool_result") continue;
+          try {
+            const parsed = JSON.parse(block.content) as { tasks?: unknown };
+            if (Array.isArray(parsed.tasks)) tasks = parsed.tasks as Array<{ id?: string; title?: string }>;
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      const has = (name: string) => input.tools.some((tool) => tool.name === name);
+
+      if (alreadyProposed) {
+        return Promise.resolve({ stopReason: "end_turn", content: [{ type: "text", text: "Скриптованный агент: предложение готово, жду подтверждения." }] });
+      }
+      if (tasks === null && has("list_my_tasks")) {
+        return Promise.resolve({
+          stopReason: "tool_use",
+          content: [
+            { type: "text", text: "Скриптованный агент: смотрю ваши задачи." },
+            { type: "tool_use", id: "scripted-a", name: "list_my_tasks", input: {} }
+          ]
+        });
+      }
+      const first = (tasks ?? []).find((task) => task.id);
+      if (first && has("comment_task")) {
+        return Promise.resolve({
+          stopReason: "tool_use",
+          content: [{ type: "tool_use", id: "scripted-m", name: "comment_task", input: { taskId: first.id!, body: `Скриптованный агент: статус по задаче «${first.title ?? first.id}» зафиксирован.` } }]
+        });
+      }
+      return Promise.resolve({ stopReason: "end_turn", content: [{ type: "text", text: "Скриптованный агент: подходящих действий не найдено." }] });
+    }
+  };
+}
+
 // ---- фабрика по окружению + тест-инъекция ----
 let override: LlmProvider | null = null;
 
@@ -136,6 +187,11 @@ export function setAgentLlmProviderOverride(provider: LlmProvider | null): void 
 export function createAgentLlmProviderFromEnv(): LlmProvider {
   if (override) return override;
   const explicit = (process.env.KISS_PM_AGENT_PROVIDER ?? "").toLowerCase();
+  // Тестовые провайдеры (scripted/demo) — только за гейтом test-hooks: без него
+  // KISS_PM_AGENT_DEMO=true на боевой инсталляции включал бы фейкового агента
+  // с configured=true (обход честного 503 agent_provider_not_configured).
+  const testHooks = process.env.KISS_PM_E2E_TEST_HOOKS === "1";
+  if (testHooks && process.env.KISS_PM_AGENT_SCRIPTED === "1") return createScriptedLlmProvider();
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const maxTokensRaw = Number.parseInt(process.env.KISS_PM_AGENT_MAX_TOKENS ?? "", 10);
@@ -148,6 +204,6 @@ export function createAgentLlmProviderFromEnv(): LlmProvider {
   if (anthropicKey && (explicit === "anthropic" || explicit === "")) {
     return createAnthropicLlmProvider({ apiKey: anthropicKey, model: process.env.KISS_PM_AGENT_MODEL || DEFAULT_MODEL, ...maxTokensOpt });
   }
-  if (explicit === "demo" || process.env.KISS_PM_AGENT_DEMO === "true") return createDemoLlmProvider();
+  if (testHooks && (explicit === "demo" || process.env.KISS_PM_AGENT_DEMO === "true")) return createDemoLlmProvider();
   return createMockLlmProvider();
 }

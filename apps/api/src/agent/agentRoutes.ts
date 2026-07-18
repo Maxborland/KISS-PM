@@ -244,7 +244,13 @@ export async function resolveAttachments(app: ApiApp, cookie: string | null, ids
         method: "GET",
         headers: { "x-kiss-pm-action": "same-origin", ...(cookie ? { cookie } : {}) }
       });
-      if (!response.ok) continue;
+      if (!response.ok) {
+        // Недоступное вложение (RBAC/не найдено) маркируем честно, а не пропускаем
+        // молча: иначе агент и пользователь принимают решение по неполному контексту.
+        await response.body?.cancel();
+        push(id, `(вложение недоступно: HTTP ${response.status} — содержимое не передано агенту)`);
+        continue;
+      }
       const mime = response.headers.get("content-type") ?? "";
       const name = attachmentName(response.headers.get("content-disposition") ?? "", id);
       if (!TEXT_MIME_RE.test(mime) && !MAYBE_TEXT_MIME_RE.test(mime)) {
@@ -288,7 +294,9 @@ const HISTORY_MAX_TURNS = 12; // память чата: последние N р�
 type AgentProviderStatus = { model: string; live: boolean; configured: boolean };
 
 function agentProviderStatus(provider: { model: string }): AgentProviderStatus {
-  const live = provider.model !== "mock-llm" && provider.model !== "demo-llm";
+  // scripted-llm — детерминированный e2e-провайдер за двойным env-гейтом: канал
+  // работоспособен (configured), но это не живой LLM — UI обязан показать деградацию.
+  const live = provider.model !== "mock-llm" && provider.model !== "demo-llm" && provider.model !== "scripted-llm";
   return { model: provider.model, live, configured: provider.model !== "mock-llm" };
 }
 

@@ -267,7 +267,7 @@ export function AgentSurface() {
         >
           <strong className="whitespace-nowrap">Демо-режим</strong>
           <span>
-            LLM-ключ не настроен (провайдер {provider.model}) — агент отвечает заглушкой и реальных предложений не даст.
+            LLM-ключ не настроен (провайдер {provider.model}) — ответы детерминированные, это не настоящий LLM.
             Задайте OPENROUTER_API_KEY или ANTHROPIC_API_KEY в конфигурации сервера.
           </span>
         </div>

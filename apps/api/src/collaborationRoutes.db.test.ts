@@ -1014,6 +1014,63 @@ describe("collaboration and communications API", () => {
     expect(olderPayload.nextCursor).toBe(created[0]);
   });
 
+  it("agent-тред: member читает историю, клиентская запись запрещена (readonly), не-member — forbidden", async () => {
+    const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
+    const executorCookie = await loginAs("executor@kiss-pm.local", "executor12345");
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+
+    // Создание agent-треда — серверная операция (так его будет заводить guarded-роут
+    // persistent history); клиентского пути создания нет намеренно.
+    const conversation = await dataSource.ensureConversation!({
+      id: "conversation-agent-admin",
+      tenantId: "tenant-alpha",
+      entityType: "agent",
+      entityId: "user-alpha-admin",
+      conversationType: "agent",
+      title: "Тред агента",
+      createdByUserId: "user-alpha-admin"
+    });
+    await dataSource.addConversationMembers!({
+      tenantId: "tenant-alpha",
+      conversationId: conversation.id,
+      userIds: ["user-alpha-admin"]
+    });
+    await dataSource.createDiscussionMessage!({
+      id: "message-agent-1",
+      tenantId: "tenant-alpha",
+      conversationId: conversation.id,
+      authorUserId: "user-alpha-admin",
+      body: "Разгрузи Иванова на следующей неделе",
+      metadata: {}
+    });
+
+    // Member читает историю существующим messages-роутом (замороженный контракт P1).
+    const read = await app.request(`/api/workspace/conversations/${conversation.id}/messages`, {
+      headers: { cookie: adminCookie }
+    });
+    expect(read.status).toBe(200);
+    const readPayload = await read.json() as { messages: Array<{ body: string }> };
+    expect(readPayload.messages.map((message) => message.body)).toEqual([
+      "Разгрузи Иванова на следующей неделе"
+    ]);
+
+    // Единственный писатель agent-семантики — сервер: прямой POST члена запрещён.
+    const write = await app.request(`/api/workspace/conversations/${conversation.id}/messages`, {
+      method: "POST",
+      headers: jsonHeaders(adminCookie),
+      body: JSON.stringify({ body: "Клиентская дозапись" })
+    });
+    expect(write.status).toBe(403);
+    await expect(write.json()).resolves.toEqual({ error: "agent_conversation_readonly" });
+
+    // Чужой тред закрыт членством, а не правами на сущность.
+    const foreign = await app.request(`/api/workspace/conversations/${conversation.id}/messages`, {
+      headers: { cookie: executorCookie }
+    });
+    expect(foreign.status).toBe(403);
+    await expect(foreign.json()).resolves.toEqual({ error: "conversation_forbidden" });
+  });
+
   it("blocks users without parent entity access and rejects unsafe meeting links", async () => {
     const deniedCookie = await loginAs("denied@kiss-pm.local", "denied12345");
     const adminCookie = await loginAs("admin@kiss-pm.local", "admin12345");
