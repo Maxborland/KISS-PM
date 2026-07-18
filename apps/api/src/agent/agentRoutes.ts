@@ -15,6 +15,15 @@ import { canReadPlanningReadModel } from "../planning/planningRouteAuth";
 import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
 import { canEditTaskFields, canParticipateInTaskActivity, canParticipantTransitionTask } from "../project-work/taskCommandGuards";
 import { runAgentLoop, type AgentLoopEvent, type AnalyzeExecutor } from "./agentLoop";
+import {
+  agentThreadConfigured,
+  agentThreadId,
+  appendAgentTurn,
+  ensureAgentThread,
+  historyFromThreadMessages,
+  proposalSnapshot,
+  serializeAgentConversation
+} from "./agentThread";
 import { createAgentLlmProviderFromEnv } from "./llmProvider";
 import { AGENT_TOOLS, allowedToolsForActor, findAgentTool, listToolAvailability, type AgentTool } from "./toolRegistry";
 
@@ -483,7 +492,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
   // Общая преамбула /propose и /propose/stream (auth + разбор тела) — единый источник правды,
   // чтобы валидация не разъезжалась между JSON- и SSE-эндпоинтами. На ошибке отдаёт готовый Response.
-  type ProposeRequest = { cookie: string | null; actor: TenantUser; profile: AccessProfile; goal: string; attachmentIds: string[]; history: Array<{ role: "user" | "assistant"; content: string }> };
+  type ProposeRequest = { cookie: string | null; actor: TenantUser; profile: AccessProfile; goal: string; attachmentIds: string[]; history: Array<{ role: "user" | "assistant"; content: string }>; threadId?: string };
   async function parseProposeRequest(context: Context): Promise<{ ok: true; value: ProposeRequest } | { ok: false; response: Response }> {
     const cookie = context.req.header("cookie") ?? null;
     const actor = await deps.getSessionActorFromHeaders(cookie);
@@ -494,8 +503,15 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (goal.length === 0 || goal.length > 2000) return { ok: false, response: context.json({ error: "invalid_goal" }, 400) };
     const attachmentIds = parseAttachmentIds((body.value as { attachmentIds?: unknown }).attachmentIds);
     const history = parseHistory((body.value as { history?: unknown }).history);
+    // threadId опционален (контракт P1): клиент, знающий свой персистентный тред, просит
+    // сервер собрать историю из него. Чужой/произвольный id — жёсткий отказ (fail-closed).
+    const threadIdRaw = (body.value as { threadId?: unknown }).threadId;
+    const threadId = typeof threadIdRaw === "string" && threadIdRaw.length > 0 ? threadIdRaw : undefined;
+    if (threadId !== undefined && threadId !== agentThreadId(actor.id)) {
+      return { ok: false, response: context.json({ error: "agent_thread_forbidden" }, 403) };
+    }
     const profile = await deps.getActorProfile(actor);
-    return { ok: true, value: { cookie, actor, profile, goal, attachmentIds, history } };
+    return { ok: true, value: { cookie, actor, profile, goal, attachmentIds, history, ...(threadId ? { threadId } : {}) } };
   }
 
   // Ядро предложения — общее для /propose (JSON) и /propose/stream (SSE).
@@ -504,7 +520,18 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     provider: ReturnType<typeof createAgentLlmProviderFromEnv>,
     onEvent?: (event: AgentLoopEvent) => void | Promise<void>
   ) {
-    const { cookie, actor, profile, goal, attachmentIds, history } = request;
+    const { cookie, actor, profile, goal, attachmentIds } = request;
+    // Источник истины истории при переданном threadId — персистентный тред (сервер),
+    // а не реконструкция из UI-стейта клиента; error-квитанции в контекст не попадают.
+    let history = request.history;
+    if (request.threadId && deps.dataSource.listDiscussionMessages) {
+      const threadMessages = await deps.dataSource.listDiscussionMessages({
+        tenantId: actor.tenantId,
+        conversationId: request.threadId,
+        limit: HISTORY_MAX_TURNS
+      });
+      history = historyFromThreadMessages(threadMessages);
+    }
     const allowed = allowedToolsForActor(actor, profile);
     // LLM получает read-only binding-и и только mutation с честным preview + реальным execute.
     // Остальные binding-mutation не предлагаем, пока review-карточка не умеет показать их payload.
@@ -543,16 +570,75 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     };
   }
 
+  // Персистентность хода propose (P1): user-реплика и ответ агента пишутся сервером в
+  // тред пользователя; при недоступном LLM квитанция тоже персистится (семантика #244,
+  // теперь переживает reload). Без collaboration-персистентности — честно ничего
+  // (messageIds в ответе нет), fake persistence с клиента запрещена.
+  type ProposePersistOutcome =
+    | { kind: "provider_unavailable"; providerModel: string }
+    | { kind: "success"; result: Awaited<ReturnType<typeof runProposeLoop>> };
+  async function persistProposeTurns(
+    request: ProposeRequest,
+    outcome: ProposePersistOutcome
+  ): Promise<{ threadId: string; messageIds: string[] } | null> {
+    if (!agentThreadConfigured(deps.dataSource)) return null;
+    const conversation = await ensureAgentThread(deps.dataSource, request.actor);
+    const messageIds: string[] = [];
+    messageIds.push(await appendAgentTurn(
+      deps.dataSource, request.actor, conversation.id, request.goal, { role: "user" }, request.attachmentIds
+    ));
+    if (outcome.kind === "provider_unavailable") {
+      messageIds.push(await appendAgentTurn(
+        deps.dataSource, request.actor, conversation.id,
+        `LLM-провайдер не настроен (провайдер ${outcome.providerModel}) — задайте OPENROUTER_API_KEY или ANTHROPIC_API_KEY на сервере.`,
+        { role: "agent", kind: "error" }
+      ));
+    } else {
+      const result = outcome.result;
+      const bodyText = result.reasoning.trim().length > 0
+        ? result.reasoning
+        : result.proposedActions.length > 0
+          ? `Предложений: ${result.proposedActions.length}.`
+          : "Предложений нет.";
+      messageIds.push(await appendAgentTurn(
+        deps.dataSource, request.actor, conversation.id, bodyText,
+        { role: "agent", proposal: proposalSnapshot(result) }
+      ));
+    }
+    return { threadId: conversation.id, messageIds };
+  }
+
+  // Guarded-роут персистентного треда (P1): create-or-get приватного треда пользователя.
+  // Сообщения читаются существующим GET /conversations/:id/messages (доступ — членство).
+  app.get("/api/workspace/agent/thread", async (context) => {
+    const cookie = context.req.header("cookie") ?? null;
+    const actor = await deps.getSessionActorFromHeaders(cookie);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    if (!agentThreadConfigured(deps.dataSource)) {
+      return context.json({ error: "collaboration_not_configured" }, 501);
+    }
+    const conversation = await ensureAgentThread(deps.dataSource, actor);
+    const readState = deps.dataSource.getConversationReadState
+      ? await deps.dataSource.getConversationReadState({ tenantId: actor.tenantId, conversationId: conversation.id, userId: actor.id })
+      : null;
+    return context.json({ conversation: serializeAgentConversation(conversation), readState });
+  });
+
   app.post("/api/workspace/agent/propose", async (context) => {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
     const runtime = createAgentProviderRuntime();
-    if (!runtime.status.configured) return context.json({ error: "agent_provider_not_configured", provider: runtime.status }, 503);
+    if (!runtime.status.configured) {
+      const persisted = await persistProposeTurns(parsed.value, { kind: "provider_unavailable", providerModel: runtime.status.model });
+      return context.json({ error: "agent_provider_not_configured", provider: runtime.status, ...(persisted ?? {}) }, 503);
+    }
     const { actor } = parsed.value;
     const slot = agentLlmConcurrency.tryAcquire(`${actor.tenantId}:${actor.id}`);
     if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
     try {
-      return context.json(await runProposeLoop(parsed.value, runtime.provider));
+      const result = await runProposeLoop(parsed.value, runtime.provider);
+      const persisted = await persistProposeTurns(parsed.value, { kind: "success", result });
+      return context.json({ ...result, ...(persisted ?? {}) });
     } finally {
       slot.release();
     }
@@ -564,7 +650,10 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const parsed = await parseProposeRequest(context);
     if (!parsed.ok) return parsed.response;
     const runtime = createAgentProviderRuntime();
-    if (!runtime.status.configured) return context.json({ error: "agent_provider_not_configured", provider: runtime.status }, 503);
+    if (!runtime.status.configured) {
+      const persisted = await persistProposeTurns(parsed.value, { kind: "provider_unavailable", providerModel: runtime.status.model });
+      return context.json({ error: "agent_provider_not_configured", provider: runtime.status, ...(persisted ?? {}) }, 503);
+    }
     const { actor } = parsed.value;
     const slot = agentLlmConcurrency.tryAcquire(`${actor.tenantId}:${actor.id}`);
     if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
@@ -573,7 +662,8 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
         const result = await runProposeLoop(parsed.value, runtime.provider, async (event) => {
           await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
         });
-        await stream.writeSSE({ event: "done", data: JSON.stringify(result) });
+        const persisted = await persistProposeTurns(parsed.value, { kind: "success", result });
+        await stream.writeSSE({ event: "done", data: JSON.stringify({ ...result, ...(persisted ?? {}) }) });
       } catch (error) {
         await stream.writeSSE({ event: "error", data: JSON.stringify({ error: error instanceof Error ? error.message : "agent_failed" }) });
       } finally {
@@ -860,11 +950,37 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       (counts, item) => ({ ...counts, [item.status]: counts[item.status] + 1 }),
       { applied: 0, denied: 0, conflict: 0, failed: 0 }
     );
+
+    // Персистентность исхода (P1): result-сообщение с per-action outcomes и ссылками
+    // на audit-квитанцию — история «запрос → предложение → исход» переживает reload.
+    let persisted: { threadId: string; messageId: string } | null = null;
+    if (agentThreadConfigured(deps.dataSource)) {
+      const conversation = await ensureAgentThread(deps.dataSource, actor);
+      const messageId = await appendAgentTurn(
+        deps.dataSource, actor, conversation.id,
+        `Результат: применено ${summary.applied}, отказано ${summary.denied}, конфликтов ${summary.conflict}, ошибок ${summary.failed}.`,
+        {
+          role: "agent",
+          kind: "result",
+          ...(batchCorrelationId ? { correlationId: batchCorrelationId } : {}),
+          outcomes: receiptResults.map((item) => ({
+            tool: item.tool,
+            status: item.status,
+            ...(item.auditEventId ? { auditEventId: item.auditEventId } : {}),
+            ...(item.planningAuditEventId ? { planningAuditEventId: item.planningAuditEventId } : {}),
+            ...(item.planVersion !== undefined ? { planVersion: item.planVersion } : {})
+          }))
+        }
+      );
+      persisted = { threadId: conversation.id, messageId };
+    }
+
     return context.json({
       results: receiptResults,
       applied: summary.applied > 0,
       summary,
-      ...(batchCorrelationId ? { correlationId: batchCorrelationId } : {})
+      ...(batchCorrelationId ? { correlationId: batchCorrelationId } : {}),
+      ...(persisted ?? {})
     });
   });
 }
