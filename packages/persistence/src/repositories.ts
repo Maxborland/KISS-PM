@@ -258,6 +258,12 @@ export type PostgresTenantDataSource = CrmRepository &
       projectId?: string | null;
     }
   ): Promise<AuditEventListItem[]>;
+  /** Точечная выборка audit-события (tenant-scoped): адресуемые квитанции агента
+      не должны зависеть от окна limit ленты. */
+  getAuditEventById(
+    tenantId: TenantId,
+    auditEventId: string
+  ): Promise<AuditEventListItem | undefined>;
 };
 
 // Маппер строки токена сброса пароля в доменную запись (Date↔timestamptz, nullable-поля).
@@ -853,23 +859,35 @@ export function createPostgresTenantDataSource(
           ? await buildQuery()
           : await buildQuery().limit(options.limit);
 
-      return rows.map((row) => ({
-        id: row.id,
-        tenantId: row.tenantId,
-        actorUserId: row.actorUserId,
-        actionType: row.actionType,
-        sourceSurfaceId: row.sourceSurfaceId,
-        sourceWorkflow: row.sourceWorkflow,
-        sourceEntity: row.sourceEntity,
-        input: row.input,
-        beforeState: row.beforeState ?? null,
-        afterState: row.afterState ?? null,
-        permissionResult: row.permissionResult,
-        executionResult: row.executionResult,
-        correlationId: row.correlationId,
-        createdAt: row.createdAt
-      }));
+      return rows.map(mapAuditEventRow);
+    },
+    async getAuditEventById(tenantId, auditEventId) {
+      const [row] = await db
+        .select()
+        .from(auditEvents)
+        .where(and(eq(auditEvents.tenantId, tenantId), eq(auditEvents.id, auditEventId)))
+        .limit(1);
+      return row ? mapAuditEventRow(row) : undefined;
     }
+  };
+}
+
+function mapAuditEventRow(row: typeof auditEvents.$inferSelect): AuditEventListItem {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    actorUserId: row.actorUserId,
+    actionType: row.actionType,
+    sourceSurfaceId: row.sourceSurfaceId,
+    sourceWorkflow: row.sourceWorkflow,
+    sourceEntity: row.sourceEntity,
+    input: row.input,
+    beforeState: row.beforeState ?? null,
+    afterState: row.afterState ?? null,
+    permissionResult: row.permissionResult,
+    executionResult: row.executionResult,
+    correlationId: row.correlationId,
+    createdAt: row.createdAt
   };
 }
 

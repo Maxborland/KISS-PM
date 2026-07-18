@@ -5,7 +5,8 @@ export const backgroundJobKinds = [
   "search.projection_rebuild",
   "capacity.cache_warmup",
   "calls.recording_janitor",
-  "calls.recording_compose"
+  "calls.recording_compose",
+  "planning.expired_runs_purge"
 ] as const;
 
 export type BackgroundJobKind = (typeof backgroundJobKinds)[number];

@@ -134,6 +134,25 @@ const callRecordingCompose: BackgroundJobHandler = async () => ({
   metadata: { composed: 0, note: "per-track files preserved; ffmpeg mux deferred" }
 });
 
+// Purge неприменённых истёкших planning runs (scenario + solver). Grace-период
+// (retentionHours) держит недавно истёкшие для честной диагностики «сценарий истёк»;
+// applied-runs не удаляются никогда — они историческая ссылка apply-квитанций.
+const planningExpiredRunsPurge: BackgroundJobHandler = async (job, context) => {
+  if (!context.dataSource.purgeExpiredPlanningRuns) {
+    throw new Error("planning_runs_purge_not_configured");
+  }
+  const retentionHours = readPositiveInteger(job.payload.retentionHours, 24);
+  const expiredBefore = new Date(context.now.getTime() - retentionHours * 3_600_000);
+  const purged = await context.dataSource.purgeExpiredPlanningRuns({
+    tenantId: job.tenantId,
+    expiredBefore
+  });
+  return {
+    message: "Expired planning runs purged",
+    metadata: { ...purged, retentionHours }
+  };
+};
+
 export function createDefaultBackgroundJobRegistry(): BackgroundJobRegistry {
   return {
     "storage.asset_cleanup": storageAssetCleanup,
@@ -142,7 +161,8 @@ export function createDefaultBackgroundJobRegistry(): BackgroundJobRegistry {
     "search.projection_rebuild": searchProjectionRebuild,
     "capacity.cache_warmup": capacityCacheWarmup,
     "calls.recording_janitor": callRecordingJanitor,
-    "calls.recording_compose": callRecordingCompose
+    "calls.recording_compose": callRecordingCompose,
+    "planning.expired_runs_purge": planningExpiredRunsPurge
   };
 }
 
@@ -153,7 +173,8 @@ export const defaultBackgroundJobKinds: BackgroundJobKind[] = [
   "search.projection_rebuild",
   "capacity.cache_warmup",
   "calls.recording_janitor",
-  "calls.recording_compose"
+  "calls.recording_compose",
+  "planning.expired_runs_purge"
 ];
 
 function readPositiveInteger(value: unknown, fallback: number): number {

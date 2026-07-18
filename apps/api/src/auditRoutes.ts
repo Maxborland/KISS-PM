@@ -53,6 +53,41 @@ export function registerAuditRoutes(app: ApiApp, deps: ApiRouteDeps) {
       }))
     });
   });
+
+  // Точечная выборка события: адресуемые квитанции агента (auditEventId/correlationId)
+  // не должны зависеть от окна limit ленты. Тот же RBAC, что и у списка.
+  app.get("/api/tenant/current/audit-events/:auditEventId", async (context) => {
+    const auditEventId = context.req.param("auditEventId").trim();
+    if (auditEventId.length === 0 || auditEventId.length > 128) {
+      return context.json({ error: "invalid_audit_event_id" }, 400);
+    }
+
+    const actor = await getSessionActorFromHeaders(
+      context.req.header("cookie") ?? null
+    );
+    if (!actor) {
+      return context.json({ error: "dev_session_required" }, 401);
+    }
+    if (!dataSource.getAuditEventById) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+
+    const actorProfile = await getActorProfile(actor);
+    const decision = canReadAuditEvents({
+      actor,
+      profile: actorProfile,
+      targetTenantId: actor.tenantId
+    });
+    if (!decision.allowed) {
+      return context.json({ error: decision.reason }, 403);
+    }
+
+    const event = await dataSource.getAuditEventById(actor.tenantId, auditEventId);
+    if (!event) return context.json({ error: "audit_event_not_found" }, 404);
+    return context.json({
+      auditEvent: { ...event, createdAt: event.createdAt.toISOString() }
+    });
+  });
 }
 
 function parseAuditProjectFilter(value: string | undefined): string | null | false {

@@ -24,5 +24,17 @@ export function useAuditEvents(limit = 50) {
   const loader = useCallback(async () => (await client.listAuditEvents(limit)).auditEvents, [client, limit]);
   const { data, status, error, reload: load } = useResource(loader);
 
-  return { events: data ?? [], status, error, reload: load };
+  // Точечная выборка для deep-link ?event=: запись может быть старше окна ленты.
+  const getEvent = useCallback(
+    async (auditEventId: string): Promise<AuditEvent | null> => {
+      try {
+        return (await client.getAuditEvent(auditEventId)).auditEvent;
+      } catch {
+        return null;
+      }
+    },
+    [client]
+  );
+
+  return { events: data ?? [], status, error, reload: load, getEvent };
 }

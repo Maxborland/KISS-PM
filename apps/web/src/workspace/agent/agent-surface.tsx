@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { BannerInline } from "@/components/ui/banner-inline";
 import { Button } from "@/components/ui/button";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
+import { hasPermission } from "@/lib/permissions";
+import { useSessionUser } from "@/shell/use-session-user";
 import { useAgent } from "@/workspace/agent/use-agent";
 import { AGENT_HISTORY_PAGE_LIMIT, type AgentActionInput, type AgentThreadTurn, type ProposedAction } from "@/workspace/agent/agent-client";
 import type { AgentChange, AgentMessage, AgentPhase } from "@/workspace/agent/agent-model";
@@ -79,6 +81,10 @@ export function AgentSurface() {
   const thinking = phase === "thinking" || status === "proposing";
   const reviewVisible = changes.length > 0 && !thinking && phase !== "draft";
   const now = () => formatMessageTime();
+  // Ссылка «Открыть в журнале аудита» в квитанции — только при праве чтения журнала:
+  // без права /admin/audit ответит forbidden, и ссылка была бы обманом.
+  const sessionUser = useSessionUser();
+  const canLinkAudit = hasPermission(sessionUser?.permissions ?? [], "tenant.audit_events.read");
 
   // Локальные id уникальны на сессию (счётчик, не длина списка): после adoptServerIds
   // длина и индексы расходятся, а коллизия id ломала бы React-ключи и дедупликацию.
@@ -483,6 +489,7 @@ export function AgentSurface() {
             thinking={thinking}
             liveSteps={liveSteps}
             historyLoading={historyStatus === "loading"}
+            auditLinkEnabled={canLinkAudit}
           />
           <AgentComposer
             value={inputValue}
