@@ -12,6 +12,8 @@ import {
   type AgentHistoryTurn,
   type AgentProposeResponse,
   type AgentStreamEvent,
+  type AgentThreadHistoryPage,
+  type AgentThreadInfo,
   type AgentToolAvailability
 } from "./agent-client";
 import { createMockAgentFetch } from "./mock-agent-backend";
@@ -84,15 +86,41 @@ export function useAgent() {
     [client]
   );
 
+  // Персистентный тред (P1): create-or-get и страницы истории. Только live-режим —
+  // mock/Storybook живёт эфемерно, и это честно (истории там нет, а не «не загрузилась»).
+  const loadThread = useCallback(
+    async (): Promise<AgentResult<AgentThreadInfo>> => {
+      if (!live) return { ok: false, code: "mock_mode" };
+      try {
+        return { ok: true, data: await client.loadThread() };
+      } catch (e) {
+        return { ok: false, code: e instanceof AgentApiError ? e.code : "request_failed" };
+      }
+    },
+    [client, live]
+  );
+
+  const loadThreadHistory = useCallback(
+    async (threadId: string, cursor?: string): Promise<AgentResult<AgentThreadHistoryPage>> => {
+      if (!live) return { ok: false, code: "mock_mode" };
+      try {
+        return { ok: true, data: await client.loadThreadHistory(threadId, cursor) };
+      } catch (e) {
+        return { ok: false, code: e instanceof AgentApiError ? e.code : "request_failed" };
+      }
+    },
+    [client, live]
+  );
+
   const proposeStream = useCallback(
-    async (goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = [], history: AgentHistoryTurn[] = []): Promise<AgentResult<AgentProposeResponse>> => {
+    async (goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = [], history: AgentHistoryTurn[] = [], threadId?: string): Promise<AgentResult<AgentProposeResponse>> => {
       setStatus("proposing");
       setError(null);
       try {
         // live → реальный SSE; mock/Storybook (нет stream-ручки) → обычный propose +
         // синтез событий из результата, чтобы CoT-трейс отображался и в витрине.
         const data = live
-          ? await client.proposeStream(goal, onEvent, attachmentIds, history)
+          ? await client.proposeStream(goal, onEvent, attachmentIds, history, threadId)
           : await (async () => {
               const result = await client.propose(goal, attachmentIds, history);
               for (const analyze of result.analyzeResults) onEvent({ type: "analyze", tool: analyze.tool, title: analyze.tool, ok: true });
@@ -157,5 +185,5 @@ export function useAgent() {
     [client]
   );
 
-  return { tools, toolsError, toolsReloading, reloadTools, provider, proposal, setProposal, status, error, propose, proposeStream, uploadAttachment, listProjects, execute };
+  return { tools, toolsError, toolsReloading, reloadTools, provider, proposal, setProposal, status, error, propose, proposeStream, uploadAttachment, listProjects, execute, loadThread, loadThreadHistory, live };
 }

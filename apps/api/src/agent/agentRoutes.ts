@@ -933,11 +933,15 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     // scenario-apply / apply-command-batch уже содержит auditEventId и newPlanVersion —
     // именно это событие видно на вкладке «Коммиты» (события agent-action-* туда не попадают).
     const receiptResults = classifiedResults.map((item, i) => {
-      const planning: { planningAuditEventId?: string; planVersion?: number } = {};
+      const planning: { planningAuditEventId?: string; planVersion?: number; projectId?: string } = {};
       if (item.ok && (item.tool === "apply_resource_resolution" || item.tool === "apply_plan_commands")) {
         const resultBody = (item.result && typeof item.result === "object" ? item.result : {}) as Record<string, unknown>;
         if (typeof resultBody.auditEventId === "string") planning.planningAuditEventId = resultBody.auditEventId;
         if (typeof resultBody.newPlanVersion === "number") planning.planVersion = resultBody.newPlanVersion;
+        // projectId нужен квитанции: ссылка «Открыть в Коммитах» адресуется в рамках проекта.
+        const action = (actions[i] ?? {}) as { input?: unknown };
+        const input = (action.input && typeof action.input === "object" ? action.input : {}) as Record<string, unknown>;
+        if (typeof input.projectId === "string") planning.projectId = input.projectId;
       }
       return {
         ...item,
@@ -968,7 +972,8 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
             status: item.status,
             ...(item.auditEventId ? { auditEventId: item.auditEventId } : {}),
             ...(item.planningAuditEventId ? { planningAuditEventId: item.planningAuditEventId } : {}),
-            ...(item.planVersion !== undefined ? { planVersion: item.planVersion } : {})
+            ...(item.planVersion !== undefined ? { planVersion: item.planVersion } : {}),
+            ...(item.projectId ? { projectId: item.projectId } : {})
           }))
         }
       );
