@@ -75,7 +75,14 @@ function MessageBubble({ message, auditLinkEnabled = false }: { message: Extract
   return (
     // 720px — намеренная локальная мера строки треда (комфортное чтение);
     // токен не заводим до второго консьюмера.
-    <article className={cn("flex max-w-[720px] gap-2.5", isUser && "self-end flex-row-reverse")}>
+    // Стабильный сигнал для e2e: реплика агента (не trace) адресуема по testid и
+    // роли/виду — журней-тесты не должны зависеть от копирайта LLM-провайдера.
+    <article
+      data-testid="agent-turn"
+      data-turn-role={message.role}
+      data-turn-kind={message.role === "agent" ? (message.kind ?? "text") : "user"}
+      className={cn("flex max-w-[720px] gap-2.5", isUser && "self-end flex-row-reverse")}
+    >
       <span
         aria-hidden
         className={cn(

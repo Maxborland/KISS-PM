@@ -40,6 +40,9 @@ const STALE_SCENARIO_CODES = new Set([
   "scenario_unavailable",
   "planning_scenario_already_applied",
   "planning_scenario_invalid",
+  // apply конкурентно отклонённого run (409 из planning apply-гарда): карточка мертва,
+  // сбрасываем предложения — авто-превью пересчитает без неё.
+  "scenario_rejected",
   "planning_scenario_hash_mismatch",
   "planning_scenario_engine_mismatch",
   "planning_scenario_target_mismatch"
@@ -382,7 +385,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                         <Button variant="secondary" size="sm" disabled={!available} onClick={() => setCompareId(compareId === p.id ? null : p.id)}>{compareId === p.id ? "Скрыть" : "Сравнить"}</Button>
                         {/* отклонённая карточка: обе кнопки действия скрыты, остаётся статус «Отклонён» */}
                         {canApplyScenarios && !rejected ? <Button variant="ghost" size="sm" disabled={rejectBusy || applyBusy || p.availability !== "available" || previewExpired} title={previewExpired ? "Предложение истекло — запросите сценарии заново" : undefined} onClick={() => void onReject(p)}><X className="size-3.5" aria-hidden />Отклонить</Button> : null}
-                        {canApplyScenarios && !rejected ? <Button variant="default" size="sm" disabled={applyBusy || !available || previewExpired} title={previewExpired ? "Предложение истекло — запросите сценарии заново" : undefined} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button> : null}
+                        {canApplyScenarios && !rejected ? <Button variant="default" size="sm" disabled={applyBusy || rejectBusy || !available || previewExpired} title={previewExpired ? "Предложение истекло — запросите сценарии заново" : undefined} onClick={() => void onApply(p)}><Check className="size-3.5" aria-hidden />Применить</Button> : null}
                       </div>
                     </div>
 

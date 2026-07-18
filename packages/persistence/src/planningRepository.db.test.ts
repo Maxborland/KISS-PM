@@ -1011,32 +1011,6 @@ describe("planning repository", () => {
     expect(rejected?.rejectedReason).toBe("не подходит по срокам");
     // appliedAt не затронут — reject не «применение».
     expect(rejected?.appliedAt).toBeNull();
-
-    // Solver-run: тот же контракт отклонения.
-    await planningRepository.createPlanningSolverRun({
-      id: "solver-reject-target",
-      tenantId: "tenant-alpha",
-      projectId,
-      mode: "schedule",
-      clientPlanVersion: 1,
-      engineVersion: "planning-core-v1",
-      inputSnapshotMetadata: { projectId, planVersion: 1 },
-      targetDeadline: null,
-      proposals: [],
-      proposalPayloadHash: "hash-solver",
-      actorUserId: "user-alpha-admin",
-      expiresAt: new Date("2099-01-01T00:00:00.000Z")
-    });
-    await planningRepository.markPlanningSolverRunRejected({
-      tenantId: "tenant-alpha",
-      projectId,
-      runId: "solver-reject-target",
-      rejectedAt: new Date("2026-05-21T00:15:00.000Z"),
-      rejectedReason: null
-    });
-    const rejectedSolver = await planningRepository.findPlanningSolverRun("tenant-alpha", projectId, "solver-reject-target");
-    expect(rejectedSolver?.rejectedAt?.toISOString()).toBe("2026-05-21T00:15:00.000Z");
-    expect(rejectedSolver?.rejectedReason).toBeNull();
   });
 
   it("purgeExpiredPlanningRuns удаляет только неприменённые истёкшие runs своего тенанта", async () => {

@@ -14,6 +14,7 @@ import { createPlanningReadModel } from "../planning/planningReadModel";
 import { canReadPlanningReadModel } from "../planning/planningRouteAuth";
 import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
 import { canEditTaskFields, canParticipateInTaskActivity, canParticipantTransitionTask } from "../project-work/taskCommandGuards";
+import { parseUpdateTaskBody } from "../projectWorkParsers";
 import { emitMessageCreated } from "../workspaceEventBus";
 import { runAgentLoop, type AgentLoopEvent, type AnalyzeExecutor } from "./agentLoop";
 import {
@@ -60,6 +61,56 @@ const OFFERABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "crea
 // Поля, которые агент может частично обновлять в update_task: остальное (участники,
 // статус) — отдельные инструменты; неизвестное поле в execute — fail-closed 400.
 const UPDATE_TASK_FIELDS = new Set(["title", "description", "priority", "plannedStart", "plannedFinish", "plannedWork", "durationWorkingDays"]);
+
+// Мёрж частичных fields поверх текущей задачи в ПОЛНОЕ тело governed PATCH.
+// СТРУКТУРНОЕ ОГРАНИЧЕНИЕ: parseUpdateTaskBody дефолтит отсутствующие поля, поэтому
+// каждое читаемое парсером поле обязано быть перечислено здесь явно — пропуск молча
+// сбросит незатронутое поле в дефолт (прецедент: requiresAcceptance → false).
+// Глубокое решение — честный partial-update в governed-слое; до него этот helper —
+// единственная точка мёржа (используется и propose-карточкой, и execute).
+// Типовой гард ПРИСУТСТВУЮЩИХ полей: parseUpdateTaskBody лоялен к нестроковым
+// description/priority (нормализует в null/"normal"), поэтому без этого гарда
+// карточка «описание → 123» молча ОЧИЩАЛА бы описание вместо fail-closed отказа.
+// Границы/enum/целочисленность — зона парсера; здесь только типы значений.
+function invalidUpdateTaskFieldType(fields: Record<string, unknown>): boolean {
+  return Object.entries(fields).some(([field, value]) =>
+    field === "plannedWork" || field === "durationWorkingDays"
+      ? typeof value !== "number"
+      : typeof value !== "string"
+  );
+}
+
+function buildUpdateTaskPatchBody(
+  task: {
+    title: string;
+    description: string | null;
+    priority: string;
+    plannedStart: Date;
+    plannedFinish: Date;
+    durationWorkingDays: number;
+    plannedWork: number;
+    requiresAcceptance: boolean;
+    participants: ReadonlyArray<{ userId: string; role: string }>;
+    statusId: string | null;
+  },
+  fields: Record<string, unknown>,
+  clientUpdatedAt: string
+): Record<string, unknown> {
+  const description = "description" in fields ? fields.description : task.description;
+  return {
+    title: "title" in fields ? fields.title : task.title,
+    ...(description !== null && description !== undefined ? { description } : {}),
+    priority: "priority" in fields ? fields.priority : task.priority,
+    plannedStart: "plannedStart" in fields ? fields.plannedStart : task.plannedStart.toISOString().slice(0, 10),
+    plannedFinish: "plannedFinish" in fields ? fields.plannedFinish : task.plannedFinish.toISOString().slice(0, 10),
+    durationWorkingDays: "durationWorkingDays" in fields ? fields.durationWorkingDays : task.durationWorkingDays,
+    plannedWork: "plannedWork" in fields ? fields.plannedWork : task.plannedWork,
+    requiresAcceptance: task.requiresAcceptance,
+    participants: task.participants,
+    statusId: task.statusId,
+    clientUpdatedAt
+  };
+}
 
 export function isAgentToolOfferable(tool: AgentTool): boolean {
   return (Boolean(tool.binding) && tool.kind === "analyze")
@@ -224,20 +275,38 @@ export async function buildProposalActionMetadata(
       durationWorkingDays: { label: "длительность (дн)", current: () => String(task.durationWorkingDays) }
     };
     const capValue = (value: string) => value.length > 120 ? `${value.slice(0, 120)}…` : value;
+    // Структурные пары «было/станет»: before не восстанавливается парсингом
+    // форматированной строки — значение поля может само содержать « → ».
     const changes = Object.entries(fields).map(([field, next]) => {
-      const known = FIELD_LABELS[field];
+      // hasOwnProperty-гард: ключ вроде "toString" резолвился бы в член
+      // Object.prototype и обходил ветку «не поддерживается», роняя current().
+      const known = Object.prototype.hasOwnProperty.call(FIELD_LABELS, field) ? FIELD_LABELS[field] : undefined;
       // Неизвестное поле честно видно в карточке — execute его отвергнет (fail-closed).
-      if (!known) return `${field}: не поддерживается`;
-      return `${known.label}: ${capValue(known.current())} → ${capValue(String(next))}`;
+      if (!known) return { before: `${field}: не поддерживается`, after: `${field}: не поддерживается` };
+      const current = capValue(known.current());
+      return { before: `${known.label}: ${current}`, after: `${known.label}: ${current} → ${capValue(String(next))}` };
     });
+    // Карточка не обещает изменение, которое execute гарантированно отвергнет:
+    // мёрж-тело валидируется ТЕМ ЖЕ парсером, что и governed PATCH (целые числа,
+    // границы, длина названия, enum приоритета, порядок дат).
+    const unsupportedField = Object.keys(fields).find((field) => !UPDATE_TASK_FIELDS.has(field));
+    const invalidFieldType = invalidUpdateTaskFieldType(fields);
+    const parsedBody = parseUpdateTaskBody(buildUpdateTaskPatchBody(task, fields, task.updatedAt.toISOString()));
     return {
       title: `Изменить задачу: «${task.title}» · проект ${task.projectId}, задача ${task.id}`,
       preview: {
-        before: changes.length > 0 ? changes.map((line) => line.split(" → ")[0]!).join("; ") : "Без изменений",
-        after: changes.length > 0 ? changes.join("; ") : "Поля не указаны"
+        before: changes.length > 0 ? changes.map((change) => change.before).join("; ") : "Без изменений",
+        after: changes.length > 0 ? changes.map((change) => change.after).join("; ") : "Поля не указаны"
       },
       // Версия задачи — обязательный precondition применения (fail-closed на execute).
-      preconditionVersions: { taskUpdatedAt: task.updatedAt.toISOString() }
+      preconditionVersions: { taskUpdatedAt: task.updatedAt.toISOString() },
+      ...(unsupportedField
+        ? { capability: { allowed: false, reason: "unsupported_update_field" } }
+        : invalidFieldType
+          ? { capability: { allowed: false, reason: "invalid_update_field_value" } }
+          : parsedBody.ok
+            ? {}
+            : { capability: { allowed: false, reason: parsedBody.error } })
     };
   }
   // D2: payload-backed карточка создания задачи — показывает ВСЁ, что реально будет
@@ -1096,17 +1165,6 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "unsupported_update_field" });
           continue;
         }
-        // Fail-closed по типам значений: молчаливый фолбэк на текущее значение
-        // (numberInput/typeof) выдавал бы success без применения того, что было в карточке.
-        const invalidValue = Object.entries(fields).some(([field, value]) =>
-          field === "plannedWork" || field === "durationWorkingDays"
-            ? typeof value !== "number" || !Number.isFinite(value) || value <= 0
-            : typeof value !== "string"
-        );
-        if (invalidValue) {
-          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_update_field_value" });
-          continue;
-        }
         const clientUpdatedAt = typeof preconditionVersions.taskUpdatedAt === "string"
           ? preconditionVersions.taskUpdatedAt
           : undefined;
@@ -1119,23 +1177,21 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           results.push({ tool: tool.name, ok: false, status: 404, error: "task_not_found" });
           continue;
         }
+        if (invalidUpdateTaskFieldType(fields)) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_update_field_value" });
+          continue;
+        }
+        // Мёрж (присутствие поля — через `in`, без typeof-фолбэка на текущее значение)
+        // + валидация ТЕМ ЖЕ парсером, что и governed PATCH: одна точка правды по
+        // целым числам, границам, длине названия, enum приоритета и порядку дат.
+        const patchBody = buildUpdateTaskPatchBody(task, fields, clientUpdatedAt);
+        const parsedPatch = parseUpdateTaskBody(patchBody);
+        if (!parsedPatch.ok) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: parsedPatch.error });
+          continue;
+        }
         previews[actionIndex] = await buildActionPreview(deps.dataSource, actor.tenantId, { tool: tool.name, input });
-        const description = typeof fields.description === "string" ? fields.description : task.description;
-        const res = await dispatchInternal(app, cookie, `/api/workspace/tasks/${taskId}`, {
-          title: typeof fields.title === "string" ? fields.title : task.title,
-          ...(description !== null && description !== undefined ? { description } : {}),
-          priority: typeof fields.priority === "string" ? fields.priority : task.priority,
-          plannedStart: typeof fields.plannedStart === "string" ? fields.plannedStart : task.plannedStart.toISOString().slice(0, 10),
-          plannedFinish: typeof fields.plannedFinish === "string" ? fields.plannedFinish : task.plannedFinish.toISOString().slice(0, 10),
-          durationWorkingDays: typeof fields.durationWorkingDays === "number" ? fields.durationWorkingDays : task.durationWorkingDays,
-          plannedWork: typeof fields.plannedWork === "number" ? fields.plannedWork : task.plannedWork,
-          // Не затрагиваемые карточкой поля переносим из текущего состояния явно:
-          // парсер PATCH дефолтит отсутствующий requiresAcceptance в false.
-          requiresAcceptance: task.requiresAcceptance,
-          participants: task.participants,
-          statusId: task.statusId,
-          clientUpdatedAt
-        }, "PATCH");
+        const res = await dispatchInternal(app, cookie, `/api/workspace/tasks/${taskId}`, patchBody, "PATCH");
         if (res.status === 200) results.push({ tool: tool.name, ok: true, result: res.body });
         else {
           const currentVersions = res.body.currentVersions;

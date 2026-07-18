@@ -35,11 +35,6 @@ export function registerPlanningScenarioRejectRoute(app: Hono, deps: PlanningRou
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const body = await readLimitedJsonBody(context);
-    if (!body.ok) return context.json({ error: body.error }, body.status);
-    const parsed = parseScenarioRejectEnvelope(body.value);
-    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
     const profile = await deps.getActorProfile(actor);
     const decision = canApplyPlanningScenarios({
       actor,
@@ -67,6 +62,14 @@ export function registerPlanningScenarioRejectRoute(app: Hono, deps: PlanningRou
         commandInput: { scenarioRunId: parsedScenarioRunId.value, intent: "reject" }
       });
     }
+
+    // Тело парсим ПОСЛЕ RBAC (как planningRevertRoute): неавторизованный вызов
+    // получает аудируемый 403, а не различимый 400-пробник формы тела.
+    // Пустое тело валидно — reason опционален (клиент по OpenAPI может не слать тело).
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseScenarioRejectEnvelope(body.value ?? {});
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
     const result = await deps.runDataSourceTransaction(async (rawStore) => {
       const transactionDataSource = requireCapabilities(rawStore, [

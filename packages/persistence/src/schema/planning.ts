@@ -655,6 +655,8 @@ export const planningSolverRuns = pgTable(
     appliedProposalId: text("applied_proposal_id"),
     appliedAt: timestamp("applied_at", { withTimezone: true }),
     // Явное отклонение предложений run: до этого статус «отклонён» выводился неявно (TTL).
+    // Зарезервировано миграцией 0055 под будущий solver-reject-роут: writer пока
+    // не реализован (см. ревью xhigh — mark-функция удалена как мёртвая).
     rejectedAt: timestamp("rejected_at", { withTimezone: true }),
     rejectedReason: text("rejected_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull()

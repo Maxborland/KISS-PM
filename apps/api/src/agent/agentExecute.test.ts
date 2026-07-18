@@ -52,7 +52,7 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
     tenantId: "tenant-1",
     projectId: "project-1",
     stageId: null,
-    title: "A",
+    title: "Смета",
     description: null,
     status: "in_progress",
     statusId: "todo",
@@ -700,8 +700,8 @@ describe("D2/D3: payload-backed карточки offerable-мутаций", () =
       harness.dataSource, plannerActor, plannerProfile,
       { tool: "update_task", input: { taskId: "task-a", fields: { title: "Новое название", priority: "high" } } }
     );
-    expect(metadata.title).toContain("Изменить задачу: «A»");
-    expect(metadata.preview.after).toContain("название: A → Новое название");
+    expect(metadata.title).toContain("Изменить задачу: «Смета»");
+    expect(metadata.preview.after).toContain("название: Смета → Новое название");
     expect(metadata.preview.after).toContain("приоритет: normal → high");
     expect(metadata.preconditionVersions).toEqual({ taskUpdatedAt: "2026-06-01T10:00:00.000Z" });
   });
@@ -758,9 +758,6 @@ describe("D2/D3: payload-backed карточки offerable-мутаций", () =
   it("update_task: requiresAcceptance задачи переживает частичный merge (не дефолтится в false)", async () => {
     const harness = createHarness();
     harness.task.requiresAcceptance = true;
-    // Однобуквенное фикстурное название не проходит парсер PATCH — merge синтезирует
-    // полное тело, поэтому текущее название должно быть валидным само по себе.
-    harness.task.title = "Задача с приёмкой";
     const execute = await post(harness.app, "/api/workspace/agent/execute", {
       actions: [{
         tool: "update_task",
@@ -776,22 +773,79 @@ describe("D2/D3: payload-backed карточки offerable-мутаций", () =
     expect(harness.updateTaskInputs[0]!.requiresAcceptance).toBe(true);
   });
 
-  it("update_task: невалидное значение поля отвергается, а не фолбэчится молча", async () => {
+  it("update_task: невалидное значение поля отвергается кодом парсера, а не фолбэчится молча", async () => {
     const harness = createHarness();
-    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+    // Строка вместо числа: раньше numberInput молча подставлял текущее значение,
+    // и квитанция была «applied» без применения показанного в карточке. Теперь
+    // валидация — тем же parseUpdateTaskBody, что и governed PATCH (единые коды).
+    const strAsNumber = await post(harness.app, "/api/workspace/agent/execute", {
       actions: [{
         tool: "update_task",
-        // Строка вместо числа: раньше numberInput молча подставлял текущее значение,
-        // и квитанция была «applied» без применения показанного в карточке.
         input: { taskId: "task-a", fields: { plannedWork: "16" } },
         preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
       }]
     });
-    expect((execute.body.results as Array<{ status: string; error?: string }>)[0]).toMatchObject({
+    // Нечисловой тип ловит типовой гард (до парсера), дробь — сам парсер.
+    expect((strAsNumber.body.results as Array<{ status: string; error?: string }>)[0]).toMatchObject({
       status: "failed",
       error: "invalid_update_field_value"
     });
+    // Дробное значение: раньше проходило агентскую проверку (конечное > 0), парсер
+    // отвергает (целые 1..10000) — карточка-пустышка больше не «одобряема».
+    const fractional = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "update_task",
+        input: { taskId: "task-a", fields: { plannedWork: 8.5 } },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+      }]
+    });
+    expect((fractional.body.results as Array<{ error?: string }>)[0]!.error).toBe("invalid_task_planned_work");
+    // Дробная длительность раньше МОЛЧА дефолтилась парсером в 1 — теперь честный отказ.
+    const fractionalDuration = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "update_task",
+        input: { taskId: "task-a", fields: { durationWorkingDays: 8.5 } },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+      }]
+    });
+    expect((fractionalDuration.body.results as Array<{ error?: string }>)[0]!.error).toBe("invalid_task_duration");
+    // Нестроковые description/priority парсер нормализует (null/"normal") — без
+    // типового гарда карточка «описание → 123» молча ОЧИЩАЛА бы описание.
+    const nonStringDescription = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "update_task",
+        input: { taskId: "task-a", fields: { description: 123 } },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+      }]
+    });
+    expect((nonStringDescription.body.results as Array<{ error?: string }>)[0]!.error).toBe("invalid_update_field_value");
+    const nonStringPriority = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "update_task",
+        input: { taskId: "task-a", fields: { priority: 123 } },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+      }]
+    });
+    expect((nonStringPriority.body.results as Array<{ error?: string }>)[0]!.error).toBe("invalid_update_field_value");
     expect(harness.updateTaskInputs).toHaveLength(0);
+  });
+
+  it("update_task: карточка честно блокирует невалидное значение и prototype-ключ не роняет propose", async () => {
+    const harness = createHarness();
+    // Значение, которое execute гарантированно отвергнет, видно уже на карточке.
+    const invalid = await buildProposalActionMetadata(
+      harness.dataSource, plannerActor, plannerProfile,
+      { tool: "update_task", input: { taskId: "task-a", fields: { plannedWork: 8.5 } } }
+    );
+    expect(invalid.capability).toEqual({ allowed: false, reason: "invalid_task_planned_work" });
+    // Ключ из Object.prototype раньше обходил ветку «не поддерживается» и ронял
+    // propose TypeError'ом (known.current is not a function).
+    const proto = await buildProposalActionMetadata(
+      harness.dataSource, plannerActor, plannerProfile,
+      { tool: "update_task", input: { taskId: "task-a", fields: { toString: "x" } } }
+    );
+    expect(proto.preview.after).toContain("toString: не поддерживается");
+    expect(proto.capability).toEqual({ allowed: false, reason: "unsupported_update_field" });
   });
 
   it("update_task: устаревшая версия — conflict с currentVersions для refresh/retry", async () => {

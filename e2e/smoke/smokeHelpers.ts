@@ -157,3 +157,52 @@ function getSmokeCustomFieldValue(field: SmokeCustomField): string {
   if (field.fieldType === "date") return "2031-01-15";
   return "Smoke";
 }
+
+// Общий журней «перегруз → сценарий агентом → живой коммит»: селекторы и шаги в
+// ОДНОМ месте — agent-scenario-commit и agent-first-evidence раньше дублировали их
+// побайтово и дрейфовали бы при первой правке лейбла. onStage — точка съёмки
+// артефактов (evidence-спек), не влияющая на сами шаги.
+export async function runAgentOverloadResolutionJourney(
+  page: Page,
+  hooks: { onStage?: (stage: "thread" | "proposal" | "receipt" | "commit") => Promise<void> } = {}
+) {
+  await page.goto("/agent");
+  const composer = page.getByRole("textbox", { name: "Сообщение Генри Гантту" });
+  await expect(composer).toBeEnabled();
+  await hooks.onStage?.("thread");
+
+  await composer.fill("Разгрузи перегруженный ресурс");
+  const executeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/workspace/agent/execute") && response.request().method() === "POST"
+  );
+  await page.getByRole("button", { name: "Отправить" }).click();
+
+  await expect(page.getByText(/Применить сценарий разрешения перегрузки/).first()).toBeVisible({ timeout: 15_000 });
+  await hooks.onStage?.("proposal");
+
+  await page.getByRole("button", { name: "Применить выбранное" }).click();
+  const executeResponse = await executeResponsePromise;
+  await expect(page.getByText("Результат: применено 1, отказано 0, конфликтов 0, ошибок 0.").last()).toBeVisible();
+  await hooks.onStage?.("receipt");
+
+  const receipt = page.getByTestId("agent-receipt").last();
+  const commitLink = receipt.getByRole("link", { name: "Открыть в Коммитах" });
+  await expect(commitLink).toBeVisible();
+  const receiptText = (await receipt.textContent()) ?? "";
+  await commitLink.click();
+  await expect(page).toHaveURL(/\/commits\?commit=/);
+  const selectedCommitRow = page.locator('[data-testid="commit-row"][aria-pressed="true"]');
+  await hooks.onStage?.("commit");
+
+  return { executeResponse, receiptText, selectedCommitRow };
+}
+
+// Компенсирующий откат последнего коммита через превью-гейт — возвращает план,
+// делая журней повторяемым.
+export async function revertLastPlanCommit(page: Page) {
+  await page.getByRole("button", { name: "Откатить последний", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Предпросмотр изменений" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Применить изменения", exact: true }).click();
+  await expect(page.getByText(/Откат применён компенсирующим коммитом/)).toBeVisible();
+}
