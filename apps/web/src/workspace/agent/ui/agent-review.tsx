@@ -108,7 +108,7 @@ function ReviewContent({ state, handlers }: { state: ReviewState; handlers: Revi
   const appliedCount = changes.filter((change) => change.status === "применено").length;
   const unresolvedCount = changes.filter((change) => UNRESOLVED_STATUSES.includes(change.status)).length;
   const hasExecutionOutcome = changes.some((change) =>
-    ["применено", "пропущено", "отказано", "конфликт", "ошибка", "неизвестно"].includes(change.status)
+    ["применено", "отказано", "конфликт", "ошибка", "неизвестно"].includes(change.status)
   );
 
   return (
@@ -189,7 +189,6 @@ const STATUS_CHIP: Record<AgentChangeStatus, string> = {
   "отклонено": "border-[var(--border-strong)] bg-[var(--panel-strong)] text-[var(--muted-strong)]",
   "требует прав": "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-text)]",
   "применено": "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success-text)]",
-  "пропущено": "border-[var(--border-strong)] bg-[var(--panel-strong)] text-[var(--muted-strong)]",
   "отказано": "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-text)]",
   "конфликт": "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]",
   "ошибка": "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-text)]",

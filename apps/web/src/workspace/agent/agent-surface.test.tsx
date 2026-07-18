@@ -257,7 +257,7 @@ describe("AgentSurface production shell contract", () => {
       data: {
         applied: true,
         results: [{ ok: true, status: "applied", tool: "change_task_status" }],
-        summary: { applied: 1, skipped: 0, denied: 0, conflict: 0, failed: 0 }
+        summary: { applied: 1, denied: 0, conflict: 0, failed: 0 }
       }
     });
     const root = await renderAgent();

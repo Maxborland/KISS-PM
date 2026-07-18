@@ -39,7 +39,7 @@ function overloadedSnapshot(): PlanSnapshot {
   };
 }
 
-function createHarness(options: { permissions?: AccessProfile["permissions"] } = {}) {
+function createHarness(options: { permissions?: AccessProfile["permissions"]; auditPersistence?: boolean } = {}) {
   let snapshot = overloadedSnapshot();
   const runs = new Map<string, PlanningScenarioRunRecord>();
   const appliedCommandTypes: string[] = [];
@@ -143,7 +143,9 @@ function createHarness(options: { permissions?: AccessProfile["permissions"] } =
       snapshot = reducePlanningCommand(snapshot, command).nextSnapshot;
     },
     async incrementPlanVersion() { snapshot = { ...snapshot, planVersion: snapshot.planVersion + 1 }; return snapshot.planVersion; },
-    async appendAuditEvent(input) { auditActionTypes.push(input.actionType); auditEvents.push(input); }
+    ...(options.auditPersistence === false
+      ? {}
+      : { async appendAuditEvent(input: AuditEventRecordInput) { auditActionTypes.push(input.actionType); auditEvents.push(input); } })
   };
 
   return { app: createApp({ dataSource: dataSource as ApiTenantDataSource }), task, appliedCommandTypes, auditActionTypes, auditEvents, get planVersion() { return snapshot.planVersion; } };
@@ -189,7 +191,6 @@ describe("agent /execute → optimistic task precondition", () => {
     expect(execute.body.applied).toBe(false);
     expect(execute.body.summary).toEqual({
       applied: 0,
-      skipped: 0,
       denied: 0,
       conflict: 1,
       failed: 0
@@ -216,7 +217,6 @@ describe("agent /execute → optimistic task precondition", () => {
     expect(execute.status).toBe(200);
     expect(execute.body.summary).toEqual({
       applied: 1,
-      skipped: 0,
       denied: 0,
       conflict: 0,
       failed: 0
@@ -235,12 +235,16 @@ describe("agent /execute → optimistic task precondition", () => {
       }]
     });
 
-    expect(execute.body.results).toEqual([{
+    expect(execute.body.results).toMatchObject([{
       tool: "change_task_status",
       ok: false,
       status: "denied",
       error: "task_participant_role_required"
     }]);
+    // Отказ тоже адресуем: попытка агента не исчезает из governance trail.
+    const denied = (execute.body.results as Array<{ auditEventId?: string; currentVersions?: unknown }>)[0]!;
+    expect(denied.auditEventId).toMatch(/^agent-action-/);
+    expect(denied.currentVersions).toBeUndefined();
     expect(harness.appliedCommandTypes).toEqual([]);
   });
 });
@@ -361,7 +365,6 @@ describe("agent apply truth contract", () => {
     expect(execute.status).toBe(200);
     expect(execute.body.summary).toEqual({
       applied: 1,
-      skipped: 0,
       denied: 0,
       conflict: 1,
       failed: 0
@@ -573,5 +576,119 @@ describe("agent apply truth contract", () => {
     expect(isAgentToolOfferable(byName.get("create_task")!)).toBe(false);
     expect(isAgentToolOfferable(byName.get("apply_resource_resolution")!)).toBe(false);
     expect(isAgentToolOfferable(byName.get("apply_plan_commands")!)).toBe(false);
+  });
+});
+
+describe("agent /execute → strict plan version precondition (no optimistic-lock bypass)", () => {
+  it("rejects apply_resource_resolution without clientPlanVersion instead of substituting the current version", async () => {
+    const harness = createHarness();
+    const overload = createPlanningReadModel(overloadedSnapshot()).resourceLoad.overloads[0]!;
+    const preview = await post(harness.app, "/api/workspace/projects/project-1/planning/scenarios/preview", {
+      clientPlanVersion: 5,
+      target: { type: "resource_overload", resourceId: overload.resourceId, date: overload.date, overloadMinutes: overload.overloadMinutes, taskIds: overload.taskIds }
+    });
+    const scenarioId = (preview.body.proposals as Array<{ id: string }>)[0]!.id;
+
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "apply_resource_resolution", input: { projectId: "project-1", scenarioId, acceptedRiskReason: "test" } }]
+    });
+
+    expect(execute.status).toBe(200);
+    expect(execute.body.results).toMatchObject([{ ok: false, status: "failed", error: "missing_precondition_versions" }]);
+    expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.planVersion).toBe(5);
+  });
+
+  it("rejects apply_plan_commands without clientPlanVersion instead of substituting the current version", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "apply_plan_commands",
+        input: { projectId: "project-1", commands: [{ type: "task.update_status", taskId: "task-a", statusId: "review" }] }
+      }]
+    });
+
+    expect(execute.status).toBe(200);
+    expect(execute.body.results).toMatchObject([{ ok: false, status: "failed", error: "missing_precondition_versions" }]);
+    expect(harness.appliedCommandTypes).toEqual([]);
+    expect(harness.planVersion).toBe(5);
+  });
+});
+
+describe("agent /execute → addressable receipt (auditEventId / correlationId)", () => {
+  it("returns per-action auditEventId and batch correlationId matching the persisted agent audit events", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "change_task_status",
+        input: { projectId: "project-1", taskId: "task-a", statusId: "review" },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+      }]
+    });
+
+    expect(execute.status).toBe(200);
+    const results = execute.body.results as Array<{ status: string; auditEventId?: string }>;
+    expect(results[0]!.status).toBe("applied");
+    expect(results[0]!.auditEventId).toMatch(/^agent-action-/);
+    expect(execute.body.correlationId).toMatch(/^agent-execute-/);
+    const agentEvent = harness.auditEvents.find((event) => event.actionType === "agent.change_task_status.applied");
+    expect(agentEvent?.id).toBe(results[0]!.auditEventId);
+    expect(agentEvent?.correlationId).toBe(execute.body.correlationId);
+  });
+
+  it("exposes the planning commit id and new plan version for an agent-applied scenario", async () => {
+    const harness = createHarness();
+    const overload = createPlanningReadModel(overloadedSnapshot()).resourceLoad.overloads[0]!;
+    const preview = await post(harness.app, "/api/workspace/projects/project-1/planning/scenarios/preview", {
+      clientPlanVersion: 5,
+      target: { type: "resource_overload", resourceId: overload.resourceId, date: overload.date, overloadMinutes: overload.overloadMinutes, taskIds: overload.taskIds }
+    });
+    const scenarioId = (preview.body.proposals as Array<{ id: string }>)[0]!.id;
+
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "apply_resource_resolution", input: { projectId: "project-1", scenarioId, clientPlanVersion: 5, acceptedRiskReason: "test" } }]
+    });
+
+    const results = execute.body.results as Array<{ status: string; auditEventId?: string; planningAuditEventId?: string; planVersion?: number }>;
+    expect(results[0]!.status).toBe("applied");
+    // planningAuditEventId — это событие штатного planning-аудита (видимое в «Коммитах»),
+    // а auditEventId — отдельное agent-provenance событие; они обязаны различаться.
+    const planningEvent = harness.auditEvents.find((event) => event.actionType === "planning.scenario.applied");
+    expect(results[0]!.planningAuditEventId).toBe(planningEvent?.id);
+    expect(results[0]!.planVersion).toBe(6);
+    expect(results[0]!.auditEventId).toMatch(/^agent-action-/);
+    expect(results[0]!.auditEventId).not.toBe(results[0]!.planningAuditEventId);
+  });
+
+  it("fail-closed: returns no receipt fields when audit persistence is not configured", async () => {
+    const harness = createHarness({ auditPersistence: false });
+    // comment_task уходит в governed-роут комментариев, который без персистентности отвечает
+    // своей ошибкой (без applied-исхода) — квитанции в ответе быть не должно.
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "comment_task", input: { taskId: "task-a", body: "Проверка" } }]
+    });
+
+    expect(execute.status).toBe(200);
+    const results = execute.body.results as Array<{ status: string; auditEventId?: string }>;
+    expect(results[0]!.status).toBe("failed");
+    expect(results[0]!.auditEventId).toBeUndefined();
+    expect(execute.body.correlationId).toBeUndefined();
+    expect(harness.appliedCommandTypes).toEqual([]);
+  });
+
+  it("does not attach auditEventId to conflict results (no audit event is written for them)", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "change_task_status",
+        input: { projectId: "project-1", taskId: "task-a", statusId: "review" },
+        preconditionVersions: { taskUpdatedAt: "2026-05-31T10:00:00.000Z" }
+      }]
+    });
+
+    const results = execute.body.results as Array<{ status: string; auditEventId?: string }>;
+    expect(results[0]!.status).toBe("conflict");
+    expect(results[0]!.auditEventId).toBeUndefined();
+    expect(execute.body.correlationId).toBeUndefined();
   });
 });

@@ -93,7 +93,7 @@ describe("agent-client.execute", () => {
     const fetchImpl = vi.fn().mockResolvedValue(Response.json({
       results: [{ tool: "comment_task", ok: true, status: "applied", result: {} }],
       applied: true,
-      summary: { applied: 1, skipped: 0, denied: 0, conflict: 0, failed: 0 }
+      summary: { applied: 1, denied: 0, conflict: 0, failed: 0 }
     }));
     const client = createAgentClient({ apiOrigin: "", fetchImpl: fetchImpl as unknown as typeof fetch });
 
@@ -113,7 +113,7 @@ describe("agent-client.execute", () => {
         currentVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
       }],
       applied: false,
-      summary: { applied: 0, skipped: 0, denied: 0, conflict: 1, failed: 0 }
+      summary: { applied: 0, denied: 0, conflict: 1, failed: 0 }
     }));
     const client = createAgentClient({ apiOrigin: "", fetchImpl: fetchImpl as unknown as typeof fetch });
 
@@ -139,7 +139,7 @@ describe("agent-client.execute", () => {
     const fetchImpl = vi.fn().mockResolvedValue(Response.json({
       results: [{ tool: "comment_task", ok: true, status: "applied" }],
       applied: true,
-      summary: { applied: 0, skipped: 0, denied: 0, conflict: 0, failed: 1 }
+      summary: { applied: 0, denied: 0, conflict: 0, failed: 1 }
     }));
     const client = createAgentClient({ apiOrigin: "", fetchImpl: fetchImpl as unknown as typeof fetch });
 
@@ -153,7 +153,7 @@ describe("agent-client.execute", () => {
     const fetchImpl = vi.fn().mockResolvedValue(Response.json({
       results: [{ tool: "comment_task", ok: false, status: "applied" }],
       applied: true,
-      summary: { applied: 1, skipped: 0, denied: 0, conflict: 0, failed: 0 }
+      summary: { applied: 1, denied: 0, conflict: 0, failed: 0 }
     }));
     const client = createAgentClient({ apiOrigin: "", fetchImpl: fetchImpl as unknown as typeof fetch });
 

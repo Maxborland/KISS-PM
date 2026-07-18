@@ -50,7 +50,7 @@ export type AgentStreamEvent =
   | { type: "analyze"; tool: string; title: string; ok: boolean }
   | { type: "proposal"; tool: string; title: string };
 
-export type AgentExecuteStatus = "applied" | "skipped" | "denied" | "conflict" | "failed";
+export type AgentExecuteStatus = "applied" | "denied" | "conflict" | "failed";
 export type AgentExecuteResultItem = {
   tool: string;
   ok: boolean;
@@ -58,15 +58,22 @@ export type AgentExecuteResultItem = {
   error?: string;
   result?: unknown;
   currentVersions?: { taskUpdatedAt?: string };
+  // Квитанция (fail-closed): id audit-события agent-action-* — только для applied/denied
+  // при сконфигурированной audit-персистентности; planningAuditEventId/planVersion — только
+  // для планообразующих applied-действий (это событие адресуемо на вкладке «Коммиты»).
+  auditEventId?: string;
+  planningAuditEventId?: string;
+  planVersion?: number;
 };
 export type AgentExecuteSummary = Record<AgentExecuteStatus, number>;
 export type AgentExecuteResponse = {
   results: AgentExecuteResultItem[];
   applied: boolean;
   summary: AgentExecuteSummary;
+  correlationId?: string;
 };
 
-const EXECUTE_STATUS_VALUES = ["applied", "skipped", "denied", "conflict", "failed"] as const;
+const EXECUTE_STATUS_VALUES = ["applied", "denied", "conflict", "failed"] as const;
 const EXECUTE_STATUSES = new Set<AgentExecuteStatus>(EXECUTE_STATUS_VALUES);
 
 function decodeExecuteResponse(value: unknown, actions: AgentActionInput[]): AgentExecuteResponse {
@@ -80,15 +87,22 @@ function decodeExecuteResponse(value: unknown, actions: AgentActionInput[]): Age
       && typeof item.ok === "boolean"
       && EXECUTE_STATUSES.has(item.status)
       && item.ok === (item.status === "applied")
+      && (item.auditEventId === undefined || typeof item.auditEventId === "string")
+      && (item.planningAuditEventId === undefined || typeof item.planningAuditEventId === "string")
+      && (item.planVersion === undefined || typeof item.planVersion === "number")
     );
   const summary = response.summary;
   const summaryValid = summary && EXECUTE_STATUS_VALUES.every((status) =>
     Number.isInteger(summary[status]) && summary[status] >= 0
   );
-  if (!resultsValid || !summaryValid || typeof response.applied !== "boolean") {
+  // correlationId опционален: без сконфигурированной audit-персистентности его честно нет.
+  if (
+    !resultsValid || !summaryValid || typeof response.applied !== "boolean"
+    || (response.correlationId !== undefined && typeof response.correlationId !== "string")
+  ) {
     throw new DomainApiError(502, "invalid_execute_response", { error: "invalid_execute_response" });
   }
-  const counts: AgentExecuteSummary = { applied: 0, skipped: 0, denied: 0, conflict: 0, failed: 0 };
+  const counts: AgentExecuteSummary = { applied: 0, denied: 0, conflict: 0, failed: 0 };
   for (const result of response.results!) counts[result.status] += 1;
   if (
     EXECUTE_STATUS_VALUES.some((status) => summary[status] !== counts[status])

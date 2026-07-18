@@ -35,7 +35,6 @@ function actionToChange(action: ProposedAction, index: number): AgentChange {
 
 const CHANGE_STATUS_BY_EXECUTION = {
   applied: "применено",
-  skipped: "пропущено",
   denied: "отказано",
   conflict: "конфликт",
   failed: "ошибка"
@@ -210,10 +209,10 @@ export function AgentSurface() {
       };
     }));
     setPhase(res.data.summary.failed > 0 ? "review-open" : "applied");
-    const { applied, skipped, denied, conflict, failed } = res.data.summary;
+    const { applied, denied, conflict, failed } = res.data.summary;
     addMessage(
       "agent",
-      `Результат: применено ${applied}, пропущено ${skipped}, отказано ${denied}, конфликтов ${conflict}, ошибок ${failed}.`,
+      `Результат: применено ${applied}, отказано ${denied}, конфликтов ${conflict}, ошибок ${failed}.`,
       "result"
     );
     if (res.data.results.some((result) => result.error === "task_version_conflict")) {
@@ -336,7 +335,7 @@ export function AgentSurface() {
             onRejectChange: (id) => {
               if (applyInFlight.current) return;
               setChanges((cs) => cs.map((c) =>
-                c.id === id && !["применено", "пропущено", "отказано", "конфликт", "неизвестно"].includes(c.status)
+                c.id === id && !["применено", "отказано", "конфликт", "неизвестно"].includes(c.status)
                   ? { ...c, selected: false, status: "отклонено" }
                   : c
               ));
@@ -344,7 +343,7 @@ export function AgentSurface() {
             onEditChange: (id) => {
               if (applyInFlight.current) return;
               const change = changes.find((item) => item.id === id);
-              if (!change || ["применено", "пропущено", "отказано", "конфликт", "неизвестно"].includes(change.status)) return;
+              if (!change || ["применено", "отказано", "конфликт", "неизвестно"].includes(change.status)) return;
               // Правка возможна только для действий с явным редактируемым полем (текст).
               if (!change.editable) {
                 addMessage("agent", "Это действие нельзя отредактировать вручную — отклоните его и уточните запрос, и я предложу новый вариант.");

@@ -8,7 +8,6 @@ export type AgentChangeStatus =
   | "отклонено"
   | "требует прав"
   | "применено"
-  | "пропущено"
   | "отказано"
   | "конфликт"
   | "ошибка"
@@ -30,7 +29,6 @@ export type AgentChange = {
 export const TERMINAL_STATUSES: readonly AgentChangeStatus[] = [
   "требует прав",
   "применено",
-  "пропущено",
   "отказано",
   "конфликт",
   "неизвестно"

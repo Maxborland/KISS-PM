@@ -676,9 +676,15 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       if (tool.name === "apply_resource_resolution") {
         const projectId = typeof input.projectId === "string" ? input.projectId : "";
         const scenarioId = typeof input.scenarioId === "string" ? input.scenarioId : "";
-        const clientPlanVersion = await resolvePlanVersion(deps, actor.tenantId, projectId, input.clientPlanVersion);
-        if (!projectId || !scenarioId || clientPlanVersion === undefined) {
+        if (!projectId || !scenarioId) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
+          continue;
+        }
+        // Optimistic lock без обходов: версию плана обязан прислать клиент — подстановка
+        // текущей версии сервером обесценила бы precondition (как и у change_task_status).
+        const clientPlanVersion = typeof input.clientPlanVersion === "number" ? input.clientPlanVersion : undefined;
+        if (clientPlanVersion === undefined) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "missing_precondition_versions" });
           continue;
         }
         const acceptedRiskReason = typeof input.acceptedRiskReason === "string" ? input.acceptedRiskReason : undefined;
@@ -693,9 +699,13 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       if (tool.name === "apply_plan_commands") {
         const projectId = typeof input.projectId === "string" ? input.projectId : "";
         const commands = Array.isArray(input.commands) ? input.commands : null;
-        const clientPlanVersion = await resolvePlanVersion(deps, actor.tenantId, projectId, input.clientPlanVersion);
-        if (!projectId || !commands || commands.length === 0 || clientPlanVersion === undefined) {
+        if (!projectId || !commands || commands.length === 0) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
+          continue;
+        }
+        const clientPlanVersion = typeof input.clientPlanVersion === "number" ? input.clientPlanVersion : undefined;
+        if (clientPlanVersion === undefined) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "missing_precondition_versions" });
           continue;
         }
         previews[actionIndex] = await buildActionPreview(deps.dataSource, actor.tenantId, { tool: tool.name, input });
@@ -784,6 +794,10 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     // Провенанс агента: на каждое применённое или отклонённое правами действие — ОТДЕЛЬНОЕ
     // audit-событие sourceWorkflow:"agent". Успешные события идут сверх штатного аудита
     // governed-команды; denied-события не дают попыткам агента исчезнуть из governance trail.
+    // Квитанция fail-closed: id событий и correlationId попадают в ответ только если
+    // audit-персистентность сконфигурирована и запись реально произошла.
+    const auditEventIds: Array<string | undefined> = [];
+    let batchCorrelationId: string | undefined;
     if (deps.dataSource.appendAuditEvent) {
       const correlationId = `agent-execute-${randomUUID()}`;
       for (let i = 0; i < classifiedResults.length; i += 1) {
@@ -792,8 +806,9 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
         const action = (actions[i] ?? {}) as { input?: unknown };
         const input = (action.input && typeof action.input === "object" ? action.input : {}) as Record<string, unknown>;
         const deniedReason = item.error ?? "permission_missing";
+        const auditEventId = `agent-action-${randomUUID()}`;
         await deps.dataSource.appendAuditEvent({
-          id: `agent-action-${randomUUID()}`,
+          id: auditEventId,
           tenantId: actor.tenantId,
           actorUserId: actor.id,
           actionType: `agent.${item.tool}.${item.ok ? "applied" : "denied"}`,
@@ -811,13 +826,37 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           correlationId,
           createdAt: new Date()
         });
+        auditEventIds[i] = auditEventId;
+        batchCorrelationId = correlationId;
       }
     }
 
+    // Планообразующие действия дополнительно адресуют коммит плана: governed-ответ
+    // scenario-apply / apply-command-batch уже содержит auditEventId и newPlanVersion —
+    // именно это событие видно на вкладке «Коммиты» (события agent-action-* туда не попадают).
+    const receiptResults = classifiedResults.map((item, i) => {
+      const planning: { planningAuditEventId?: string; planVersion?: number } = {};
+      if (item.ok && (item.tool === "apply_resource_resolution" || item.tool === "apply_plan_commands")) {
+        const resultBody = (item.result && typeof item.result === "object" ? item.result : {}) as Record<string, unknown>;
+        if (typeof resultBody.auditEventId === "string") planning.planningAuditEventId = resultBody.auditEventId;
+        if (typeof resultBody.newPlanVersion === "number") planning.planVersion = resultBody.newPlanVersion;
+      }
+      return {
+        ...item,
+        ...(auditEventIds[i] ? { auditEventId: auditEventIds[i] } : {}),
+        ...planning
+      };
+    });
+
     const summary = classifiedResults.reduce(
       (counts, item) => ({ ...counts, [item.status]: counts[item.status] + 1 }),
-      { applied: 0, skipped: 0, denied: 0, conflict: 0, failed: 0 }
+      { applied: 0, denied: 0, conflict: 0, failed: 0 }
     );
-    return context.json({ results: classifiedResults, applied: summary.applied > 0, summary });
+    return context.json({
+      results: receiptResults,
+      applied: summary.applied > 0,
+      summary,
+      ...(batchCorrelationId ? { correlationId: batchCorrelationId } : {})
+    });
   });
 }
